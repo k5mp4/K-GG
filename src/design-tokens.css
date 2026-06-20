@@ -1,0 +1,29 @@
+/**
+ * 篝火 Design Tokens
+ * ──────────────────────────────────────────────────────────────
+ */
+
+@theme {
+  /* Brand Colors */
+  --color-fire: #D11402;
+  --color-cream: #ECDBBE;
+  --color-deep: #6075A4;
+
+  /* Surface / Structural Colors */
+  --color-k-bg: #141414;
+  --color-k-surface: #0D0D0D;
+  --color-k-border: #1A1A1A;
+  --color-k-muted: #2E2E2E;
+  --color-k-text: #F0EAD9;
+
+  /* Border Tokens - ここを編集すれば境界線が一括で変わります */
+  --color-panel-border: rgba(236, 219, 190, 1); /* 境界線の色 (#ECDBBE の 40%) */
+  --border-width-panel: 1px;                      /* 境界線の太さ */
+
+  /* Component-Level Tokens */
+  --color-tab-inactive: #7A7A7A;
+
+  /* Typography */
+  --font-display: 'Open Sans', sans-serif;
+  --font-body: 'Noto Sans JP', sans-serif;
+}

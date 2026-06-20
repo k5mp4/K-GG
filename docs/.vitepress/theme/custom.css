@@ -1,0 +1,454 @@
+/* .vitepress/theme/custom.css
+   篝火デザインシステム — BEYOND THE RED
+   VitePress デフォルトテーマを上書き */
+
+@import url('https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@400;600;700&family=Noto+Sans+JP:wght@400;500;700&display=swap');
+
+/* ---------------------------------------------------------
+   CSS 変数：VitePressのトークンを篝火カラーで上書き
+---------------------------------------------------------- */
+:root {
+  /* 篝火カラー */
+  --k-fire:    #D11402;
+  --k-cream:   #ECDBBE;
+  --k-deep:    #6075A4;
+  --k-black:   #000000;
+  --k-surface: #0D0D0D;
+  --k-border:  #1A1A1A;
+  --k-muted:   #2E2E2E;
+  --k-text:    #F0EAD9;
+
+  /* ブランドカラー（赤で統一） */
+  --vp-c-brand-1: #D11402;
+  --vp-c-brand-2: #ff2a10;
+  --vp-c-brand-3: #D11402;
+  --vp-c-brand-soft: rgba(209, 20, 2, 0.16);
+
+  --vp-c-brand: var(--vp-c-brand-1);
+  --vp-c-brand-light: var(--vp-c-brand-2);
+  --vp-c-brand-lighter: #ff5a40;
+  --vp-c-brand-dark: #a60f01;
+  --vp-c-brand-darker: #7a0b01;
+
+  /* リンク */
+  --vp-c-text-link: var(--k-fire);
+
+  /* フォント */
+  --vp-font-family-base: 'Noto Sans JP', 'M PLUS 1', -apple-system, sans-serif;
+  --vp-font-family-mono: 'JetBrains Mono', ui-monospace, 'Courier New', monospace;
+}
+
+/* ダークモード時（メインターゲット） */
+.dark {
+  --vp-c-bg:         #000000;
+  --vp-c-bg-alt:     #0D0D0D;
+  --vp-c-bg-elv:     #0D0D0D;
+  --vp-c-bg-soft:    #0D0D0D;
+
+  --vp-c-divider:    #1A1A1A;
+  --vp-c-border:     #1A1A1A;
+  --vp-c-gutter:     #000000;
+
+  --vp-c-text-1:     #F0EAD9;
+  --vp-c-text-2:     #ECDBBE;
+  --vp-c-text-3:     #6b6357;
+
+  --vp-c-default-1:  #1A1A1A;
+  --vp-c-default-2:  #2E2E2E;
+  --vp-c-default-3:  #3a3a3a;
+  --vp-c-default-soft: rgba(46, 46, 46, 0.4);
+
+  --vp-c-tip-1: var(--k-cream);
+  --vp-c-tip-2: var(--k-cream);
+  --vp-c-tip-3: var(--k-deep);
+  --vp-c-tip-soft: rgba(96, 117, 164, 0.14);
+
+  --vp-c-warning-1: var(--k-cream);
+  --vp-c-warning-soft: rgba(236, 219, 190, 0.1);
+
+  --vp-c-danger-1: var(--k-fire);
+  --vp-c-danger-soft: rgba(209, 20, 2, 0.14);
+
+  --vp-code-block-bg: #0D0D0D;
+  --vp-code-bg: rgba(236, 219, 190, 0.08);
+  --vp-code-color: var(--k-cream);
+
+  --vp-button-brand-bg: var(--k-fire);
+  --vp-button-brand-hover-bg: #ff2a10;
+  --vp-button-brand-active-bg: #a60f01;
+  --vp-button-brand-border: var(--k-fire);
+  --vp-button-brand-text: var(--k-cream);
+  --vp-button-brand-hover-border: #ff2a10;
+  --vp-button-brand-hover-text: var(--k-cream);
+  --vp-button-brand-active-border: #a60f01;
+
+  --vp-button-alt-bg: transparent;
+  --vp-button-alt-border: var(--k-muted);
+  --vp-button-alt-text: var(--k-text);
+  --vp-button-alt-hover-bg: transparent;
+  --vp-button-alt-hover-border: var(--k-cream);
+  --vp-button-alt-hover-text: var(--k-cream);
+
+  --vp-custom-block-tip-border: var(--k-deep);
+  --vp-custom-block-tip-text: var(--k-cream);
+  --vp-custom-block-tip-bg: rgba(96, 117, 164, 0.08);
+}
+
+/* ライトモードでも赤を基調に */
+:root:not(.dark) {
+  --vp-c-bg:         #F0EAD9;
+  --vp-c-bg-alt:     #ECDBBE;
+  --vp-c-bg-elv:     #ECDBBE;
+  --vp-c-text-1:     #000000;
+  --vp-c-text-2:     #1A1A1A;
+}
+
+/* ---------------------------------------------------------
+   タイポグラフィ：見出しは Barlow Condensed で力強く
+---------------------------------------------------------- */
+.VPDoc h1,
+.VPDoc h2,
+.VPDoc h3,
+.VPNavBarTitle .title,
+.VPButton {
+  font-family: 'Barlow Condensed', 'Oswald', sans-serif;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+}
+
+.VPDoc h1 {
+  text-transform: uppercase;
+  border-left: 4px solid var(--k-fire);
+  padding-left: 0.75rem;
+  line-height: 1.15;
+}
+
+.VPDoc h2 {
+  text-transform: uppercase;
+  border-top: 1px solid var(--k-border) !important;
+  padding-top: 1.5rem !important;
+  margin-top: 3rem !important;
+  position: relative;
+}
+
+.VPDoc h2::before {
+  content: '';
+  position: absolute;
+  top: -1px;
+  left: 0;
+  width: 48px;
+  height: 2px;
+  background: var(--k-fire);
+}
+
+.VPDoc h3 {
+  color: var(--k-deep);
+  letter-spacing: 0.02em;
+}
+
+.VPNavBarTitle .title {
+  text-transform: uppercase;
+  font-size: 1.05rem;
+  color: var(--k-text);
+}
+
+/* ---------------------------------------------------------
+   ナビゲーションバー
+---------------------------------------------------------- */
+.VPNavBar {
+  background: var(--k-black) !important;
+  border-bottom: 1px solid var(--k-border) !important;
+}
+
+.VPNavBar.has-sidebar .content-body,
+.VPNavBar .divider-line {
+  background: transparent !important;
+}
+
+.VPNavBarMenuLink,
+.VPNavBarMenuGroup .text {
+  font-family: 'Barlow Condensed', sans-serif;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  font-weight: 600;
+  color: var(--k-text) !important;
+}
+
+.VPNavBarMenuLink:hover,
+.VPNavBarMenuLink.active {
+  color: var(--k-fire) !important;
+}
+
+/* ---------------------------------------------------------
+   サイドバー
+---------------------------------------------------------- */
+.VPSidebar {
+  background: var(--k-surface) !important;
+  border-right: 1px solid var(--k-border) !important;
+}
+
+.VPSidebarItem.level-0 > .item > .text {
+  font-family: 'Barlow Condensed', sans-serif;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.VPSidebarItem.is-active > .item .link .text {
+  color: var(--k-fire) !important;
+  font-weight: 700;
+}
+
+/* ---------------------------------------------------------
+   アウトライン（右側目次）
+---------------------------------------------------------- */
+.VPDocAsideOutline .outline-title {
+  font-family: 'Barlow Condensed', sans-serif;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--k-fire) !important;
+  font-weight: 700;
+}
+
+.VPDocAsideOutline .outline-marker {
+  background-color: var(--k-fire) !important;
+}
+
+.VPDocAsideOutline .outline-link.active {
+  color: var(--k-fire) !important;
+}
+
+.VPDocAsideOutline .outline-link:hover {
+  color: var(--k-deep) !important;
+}
+
+/* ---------------------------------------------------------
+   リンク・インラインコード
+---------------------------------------------------------- */
+.VPDoc a:not(.header-anchor) {
+  color: var(--k-fire);
+  text-decoration: none;
+  border-bottom: 1px dotted var(--k-fire);
+  transition: all 0.15s;
+}
+
+.VPDoc a:not(.header-anchor):hover {
+  color: var(--k-deep);
+  border-bottom-color: var(--k-deep);
+  background: rgba(96, 117, 164, 0.1);
+}
+
+.VPDoc code {
+  background: rgba(96, 117, 164, 0.1) !important;
+  color: var(--k-deep) !important;
+  border: 1px solid var(--k-border);
+  border-radius: 0 !important;
+  padding: 0.1em 0.4em;
+  font-size: 0.88em;
+}
+
+/* kbdライク：ショートカットキー表示を強化 */
+.VPDoc li strong + code,
+.VPDoc strong code {
+  border-color: var(--k-muted);
+}
+
+/* ---------------------------------------------------------
+   コードブロック
+---------------------------------------------------------- */
+.VPDoc div[class*='language-'] {
+  background: var(--k-surface) !important;
+  border: 1px solid var(--k-border);
+  border-left: 2px solid var(--k-fire);
+  border-radius: 0 !important;
+}
+
+.VPDoc div[class*='language-']::before {
+  color: var(--k-muted) !important;
+  font-family: 'Barlow Condensed', sans-serif;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+/* ---------------------------------------------------------
+   カスタムブロック (::: tip / warning / danger)
+---------------------------------------------------------- */
+.VPDoc .custom-block {
+  border-radius: 0 !important;
+  border-left-width: 3px !important;
+  font-size: 0.92rem;
+}
+
+.VPDoc .custom-block.tip {
+  background: rgba(96, 117, 164, 0.08) !important;
+  border-color: var(--k-deep) !important;
+}
+
+.VPDoc .custom-block.tip .custom-block-title {
+  font-family: 'Barlow Condensed', sans-serif;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--k-deep) !important;
+}
+
+.VPDoc .custom-block.warning {
+  background: rgba(236, 219, 190, 0.08) !important;
+  border-color: var(--k-cream) !important;
+}
+
+.VPDoc .custom-block.danger {
+  background: rgba(209, 20, 2, 0.08) !important;
+  border-color: var(--k-fire) !important;
+}
+
+/* ---------------------------------------------------------
+   ボタン
+---------------------------------------------------------- */
+.VPButton {
+  border-radius: 0 !important;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  transition: all 0.15s;
+}
+
+.VPButton:active {
+  transform: scale(0.98);
+}
+
+.VPButton.brand:hover {
+  filter: brightness(1.1);
+}
+
+/* ---------------------------------------------------------
+   テーブル
+---------------------------------------------------------- */
+.VPDoc table {
+  border: 1px solid var(--k-border);
+}
+
+.VPDoc th {
+  background: var(--k-surface) !important;
+  font-family: 'Barlow Condensed', sans-serif;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--k-cream);
+  border-color: var(--k-border) !important;
+}
+
+.VPDoc td {
+  border-color: var(--k-border) !important;
+}
+
+/* ---------------------------------------------------------
+   水平線：暗闇に走る赤い線
+---------------------------------------------------------- */
+.VPDoc hr {
+  border: none;
+  height: 1px;
+  background: linear-gradient(
+    to right,
+    transparent 0%,
+    var(--k-border) 20%,
+    var(--k-fire) 50%,
+    var(--k-border) 80%,
+    transparent 100%
+  );
+  margin: 3rem 0;
+}
+
+/* ---------------------------------------------------------
+   リストマーカー
+---------------------------------------------------------- */
+.VPDoc ul > li::marker {
+  color: var(--k-fire);
+}
+
+/* ---------------------------------------------------------
+   検索ボックス
+---------------------------------------------------------- */
+.DocSearch-Button {
+  border-radius: 0 !important;
+  background: var(--k-surface) !important;
+  border: 1px solid var(--k-border) !important;
+}
+
+/* ---------------------------------------------------------
+   フッター・前後ページリンク
+---------------------------------------------------------- */
+.VPDocFooter .pager-link {
+  border: 1px solid var(--k-border) !important;
+  border-radius: 0 !important;
+  transition: all 0.15s;
+}
+
+.VPDocFooter .pager-link:hover {
+  border-color: var(--k-fire) !important;
+  background: rgba(209, 20, 2, 0.04);
+}
+
+.VPDocFooter .pager-link .desc {
+  font-family: 'Barlow Condensed', sans-serif;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--k-fire) !important;
+}
+
+/* ---------------------------------------------------------
+   画像グリッド（既存機能を維持＋篝火スタイル適用）
+---------------------------------------------------------- */
+.image-grid-2 {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 1.5rem;
+  margin: 1.5rem 0;
+  width: 100%;
+}
+
+@media (min-width: 768px) {
+  .image-grid-2 {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+.image-grid-2 img {
+  border-radius: 0;
+  border: 1px solid var(--k-border);
+  width: 100%;
+  height: auto;
+  object-fit: contain;
+  transition: border-color 0.2s;
+}
+
+.image-grid-2 img:hover {
+  border-color: var(--k-fire);
+}
+
+.image-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.image-caption {
+  font-family: 'Barlow Condensed', sans-serif;
+  font-size: 0.8rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--k-cream);
+  text-align: center;
+}
+
+/* ドキュメント内の単独CldImageも同様に */
+.VPDoc > div > p > .cld-image,
+.VPDoc .cld-image img {
+  border: 1px solid var(--k-border);
+  border-radius: 0;
+}
+
+/* ---------------------------------------------------------
+   選択色：赤く光る
+---------------------------------------------------------- */
+::selection {
+  background: var(--k-fire);
+  color: var(--k-cream);
+}

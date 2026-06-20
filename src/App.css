@@ -1,0 +1,100 @@
+@utility no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+  &::-webkit-scrollbar {
+    display: none;
+  }
+}
+
+/* カスタムスライダー */
+@utility slider {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 14px; /* 最小幅 */
+  height: 14px; /* thumbの高さに合わせてクリック領域を確保 */
+  background: transparent;
+  outline: none;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+
+  /* Webkit系でトラックを定義 */
+  &::-webkit-slider-runnable-track {
+    width: 100%;
+    height: 4px;
+    border-radius: 9999px;
+    background: linear-gradient(
+      to right,
+      var(--color-deep) 0%,
+      var(--color-fire) var(--slider-pct, 0%),
+      var(--color-k-muted) var(--slider-pct, 0%),
+      var(--color-k-muted) 100%
+    );
+  }
+
+  &::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 14px;
+    height: 14px;
+    border-radius: 50%;
+    background: var(--color-k-text);
+    box-shadow: 0 1px 4px rgba(0, 0, 0, 0.6);
+    cursor: pointer;
+    transition: transform 0.1s ease, box-shadow 0.1s ease;
+    margin-top: -5px; /* (track-height(4)/2) - (thumb-height(14)/2) = 2 - 7 = -5 */
+  }
+  &:hover::-webkit-slider-thumb {
+    transform: scale(1.2);
+    box-shadow: 0 0 0 3px rgba(209, 20, 2, 0.4);
+  }
+  &:focus-visible::-webkit-slider-thumb {
+    box-shadow: 0 0 0 3px rgba(209, 20, 2, 0.5);
+  }
+
+  &::-moz-range-thumb {
+    width: 14px;
+    height: 14px;
+    border-radius: 50%;
+    border: none;
+    background: var(--color-k-text);
+    box-shadow: 0 1px 4px rgba(0, 0, 0, 0.6);
+    cursor: pointer;
+  }
+  &::-moz-range-track {
+    height: 4px;
+    border-radius: 9999px;
+    background: var(--color-k-muted);
+  }
+  &::-moz-range-progress {
+    height: 4px;
+    border-radius: 9999px;
+    background: var(--color-fire);
+  }
+}
+
+/* カスタムスクロールバー */
+@utility scrollbar-thin {
+  scrollbar-gutter: stable;
+  scrollbar-width: thin;
+  scrollbar-color: var(--color-k-muted) transparent;
+
+  &::-webkit-scrollbar {
+    width: 4px;
+    height: 4px;
+  }
+  &::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  &::-webkit-scrollbar-thumb {
+    background-color: var(--color-k-muted);
+    border-radius: 9999px;
+    transition: background-color 0.2s;
+  }
+  &::-webkit-scrollbar-thumb:hover {
+    background-color: var(--color-deep);
+  }
+  &::-webkit-scrollbar-corner {
+    background: transparent;
+  }
+}
