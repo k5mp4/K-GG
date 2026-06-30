@@ -4,6 +4,8 @@ K-GG is a gradient generator for KAGARIBI visual production. It supports still-i
 
 K-GG は KAGARIBI 関連のビジュアル制作向けグラデーション生成ツールです。静止画書き出し、スリットスキャン風の出力、アニメーションプレビュー、PNG 連番書き出し、Tauri デスクトップ版での動画エンコードに対応しています。
 
+webアプリケーション版: https://kagaribi15-grad.ke-goworks.com/
+
 ## Requirements / 必要環境
 
 - Node.js 22.12.0 or later / Node.js 22.12.0 以上
