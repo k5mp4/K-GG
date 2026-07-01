@@ -41,6 +41,9 @@ import { PanelEdgeToggle } from './components/PanelEdgeToggle';
 import { parseSvgPaths } from './lib/svgParser';
 import { undo, redo } from './lib/history';
 import type { GpuDiagnostics } from './lib/gpuDiagnostics';
+import { useAppUpdater } from './features/updater/useAppUpdater';
+import { UpdateButton } from './features/updater/UpdateButton';
+import { UpdateDialog } from './features/updater/UpdateDialog';
 
 const MAX_DISPLAY_W = 1000;
 
@@ -110,6 +113,7 @@ const TAB_ANIMATION_PREFIX: Partial<Record<LeftTab, string>> = {
 
 export default function App() {
   const store = useGradientStore();
+  const updater = useAppUpdater();
   const {
     bezierAxis,
     setBezierAxis,
@@ -442,6 +446,12 @@ export default function App() {
               {gpuInfo.label}
             </span>
           </div>
+          {updater.supported && (
+            <UpdateButton
+              status={updater.state.status}
+              onClick={updater.openDialog}
+            />
+          )}
           <button
             type="button"
             onClick={(e) => { setShowPropertyModulesSettings(true); e.currentTarget.blur(); }}
@@ -1016,7 +1026,18 @@ export default function App() {
           />
         </PanelEdgeToggle>
       </div>
-      {showHelp && <HelpPanel onClose={() => setShowHelp(false)} />}
+      {showHelp && (
+        <HelpPanel
+          onClose={() => setShowHelp(false)}
+          appVersion={updater.appVersion}
+          updateSupported={updater.supported}
+          updateStatus={updater.state.status}
+          onCheckForUpdates={() => {
+            setShowHelp(false);
+            updater.openDialog();
+          }}
+        />
+      )}
       {showFeedback && <FeedbackPanel onClose={() => setShowFeedback(false)} />}
       {showPropertyModulesSettings && (
         <PropertyModulesSettingsPanel
@@ -1025,6 +1046,14 @@ export default function App() {
           onClose={() => setShowPropertyModulesSettings(false)}
         />
       )}
+      <UpdateDialog
+        open={updater.dialogOpen}
+        state={updater.state}
+        appVersion={updater.appVersion}
+        onClose={updater.closeDialog}
+        onRetry={updater.checkForUpdates}
+        onInstall={updater.installUpdate}
+      />
     </div>
     </InteractionSettingsProvider>
   );
