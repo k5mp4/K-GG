@@ -11,8 +11,7 @@ import { isTauriRuntime } from './exportService';
 
 function calcExportNormalizedTime(frameIndex: number, totalFrames: number): number {
   if (totalFrames <= 1) return 0;
-  if (frameIndex >= totalFrames - 1) return 0;
-  return frameIndex / (totalFrames - 1);
+  return Math.max(0, Math.min(1, frameIndex / totalFrames));
 }
 
 function calcTimeFromNormalized(

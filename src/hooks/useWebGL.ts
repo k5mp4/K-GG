@@ -1,17 +1,14 @@
 import { useEffect, useRef, useReducer, useState } from 'react';
-import { initWebGL, render, SHADER_VERSION } from '../lib/webgl';
+import { initWebGL, SHADER_VERSION } from '../lib/webgl';
 import { generateDistanceMap, uploadDistanceMap } from '../lib/bezierAxis';
 import { buildRampTextureData } from '../lib/gradientRampUtils';
 import { renderBridge } from '../lib/renderBridge';
 import { AnimationLoop } from '../lib/animation';
 import { SDF_MAP_SIZE, RAMP_TEX_WIDTH } from '../lib/constants';
-import { interpolateKeyframes } from '../lib/keyframeInterpolator';
-import { applyTimeRemap } from '../lib/timeRemap';
-import { withAnimatedDiffuseSeed } from '../lib/diffuseSeed';
+import { renderSceneAtTime } from '../lib/renderSceneAtTime';
 import { useGradientStore } from '../store/gradientStore';
 import type { WebGLContext } from '../lib/webgl';
 import type { GradientConfig } from '../types/gradient';
-import type { NoiseDistortionConfig, BezierAxisConfig, SlitScanConfig, StretchConfig, RadonConfig, IridescenceConfig } from '../types/distortion';
 import type { LatestState } from '../types/latestState';
 
 export function useWebGL(
@@ -36,7 +33,6 @@ export function useWebGL(
     if (initializingRef.current) return; // 初期化中は重複実行しない
     // stale 検出: 古いコンテキストで必要な uniform が未登録なら再初期化
     // SHADER_VERSION が変わった場合（GLSL が HMR で更新された場合）も再初期化
-    // キャンバスサイズ変更時も再初期化
     const stale = webglRef.current !== null && (
       webglRef.current.gl.canvas !== canvasRef.current ||
       webglRef.current.uniforms['u_bezierRadius'] === undefined ||
@@ -46,12 +42,7 @@ export function useWebGL(
       webglRef.current.stretchProgram === undefined ||
       webglRef.current.postprocessProgram === undefined ||
       webglRef.current.blurProgram === undefined ||
-      compiledShaderVersionRef.current !== SHADER_VERSION ||
-      // キャンバスサイズが変更されたら再初期化
-      (canvasRef.current && (
-        webglRef.current.gl.canvas.width !== canvasRef.current.width ||
-        webglRef.current.gl.canvas.height !== canvasRef.current.height
-      ))
+      compiledShaderVersionRef.current !== SHADER_VERSION
     );
     if (webglRef.current && !stale) return;
 
@@ -111,84 +102,12 @@ export function useWebGL(
         const ctx = webglRef.current;
         const latest = latestRef.current;
         if (!ctx || !latest) return;
-
-        const anim = latest.animation || { enabled: false, speed: 1, duration: 1, direction: 1 };
-        const totalDuration = (anim.speed ?? 1) * (anim.duration ?? 1) || 1;
-        const baseNormalizedTime = nt !== undefined ? nt : (t / totalDuration);
-        const loopNormalizedTime = baseNormalizedTime;
-        const easedNormalizedTime = applyTimeRemap(loopNormalizedTime, anim.duration ?? 1, anim.easing);
-
-        // キーフレーム補間を適用して最新値をクローン・上書き
-        // すべてのプロパティに対して存在チェックを行い、なければ空オブジェクトで受ける
-        const keyframed = {
-          noiseDistortion: latest.noiseDistortion ? { ...latest.noiseDistortion } : {} as NoiseDistortionConfig,
-          bezierAxis: latest.bezierAxis ? { ...latest.bezierAxis } : {} as BezierAxisConfig,
-          slitScan: latest.slitScan ? { ...latest.slitScan } : {} as SlitScanConfig,
-          stretch: latest.stretch ? { ...latest.stretch } : {} as StretchConfig,
-          radon: latest.radon ? { ...latest.radon } : {} as RadonConfig,
-          iridescence: latest.iridescence ? { ...latest.iridescence } : {} as IridescenceConfig,
-        };
-        
-        if (latest.keyframeTracks) {
-          Object.values(latest.keyframeTracks).forEach(track => {
-            if (!track || !track.enabled || !track.keyframes || track.keyframes.length === 0) return;
-            const val = interpolateKeyframes(loopNormalizedTime, track.keyframes);
-            const parts = track.propertyId.split('.');
-            if (parts.length !== 2) return;
-            const category = parts[0] as keyof typeof keyframed;
-            const field = parts[1];
-            if (keyframed[category]) {
-              (keyframed[category] as any)[field] = val;
-            }
-          });
-        }
-
-        const effectiveBezier = (keyframed.bezierAxis && keyframed.bezierAxis.enabled && !sdfReadyRef.current)
-          ? { ...keyframed.bezierAxis, enabled: false }
-          : keyframed.bezierAxis;
-
-        // すべての引数が存在することを確認してからレンダー
-        if (latest.gradient && keyframed.noiseDistortion && latest.diffuse && effectiveBezier && keyframed.slitScan && keyframed.stretch && latest.normalMap && keyframed.radon && keyframed.iridescence && latest.manualDistort && latest.postprocess && latest.matcap) {
-          const prismAnimActive = latest.postprocess.enabled && latest.postprocess.effectMode === 'prism';
-          const renderTime = anim.affectNoise || prismAnimActive
-            ? easedNormalizedTime * (anim.speed ?? 1) * (anim.duration ?? 1)
-            : 0;
-          const noiseLoopPeriod = Math.max(Math.abs((anim.speed ?? 1) * (anim.duration ?? 1)), 0.0001);
-          const slitAnimTimeOverride = anim.affectSlit && keyframed.slitScan.animEnabled
-            ? easedNormalizedTime * (anim.duration ?? 1)
-            : null;
-          const seedFrame = anim.enabled
-            ? Math.floor(baseNormalizedTime * (anim.duration ?? 1) * (anim.fps ?? 60))
-            : 0;
-          const diffuseForFrame = withAnimatedDiffuseSeed(latest.diffuse, seedFrame);
-          render(
-            ctx,
-            latest.gradient,
-            keyframed.noiseDistortion,
-            diffuseForFrame,
-            effectiveBezier,
-            keyframed.slitScan,
-            keyframed.stretch,
-            latest.normalMap,
-            keyframed.radon,
-            keyframed.iridescence,
-            latest.manualDistort,
-            latest.postprocess,
-            latest.matcap,
-            latest.width || 800,
-            latest.height || 600,
-            renderTime,
-            anim.direction ?? 1,
-            slitAnimTimeOverride,
-            latest.animation?.affectStretch ? easedNormalizedTime : null,
-            tile,
-            latest.sourceImageCanvas ?? null,
-            noiseLoopPeriod,
-            Math.abs(anim.speed ?? 1),
-            latest.imageMaskSource ?? null,
-            latest.imageMaskEnabled ?? false,
-          );
-        }
+        const totalDuration = Math.max((latest.animation.speed ?? 1) * (latest.animation.duration ?? 1), 0.0001);
+        const normalizedTime = nt !== undefined ? nt : t / totalDuration;
+        renderSceneAtTime(ctx, latest, normalizedTime, {
+          sdfReady: sdfReadyRef.current,
+          tile,
+        });
       },
       () => { animLoopRef.current?.stop(); },
       () => { animLoopRef.current?.start(); },
@@ -197,11 +116,24 @@ export function useWebGL(
       () => {
         const loop = animLoopRef.current;
         if (!loop) return;
+        if (loop.isPaused && loop.currentNormalizedTime >= 0.999999) {
+          loop.seekTo(0);
+        }
         loop.togglePause();
         useGradientStore.getState().setCurrentTime(loop.currentNormalizedTime);
       },
       () => animLoopRef.current?.isPaused ?? false,
       () => animLoopRef.current?.currentLoopTime ?? 0,
+      (normalizedTime: number) => {
+        animLoopRef.current?.seekTo(normalizedTime);
+        useGradientStore.getState().setCurrentTime(normalizedTime);
+        const ctx = webglRef.current;
+        const latest = latestRef.current;
+        if (ctx && latest) {
+          renderSceneAtTime(ctx, latest, normalizedTime, { sdfReady: sdfReadyRef.current });
+        }
+      },
+      () => animLoopRef.current?.currentNormalizedTime ?? useGradientStore.getState().currentTime,
     );
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 

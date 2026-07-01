@@ -1,6 +1,7 @@
 import { useRef, useEffect } from 'react';
 import { useGradientStore, GRADIENT_ANCHOR_DEFAULTS, defaultBezierControlsForAnchors } from '../store/gradientStore';
 import { interpolateKeyframes } from '../lib/keyframeInterpolator';
+import { getTrackMode } from '../types/keyframe';
 
 // デバッグ用：ブラウザコンソールから調整可能
 const SNAP_CONFIG = {
@@ -112,8 +113,8 @@ export function GradientAnchorEditor({ width, height }: Props) {
       const yTrackId = `gradientAnchor.${index}.y`;
       const xTrack = state.keyframeTracks[xTrackId];
       const yTrack = state.keyframeTracks[yTrackId];
-      const xActive = state.animation.affectRamp && xTrack?.enabled && xTrack.keyframes.length > 0;
-      const yActive = state.animation.affectRamp && yTrack?.enabled && yTrack.keyframes.length > 0;
+      const xActive = Boolean(xTrack && getTrackMode(xTrack) === 'keys' && xTrack.keyframes.length > 0);
+      const yActive = Boolean(yTrack && getTrackMode(yTrack) === 'keys' && yTrack.keyframes.length > 0);
 
       if (xActive || yActive) {
         // キーフレームが有効な軸はキーフレームを更新 or 作成
@@ -239,22 +240,20 @@ export function GradientAnchorEditor({ width, height }: Props) {
     });
   }
 
-  const showKfButton = animation.enabled && animation.affectRamp;
+  const showKfButton = animation.enabled;
 
   // アニメーション再生中はキーフレームを補間した位置を使用
-  const effectiveAnchors: typeof anchors = animation.affectRamp
-    ? (anchors.map((anchor, idx) => {
+  const effectiveAnchors: typeof anchors = anchors.map((anchor, idx) => {
         const xTrack = keyframeTracks[`gradientAnchor.${idx}.x`];
         const yTrack = keyframeTracks[`gradientAnchor.${idx}.y`];
-        const x = xTrack?.enabled && xTrack.keyframes.length > 0
+        const x = xTrack && getTrackMode(xTrack) === 'keys' && xTrack.keyframes.length > 0
           ? interpolateKeyframes(currentTime, xTrack.keyframes)
           : anchor[0];
-        const y = yTrack?.enabled && yTrack.keyframes.length > 0
+        const y = yTrack && getTrackMode(yTrack) === 'keys' && yTrack.keyframes.length > 0
           ? interpolateKeyframes(currentTime, yTrack.keyframes)
           : anchor[1];
         return [x, y] as [number, number];
-      }) as typeof anchors)
-    : anchors;
+      }) as typeof anchors;
 
   const positions = effectiveAnchors.slice(0, numAnchors).map(uvToCss);
   const bezierControlPositions = bezierControls.map(uvToCss) as [{ x: number; y: number }, { x: number; y: number }];

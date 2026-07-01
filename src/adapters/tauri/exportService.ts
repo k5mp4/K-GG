@@ -43,11 +43,13 @@ async function getExportSourceCanvas(canvas: HTMLCanvasElement): Promise<HTMLCan
 
   if (needsTiledRender(canvas, fullW, fullH)) {
     const t = renderBridge.getCurrentTime();
+    const nt = renderBridge.getCurrentNormalizedTime();
     return await renderTiledToCanvas2D({
       canvas,
       fullWidth: fullW,
       fullHeight: fullH,
       time: t,
+      normalizedTime: nt,
     });
   }
 

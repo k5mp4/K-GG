@@ -7,10 +7,18 @@ export class AnimationLoop {
   private rafId: number | null = null;
   private readonly duration: number;
   private readonly onFrame: OnFrameCallback;
+  private readonly loop: boolean;
+  private readonly onEnd?: () => void;
 
-  constructor(duration: number, onFrame: OnFrameCallback) {
+  constructor(
+    duration: number,
+    onFrame: OnFrameCallback,
+    options: { loop?: boolean; onEnd?: () => void } = {},
+  ) {
     this.duration = duration;
     this.onFrame = onFrame;
+    this.loop = options.loop ?? true;
+    this.onEnd = options.onEnd;
   }
 
   start(): void {
@@ -61,6 +69,7 @@ export class AnimationLoop {
     }
     const duration = this.duration || 1;
     const seconds = ms / 1000;
+    if (!this.loop) return Math.min(duration, seconds);
     const loopTime = seconds % duration;
     if (this.pausedAt !== null && seconds > 0 && Math.abs(loopTime) < 1e-6) {
       return duration;
@@ -108,6 +117,16 @@ export class AnimationLoop {
     this.rafId = requestAnimationFrame(this.tick);
     const now = performance.now();
     const elapsed = (this.accumulatedMs + (now - (this.startTime ?? now))) / 1000;
+    if (!this.loop && elapsed >= this.duration) {
+      if (this.rafId !== null) cancelAnimationFrame(this.rafId);
+      this.rafId = null;
+      this.accumulatedMs = this.duration * 1000;
+      this.startTime = null;
+      this.pausedAt = now;
+      this.onFrame(this.duration, 1);
+      this.onEnd?.();
+      return;
+    }
     const loopTime = elapsed % this.duration;
     const normalizedTime = loopTime / this.duration; // 0.0–1.0
 

@@ -2,8 +2,10 @@ import { create } from 'zustand';
 import type { GradientConfig } from '../types/gradient';
 import type { NoiseDistortionConfig, BezierAxisConfig, DiffuseConfig, SlitScanConfig, StretchConfig, NormalMapConfig, RadonConfig, IridescenceConfig, ManualDistortConfig, PostprocessConfig, MatcapConfig, HistogramConfig } from '../types/distortion';
 import { gradientRampPresets } from '../lib/gradientRampUtils';
-import type { Keyframe, PropertyTrack } from '../types/keyframe';
+import type { AnimationMode, Keyframe, PropertyTrack } from '../types/keyframe';
+import { normalizePropertyTrack } from '../types/keyframe';
 import { computeAutoHandles } from '../lib/autoBezier';
+import { createAnimationTrack, getAnimationDefinition } from '../lib/animationRegistry';
 
 export type AnimationEasing = {
   enabled: boolean;
@@ -20,6 +22,7 @@ export type AnimationEasing = {
 
 export type AnimationConfig = {
   enabled: boolean;
+  previewLoop: boolean;
   speed: number;
   intensity: number;
   duration: number;
@@ -81,6 +84,7 @@ type GradientStore = {
   setMatcap: (v: Partial<MatcapConfig>) => void;
   setHistogram: (v: Partial<HistogramConfig>) => void;
   setKeyframeTracks: (v: Record<string, PropertyTrack> | ((prev: Record<string, PropertyTrack>) => Record<string, PropertyTrack>)) => void;
+  setTrackMode: (trackId: string, mode: AnimationMode, options?: { label?: string; value?: number; time?: number }) => void;
   setKeyframe: (trackId: string, kf: Partial<Keyframe> & { id: string }) => void;
   removeKeyframe: (trackId: string, kfId: string) => void;
   addKeyframe: (trackId: string, kf: Omit<Keyframe, 'id'>, options?: { preserveHandles?: boolean }) => void;
@@ -255,6 +259,7 @@ export const STORE_DEFAULTS = {
   },
   animation: {
     enabled: false,
+    previewLoop: true,
     speed: 0.3,
     intensity: 0.5,
     duration: 5,
@@ -400,6 +405,55 @@ export const STORE_DEFAULTS = {
   },
 };
 
+type AutoTrackState = Pick<
+  GradientStore,
+  'noiseDistortion' | 'diffuse' | 'slitScan' | 'stretch' | 'radon' | 'iridescence' | 'postprocess'
+>;
+
+function ensureAutoTrack(
+  tracks: Record<string, PropertyTrack>,
+  propertyId: string,
+): Record<string, PropertyTrack> {
+  const existing = tracks[propertyId];
+  if (existing) {
+    return { ...tracks, [propertyId]: normalizePropertyTrack(existing) };
+  }
+  const definition = getAnimationDefinition(propertyId);
+  return {
+    ...tracks,
+    [propertyId]: createAnimationTrack(propertyId, definition?.label ?? propertyId, 'auto'),
+  };
+}
+
+function ensureDefaultAutoTracks(
+  state: AutoTrackState,
+  source: Record<string, PropertyTrack>,
+): Record<string, PropertyTrack> {
+  let tracks = source;
+  if (state.noiseDistortion.enabled) tracks = ensureAutoTrack(tracks, 'noiseDistortion.evolution');
+  if (state.radon.enabled) tracks = ensureAutoTrack(tracks, 'radon.evolution');
+  if (state.iridescence.enabled) tracks = ensureAutoTrack(tracks, 'iridescence.__time');
+  if (state.slitScan.enabled) {
+    tracks = ensureAutoTrack(tracks, 'slitScan.offset');
+    if (state.slitScan.phaseAnimEnabled) tracks = ensureAutoTrack(tracks, 'slitScan.slitPhase');
+  }
+  if (state.stretch.enabled) tracks = ensureAutoTrack(tracks, 'stretch.__scan');
+  if (state.diffuse.enabled && state.diffuse.seedAnimEnabled) tracks = ensureAutoTrack(tracks, 'diffuse.seed');
+  if (state.postprocess.enabled && (state.postprocess.effectMode === 'prism' || state.postprocess.effectMode === 'particles')) {
+    tracks = ensureAutoTrack(tracks, 'postprocess.__time');
+  }
+  return tracks;
+}
+
+export function migratePropertyTracks(
+  tracks: Record<string, PropertyTrack> | undefined,
+): Record<string, PropertyTrack> {
+  if (!tracks) return {};
+  return Object.fromEntries(
+    Object.entries(tracks).map(([id, track]) => [id, normalizePropertyTrack(track)]),
+  );
+}
+
 export const useGradientStore = create<GradientStore>((set) => ({
   gradient: { ...STORE_DEFAULTS.gradient },
   noiseDistortion: { ...STORE_DEFAULTS.noiseDistortion },
@@ -456,29 +510,72 @@ export const useGradientStore = create<GradientStore>((set) => ({
     return { gradient: { ...s.gradient, ...next } };
   }),
   setNoiseDistortion: (v) => set((s) => {
+    let noiseDistortion: NoiseDistortionConfig;
     if (v.type && v.type !== s.noiseDistortion.type) {
-      return { noiseDistortion: { ...s.noiseDistortion, ...NOISE_TYPE_PRESETS[v.type], ...v } };
+      noiseDistortion = { ...s.noiseDistortion, ...NOISE_TYPE_PRESETS[v.type], ...v };
+    } else {
+      noiseDistortion = { ...s.noiseDistortion, ...v };
     }
-    return { noiseDistortion: { ...s.noiseDistortion, ...v } };
+    const keyframeTracks = s.animation.enabled && noiseDistortion.enabled
+      ? ensureAutoTrack(s.keyframeTracks, 'noiseDistortion.evolution')
+      : s.keyframeTracks;
+    return { noiseDistortion, keyframeTracks };
   }),
-  setDiffuse: (v) => set((s) => ({ diffuse: { ...s.diffuse, ...v } })),
+  setDiffuse: (v) => set((s) => {
+    const diffuse = { ...s.diffuse, ...v };
+    const keyframeTracks = s.animation.enabled && diffuse.enabled && diffuse.seedAnimEnabled
+      ? ensureAutoTrack(s.keyframeTracks, 'diffuse.seed')
+      : s.keyframeTracks;
+    return { diffuse, keyframeTracks };
+  }),
   setBezierAxis: (v) => set((s) => ({ bezierAxis: { ...s.bezierAxis, ...v } })),
-  setSlitScan: (v) => set((s) => ({ slitScan: { ...s.slitScan, ...v } })),
-  setStretch: (v) => set((s) => ({ stretch: { ...s.stretch, ...v } })),
+  setSlitScan: (v) => set((s) => {
+    const slitScan = { ...s.slitScan, ...v };
+    let keyframeTracks = s.keyframeTracks;
+    if (s.animation.enabled && slitScan.enabled) {
+      keyframeTracks = ensureAutoTrack(keyframeTracks, 'slitScan.offset');
+      if (slitScan.phaseAnimEnabled) keyframeTracks = ensureAutoTrack(keyframeTracks, 'slitScan.slitPhase');
+    }
+    return { slitScan, keyframeTracks };
+  }),
+  setStretch: (v) => set((s) => {
+    const stretch = { ...s.stretch, ...v };
+    const keyframeTracks = s.animation.enabled && stretch.enabled
+      ? ensureAutoTrack(s.keyframeTracks, 'stretch.__scan')
+      : s.keyframeTracks;
+    return { stretch, keyframeTracks };
+  }),
   setAnimation: (v) => set((s) => {
     const nextAnimation = { ...s.animation, ...v };
     const beatSync = nextAnimation.easing.beatSync;
     const beatSyncEnabled = beatSync?.enabled ?? false;
+    const animation = {
+      ...nextAnimation,
+      previewLoop: nextAnimation.previewLoop ?? true,
+      duration: beatSyncEnabled ? getBeatSyncDurationSeconds(beatSync?.bpm ?? 120) : nextAnimation.duration,
+    };
     return {
-      animation: {
-        ...nextAnimation,
-        duration: beatSyncEnabled ? getBeatSyncDurationSeconds(beatSync?.bpm ?? 120) : nextAnimation.duration,
-      },
+      animation,
+      keyframeTracks: animation.enabled
+        ? ensureDefaultAutoTracks(s, s.keyframeTracks)
+        : s.keyframeTracks,
     };
   }),
   setNormalMap: (v) => set((s) => ({ normalMap: { ...s.normalMap, ...v } })),
-  setRadon: (v) => set((s) => ({ radon: { ...s.radon, ...v } })),
-  setIridescence: (v) => set((s) => ({ iridescence: { ...s.iridescence, ...v } })),
+  setRadon: (v) => set((s) => {
+    const radon = { ...s.radon, ...v };
+    const keyframeTracks = s.animation.enabled && radon.enabled
+      ? ensureAutoTrack(s.keyframeTracks, 'radon.evolution')
+      : s.keyframeTracks;
+    return { radon, keyframeTracks };
+  }),
+  setIridescence: (v) => set((s) => {
+    const iridescence = { ...s.iridescence, ...v };
+    const keyframeTracks = s.animation.enabled && iridescence.enabled
+      ? ensureAutoTrack(s.keyframeTracks, 'iridescence.__time')
+      : s.keyframeTracks;
+    return { iridescence, keyframeTracks };
+  }),
   setManualDistort: (v) => set((s) => {
     const resolution = v.mapResolution ?? s.manualDistort.mapResolution;
     const displacement = v.displacement
@@ -508,18 +605,52 @@ export const useGradientStore = create<GradientStore>((set) => ({
     const next = { ...s.postprocess, ...v, displacement, smoothMask };
     if ((next.particleEmitterType as string) === 'nexus') next.particleEmitterType = 'point';
     if (!next.particleEmitterPoint) next.particleEmitterPoint = [...STORE_DEFAULTS.postprocess.particleEmitterPoint] as [number, number];
-    return { postprocess: next };
+    const keyframeTracks = s.animation.enabled && next.enabled && (next.effectMode === 'prism' || next.effectMode === 'particles')
+      ? ensureAutoTrack(s.keyframeTracks, 'postprocess.__time')
+      : s.keyframeTracks;
+    return { postprocess: next, keyframeTracks };
   }),
   setMatcap: (v) => set((s) => ({ matcap: { ...s.matcap, ...v } })),
   setHistogram: (v) => set((s) => ({ histogram: { ...s.histogram, ...v } })),
-  setKeyframeTracks: (v) => set((s) => ({ 
-    keyframeTracks: typeof v === 'function' ? v(s.keyframeTracks) : v 
+  setKeyframeTracks: (v) => set((s) => ({
+    keyframeTracks: migratePropertyTracks(typeof v === 'function' ? v(s.keyframeTracks) : v),
   })),
+  setTrackMode: (trackId, requestedMode, options) => set((s) => {
+    const definition = getAnimationDefinition(trackId);
+    const mode: AnimationMode = requestedMode === 'auto' && !definition?.autoCapable
+      ? 'static'
+      : requestedMode;
+    const existing = s.keyframeTracks[trackId];
+    const track = existing
+      ? normalizePropertyTrack(existing)
+      : createAnimationTrack(trackId, options?.label ?? definition?.label ?? trackId, mode);
+    let keyframes = track.keyframes;
+    if (mode === 'keys' && keyframes.length === 0 && typeof options?.value === 'number' && Number.isFinite(options.value)) {
+      keyframes = [{
+        id: crypto.randomUUID(),
+        time: Math.max(0, Math.min(1, options?.time ?? s.currentTime)),
+        value: options?.value ?? 0,
+        interpolation: 'linear',
+      }];
+    }
+    return {
+      keyframeTracks: {
+        ...s.keyframeTracks,
+        [trackId]: {
+          ...track,
+          label: options?.label ?? track.label,
+          mode,
+          enabled: mode === 'keys',
+          keyframes,
+        },
+      },
+    };
+  }),
   setKeyframe: (trackId, kf) => set((s) => {
     const track = s.keyframeTracks[trackId];
     if (!track) return s;
     const nextKeyframes = track.keyframes.map(k => k.id === kf.id ? { ...k, ...kf } : k);
-    return { keyframeTracks: { ...s.keyframeTracks, [trackId]: { ...track, keyframes: nextKeyframes } } };
+    return { keyframeTracks: { ...s.keyframeTracks, [trackId]: { ...track, mode: 'keys', enabled: true, keyframes: nextKeyframes } } };
   }),
   removeKeyframe: (trackId, kfId) => set((s) => {
     const track = s.keyframeTracks[trackId];
@@ -541,7 +672,7 @@ export const useGradientStore = create<GradientStore>((set) => ({
     if (!options?.preserveHandles && nextKeyframes.some(k => k.interpolation === 'bezier')) {
       nextKeyframes = computeAutoHandles(nextKeyframes);
     }
-    return { keyframeTracks: { ...s.keyframeTracks, [trackId]: { ...track, keyframes: nextKeyframes } } };
+    return { keyframeTracks: { ...s.keyframeTracks, [trackId]: { ...track, mode: 'keys', enabled: true, keyframes: nextKeyframes } } };
   }),
   setCurrentTime: (v) => set({ currentTime: v }),
   setPresetName: (name) => set({ presetName: name }),

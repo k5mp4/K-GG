@@ -7,6 +7,7 @@ import { AnimatedButton } from './AnimatedButton';
 import { Toggle } from './Toggle';
 import { imageFileToCanvas } from '../lib/applySlitToImage';
 import { CustomSelect } from './CustomSelect';
+import { AnimationPropertyControls } from './AnimationPropertyControls';
 
 const D = STORE_DEFAULTS.slitScan;
 const WAVE_DEFAULT_DIRECTION = 90;
@@ -274,54 +275,48 @@ export function SlitScanPanel({ sourceImageName, hasSourceImage, onSourceImageLo
             />
           )}
 
-          {/* アニメーション */}
-          <div className="flex items-center justify-between">
-            <p className="text-xs text-deep">Animate</p>
-            <Toggle variant="switch" size="xs" checked={slitScan.animEnabled} onChange={(v) => setSlitScan({ animEnabled: v })} />
-          </div>
-
-          {slitScan.animEnabled && (
-            <div className="space-y-3">
-              <div className="flex gap-1">
-                {(['off', 'unidirectional', 'pingpong'] as const).map((m) => (
-                  <AnimatedButton
-                    key={m}
-                    onClick={() => setSlitScan({ animMode: m })}
-                    isActive={slitScan.animMode === m}
-                    className="flex-1 py-1"
-                  >
-                    {m === 'off' ? 'Off' : m === 'unidirectional' ? '→ Loop' : '↔ PingPong'}
-                  </AnimatedButton>
-                ))}
-              </div>
-              {slitScan.animMode !== 'off' && (
-                <SliderField
-                  label="Speed"
-                  min={-2} max={2} step={0.01}
-                  value={slitScan.offsetSpeed}
-                  onChange={(v) => setSlitScan({ offsetSpeed: v })}
-                  format={(v) => v.toFixed(2)}
-                  defaultValue={D.offsetSpeed}
-                  trackId="slitScan.offsetSpeed"
-                />
-              )}
-              <div className="flex items-center justify-between">
-                <p className="text-xs text-deep">Move Slits</p>
-                <Toggle variant="switch" size="xs" checked={slitScan.phaseAnimEnabled ?? false} onChange={(v) => setSlitScan({ phaseAnimEnabled: v })} />
-              </div>
-              {(slitScan.phaseAnimEnabled ?? false) && (
-                <SliderField
-                  label="Move Speed"
-                  min={-4} max={4} step={0.01}
-                  value={slitScan.phaseSpeed ?? D.phaseSpeed}
-                  onChange={(v) => setSlitScan({ phaseSpeed: v })}
-                  format={(v) => v.toFixed(2)}
-                  defaultValue={D.phaseSpeed}
-                  trackId="slitScan.phaseSpeed"
-                />
-              )}
+          {/* Auto modifier settings. Activation is controlled by property mode. */}
+          <div className="space-y-3 border-t border-panel-border/30 pt-3">
+            <p className="text-[9px] font-display font-semibold uppercase tracking-widest text-tab-inactive">Auto Modifier</p>
+            <div className="flex gap-1">
+              {(['unidirectional', 'pingpong'] as const).map((m) => (
+                <AnimatedButton
+                  key={m}
+                  onClick={() => setSlitScan({ animMode: m })}
+                  isActive={slitScan.animMode === m}
+                  className="flex-1 py-1"
+                >
+                  {m === 'unidirectional' ? '→ Loop' : '↔ PingPong'}
+                </AnimatedButton>
+              ))}
             </div>
-          )}
+            <SliderField
+              label="Offset Speed"
+              min={-2} max={2} step={0.01}
+              value={slitScan.offsetSpeed}
+              onChange={(v) => setSlitScan({ offsetSpeed: v })}
+              format={(v) => v.toFixed(2)}
+              defaultValue={D.offsetSpeed}
+              trackId="slitScan.offsetSpeed"
+            />
+            <div className="flex items-center justify-between">
+              <p className="text-xs text-deep">Phase Motion</p>
+              <AnimationPropertyControls
+                trackId="slitScan.slitPhase"
+                label="Phase Motion"
+                value={slitScan.slitPhase}
+              />
+            </div>
+            <SliderField
+              label="Phase Speed"
+              min={-4} max={4} step={0.01}
+              value={slitScan.phaseSpeed ?? D.phaseSpeed}
+              onChange={(v) => setSlitScan({ phaseSpeed: v })}
+              format={(v) => v.toFixed(2)}
+              defaultValue={D.phaseSpeed}
+              trackId="slitScan.phaseSpeed"
+            />
+          </div>
 
           {slitScan.mode === 'linear' && (
             <SliderField

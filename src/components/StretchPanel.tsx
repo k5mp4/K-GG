@@ -3,6 +3,7 @@ import type { StretchConfig } from '../types/distortion';
 import { SliderField } from './SliderField';
 import { Collapsible } from './Collapsible';
 import { Toggle } from './Toggle';
+import { AnimationPropertyControls } from './AnimationPropertyControls';
 
 const D = STORE_DEFAULTS.stretch;
 const isStretchDirty = (value: StretchConfig) =>
@@ -37,6 +38,13 @@ export function StretchPanel() {
 
       <Collapsible isOpen={stretch.enabled}>
         <div className="space-y-4 pt-2">
+          <div className="flex items-center justify-between border-b border-panel-border/30 pb-3">
+            <div>
+              <p className="text-xs text-deep">Scan Position</p>
+              <p className="text-[9px] text-tab-inactive">Auto loops across the composition</p>
+            </div>
+            <AnimationPropertyControls trackId="stretch.__scan" label="Scan Position" value={0} />
+          </div>
           <SliderField
             label="Band Height"
             min={1} max={600} step={1}

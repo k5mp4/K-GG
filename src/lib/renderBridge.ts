@@ -16,6 +16,8 @@ let _startAnim: VoidFn | null = null;
 let _togglePause: VoidFn | null = null;
 let _isPaused: BoolFn | null = null;
 let _getCurrentTime: NumberFn | null = null;
+let _getCurrentNormalizedTime: NumberFn | null = null;
+let _seekTo: ((normalizedTime: number) => void) | null = null;
 
 export const renderBridge = {
   register(renderAtTime: RenderAtTimeFn, stopAnim: VoidFn, startAnim: VoidFn): void {
@@ -23,10 +25,18 @@ export const renderBridge = {
     _stopAnim = stopAnim;
     _startAnim = startAnim;
   },
-  registerPause(togglePause: VoidFn, isPaused: BoolFn, getCurrentTime: NumberFn): void {
+  registerPause(
+    togglePause: VoidFn,
+    isPaused: BoolFn,
+    getCurrentTime: NumberFn,
+    seekTo?: (normalizedTime: number) => void,
+    getCurrentNormalizedTime?: NumberFn,
+  ): void {
     _togglePause = togglePause;
     _isPaused = isPaused;
     _getCurrentTime = getCurrentTime;
+    _getCurrentNormalizedTime = getCurrentNormalizedTime ?? null;
+    _seekTo = seekTo ?? null;
   },
   renderAtTime(t: number, nt?: number, tile?: TileRenderOptions): void {
     _renderAtTime?.(t, nt, tile);
@@ -47,5 +57,11 @@ export const renderBridge = {
   /** 現在の再生位置（秒）を返す。ポーズ中でも停止時点の値を返す */
   getCurrentTime(): number {
     return _getCurrentTime?.() ?? 0;
+  },
+  getCurrentNormalizedTime(): number {
+    return _getCurrentNormalizedTime?.() ?? 0;
+  },
+  seekTo(normalizedTime: number): void {
+    _seekTo?.(Math.max(0, Math.min(1, normalizedTime)));
   },
 };
