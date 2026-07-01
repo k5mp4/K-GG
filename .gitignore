@@ -14,6 +14,7 @@ dist-ssr/
 src-tauri/target/
 docs/.vitepress/cache/
 docs/.vitepress/dist/
+docs/.vitepress/.temp/
 *.local
 
 # Editor directories and files
@@ -36,3 +37,6 @@ myskill/
 .env
 .env.*.local
 .dev.vars*
+
+# Tauri updater private keys
+*.key

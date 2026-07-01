@@ -1,11 +1,24 @@
 import ReactMarkdown from 'react-markdown';
 import helpContent from '../docs/help.md?raw';
+import type { UpdateStatus } from '../features/updater/types';
 
 interface HelpPanelProps {
   onClose: () => void;
+  appVersion: string | null;
+  updateSupported: boolean;
+  updateStatus: UpdateStatus;
+  onCheckForUpdates: () => void;
 }
 
-export function HelpPanel({ onClose }: HelpPanelProps) {
+export function HelpPanel({
+  onClose,
+  appVersion,
+  updateSupported,
+  updateStatus,
+  onCheckForUpdates,
+}: HelpPanelProps) {
+  const checking = updateStatus === 'checking';
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-10">
       {/* 背景のぼかしとクリックで閉じる機能 */}
@@ -81,6 +94,29 @@ export function HelpPanel({ onClose }: HelpPanelProps) {
             {helpContent}
           </ReactMarkdown>
         </div>
+        <footer className="flex shrink-0 flex-col gap-3 border-t border-cream/30 bg-k-bg/65 px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <p className="text-[9px] font-display font-semibold uppercase tracking-[0.22em] text-tab-inactive">
+              K-GG Desktop
+            </p>
+            <p className="mt-1 font-display text-sm font-bold text-k-text">
+              {appVersion ? `Version ${appVersion}` : 'Web build'}
+            </p>
+          </div>
+          {updateSupported && (
+            <button
+              type="button"
+              onClick={onCheckForUpdates}
+              disabled={checking}
+              className="inline-flex items-center justify-center gap-2 border border-fire/60 bg-fire/10 px-4 py-2 text-[10px] font-display font-bold uppercase tracking-wider text-fire transition-colors hover:bg-fire hover:text-k-bg disabled:cursor-wait disabled:opacity-60"
+            >
+              <span className={`material-symbols-rounded text-[15px] ${checking ? 'animate-spin' : ''}`}>
+                {checking ? 'progress_activity' : 'system_update_alt'}
+              </span>
+              Check for updates
+            </button>
+          )}
+        </footer>
       </div>
     </div>
   );

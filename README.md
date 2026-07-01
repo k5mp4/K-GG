@@ -61,6 +61,26 @@ For the desktop app / デスクトップアプリをビルドする場合:
 npm run tauri:build
 ```
 
+For a signed Windows x64 NSIS installer / 署名付きWindows x64 NSISインストーラー:
+
+```sh
+npm run tauri:build:windows
+```
+
+## Windows Releases and Updates / Windows版の配布と更新
+
+Windows x64 desktop releases are distributed from [GitHub Releases](https://github.com/k5mp4/K-GG/releases). Production builds check the latest published release at startup and let the user choose when to download and install it. Updates are never downloaded or installed automatically.
+
+Windows x64デスクトップ版は[GitHub Releases](https://github.com/k5mp4/K-GG/releases)から配布します。本番版は起動時に公開済みの最新版を確認し、利用者が選んだタイミングでダウンロード・インストールします。自動ダウンロードや強制更新は行いません。
+
+The initial installer is protected by the Tauri updater signature but does not yet use Windows Authenticode code signing. Microsoft Defender SmartScreen may therefore display a warning when installing it for the first time.
+
+初回インストーラーにはTauriの更新署名を使用しますが、Windows Authenticodeコード署名はまだ使用しません。そのため、初回インストール時にMicrosoft Defender SmartScreenの警告が表示される場合があります。
+
+Maintainers must complete the updater key and GitHub Environment setup before creating a release. See the [Windows release guide](docs/releasing.md).
+
+管理者はリリース前に更新署名鍵とGitHub Environmentを設定する必要があります。詳しくは[Windows版リリース手順](docs/releasing.md)を参照してください。
+
 ## Documentation / ドキュメント
 
 ```sh
