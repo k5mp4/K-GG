@@ -9,7 +9,6 @@ import { BezierEasingEditor } from './components/BezierEasingEditor';
 import { AnimationLoop } from './lib/animation';
 import { NoiseDistortionPanel } from './components/NoiseDistortionPanel';
 import { DiffusePanel } from './components/BlockNoisePanel';
-import { AnimationControls } from './components/AnimationControls';
 import { ExportPanel } from './components/ExportPanel';
 import { SlitScanPanel } from './components/SlitScanPanel';
 import { StretchPanel } from './components/StretchPanel';
@@ -37,6 +36,8 @@ import { InteractionSettingsProvider } from './components/InteractionSettingsCon
 import { Collapsible } from './components/Collapsible';
 import { ColorHistogram } from './components/ColorHistogram';
 import { SlitOverlay } from './components/SlitOverlay';
+import { DockPanel } from './components/DockPanel';
+import { PanelEdgeToggle } from './components/PanelEdgeToggle';
 import { parseSvgPaths } from './lib/svgParser';
 import { undo, redo } from './lib/history';
 import type { GpuDiagnostics } from './lib/gpuDiagnostics';
@@ -97,6 +98,14 @@ const TAB_ENABLED_MAP: Partial<Record<LeftTab, (s: StoreSnapshot) => boolean>> =
   distort: (s) => s.manualDistort.enabled,
   postprocess: (s) => s.postprocess.enabled,
   matcap: (s) => s.matcap.enabled,
+};
+
+const TAB_ANIMATION_PREFIX: Partial<Record<LeftTab, string>> = {
+  diffuse: 'diffuse.',
+  noise: 'noiseDistortion.',
+  slit: 'slitScan.',
+  stretch: 'stretch.',
+  postprocess: 'postprocess.',
 };
 
 export default function App() {
@@ -217,16 +226,8 @@ export default function App() {
   const [showTimeRemap, setShowTimeRemap] = useState(false);
   const [timelineHeight, setTimelineHeight] = useState(300);
   const timelineResizingRef = useRef(false);
-
-  const isAnimPanelOpen = animation.enabled;
-
-  function toggleAnimationEnabled() {
-    const nextEnabled = !animation.enabled;
-    store.setAnimation({ enabled: nextEnabled });
-    if (nextEnabled) {
-      store.setNoiseDistortion({ enabled: true });
-    }
-  }
+  const [leftPanelOpen, setLeftPanelOpen] = useState(true);
+  const [rightPanelOpen, setRightPanelOpen] = useState(true);
 
   // アニメーションが有効化されたとき、または対象のいずれかが有効なときにタイムラインを自動で開く
   useEffect(() => {
@@ -243,6 +244,7 @@ export default function App() {
 
   const handleTabClick = (value: LeftTab) => {
     setLeftTab(value);
+    setLeftPanelOpen(true);
     setShowLeftSidebar(true); // モバイルでタブをタップしたらサイドバーを表示
     if (!tabHoverSwitchEnabled) return;
     setIsHoverLocked(true);
@@ -395,27 +397,8 @@ export default function App() {
     <InteractionSettingsProvider value={{ hoverInteractionsEnabled: tabHoverSwitchEnabled }}>
     <div className="h-[100dvh] text-k-text flex flex-col overflow-hidden relative">
       {/* 項目選択用のトップバー */}
-      <div className="flex bg-k-bg border-b border-panel-border border-b-panel z-30 shrink-0">
-        <div style={{ width: leftPanelW }} className="border-r border-panel-border border-r-panel hidden md:flex items-center justify-between gap-3 px-4 bg-k-surface">
-          <div className="min-w-0">
-            <span className="block text-[10px] font-display font-semibold text-k-text uppercase tracking-widest">Property Modules</span>
-            <span className="block truncate text-[9px] text-tab-inactive" title={gpuInfo.title}>{gpuInfo.label}</span>
-          </div>
-          <button
-            type="button"
-            onClick={(e) => { setShowPropertyModulesSettings(true); (e.currentTarget as HTMLButtonElement).blur(); }}
-            className={`inline-flex h-7 w-7 shrink-0 items-center justify-center border transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-fire ${
-              tabHoverSwitchEnabled
-                ? 'border-fire/55 bg-fire/10 text-fire hover:bg-fire/20'
-                : 'border-cream/25 bg-k-bg text-tab-inactive hover:text-k-text hover:border-cream/45'
-            }`}
-            title="Property module settings"
-            aria-label="Open property module settings"
-          >
-            <span className="material-symbols-rounded text-[15px] leading-none">settings</span>
-          </button>
-        </div>
-        <div className="flex-1 flex bg-k-surface/50 overflow-x-auto no-scrollbar scroll-smooth">
+      <div className="z-30 flex shrink-0 items-center gap-2 border-b border-panel-border bg-k-bg/95 px-2 py-1.5">
+        <div className="inline-flex min-w-0 flex-1 bg-k-surface/80 overflow-x-auto no-scrollbar scroll-smooth">
           {LEFT_TABS.map(({ value, label }) => {
             const getEnabled = TAB_ENABLED_MAP[value];
             const enabled = getEnabled ? getEnabled(store) : undefined;
@@ -426,16 +409,16 @@ export default function App() {
                 key={value}
                 onMouseEnter={() => handleTabMouseEnter(value)}
                 onClick={(e) => { handleTabClick(value); (e.currentTarget as HTMLButtonElement).blur(); }}
-                className={`flex-1 min-w-20 py-3 text-[10px] font-display font-semibold uppercase tracking-wider transition-all border-b-2 flex flex-col items-center gap-0.5 shrink-0 focus:outline-none focus-visible:ring-2 focus-visible:ring-fire ${
+                className={`h-10 w-[86px] !border-0 px-2 py-1 text-[10px] font-display font-semibold uppercase tracking-wider transition-all flex flex-col items-center justify-center gap-0.5 shrink-0 focus:outline-none focus-visible:ring-2 focus-visible:ring-fire ${
                   isUtility
                     ? leftTab === value
-                      ? 'text-k-text border-deep bg-deep/10'
-                      : 'text-deep/80 hover:text-deep border-transparent bg-k-bg hover:bg-k-bg'
+                      ? 'text-k-text bg-deep/10'
+                      : 'text-deep/80 hover:text-deep bg-k-bg hover:bg-k-bg'
                     : leftTab === value
-                      ? 'text-k-text border-fire bg-fire/10'
+                      ? 'text-k-text bg-fire/10'
                       : isPrimary
-                        ? 'text-fire/70 hover:text-fire border-transparent hover:bg-k-surface'
-                        : 'text-tab-inactive/60 hover:text-tab-inactive border-transparent hover:bg-k-surface'
+                        ? 'text-fire/70 hover:text-fire hover:bg-k-surface'
+                        : 'text-tab-inactive/60 hover:text-tab-inactive hover:bg-k-surface'
                 } ${tabHoverSwitchEnabled && isHoverLocked && leftTab !== value ? 'cursor-default opacity-80' : 'cursor-pointer'}`}
               >
                 {label}
@@ -448,10 +431,39 @@ export default function App() {
             );
           })}
         </div>
+
+        <div className="ml-auto flex h-10 shrink-0 items-stretch gap-1">
+          <div
+            className="hidden min-w-0 max-w-[240px] items-center gap-2 border border-cream/20 bg-k-surface px-3 text-tab-inactive md:flex"
+            title={gpuInfo.title}
+          >
+            <span className="material-symbols-rounded shrink-0 text-[16px] text-deep">memory</span>
+            <span className="truncate text-[9px] font-display font-semibold uppercase tracking-wider">
+              {gpuInfo.label}
+            </span>
+          </div>
+          <button
+            type="button"
+            onClick={(e) => { setShowPropertyModulesSettings(true); e.currentTarget.blur(); }}
+            className={`inline-flex min-w-10 items-center justify-center gap-2 border px-2 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-fire ${
+              tabHoverSwitchEnabled
+                ? 'border-fire/55 bg-fire/10 text-fire hover:bg-fire/20'
+                : 'border-cream/25 bg-k-surface text-tab-inactive hover:border-cream/45 hover:text-k-text'
+            }`}
+            title={`Property module settings · ${tabHoverSwitchEnabled ? 'Hover' : 'Click only'}`}
+            aria-label="Open property module settings"
+          >
+            <span className="material-symbols-rounded text-[16px] leading-none">settings</span>
+            <span className="hidden text-[9px] font-display font-semibold uppercase tracking-wider xl:inline">
+              {tabHoverSwitchEnabled ? 'Hover' : 'Click only'}
+            </span>
+          </button>
+        </div>
+
         {/* モバイル用右サイドバーボタン */}
         <button
-          onClick={(e) => { setShowRightSidebar(!showRightSidebar); (e.currentTarget as HTMLButtonElement).blur(); }}
-          className="md:hidden px-4 py-3 bg-k-surface border-l border-panel-border border-l-panel text-k-text hover:text-cream focus:outline-none focus-visible:ring-2 focus-visible:ring-fire"
+          onClick={(e) => { setRightPanelOpen(true); setShowRightSidebar(!showRightSidebar); (e.currentTarget as HTMLButtonElement).blur(); }}
+          className="md:hidden ml-1 h-10 w-10 bg-k-surface border border-panel-border text-k-text hover:text-cream focus:outline-none focus-visible:ring-2 focus-visible:ring-fire"
         >
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
             <line x1="3" y1="12" x2="21" y2="12"></line>
@@ -459,8 +471,6 @@ export default function App() {
             <line x1="3" y1="18" x2="21" y2="18"></line>
           </svg>
         </button>
-        {/* 右サイドバーの上部は空けるか、境界を維持 */}
-        <div style={{ width: rightPanelW }} className="bg-k-surface border-l border-panel-border border-l-panel hidden md:block" />
       </div>
 
       <div className="flex-1 flex flex-row overflow-hidden relative">
@@ -474,46 +484,26 @@ export default function App() {
         )}
 
         {/* 詳細プロパティ表示用の左サイドバー */}
-        <div className={`
-          ${showLeftSidebar ? 'translate-x-0' : '-translate-x-full md:translate-x-0'}
-          fixed md:relative top-0 left-0 h-full max-w-[min(90vw,400px)] md:max-w-none bg-k-surface flex flex-col shrink-0 z-30 md:z-10 border-r border-panel-border border-r-panel transition-transform duration-300 ease-in-out
-        `}
-          style={{ width: leftPanelW }}
-        >
-          <div
-            className={`absolute -right-1.5 top-0 bottom-0 z-20 hidden w-3 cursor-col-resize touch-none transition-colors md:block ${
-              activeResizeSide === 'left' ? 'bg-fire/40 shadow-[0_0_18px_rgba(209,20,2,0.55)]' : 'hover:bg-fire/40'
-            }`}
-            onPointerDown={(e) => {
+        <DockPanel
+          id="property-modules-panel"
+          side="left"
+          title="Property Modules"
+          open={leftPanelOpen}
+          mobileOpen={showLeftSidebar}
+          width={leftPanelW}
+          onOpenChange={setLeftPanelOpen}
+          onMobileOpenChange={setShowLeftSidebar}
+          resizing={activeResizeSide === 'left'}
+          bodyClassName="overflow-hidden"
+          onResizeStart={(e) => {
               e.preventDefault();
               resizingRef.current = 'left';
               setActiveResizeSide('left');
               document.body.style.cursor = 'col-resize';
               e.currentTarget.setPointerCapture?.(e.pointerId);
             }}
-          />
-          {/* モバイル用閉じるボタン */}
-          <div className="md:hidden flex items-center gap-4 p-4 border-b border-panel-border border-b-panel bg-k-bg">
-            <button onClick={(e) => { setShowLeftSidebar(false); (e.currentTarget as HTMLButtonElement).blur(); }} className="text-k-text p-1 -ml-1 focus:outline-none focus-visible:ring-2 focus-visible:ring-fire">✕</button>
-            <div className="min-w-0">
-              <span className="block text-[10px] font-display font-semibold text-k-text uppercase tracking-widest">Property Modules</span>
-              <span className="block max-w-[190px] truncate text-[9px] text-tab-inactive" title={gpuInfo.title}>{gpuInfo.label}</span>
-            </div>
-            <button
-              type="button"
-              onClick={(e) => { setShowPropertyModulesSettings(true); (e.currentTarget as HTMLButtonElement).blur(); }}
-              className={`ml-auto inline-flex h-7 w-7 shrink-0 items-center justify-center border transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-fire ${
-                tabHoverSwitchEnabled
-                  ? 'border-fire/55 bg-fire/10 text-fire'
-                  : 'border-cream/25 bg-k-surface text-tab-inactive'
-              }`}
-              title="Property module settings"
-              aria-label="Open property module settings"
-            >
-              <span className="material-symbols-rounded text-[15px] leading-none">settings</span>
-            </button>
-          </div>
-          <div className="flex-1 overflow-hidden relative">
+        >
+          <div className="relative h-full overflow-hidden">
             <div
               ref={panelsContainerRef}
               className="flex flex-row h-full w-full"
@@ -548,22 +538,7 @@ export default function App() {
               ))}
             </div>
           </div>
-
-          {/* Animation Panel - left sidebar bottom */}
-          <div className="border-t border-panel-border border-t-panel bg-k-bg shrink-0">
-            <div className="w-full px-4 py-2.5 flex items-center gap-2">
-              <div className="flex-1 min-w-0 text-left text-[10px] font-display font-semibold uppercase tracking-wider text-k-text">
-                Animation
-              </div>
-              <Toggle variant="switch" size="sm" checked={animation.enabled} onChange={toggleAnimationEnabled} />
-            </div>
-            <Collapsible isOpen={isAnimPanelOpen} duration={0.24}>
-              <div className="px-4 pb-3 max-h-72 overflow-y-auto scrollbar-thin bg-k-surface">
-                <AnimationControls />
-              </div>
-            </Collapsible>
-          </div>
-        </div>
+        </DockPanel>
 
         {/* プレビューエリア */}
         <div
@@ -590,7 +565,7 @@ export default function App() {
 
           {/* モバイル用サイドバーボタン (左) */}
           <button 
-            onClick={() => setShowLeftSidebar(true)}
+            onClick={() => { setLeftPanelOpen(true); setShowLeftSidebar(true); }}
             className={`md:hidden absolute top-4 left-4 p-3 bg-k-surface/80 border border-panel-border border-panel rounded-sm text-k-text z-10 transition-opacity ${showLeftSidebar || showRightSidebar ? 'opacity-0 pointer-events-none' : 'opacity-100'}`}
           >
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
@@ -704,7 +679,7 @@ export default function App() {
                 type="button"
                 className="absolute right-1 top-1 z-10 flex h-5 w-5 items-center justify-center bg-transparent text-tab-inactive hover:text-fire transition-colors"
                 onClick={() => setShowTimeRemap(false)}
-                aria-label="Close Time Remap"
+                aria-label="Close Loop Timing"
               >
                 <span className="material-symbols-rounded text-[12px] leading-none">close</span>
               </button>
@@ -716,70 +691,28 @@ export default function App() {
             <ColorHistogram sourceCanvasRef={canvasRef} />
           </div>
 
-          {/* TimelineBar を Collapsible で包んで滑らかに表示 */}
-          <Collapsible isOpen={showTimeline}>
-            <div className="relative group/timeline">
-              {/* リサイズハンドル (上端) */}
-              <div 
-                className="absolute top-0 left-0 right-0 h-1.5 cursor-row-resize z-[70] hover:bg-fire/40 transition-colors"
-                onPointerDown={(e) => {
-                  e.preventDefault();
-                  timelineResizingRef.current = true;
-                  document.body.style.cursor = 'row-resize';
-                  e.currentTarget.setPointerCapture?.(e.pointerId);
-                }}
-              />
-              <TimelineBar 
-                animLoopRef={animLoopRef} 
-                onSeek={() => setSeekVersion(v => v + 1)} 
-                exportProgress={exportProgress} 
-                height={timelineHeight}
-                showTimeRemap={showTimeRemap}
-                onToggleTimeRemap={() => setShowTimeRemap(v => !v)}
-              />
-              {/* 閉じるボタン */}
-              <button 
-                onClick={() => setShowTimeline(false)}
-                className="absolute top-2 right-4 z-[60] text-tab-inactive hover:text-fire transition-colors p-1"
-                title="タイムラインを閉じる"
-              >
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                  <line x1="18" y1="6" x2="6" y2="18"></line>
-                  <line x1="6" y1="6" x2="18" y2="18"></line>
-                </svg>
-              </button>
-            </div>
-          </Collapsible>
         </div>
 
         {/* 右サイドバー: グラデーション設定 */}
-        <div
-          className={`
-            ${showRightSidebar ? 'translate-x-0' : 'translate-x-full md:translate-x-0'}
-            bg-k-surface border-l border-panel-border border-l-panel flex flex-col shrink-0 fixed md:relative top-0 right-0 h-full z-30 md:z-10 shadow-xl transition-transform duration-300 ease-in-out
-          `}
-          style={{ width: showRightSidebar ? 'min(90vw, 400px)' : rightPanelW }}
-        >
-          {/* モバイル用閉じるボタン入りのヘッダー */}
-          <div className="md:hidden flex justify-between items-center p-4 border-b border-panel-border border-b-panel bg-k-bg shrink-0">
-            <span className="text-[10px] font-display font-semibold text-k-text uppercase tracking-widest">Gradient Settings</span>
-            <button onClick={() => setShowRightSidebar(false)} className="text-k-text p-1">✕</button>
-          </div>
-
-          {/* リサイズハンドル */}
-          <div
-            className={`absolute -left-1.5 top-0 bottom-0 z-20 hidden w-3 cursor-col-resize touch-none transition-colors md:block ${
-              activeResizeSide === 'right' ? 'bg-fire/40 shadow-[0_0_18px_rgba(209,20,2,0.55)]' : 'hover:bg-fire/40'
-            }`}
-            onPointerDown={(e) => {
+        <DockPanel
+          id="gradient-settings-panel"
+          side="right"
+          title="Gradient Settings"
+          open={rightPanelOpen}
+          mobileOpen={showRightSidebar}
+          width={rightPanelW}
+          onOpenChange={setRightPanelOpen}
+          onMobileOpenChange={setShowRightSidebar}
+          resizing={activeResizeSide === 'right'}
+          bodyClassName="flex flex-col gap-6 overflow-y-auto p-6 scrollbar-thin"
+          onResizeStart={(e) => {
               e.preventDefault();
               resizingRef.current = 'right';
               setActiveResizeSide('right');
               document.body.style.cursor = 'col-resize';
               e.currentTarget.setPointerCapture?.(e.pointerId);
             }}
-          />
-          <div className="flex-1 p-6 flex flex-col gap-6 overflow-y-auto scrollbar-thin min-w-0">
+        >
             <div className="flex justify-between items-start">
               <div className="min-w-0">
                 <h2 className="text-xl font-display font-bold uppercase tracking-wider leading-tight text-k-text">Kagaribi-15<br />Gradient Generator</h2>
@@ -1037,8 +970,51 @@ export default function App() {
                 </div>
               </Collapsible>
             </div>
+        </DockPanel>
+      </div>
+      {/* TimelineBar sits below the sidebars so sidebar resizing does not change its footprint. */}
+      <div className="relative z-20 shrink-0">
+        <Collapsible isOpen={showTimeline}>
+          <div id="animation-timeline-panel" className="relative group/timeline border-t border-panel-border bg-k-bg/95">
+            <div
+              className="absolute top-0 left-0 right-0 h-1.5 cursor-row-resize z-[70] hover:bg-fire/40 transition-colors"
+              onPointerDown={(e) => {
+                e.preventDefault();
+                timelineResizingRef.current = true;
+                document.body.style.cursor = 'row-resize';
+                e.currentTarget.setPointerCapture?.(e.pointerId);
+              }}
+            />
+            <div className="flex min-h-0" style={{ height: timelineHeight }}>
+              <div className="min-w-0 flex-1">
+                <TimelineBar
+                  animLoopRef={animLoopRef}
+                  onSeek={() => setSeekVersion(v => v + 1)}
+                  exportProgress={exportProgress}
+                  height={timelineHeight}
+                  showTimeRemap={showTimeRemap}
+                  onToggleTimeRemap={() => setShowTimeRemap(v => !v)}
+                  selectedEffectPrefix={TAB_ANIMATION_PREFIX[leftTab]}
+                />
+              </div>
+            </div>
           </div>
-        </div>
+        </Collapsible>
+        <PanelEdgeToggle
+          edge="bottom"
+          open={showTimeline}
+          panelTitle="Animation Timeline"
+          controlsId="animation-timeline-panel"
+          onToggle={() => setShowTimeline(value => !value)}
+        >
+          <span className="text-[10px] font-display font-semibold uppercase tracking-wider text-k-text">
+            Animation
+          </span>
+          <span
+            className={`h-1.5 w-1.5 rounded-full ${animation.enabled ? 'bg-emerald-400' : 'bg-k-muted'}`}
+            aria-hidden="true"
+          />
+        </PanelEdgeToggle>
       </div>
       {showHelp && <HelpPanel onClose={() => setShowHelp(false)} />}
       {showFeedback && <FeedbackPanel onClose={() => setShowFeedback(false)} />}

@@ -98,16 +98,8 @@ export function DiffusePanel() {
               value={diffuse.seed}
               onChange={(v) => setDiffuse({ seed: v })}
               defaultValue={D.seed}
+              trackId="diffuse.seed"
             />
-
-            <AnimatedButton
-              onClick={() => setDiffuse({ seedAnimEnabled: !(diffuse.seedAnimEnabled ?? false) })}
-              isActive={diffuse.seedAnimEnabled ?? false}
-              className="w-full"
-              title="毎フレーム Diffuse の seed を変化させる"
-            >
-              Seed Per Frame
-            </AnimatedButton>
           </div>
         </Collapsible>
       </div>

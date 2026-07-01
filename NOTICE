@@ -1,0 +1,43 @@
+K-GG
+Copyright 2026 ke-go
+
+This product is licensed under the Apache License, Version 2.0.
+
+Third-party components
+----------------------
+
+K-GG uses open source JavaScript and Rust dependencies. The current dependency
+set is primarily licensed under MIT, Apache-2.0, BSD, ISC, Zlib, Unicode-3.0,
+Unlicense, CC0-1.0, Python-2.0, CC-BY-4.0, and MPL-2.0 style licenses.
+
+Notable direct/runtime dependencies:
+
+- React and React DOM: MIT
+- Tauri and Tauri plugins: MIT OR Apache-2.0
+- fflate: MIT
+- ogl: Unlicense
+- zustand: MIT
+- react-colorful: MIT
+- react-markdown and unified ecosystem packages: mostly MIT
+- GSAP: Standard "no charge" license, https://gsap.com/standard-license/
+
+Tauri/Rust dependency review found MPL-2.0 components in the current lockfile,
+including cssparser, cssparser-macros, dtoa-short, option-ext, and selectors.
+MPL-2.0 applies to those third-party components and does not change K-GG's
+Apache-2.0 license.
+
+FFmpeg
+------
+
+K-GG does not bundle FFmpeg. The Tauri desktop app calls an externally installed
+`ffmpeg` command for MOV/MP4 export. FFmpeg licensing depends on the user's
+installed build; FFmpeg is typically LGPL-2.1-or-later, but builds that include
+GPL components are governed by GPL terms. See https://ffmpeg.org/legal.html.
+
+Fonts
+-----
+
+The web app currently loads Google Fonts from Google-hosted CSS in `index.html`.
+The loaded font families are Material Symbols Rounded, Noto Sans JP, and Open
+Sans. For offline desktop distribution or stricter privacy/compliance
+requirements, self-host these fonts and include their license files.

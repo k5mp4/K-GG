@@ -9,9 +9,9 @@ import type { VideoExportConfig, VideoExportService } from '../types';
 
 function calcExportNormalizedTime(frameIndex: number, totalFrames: number): number {
   if (totalFrames <= 1) return 0;
-  if (frameIndex >= totalFrames - 1) return 0;
-  // The final exported frame is an exact copy of frame 0; preceding frames sample toward the loop endpoint.
-  return frameIndex / (totalFrames - 1);
+  // Sample the composition frame interval [0, 1). Preview looping is a transport
+  // choice and must not replace a keyed animation's final frame with frame zero.
+  return Math.max(0, Math.min(1, frameIndex / totalFrames));
 }
 
 /** easing に応じた normalizedTime → u_time を計算 */

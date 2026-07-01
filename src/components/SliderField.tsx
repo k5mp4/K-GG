@@ -2,6 +2,8 @@ import { useState, useRef, useLayoutEffect, useCallback } from 'react';
 import type React from 'react';
 import { useGradientStore } from '../store/gradientStore';
 import { getTimelineTime } from '../lib/timelineClock';
+import { getTrackMode } from '../types/keyframe';
+import { AnimationPropertyControls } from './AnimationPropertyControls';
 
 type Props = {
   label: string;
@@ -33,9 +35,9 @@ export function SliderField({
   const inputRef = useRef<HTMLInputElement>(null);
   const rangeRef = useRef<HTMLInputElement>(null);
 
-  const { keyframeTracks, setKeyframeTracks, addKeyframe, setKeyframe } = useGradientStore();
+  const { keyframeTracks, addKeyframe, setKeyframe } = useGradientStore();
   const track = trackId ? keyframeTracks[trackId] : null;
-  const isKeyframed = track?.enabled ?? false;
+  const isKeyframed = getTrackMode(track) === 'keys';
   const getKeyframeTime = () => getTimelineTime(useGradientStore.getState().currentTime);
 
   // オートキーフレーム: 値が変更されたときにキーフレームを打つ
@@ -56,35 +58,6 @@ export function SliderField({
   // wheel ハンドラ内で常に最新の handleValueChange を参照するための ref
   const handleValueChangeRef = useRef(handleValueChange);
   useLayoutEffect(() => { handleValueChangeRef.current = handleValueChange; });
-
-  const toggleKeyframes = () => {
-    if (!trackId) return;
-    if (isKeyframed) {
-      setKeyframeTracks(prev => ({
-        ...prev,
-        [trackId]: { ...prev[trackId], enabled: false }
-      }));
-    } else {
-      const existingTrack = keyframeTracks[trackId];
-      if (existingTrack) {
-        setKeyframeTracks(prev => ({
-          ...prev,
-          [trackId]: { ...prev[trackId], enabled: true }
-        }));
-      } else {
-        const nt = getKeyframeTime();
-        setKeyframeTracks(prev => ({
-          ...prev,
-          [trackId]: {
-            propertyId: trackId,
-            label,
-            enabled: true,
-            keyframes: [{ id: crypto.randomUUID(), time: nt, value, interpolation: 'linear' }]
-          }
-        }));
-      }
-    }
-  };
 
   // valueとonChangeをrefで持ち、ホイールハンドラ内で最新値を参照できるようにする
   const valueRef = useRef(value);
@@ -226,17 +199,7 @@ export function SliderField({
             {label}
           </label>
           {trackId && (
-            <button
-              onClick={toggleKeyframes}
-              title={isKeyframed ? 'キーフレームを無効化' : 'キーフレームを有効化'}
-              className={`w-4 h-4 flex items-center justify-center p-0 bg-transparent border-transparent transition-all shrink-0 ${
-                isKeyframed
-                  ? 'text-fire drop-shadow-[0_0_5px_rgba(209,20,2,0.7)]'
-                  : 'text-deep/55 group-hover/row:text-deep'
-              }`}
-            >
-              <span className="material-symbols-rounded text-[10.5px]">timer</span>
-            </button>
+            <AnimationPropertyControls trackId={trackId} label={label} value={value} compact />
           )}
         </div>
         <div className="flex items-center gap-1">

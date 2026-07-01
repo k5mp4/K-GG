@@ -56,7 +56,7 @@ type GradientGrabMode = {
 };
 
 export function BezierAxisEditor({ width, height, showOverlay = true }: Props) {
-  const { bezierAxis, setBezierAxis, isSlitAdjusting, gradient, animation, keyframeTracks, currentTime, selectedGradientAnchors, setSelectedGradientAnchors } = useGradientStore();
+  const { bezierAxis, setBezierAxis, isSlitAdjusting, gradient, keyframeTracks, currentTime, selectedGradientAnchors, setSelectedGradientAnchors } = useGradientStore();
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const draggingRef = useRef<DragTarget | null>(null);
   const didDragRef = useRef(false);
@@ -907,8 +907,7 @@ export function BezierAxisEditor({ width, height, showOverlay = true }: Props) {
       const x0 = Math.min(rectSelect.startX, rectSelect.currentX), x1 = Math.max(rectSelect.startX, rectSelect.currentX);
       const y0 = Math.min(rectSelect.startY, rectSelect.currentY), y1 = Math.max(rectSelect.startY, rectSelect.currentY);
       const gradientAnchors = gradient.anchors ?? GRADIENT_ANCHOR_DEFAULTS[gradient.gradientType ?? 'linear'];
-      const effectiveGradientAnchors = animation.affectRamp
-        ? gradientAnchors.map((anchor, idx) => {
+      const effectiveGradientAnchors = gradientAnchors.map((anchor, idx) => {
             const xTrack = keyframeTracks[`gradientAnchor.${idx}.x`];
             const yTrack = keyframeTracks[`gradientAnchor.${idx}.y`];
             const x = xTrack?.enabled && xTrack.keyframes.length > 0
@@ -918,8 +917,7 @@ export function BezierAxisEditor({ width, height, showOverlay = true }: Props) {
               ? interpolateKeyframes(currentTime, yTrack.keyframes)
               : anchor[1];
             return [x, y] as [number, number];
-          })
-        : gradientAnchors;
+          });
       const numGradientAnchors = gradient.gradientType === 'fourcolor' ? 4 : 2;
       const gradientHits = new Set<number>();
       effectiveGradientAnchors.slice(0, numGradientAnchors).forEach((anchor, index) => {

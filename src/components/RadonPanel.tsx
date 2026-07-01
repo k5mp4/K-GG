@@ -82,6 +82,7 @@ export function RadonPanel() {
             onChange={(v) => setRadon({ evolution: v })}
             format={(v) => v.toFixed(2)}
             defaultValue={D.evolution}
+            trackId="radon.evolution"
           />
 
           <SliderField

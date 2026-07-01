@@ -5,7 +5,9 @@ import { GraphEditor, GRAPH_COLORS } from './GraphEditor';
 import { solveBezierU, splitBezier } from '../lib/easingBezier';
 import { interpolateKeyframes } from '../lib/keyframeInterpolator';
 import { getTimelineTime, setTimelineTime } from '../lib/timelineClock';
-import type { Keyframe } from '../types/keyframe';
+import { getTrackMode, type Keyframe } from '../types/keyframe';
+import { getAnimationGroup } from '../lib/animationRegistry';
+import { AnimationPropertyControls } from './AnimationPropertyControls';
 
 type Props = {
   animLoopRef: React.MutableRefObject<AnimationLoop | null>;
@@ -14,6 +16,7 @@ type Props = {
   height?: number;
   showTimeRemap?: boolean;
   onToggleTimeRemap?: () => void;
+  selectedEffectPrefix?: string;
 };
 
 // トラック行レイアウト定数（トラックビュー）
@@ -29,15 +32,16 @@ function formatSeconds(seconds: number): string {
   return `${seconds.toFixed(2)}s`;
 }
 
-export function TimelineBar({ animLoopRef, onSeek, exportProgress = null, height = 300, showTimeRemap = false, onToggleTimeRemap }: Props) {
+export function TimelineBar({ animLoopRef, onSeek, exportProgress = null, height = 300, showTimeRemap = false, onToggleTimeRemap, selectedEffectPrefix = '' }: Props) {
   const isExporting = exportProgress !== null;
   const {
     animation, keyframeTracks, currentTime,
-    addKeyframe, removeKeyframe, setKeyframe, setCurrentTime,
+    addKeyframe, removeKeyframe, setKeyframe, setCurrentTime, setAnimation,
   } = useGradientStore();
 
   // ── ビューモード ──
   const [viewMode,      setViewMode]      = useState<'track' | 'graph'>('track');
+  const [trackFilter, setTrackFilter] = useState<'moving' | 'selected' | 'all'>('moving');
   // グラフモードで表示するトラック ID
   const [graphTrackId,  setGraphTrackId]  = useState<string | null>(null);
   // グラフモードで選択中のキーフレームキー (複数選択対応)
@@ -69,7 +73,15 @@ export function TimelineBar({ animLoopRef, onSeek, exportProgress = null, height
   const lastPausedRef         = useRef(false);
   const displayedTimeRef      = useRef(currentTime);
 
-  const activeTracks = Object.values(keyframeTracks).filter(t => t.enabled);
+  const allTracks = Object.values(keyframeTracks);
+  const activeTracks = allTracks.filter(track => {
+    if (trackFilter === 'all') return true;
+    if (trackFilter === 'selected') {
+      return selectedEffectPrefix ? track.propertyId.startsWith(selectedEffectPrefix) : true;
+    }
+    return getTrackMode(track) !== 'static';
+  });
+  const graphTracks = activeTracks.filter(track => getTrackMode(track) === 'keys');
   const beatSync = animation.easing.beatSync;
   const beatSyncEnabled = beatSync?.enabled ?? false;
   const beatMarkerCount = beatSync?.subdivision === 3 ? 3 : 4;
@@ -325,6 +337,11 @@ export function TimelineBar({ animLoopRef, onSeek, exportProgress = null, height
   const togglePause = () => {
     const loop = animLoopRef.current;
     if (!loop) return;
+    if (loop.isPaused && loop.currentNormalizedTime >= 0.999999) {
+      loop.seekTo(0);
+      updateThumb(0);
+      setCurrentTime(0);
+    }
     loop.togglePause();
     lastPausedRef.current = loop.isPaused;
     setIsPaused(loop.isPaused);
@@ -457,8 +474,8 @@ export function TimelineBar({ animLoopRef, onSeek, exportProgress = null, height
         trackId = [...selectedKfIds][0].split('::')[0];
       } else if (selectedKf) {
         trackId = selectedKf.trackId;
-      } else if (activeTracks.length > 0) {
-        trackId = activeTracks[0].propertyId;
+      } else if (graphTracks.length > 0) {
+        trackId = graphTracks[0].propertyId;
       }
       if (!trackId) return; // アクティブトラックがなければ何もしない
       setGraphTrackId(trackId);
@@ -598,12 +615,15 @@ export function TimelineBar({ animLoopRef, onSeek, exportProgress = null, height
   };
 
   // ────────── 描画 ──────────
-  const graphTrack = graphTrackId ? keyframeTracks[graphTrackId] : null;
-  const graphTrackIdx = graphTrackId ? activeTracks.findIndex(t => t.propertyId === graphTrackId) : 0;
+  const graphTrackCandidate = graphTrackId ? keyframeTracks[graphTrackId] : null;
+  const graphTrack = graphTrackCandidate && getTrackMode(graphTrackCandidate) === 'keys'
+    ? graphTrackCandidate
+    : null;
+  const graphTrackIdx = graphTrackId ? graphTracks.findIndex(t => t.propertyId === graphTrackId) : 0;
   const graphColor = GRAPH_COLORS[Math.max(0, graphTrackIdx) % GRAPH_COLORS.length];
 
   // グラフモードが有効か (アクティブトラックが存在する場合のみ)
-  const canGraph = activeTracks.length > 0;
+  const canGraph = graphTracks.length > 0;
   const timeRemapActive = animation.easing.enabled || (animation.easing.beatSync?.enabled ?? false);
 
   return (
@@ -611,6 +631,113 @@ export function TimelineBar({ animLoopRef, onSeek, exportProgress = null, height
       className="relative shrink-0 overflow-hidden bg-k-bg/95 backdrop-blur-md border-t border-panel-border flex flex-col"
       style={{ height }}
     >
+      <div className="flex h-10 shrink-0 items-center gap-2 border-b border-panel-border/60 bg-k-surface/80 px-3">
+        <button
+          type="button"
+          onClick={() => setAnimation({ enabled: !animation.enabled })}
+          className={`flex h-6 items-center gap-1.5 border px-2 text-[9px] font-display font-semibold uppercase tracking-wider transition-colors ${
+            animation.enabled
+              ? 'border-emerald-400/60 bg-emerald-400/10 text-emerald-300'
+              : 'border-k-muted/60 bg-k-bg text-tab-inactive'
+          }`}
+          title="Animation ON/OFF"
+        >
+          <span className={`h-1.5 w-1.5 rounded-full ${animation.enabled ? 'bg-emerald-400' : 'bg-k-muted'}`} />
+          Animation
+        </button>
+
+        <div className="flex items-center border border-k-muted/50 bg-k-bg">
+          {(['moving', 'selected', 'all'] as const).map(filter => (
+            <button
+              key={filter}
+              type="button"
+              onClick={() => setTrackFilter(filter)}
+              className={`h-5 px-2 text-[8px] font-display uppercase tracking-wider transition-colors ${
+                trackFilter === filter ? 'bg-fire text-k-text' : 'text-tab-inactive hover:text-k-text'
+              }`}
+            >
+              {filter === 'moving' ? 'Moving' : filter === 'selected' ? 'Selected' : 'All'}
+            </button>
+          ))}
+        </div>
+
+        <div className="ml-auto flex items-center gap-1.5">
+          <label className="flex items-center gap-1 text-[8px] uppercase tracking-wider text-tab-inactive">
+            Duration
+            <input
+              type="number"
+              min={0.1}
+              max={300}
+              step={0.1}
+              value={Number(animation.duration.toFixed(2))}
+              disabled={beatSyncEnabled}
+              onChange={event => setAnimation({ duration: Math.max(0.1, Math.min(300, Number(event.target.value) || 0.1)) })}
+              className="h-5 w-14 border border-k-muted/60 bg-k-bg px-1 text-right text-[9px] tabular-nums text-k-text outline-none focus:border-fire disabled:opacity-50"
+            />
+            <span className="normal-case">s</span>
+          </label>
+          <label className="flex items-center gap-1 text-[8px] uppercase tracking-wider text-tab-inactive">
+            FPS
+            <select
+              value={animation.fps}
+              onChange={event => setAnimation({ fps: Number(event.target.value) as 24 | 30 | 60 })}
+              className="h-5 border border-k-muted/60 bg-k-bg px-1 text-[9px] text-k-text outline-none focus:border-fire"
+            >
+              <option value={24}>24</option>
+              <option value={30}>30</option>
+              <option value={60}>60</option>
+            </select>
+          </label>
+          <label className="hidden items-center gap-1 text-[8px] uppercase tracking-wider text-tab-inactive lg:flex">
+            Speed
+            <input
+              type="number"
+              min={0.01}
+              max={8}
+              step={0.01}
+              value={Number(animation.speed.toFixed(2))}
+              onChange={event => setAnimation({ speed: Math.max(0.01, Math.min(8, Number(event.target.value) || 0.01)) })}
+              className="h-5 w-12 border border-k-muted/60 bg-k-bg px-1 text-right text-[9px] tabular-nums text-k-text outline-none focus:border-fire"
+            />
+          </label>
+          <label className="hidden items-center gap-1 text-[8px] uppercase tracking-wider text-tab-inactive xl:flex">
+            Direction
+            <input
+              type="number"
+              min={0}
+              max={360}
+              step={1}
+              value={Math.round(animation.direction)}
+              onChange={event => setAnimation({ direction: ((Number(event.target.value) || 0) % 360 + 360) % 360 })}
+              className="h-5 w-12 border border-k-muted/60 bg-k-bg px-1 text-right text-[9px] tabular-nums text-k-text outline-none focus:border-fire"
+            />
+          </label>
+          <button
+            type="button"
+            onClick={() => setAnimation({ previewLoop: !(animation.previewLoop ?? true) })}
+            className={`h-5 border px-2 text-[8px] font-display uppercase tracking-wider ${
+              (animation.previewLoop ?? true)
+                ? 'border-fire/60 bg-fire/10 text-fire'
+                : 'border-k-muted/60 bg-k-bg text-tab-inactive'
+            }`}
+            title="Preview Loop ON/OFF"
+          >
+            Loop {(animation.previewLoop ?? true) ? 'On' : 'Off'}
+          </button>
+          <button
+            type="button"
+            onClick={onToggleTimeRemap}
+            className={`h-5 border px-2 text-[8px] font-display uppercase tracking-wider ${
+              showTimeRemap || timeRemapActive
+                ? 'border-fire/60 bg-fire/10 text-fire'
+                : 'border-k-muted/60 bg-k-bg text-tab-inactive'
+            }`}
+            title="Autoモーション専用のLoop Timing"
+          >
+            Loop Timing
+          </button>
+        </div>
+      </div>
       {/* ── Transport row ── */}
       <div className="shrink-0 border-b border-panel-border/20">
         {/* 中央: Preview controls */}
@@ -729,22 +856,7 @@ export function TimelineBar({ animLoopRef, onSeek, exportProgress = null, height
         </div>
 
           {/* 右: タイムライン編集ボタン */}
-          <div className="w-[76px] shrink-0 flex items-center justify-end gap-1">
-            <button
-              onClick={onToggleTimeRemap}
-              style={{ display: isExporting ? 'none' : 'block' }}
-              className={`shrink-0 text-[9px] px-1 py-0.5 rounded-none transition-colors ${
-                showTimeRemap
-                  ? 'bg-fire text-k-text'
-                  : timeRemapActive
-                    ? 'bg-deep/30 text-cream hover:bg-deep/40'
-                    : 'bg-k-surface text-tab-inactive hover:bg-k-muted'
-              }`}
-              title="Time Remap エディタ"
-            >
-              {timeRemapActive ? 'Remap●' : 'Remap'}
-            </button>
-
+          <div className="w-[92px] shrink-0 flex items-center justify-end gap-1">
             {/* グラフエディタ切り替えボタン */}
             <button
               onClick={toggleGraph}
@@ -773,7 +885,7 @@ export function TimelineBar({ animLoopRef, onSeek, exportProgress = null, height
             className="absolute inset-y-0 z-30 pointer-events-none"
             style={{
               left: `calc(1rem + 9rem + 0.75rem + ${PAD_X}px)`,
-              right: `calc(1rem + 76px + 0.75rem + ${PAD_X}px)`,
+              right: `calc(1rem + 92px + 0.75rem + ${PAD_X}px)`,
             }}
           >
             {beatFractions.map((fraction, index) => (
@@ -817,13 +929,15 @@ export function TimelineBar({ animLoopRef, onSeek, exportProgress = null, height
               className="absolute inset-0 flex items-center justify-center text-[11px] text-tab-inactive opacity-50 pointer-events-none"
               style={{ display: activeTracks.length === 0 ? 'flex' : 'none' }}
             >
-              スライダーの ◇ ボタンでキーフレームを有効化
+              プロパティを Auto または Keys にするとここへ表示されます
             </div>
 
             {/* トラックリスト (常にDOMに保持し、visibility で制御) */}
             <div style={{ visibility: activeTracks.length > 0 ? 'visible' : 'hidden' }}>
               {activeTracks.map((track, trackIdx) => {
                 const color = GRAPH_COLORS[trackIdx % GRAPH_COLORS.length];
+                const mode = getTrackMode(track);
+                const group = track.group ?? getAnimationGroup(track.propertyId);
                 return (
                   <div key={track.propertyId} className="flex items-center gap-3 h-7 mb-1.5 relative">
                     {/* トラックラベル */}
@@ -835,8 +949,10 @@ export function TimelineBar({ animLoopRef, onSeek, exportProgress = null, height
                       <div className="w-1.5 h-1.5 rounded-full shrink-0 mr-1" style={{ backgroundColor: color }} />
                       <span
                         className="flex-1 text-[10px] font-display font-semibold text-k-text/90 truncate uppercase tracking-wider"
-                        title={track.label}
+                        title={`${group} / ${track.label}`}
                       >
+                        <span className="text-tab-inactive">{group}</span>
+                        <span className="px-1 text-k-muted">/</span>
                         {track.label}
                       </span>
                       <button
@@ -855,8 +971,17 @@ export function TimelineBar({ animLoopRef, onSeek, exportProgress = null, height
                       ref={trackIdx === 0 ? el => { firstTrackVisualRef.current = el; } : undefined}
                     >
                       <div className="absolute left-0 right-0 h-[1px] bg-k-muted/20" />
+                      {mode === 'auto' && (
+                        <div
+                          className="absolute h-3 rounded-sm border border-emerald-400/40 bg-emerald-400/10"
+                          style={{ left: PAD_X, right: PAD_X }}
+                          title="Auto modifier: composition durationをループ"
+                        >
+                          <div className="h-full w-full bg-[repeating-linear-gradient(135deg,transparent_0,transparent_5px,rgba(52,211,153,0.12)_5px,rgba(52,211,153,0.12)_7px)]" />
+                        </div>
+                      )}
 
-                      {track.keyframes.map(kf => {
+                      {mode === 'keys' && track.keyframes.map(kf => {
                         const key        = kfKey(track.propertyId, kf.id);
                         const isSelected = selectedKfIds.has(key);
                         return (
@@ -896,7 +1021,14 @@ export function TimelineBar({ animLoopRef, onSeek, exportProgress = null, height
                       })}
 
                     </div>
-                    <div className="w-[76px] shrink-0" aria-hidden="true" />
+                    <div className="w-[92px] shrink-0">
+                      <AnimationPropertyControls
+                        trackId={track.propertyId}
+                        label={track.label}
+                        value={getPropertyValue(track.propertyId)}
+                        compact
+                      />
+                    </div>
                   </div>
                 );
               })}
@@ -923,7 +1055,7 @@ export function TimelineBar({ animLoopRef, onSeek, exportProgress = null, height
             {/* 左: トラック名 + グラフ切り替えドロップダウン */}
             <div className="w-36 shrink-0 border-r border-panel-border/20 py-2 flex flex-col gap-1 overflow-y-auto scrollbar-thin">
               <div className="text-[9px] text-tab-inactive uppercase tracking-wider mb-1 px-1">Graph Track</div>
-              {activeTracks.map((track, idx) => {
+              {graphTracks.map((track, idx) => {
                 const c = GRAPH_COLORS[idx % GRAPH_COLORS.length];
                 const isActive = track.propertyId === graphTrackId;
                 return (
@@ -982,7 +1114,7 @@ export function TimelineBar({ animLoopRef, onSeek, exportProgress = null, height
                 )}
               </div>
             </div>
-            <div className="w-[76px] shrink-0" aria-hidden="true" />
+            <div className="w-[92px] shrink-0" aria-hidden="true" />
         </div>
       </div>
     </div>

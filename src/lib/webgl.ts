@@ -357,7 +357,6 @@ export async function initWebGL(canvas: HTMLCanvasElement): Promise<WebGLContext
   const { fbo: hBlurFbo, tex: hBlurTexture } = createFboWithTexture(gl);
   const { fbo: gradFbo, tex: gradTexture } = createFboWithTexture(gl);
   const ctx: WebGLContext = { gl, gpuDiagnostics, renderOptimization, program, uniforms, distanceTexture, gradientRampTexture, manualDistortTexture, manualDistortDisplacement: null, manualDistortSmoothMask: null, manualDistortMapResolution: 0, sourceImageTexture, sourceImageCanvas: null, imageMaskTexture, imageMaskSource: null, normalMapProgram: null, normalMapUniforms: {}, gradFbo, gradTexture, blurProgram: null, blurUniforms: {}, stretchProgram: null, stretchUniforms: {}, postprocessProgram: null, postprocessUniforms: {}, prismCompositeProgram: null, prismCompositeUniforms: {}, particleProgram: null, particleUniforms: {}, particleVao: null, particleQuadBuffer: null, particleInstanceBuffer: null, particleInstanceCount: 0, particleInstanceSeed: Number.NaN, normalFbo, normalTexture, hBlurFbo, hBlurTexture, fboSize: [0, 0], shaderCompileExt: ext, lazyProgramState: createLazyProgramState() };
-  warmOptionalPrograms(ctx);
   return ctx;
 }
 
@@ -635,19 +634,12 @@ function requestLazyProgram(ctx: WebGLContext, key: LazyProgramKey): boolean {
       console.error(`[WebGL] Lazy shader compile failed (${key}):`, error);
     }).finally(() => {
       state.promise = null;
+      if (!state.failed) {
+        window.dispatchEvent(new CustomEvent('kgg:webgl-lazy-program-ready'));
+      }
     });
   }
   return false;
-}
-
-function warmOptionalPrograms(ctx: WebGLContext): void {
-  const run = async () => {
-    for (const key of ['blur', 'normalMap', 'stretch', 'postprocess', 'prismComposite', 'particles'] as LazyProgramKey[]) {
-      requestLazyProgram(ctx, key);
-      await ctx.lazyProgramState[key].promise;
-    }
-  };
-  window.setTimeout(() => { void run(); }, 100);
 }
 
 function setupParticleGeometry(ctx: WebGLContext): void {

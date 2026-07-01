@@ -1,149 +1,254 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { useGradientStore } from '../store/gradientStore';
-import { render } from '../lib/webgl';
 import { AnimationLoop } from '../lib/animation';
 import { useWebGL } from '../hooks/useWebGL';
 import { useSdfUpdate } from '../hooks/useSdfUpdate';
-import { applyTimeRemap } from '../lib/timeRemap';
-import { interpolateKeyframes } from '../lib/keyframeInterpolator';
-import { hexToRgb255, rgb255ToHex } from '../lib/gradientRampUtils';
-import { withAnimatedDiffuseSeed } from '../lib/diffuseSeed';
+import { buildRampTextureData, RAMP_TEX_WIDTH } from '../lib/gradientRampUtils';
 import { setTimelineTime } from '../lib/timelineClock';
+import { hasActiveAnimation } from '../lib/sceneEvaluation';
+import { renderSceneAtTime } from '../lib/renderSceneAtTime';
 import type { GradientConfig } from '../types/gradient';
-import type { StretchConfig } from '../types/distortion';
-import type { PropertyTrack } from '../types/keyframe';
 
-function applyGradientKeyframes(
+const FALLBACK_PREVIEW_MAX_W = 360;
+const FALLBACK_PREVIEW_MAX_H = 240;
+
+function clamp01(v: number): number {
+  return Math.max(0, Math.min(1, v));
+}
+
+function fract(v: number): number {
+  return v - Math.floor(v);
+}
+
+function dot2(ax: number, ay: number, bx: number, by: number): number {
+  return ax * bx + ay * by;
+}
+
+function len2(x: number, y: number): number {
+  return Math.sqrt(x * x + y * y);
+}
+
+function cubicBezierPoint(
+  p0: [number, number],
+  p1: [number, number],
+  p2: [number, number],
+  p3: [number, number],
+  t: number,
+): [number, number] {
+  const mt = 1 - t;
+  return [
+    mt * mt * mt * p0[0] + 3 * mt * mt * t * p1[0] + 3 * mt * t * t * p2[0] + t * t * t * p3[0],
+    mt * mt * mt * p0[1] + 3 * mt * mt * t * p1[1] + 3 * mt * t * t * p2[1] + t * t * t * p3[1],
+  ];
+}
+
+function cubicBezierDerivative(
+  p0: [number, number],
+  p1: [number, number],
+  p2: [number, number],
+  p3: [number, number],
+  t: number,
+): [number, number] {
+  const mt = 1 - t;
+  return [
+    3 * mt * mt * (p1[0] - p0[0]) + 6 * mt * t * (p2[0] - p1[0]) + 3 * t * t * (p3[0] - p2[0]),
+    3 * mt * mt * (p1[1] - p0[1]) + 6 * mt * t * (p2[1] - p1[1]) + 3 * t * t * (p3[1] - p2[1]),
+  ];
+}
+
+function cubicBezierSecondDerivative(
+  p0: [number, number],
+  p1: [number, number],
+  p2: [number, number],
+  p3: [number, number],
+  t: number,
+): [number, number] {
+  return [
+    6 * (1 - t) * (p2[0] - 2 * p1[0] + p0[0]) + 6 * t * (p3[0] - 2 * p2[0] + p1[0]),
+    6 * (1 - t) * (p2[1] - 2 * p1[1] + p0[1]) + 6 * t * (p3[1] - 2 * p2[1] + p1[1]),
+  ];
+}
+
+function normalize2(x: number, y: number, fallbackX: number, fallbackY: number): [number, number] {
+  const l = len2(x, y);
+  if (l >= 1e-5) return [x / l, y / l];
+  const fallbackLen = len2(fallbackX, fallbackY);
+  return fallbackLen < 1e-5 ? [0, 1] : [fallbackX / fallbackLen, fallbackY / fallbackLen];
+}
+
+function fallbackBezierT(gradient: GradientConfig, x: number, y: number, width: number, height: number): number {
+  const anchors = gradient.anchors ?? [[0.5, 0], [0.5, 1], [0.5, 0.5], [0.5, 0.5]];
+  const controls = gradient.bezierControls ?? [[anchors[0][0], anchors[0][1]], [anchors[1][0], anchors[1][1]]];
+  const p0: [number, number] = [anchors[0][0] * width, anchors[0][1] * height];
+  const p1: [number, number] = [controls[0][0] * width, controls[0][1] * height];
+  const p2: [number, number] = [controls[1][0] * width, controls[1][1] * height];
+  const p3: [number, number] = [anchors[1][0] * width, anchors[1][1] * height];
+  const target: [number, number] = [x * width, y * height];
+  const axisLen = Math.max(
+    len2(p1[0] - p0[0], p1[1] - p0[1]) + len2(p2[0] - p1[0], p2[1] - p1[1]) + len2(p3[0] - p2[0], p3[1] - p2[1]),
+    len2(p3[0] - p0[0], p3[1] - p0[1]),
+    1,
+  );
+  let bestT = 0;
+  let bestD = Number.POSITIVE_INFINITY;
+
+  for (let i = 0; i <= 24; i++) {
+    const t = i / 24;
+    const p = cubicBezierPoint(p0, p1, p2, p3, t);
+    const dx = target[0] - p[0];
+    const dy = target[1] - p[1];
+    const d = dx * dx + dy * dy;
+    if (d < bestD) {
+      bestD = d;
+      bestT = t;
+    }
+  }
+
+  let t = bestT;
+  for (let i = 0; i < 6; i++) {
+    const p = cubicBezierPoint(p0, p1, p2, p3, t);
+    const d1 = cubicBezierDerivative(p0, p1, p2, p3, t);
+    const d2 = cubicBezierSecondDerivative(p0, p1, p2, p3, t);
+    const rx = p[0] - target[0];
+    const ry = p[1] - target[1];
+    const denom = dot2(d1[0], d1[1], d1[0], d1[1]) + dot2(rx, ry, d2[0], d2[1]);
+    if (Math.abs(denom) > 1e-5) {
+      t = clamp01(t - dot2(rx, ry, d1[0], d1[1]) / denom);
+    }
+  }
+
+  const curvePoint = cubicBezierPoint(p0, p1, p2, p3, t);
+  bestD = dot2(target[0] - curvePoint[0], target[1] - curvePoint[1], target[0] - curvePoint[0], target[1] - curvePoint[1]);
+  bestT = t;
+
+  const startDeriv = cubicBezierDerivative(p0, p1, p2, p3, 0);
+  const startDir = normalize2(startDeriv[0], startDeriv[1], p3[0] - p0[0], p3[1] - p0[1]);
+  const startS = dot2(target[0] - p0[0], target[1] - p0[1], startDir[0], startDir[1]);
+  if (startS < 0) {
+    const startDx = target[0] - (p0[0] + startDir[0] * startS);
+    const startDy = target[1] - (p0[1] + startDir[1] * startS);
+    const startD = startDx * startDx + startDy * startDy;
+    if (startD < bestD) {
+      bestD = startD;
+      bestT = startS / axisLen;
+    }
+  }
+
+  const endDeriv = cubicBezierDerivative(p0, p1, p2, p3, 1);
+  const endDir = normalize2(endDeriv[0], endDeriv[1], p3[0] - p0[0], p3[1] - p0[1]);
+  const endS = dot2(target[0] - p3[0], target[1] - p3[1], endDir[0], endDir[1]);
+  if (endS > 0) {
+    const endDx = target[0] - (p3[0] + endDir[0] * endS);
+    const endDy = target[1] - (p3[1] + endDir[1] * endS);
+    const endD = endDx * endDx + endDy * endDy;
+    if (endD < bestD) {
+      bestT = 1 + endS / axisLen;
+    }
+  }
+
+  return Number.isFinite(bestT) ? bestT : 0;
+}
+
+function fallbackGradientT(gradient: GradientConfig, x: number, y: number, width: number, height: number): number {
+  const type = gradient.gradientType ?? 'linear';
+  const anchors = gradient.anchors ?? [[0.5, 0], [0.5, 1], [0.5, 0.5], [0.5, 0.5]];
+  if (type === 'radial') {
+    const [ax, ay] = anchors[0] ?? [0.5, 0.5];
+    const [bx, by] = anchors[1] ?? [1, 0.5];
+    const cx = (x - ax) * width;
+    const cy = (y - ay) * height;
+    const rx = (bx - ax) * width;
+    const ry = (by - ay) * height;
+    return clamp01(len2(cx, cy) / Math.max(len2(rx, ry), 0.001));
+  }
+  if (type === 'diamond') {
+    const [ax, ay] = anchors[0] ?? [0.5, 0.5];
+    const [bx, by] = anchors[1] ?? [1, 0.5];
+    const refX = bx - ax;
+    const refY = by - ay;
+    const refLen = len2(refX, refY);
+    if (refLen < 0.00001) return 0;
+    const refNX = refX / refLen;
+    const refNY = refY / refLen;
+    const cx = x - ax;
+    const cy = y - ay;
+    const rotX = dot2(cx, cy, refNX, refNY);
+    const rotY = dot2(cx, cy, -refNY, refNX);
+    return clamp01((Math.abs(rotX) + Math.abs(rotY)) / Math.max(refLen, 0.001));
+  }
+  if (type === 'angle') {
+    const [ax, ay] = anchors[0] ?? [0.5, 0.5];
+    const [bx, by] = anchors[1] ?? [1, 0.5];
+    const cx = x - ax;
+    const cy = y - ay;
+    if (dot2(cx, cy, cx, cy) < 0.00001) return 0;
+    const startAngle = Math.atan2(by - ay, bx - ax);
+    return fract((Math.atan2(cy, cx) - startAngle) / (Math.PI * 2) + 0.5);
+  }
+  if (type === 'fourcolor') {
+    const weights = anchors.map(([ax, ay]) => 1 / Math.max(dot2(x - ax, y - ay, x - ax, y - ay), 0.0001));
+    const total = weights.reduce((sum, w) => sum + w, 0);
+    return clamp01((weights[1] * (1 / 3) + weights[2] * (2 / 3) + weights[3]) / total);
+  }
+  if (type === 'bezier') {
+    return clamp01(fallbackBezierT(gradient, x, y, width, height));
+  }
+  if (type === 'linear') {
+    const [ax, ay] = anchors[0] ?? [0.5, 0];
+    const [bx, by] = anchors[1] ?? [0.5, 1];
+    const dx = bx - ax;
+    const dy = by - ay;
+    const lenSq = dx * dx + dy * dy;
+    if (lenSq > 0.000001) {
+      return clamp01(((x - ax) * dx + (y - ay) * dy) / lenSq);
+    }
+  }
+  return 0;
+}
+
+function fallbackSampleColor(gradient: GradientConfig, rampData: Uint8Array, x: number, y: number, width: number, height: number): [number, number, number, number] {
+  const t = fallbackGradientT(gradient, clamp01(x), clamp01(y), width, height);
+  const i = Math.max(0, Math.min(RAMP_TEX_WIDTH - 1, Math.round(t * (RAMP_TEX_WIDTH - 1)))) * 4;
+  return [rampData[i], rampData[i + 1], rampData[i + 2], rampData[i + 3]];
+}
+
+function renderFallbackPreview(
+  canvas: HTMLCanvasElement,
   gradient: GradientConfig,
-  keyframeTracks: Record<string, PropertyTrack>,
-  normalizedTime: number
-): GradientConfig {
-  let result = gradient;
-
-  // ── gradientStop.{stopId}.{position|r|g|b} / opacityStop.{stopId}.{position|opacity} ──
-  const stopOverrides = new Map<string, { position?: number; r?: number; g?: number; b?: number }>();
-  const opacityStopOverrides = new Map<string, { position?: number; opacity?: number }>();
-
-  // ── gradientAnchor.{idx}.{x|y} ──
-  const anchorOverrides = new Map<number, { x?: number; y?: number }>();
-
-  for (const track of Object.values(keyframeTracks)) {
-    if (!track.enabled || track.keyframes.length === 0) continue;
-    const val = interpolateKeyframes(normalizedTime, track.keyframes);
-
-    if (track.propertyId.startsWith('gradientStop.')) {
-      const parts = track.propertyId.split('.');
-      if (parts.length !== 3) continue;
-      const stopId = parts[1]; const field = parts[2];
-      let ov = stopOverrides.get(stopId);
-      if (!ov) { ov = {}; stopOverrides.set(stopId, ov); }
-      if (field === 'position') ov.position = val;
-      else if (field === 'r') ov.r = val;
-      else if (field === 'g') ov.g = val;
-      else if (field === 'b') ov.b = val;
-      continue;
-    }
-
-    if (track.propertyId.startsWith('opacityStop.')) {
-      const parts = track.propertyId.split('.');
-      if (parts.length !== 3) continue;
-      const stopId = parts[1]; const field = parts[2];
-      let ov = opacityStopOverrides.get(stopId);
-      if (!ov) { ov = {}; opacityStopOverrides.set(stopId, ov); }
-      if (field === 'position') ov.position = val;
-      else if (field === 'opacity') ov.opacity = val;
-      continue;
-    }
-
-    if (track.propertyId.startsWith('gradientAnchor.')) {
-      const parts = track.propertyId.split('.');
-      if (parts.length !== 3) continue;
-      const idx = parseInt(parts[1], 10); const field = parts[2];
-      if (isNaN(idx)) continue;
-      let ov = anchorOverrides.get(idx);
-      if (!ov) { ov = {}; anchorOverrides.set(idx, ov); }
-      if (field === 'x') ov.x = val;
-      else if (field === 'y') ov.y = val;
+  width: number,
+  height: number,
+): void {
+  const aspect = Math.max(width / Math.max(height, 1), 0.01);
+  const previewW = Math.max(1, Math.min(FALLBACK_PREVIEW_MAX_W, Math.round(aspect >= 1 ? FALLBACK_PREVIEW_MAX_W : FALLBACK_PREVIEW_MAX_H * aspect)));
+  const previewH = Math.max(1, Math.min(FALLBACK_PREVIEW_MAX_H, Math.round(previewW / aspect)));
+  if (canvas.width !== previewW) canvas.width = previewW;
+  if (canvas.height !== previewH) canvas.height = previewH;
+  const ctx = canvas.getContext('2d');
+  if (!ctx) return;
+  const rampData = buildRampTextureData(
+    gradient.stops,
+    gradient.rampInterpolation,
+    gradient.rampMirror ?? false,
+    gradient.opacityStops,
+    gradient.rampColorMode,
+    gradient.rampVariable ?? 0,
+    gradient.rampRepeat ?? 1,
+  );
+  const image = ctx.createImageData(previewW, previewH);
+  const data = image.data;
+  for (let py = 0; py < previewH; py++) {
+    for (let px = 0; px < previewW; px++) {
+      const sx = (px + 0.5) / previewW;
+      const sy = 1 - ((py + 0.5) / previewH);
+      const [r, g, b, a] = fallbackSampleColor(gradient, rampData, sx, sy, previewW, previewH);
+      const i = (py * previewW + px) * 4;
+      data[i] = r;
+      data[i + 1] = g;
+      data[i + 2] = b;
+      data[i + 3] = a;
     }
   }
-
-  if (stopOverrides.size > 0) {
-    const newStops = result.stops.map(stop => {
-      if (!stop.stopId) return stop;
-      const ov = stopOverrides.get(stop.stopId);
-      if (!ov) return stop;
-      let next = { ...stop };
-      if (ov.position !== undefined) next.position = Math.max(0, Math.min(1, ov.position));
-      if (ov.r !== undefined || ov.g !== undefined || ov.b !== undefined) {
-        const [baseR, baseG, baseB] = hexToRgb255(stop.color);
-        next.color = rgb255ToHex(ov.r ?? baseR, ov.g ?? baseG, ov.b ?? baseB);
-      }
-      return next;
-    });
-    result = { ...result, stops: newStops };
-  }
-
-  if (opacityStopOverrides.size > 0 && result.opacityStops) {
-    const newStops = result.opacityStops.map(stop => {
-      if (!stop.stopId) return stop;
-      const ov = opacityStopOverrides.get(stop.stopId);
-      if (!ov) return stop;
-      return {
-        ...stop,
-        ...(ov.position !== undefined ? { position: Math.max(0, Math.min(1, ov.position)) } : {}),
-        ...(ov.opacity !== undefined ? { opacity: Math.max(0, Math.min(1, ov.opacity)) } : {}),
-      };
-    });
-    result = { ...result, opacityStops: newStops };
-  }
-
-  if (anchorOverrides.size > 0 && result.anchors) {
-    const newAnchors = result.anchors.map((anchor, idx) => {
-      const ov = anchorOverrides.get(idx);
-      if (!ov) return anchor;
-      return [
-        ov.x !== undefined ? Math.max(0, Math.min(1, ov.x)) : anchor[0],
-        ov.y !== undefined ? Math.max(0, Math.min(1, ov.y)) : anchor[1],
-      ] as [number, number];
-    }) as typeof result.anchors;
-    result = { ...result, anchors: newAnchors };
-  }
-
-  return result;
-}
-
-function applyStretchKeyframes(
-  stretch: StretchConfig,
-  keyframeTracks: Record<string, PropertyTrack>,
-  normalizedTime: number
-): StretchConfig {
-  let result = stretch;
-  for (const track of Object.values(keyframeTracks)) {
-    if (!track.enabled || track.keyframes.length === 0) continue;
-    const [, field] = track.propertyId.split('.');
-    if (!track.propertyId.startsWith('stretch.') || !(field in stretch)) continue;
-    const val = interpolateKeyframes(normalizedTime, track.keyframes);
-    result = { ...result, [field]: val };
-  }
-  return result;
-}
-
-function applyDistortionKeyframes<T extends Record<string, unknown>>(
-  category: string,
-  value: T,
-  keyframeTracks: Record<string, PropertyTrack>,
-  normalizedTime: number
-): T {
-  let result = value;
-  for (const track of Object.values(keyframeTracks)) {
-    if (!track.enabled || track.keyframes.length === 0) continue;
-    const [trackCategory, field] = track.propertyId.split('.');
-    if (trackCategory !== category || !(field in value)) continue;
-    const val = interpolateKeyframes(normalizedTime, track.keyframes);
-    result = { ...result, [field]: val };
-  }
-
-  return result;
+  ctx.putImageData(image, 0, 0);
 }
 
 type Props = {
@@ -158,8 +263,7 @@ type Props = {
 };
 
 export function GradientCanvas({ width = 800, height = 800, animLoopRef, seekVersion = 0, canvasRef, sourceImageCanvas = null, imageMaskSource = null, imageMaskEnabled = false }: Props) {
-  const slitAnimRafRef = useRef<number | null>(null);
-  const diffuseSeedFrameRef = useRef(0);
+  const fallbackCanvasRef = useRef<HTMLCanvasElement | null>(null);
 
   const { gradient, noiseDistortion, diffuse, bezierAxis, slitScan, stretch, animation, normalMap, radon, iridescence, manualDistort, postprocess, matcap, keyframeTracks, currentTime } = useGradientStore();
 
@@ -168,14 +272,20 @@ export function GradientCanvas({ width = 800, height = 800, animLoopRef, seekVer
   // SDF 生成完了時に静的レンダーを再実行するためのカウンター
   const [sdfGenCount, setSdfGenCount] = useState(0);
   const onSdfReady = useCallback(() => setSdfGenCount(c => c + 1), []);
+  const [lazyProgramReadyCount, setLazyProgramReadyCount] = useState(0);
 
-  // easingRef: アニメーションループのクロージャから常に最新の easing 値を参照するための ref
-  const easingRef = useRef(animation.easing);
-  useEffect(() => { easingRef.current = animation.easing; });
+  useEffect(() => {
+    if (isWebGLReady) return;
+    const canvas = fallbackCanvasRef.current;
+    if (!canvas) return;
+    renderFallbackPreview(canvas, gradient, width, height);
+  }, [isWebGLReady, gradient, width, height]);
 
-  // animAffectRef: アニメーションループから最新の対象設定を参照するための ref
-  const animAffectRef = useRef({ affectNoise: animation.affectNoise, affectSlit: animation.affectSlit, affectStretch: animation.affectStretch });
-  useEffect(() => { animAffectRef.current = { affectNoise: animation.affectNoise, affectSlit: animation.affectSlit, affectStretch: animation.affectStretch }; });
+  useEffect(() => {
+    const handleReady = () => setLazyProgramReadyCount(c => c + 1);
+    window.addEventListener('kgg:webgl-lazy-program-ready', handleReady);
+    return () => window.removeEventListener('kgg:webgl-lazy-program-ready', handleReady);
+  }, []);
 
   // latestRef を毎レンダー更新（ブラウザ描画前に同期更新し、RAFループが即座に最新値を参照できるようにする）
   useLayoutEffect(() => {
@@ -185,171 +295,107 @@ export function GradientCanvas({ width = 800, height = 800, animLoopRef, seekVer
   useSdfUpdate(webglRef, sdfReadyRef, latestRef, bezierAxis.paths, bezierAxis.enabled, width, height, onSdfReady);
 
   // 静止レンダリング（アニメーション停止中の状態変化に反応）
-  useEffect(() => {
-    if (!webglRef.current) return;
+  useLayoutEffect(() => {
+    const ctx = webglRef.current;
+    const latest = latestRef.current;
+    if (!ctx || !latest) return;
     const isPaused = animLoopRef.current?.isPaused ?? false;
-    const diffuseSeedAnimActive = animation.enabled && diffuse.enabled && (diffuse.seedAnimEnabled ?? false);
-    const prismAnimActive = postprocess.enabled && postprocess.effectMode === 'prism';
-    const isPlaying = (animation.enabled && !isPaused && (
-      (animation.affectNoise && (noiseDistortion.enabled || iridescence.enabled)) ||
-      (animation.affectSlit && slitScan.enabled && slitScan.animEnabled) ||
-      (animation.affectStretch && stretch.enabled) ||
-      animation.affectRamp ||
-      prismAnimActive
-    )) || (diffuseSeedAnimActive && !isPaused);
-    if (isPlaying) return;
-    const effectiveBezier = bezierAxis.enabled && !sdfReadyRef.current
-      ? { ...bezierAxis, enabled: false }
-      : bezierAxis;
-    let loopNT = 0;
-    let easedNT = 0;
-    if (isPaused) {
-      loopNT = animLoopRef.current?.currentNormalizedTime ?? currentTime;
-      easedNT = applyTimeRemap(loopNT, animation.duration, animation.easing);
-    }
-    const t = (animation.affectNoise || prismAnimActive) ? easedNT * animation.speed * animation.duration : 0;
-    const effectiveGradient = animation.affectRamp
-      ? applyGradientKeyframes(gradient, keyframeTracks, loopNT)
-      : gradient;
-    const noiseWithKeyframes = applyDistortionKeyframes('noiseDistortion', noiseDistortion, keyframeTracks, loopNT);
-    const slitWithKeyframes = applyDistortionKeyframes('slitScan', slitScan, keyframeTracks, loopNT);
-    const radonWithKeyframes = applyDistortionKeyframes('radon', radon, keyframeTracks, loopNT);
-    const iridescenceWithKeyframes = applyDistortionKeyframes('iridescence', iridescence, keyframeTracks, loopNT);
-    const stretchWithKeyframes = animation.affectStretch
-      ? applyStretchKeyframes(stretch, keyframeTracks, loopNT)
-      : stretch;
-    const slitAnimTimeOverride = animation.affectSlit && slitWithKeyframes.animEnabled
-      ? easedNT * animation.duration
-      : null;
-    render(webglRef.current, effectiveGradient, noiseWithKeyframes, withAnimatedDiffuseSeed(diffuse, 0), effectiveBezier, slitWithKeyframes, stretchWithKeyframes, normalMap, radonWithKeyframes, iridescenceWithKeyframes, manualDistort, postprocess, matcap, width, height, t, animation.direction, slitAnimTimeOverride, animation.affectStretch ? easedNT : null, undefined, sourceImageCanvas, Math.max(Math.abs(animation.speed * animation.duration), 0.0001), Math.abs(animation.speed), imageMaskSource, imageMaskEnabled);
-  }, [gradient, noiseDistortion, diffuse, bezierAxis, slitScan, stretch, normalMap, radon, iridescence, manualDistort, postprocess, width, height, animation.enabled, animation.speed, animation.direction, animation.easing, animation.affectNoise, animation.affectSlit, animation.affectRamp, animation.affectStretch, keyframeTracks, currentTime, sdfGenCount, seekVersion, isWebGLReady, sourceImageCanvas, imageMaskSource, imageMaskEnabled]); // eslint-disable-line react-hooks/exhaustive-deps
-
-  // スリットスキャン独自アニメーションループ（メインアニメーション停止中に有効）
-  useEffect(() => {
-    if (slitAnimRafRef.current !== null) {
-      cancelAnimationFrame(slitAnimRafRef.current);
-      slitAnimRafRef.current = null;
-    }
-    const diffuseSeedAnimActive = animation.enabled && diffuse.enabled && (diffuse.seedAnimEnabled ?? false);
-    const prismAnimActive = postprocess.enabled && postprocess.effectMode === 'prism';
-    const mainAnimLoopActive = (animation.enabled && (
-      (animation.affectNoise && (noiseDistortion.enabled || iridescence.enabled)) ||
-      (animation.affectSlit && slitScan.enabled && slitScan.animEnabled) ||
-      (animation.affectStretch && stretch.enabled) ||
-      animation.affectRamp ||
-      prismAnimActive
-    )) || diffuseSeedAnimActive;
-    const standaloneSlitActive = slitScan.animEnabled && (
-      (slitScan.animMode !== 'off' && slitScan.offsetSpeed !== 0) ||
-      ((slitScan.phaseAnimEnabled ?? false) && (slitScan.phaseSpeed ?? 0) !== 0)
-    );
-    if (!standaloneSlitActive || mainAnimLoopActive) return;
-    const loop = () => {
-      const ctx = webglRef.current;
-      const latest = latestRef.current;
-      if (ctx && latest) {
-        const effectiveBezier = latest.bezierAxis.enabled && !sdfReadyRef.current
-          ? { ...latest.bezierAxis, enabled: false }
-          : latest.bezierAxis;
-        const diffuseForFrame = withAnimatedDiffuseSeed(latest.diffuse, 0);
-        render(ctx, latest.gradient, latest.noiseDistortion, diffuseForFrame, effectiveBezier, latest.slitScan, latest.stretch, latest.normalMap, latest.radon, latest.iridescence, latest.manualDistort, latest.postprocess, latest.matcap, latest.width, latest.height, 0, latest.animDirection, null, null, undefined, latest.sourceImageCanvas ?? null, undefined, 1, latest.imageMaskSource ?? null, latest.imageMaskEnabled ?? false);
-      }
-      slitAnimRafRef.current = requestAnimationFrame(loop);
-    };
-    slitAnimRafRef.current = requestAnimationFrame(loop);
-    return () => {
-      if (slitAnimRafRef.current !== null) {
-        cancelAnimationFrame(slitAnimRafRef.current);
-        slitAnimRafRef.current = null;
-      }
-    };
-  }, [slitScan.animEnabled, slitScan.animMode, slitScan.offsetSpeed, slitScan.phaseAnimEnabled, slitScan.phaseSpeed, slitScan.enabled, animation.enabled, animation.affectNoise, animation.affectSlit, animation.affectStretch, stretch.enabled, noiseDistortion.enabled, iridescence.enabled, diffuse.enabled, diffuse.seedAnimEnabled, postprocess.enabled, postprocess.effectMode]); // eslint-disable-line react-hooks/exhaustive-deps
+    if (hasActiveAnimation(latest) && !isPaused) return;
+    const normalizedTime = animation.enabled
+      ? (animLoopRef.current?.currentNormalizedTime ?? currentTime)
+      : 0;
+    renderSceneAtTime(ctx, latest, normalizedTime, { sdfReady: sdfReadyRef.current });
+  }, [gradient, noiseDistortion, diffuse, bezierAxis, slitScan, stretch, normalMap, radon, iridescence, manualDistort, postprocess, width, height, animation.enabled, animation.speed, animation.direction, animation.easing, animation.affectNoise, animation.affectSlit, animation.affectRamp, animation.affectStretch, keyframeTracks, currentTime, sdfGenCount, lazyProgramReadyCount, seekVersion, isWebGLReady, sourceImageCanvas, imageMaskSource, imageMaskEnabled]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // アニメーションループの管理
   useEffect(() => {
     if (!webglRef.current) return;
+    const resumeTime = animLoopRef.current?.currentNormalizedTime ?? currentTime;
     animLoopRef.current?.stop();
     animLoopRef.current = null;
-    const diffuseSeedAnimActive = animation.enabled && diffuse.enabled && (diffuse.seedAnimEnabled ?? false);
-    const prismAnimActive = postprocess.enabled && postprocess.effectMode === 'prism';
-    if ((animation.enabled && (
-      (animation.affectNoise && (noiseDistortion.enabled || iridescence.enabled)) ||
-      (animation.affectSlit && slitScan.enabled && slitScan.animEnabled) ||
-      (animation.affectStretch && stretch.enabled) ||
-      animation.affectRamp ||
-      prismAnimActive
-    )) || diffuseSeedAnimActive) {
+    const latest = latestRef.current;
+    if (latest && hasActiveAnimation(latest)) {
       animLoopRef.current = new AnimationLoop(
         animation.duration,
         (_loopTime, normalizedTime) => {
           setTimelineTime(normalizedTime);
           const ctx = webglRef.current;
-          const latest = latestRef.current;
-          if (!ctx || !latest) return;
-          let easedNT = normalizedTime;
-          const easing = easingRef.current;
-          easedNT = applyTimeRemap(normalizedTime, animation.duration, easing);
-
-          // キーフレーム補間を適用して最新値をクローン・上書き
-          const keyframed = {
-            gradient: latest.gradient,
-            noiseDistortion: { ...latest.noiseDistortion },
-            bezierAxis: { ...latest.bezierAxis },
-            slitScan: { ...latest.slitScan },
-            stretch: { ...latest.stretch },
-            radon: { ...latest.radon },
-            iridescence: { ...latest.iridescence },
-          };
-
-          // gradient 以外のプロパティトラックを適用
-          Object.values(latest.keyframeTracks).forEach(track => {
-            if (!track.enabled || track.keyframes.length === 0) return;
-            if (track.propertyId.startsWith('gradientStop.') || track.propertyId.startsWith('opacityStop.') || track.propertyId.startsWith('gradientAnchor.')) return;
-            const val = interpolateKeyframes(normalizedTime, track.keyframes);
-            const [category, field] = track.propertyId.split('.') as [keyof typeof keyframed, string];
-            if (keyframed[category as keyof typeof keyframed] && category !== 'gradient') {
-              (keyframed[category as keyof typeof keyframed] as any)[field] = val;
-            }
-          });
-
-          // gradient (ストップ + アンカー) のキーフレームを適用
-          keyframed.gradient = applyGradientKeyframes(latest.gradient, latest.keyframeTracks, normalizedTime);
-
-          const affect = animAffectRef.current;
-          const framePrismAnimActive = latest.postprocess.enabled && latest.postprocess.effectMode === 'prism';
-          const t = (affect.affectNoise || framePrismAnimActive) ? easedNT * animation.speed * animation.duration : 0;
-          const slitAnimTimeOverride = affect.affectSlit && keyframed.slitScan.animEnabled
-            ? easedNT * animation.duration
-            : null;
-          const effectiveBezier = keyframed.bezierAxis.enabled && !sdfReadyRef.current
-            ? { ...keyframed.bezierAxis, enabled: false }
-            : keyframed.bezierAxis;
-          const diffuseForFrame = withAnimatedDiffuseSeed(latest.diffuse, diffuseSeedFrameRef.current++);
-          render(ctx, keyframed.gradient, keyframed.noiseDistortion, diffuseForFrame, effectiveBezier, keyframed.slitScan, keyframed.stretch, latest.normalMap, keyframed.radon, keyframed.iridescence, latest.manualDistort, latest.postprocess, latest.matcap, latest.width, latest.height, t, latest.animDirection, slitAnimTimeOverride, affect.affectStretch ? easedNT : null, undefined, latest.sourceImageCanvas ?? null, Math.max(Math.abs(animation.speed * animation.duration), 0.0001), Math.abs(animation.speed), latest.imageMaskSource ?? null, latest.imageMaskEnabled ?? false);
-        }
+          const frameState = latestRef.current;
+          if (!ctx || !frameState) return;
+          renderSceneAtTime(ctx, frameState, normalizedTime, { sdfReady: sdfReadyRef.current });
+        },
+        {
+          loop: animation.previewLoop ?? true,
+          onEnd: () => useGradientStore.getState().setCurrentTime(1),
+        },
       );
 
       animLoopRef.current.start();
-    } else {
-      const ctx = webglRef.current;
-      const latest = latestRef.current;
-      if (ctx && latest) {
-        const effectiveBezier = latest.bezierAxis.enabled && !sdfReadyRef.current
-          ? { ...latest.bezierAxis, enabled: false }
-          : latest.bezierAxis;
-        render(ctx, latest.gradient, latest.noiseDistortion, withAnimatedDiffuseSeed(latest.diffuse, 0), effectiveBezier, latest.slitScan, latest.stretch, latest.normalMap, latest.radon, latest.iridescence, latest.manualDistort, latest.postprocess, latest.matcap, latest.width, latest.height, 0, latest.animDirection, null, null, undefined, latest.sourceImageCanvas ?? null, undefined, 1, latest.imageMaskSource ?? null, latest.imageMaskEnabled ?? false);
-      }
+      if (resumeTime > 0 && resumeTime < 1) animLoopRef.current.seekTo(resumeTime);
+    } else if (latest) {
+      renderSceneAtTime(webglRef.current, latest, animation.enabled ? currentTime : 0, {
+        sdfReady: sdfReadyRef.current,
+      });
     }
     return () => { animLoopRef.current?.stop(); };
-  }, [animation.enabled, animation.duration, animation.speed, animation.affectNoise, animation.affectSlit, animation.affectRamp, animation.affectStretch, noiseDistortion.enabled, iridescence.enabled, slitScan.enabled, slitScan.animEnabled, stretch.enabled, diffuse.enabled, diffuse.seedAnimEnabled, postprocess.enabled, postprocess.effectMode]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [animation.enabled, animation.duration, animation.previewLoop, animation.speed, keyframeTracks, noiseDistortion.enabled, iridescence.enabled, radon.enabled, slitScan.enabled, stretch.enabled, diffuse.enabled, diffuse.seedAnimEnabled, postprocess.enabled, postprocess.effectMode]); // eslint-disable-line react-hooks/exhaustive-deps
 
   return (
     <div style={{ position: 'relative', width: '100%', height: '100%' }}>
       {!isWebGLReady && (
-        <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: '0.5rem', backgroundColor: '#13141f', zIndex: 1 }}>
-          <div style={{ color: '#555', fontSize: '13px', letterSpacing: '0.05em' }}>Compiling shaders...</div>
-        </div>
+        <canvas
+          ref={fallbackCanvasRef}
+          aria-hidden="true"
+          style={{
+            position: 'absolute',
+            inset: 0,
+            display: 'block',
+            width: '100%',
+            height: '100%',
+            zIndex: 1,
+            pointerEvents: 'none',
+          }}
+        />
       )}
+      <div
+        aria-live="polite"
+        style={{
+          position: 'absolute',
+          top: 10,
+          left: 10,
+          zIndex: 3,
+          display: 'flex',
+          alignItems: 'center',
+          gap: 8,
+          padding: '6px 9px',
+          borderRadius: 6,
+          border: '1px solid rgba(255,255,255,0.16)',
+          background: isWebGLReady ? 'rgba(7, 18, 15, 0.78)' : 'rgba(20, 20, 28, 0.82)',
+          color: '#f4f7fb',
+          boxShadow: '0 8px 24px rgba(0,0,0,0.24)',
+          fontSize: 11,
+          fontWeight: 700,
+          lineHeight: 1,
+          letterSpacing: 0,
+          pointerEvents: 'none',
+          userSelect: 'none',
+        }}
+      >
+        <span
+          style={{
+            width: 7,
+            height: 7,
+            borderRadius: 999,
+            background: isWebGLReady ? '#36d399' : '#f59e0b',
+            boxShadow: isWebGLReady ? '0 0 10px rgba(54,211,153,0.65)' : '0 0 10px rgba(245,158,11,0.65)',
+            flex: '0 0 auto',
+          }}
+        />
+        <span>{isWebGLReady ? 'GPU RENDER' : 'PREVIEW'}</span>
+        {!isWebGLReady && (
+          <span style={{ opacity: 0.68, fontWeight: 600 }}>BASE ONLY</span>
+        )}
+      </div>
       <canvas
         ref={canvasRef}
         width={width}

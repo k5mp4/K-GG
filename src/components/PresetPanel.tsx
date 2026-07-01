@@ -69,7 +69,6 @@ export function PresetPanel({ canvasW, canvasH, setCanvasW, setCanvasH, aspectRa
     if (s.bezierAxis) store.setBezierAxis(s.bezierAxis);
     if (s.slitScan) store.setSlitScan({ ...STORE_DEFAULTS.slitScan, ...s.slitScan });
     if (s.stretch) store.setStretch(s.stretch);
-    if (s.animation) store.setAnimation(s.animation);
     if (s.normalMap) store.setNormalMap(s.normalMap);
     if (s.radon) store.setRadon(s.radon);
     if (s.iridescence) store.setIridescence(s.iridescence);
@@ -95,7 +94,8 @@ export function PresetPanel({ canvasW, canvasH, setCanvasW, setCanvasH, aspectRa
       });
     }
     if (s.matcap) store.setMatcap(s.matcap);
-    if (s.keyframeTracks) store.setKeyframeTracks(s.keyframeTracks);
+    store.setKeyframeTracks(s.keyframeTracks ?? {});
+    if (s.animation) store.setAnimation({ ...s.animation, previewLoop: s.animation.previewLoop ?? true });
     if (s.colorPalettes) mergeUserColorPalettes(s.colorPalettes);
     if (s.resolution) {
       setCanvasW(s.resolution.width);

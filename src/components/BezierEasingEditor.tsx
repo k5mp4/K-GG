@@ -163,7 +163,10 @@ export function BezierEasingEditor({ compact = false }: { compact?: boolean }) {
     <div className="space-y-3">
       {/* Enable toggle */}
       <div className="flex items-center justify-start gap-2 pr-6">
-        <span className="text-xs text-deep">Time Remap</span>
+        <div>
+          <span className="block text-xs text-deep">Loop Timing</span>
+          <span className="block text-[9px] text-tab-inactive">Auto tracks only</span>
+        </div>
         <Toggle
           variant="switch"
           size="xs"
