@@ -20,6 +20,7 @@ import {
   optimizeStretch,
 } from './gpuDiagnostics';
 import type { GpuDiagnostics, RenderOptimization } from './gpuDiagnostics';
+import { GLASS_LIMITS, smoothGlassNoiseBlend } from './glass';
 
 // シェーダーソース変更検出用バージョン（HMR 対応: GLSL が変わると値が変わり再コンパイルをトリガーする）
 export const SHADER_VERSION = (fragSrcGLSL.length * 1000003 + noiseGLSL.length + normalMapFragSrcGLSL.length * 997 + stretchFragSrcGLSL.length * 313 + postprocessFragSrcGLSL.length * 191 + prismCompositeFragSrcGLSL.length * 127 + particlesVertSrcGLSL.length * 89 + particlesFragSrcGLSL.length * 83) | 0;
@@ -143,7 +144,16 @@ function sampleManualDistortChannel(
 }
 
 export async function initWebGL(canvas: HTMLCanvasElement): Promise<WebGLContext> {
-  const gl = canvas.getContext('webgl2', { preserveDrawingBuffer: true, premultipliedAlpha: false });
+  const gl = canvas.getContext('webgl2', {
+    alpha: true,
+    antialias: false,
+    depth: false,
+    stencil: false,
+    desynchronized: false,
+    powerPreference: 'high-performance',
+    preserveDrawingBuffer: true,
+    premultipliedAlpha: false,
+  });
   if (!gl) throw new Error('WebGL2 is required but was not available');
 
   // WebGL テクスチャサイズ制限を確認（デバッグ用）
@@ -478,6 +488,7 @@ function getPostprocessUniforms(gl: WebGL2RenderingContext, program: WebGLProgra
     u_effectEnabled: gl.getUniformLocation(program, 'u_effectEnabled'),
     u_effectMode: gl.getUniformLocation(program, 'u_effectMode'),
     u_noiseEnabled: gl.getUniformLocation(program, 'u_noiseEnabled'),
+    u_noiseType: gl.getUniformLocation(program, 'u_noiseType'),
     u_noiseAmount: gl.getUniformLocation(program, 'u_noiseAmount'),
     u_noiseScale: gl.getUniformLocation(program, 'u_noiseScale'),
     u_noiseOctaves: gl.getUniformLocation(program, 'u_noiseOctaves'),
@@ -485,6 +496,25 @@ function getPostprocessUniforms(gl: WebGL2RenderingContext, program: WebGLProgra
     u_noiseSeed: gl.getUniformLocation(program, 'u_noiseSeed'),
     u_time: gl.getUniformLocation(program, 'u_time'),
     u_noiseLoopPeriod: gl.getUniformLocation(program, 'u_noiseLoopPeriod'),
+    u_noiseLoopMode: gl.getUniformLocation(program, 'u_noiseLoopMode'),
+    u_animDir: gl.getUniformLocation(program, 'u_animDir'),
+    u_dwInitAmp: gl.getUniformLocation(program, 'u_dwInitAmp'),
+    u_seamlessTwist: gl.getUniformLocation(program, 'u_seamlessTwist'),
+    u_voronoiDistMetric: gl.getUniformLocation(program, 'u_voronoiDistMetric'),
+    u_voronoiRandomness: gl.getUniformLocation(program, 'u_voronoiRandomness'),
+    u_voronoiFeature: gl.getUniformLocation(program, 'u_voronoiFeature'),
+    u_voronoiMinkowskiExp: gl.getUniformLocation(program, 'u_voronoiMinkowskiExp'),
+    u_ridgeSharpness: gl.getUniformLocation(program, 'u_ridgeSharpness'),
+    u_ridgeLacunarity: gl.getUniformLocation(program, 'u_ridgeLacunarity'),
+    u_ridgePersistence: gl.getUniformLocation(program, 'u_ridgePersistence'),
+    u_ridgeOffset: gl.getUniformLocation(program, 'u_ridgeOffset'),
+    u_ridgeWarp: gl.getUniformLocation(program, 'u_ridgeWarp'),
+    u_aeFractalType: gl.getUniformLocation(program, 'u_aeFractalType'),
+    u_aeSubInfluence: gl.getUniformLocation(program, 'u_aeSubInfluence'),
+    u_aeSubScaling: gl.getUniformLocation(program, 'u_aeSubScaling'),
+    u_aeSubRotation: gl.getUniformLocation(program, 'u_aeSubRotation'),
+    u_aeContrast: gl.getUniformLocation(program, 'u_aeContrast'),
+    u_aeBrightness: gl.getUniformLocation(program, 'u_aeBrightness'),
     u_prismSpeed: gl.getUniformLocation(program, 'u_prismSpeed'),
     u_mirrorMode: gl.getUniformLocation(program, 'u_mirrorMode'),
     u_kaleidoscopeType: gl.getUniformLocation(program, 'u_kaleidoscopeType'),
@@ -507,6 +537,20 @@ function getPostprocessUniforms(gl: WebGL2RenderingContext, program: WebGLProgra
     u_postVoronoiGradientScale: gl.getUniformLocation(program, 'u_postVoronoiGradientScale'),
     u_postVoronoiEdgeWidth: gl.getUniformLocation(program, 'u_postVoronoiEdgeWidth'),
     u_postVoronoiSeed: gl.getUniformLocation(program, 'u_postVoronoiSeed'),
+    u_glassScale: gl.getUniformLocation(program, 'u_glassScale'),
+    u_glassStretch: gl.getUniformLocation(program, 'u_glassStretch'),
+    u_glassRotation: gl.getUniformLocation(program, 'u_glassRotation'),
+    u_glassComplexity: gl.getUniformLocation(program, 'u_glassComplexity'),
+    u_glassWarp: gl.getUniformLocation(program, 'u_glassWarp'),
+    u_glassSeed: gl.getUniformLocation(program, 'u_glassSeed'),
+    u_glassNoiseInfluence: gl.getUniformLocation(program, 'u_glassNoiseInfluence'),
+    u_glassRefraction: gl.getUniformLocation(program, 'u_glassRefraction'),
+    u_glassChromaticAberration: gl.getUniformLocation(program, 'u_glassChromaticAberration'),
+    u_glassRoughness: gl.getUniformLocation(program, 'u_glassRoughness'),
+    u_glassHighlight: gl.getUniformLocation(program, 'u_glassHighlight'),
+    u_glassMix: gl.getUniformLocation(program, 'u_glassMix'),
+    u_glassEvolution: gl.getUniformLocation(program, 'u_glassEvolution'),
+    u_glassMotion: gl.getUniformLocation(program, 'u_glassMotion'),
     u_diffuseEnabled: gl.getUniformLocation(program, 'u_diffuseEnabled'),
     u_diffuseMode: gl.getUniformLocation(program, 'u_diffuseMode'),
     u_diffuseScatter: gl.getUniformLocation(program, 'u_diffuseScatter'),
@@ -883,9 +927,10 @@ function drawPostprocessPass(
   gl.uniform2f(ctx.postprocessUniforms.u_gradAnchor1, anchors[1][0], anchors[1][1]);
   gl.uniform1f(ctx.postprocessUniforms.u_maxDisplacement, postprocess.maxDisplacement);
   gl.uniform1i(ctx.postprocessUniforms.u_effectEnabled, 1);
-  const effectModeMap = { distort: 0, mirror: 1, kaleidoscope: 2, prism: 3, voronoi: 4, particles: 0 } as const;
+  const effectModeMap = { distort: 0, mirror: 1, kaleidoscope: 2, prism: 3, voronoi: 4, glass: 5, particles: 0 } as const;
   gl.uniform1i(ctx.postprocessUniforms.u_effectMode, effectModeMap[postprocess.effectMode ?? 'distort']);
   gl.uniform1i(ctx.postprocessUniforms.u_noiseEnabled, noiseDistortion.enabled ? 1 : 0);
+  gl.uniform1i(ctx.postprocessUniforms.u_noiseType, NOISE_TYPE_MAP[noiseDistortion.type]);
   gl.uniform1f(ctx.postprocessUniforms.u_noiseAmount, noiseDistortion.amount ?? 0);
   gl.uniform1f(ctx.postprocessUniforms.u_noiseScale, noiseDistortion.scale ?? 1);
   gl.uniform1i(ctx.postprocessUniforms.u_noiseOctaves, noiseDistortion.octaves ?? 3);
@@ -893,6 +938,27 @@ function drawPostprocessPass(
   gl.uniform1f(ctx.postprocessUniforms.u_noiseSeed, noiseDistortion.noiseSeed ?? 0);
   gl.uniform1f(ctx.postprocessUniforms.u_time, time);
   gl.uniform1f(ctx.postprocessUniforms.u_noiseLoopPeriod, Math.max(Math.abs(noiseLoopPeriod), 0.0001));
+  gl.uniform1i(ctx.postprocessUniforms.u_noiseLoopMode, noiseDistortion.noiseLoopMode === 'seamless' ? 1 : 0);
+  gl.uniform2f(ctx.postprocessUniforms.u_animDir, 0, -1);
+  gl.uniform1f(ctx.postprocessUniforms.u_dwInitAmp, noiseDistortion.dwInitAmp);
+  gl.uniform1f(ctx.postprocessUniforms.u_seamlessTwist, noiseDistortion.seamlessTwist);
+  const voronoiDistanceMap = { euclidean: 0, manhattan: 1, chebyshev: 2, minkowski: 3 } as const;
+  const voronoiFeatureMap = { f1: 0, f2: 1, distance_to_edge: 2 } as const;
+  gl.uniform1i(ctx.postprocessUniforms.u_voronoiDistMetric, voronoiDistanceMap[noiseDistortion.voronoiDistMetric] ?? 0);
+  gl.uniform1f(ctx.postprocessUniforms.u_voronoiRandomness, noiseDistortion.voronoiRandomness ?? 1);
+  gl.uniform1i(ctx.postprocessUniforms.u_voronoiFeature, voronoiFeatureMap[noiseDistortion.voronoiFeature] ?? 0);
+  gl.uniform1f(ctx.postprocessUniforms.u_voronoiMinkowskiExp, noiseDistortion.voronoiMinkowskiExp ?? 2);
+  gl.uniform1f(ctx.postprocessUniforms.u_ridgeSharpness, noiseDistortion.ridgeSharpness ?? 2);
+  gl.uniform1f(ctx.postprocessUniforms.u_ridgeLacunarity, noiseDistortion.ridgeLacunarity ?? 2);
+  gl.uniform1f(ctx.postprocessUniforms.u_ridgePersistence, noiseDistortion.ridgePersistence ?? 0.6);
+  gl.uniform1f(ctx.postprocessUniforms.u_ridgeOffset, noiseDistortion.ridgeOffset ?? 1);
+  gl.uniform1f(ctx.postprocessUniforms.u_ridgeWarp, noiseDistortion.ridgeWarp ?? 1);
+  gl.uniform1i(ctx.postprocessUniforms.u_aeFractalType, noiseDistortion.aeFractalType === 'turbulent' ? 1 : 0);
+  gl.uniform1f(ctx.postprocessUniforms.u_aeSubInfluence, noiseDistortion.aeSubInfluence ?? 0.7);
+  gl.uniform1f(ctx.postprocessUniforms.u_aeSubScaling, noiseDistortion.aeSubScaling ?? 1.78);
+  gl.uniform1f(ctx.postprocessUniforms.u_aeSubRotation, (noiseDistortion.aeSubRotation ?? 0) * Math.PI / 180);
+  gl.uniform1f(ctx.postprocessUniforms.u_aeContrast, noiseDistortion.aeContrast ?? 1);
+  gl.uniform1f(ctx.postprocessUniforms.u_aeBrightness, noiseDistortion.aeBrightness ?? 0);
   gl.uniform1f(ctx.postprocessUniforms.u_prismSpeed, Math.max(Math.abs(animationSpeed), 0.0));
   const mirrorModeMap = { horizontal: 0, vertical: 1, quad: 2 } as const;
   gl.uniform1i(ctx.postprocessUniforms.u_mirrorMode, mirrorModeMap[postprocess.mirrorMode ?? 'horizontal']);
@@ -918,6 +984,23 @@ function drawPostprocessPass(
   gl.uniform1f(ctx.postprocessUniforms.u_postVoronoiGradientScale, postprocess.voronoiGradientScale ?? 1.15);
   gl.uniform1f(ctx.postprocessUniforms.u_postVoronoiEdgeWidth, postprocess.voronoiEdgeWidth ?? 0.025);
   gl.uniform1f(ctx.postprocessUniforms.u_postVoronoiSeed, postprocess.voronoiSeed ?? 0);
+  gl.uniform1f(ctx.postprocessUniforms.u_glassScale, clampNumber(postprocess.glassScale ?? 3.2, 0.5, 12));
+  gl.uniform1f(ctx.postprocessUniforms.u_glassStretch, clampNumber(postprocess.glassStretch ?? 4, 0.25, 8));
+  gl.uniform1f(ctx.postprocessUniforms.u_glassRotation, clampNumber(postprocess.glassRotation ?? 12, 0, 360) * Math.PI / 180);
+  gl.uniform1i(ctx.postprocessUniforms.u_glassComplexity, Math.round(clampNumber(postprocess.glassComplexity ?? 4, 1, 5)));
+  gl.uniform1f(ctx.postprocessUniforms.u_glassWarp, clampNumber(postprocess.glassWarp ?? 0.55, 0, 1));
+  gl.uniform1f(ctx.postprocessUniforms.u_glassSeed, Math.round(clampNumber(postprocess.glassSeed ?? 0, 0, 99)));
+  gl.uniform1f(
+    ctx.postprocessUniforms.u_glassNoiseInfluence,
+    smoothGlassNoiseBlend(postprocess.glassNoiseInfluence ?? 0),
+  );
+  gl.uniform1f(ctx.postprocessUniforms.u_glassRefraction, clampNumber(postprocess.glassRefraction ?? 32, 0, GLASS_LIMITS.refraction));
+  gl.uniform1f(ctx.postprocessUniforms.u_glassChromaticAberration, clampNumber(postprocess.glassChromaticAberration ?? 4, 0, GLASS_LIMITS.chromaticAberration));
+  gl.uniform1f(ctx.postprocessUniforms.u_glassRoughness, clampNumber(postprocess.glassRoughness ?? 1.5, 0, GLASS_LIMITS.roughness));
+  gl.uniform1f(ctx.postprocessUniforms.u_glassHighlight, clampNumber(postprocess.glassHighlight ?? 0.45, 0, 2));
+  gl.uniform1f(ctx.postprocessUniforms.u_glassMix, clampNumber(postprocess.glassMix ?? 1, 0, 1));
+  gl.uniform1f(ctx.postprocessUniforms.u_glassEvolution, clampNumber(postprocess.glassEvolution ?? 0, 0, 1));
+  gl.uniform1f(ctx.postprocessUniforms.u_glassMotion, clampNumber(postprocess.glassMotion ?? 0.35, 0, 1));
   const diffuseScale = diffuseResolutionScale(fullWidth, fullHeight);
   gl.uniform1i(ctx.postprocessUniforms.u_diffuseEnabled, postprocess.diffuseEnabled ? 1 : 0);
   gl.uniform1i(ctx.postprocessUniforms.u_diffuseMode, DIFFUSE_MODE_MAP[postprocess.diffuseMode ?? 'block'] ?? 0);

@@ -5,6 +5,7 @@ import { SliderField } from './SliderField';
 import { Collapsible } from './Collapsible';
 import { Toggle } from './Toggle';
 import { CustomSelect } from './CustomSelect';
+import { Icon } from './Icon';
 
 const D = STORE_DEFAULTS.noiseDistortion;
 
@@ -78,7 +79,7 @@ export function NoiseDistortionPanel() {
             }`}
             title="Noise Distortion のパラメータをリセット"
           >
-            <span className="material-symbols-rounded text-[14px]">restart_alt</span>
+            <Icon name="restart" className="text-[14px]" />
           </button>
           <Toggle variant="switch" checked={noiseDistortion.enabled} onChange={(v) => setNoiseDistortion({ enabled: v })} />
         </div>

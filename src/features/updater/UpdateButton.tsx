@@ -1,4 +1,5 @@
 import type { UpdateStatus } from './types';
+import { Icon } from '../../components/Icon';
 
 type UpdateButtonProps = {
   status: UpdateStatus;
@@ -27,9 +28,10 @@ export function UpdateButton({ status, onClick }: UpdateButtonProps) {
       title={available ? 'アップデートを利用できます' : 'アップデートを確認'}
       aria-label={available ? 'アップデートを利用できます' : 'アップデートを確認'}
     >
-      <span className={`material-symbols-rounded text-[18px] leading-none ${busy ? 'animate-spin' : ''}`}>
-        {busy ? 'progress_activity' : 'system_update_alt'}
-      </span>
+      <Icon
+        name={busy ? 'progress' : 'systemUpdate'}
+        className={`text-[18px] ${busy ? 'animate-spin' : ''}`}
+      />
       {(available || failed) && (
         <span
           className={`absolute -right-1 -top-1 h-2.5 w-2.5 border-2 border-k-bg ${

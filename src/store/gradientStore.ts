@@ -6,6 +6,7 @@ import type { AnimationMode, Keyframe, PropertyTrack } from '../types/keyframe';
 import { normalizePropertyTrack } from '../types/keyframe';
 import { computeAutoHandles } from '../lib/autoBezier';
 import { createAnimationTrack, getAnimationDefinition } from '../lib/animationRegistry';
+import { isPostprocessTimeAnimationActive } from '../lib/postprocessAnimation';
 
 export type AnimationEasing = {
   enabled: boolean;
@@ -348,6 +349,20 @@ export const STORE_DEFAULTS = {
     voronoiGradientScale: 1.15,
     voronoiEdgeWidth: 0.025,
     voronoiSeed: 0,
+    glassScale: 3.2,
+    glassStretch: 4,
+    glassRotation: 12,
+    glassComplexity: 4,
+    glassWarp: 0.55,
+    glassSeed: 0,
+    glassNoiseInfluence: 0,
+    glassRefraction: 32,
+    glassChromaticAberration: 4,
+    glassRoughness: 1.5,
+    glassHighlight: 0.45,
+    glassMix: 1,
+    glassEvolution: 0,
+    glassMotion: 0.35,
     particleCount: 180000,
     particleEmitterType: 'field' as const,
     particleEmitterPoint: [0.5, 0.5] as [number, number],
@@ -405,6 +420,23 @@ export const STORE_DEFAULTS = {
   },
 };
 
+export function normalizePostprocessConfig(
+  saved?: Partial<PostprocessConfig>,
+): PostprocessConfig {
+  const resolution = saved?.mapResolution ?? STORE_DEFAULTS.postprocess.mapResolution;
+  return {
+    ...STORE_DEFAULTS.postprocess,
+    ...saved,
+    mapResolution: resolution,
+    displacement: saved?.displacement
+      ? [...saved.displacement]
+      : createEmptyManualDistortMap(resolution),
+    smoothMask: saved?.smoothMask
+      ? [...saved.smoothMask]
+      : createEmptyManualSmoothMask(resolution),
+  };
+}
+
 type AutoTrackState = Pick<
   GradientStore,
   'noiseDistortion' | 'diffuse' | 'slitScan' | 'stretch' | 'radon' | 'iridescence' | 'postprocess'
@@ -439,7 +471,7 @@ function ensureDefaultAutoTracks(
   }
   if (state.stretch.enabled) tracks = ensureAutoTrack(tracks, 'stretch.__scan');
   if (state.diffuse.enabled && state.diffuse.seedAnimEnabled) tracks = ensureAutoTrack(tracks, 'diffuse.seed');
-  if (state.postprocess.enabled && (state.postprocess.effectMode === 'prism' || state.postprocess.effectMode === 'particles')) {
+  if (isPostprocessTimeAnimationActive(state.postprocess)) {
     tracks = ensureAutoTrack(tracks, 'postprocess.__time');
   }
   return tracks;
@@ -605,7 +637,7 @@ export const useGradientStore = create<GradientStore>((set) => ({
     const next = { ...s.postprocess, ...v, displacement, smoothMask };
     if ((next.particleEmitterType as string) === 'nexus') next.particleEmitterType = 'point';
     if (!next.particleEmitterPoint) next.particleEmitterPoint = [...STORE_DEFAULTS.postprocess.particleEmitterPoint] as [number, number];
-    const keyframeTracks = s.animation.enabled && next.enabled && (next.effectMode === 'prism' || next.effectMode === 'particles')
+    const keyframeTracks = s.animation.enabled && isPostprocessTimeAnimationActive(next)
       ? ensureAutoTrack(s.keyframeTracks, 'postprocess.__time')
       : s.keyframeTracks;
     return { postprocess: next, keyframeTracks };

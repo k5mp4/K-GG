@@ -38,6 +38,7 @@ import { ColorHistogram } from './components/ColorHistogram';
 import { SlitOverlay } from './components/SlitOverlay';
 import { DockPanel } from './components/DockPanel';
 import { PanelEdgeToggle } from './components/PanelEdgeToggle';
+import { Icon } from './components/Icon';
 import { parseSvgPaths } from './lib/svgParser';
 import { undo, redo } from './lib/history';
 import type { GpuDiagnostics } from './lib/gpuDiagnostics';
@@ -441,7 +442,7 @@ export default function App() {
             className="hidden min-w-0 max-w-[240px] items-center gap-2 border border-cream/20 bg-k-surface px-3 text-tab-inactive md:flex"
             title={gpuInfo.title}
           >
-            <span className="material-symbols-rounded shrink-0 text-[16px] text-deep">memory</span>
+            <Icon name="memory" className="text-[16px] text-deep" />
             <span className="truncate text-[9px] font-display font-semibold uppercase tracking-wider">
               {gpuInfo.label}
             </span>
@@ -463,7 +464,7 @@ export default function App() {
             title={`Property module settings · ${tabHoverSwitchEnabled ? 'Hover' : 'Click only'}`}
             aria-label="Open property module settings"
           >
-            <span className="material-symbols-rounded text-[16px] leading-none">settings</span>
+            <Icon name="settings" className="text-[16px]" />
             <span className="hidden text-[9px] font-display font-semibold uppercase tracking-wider xl:inline">
               {tabHoverSwitchEnabled ? 'Hover' : 'Click only'}
             </span>
@@ -691,7 +692,7 @@ export default function App() {
                 onClick={() => setShowTimeRemap(false)}
                 aria-label="Close Loop Timing"
               >
-                <span className="material-symbols-rounded text-[12px] leading-none">close</span>
+                <Icon name="close" className="text-[12px]" />
               </button>
               <BezierEasingEditor compact />
             </div>

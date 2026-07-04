@@ -1,5 +1,5 @@
 import { useEffect, useState, useRef, type MutableRefObject } from 'react';
-import { createEmptyManualDistortMap, createEmptyManualSmoothMask, STORE_DEFAULTS, useGradientStore } from '../store/gradientStore';
+import { createEmptyManualDistortMap, createEmptyManualSmoothMask, normalizePostprocessConfig, STORE_DEFAULTS, useGradientStore } from '../store/gradientStore';
 import {
   loadPresets,
   savePreset,
@@ -84,14 +84,7 @@ export function PresetPanel({ canvasW, canvasH, setCanvasW, setCanvasH, aspectRa
     }
     {
       const savedPostprocess = s.postprocess ?? s.postprocessDistort;
-      const resolution = savedPostprocess?.mapResolution ?? STORE_DEFAULTS.postprocess.mapResolution;
-      store.setPostprocess({
-        ...STORE_DEFAULTS.postprocess,
-        ...savedPostprocess,
-        mapResolution: resolution,
-        displacement: savedPostprocess?.displacement ?? createEmptyManualDistortMap(resolution),
-        smoothMask: savedPostprocess?.smoothMask ?? createEmptyManualSmoothMask(resolution),
-      });
+      store.setPostprocess(normalizePostprocessConfig(savedPostprocess));
     }
     if (s.matcap) store.setMatcap(s.matcap);
     store.setKeyframeTracks(s.keyframeTracks ?? {});

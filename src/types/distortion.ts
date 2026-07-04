@@ -148,7 +148,7 @@ export type ManualDistortConfig = {
   maxDisplacement: number; // max UV displacement represented by +/-1 in the map
 };
 
-export type PostprocessEffectMode = 'distort' | 'mirror' | 'kaleidoscope' | 'prism' | 'voronoi' | 'particles';
+export type PostprocessEffectMode = 'distort' | 'mirror' | 'kaleidoscope' | 'prism' | 'voronoi' | 'glass' | 'particles';
 export type PostprocessMirrorMode = 'horizontal' | 'vertical' | 'quad';
 export type PostprocessKaleidoscopeType = 'unfold' | 'flower' | 'starlish';
 export type PostprocessParticleBlendMode = 'alpha' | 'add';
@@ -180,6 +180,20 @@ export type PostprocessConfig = ManualDistortConfig & {
   voronoiGradientScale: number;
   voronoiEdgeWidth: number;
   voronoiSeed: number;
+  glassScale: number;
+  glassStretch: number;
+  glassRotation: number;
+  glassComplexity: number;
+  glassWarp: number;
+  glassSeed: number;
+  glassNoiseInfluence: number;
+  glassRefraction: number;
+  glassChromaticAberration: number;
+  glassRoughness: number;
+  glassHighlight: number;
+  glassMix: number;
+  glassEvolution: number;
+  glassMotion: number;
   particleCount: number;
   particleEmitterType: PostprocessParticleEmitterType;
   particleEmitterPoint: [number, number];

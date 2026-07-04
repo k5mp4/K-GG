@@ -2,6 +2,7 @@ import { useRef, useEffect } from 'react';
 import { useGradientStore, GRADIENT_ANCHOR_DEFAULTS, defaultBezierControlsForAnchors } from '../store/gradientStore';
 import { interpolateKeyframes } from '../lib/keyframeInterpolator';
 import { getTrackMode } from '../types/keyframe';
+import { Icon } from './Icon';
 
 // デバッグ用：ブラウザコンソールから調整可能
 const SNAP_CONFIG = {
@@ -434,7 +435,7 @@ export function GradientAnchorEditor({ width, height }: Props) {
                   color: '#D11402',
                 }}
               >
-                <span className="material-symbols-rounded" style={{ fontSize: 10 }}>timer</span>
+                <Icon name="timer" style={{ fontSize: 10 }} />
               </button>
             )}
           </div>

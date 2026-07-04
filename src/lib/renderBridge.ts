@@ -9,6 +9,7 @@ type RenderAtTimeFn = (time: number, normalizedTime?: number, tile?: TileRenderO
 type VoidFn = () => void;
 type BoolFn = () => boolean;
 type NumberFn = () => number;
+type TilePaddingFn = () => number;
 
 let _renderAtTime: RenderAtTimeFn | null = null;
 let _stopAnim: VoidFn | null = null;
@@ -18,12 +19,19 @@ let _isPaused: BoolFn | null = null;
 let _getCurrentTime: NumberFn | null = null;
 let _getCurrentNormalizedTime: NumberFn | null = null;
 let _seekTo: ((normalizedTime: number) => void) | null = null;
+let _getTilePadding: TilePaddingFn | null = null;
 
 export const renderBridge = {
-  register(renderAtTime: RenderAtTimeFn, stopAnim: VoidFn, startAnim: VoidFn): void {
+  register(
+    renderAtTime: RenderAtTimeFn,
+    stopAnim: VoidFn,
+    startAnim: VoidFn,
+    getTilePadding?: TilePaddingFn,
+  ): void {
     _renderAtTime = renderAtTime;
     _stopAnim = stopAnim;
     _startAnim = startAnim;
+    _getTilePadding = getTilePadding ?? null;
   },
   registerPause(
     togglePause: VoidFn,
@@ -60,6 +68,9 @@ export const renderBridge = {
   },
   getCurrentNormalizedTime(): number {
     return _getCurrentNormalizedTime?.() ?? 0;
+  },
+  getTilePadding(): number {
+    return Math.max(0, Math.floor(_getTilePadding?.() ?? 0));
   },
   seekTo(normalizedTime: number): void {
     _seekTo?.(Math.max(0, Math.min(1, normalizedTime)));

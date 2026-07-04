@@ -7,6 +7,7 @@ import { buildRampTextureData, RAMP_TEX_WIDTH } from '../lib/gradientRampUtils';
 import { setTimelineTime } from '../lib/timelineClock';
 import { hasActiveAnimation } from '../lib/sceneEvaluation';
 import { renderSceneAtTime } from '../lib/renderSceneAtTime';
+import { LatestFrameScheduler } from '../lib/latestFrameScheduler';
 import type { GradientConfig } from '../types/gradient';
 
 const FALLBACK_PREVIEW_MAX_W = 360;
@@ -264,6 +265,10 @@ type Props = {
 
 export function GradientCanvas({ width = 800, height = 800, animLoopRef, seekVersion = 0, canvasRef, sourceImageCanvas = null, imageMaskSource = null, imageMaskEnabled = false }: Props) {
   const fallbackCanvasRef = useRef<HTMLCanvasElement | null>(null);
+  const staticRenderSchedulerRef = useRef<LatestFrameScheduler | null>(null);
+  if (!staticRenderSchedulerRef.current) {
+    staticRenderSchedulerRef.current = new LatestFrameScheduler();
+  }
 
   const { gradient, noiseDistortion, diffuse, bezierAxis, slitScan, stretch, animation, normalMap, radon, iridescence, manualDistort, postprocess, matcap, keyframeTracks, currentTime } = useGradientStore();
 
@@ -287,6 +292,10 @@ export function GradientCanvas({ width = 800, height = 800, animLoopRef, seekVer
     return () => window.removeEventListener('kgg:webgl-lazy-program-ready', handleReady);
   }, []);
 
+  useEffect(() => () => {
+    staticRenderSchedulerRef.current?.cancel();
+  }, []);
+
   // latestRef を毎レンダー更新（ブラウザ描画前に同期更新し、RAFループが即座に最新値を参照できるようにする）
   useLayoutEffect(() => {
     latestRef.current = { gradient, noiseDistortion, diffuse, bezierAxis, slitScan, stretch, normalMap, radon, iridescence, manualDistort, postprocess, matcap, animation, keyframeTracks, width, height, animDirection: animation.direction, sourceImageCanvas, imageMaskSource, imageMaskEnabled };
@@ -296,15 +305,21 @@ export function GradientCanvas({ width = 800, height = 800, animLoopRef, seekVer
 
   // 静止レンダリング（アニメーション停止中の状態変化に反応）
   useLayoutEffect(() => {
-    const ctx = webglRef.current;
     const latest = latestRef.current;
-    if (!ctx || !latest) return;
+    if (!webglRef.current || !latest) return;
     const isPaused = animLoopRef.current?.isPaused ?? false;
     if (hasActiveAnimation(latest) && !isPaused) return;
-    const normalizedTime = animation.enabled
-      ? (animLoopRef.current?.currentNormalizedTime ?? currentTime)
-      : 0;
-    renderSceneAtTime(ctx, latest, normalizedTime, { sdfReady: sdfReadyRef.current });
+    staticRenderSchedulerRef.current?.schedule(() => {
+      const ctx = webglRef.current;
+      const frameState = latestRef.current;
+      if (!ctx || !frameState) return;
+      const frameIsPaused = animLoopRef.current?.isPaused ?? false;
+      if (hasActiveAnimation(frameState) && !frameIsPaused) return;
+      const normalizedTime = frameState.animation.enabled
+        ? (animLoopRef.current?.currentNormalizedTime ?? useGradientStore.getState().currentTime)
+        : 0;
+      renderSceneAtTime(ctx, frameState, normalizedTime, { sdfReady: sdfReadyRef.current });
+    });
   }, [gradient, noiseDistortion, diffuse, bezierAxis, slitScan, stretch, normalMap, radon, iridescence, manualDistort, postprocess, width, height, animation.enabled, animation.speed, animation.direction, animation.easing, animation.affectNoise, animation.affectSlit, animation.affectRamp, animation.affectStretch, keyframeTracks, currentTime, sdfGenCount, lazyProgramReadyCount, seekVersion, isWebGLReady, sourceImageCanvas, imageMaskSource, imageMaskEnabled]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // アニメーションループの管理
@@ -333,12 +348,21 @@ export function GradientCanvas({ width = 800, height = 800, animLoopRef, seekVer
       animLoopRef.current.start();
       if (resumeTime > 0 && resumeTime < 1) animLoopRef.current.seekTo(resumeTime);
     } else if (latest) {
-      renderSceneAtTime(webglRef.current, latest, animation.enabled ? currentTime : 0, {
-        sdfReady: sdfReadyRef.current,
+      // effectMode/Motion切替時も静止描画を同期発行しない。
+      // 上のlayout effectと同じフレームへ集約し、WebView2へ二重描画を投入しない。
+      staticRenderSchedulerRef.current?.schedule(() => {
+        const ctx = webglRef.current;
+        const frameState = latestRef.current;
+        if (!ctx || !frameState || hasActiveAnimation(frameState)) return;
+        renderSceneAtTime(ctx, frameState, frameState.animation.enabled
+          ? useGradientStore.getState().currentTime
+          : 0, {
+          sdfReady: sdfReadyRef.current,
+        });
       });
     }
     return () => { animLoopRef.current?.stop(); };
-  }, [animation.enabled, animation.duration, animation.previewLoop, animation.speed, keyframeTracks, noiseDistortion.enabled, iridescence.enabled, radon.enabled, slitScan.enabled, stretch.enabled, diffuse.enabled, diffuse.seedAnimEnabled, postprocess.enabled, postprocess.effectMode]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [animation.enabled, animation.duration, animation.previewLoop, animation.speed, keyframeTracks, noiseDistortion.enabled, iridescence.enabled, radon.enabled, slitScan.enabled, stretch.enabled, diffuse.enabled, diffuse.seedAnimEnabled, postprocess.enabled, postprocess.effectMode, postprocess.glassMotion]); // eslint-disable-line react-hooks/exhaustive-deps
 
   return (
     <div style={{ position: 'relative', width: '100%', height: '100%' }}>

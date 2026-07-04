@@ -35,14 +35,10 @@ npm run updater:key -- "$env:USERPROFILE\.tauri\k-gg.key.pub"
 ローカルでWindowsインストーラーを検証する場合は、同じPowerShell内で署名鍵を一時的に環境変数へ設定してビルドします。
 
 ```powershell
-$env:TAURI_SIGNING_PRIVATE_KEY = "$env:USERPROFILE\.tauri\k-gg.key"
-$env:TAURI_SIGNING_PRIVATE_KEY_PASSWORD = Read-Host "署名鍵のパスワード" -MaskInput
-
-npm run tauri:build:windows
-
-Remove-Item Env:TAURI_SIGNING_PRIVATE_KEY
-Remove-Item Env:TAURI_SIGNING_PRIVATE_KEY_PASSWORD
+npm run verify:windows
 ```
+
+このコマンドはバージョン・公開鍵検証、フロントエンドテスト、lint、Webビルド、Rustテスト、Rust check、署名付きNSIS生成を順番に実行します。署名鍵のパスワードは実行時に一度だけ入力し、成功・失敗にかかわらず環境変数から削除されます。
 
 ### 2. GitHub EnvironmentとSecretsを作る
 
@@ -85,11 +81,7 @@ git pull --ff-only origin main
 git status
 npm ci
 npm run release:version -- 0.1.0
-npm run release:check
-npm test
-npm run lint
-npm run build
-cargo test --manifest-path src-tauri/Cargo.toml
+npm run verify
 ```
 
 `git status`に意図しない変更がある場合は、先へ進まないでください。バージョン変更をコミットします。

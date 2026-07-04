@@ -147,7 +147,7 @@ export type ExportConfig = VideoExportConfig;
 /** QuickTime Animation (qtrle) でロスレス RGB MOV を生成して Blob を返す。
  *  YUV 変換を行わないため PNG と同一の色が保持される。 */
 export async function exportLosslessMOV(_config: ExportConfig): Promise<Blob> {
-  throw new Error('Lossless MOV エクスポートには Tauri ローカルアプリと外部 FFmpeg バイナリが必要です。');
+  throw new Error('MOV エクスポートには Tauri ローカルアプリと外部 FFmpeg バイナリが必要です。');
 }
 
 export async function exportHighQualityMP4(_config: ExportConfig): Promise<Blob> {

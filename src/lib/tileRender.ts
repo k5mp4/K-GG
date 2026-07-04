@@ -63,6 +63,50 @@ export type TiledRenderOptions = {
   signal?: AbortSignal;
 };
 
+export type PaddedTileRegion = {
+  coreX: number;
+  coreY: number;
+  coreWidth: number;
+  coreHeight: number;
+  renderX: number;
+  renderY: number;
+  renderWidth: number;
+  renderHeight: number;
+  sourceX: number;
+  sourceY: number;
+};
+
+export function getPaddedTileRegion(
+  col: number,
+  row: number,
+  coreTileSize: number,
+  fullWidth: number,
+  fullHeight: number,
+  padding: number,
+): PaddedTileRegion {
+  const coreX = col * coreTileSize;
+  const coreY = row * coreTileSize;
+  const coreWidth = Math.min(coreTileSize, fullWidth - coreX);
+  const coreHeight = Math.min(coreTileSize, fullHeight - coreY);
+  const renderX = Math.max(0, coreX - padding);
+  const renderY = Math.max(0, coreY - padding);
+  const renderRight = Math.min(fullWidth, coreX + coreWidth + padding);
+  const renderBottom = Math.min(fullHeight, coreY + coreHeight + padding);
+
+  return {
+    coreX,
+    coreY,
+    coreWidth,
+    coreHeight,
+    renderX,
+    renderY,
+    renderWidth: renderRight - renderX,
+    renderHeight: renderBottom - renderY,
+    sourceX: coreX - renderX,
+    sourceY: coreY - renderY,
+  };
+}
+
 /**
  * タイル分割で描画した結果を 2D canvas に合成して返す。
  * 呼び出し側は `out.toBlob('image/png')` 等で書き出す。
@@ -72,6 +116,8 @@ export async function renderTiledToCanvas2D(
 ): Promise<HTMLCanvasElement> {
   const { canvas, fullWidth, fullHeight, time = 0, normalizedTime, onProgress, signal } = opts;
   const tileSize = opts.tileSize ?? pickTileSize(canvas);
+  const padding = Math.min(renderBridge.getTilePadding(), Math.max(0, Math.floor((tileSize - 1) / 2)));
+  const coreTileSize = Math.max(1, tileSize - padding * 2);
   const syncFrames = opts.syncFrames ?? 1;
 
   const out = document.createElement('canvas');
@@ -80,8 +126,8 @@ export async function renderTiledToCanvas2D(
   const out2d = out.getContext('2d');
   if (!out2d) throw new Error('Failed to create 2D context for tile compositor');
 
-  const cols = Math.ceil(fullWidth / tileSize);
-  const rows = Math.ceil(fullHeight / tileSize);
+  const cols = Math.ceil(fullWidth / coreTileSize);
+  const rows = Math.ceil(fullHeight / coreTileSize);
   const totalTiles = cols * rows;
 
   const origW = canvas.width;
@@ -91,7 +137,7 @@ export async function renderTiledToCanvas2D(
   renderBridge.stopAnimation();
 
   console.log(
-    `[tileRender] start ${fullWidth}×${fullHeight} → ${cols}×${rows} tiles (${tileSize}px)`,
+    `[tileRender] start ${fullWidth}×${fullHeight} → ${cols}×${rows} tiles (${coreTileSize}px core, ${padding}px padding)`,
   );
 
   let tileIndex = 0;
@@ -100,24 +146,27 @@ export async function renderTiledToCanvas2D(
       for (let col = 0; col < cols; col++) {
         if (signal?.aborted) throw new DOMException('Tile render cancelled', 'AbortError');
 
-        // 2D-canvas（top-down）座標でのタイル位置
-        const dx = col * tileSize;
-        const dy = row * tileSize;
-        const tw = Math.min(tileSize, fullWidth - dx);
-        const th = Math.min(tileSize, fullHeight - dy);
+        // 2D-canvas（top-down）座標でのコア領域と、サンプル用ガターを含む描画領域
+        const region = getPaddedTileRegion(
+          col,
+          row,
+          coreTileSize,
+          fullWidth,
+          fullHeight,
+          padding,
+        );
 
-        // canvas を タイルサイズに合わせる（drawingBuffer も同サイズに）
-        if (canvas.width !== tw) canvas.width = tw;
-        if (canvas.height !== th) canvas.height = th;
+        // canvas をガター込み描画サイズに合わせる（drawingBuffer も同サイズに）
+        if (canvas.width !== region.renderWidth) canvas.width = region.renderWidth;
+        if (canvas.height !== region.renderHeight) canvas.height = region.renderHeight;
 
         // u_tileOffset は gl_FragCoord（bottom-up）空間で指定する。
-        // 2D-canvas 上の (dx, dy, tw, th) は WebGL 上では Y 反転して
-        // (dx, fullHeight - dy - th, tw, th) に対応する。
-        const offsetX = dx;
-        const offsetY = fullHeight - dy - th;
+        // 2D-canvas 上の描画領域を WebGL の bottom-up 座標へ変換する。
+        const offsetX = region.renderX;
+        const offsetY = fullHeight - region.renderY - region.renderHeight;
 
         renderBridge.renderAtTime(time, normalizedTime, {
-          viewport: [tw, th],
+          viewport: [region.renderWidth, region.renderHeight],
           offset: [offsetX, offsetY],
         });
 
@@ -127,7 +176,17 @@ export async function renderTiledToCanvas2D(
         }
 
         // 2D canvas へコピー（drawImage は WebGL canvas の bottom-up を自動で正立に変換）
-        out2d.drawImage(canvas, dx, dy, tw, th);
+        out2d.drawImage(
+          canvas,
+          region.sourceX,
+          region.sourceY,
+          region.coreWidth,
+          region.coreHeight,
+          region.coreX,
+          region.coreY,
+          region.coreWidth,
+          region.coreHeight,
+        );
 
         tileIndex++;
         onProgress?.(tileIndex / totalTiles);

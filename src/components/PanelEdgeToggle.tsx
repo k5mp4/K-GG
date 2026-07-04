@@ -1,4 +1,5 @@
 import type { ReactNode } from 'react';
+import { Icon, type IconName } from './Icon';
 
 export type PanelEdge = 'left' | 'right' | 'bottom';
 
@@ -19,8 +20,8 @@ const EDGE_STYLES = {
     border: 'border-y border-r',
     color: 'text-fire hover:bg-fire/15',
     shadow: 'shadow-[8px_0_26px_rgba(0,0,0,0.24)]',
-    openIcon: 'chevron_left',
-    closedIcon: 'chevron_right',
+    openIcon: 'chevronLeft',
+    closedIcon: 'chevronRight',
   },
   right: {
     hotspot: 'top-1/2 -left-[38px] h-30 w-11 -translate-y-1/2',
@@ -28,8 +29,8 @@ const EDGE_STYLES = {
     border: 'border-y border-l',
     color: 'text-deep hover:bg-deep/15 hover:text-cream',
     shadow: 'shadow-[-8px_0_26px_rgba(0,0,0,0.24)]',
-    openIcon: 'chevron_right',
-    closedIcon: 'chevron_left',
+    openIcon: 'chevronRight',
+    closedIcon: 'chevronLeft',
   },
   bottom: {
     hotspot: 'bottom-full left-1/2 h-10 w-40 -translate-x-1/2',
@@ -37,10 +38,18 @@ const EDGE_STYLES = {
     border: 'border-x border-t',
     color: 'text-fire hover:bg-fire/15',
     shadow: 'shadow-[0_-8px_26px_rgba(0,0,0,0.24)]',
-    openIcon: 'keyboard_arrow_down',
-    closedIcon: 'keyboard_arrow_up',
+    openIcon: 'chevronDown',
+    closedIcon: 'chevronUp',
   },
-} satisfies Record<PanelEdge, Record<string, string>>;
+} satisfies Record<PanelEdge, {
+  hotspot: string;
+  button: string;
+  border: string;
+  color: string;
+  shadow: string;
+  openIcon: IconName;
+  closedIcon: IconName;
+}>;
 
 /**
  * A panel toggle anchored to its panel boundary. The same control stays in
@@ -93,9 +102,7 @@ export function PanelEdgeToggle({
         aria-controls={controlsId}
         aria-expanded={open}
       >
-        <span className="material-symbols-rounded text-[20px] leading-none">
-          {open ? styles.openIcon : styles.closedIcon}
-        </span>
+        <Icon name={open ? styles.openIcon : styles.closedIcon} className="text-[20px]" />
         {children && (
           <span className={`inline-flex items-center gap-2 transition-opacity duration-150 ${detailsStyle}`}>
             {children}

@@ -6,6 +6,7 @@ import { solveBezierU, splitBezier } from '../lib/easingBezier';
 import { interpolateKeyframes } from '../lib/keyframeInterpolator';
 import { getTimelineTime, setTimelineTime } from '../lib/timelineClock';
 import { getTrackMode, type Keyframe } from '../types/keyframe';
+import { Icon } from './Icon';
 import { getAnimationGroup } from '../lib/animationRegistry';
 import { AnimationPropertyControls } from './AnimationPropertyControls';
 
@@ -752,7 +753,7 @@ export function TimelineBar({ animLoopRef, onSeek, exportProgress = null, height
               className="w-6 h-6 flex items-center justify-center p-0 bg-transparent text-tab-inactive hover:text-k-text disabled:opacity-30 transition-colors"
               title="先頭へ"
             >
-              <span className="material-symbols-rounded text-[17px]">first_page</span>
+              <Icon name="firstPage" className="text-[17px]" />
             </button>
             <button
               onClick={() => nudgeFrame(-1)}
@@ -760,7 +761,7 @@ export function TimelineBar({ animLoopRef, onSeek, exportProgress = null, height
               className="w-6 h-6 flex items-center justify-center p-0 bg-transparent text-tab-inactive hover:text-k-text disabled:opacity-30 transition-colors"
               title="1フレーム戻る"
             >
-              <span className="material-symbols-rounded text-[17px]">skip_previous</span>
+              <Icon name="skipPrevious" className="text-[17px]" />
             </button>
             <button
               onClick={togglePause}
@@ -768,7 +769,7 @@ export function TimelineBar({ animLoopRef, onSeek, exportProgress = null, height
               className="w-9 h-9 flex items-center justify-center shrink-0 rounded-full border border-fire bg-k-surface p-0 text-fire hover:bg-fire hover:text-k-text disabled:opacity-30 transition-colors shadow-[0_0_0_1px_rgba(209,20,2,0.22)]"
               title={isPaused ? '再生' : '一時停止'}
             >
-              <span className="material-symbols-rounded text-[22px]">{isPaused ? 'play_arrow' : 'pause'}</span>
+              <Icon name={isPaused ? 'play' : 'pause'} className="text-[22px]" />
             </button>
             <button
               onClick={() => nudgeFrame(1)}
@@ -776,7 +777,7 @@ export function TimelineBar({ animLoopRef, onSeek, exportProgress = null, height
               className="w-6 h-6 flex items-center justify-center p-0 bg-transparent text-tab-inactive hover:text-k-text disabled:opacity-30 transition-colors"
               title="1フレーム進む"
             >
-              <span className="material-symbols-rounded text-[17px]">skip_next</span>
+              <Icon name="skipNext" className="text-[17px]" />
             </button>
             <button
               onClick={seekToEnd}
@@ -784,7 +785,7 @@ export function TimelineBar({ animLoopRef, onSeek, exportProgress = null, height
               className="w-6 h-6 flex items-center justify-center p-0 bg-transparent text-tab-inactive hover:text-k-text disabled:opacity-30 transition-colors"
               title="末尾へ"
             >
-              <span className="material-symbols-rounded text-[17px]">last_page</span>
+              <Icon name="lastPage" className="text-[17px]" />
             </button>
           </div>
         </div>

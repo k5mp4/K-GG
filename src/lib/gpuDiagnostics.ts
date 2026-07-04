@@ -56,6 +56,7 @@ export type RenderOptimization = {
   maxBlurRadius: number;
   maxPrismRays: number;
   maxKaleidoscopeSlices: number;
+  maxGlassComplexity: number;
   maxStretchGlowRadius: number;
 };
 
@@ -120,6 +121,7 @@ function tierSettings(tier: GpuPerformanceTier, reasons: string[]): RenderOptimi
       maxBlurRadius: 18,
       maxPrismRays: 32,
       maxKaleidoscopeSlices: 24,
+      maxGlassComplexity: 3,
       maxStretchGlowRadius: 24,
     };
   }
@@ -133,6 +135,7 @@ function tierSettings(tier: GpuPerformanceTier, reasons: string[]): RenderOptimi
       maxBlurRadius: 48,
       maxPrismRays: 64,
       maxKaleidoscopeSlices: 48,
+      maxGlassComplexity: 4,
       maxStretchGlowRadius: 48,
     };
   }
@@ -145,6 +148,7 @@ function tierSettings(tier: GpuPerformanceTier, reasons: string[]): RenderOptimi
     maxBlurRadius: 100,
     maxPrismRays: 96,
     maxKaleidoscopeSlices: 64,
+    maxGlassComplexity: 5,
     maxStretchGlowRadius: 80,
   };
 }
@@ -259,5 +263,6 @@ export function optimizePostprocess(
     prismRayCount: Math.min(config.prismRayCount ?? 24, optimization.maxPrismRays),
     prismGlowRadius: Math.min(config.prismGlowRadius ?? 0, optimization.maxBlurRadius),
     kaleidoscopeSlices: Math.min(config.kaleidoscopeSlices ?? 8, optimization.maxKaleidoscopeSlices),
+    glassComplexity: Math.min(config.glassComplexity ?? 4, optimization.maxGlassComplexity),
   };
 }

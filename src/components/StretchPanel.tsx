@@ -4,6 +4,7 @@ import { SliderField } from './SliderField';
 import { Collapsible } from './Collapsible';
 import { Toggle } from './Toggle';
 import { AnimationPropertyControls } from './AnimationPropertyControls';
+import { Icon } from './Icon';
 
 const D = STORE_DEFAULTS.stretch;
 const isStretchDirty = (value: StretchConfig) =>
@@ -30,7 +31,7 @@ export function StretchPanel() {
             }`}
             title="Stretch のパラメータをリセット"
           >
-            <span className="material-symbols-rounded text-[14px]">restart_alt</span>
+            <Icon name="restart" className="text-[14px]" />
           </button>
           <Toggle variant="switch" checked={stretch.enabled} onChange={(v) => setStretch({ enabled: v })} />
         </div>

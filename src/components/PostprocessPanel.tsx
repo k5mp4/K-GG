@@ -6,6 +6,7 @@ import type { ManualDistortConfig, PostprocessParticleEmitterType } from '../typ
 import { Collapsible } from './Collapsible';
 import { CustomSelect } from './CustomSelect';
 import { SliderField } from './SliderField';
+import { Icon } from './Icon';
 import { Toggle } from './Toggle';
 
 const D = STORE_DEFAULTS.manualDistort;
@@ -31,13 +32,13 @@ const PARTICLE_EMITTER_TYPE_OPTIONS = [
   { value: 'point', label: 'Point' },
 ];
 
-type ParticleControlGroupProps = {
+type PostprocessControlGroupProps = {
   title: string;
   defaultOpen?: boolean;
   children: ReactNode;
 };
 
-function ParticleControlGroup({ title, defaultOpen = true, children }: ParticleControlGroupProps) {
+function PostprocessControlGroup({ title, defaultOpen = true, children }: PostprocessControlGroupProps) {
   const [isOpen, setIsOpen] = useState(defaultOpen);
 
   return (
@@ -49,9 +50,10 @@ function ParticleControlGroup({ title, defaultOpen = true, children }: ParticleC
         aria-expanded={isOpen}
       >
         <span>{title}</span>
-        <span className={`material-symbols-rounded text-[16px] transition-transform ${isOpen ? 'rotate-180' : ''}`}>
-          expand_more
-        </span>
+        <Icon
+          name="chevronDown"
+          className={`text-[16px] transition-transform ${isOpen ? 'rotate-180' : ''}`}
+        />
       </button>
       <Collapsible isOpen={isOpen} duration={0.2}>
         <div className="space-y-4 px-3 pb-3 pt-1">
@@ -230,7 +232,7 @@ export function ManualDistortControls({ title, value: manualDistort, defaults = 
               }`}
               title="Manual Distort のパラメータと変位マップをリセット"
             >
-              <span className="material-symbols-rounded text-[14px]">restart_alt</span>
+              <Icon name="restart" className="text-[14px]" />
             </button>
             <Toggle
               variant="switch"
@@ -378,6 +380,7 @@ export function PostprocessPanel() {
               { value: 'kaleidoscope', label: 'Kaleidoscope' },
               { value: 'prism', label: 'Prism' },
               { value: 'voronoi', label: 'Voronoi' },
+              { value: 'glass', label: 'Glass' },
               { value: 'particles', label: 'Particles' },
             ]}
             onChange={(value) => setEffectMode(value as typeof postprocess.effectMode)}
@@ -650,9 +653,174 @@ export function PostprocessPanel() {
                 defaultValue={STORE_DEFAULTS.postprocess.voronoiSeed}
               />
             </div>
+          ) : postprocess.effectMode === 'glass' ? (
+            <div className="space-y-4">
+              <PostprocessControlGroup title="Surface">
+                <SliderField
+                  label="Scale"
+                  min={0.5}
+                  max={12}
+                  step={0.1}
+                  value={postprocess.glassScale}
+                  onChange={(v) => setPostprocess({ glassScale: v })}
+                  format={(v) => v.toFixed(1)}
+                  defaultValue={STORE_DEFAULTS.postprocess.glassScale}
+                  trackId="postprocess.glassScale"
+                />
+                <SliderField
+                  label="Stretch"
+                  min={0.25}
+                  max={8}
+                  step={0.05}
+                  value={postprocess.glassStretch}
+                  onChange={(v) => setPostprocess({ glassStretch: v })}
+                  format={(v) => v.toFixed(2)}
+                  defaultValue={STORE_DEFAULTS.postprocess.glassStretch}
+                  trackId="postprocess.glassStretch"
+                />
+                <SliderField
+                  label="Rotation"
+                  min={0}
+                  max={360}
+                  step={1}
+                  value={postprocess.glassRotation}
+                  onChange={(v) => setPostprocess({ glassRotation: v })}
+                  format={(v) => `${Math.round(v)}°`}
+                  defaultValue={STORE_DEFAULTS.postprocess.glassRotation}
+                  trackId="postprocess.glassRotation"
+                />
+                <SliderField
+                  label="Complexity"
+                  min={1}
+                  max={5}
+                  step={1}
+                  value={postprocess.glassComplexity}
+                  onChange={(v) => setPostprocess({ glassComplexity: Math.round(v) })}
+                  format={(v) => `${Math.round(v)}`}
+                  defaultValue={STORE_DEFAULTS.postprocess.glassComplexity}
+                />
+                <SliderField
+                  label="Warp"
+                  min={0}
+                  max={1}
+                  step={0.01}
+                  value={postprocess.glassWarp}
+                  onChange={(v) => setPostprocess({ glassWarp: v })}
+                  format={(v) => `${Math.round(v * 100)}%`}
+                  defaultValue={STORE_DEFAULTS.postprocess.glassWarp}
+                  trackId="postprocess.glassWarp"
+                />
+                <SliderField
+                  label="Seed"
+                  min={0}
+                  max={99}
+                  step={1}
+                  value={postprocess.glassSeed}
+                  onChange={(v) => setPostprocess({ glassSeed: Math.round(v) })}
+                  defaultValue={STORE_DEFAULTS.postprocess.glassSeed}
+                />
+                <SliderField
+                  label="Noise Distortion"
+                  min={0}
+                  max={1}
+                  step={0.01}
+                  value={postprocess.glassNoiseInfluence}
+                  onChange={(v) => setPostprocess({ glassNoiseInfluence: v })}
+                  format={(v) => `${Math.round(v * 100)}%`}
+                  defaultValue={STORE_DEFAULTS.postprocess.glassNoiseInfluence}
+                  trackId="postprocess.glassNoiseInfluence"
+                />
+                <p className="text-[10px] leading-relaxed text-tab-inactive">
+                  Noise Distortion パネルの模様とパラメータをガラス表面へブレンドします。
+                </p>
+              </PostprocessControlGroup>
+
+              <PostprocessControlGroup title="Optics">
+                <SliderField
+                  label="Refraction"
+                  min={0}
+                  max={120}
+                  step={0.5}
+                  value={postprocess.glassRefraction}
+                  onChange={(v) => setPostprocess({ glassRefraction: v })}
+                  format={(v) => `${v.toFixed(1)}px`}
+                  defaultValue={STORE_DEFAULTS.postprocess.glassRefraction}
+                  trackId="postprocess.glassRefraction"
+                />
+                <SliderField
+                  label="Chromatic Aberration"
+                  min={0}
+                  max={40}
+                  step={0.1}
+                  value={postprocess.glassChromaticAberration}
+                  onChange={(v) => setPostprocess({ glassChromaticAberration: v })}
+                  format={(v) => `${v.toFixed(1)}px`}
+                  defaultValue={STORE_DEFAULTS.postprocess.glassChromaticAberration}
+                  trackId="postprocess.glassChromaticAberration"
+                />
+                <SliderField
+                  label="Roughness"
+                  min={0}
+                  max={12}
+                  step={0.1}
+                  value={postprocess.glassRoughness}
+                  onChange={(v) => setPostprocess({ glassRoughness: v })}
+                  format={(v) => `${v.toFixed(1)}px`}
+                  defaultValue={STORE_DEFAULTS.postprocess.glassRoughness}
+                  trackId="postprocess.glassRoughness"
+                />
+                <SliderField
+                  label="Highlight"
+                  min={0}
+                  max={2}
+                  step={0.01}
+                  value={postprocess.glassHighlight}
+                  onChange={(v) => setPostprocess({ glassHighlight: v })}
+                  format={(v) => v.toFixed(2)}
+                  defaultValue={STORE_DEFAULTS.postprocess.glassHighlight}
+                  trackId="postprocess.glassHighlight"
+                />
+                <SliderField
+                  label="Mix"
+                  min={0}
+                  max={1}
+                  step={0.01}
+                  value={postprocess.glassMix}
+                  onChange={(v) => setPostprocess({ glassMix: v })}
+                  format={(v) => `${Math.round(v * 100)}%`}
+                  defaultValue={STORE_DEFAULTS.postprocess.glassMix}
+                  trackId="postprocess.glassMix"
+                />
+              </PostprocessControlGroup>
+
+              <PostprocessControlGroup title="Motion" defaultOpen={false}>
+                <SliderField
+                  label="Evolution"
+                  min={0}
+                  max={1}
+                  step={0.001}
+                  value={postprocess.glassEvolution}
+                  onChange={(v) => setPostprocess({ glassEvolution: v })}
+                  format={(v) => v.toFixed(3)}
+                  defaultValue={STORE_DEFAULTS.postprocess.glassEvolution}
+                  trackId="postprocess.glassEvolution"
+                />
+                <SliderField
+                  label="Motion"
+                  min={0}
+                  max={1}
+                  step={0.01}
+                  value={postprocess.glassMotion}
+                  onChange={(v) => setPostprocess({ glassMotion: v })}
+                  format={(v) => `${Math.round(v * 100)}%`}
+                  defaultValue={STORE_DEFAULTS.postprocess.glassMotion}
+                  trackId="postprocess.glassMotion"
+                />
+              </PostprocessControlGroup>
+            </div>
           ) : (
             <div className="space-y-4">
-              <ParticleControlGroup title="Emission">
+              <PostprocessControlGroup title="Emission">
                 <CustomSelect
                   label="Emitter Type"
                   value={particleEmitterType}
@@ -711,9 +879,9 @@ export function PostprocessPanel() {
                   ]}
                   onChange={(value) => setPostprocess({ particleBlendMode: value as typeof postprocess.particleBlendMode })}
                 />
-              </ParticleControlGroup>
+              </PostprocessControlGroup>
 
-              <ParticleControlGroup title="Shape">
+              <PostprocessControlGroup title="Shape">
                 <SliderField
                   label="Size"
                   min={0.5}
@@ -754,9 +922,9 @@ export function PostprocessPanel() {
                   format={(v) => `${Math.round(v * 100)}%`}
                   defaultValue={STORE_DEFAULTS.postprocess.particleCore}
                 />
-              </ParticleControlGroup>
+              </PostprocessControlGroup>
 
-              <ParticleControlGroup title="Lifetime">
+              <PostprocessControlGroup title="Lifetime">
                 <SliderField
                   label="Life Time"
                   min={0.25}
@@ -791,9 +959,9 @@ export function PostprocessPanel() {
                   format={(v) => `${Math.round(v * 100)}%`}
                   defaultValue={STORE_DEFAULTS.postprocess.particleSizeOverLife}
                 />
-              </ParticleControlGroup>
+              </PostprocessControlGroup>
 
-              <ParticleControlGroup title="Motion" defaultOpen={false}>
+              <PostprocessControlGroup title="Motion" defaultOpen={false}>
                 <SliderField
                   label="Speed"
                   min={0}
@@ -904,9 +1072,9 @@ export function PostprocessPanel() {
                   format={(v) => v.toFixed(2)}
                   defaultValue={STORE_DEFAULTS.postprocess.particleDepth}
                 />
-              </ParticleControlGroup>
+              </PostprocessControlGroup>
 
-              <ParticleControlGroup title="Color">
+              <PostprocessControlGroup title="Color">
                 <SliderField
                   label="Brightness"
                   min={0.1}
@@ -982,7 +1150,7 @@ export function PostprocessPanel() {
                   format={(v) => `${Math.round(v * 100)}%`}
                   defaultValue={STORE_DEFAULTS.postprocess.particleEdgeFade}
                 />
-              </ParticleControlGroup>
+              </PostprocessControlGroup>
             </div>
           )}
 

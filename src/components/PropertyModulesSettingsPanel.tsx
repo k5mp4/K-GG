@@ -1,4 +1,5 @@
 import { Toggle } from './Toggle';
+import { Icon } from './Icon';
 
 type PropertyModulesSettingsPanelProps = {
   hoverSwitchEnabled: boolean;
@@ -21,7 +22,7 @@ export function PropertyModulesSettingsPanel({
       <div className="relative flex h-[310px] w-full max-w-md flex-col overflow-hidden border border-cream/40 bg-k-surface shadow-2xl animate-in fade-in zoom-in duration-200">
         <div className="sticky top-0 z-10 flex shrink-0 items-center justify-between border-b border-cream/40 bg-k-surface p-4">
           <h2 className="flex items-center gap-2 text-lg font-display font-bold text-k-text">
-            <span className="material-symbols-rounded text-[20px] text-fire">settings</span>
+            <Icon name="settings" className="text-[20px] text-fire" />
             Property Modules
           </h2>
           <button

@@ -6,6 +6,7 @@ import { Collapsible } from './Collapsible';
 import { AnimatedButton } from './AnimatedButton';
 import { Toggle } from './Toggle';
 import { imageFileToCanvas } from '../lib/applySlitToImage';
+import { Icon } from './Icon';
 import { CustomSelect } from './CustomSelect';
 import { AnimationPropertyControls } from './AnimationPropertyControls';
 
@@ -71,7 +72,7 @@ export function SlitScanPanel({ sourceImageName, hasSourceImage, onSourceImageLo
             }`}
             title="Slit Scan のパラメータをリセット"
           >
-            <span className="material-symbols-rounded text-[14px]">restart_alt</span>
+            <Icon name="restart" className="text-[14px]" />
           </button>
           <Toggle variant="switch" checked={slitScan.enabled} onChange={(v) => setSlitScan({ enabled: v })} />
         </div>

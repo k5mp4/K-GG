@@ -19,7 +19,7 @@ K-GG は React、Tauri、fflate、ogl、zustand、react-colorful、react-markdow
 
 GSAP は UI アニメーション用途で使用しています。GSAP は MIT ではなく GSAP Standard License です。K-GG をアニメーション制作サービスや Webflow 系のビジュアルアニメーション制作ツールと競合する形で公開・販売する場合は、公開前に GSAP ライセンスを確認するか、GSAP 依存を外してください。
 
-Web 版は `index.html` で Google Fonts から Material Symbols Rounded、Noto Sans JP、Open Sans を読み込んでいます。オフライン配布やプライバシー要件を重視する配布では、フォントをセルフホストし、該当フォントのライセンスファイルを同梱してください。
+Web 版は `index.html` で Google Fonts から Noto Sans JP、Open Sans を読み込んでいます。オフライン配布やプライバシー要件を重視する配布では、フォントをセルフホストし、該当フォントのライセンスファイルを同梱してください。
 
 - FFmpeg: https://ffmpeg.org
 - FFmpeg license information: https://ffmpeg.org/legal.html
@@ -97,7 +97,7 @@ Web 版は `index.html` で Google Fonts から Material Symbols Rounded、Noto 
 ### Export (書き出し)
 - **Image**: 現在の表示内容を PNG / JPG / WebP 画像として書き出します。
 - **Slit PNGs**: スリットごとに個別 PNG を書き出します。
-- **Lossless MOV**: Tauri デスクトップ版で、外部 FFmpeg を使って QuickTime Animation(qtrle) のロスレス MOV を生成します。
+- **MOV**: Tauri デスクトップ版で、外部 FFmpeg を使って QuickTime Animation(qtrle) の MOV を生成します。
 - **MP4 (H.264 RGB)**: Tauri デスクトップ版で、外部 FFmpeg を使って MP4 を生成します。
 - **ZIP PNG**: Web 版 / Tauri 版の両方で利用できる連番 PNG ZIP 書き出しです。FFmpeg は不要です。
 - MOV / MP4 書き出しには、`ffmpeg` コマンドが PATH から実行できる状態でインストールされている必要があります。
