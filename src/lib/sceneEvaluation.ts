@@ -16,6 +16,7 @@ import { interpolateKeyframes } from './keyframeInterpolator';
 import { applyTimeRemap } from './timeRemap';
 import { hexToRgb255, rgb255ToHex } from './gradientRampUtils';
 import { withAnimatedDiffuseSeed } from './diffuseSeed';
+import { isPostprocessTimeAnimationActive } from './postprocessAnimation';
 
 export type EvaluatedScene = {
   gradient: GradientConfig;
@@ -166,6 +167,9 @@ function propertyOwnerEnabled(state: LatestState, propertyId: string): boolean {
   if (propertyId.startsWith('stretch.')) return state.stretch.enabled;
   if (propertyId.startsWith('radon.')) return state.radon.enabled;
   if (propertyId.startsWith('iridescence.')) return state.iridescence.enabled;
+  if (propertyId === 'postprocess.__time') {
+    return isPostprocessTimeAnimationActive(state.postprocess);
+  }
   if (propertyId.startsWith('postprocess.')) return state.postprocess.enabled;
   if (propertyId.startsWith('bezierAxis.')) return state.bezierAxis.enabled;
   return true;
@@ -188,7 +192,7 @@ export function hasActiveAnimation(state: LatestState): boolean {
     (state.animation.affectStretch && state.stretch.enabled) ||
     state.animation.affectRamp ||
     (state.diffuse.enabled && Boolean(state.diffuse.seedAnimEnabled)) ||
-    (state.postprocess.enabled && (state.postprocess.effectMode === 'prism' || state.postprocess.effectMode === 'particles'))
+    isPostprocessTimeAnimationActive(state.postprocess)
   );
 }
 
@@ -208,7 +212,7 @@ export function evaluateSceneAtTime(state: LatestState, normalizedTime: number):
   const postprocessMode = trackMode(
     state,
     'postprocess.__time',
-    state.postprocess.enabled && (state.postprocess.effectMode === 'prism' || state.postprocess.effectMode === 'particles'),
+    isPostprocessTimeAnimationActive(state.postprocess),
   );
 
   const anySharedAuto = (

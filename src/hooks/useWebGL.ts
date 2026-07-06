@@ -1,4 +1,4 @@
-import { useEffect, useRef, useReducer, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { initWebGL, SHADER_VERSION } from '../lib/webgl';
 import { generateDistanceMap, uploadDistanceMap } from '../lib/bezierAxis';
 import { buildRampTextureData } from '../lib/gradientRampUtils';
@@ -6,10 +6,17 @@ import { renderBridge } from '../lib/renderBridge';
 import { AnimationLoop } from '../lib/animation';
 import { SDF_MAP_SIZE, RAMP_TEX_WIDTH } from '../lib/constants';
 import { renderSceneAtTime } from '../lib/renderSceneAtTime';
+import { getGlassSamplePadding } from '../lib/glass';
 import { useGradientStore } from '../store/gradientStore';
 import type { WebGLContext } from '../lib/webgl';
 import type { GradientConfig } from '../types/gradient';
 import type { LatestState } from '../types/latestState';
+
+type WebGLInitRequest = {
+  canvas: HTMLCanvasElement;
+  shaderVersion: number;
+  promise: Promise<WebGLContext>;
+};
 
 export function useWebGL(
   canvasRef: React.RefObject<HTMLCanvasElement | null>,
@@ -19,22 +26,21 @@ export function useWebGL(
   const webglRef = useRef<WebGLContext | null>(null);
   const sdfReadyRef = useRef(false);
   const latestRef = useRef<LatestState | null>(null);
-  const initFailedRef = useRef(false);
-  const initializingRef = useRef(false);
+  const initRequestRef = useRef<WebGLInitRequest | null>(null);
   const compiledShaderVersionRef = useRef(0); // コンパイル済みシェーダーのバージョン
   const [isWebGLReady, setIsWebGLReady] = useState(false);
-  // abort 後に再試行をトリガーするためのカウンター（値は不使用、再レンダーだけが目的）
-  const [, forceRetry] = useReducer((x: number) => x + 1, 0);
+  const shaderVersion = SHADER_VERSION;
 
   // WebGL 初期化（非同期・stale チェック付き）
   useEffect(() => {
-    if (!canvasRef.current) return;
-    if (initFailedRef.current) return; // 初期化失敗後はリトライしない
-    if (initializingRef.current) return; // 初期化中は重複実行しない
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+
+    let disposed = false;
     // stale 検出: 古いコンテキストで必要な uniform が未登録なら再初期化
     // SHADER_VERSION が変わった場合（GLSL が HMR で更新された場合）も再初期化
     const stale = webglRef.current !== null && (
-      webglRef.current.gl.canvas !== canvasRef.current ||
+      webglRef.current.gl.canvas !== canvas ||
       webglRef.current.uniforms['u_bezierRadius'] === undefined ||
       webglRef.current.uniforms['u_iridEnabled'] === undefined ||
       webglRef.current.uniforms['u_manualDistortEnabled'] === undefined ||
@@ -42,29 +48,50 @@ export function useWebGL(
       webglRef.current.stretchProgram === undefined ||
       webglRef.current.postprocessProgram === undefined ||
       webglRef.current.blurProgram === undefined ||
-      compiledShaderVersionRef.current !== SHADER_VERSION
+      compiledShaderVersionRef.current !== shaderVersion
     );
-    if (webglRef.current && !stale) return;
+    if (webglRef.current && !stale) {
+      setIsWebGLReady(true);
+      return;
+    }
 
-    initializingRef.current = true;
-    if (stale) setIsWebGLReady(false);
+    setIsWebGLReady(false);
 
-    // cancelled フラグ: cleanup 時に true にするだけで rAF poll は止めない。
-    // AbortController で poll を即停止すると init1 の GPU linkProgram が完了前に
-    // init2 の linkProgram が走り、ドライバーによっては link failed（空メッセージ）が発生する。
-    // poll を自然完了させることで GPU 上の link 操作を直列化し、この衝突を防ぐ。
-    let cancelled = false;
-    initWebGL(canvasRef.current).then(ctx => {
-      if (cancelled) {
-        // cleanup によるキャンセル: 結果を破棄してガードをリセットし再試行
-        initializingRef.current = false;
-        forceRetry();
-        return;
-      }
+    // StrictMode は setup → cleanup → setup を意図的に行う。同じ canvas/version の
+    // 初期化Promiseを共有することで、最初のcleanupが進行中のGPUコンパイルを無効化しない。
+    // HMRでversionが変わった場合は、ドライバー上のlinkProgramを並列化しないよう直列実行する。
+    const currentRequest = initRequestRef.current;
+    let request: WebGLInitRequest;
+    if (
+      currentRequest &&
+      currentRequest.canvas === canvas &&
+      currentRequest.shaderVersion === shaderVersion
+    ) {
+      request = currentRequest;
+    } else {
+      const waitForPrevious = currentRequest
+        ? currentRequest.promise.then(() => undefined, () => undefined)
+        : Promise.resolve();
+      request = {
+        canvas,
+        shaderVersion,
+        promise: waitForPrevious.then(() => initWebGL(canvas)),
+      };
+      initRequestRef.current = request;
+      void request.promise.then(
+        () => {
+          if (initRequestRef.current === request) initRequestRef.current = null;
+        },
+        () => {
+          if (initRequestRef.current === request) initRequestRef.current = null;
+        },
+      );
+    }
+
+    void request.promise.then(ctx => {
+      if (disposed) return;
       webglRef.current = ctx;
-      compiledShaderVersionRef.current = SHADER_VERSION;
-      initFailedRef.current = false;
-      initializingRef.current = false;
+      compiledShaderVersionRef.current = shaderVersion;
       if (stale && latestRef.current) {
         const latest = latestRef.current;
         sdfReadyRef.current = false;
@@ -76,24 +103,15 @@ export function useWebGL(
       }
       setIsWebGLReady(true);
     }).catch(e => {
-      if (cancelled) {
-        // キャンセル済みの init が失敗しても initFailed にしない（次の init で再試行）
-        initializingRef.current = false;
-        forceRetry();
-        return;
-      }
+      if (disposed) return;
       console.error('WebGL init failed:', e);
-      initFailedRef.current = true;
-      initializingRef.current = false;
+      setIsWebGLReady(false);
     });
 
     return () => {
-      // rAF poll は止めない（GPU linkProgram を自然完了させて次 init との衝突を防ぐ）。
-      // initializingRef.current はここでリセットしない——.then()/.catch() でリセットされるまで
-      // ガードを保持することで並行 initWebGL の乱立（CPU スパイク）を防ぐ。
-      cancelled = true;
+      disposed = true;
     };
-  });
+  }, [canvasRef, shaderVersion]);
 
   // renderBridge への登録
   useEffect(() => {
@@ -111,6 +129,7 @@ export function useWebGL(
       },
       () => { animLoopRef.current?.stop(); },
       () => { animLoopRef.current?.start(); },
+      () => getGlassSamplePadding(latestRef.current?.postprocess),
     );
     renderBridge.registerPause(
       () => {

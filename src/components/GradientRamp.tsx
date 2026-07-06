@@ -6,6 +6,7 @@ import { gradientRampPresets, getColorAtPosition, getOpacityAtPosition, applyMir
 import { RAMP_W, RAMP_BAR_H, RAMP_HANDLE_AREA, RAMP_HANDLE_HALF, RAMP_WHEEL_STEP } from '../lib/constants';
 import type { ColorStop, OpacityStop, RampColorMode, RampInterpolation, GradientType } from '../types/gradient';
 import { CustomSelect } from './CustomSelect';
+import { Icon } from './Icon';
 import { undo, redo } from '../lib/history'; // 追加
 import { renderBridge } from '../lib/renderBridge'; // 追加
 import {
@@ -1486,7 +1487,7 @@ export function GradientRamp() {
         className="flex items-center gap-1 text-xs text-k-text bg-k-muted hover:bg-k-muted/70 px-2 py-1 rounded-none disabled:opacity-40"
         title="選択ストップの現在値をキーフレームとして記録 (位置 + RGB)"
       >
-        <span className="material-symbols-rounded text-[10.5px] text-fire">timer</span>
+        <Icon name="timer" className="text-[10.5px] text-fire" />
       </button>
     </div>
   );
@@ -1588,7 +1589,7 @@ export function GradientRamp() {
           className="flex items-center gap-1 text-xs text-k-text bg-k-muted hover:bg-k-muted/70 px-2 py-1 rounded-none disabled:opacity-35"
           title="選択した不透明度ストップの現在値をキーフレームとして記録"
         >
-          <span className="material-symbols-rounded text-[10.5px] text-fire">timer</span>
+          <Icon name="timer" className="text-[10.5px] text-fire" />
         </button>
       </div>
       <button

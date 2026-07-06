@@ -40,3 +40,6 @@ myskill/
 
 # Tauri updater private keys
 *.key
+
+# Local maintainer documentation
+local-docs/

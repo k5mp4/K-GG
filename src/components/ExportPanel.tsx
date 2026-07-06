@@ -21,7 +21,7 @@ import {
 import type { ExportDirectoryHandle } from '../adapters';
 import type { AeSaveDirStatus, AeStatus } from '../lib/aftereffectsExport';
 
-type ExportJob = 'lossless' | 'mp4' | 'zip' | 'slits' | null;
+type ExportJob = 'mov' | 'mp4' | 'zip' | 'slits' | null;
 type VideoExt = 'mov' | 'mp4';
 
 type Props = {
@@ -174,8 +174,8 @@ export function ExportPanel({ onExportProgress, onResizeCanvas, canvasRef }: Pro
     setAeSaveDirStatus(status);
   }
 
-  async function handleExportLossless() {
-    console.log('[Export] handleExportLossless START');
+  async function handleExportMov() {
+    console.log('[Export] handleExportMov START');
     const canvas = canvasRef.current;
     if (!canvas || exportJob) return;
 
@@ -190,7 +190,7 @@ export function ExportPanel({ onExportProgress, onResizeCanvas, canvasRef }: Pro
 
     const controller = new AbortController();
     abortControllerRef.current = controller;
-    setExportJob('lossless');
+    setExportJob('mov');
     lastReportedProgressRef.current = 0;
     setExportProgress(0);
 
@@ -204,18 +204,18 @@ export function ExportPanel({ onExportProgress, onResizeCanvas, canvasRef }: Pro
         signal: controller.signal,
         onProgress: reportProgress,
       });
-      await saveBlobToDir(blob, `${stem}_lossless.mov`, dirHandleRef.current);
+      await saveBlobToDir(blob, `${stem}.mov`, dirHandleRef.current);
       lastVideoRef.current = { blob, ext: 'mov' };
-      flashSaved('lossless');
+      flashSaved('mov');
       if (sendToAe) await sendVideoToAe(blob, 'mov');
     } catch (e) {
       if (e instanceof DOMException && e.name === 'AbortError') { /* cancelled */ }
       else {
         const errorMsg = e instanceof Error ? e.message : String(e);
-        console.error('Lossless MOV export failed:', e);
+        console.error('MOV export failed:', e);
         setExportError(errorMsg.includes('ビデオサイズが大きすぎます')
           ? errorMsg
-          : 'Lossless MOV エクスポートに失敗しました。コンソールを確認してください。');
+          : 'MOV エクスポートに失敗しました。コンソールを確認してください。');
         setTimeout(() => setExportError(null), 8000);
       }
     } finally {
@@ -250,7 +250,7 @@ export function ExportPanel({ onExportProgress, onResizeCanvas, canvasRef }: Pro
         signal: controller.signal,
         onProgress: reportProgress,
       });
-      await saveBlobToDir(blob, `${stem}_h264rgb_lossless.mp4`, dirHandleRef.current);
+      await saveBlobToDir(blob, `${stem}_h264rgb.mp4`, dirHandleRef.current);
       lastVideoRef.current = { blob, ext: 'mp4' };
       flashSaved('mp4');
       if (sendToAe) await sendVideoToAe(blob, 'mp4');
@@ -482,17 +482,17 @@ export function ExportPanel({ onExportProgress, onResizeCanvas, canvasRef }: Pro
           <p className="text-xs text-tab-inactive">動画ファイル</p>
 
           <div className="relative min-h-[40px]">
-            {/* Lossless MOV Section */}
-            <div style={{ display: exportJob === 'lossless' ? 'block' : 'none' }}>
-              <ProgressBar label={`Lossless MOV ${Math.round(exportProgress * 100)}%`} progress={exportProgress} onCancel={handleCancel} />
+            {/* MOV Section */}
+            <div style={{ display: exportJob === 'mov' ? 'block' : 'none' }}>
+              <ProgressBar label={`MOV ${Math.round(exportProgress * 100)}%`} progress={exportProgress} onCancel={handleCancel} />
             </div>
             <div style={{ display: exportJob === null ? 'block' : 'none' }}>
               <button
-                onClick={handleExportLossless}
+                onClick={handleExportMov}
                 disabled={recording || !videoReady || !nativeVideoEncodeReady}
                 className="w-full py-1.5 bg-fire hover:brightness-110 disabled:opacity-40 disabled:cursor-not-allowed rounded-none text-xs font-display font-semibold text-k-text uppercase tracking-wider"
               >
-                {savedFormats['lossless'] ? '✓ Saved' : 'Export Lossless MOV'}
+                {savedFormats['mov'] ? '✓ Saved' : 'Export MOV'}
               </button>
             </div>
           </div>

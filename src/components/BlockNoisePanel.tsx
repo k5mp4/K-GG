@@ -4,6 +4,7 @@ import { Collapsible } from './Collapsible';
 import { AnimatedButton } from './AnimatedButton';
 import { Toggle } from './Toggle';
 import type { DiffuseConfig } from '../types/distortion';
+import { Icon } from './Icon';
 
 const D = STORE_DEFAULTS.diffuse;
 const isDiffuseDirty = (value: DiffuseConfig) =>
@@ -37,7 +38,7 @@ export function DiffusePanel() {
               }`}
               title="Diffuse のパラメータをリセット"
             >
-              <span className="material-symbols-rounded text-[14px]">restart_alt</span>
+              <Icon name="restart" className="text-[14px]" />
             </button>
             <Toggle variant="switch" checked={diffuse.enabled} onChange={(v) => setDiffuse({ enabled: v })} />
           </div>

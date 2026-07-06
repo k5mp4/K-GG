@@ -4,6 +4,7 @@ import { gradientRampPresets } from '../lib/gradientRampUtils';
 import { SliderField } from './SliderField';
 import { Collapsible } from './Collapsible';
 import { Toggle } from './Toggle';
+import { Icon } from './Icon';
 
 const D = STORE_DEFAULTS.normalMap;
 const isNormalMapDirty = (value: NormalMapConfig) =>
@@ -33,7 +34,7 @@ export function NormalMapPanel() {
             }`}
             title="Normal Map のパラメータをリセット"
           >
-            <span className="material-symbols-rounded text-[14px]">restart_alt</span>
+            <Icon name="restart" className="text-[14px]" />
           </button>
           <Toggle
             variant="switch"

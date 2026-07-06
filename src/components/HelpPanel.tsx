@@ -1,6 +1,7 @@
 import ReactMarkdown from 'react-markdown';
 import helpContent from '../docs/help.md?raw';
 import type { UpdateStatus } from '../features/updater/types';
+import { Icon } from './Icon';
 
 interface HelpPanelProps {
   onClose: () => void;
@@ -110,9 +111,10 @@ export function HelpPanel({
               disabled={checking}
               className="inline-flex items-center justify-center gap-2 border border-fire/60 bg-fire/10 px-4 py-2 text-[10px] font-display font-bold uppercase tracking-wider text-fire transition-colors hover:bg-fire hover:text-k-bg disabled:cursor-wait disabled:opacity-60"
             >
-              <span className={`material-symbols-rounded text-[15px] ${checking ? 'animate-spin' : ''}`}>
-                {checking ? 'progress_activity' : 'system_update_alt'}
-              </span>
+              <Icon
+                name={checking ? 'progress' : 'systemUpdate'}
+                className={`text-[15px] ${checking ? 'animate-spin' : ''}`}
+              />
               Check for updates
             </button>
           )}

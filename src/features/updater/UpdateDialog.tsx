@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import type { UpdateState } from './types';
 import { updateProgressPercent } from './updateState';
+import { Icon } from '../../components/Icon';
 
 type UpdateDialogProps = {
   open: boolean;
@@ -73,7 +74,7 @@ export function UpdateDialog({
         <header className="flex shrink-0 items-center justify-between border-b border-cream/30 bg-k-bg/80 px-5 py-4">
           <div className="flex items-center gap-3">
             <span className="flex h-9 w-9 items-center justify-center border border-fire/60 bg-fire/10 text-fire">
-              <span className="material-symbols-rounded text-[20px]">system_update_alt</span>
+              <Icon name="systemUpdate" className="text-[20px]" />
             </span>
             <div>
               <p className="text-[9px] font-display font-semibold uppercase tracking-[0.24em] text-fire">
@@ -91,14 +92,14 @@ export function UpdateDialog({
             className="flex h-9 w-9 items-center justify-center text-tab-inactive transition-colors hover:bg-k-border hover:text-k-text disabled:cursor-not-allowed disabled:opacity-30"
             aria-label="閉じる"
           >
-            <span className="material-symbols-rounded text-[20px]">close</span>
+            <Icon name="close" className="text-[20px]" />
           </button>
         </header>
 
         <div className="min-h-0 overflow-y-auto p-6 scrollbar-thin">
           {state.status === 'checking' && (
             <div className="flex min-h-44 flex-col items-center justify-center gap-4 text-center">
-              <span className="material-symbols-rounded animate-spin text-3xl text-fire">progress_activity</span>
+              <Icon name="progress" className="animate-spin text-3xl text-fire" />
               <div>
                 <p className="font-display text-sm font-semibold uppercase tracking-wider text-k-text">Checking release channel</p>
                 <p className="mt-2 text-xs text-tab-inactive">GitHub Releasesから最新情報を確認しています。</p>
@@ -108,7 +109,7 @@ export function UpdateDialog({
 
           {state.status === 'upToDate' && (
             <div className="flex min-h-44 flex-col items-center justify-center gap-4 text-center">
-              <span className="material-symbols-rounded text-4xl text-emerald-400">verified</span>
+              <Icon name="verified" className="text-4xl text-emerald-400" />
               <div>
                 <p className="font-display text-base font-bold uppercase tracking-wider text-k-text">Up to date</p>
                 <p className="mt-2 text-sm text-k-text/75">
@@ -125,7 +126,7 @@ export function UpdateDialog({
                   <p className="text-[9px] font-display uppercase tracking-[0.2em] text-tab-inactive">Installed</p>
                   <p className="mt-1 font-display text-xl font-bold text-k-text">v{state.info.currentVersion}</p>
                 </div>
-                <span className="material-symbols-rounded text-fire">arrow_forward</span>
+                <Icon name="arrowForward" className="text-fire" />
                 <div className="text-right">
                   <p className="text-[9px] font-display uppercase tracking-[0.2em] text-fire">Available</p>
                   <p className="mt-1 font-display text-xl font-bold text-fire">v{state.info.version}</p>
@@ -150,7 +151,7 @@ export function UpdateDialog({
               {confirmingInstall ? (
                 <div className="border border-fire/55 bg-fire/10 p-4">
                   <div className="flex gap-3">
-                    <span className="material-symbols-rounded mt-0.5 text-fire">warning</span>
+                    <Icon name="warning" className="mt-0.5 text-fire" />
                     <div>
                       <p className="text-sm font-semibold text-k-text">更新中にK-GGを終了します</p>
                       <p className="mt-1 text-xs leading-relaxed text-k-text/70">
@@ -230,7 +231,7 @@ export function UpdateDialog({
           {state.status === 'error' && (
             <div className="space-y-5">
               <div className="flex gap-4 border border-red-400/45 bg-red-400/10 p-4">
-                <span className="material-symbols-rounded text-red-300">error</span>
+                <Icon name="error" className="text-red-300" />
                 <div>
                   <p className="font-display text-sm font-bold uppercase tracking-wider text-k-text">Update failed</p>
                   <p className="mt-2 break-words text-xs leading-relaxed text-k-text/75">{state.error}</p>
