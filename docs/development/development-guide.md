@@ -40,6 +40,17 @@ npm run dev:local
 └─ tools/                リリース・検証用スクリプト
 ```
 
+## AIと人間がレビューしやすい変更方針
+
+K-GGは生成AIによる開発参加を歓迎するため、変更の一次情報と責務の置き場所を明確にします。
+
+- 仕様、ADR、開発者ガイドを読んでからコードを変更する。
+- 観測可能な挙動を変えないリファクタリングでは、既存の契約、ファイル名、保存先、エラー文言を維持する。
+- 型や型ガードを複数箇所へ複製しない。プリセット永続化の型は`src/lib/presetModel.ts`を参照する。
+- Canvasから画像Blobを作る共通処理は`src/lib/exportCanvas.ts`へ集約し、ブラウザ/Tauriごとの保存処理はアダプターに残す。
+- RendererからTauriコマンドへ渡る値は信頼しない。ファイルパス、外部プロセス、OS機能を扱う場合はRust側で検証する。
+- 大きなUIファイルを触る場合は、まず純粋関数、hook、小さな表示コンポーネントへ分けられる範囲を探す。
+
 ## 変更時の確認範囲
 
 | 変更 | 最低限の確認 |
@@ -48,7 +59,7 @@ npm run dev:local
 | TypeScript/React | `npm test`, `npm run lint`, `npm run build` |
 | 描画・GLSL | 上記に加えて対象機能のプレビューと代表的なエクスポート |
 | プリセット形式 | 旧データ読込、新規保存、再読込、ブラウザ/Tauri差分 |
-| Rust/Tauri | `cargo test`, `cargo check`, 対象デスクトップ操作 |
+| Rust/Tauri | `cargo fmt --manifest-path src-tauri/Cargo.toml --check`, `cargo test`, `cargo check`, 対象デスクトップ操作 |
 | リリース/更新 | 上記に加えて[Windows版リリース手順](../releasing.md) |
 
 ## テスト方針

@@ -1,27 +1,9 @@
 import { invoke } from '@tauri-apps/api/core';
 import { save as saveDialog } from '@tauri-apps/plugin-dialog';
 import { writeTextFile } from '@tauri-apps/plugin-fs';
+import { isPreset, makePreset } from '../../lib/presetModel';
+import type { Preset, StoreSnapshot } from '../../lib/presetModel';
 import type { PresetRepository } from '../types';
-import type { Preset, StoreSnapshot } from '../../lib/presets';
-
-function makePreset(name: string, state: StoreSnapshot): Preset {
-  return {
-    id: Math.random().toString(36).slice(2),
-    name,
-    createdAt: Date.now(),
-    state,
-  };
-}
-
-function isPreset(v: unknown): v is Preset {
-  return (
-    typeof v === 'object' && v !== null &&
-    typeof (v as Preset).id === 'string' &&
-    typeof (v as Preset).name === 'string' &&
-    typeof (v as Preset).createdAt === 'number' &&
-    typeof (v as Preset).state === 'object' && (v as Preset).state !== null
-  );
-}
 
 async function readAll(): Promise<Preset[]> {
   const presets = await invoke<unknown>('load_presets_file');

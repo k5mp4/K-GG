@@ -29,10 +29,19 @@ Apache-2.0 license.
 FFmpeg
 ------
 
-K-GG does not bundle FFmpeg. The Tauri desktop app calls an externally installed
-`ffmpeg` command for MOV/MP4 export. FFmpeg licensing depends on the user's
-installed build; FFmpeg is typically LGPL-2.1-or-later, but builds that include
-GPL components are governed by GPL terms. See https://ffmpeg.org/legal.html.
+K-GG does not bundle or distribute FFmpeg. For MOV/MP4 export, the Tauri desktop
+app invokes either an `ffmpeg.exe` placed by the user in K-GG's app-data folder
+or an `ffmpeg` command available on the system PATH. FFmpeg runs as a separate
+process.
+
+FFmpeg licensing depends on the user's build. FFmpeg is typically
+LGPL-2.1-or-later, but builds that include GPL components are governed by GPL
+terms. The recommended Windows builds from gyan.dev are GPLv3. See:
+
+- https://ffmpeg.org
+- https://ffmpeg.org/legal.html
+- https://www.gyan.dev/ffmpeg/builds/
+- https://www.gnu.org/licenses/gpl-3.0.html
 
 Fonts
 -----

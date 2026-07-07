@@ -17,6 +17,7 @@ title: 機能仕様
 | SPEC-004 | [内蔵SVGアイコンへの移行](./SPEC-004-bundled-svg-icons.md) | implemented |
 | SPEC-005 | [動画出力表示名とファイル名の整理](./SPEC-005-video-export-naming.md) | implemented |
 | SPEC-006 | [統合検証コマンド](./SPEC-006-verification-commands.md) | implemented |
+| SPEC-007 | [K-GG専用フォルダとPATHからのFFmpeg検出](./SPEC-007-ffmpeg-install-guidance.md) | implemented |
 
 ## 新しい仕様の作り方
 
