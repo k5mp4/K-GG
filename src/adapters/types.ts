@@ -1,6 +1,6 @@
 import type { AnimationEasing } from '../store/gradientStore';
 import type { ColorStop } from '../types/gradient';
-import type { Preset, StoreSnapshot } from '../lib/presets';
+import type { Preset, StoreSnapshot } from '../lib/presetModel';
 import type { UserColorPalette } from '../lib/colorPalettes';
 
 export type MaybePromise<T> = T | Promise<T>;
@@ -66,9 +66,13 @@ export type VideoExportConfig = {
 
 export type NativeFfmpegStatus = {
   supported: boolean;
+  available: boolean;
+  source: 'app-data-folder' | 'system-path' | null;
   path: string | null;
   version: string | null;
   error: string | null;
+  warning: string | null;
+  folderPath: string | null;
 };
 
 export interface VideoExportService {
@@ -76,6 +80,9 @@ export interface VideoExportService {
   exportHighQualityMP4(config: VideoExportConfig): Promise<Blob>;
   exportFrameZip(config: VideoExportConfig): Promise<Blob>;
   nativeFfmpegSupported?(): boolean;
+  getNativeFfmpegStatus?(): Promise<NativeFfmpegStatus>;
+  openNativeFfmpegFolder?(): Promise<void>;
+  openFfmpegBuildsPage?(): Promise<void>;
 }
 
 export interface AppAdapters {

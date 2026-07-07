@@ -6,7 +6,7 @@ import { renderBridge } from '../../lib/renderBridge';
 import { applyTimeRemap } from '../../lib/timeRemap';
 import { canvas2dToPngBlob, needsTiledRender, renderTiledToCanvas2D } from '../../lib/tileRender';
 import type { AnimationEasing } from '../../store/gradientStore';
-import type { VideoExportConfig, VideoExportService } from '../types';
+import type { NativeFfmpegStatus, VideoExportConfig, VideoExportService } from '../types';
 import { isTauriRuntime } from './exportService';
 
 function calcExportNormalizedTime(frameIndex: number, totalFrames: number): number {
@@ -100,9 +100,16 @@ async function writePngSequenceToTempDir(
 export const tauriVideoExportService: VideoExportService = {
   exportFrameZip: browserVideoExportService.exportFrameZip,
   nativeFfmpegSupported: isTauriRuntime,
+  async getNativeFfmpegStatus(): Promise<NativeFfmpegStatus> {
+    return await invoke<NativeFfmpegStatus>('get_native_ffmpeg_status');
+  },
+  async openNativeFfmpegFolder(): Promise<void> {
+    await invoke('open_native_ffmpeg_folder');
+  },
+  async openFfmpegBuildsPage(): Promise<void> {
+    await invoke('open_ffmpeg_builds_page');
+  },
   async exportLosslessMOV(config: VideoExportConfig): Promise<Blob> {
-    const ffmpegPath = 'ffmpeg';
-
     const totalFrames = Math.ceil(config.fps * config.duration);
     const rootTemp = await join(await tempDir(), 'kagaribi-grad');
     const exportTemp = await join(rootTemp, `mov-${Date.now()}-${Math.random().toString(36).slice(2)}`);
@@ -114,7 +121,6 @@ export const tauriVideoExportService: VideoExportService = {
       await writePngSequenceToTempDir(config, exportTemp, totalFrames);
       config.onProgress?.(0.72);
       await invoke('encode_qtrle_mov', {
-        ffmpegPath,
         inputPattern: await join(exportTemp, 'frame_%04d.png'),
         outputPath,
         fps: config.fps,
@@ -128,8 +134,6 @@ export const tauriVideoExportService: VideoExportService = {
     }
   },
   async exportHighQualityMP4(config: VideoExportConfig): Promise<Blob> {
-    const ffmpegPath = 'ffmpeg';
-
     const totalFrames = Math.ceil(config.fps * config.duration);
     const rootTemp = await join(await tempDir(), 'kagaribi-grad');
     const exportTemp = await join(rootTemp, `mp4-${Date.now()}-${Math.random().toString(36).slice(2)}`);
@@ -141,7 +145,6 @@ export const tauriVideoExportService: VideoExportService = {
       await writePngSequenceToTempDir(config, exportTemp, totalFrames);
       config.onProgress?.(0.72);
       await invoke('encode_h264_rgb_mp4', {
-        ffmpegPath,
         inputPattern: await join(exportTemp, 'frame_%04d.png'),
         outputPath,
         fps: config.fps,

@@ -1,15 +1,11 @@
 import { join } from '@tauri-apps/api/path';
 import { open as openDialog, save as saveDialog } from '@tauri-apps/plugin-dialog';
 import { mkdir, writeFile } from '@tauri-apps/plugin-fs';
-import { pngInjectSrgb } from '../../lib/pngIcc';
-import { renderBridge } from '../../lib/renderBridge';
 import {
-  canvas2dToJpegBlob,
-  canvas2dToPngBlob,
-  canvas2dToWebpBlob,
-  needsTiledRender,
-  renderTiledToCanvas2D,
-} from '../../lib/tileRender';
+  canvasToJpgBlob,
+  canvasToPngBlob as canvasToTauriPngBlob,
+  canvasToWebpBlob,
+} from '../../lib/exportCanvas';
 import { browserExportService } from '../browser/exportService';
 import type { ExportDirectoryHandle, ExportService } from '../types';
 
@@ -35,78 +31,6 @@ function dialogFilters(filename: string) {
 
 async function blobToBytes(blob: Blob): Promise<Uint8Array> {
   return new Uint8Array(await blob.arrayBuffer());
-}
-
-async function getExportSourceCanvas(canvas: HTMLCanvasElement): Promise<HTMLCanvasElement> {
-  const fullW = canvas.width;
-  const fullH = canvas.height;
-
-  if (needsTiledRender(canvas, fullW, fullH)) {
-    const t = renderBridge.getCurrentTime();
-    const nt = renderBridge.getCurrentNormalizedTime();
-    return await renderTiledToCanvas2D({
-      canvas,
-      fullWidth: fullW,
-      fullHeight: fullH,
-      time: t,
-      normalizedTime: nt,
-    });
-  }
-
-  for (let i = 0; i < 3; i++) {
-    await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
-  }
-  await new Promise<void>((resolve) => setTimeout(resolve, 50));
-  return canvas;
-}
-
-async function canvasToTauriPngBlob(canvas: HTMLCanvasElement): Promise<Blob> {
-  const src = await getExportSourceCanvas(canvas);
-  const raw = src === canvas
-    ? await new Promise<Blob>((resolve, reject) => {
-        try {
-          canvas.toBlob(
-            (blob) => (blob ? resolve(blob) : reject(new Error('toBlob returned null'))),
-            'image/png',
-          );
-        } catch (e) {
-          reject(e);
-        }
-      })
-    : await canvas2dToPngBlob(src);
-
-  try {
-    const buf = await raw.arrayBuffer();
-    const patched = pngInjectSrgb(new Uint8Array(buf));
-    return new Blob([patched], { type: 'image/png' });
-  } catch (e) {
-    console.error('ICC profile injection failed, falling back to raw PNG:', e);
-    return raw;
-  }
-}
-
-async function canvasToJpgBlob(canvas: HTMLCanvasElement, quality: number): Promise<Blob> {
-  const src = await getExportSourceCanvas(canvas);
-  if (src !== canvas) return canvas2dToJpegBlob(src, quality);
-  return new Promise((resolve, reject) => {
-    canvas.toBlob(
-      (blob) => (blob ? resolve(blob) : reject(new Error('toBlob null'))),
-      'image/jpeg',
-      quality,
-    );
-  });
-}
-
-async function canvasToWebpBlob(canvas: HTMLCanvasElement, quality: number): Promise<Blob> {
-  const src = await getExportSourceCanvas(canvas);
-  if (src !== canvas) return canvas2dToWebpBlob(src, quality);
-  return new Promise((resolve, reject) => {
-    canvas.toBlob(
-      (blob) => (blob ? resolve(blob) : reject(new Error('toBlob null'))),
-      'image/webp',
-      quality,
-    );
-  });
 }
 
 export const tauriExportService: ExportService = {

@@ -1,12 +1,8 @@
-import { pngInjectSrgb } from '../../lib/pngIcc';
 import {
-  needsTiledRender,
-  renderTiledToCanvas2D,
-  canvas2dToPngBlob,
-  canvas2dToJpegBlob,
-  canvas2dToWebpBlob,
-} from '../../lib/tileRender';
-import { renderBridge } from '../../lib/renderBridge';
+  canvasToJpgBlob as exportCanvasToJpgBlob,
+  canvasToPngBlob as exportCanvasToPngBlob,
+  canvasToWebpBlob as exportCanvasToWebpBlob,
+} from '../../lib/exportCanvas';
 import type { ExportDirectoryHandle, ExportService } from '../types';
 
 /** プリセット名をファイル名に使える文字列に変換 */
@@ -66,84 +62,16 @@ export async function saveBlobToDir(
   URL.revokeObjectURL(url);
 }
 
-// ---------- Canvas → 各フォーマット Blob ----------
-
-/**
- * 高解像度エクスポート用: drawingBuffer 限界を超える場合はタイルレンダリングで合成。
- * 戻り値の Canvas は呼び出し側で必要なフォーマットに変換する。
- */
-async function getExportSourceCanvas(canvas: HTMLCanvasElement): Promise<HTMLCanvasElement> {
-  const fullW = canvas.width;
-  const fullH = canvas.height;
-
-  if (needsTiledRender(canvas, fullW, fullH)) {
-    console.log(`[export] Using tiled render for ${fullW}×${fullH}`);
-    // 現在の再生位置を維持してタイル描画
-    const t = renderBridge.getCurrentTime();
-    const nt = renderBridge.getCurrentNormalizedTime();
-    return await renderTiledToCanvas2D({
-      canvas,
-      fullWidth: fullW,
-      fullHeight: fullH,
-      time: t,
-      normalizedTime: nt,
-    });
-  }
-
-  // 通常パス: 既存の WebGL canvas をそのまま使用
-  // GPU→CPU 同期のため複数フレーム待機
-  for (let i = 0; i < 3; i++) {
-    await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
-  }
-  await new Promise<void>((resolve) => setTimeout(resolve, 50));
-  return canvas;
-}
-
 export async function canvasToPngBlob(canvas: HTMLCanvasElement): Promise<Blob> {
-  const src = await getExportSourceCanvas(canvas);
-  const raw = src === canvas
-    ? await new Promise<Blob>((resolve, reject) => {
-        try {
-          canvas.toBlob(
-            (blob) => (blob ? resolve(blob) : reject(new Error('toBlob returned null'))),
-            'image/png',
-          );
-        } catch (e) {
-          reject(e);
-        }
-      })
-    : await canvas2dToPngBlob(src);
-
-  try {
-    const buf = await raw.arrayBuffer();
-    const patched = pngInjectSrgb(new Uint8Array(buf));
-    return new Blob([patched], { type: 'image/png' });
-  } catch (e) {
-    console.error('ICC profile injection failed, falling back to raw PNG:', e);
-    return raw;
-  }
+  return await exportCanvasToPngBlob(canvas, { logTiledRender: true });
 }
 
 async function canvasToJpgBlob(canvas: HTMLCanvasElement, quality: number): Promise<Blob> {
-  const src = await getExportSourceCanvas(canvas);
-  if (src !== canvas) return canvas2dToJpegBlob(src, quality);
-  return new Promise((resolve, reject) => {
-    canvas.toBlob(
-      (blob) => (blob ? resolve(blob) : reject(new Error('toBlob null'))),
-      'image/jpeg', quality,
-    );
-  });
+  return await exportCanvasToJpgBlob(canvas, quality, { logTiledRender: true });
 }
 
 async function canvasToWebpBlob(canvas: HTMLCanvasElement, quality: number): Promise<Blob> {
-  const src = await getExportSourceCanvas(canvas);
-  if (src !== canvas) return canvas2dToWebpBlob(src, quality);
-  return new Promise((resolve, reject) => {
-    canvas.toBlob(
-      (blob) => (blob ? resolve(blob) : reject(new Error('toBlob null'))),
-      'image/webp', quality,
-    );
-  });
+  return await exportCanvasToWebpBlob(canvas, quality, { logTiledRender: true });
 }
 
 // ---------- 公開保存関数 ----------

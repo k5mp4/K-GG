@@ -7,6 +7,7 @@ import {
   exportHighQualityMP4,
   exportLosslessMOV,
   nativeFfmpegSupported,
+  openNativeFfmpegFolder,
 } from '../lib/exportVideo';
 import {
   downloadPNG, downloadJPG, downloadWebP,
@@ -18,7 +19,7 @@ import {
   aePing, aeImportImage, aeImportVideo, aeBridgeAvailable,
   aeGetSaveDir, aeChooseSaveDir, aeClearSaveDir,
 } from '../lib/aftereffectsExport';
-import type { ExportDirectoryHandle } from '../adapters';
+import type { ExportDirectoryHandle, NativeFfmpegStatus } from '../adapters';
 import type { AeSaveDirStatus, AeStatus } from '../lib/aftereffectsExport';
 
 type ExportJob = 'mov' | 'mp4' | 'zip' | 'slits' | null;
@@ -28,9 +29,19 @@ type Props = {
   onExportProgress?: (progress: number | null) => void;
   onResizeCanvas?: (w: number, h: number) => void;
   canvasRef: React.RefObject<HTMLCanvasElement | null>;
+  ffmpegStatus: NativeFfmpegStatus | null;
+  ffmpegChecking: boolean;
+  onCheckFfmpeg: (showDialog: boolean) => Promise<NativeFfmpegStatus | null>;
 };
 
-export function ExportPanel({ onExportProgress, onResizeCanvas, canvasRef }: Props) {
+export function ExportPanel({
+  onExportProgress,
+  onResizeCanvas,
+  canvasRef,
+  ffmpegStatus,
+  ffmpegChecking,
+  onCheckFfmpeg,
+}: Props) {
   const { animation, slitScan, presetName } = useGradientStore();
   const { recording } = useRecorder();
 
@@ -148,7 +159,14 @@ export function ExportPanel({ onExportProgress, onResizeCanvas, canvasRef }: Pro
   const videoReady = animation.enabled;
   const pickerAvailable = canUseDirectoryPicker();
   const nativeFfmpegAvailable = nativeFfmpegSupported();
-  const nativeVideoEncodeReady = nativeFfmpegAvailable;
+  const nativeVideoEncodeReady = nativeFfmpegAvailable
+    && !ffmpegChecking
+    && ffmpegStatus?.available === true;
+
+  async function ensureNativeVideoEncodeReady(): Promise<boolean> {
+    const status = await onCheckFfmpeg(true);
+    return status?.available === true;
+  }
 
   async function handlePickDirectory() {
     const handle = await pickDirectory();
@@ -178,6 +196,7 @@ export function ExportPanel({ onExportProgress, onResizeCanvas, canvasRef }: Pro
     console.log('[Export] handleExportMov START');
     const canvas = canvasRef.current;
     if (!canvas || exportJob) return;
+    if (!await ensureNativeVideoEncodeReady()) return;
 
     // キャンバスが描画されるまで待機（高解像度で WebGL 初期化が遅延する場合がある）
     console.log(`[Export] Canvas size: ${canvas.width}×${canvas.height}`);
@@ -226,6 +245,7 @@ export function ExportPanel({ onExportProgress, onResizeCanvas, canvasRef }: Pro
   async function handleExportMP4() {
     const canvas = canvasRef.current;
     if (!canvas || exportJob) return;
+    if (!await ensureNativeVideoEncodeReady()) return;
 
     console.log(`[Export] Canvas size: ${canvas.width}×${canvas.height}`);
     await new Promise<void>((resolve) => {
@@ -475,6 +495,55 @@ export function ExportPanel({ onExportProgress, onResizeCanvas, canvasRef }: Pro
 
         {!animation.enabled && (
           <p className="text-xs text-tab-inactive">Animation を有効にすると動画書き出しが可能です</p>
+        )}
+
+        {nativeFfmpegAvailable && (
+          <div className={`border p-3 text-xs ${
+            ffmpegStatus?.available
+              ? 'border-emerald-400/35 bg-emerald-400/10'
+              : 'border-amber-300/35 bg-amber-300/10'
+          }`}>
+            <div className="flex items-start justify-between gap-3">
+              <div className="min-w-0">
+                <p className={ffmpegStatus?.available ? 'text-emerald-300' : 'text-amber-200'}>
+                  {ffmpegChecking
+                    ? 'Checking FFmpeg…'
+                    : ffmpegStatus?.available
+                      ? `FFmpeg ready · ${ffmpegStatus.source === 'app-data-folder' ? 'K-GG folder' : 'System PATH'}`
+                      : 'FFmpeg not found'}
+                </p>
+                {ffmpegStatus?.version && (
+                  <p className="mt-1 truncate text-[10px] text-k-text/65" title={ffmpegStatus.version}>
+                    {ffmpegStatus.version}
+                  </p>
+                )}
+                {ffmpegStatus?.warning && (
+                  <p className="mt-1 text-[10px] leading-relaxed text-amber-200/80">
+                    {ffmpegStatus.warning}
+                  </p>
+                )}
+              </div>
+              <button
+                type="button"
+                onClick={() => void onCheckFfmpeg(true)}
+                disabled={ffmpegChecking}
+                className="shrink-0 border border-cream/30 px-2 py-1 text-[9px] font-display font-semibold uppercase tracking-wider text-k-text hover:border-cream disabled:opacity-40"
+              >
+                Check
+              </button>
+            </div>
+            <button
+              type="button"
+              onClick={() => {
+                void openNativeFfmpegFolder().catch((error) => {
+                  setExportError(error instanceof Error ? error.message : String(error));
+                });
+              }}
+              className="mt-2 text-[10px] text-fire underline underline-offset-2 hover:text-cream"
+            >
+              Open K-GG FFmpeg folder
+            </button>
+          </div>
         )}
 
         {/* オフライン書き出し */}

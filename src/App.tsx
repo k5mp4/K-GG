@@ -45,6 +45,14 @@ import type { GpuDiagnostics } from './lib/gpuDiagnostics';
 import { useAppUpdater } from './features/updater/useAppUpdater';
 import { UpdateButton } from './features/updater/UpdateButton';
 import { UpdateDialog } from './features/updater/UpdateDialog';
+import { FfmpegSetupDialog } from './components/FfmpegSetupDialog';
+import {
+  getNativeFfmpegStatus,
+  nativeFfmpegSupported,
+  openFfmpegBuildsPage,
+  openNativeFfmpegFolder,
+} from './lib/exportVideo';
+import type { NativeFfmpegStatus } from './adapters';
 
 const MAX_DISPLAY_W = 1000;
 
@@ -139,6 +147,10 @@ export default function App() {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const [seekVersion, setSeekVersion] = useState(0);
   const [exportProgress, setExportProgress] = useState<number | null>(null);
+  const [ffmpegStatus, setFfmpegStatus] = useState<NativeFfmpegStatus | null>(null);
+  const [ffmpegChecking, setFfmpegChecking] = useState(false);
+  const [ffmpegDialogOpen, setFfmpegDialogOpen] = useState(false);
+  const ffmpegCheckRequestRef = useRef(0);
   const [slitSourceImageCanvas, setSlitSourceImageCanvas] = useState<HTMLCanvasElement | null>(null);
   const [slitSourceImageName, setSlitSourceImageName] = useState('');
 
@@ -225,6 +237,7 @@ export default function App() {
   }, []);
 
   const [leftTab, setLeftTab] = useState<LeftTab>('diffuse');
+  const activeLeftTabRef = useRef<LeftTab>('diffuse');
   const [tabHoverSwitchEnabled, setTabHoverSwitchEnabled] = useState(true);
   const [isHoverLocked, setIsHoverLocked] = useState(false);
   const [showTimeline, setShowTimeline] = useState(false);
@@ -247,10 +260,49 @@ export default function App() {
   const [showLeftSidebar, setShowLeftSidebar] = useState(false);
   const [showRightSidebar, setShowRightSidebar] = useState(false);
 
+  const refreshFfmpegStatus = async (showDialog: boolean): Promise<NativeFfmpegStatus | null> => {
+    if (!nativeFfmpegSupported()) return null;
+    const requestId = ++ffmpegCheckRequestRef.current;
+    setFfmpegChecking(true);
+    try {
+      const status = await getNativeFfmpegStatus();
+      if (requestId !== ffmpegCheckRequestRef.current) return status;
+      setFfmpegStatus(status);
+      if (status.available) {
+        setFfmpegDialogOpen(false);
+      } else if (showDialog && activeLeftTabRef.current === 'export') {
+        setFfmpegDialogOpen(true);
+      }
+      return status;
+    } catch (error) {
+      const status: NativeFfmpegStatus = {
+        supported: true,
+        available: false,
+        source: null,
+        path: null,
+        version: null,
+        error: error instanceof Error ? error.message : String(error),
+        warning: null,
+        folderPath: null,
+      };
+      if (requestId === ffmpegCheckRequestRef.current) {
+        setFfmpegStatus(status);
+        if (showDialog && activeLeftTabRef.current === 'export') {
+          setFfmpegDialogOpen(true);
+        }
+      }
+      return status;
+    } finally {
+      if (requestId === ffmpegCheckRequestRef.current) setFfmpegChecking(false);
+    }
+  };
+
   const handleTabClick = (value: LeftTab) => {
+    activeLeftTabRef.current = value;
     setLeftTab(value);
     setLeftPanelOpen(true);
     setShowLeftSidebar(true); // モバイルでタブをタップしたらサイドバーを表示
+    if (value === 'export') void refreshFfmpegStatus(true);
     if (!tabHoverSwitchEnabled) return;
     setIsHoverLocked(true);
     if (hoverLockTimerRef.current) clearTimeout(hoverLockTimerRef.current);
@@ -262,6 +314,7 @@ export default function App() {
 
   const handleTabMouseEnter = (value: LeftTab) => {
     if (tabHoverSwitchEnabled && !isHoverLocked) {
+      activeLeftTabRef.current = value;
       setLeftTab(value);
     }
   };
@@ -543,7 +596,20 @@ export default function App() {
                   {value === 'distort' && <IridescencePanel />}
                   {value === 'postprocess' && <PostprocessPanel />}
                   {value === 'matcap' && <MatcapPanel />}
-                  {value === 'export' && <ExportPanel onExportProgress={setExportProgress} onResizeCanvas={(w, h) => { setCanvasW(w); setCanvasH(h); aspectRatioRef.current = w / h; }} canvasRef={canvasRef} />}
+                  {value === 'export' && (
+                    <ExportPanel
+                      onExportProgress={setExportProgress}
+                      onResizeCanvas={(w, h) => {
+                        setCanvasW(w);
+                        setCanvasH(h);
+                        aspectRatioRef.current = w / h;
+                      }}
+                      canvasRef={canvasRef}
+                      ffmpegStatus={ffmpegStatus}
+                      ffmpegChecking={ffmpegChecking}
+                      onCheckFfmpeg={refreshFfmpegStatus}
+                    />
+                  )}
                   {value === 'preset' && <PresetPanel canvasW={canvasW} canvasH={canvasH} setCanvasW={setCanvasW} setCanvasH={setCanvasH} aspectRatioRef={aspectRatioRef} />}
                 </div>
               ))}
@@ -1054,6 +1120,41 @@ export default function App() {
         onClose={updater.closeDialog}
         onRetry={updater.checkForUpdates}
         onInstall={updater.installUpdate}
+      />
+      <FfmpegSetupDialog
+        open={ffmpegDialogOpen}
+        checking={ffmpegChecking}
+        status={ffmpegStatus}
+        onClose={() => setFfmpegDialogOpen(false)}
+        onCheckAgain={() => void refreshFfmpegStatus(true)}
+        onOpenBuildsPage={() => {
+          void openFfmpegBuildsPage().catch((error) => {
+            setFfmpegStatus((current) => ({
+              supported: true,
+              available: current?.available ?? false,
+              source: current?.source ?? null,
+              path: current?.path ?? null,
+              version: current?.version ?? null,
+              error: error instanceof Error ? error.message : String(error),
+              warning: current?.warning ?? null,
+              folderPath: current?.folderPath ?? null,
+            }));
+          });
+        }}
+        onOpenFolder={() => {
+          void openNativeFfmpegFolder().catch((error) => {
+            setFfmpegStatus((current) => ({
+              supported: true,
+              available: current?.available ?? false,
+              source: current?.source ?? null,
+              path: current?.path ?? null,
+              version: current?.version ?? null,
+              error: error instanceof Error ? error.message : String(error),
+              warning: current?.warning ?? null,
+              folderPath: current?.folderPath ?? null,
+            }));
+          });
+        }}
       />
     </div>
     </InteractionSettingsProvider>
