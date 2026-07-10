@@ -91,7 +91,6 @@ export function getAnimationGroup(propertyId: string, fallback = 'Properties'): 
     iridescence: 'Iridescence',
     diffuse: 'Diffuse',
     postprocess: 'Postprocess',
-    bezierAxis: 'Bezier Axis',
   };
   return labels[category] ?? fallback;
 }

@@ -9,7 +9,7 @@ function createGlassState(glassMotion: number): LatestState {
     gradient: { ...STORE_DEFAULTS.gradient },
     noiseDistortion: { ...STORE_DEFAULTS.noiseDistortion },
     diffuse: { ...STORE_DEFAULTS.diffuse, enabled: false },
-    bezierAxis: { ...STORE_DEFAULTS.bezierAxis },
+    imageGradient: { ...STORE_DEFAULTS.imageGradient },
     slitScan: { ...STORE_DEFAULTS.slitScan },
     stretch: { ...STORE_DEFAULTS.stretch },
     normalMap: { ...STORE_DEFAULTS.normalMap },

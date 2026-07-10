@@ -18,7 +18,9 @@ title: 機能仕様
 | SPEC-005 | [動画出力表示名とファイル名の整理](./SPEC-005-video-export-naming.md) | implemented |
 | SPEC-006 | [統合検証コマンド](./SPEC-006-verification-commands.md) | implemented |
 | SPEC-007 | [K-GG専用フォルダとPATHからのFFmpeg検出](./SPEC-007-ffmpeg-install-guidance.md) | implemented |
-| SPEC-008 | [画像カラーパレット生成機能](./SPEC-008-color-palette-generator.md) | review |
+| SPEC-008 | [画像カラーパレット生成機能](./SPEC-008-color-palette-generator.md) | implemented |
+| SPEC-009 | [画像グラデーション入力](./SPEC-009-image-gradient-source.md) | implemented |
+| SPEC-010 | [Bezier Axisの廃止](./SPEC-010-remove-bezier-axis.md) | implemented |
 
 ## 新しい仕様の作り方
 

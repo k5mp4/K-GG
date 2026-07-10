@@ -1,10 +1,9 @@
 import { useEffect, useRef, useState } from 'react';
 import { initWebGL, SHADER_VERSION } from '../lib/webgl';
-import { generateDistanceMap, uploadDistanceMap } from '../lib/bezierAxis';
 import { buildRampTextureData } from '../lib/gradientRampUtils';
 import { renderBridge } from '../lib/renderBridge';
 import { AnimationLoop } from '../lib/animation';
-import { SDF_MAP_SIZE, RAMP_TEX_WIDTH } from '../lib/constants';
+import { RAMP_TEX_WIDTH } from '../lib/constants';
 import { renderSceneAtTime } from '../lib/renderSceneAtTime';
 import { getGlassSamplePadding } from '../lib/glass';
 import { useGradientStore } from '../store/gradientStore';
@@ -24,7 +23,6 @@ export function useWebGL(
   gradient: GradientConfig,
 ) {
   const webglRef = useRef<WebGLContext | null>(null);
-  const sdfReadyRef = useRef(false);
   const latestRef = useRef<LatestState | null>(null);
   const initRequestRef = useRef<WebGLInitRequest | null>(null);
   const compiledShaderVersionRef = useRef(0); // コンパイル済みシェーダーのバージョン
@@ -41,7 +39,7 @@ export function useWebGL(
     // SHADER_VERSION が変わった場合（GLSL が HMR で更新された場合）も再初期化
     const stale = webglRef.current !== null && (
       webglRef.current.gl.canvas !== canvas ||
-      webglRef.current.uniforms['u_bezierRadius'] === undefined ||
+      webglRef.current.uniforms['u_imageGradientEnabled'] === undefined ||
       webglRef.current.uniforms['u_iridEnabled'] === undefined ||
       webglRef.current.uniforms['u_manualDistortEnabled'] === undefined ||
       webglRef.current.uniforms['u_matcapEnabled'] === undefined ||
@@ -92,15 +90,6 @@ export function useWebGL(
       if (disposed) return;
       webglRef.current = ctx;
       compiledShaderVersionRef.current = shaderVersion;
-      if (stale && latestRef.current) {
-        const latest = latestRef.current;
-        sdfReadyRef.current = false;
-        if (latest.bezierAxis.enabled && latest.bezierAxis.paths.some(p => p.anchors.length >= 2)) {
-          const mapData = generateDistanceMap(latest.bezierAxis.paths, SDF_MAP_SIZE, SDF_MAP_SIZE, latest.width, latest.height);
-          uploadDistanceMap(ctx.gl, mapData, SDF_MAP_SIZE, SDF_MAP_SIZE, ctx.distanceTexture);
-          sdfReadyRef.current = true;
-        }
-      }
       setIsWebGLReady(true);
     }).catch(e => {
       if (disposed) return;
@@ -122,10 +111,7 @@ export function useWebGL(
         if (!ctx || !latest) return;
         const totalDuration = Math.max((latest.animation.speed ?? 1) * (latest.animation.duration ?? 1), 0.0001);
         const normalizedTime = nt !== undefined ? nt : t / totalDuration;
-        renderSceneAtTime(ctx, latest, normalizedTime, {
-          sdfReady: sdfReadyRef.current,
-          tile,
-        });
+        renderSceneAtTime(ctx, latest, normalizedTime, { tile });
       },
       () => { animLoopRef.current?.stop(); },
       () => { animLoopRef.current?.start(); },
@@ -149,7 +135,7 @@ export function useWebGL(
         const ctx = webglRef.current;
         const latest = latestRef.current;
         if (ctx && latest) {
-          renderSceneAtTime(ctx, latest, normalizedTime, { sdfReady: sdfReadyRef.current });
+          renderSceneAtTime(ctx, latest, normalizedTime, {});
         }
       },
       () => animLoopRef.current?.currentNormalizedTime ?? useGradientStore.getState().currentTime,
@@ -167,5 +153,5 @@ export function useWebGL(
     gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, RAMP_TEX_WIDTH, 1, 0, gl.RGBA, gl.UNSIGNED_BYTE, data);
   }, [gradient.stops, gradient.opacityStops, gradient.rampColorMode, gradient.rampInterpolation, gradient.rampVariable, gradient.rampMirror, isWebGLReady]); // isWebGLReady: WebGL 初期化完了時に初回アップロードを確実に行う
 
-  return { webglRef, sdfReadyRef, latestRef, isWebGLReady };
+  return { webglRef, latestRef, isWebGLReady };
 }

@@ -1,6 +1,8 @@
 import { create } from 'zustand';
 import type { GradientConfig } from '../types/gradient';
-import type { NoiseDistortionConfig, BezierAxisConfig, DiffuseConfig, SlitScanConfig, StretchConfig, NormalMapConfig, RadonConfig, IridescenceConfig, ManualDistortConfig, PostprocessConfig, MatcapConfig, HistogramConfig } from '../types/distortion';
+import type { NoiseDistortionConfig, DiffuseConfig, SlitScanConfig, StretchConfig, NormalMapConfig, RadonConfig, IridescenceConfig, ManualDistortConfig, PostprocessConfig, MatcapConfig, HistogramConfig } from '../types/distortion';
+import type { ImageGradientConfig } from '../types/imageGradient';
+import { IMAGE_GRADIENT_DEFAULTS } from '../types/imageGradient';
 import { gradientRampPresets } from '../lib/gradientRampUtils';
 import type { AnimationMode, Keyframe, PropertyTrack } from '../types/keyframe';
 import { normalizePropertyTrack } from '../types/keyframe';
@@ -47,7 +49,7 @@ type GradientStore = {
   gradient: GradientConfig;
   noiseDistortion: NoiseDistortionConfig;
   diffuse: DiffuseConfig;
-  bezierAxis: BezierAxisConfig;
+  imageGradient: ImageGradientConfig;
   slitScan: SlitScanConfig;
   stretch: StretchConfig;
   animation: AnimationConfig;
@@ -73,7 +75,7 @@ type GradientStore = {
   setGradient: (v: Partial<GradientConfig>) => void;
   setNoiseDistortion: (v: Partial<NoiseDistortionConfig>) => void;
   setDiffuse: (v: Partial<DiffuseConfig>) => void;
-  setBezierAxis: (v: Partial<BezierAxisConfig>) => void;
+  setImageGradient: (v: Partial<ImageGradientConfig>) => void;
   setSlitScan: (v: Partial<SlitScanConfig>) => void;
   setStretch: (v: Partial<StretchConfig>) => void;
   setAnimation: (v: Partial<AnimationConfig>) => void;
@@ -213,16 +215,7 @@ export const STORE_DEFAULTS = {
     seedAnimEnabled: false,
     ditherThreshold: 0.5,
   },
-  bezierAxis: {
-    enabled: false,
-    paths: [] as import('../types/distortion').BezierPath[],
-    strength: 1.0,
-    boundary: 'clamp' as const,
-    radius: 1.0,
-    curvatureInfluence: 0.0,
-    curvatureMode: 'wide' as const,
-    bezierSide: 'both' as const,
-  },
+  imageGradient: IMAGE_GRADIENT_DEFAULTS,
   slitScan: {
     enabled: false,
     mode: 'linear' as const,
@@ -307,7 +300,6 @@ export const STORE_DEFAULTS = {
     speed: 1.0,
     frequency: 3.0,
     angle: 45,
-    bezierWarpStrength: 0.5,
   },
   manualDistort: {
     enabled: false,
@@ -490,7 +482,7 @@ export const useGradientStore = create<GradientStore>((set) => ({
   gradient: { ...STORE_DEFAULTS.gradient },
   noiseDistortion: { ...STORE_DEFAULTS.noiseDistortion },
   diffuse: { ...STORE_DEFAULTS.diffuse },
-  bezierAxis: { ...STORE_DEFAULTS.bezierAxis },
+  imageGradient: { ...STORE_DEFAULTS.imageGradient },
   slitScan: { ...STORE_DEFAULTS.slitScan },
   stretch: { ...STORE_DEFAULTS.stretch },
   animation: { ...STORE_DEFAULTS.animation },
@@ -560,7 +552,7 @@ export const useGradientStore = create<GradientStore>((set) => ({
       : s.keyframeTracks;
     return { diffuse, keyframeTracks };
   }),
-  setBezierAxis: (v) => set((s) => ({ bezierAxis: { ...s.bezierAxis, ...v } })),
+  setImageGradient: (v) => set((s) => ({ imageGradient: { ...s.imageGradient, ...v } })),
   setSlitScan: (v) => set((s) => {
     const slitScan = { ...s.slitScan, ...v };
     let keyframeTracks = s.keyframeTracks;

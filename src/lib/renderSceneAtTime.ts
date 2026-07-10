@@ -6,22 +6,15 @@ export function renderSceneAtTime(
   ctx: WebGLContext,
   state: LatestState,
   normalizedTime: number,
-  options: {
-    sdfReady: boolean;
-    tile?: TileRenderOptions;
-  },
+  options: { tile?: TileRenderOptions },
 ): void {
   const scene = evaluateSceneAtTime(state, normalizedTime);
-  const effectiveBezier = scene.bezierAxis.enabled && !options.sdfReady
-    ? { ...scene.bezierAxis, enabled: false }
-    : scene.bezierAxis;
 
   render(
     ctx,
     scene.gradient,
     scene.noiseDistortion,
     scene.diffuse,
-    effectiveBezier,
     scene.slitScan,
     scene.stretch,
     state.normalMap,
@@ -38,6 +31,8 @@ export function renderSceneAtTime(
     scene.stretchTime,
     options.tile,
     state.sourceImageCanvas ?? null,
+    state.imageGradientSource ?? null,
+    state.imageGradient,
     scene.noiseLoopPeriod,
     scene.animationSpeed,
     state.imageMaskSource ?? null,

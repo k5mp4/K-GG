@@ -26,19 +26,14 @@
   uniform float u_diffuseSeed;
   uniform float u_diffuseDitherThreshold;
 
-  uniform bool u_bezierEnabled;
-  uniform sampler2D u_bezierDistanceMap;
-  uniform float u_bezierStrength;
-  uniform float u_bezierRadius;
-  uniform float u_curvatureInfluence;
-  uniform int u_curvatureMode;  // 0=wide(高曲率→色幅広), 1=narrow(高曲率→色幅狭)
-  uniform int u_bezierSide;     // 0=both, 1=outer(bezierT>=0.5), 2=inner(bezierT<0.5)
-  uniform int u_bezierBoundary;
-
   uniform sampler2D u_gradientRamp;
   uniform float u_rampRepeat;
   uniform bool u_sourceImageEnabled;
   uniform sampler2D u_sourceImage;
+  uniform bool u_imageGradientEnabled;
+  uniform sampler2D u_imageGradient;
+  uniform vec2 u_imageGradientSize;
+  uniform int u_imageGradientChannel;
   uniform bool u_imageMaskEnabled;
   uniform sampler2D u_imageMask;
 
@@ -91,7 +86,6 @@
   uniform float u_iridAngle;
   uniform float u_iridSpeed;
   uniform float u_iridFreq;
-  uniform float u_iridBezierStrength;
   uniform float u_iridStrength;
 
   // Manual Distort
@@ -109,27 +103,6 @@
   // 通常レンダリングでは vec2(0.0) でデフォルト動作。
   uniform vec2 u_tileOffset;
   uniform vec2 u_tileSize;
-
-  float computeBezierRampT(vec2 sampleUV, bool applySideMask) {
-    vec4 sdfSample = texture2D(u_bezierDistanceMap, vec2(sampleUV.x, 1.0 - sampleUV.y));
-    float bezierT   = sdfSample.r;
-    float curvature = sdfSample.g;
-    float amplifiedBezierT;
-    if (u_curvatureMode == 0) {
-      float effectiveRadius = u_bezierRadius * (curvature * u_curvatureInfluence * 5.0 + (1.0 - u_curvatureInfluence));
-      amplifiedBezierT = clamp((bezierT - 0.5) / max(effectiveRadius, 0.001) + 0.5, 0.0, 1.0);
-    } else {
-      float scaledBezierT = (bezierT - 0.5) / max(u_bezierRadius, 0.01) + 0.5;
-      amplifiedBezierT = clamp(0.5 + (scaledBezierT - 0.5) * (1.0 + curvature * u_curvatureInfluence * 5.0), 0.0, 1.0);
-    }
-    if (applySideMask) {
-      vec2 gradDir = u_gradDir;
-      float baseLinearT = dot(sampleUV - 0.5, gradDir) + 0.5;
-      if (u_bezierSide == 1 && bezierT < 0.5)  amplifiedBezierT = baseLinearT;
-      else if (u_bezierSide == 2 && bezierT >= 0.5) amplifiedBezierT = baseLinearT;
-    }
-    return amplifiedBezierT;
-  }
 
   vec2 cubicBezierPoint(vec2 p0, vec2 p1, vec2 p2, vec2 p3, float t) {
     float mt = 1.0 - t;
@@ -266,24 +239,7 @@
   }
 
   float computeGradientT(vec2 sampleUV) {
-    float t;
-    if (u_bezierEnabled && u_gradientType != 5) {
-      float amplifiedBezierT = computeBezierRampT(sampleUV, true);
-      vec2 gradDir = u_gradDir;
-      float baseLinearT = dot(sampleUV - 0.5, gradDir) + 0.5;
-      vec2 warpedUV = sampleUV + (amplifiedBezierT - baseLinearT) * u_bezierStrength * gradDir;
-      t = computeGradientBase(warpedUV);
-    } else {
-      t = computeGradientBase(sampleUV);
-    }
-    if (u_bezierBoundary == 1) {
-      if (u_bezierEnabled || u_gradientType == 5) { t = fract(abs(t - 0.5) * 4.0); } else { t = fract(t * 2.0); }
-    } else if (u_bezierBoundary == 2) {
-      t = abs(t * 2.0 - 1.0);
-    } else {
-      t = clamp(t, 0.0, 1.0);
-    }
-    return t;
+    return clamp(computeGradientBase(sampleUV), 0.0, 1.0);
   }
 
   vec2 applyCurlNoiseUV(vec2 uv, float evo, float curlTime) {
@@ -370,6 +326,26 @@
   vec4 sampleSourceImageRaw(vec2 sampleUV) {
     vec2 suv = clamp(sampleUV, 0.0, 1.0);
     return texture2D(u_sourceImage, vec2(suv.x, 1.0 - suv.y));
+  }
+
+  vec4 sampleImageGradient(vec2 sampleUV) {
+    float imageAspect = u_imageGradientSize.x / max(u_imageGradientSize.y, 1.0);
+    float outputAspect = u_resolution.x / max(u_resolution.y, 1.0);
+    vec2 coverUv = sampleUV;
+    if (imageAspect > outputAspect) {
+      coverUv.x = 0.5 + (sampleUV.x - 0.5) * outputAspect / imageAspect;
+    } else {
+      coverUv.y = 0.5 + (sampleUV.y - 0.5) * imageAspect / outputAspect;
+    }
+    return texture2D(u_imageGradient, vec2(clamp(coverUv.x, 0.0, 1.0), 1.0 - clamp(coverUv.y, 0.0, 1.0)));
+  }
+
+  float imageGradientT(vec2 sampleUV) {
+    vec3 rgb = clamp(sampleImageGradient(sampleUV).rgb, 0.0, 1.0);
+    if (u_imageGradientChannel == 1) return rgb.r;
+    if (u_imageGradientChannel == 2) return rgb.g;
+    if (u_imageGradientChannel == 3) return rgb.b;
+    return dot(rgb, vec3(0.299, 0.587, 0.114));
   }
 
   vec4 applyImageMask(vec4 color, vec2 globalCoord) {
@@ -590,8 +566,9 @@
     float manualSmoothMask = 0.0;
     vec2 sourceStretchDir = vec2(1.0, 0.0);
     float sourceStretchAmount = 0.0;
+    bool rawSourceActive = u_sourceImageEnabled && !u_imageGradientEnabled;
 
-    if (u_manualDistortEnabled && !u_sourceImageEnabled) {
+    if (u_manualDistortEnabled && !rawSourceActive) {
       manualDistortSample = texture2D(u_manualDistortMap, vec2(manualDistortUV.x, 1.0 - manualDistortUV.y));
       manualSmoothMask = manualDistortSample.b;
       vec2 distortOffset = (manualDistortSample.rg * 2.0 - 1.0) * u_manualDistortMaxDisplacement;
@@ -599,24 +576,15 @@
     }
 
     // Fluid Warp UV Warp (Early) - 画像全体を歪ませる
-    if (u_iridEnabled && !u_sourceImageEnabled) {
+    if (u_iridEnabled && !rawSourceActive) {
       float iTime = u_time * 0.1 * u_iridSpeed;
-      
-      // ベジェ軸からの距離を取得
-      vec4 sdfSample = texture2D(u_bezierDistanceMap, vec2(uv.x, 1.0 - uv.y));
-      float dist = abs(sdfSample.r - 0.5) * 2.0;
-      
       vec2 flowDir = vec2(cos(u_iridAngle), sin(u_iridAngle));
       float f = fbm(uv * u_iridFreq + flowDir * iTime, 3);
-      
-      // 油膜のような流動的な歪み + ベジェ軸周辺でのブースト
       float warpAmt = 0.15 * u_iridStrength;
-      warpAmt += (1.0 - smoothstep(0.0, 0.5, dist)) * 0.3 * u_iridBezierStrength;
-      
       uv += vec2(cos(f * 6.28), sin(f * 6.28)) * warpAmt;
     }
 
-    if (u_radonEnabled && !u_sourceImageEnabled) {
+    if (u_radonEnabled && !rawSourceActive) {
       float rEvo = u_radonEvolution + u_time * u_radonSpeed;
       float rTheta = uv.x * u_radonFreq * 3.14159265 + u_radonAngle + rEvo;
       float rT = (uv.y - 0.5) * u_radonRadius;
@@ -658,7 +626,7 @@
         uv += snapSlitOffsetToCanvasPixel(sf * u_slitOffset * sourceStretchDir);
       }
     }
-    if (!u_sourceImageEnabled) {
+    if (!rawSourceActive) {
       uv = applyNoiseUV(uv);
     }
     if (u_diffuseEnabled && u_diffuseMode != 2) {
@@ -715,7 +683,7 @@
       }
     }
 
-    if (u_sourceImageEnabled) {
+    if (rawSourceActive) {
       vec4 sourceColor = sampleSourceImageRaw(uv);
       if (usePatternDither) {
         float sourcePaletteT = dot(clamp(sourceColor.rgb, 0.0, 1.0), vec3(0.299, 0.587, 0.114));
@@ -725,8 +693,9 @@
       return;
     }
 
-    float t = computeGradientT(uv);
-    if (u_manualDistortEnabled) {
+    float sourceAlpha = u_imageGradientEnabled ? sampleImageGradient(uv).a : 1.0;
+    float t = u_imageGradientEnabled ? imageGradientT(uv) : computeGradientT(uv);
+    if (u_manualDistortEnabled && !u_imageGradientEnabled) {
       float smoothPasses = manualSmoothMask * 8.0;
       if (smoothPasses > 0.001) {
         vec2 px = (u_manualDistortSmoothRadius * (1.0 + smoothPasses * 0.08)) / u_resolution;
@@ -749,7 +718,7 @@
     vec4 rampColor = texture2D(u_gradientRamp, vec2(rampT, 0.5));
     vec3 color = rampColor.rgb;
     float rampAlpha = rampColor.a;
-    if (u_radonEnabled) {
+    if (u_radonEnabled && !u_imageGradientEnabled) {
       float radonEvo = u_radonEvolution + u_time * u_radonSpeed;
       vec2 rv = globalCoord / u_resolution;
       float radonTheta = rv.x * u_radonFreq * 3.14159265 + u_radonAngle + radonEvo;
@@ -775,7 +744,7 @@
       color = applyPatternDither(color, globalCoord, rampT);
     }
 
-    gl_FragColor = vec4(color, rampAlpha);
+    gl_FragColor = vec4(color, rampAlpha * sourceAlpha);
 
     // Matcap: 円形アルファマスク
     if (u_matcapEnabled) {

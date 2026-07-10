@@ -1,6 +1,5 @@
 import type { AnimationConfig } from '../store/gradientStore';
 import type {
-  BezierAxisConfig,
   DiffuseConfig,
   IridescenceConfig,
   ManualDistortConfig,
@@ -12,6 +11,7 @@ import type {
   SlitScanConfig,
   StretchConfig,
 } from './distortion';
+import type { ImageGradientConfig } from './imageGradient';
 import type { GradientConfig } from './gradient';
 import type { PropertyTrack } from './keyframe';
 
@@ -19,7 +19,7 @@ export type LatestState = {
   gradient: GradientConfig;
   noiseDistortion: NoiseDistortionConfig;
   diffuse: DiffuseConfig;
-  bezierAxis: BezierAxisConfig;
+  imageGradient: ImageGradientConfig;
   slitScan: SlitScanConfig;
   stretch: StretchConfig;
   normalMap: NormalMapConfig;
@@ -34,6 +34,7 @@ export type LatestState = {
   height: number;
   animDirection: number;
   sourceImageCanvas?: HTMLCanvasElement | null;
+  imageGradientSource?: HTMLCanvasElement | null;
   imageMaskSource?: TexImageSource | null;
   imageMaskEnabled?: boolean;
 };
