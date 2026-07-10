@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect } from 'react';
 import { undo, redo } from '../lib/history';
+import { useGradientStore } from '../store/gradientStore';
 
 type Pan = { x: number; y: number };
 type TouchPoint = { x: number; y: number };
@@ -15,6 +16,11 @@ export function useViewportControl() {
   const [pan, setPan] = useState<Pan>({ x: 0, y: 0 });
   const [isViewportControlEnabled, setIsViewportControlEnabled] = useState(true);
   const [gestureFeedbacks, setGestureFeedbacks] = useState<GestureFeedback[]>([]);
+  const [isSpacePressed, setIsSpacePressed] = useState(false);
+  const [isDragging, setIsDragging] = useState(false);
+
+  const animationEnabled = useGradientStore(s => s.animation.enabled);
+  const isSpacePressedRef = useRef(false);
 
   const viewportRef = useRef<HTMLDivElement>(null);
   const panStartRef = useRef<{ mx: number; my: number; px: number; py: number } | null>(null);
@@ -53,6 +59,49 @@ export function useViewportControl() {
     updateEnabled();
     query.addEventListener('change', updateEnabled);
     return () => query.removeEventListener('change', updateEnabled);
+  }, []);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      const activeEl = document.activeElement;
+      if (activeEl && (
+        activeEl.tagName === 'INPUT' ||
+        activeEl.tagName === 'TEXTAREA' ||
+        (activeEl instanceof HTMLElement && activeEl.isContentEditable)
+      )) {
+        return;
+      }
+      if (e.code === 'Space') {
+        e.preventDefault();
+        if (!isSpacePressedRef.current) {
+          isSpacePressedRef.current = true;
+          setIsSpacePressed(true);
+        }
+      }
+    };
+
+    const handleKeyUp = (e: KeyboardEvent) => {
+      if (e.code === 'Space') {
+        isSpacePressedRef.current = false;
+        setIsSpacePressed(false);
+      }
+    };
+
+    const handleBlur = () => {
+      isSpacePressedRef.current = false;
+      setIsSpacePressed(false);
+    };
+
+    window.addEventListener('keydown', handleKeyDown, { passive: false });
+    window.addEventListener('keyup', handleKeyUp);
+    window.addEventListener('blur', handleBlur);
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown);
+      window.removeEventListener('keyup', handleKeyUp);
+      window.removeEventListener('blur', handleBlur);
+    };
   }, []);
 
   // ホイールズーム + タッチパン/ピンチ
@@ -260,9 +309,11 @@ export function useViewportControl() {
   }, []);
 
   function handleMiddleDown(e: React.MouseEvent) {
-    if (e.button !== 1) return;
+    const isSpaceDrag = isSpacePressedRef.current && !animationEnabled && e.button === 0;
+    if (e.button !== 1 && !isSpaceDrag) return;
     e.preventDefault();
     panStartRef.current = { mx: e.clientX, my: e.clientY, px: pan.x, py: pan.y };
+    setIsDragging(true);
   }
 
   function handleMiddleMove(e: React.MouseEvent) {
@@ -274,12 +325,25 @@ export function useViewportControl() {
   }
 
   function handleMiddleUp(e: React.MouseEvent) {
-    if (e.button === 1) panStartRef.current = null;
+    if (e.button === 1 || e.button === 0) {
+      panStartRef.current = null;
+      setIsDragging(false);
+    }
   }
 
   function handleMiddleLeave() {
     panStartRef.current = null;
+    setIsDragging(false);
   }
+
+  const resetViewport = () => {
+    setZoom(1);
+    setPan({ x: 0, y: 0 });
+  };
+
+  const cursor = isDragging 
+    ? 'grabbing' 
+    : (isSpacePressed && !animationEnabled ? 'grab' : 'default');
 
   return {
     viewportRef,
@@ -291,5 +355,7 @@ export function useViewportControl() {
     handleMiddleMove,
     handleMiddleUp,
     handleMiddleLeave,
+    resetViewport,
+    cursor,
   };
 }

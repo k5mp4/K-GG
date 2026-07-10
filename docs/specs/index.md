@@ -18,6 +18,7 @@ title: 機能仕様
 | SPEC-005 | [動画出力表示名とファイル名の整理](./SPEC-005-video-export-naming.md) | implemented |
 | SPEC-006 | [統合検証コマンド](./SPEC-006-verification-commands.md) | implemented |
 | SPEC-007 | [K-GG専用フォルダとPATHからのFFmpeg検出](./SPEC-007-ffmpeg-install-guidance.md) | implemented |
+| SPEC-008 | [画像カラーパレット生成機能](./SPEC-008-color-palette-generator.md) | review |
 
 ## 新しい仕様の作り方
 

@@ -3,6 +3,7 @@ import { useGradientStore, GRADIENT_ANCHOR_DEFAULTS, defaultBezierControlsForAnc
 import { interpolateKeyframes } from '../lib/keyframeInterpolator';
 import { getTrackMode } from '../types/keyframe';
 import { Icon } from './Icon';
+import { getColorAtPosition } from '../lib/gradientRampUtils';
 
 // デバッグ用：ブラウザコンソールから調整可能
 const SNAP_CONFIG = {
@@ -16,13 +17,55 @@ type Props = {
   height: number;
 };
 
-/** アンカーのスタイル定義: [塗り, ボーダー色, ラベル] */
-const ANCHOR_STYLES = [
-  { fill: 'rgba(255,255,255,0.95)', border: '#ffffff', label: 'A', labelColor: '#1a1a2e' },
-  { fill: 'rgba(20,20,35,0.75)',    border: '#94a3b8', label: 'B', labelColor: '#94a3b8' },
-  { fill: 'rgba(20,20,35,0.75)',    border: '#60a5fa', label: 'C', labelColor: '#60a5fa' },
-  { fill: 'rgba(20,20,35,0.75)',    border: '#f472b6', label: 'D', labelColor: '#f472b6' },
-] as const;
+/**
+ * アンカーインデックスからランプのt値へのマッピング。
+ * シェーダー (gradient.frag.glsl L242-243) と同じ対応：
+ *   linear/radial/diamond/angle/bezier: index0=0, index1=1
+ *   fourcolor: index0=0, index1=1/3, index2=2/3, index3=1
+ */
+const ANCHOR_T_VALUES = {
+  default: [0, 1, 0, 1],
+  fourcolor: [0, 1 / 3, 2 / 3, 1],
+} as const;
+
+/** hexカラーから輝度 (0–1) を算出する */
+function getLuminance(hex: string): number {
+  const r = parseInt(hex.slice(1, 3), 16) / 255;
+  const g = parseInt(hex.slice(3, 5), 16) / 255;
+  const b = parseInt(hex.slice(5, 7), 16) / 255;
+  // sRGB 輝度（ITU-R BT.709）
+  return 0.2126 * r + 0.7152 * g + 0.0722 * b;
+}
+
+/**
+ * アンカーindex の実際のグラデーション色と視認性用スタイルを計算する。
+ * - fill: アンカーの実際のグラデーション色
+ * - innerBorder: fillの輝度に応じた自動コントラスト色 (白 or 黒)
+ * - outerGlow: 外側のコントラストglow
+ */
+function computeAnchorColors(
+  index: number,
+  gradientType: string,
+  stops: import('../types/gradient').ColorStop[],
+  interpolation: import('../types/gradient').RampInterpolation,
+  colorMode: import('../types/gradient').RampColorMode | undefined,
+  rampMirror?: boolean,
+): { fill: string; innerBorder: string; outerGlow: string } {
+  const tValues = gradientType === 'fourcolor'
+    ? ANCHOR_T_VALUES.fourcolor
+    : ANCHOR_T_VALUES.default;
+  let t = tValues[index] ?? 0;
+  if (rampMirror) {
+    // mirrorモード: t=0.5 を超えたら折り返す
+    t = t <= 0.5 ? t : 1 - t;
+  }
+  const fill = getColorAtPosition(stops, t, interpolation, colorMode);
+  const lum = getLuminance(fill);
+  // 輝度0.45を境に白/黒を切り替えるコントラストボーダー
+  const innerBorder = lum > 0.45 ? '#000000' : '#ffffff';
+  const outerGlow   = lum > 0.45 ? '#ffffff' : '#000000';
+  return { fill, innerBorder, outerGlow };
+}
 
 export function GradientAnchorEditor({ width, height }: Props) {
   const { gradient, keyframeTracks, setKeyframeTracks, addKeyframe, setKeyframe, currentTime, animation, selectedGradientAnchors, setSelectedGradientAnchors, setIsGradientAnchorDragging } = useGradientStore();
@@ -36,6 +79,7 @@ export function GradientAnchorEditor({ width, height }: Props) {
 
   // デバッグ用：window に SNAP_CONFIG を露出させる
   useEffect(() => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     (window as any).GRADIENT_ANCHOR_SNAP_CONFIG = SNAP_CONFIG;
   }, []);
 
@@ -56,7 +100,7 @@ export function GradientAnchorEditor({ width, height }: Props) {
   const snapToGuidelines = (uvPos: [number, number], dragIndex: number): [number, number] => {
     const { SNAP_THRESHOLD } = SNAP_CONFIG;
 
-    let result: [number, number] = [uvPos[0], uvPos[1]];
+    const result: [number, number] = [uvPos[0], uvPos[1]];
     const snapPoints = [0, 0.5, 1];
 
     // キャンバス中心・上下左右へのスナップ
@@ -215,7 +259,7 @@ export function GradientAnchorEditor({ width, height }: Props) {
   function recordAnchorKeyframe(index: number) {
     const anchor = anchors[index];
     const nt = currentTime;
-    const label = ANCHOR_STYLES[index].label;
+    const label = ['A', 'B', 'C', 'D'][index] ?? String(index);
     const fields: Array<{ field: 'x' | 'y'; value: number }> = [
       { field: 'x', value: anchor[0] },
       { field: 'y', value: anchor[1] },
@@ -281,15 +325,20 @@ export function GradientAnchorEditor({ width, height }: Props) {
     )
   );
 
-  // ライン色を決定：垂直 = 緑、水平 = 赤、辺の中心スナップ = オレンジ
-  let lineColor = 'rgba(255,255,255,0.55)'; // デフォルト：白
+  // ライン色を決定：垂直 = 緑、水平 = 赤、辺の中心スナップ = オレンジ（スナップ強調用）
+  let snapLineColor: string | null = null;
   if (isABVertical) {
-    lineColor = 'rgba(34,197,94,0.85)'; // 緑
+    snapLineColor = 'rgba(34,197,94,0.9)'; // 緑
   } else if (isABHorizontal) {
-    lineColor = 'rgba(209,20,2,0.85)'; // 赤
+    snapLineColor = 'rgba(209,20,2,0.9)'; // 赤
   } else if (isSnappedToEdgeCenter) {
-    lineColor = 'rgba(251,146,60,0.85)'; // オレンジ
+    snapLineColor = 'rgba(251,146,60,0.9)'; // オレンジ
   }
+
+  // 各アンカーの実色を取得（接続線のグラデーション用）
+  const anchorColors = Array.from({ length: numAnchors }, (_, i) =>
+    computeAnchorColors(i, gradientType, gradient.stops, gradient.rampInterpolation, gradient.rampColorMode, gradient.rampMirror)
+  );
 
   return (
     <div
@@ -302,50 +351,48 @@ export function GradientAnchorEditor({ width, height }: Props) {
         width={width}
         height={height}
       >
+        <defs>
+          {/* linear/bezier用: A→Bグラデーション線 */}
+          {gradientType !== 'fourcolor' && (
+            <linearGradient id="anchorLineGrad" x1={positions[0].x} y1={positions[0].y} x2={positions[1]?.x ?? positions[0].x} y2={positions[1]?.y ?? positions[0].y} gradientUnits="userSpaceOnUse">
+              <stop offset="0%" stopColor={anchorColors[0]?.fill ?? '#ffffff'} stopOpacity={0.7} />
+              <stop offset="100%" stopColor={anchorColors[1]?.fill ?? '#ffffff'} stopOpacity={0.7} />
+            </linearGradient>
+          )}
+          {/* fourcolor用: ペアごとのグラデーション */}
+          {gradientType === 'fourcolor' && fourColorLines.map(([a, b]) => (
+            <linearGradient key={`grad-${a}-${b}`} id={`anchorLineGrad-${a}-${b}`} x1={positions[a]?.x} y1={positions[a]?.y} x2={positions[b]?.x} y2={positions[b]?.y} gradientUnits="userSpaceOnUse">
+              <stop offset="0%" stopColor={anchorColors[a]?.fill ?? '#ffffff'} stopOpacity={0.6} />
+              <stop offset="100%" stopColor={anchorColors[b]?.fill ?? '#ffffff'} stopOpacity={0.6} />
+            </linearGradient>
+          ))}
+        </defs>
+
         {gradientType !== 'fourcolor' ? (
           showBezierControls ? (
             <>
-              <line
-                x1={positions[0].x} y1={positions[0].y}
-                x2={bezierControlPositions[0].x} y2={bezierControlPositions[0].y}
-                stroke="rgba(236,219,190,0.36)"
-                strokeWidth="1"
-                strokeDasharray="3,3"
-              />
-              <line
-                x1={positions[1].x} y1={positions[1].y}
-                x2={bezierControlPositions[1].x} y2={bezierControlPositions[1].y}
-                stroke="rgba(236,219,190,0.36)"
-                strokeWidth="1"
-                strokeDasharray="3,3"
-              />
-              <path
-                d={`M ${positions[0].x} ${positions[0].y} C ${bezierControlPositions[0].x} ${bezierControlPositions[0].y}, ${bezierControlPositions[1].x} ${bezierControlPositions[1].y}, ${positions[1].x} ${positions[1].y}`}
-                fill="none"
-                stroke={lineColor}
-                strokeWidth="1.8"
-                strokeDasharray="5,3"
-              />
+              {/* ベジェ制御点へのガイド線 */}
+              <line x1={positions[0].x} y1={positions[0].y} x2={bezierControlPositions[0].x} y2={bezierControlPositions[0].y} stroke="rgba(255,255,255,0.12)" strokeWidth="1.5" strokeDasharray="3,3" />
+              <line x1={positions[0].x} y1={positions[0].y} x2={bezierControlPositions[0].x} y2={bezierControlPositions[0].y} stroke={anchorColors[0]?.fill ?? 'rgba(236,219,190,0.4)'} strokeWidth="0.75" strokeDasharray="3,3" strokeOpacity={0.45} />
+              <line x1={positions[1].x} y1={positions[1].y} x2={bezierControlPositions[1].x} y2={bezierControlPositions[1].y} stroke="rgba(255,255,255,0.12)" strokeWidth="1.5" strokeDasharray="3,3" />
+              <line x1={positions[1].x} y1={positions[1].y} x2={bezierControlPositions[1].x} y2={bezierControlPositions[1].y} stroke={anchorColors[1]?.fill ?? 'rgba(236,219,190,0.4)'} strokeWidth="0.75" strokeDasharray="3,3" strokeOpacity={0.45} />
+              {/* ベジェ曲線本体: アウトライン白 + 色付き本線 */}
+              <path d={`M ${positions[0].x} ${positions[0].y} C ${bezierControlPositions[0].x} ${bezierControlPositions[0].y}, ${bezierControlPositions[1].x} ${bezierControlPositions[1].y}, ${positions[1].x} ${positions[1].y}`} fill="none" stroke="rgba(255,255,255,0.15)" strokeWidth={snapLineColor ? 3 : 2.5} strokeDasharray="5,3" />
+              <path d={`M ${positions[0].x} ${positions[0].y} C ${bezierControlPositions[0].x} ${bezierControlPositions[0].y}, ${bezierControlPositions[1].x} ${bezierControlPositions[1].y}, ${positions[1].x} ${positions[1].y}`} fill="none" stroke={snapLineColor ?? 'url(#anchorLineGrad)'} strokeWidth="1.2" strokeDasharray="5,3" />
             </>
           ) : (
-            <line
-              x1={positions[0].x} y1={positions[0].y}
-              x2={positions[1].x} y2={positions[1].y}
-              stroke={lineColor}
-              strokeWidth="1.5"
-              strokeDasharray="5,3"
-            />
+            <>
+              {/* 直線: アウトライン白 + 色付き本線 */}
+              <line x1={positions[0].x} y1={positions[0].y} x2={positions[1].x} y2={positions[1].y} stroke="rgba(255,255,255,0.15)" strokeWidth={snapLineColor ? 3 : 2.5} strokeDasharray="5,3" />
+              <line x1={positions[0].x} y1={positions[0].y} x2={positions[1].x} y2={positions[1].y} stroke={snapLineColor ?? 'url(#anchorLineGrad)'} strokeWidth="1.2" strokeDasharray="5,3" />
+            </>
           )
         ) : (
           fourColorLines.map(([a, b]) => (
-            <line
-              key={`${a}-${b}`}
-              x1={positions[a].x} y1={positions[a].y}
-              x2={positions[b].x} y2={positions[b].y}
-              stroke="rgba(255,255,255,0.3)"
-              strokeWidth="1"
-              strokeDasharray="3,4"
-            />
+            <g key={`${a}-${b}`}>
+              <line x1={positions[a].x} y1={positions[a].y} x2={positions[b].x} y2={positions[b].y} stroke="rgba(255,255,255,0.12)" strokeWidth="2" strokeDasharray="3,4" />
+              <line x1={positions[a].x} y1={positions[a].y} x2={positions[b].x} y2={positions[b].y} stroke={`url(#anchorLineGrad-${a}-${b})`} strokeWidth="1" strokeDasharray="3,4" />
+            </g>
           ))
         )}
       </svg>
@@ -381,40 +428,43 @@ export function GradientAnchorEditor({ width, height }: Props) {
 
       {/* アンカーハンドル */}
       {positions.map((pos, i) => {
-        const s = ANCHOR_STYLES[i];
         const isSelected = selectedGradientAnchors.includes(i);
+        const { fill, innerBorder, outerGlow } = computeAnchorColors(
+          i,
+          gradientType,
+          gradient.stops,
+          gradient.rampInterpolation,
+          gradient.rampColorMode,
+          gradient.rampMirror,
+        );
+        // 選択時: 赤グロー二重リング / 非選択時: 薄いコントラスト二重アウトライン
+        const boxShadow = isSelected
+          ? `0 0 0 1.5px #D11402, 0 0 0 3px rgba(209,20,2,0.3), 0 0 7px rgba(209,20,2,0.45)`
+          : `0 0 0 1px ${innerBorder}55, 0 0 0 2.5px ${outerGlow}28, 0 1px 4px rgba(0,0,0,0.45)`;
+        const label = ['A', 'B', 'C', 'D'][i] ?? String(i);
         return (
           <div key={i} style={{ position: 'absolute', left: pos.x, top: pos.y, transform: 'translate(-50%, -50%)', zIndex: 20 }}>
             <div
+              title={label}
               style={{
                 width: 18,
                 height: 18,
                 borderRadius: '50%',
-                background: s.fill,
-                border: `2px solid ${isSelected ? '#D11402' : s.border}`,
-                boxShadow: isSelected
-                  ? '0 0 0 2px rgba(236,219,190,0.85), 0 0 12px rgba(209,20,2,0.75)'
-                  : '0 1px 4px rgba(0,0,0,0.5)',
+                background: fill,
+                border: `1.5px solid ${isSelected ? '#D11402' : innerBorder}`,
+                boxShadow,
                 cursor: 'move',
                 pointerEvents: 'auto',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                fontSize: 8,
-                fontWeight: 'bold',
-                color: s.labelColor,
                 userSelect: 'none',
               }}
               onPointerDown={handlePointerDown(i)}
-            >
-              {s.label}
-            </div>
+            />
             {/* タイマーボタン: animation.affectRamp が有効な場合のみ表示 */}
             {showKfButton && (
               <button
                 onPointerDown={e => e.stopPropagation()}
                 onClick={e => { e.stopPropagation(); recordAnchorKeyframe(i); }}
-                title={`${s.label} のキーフレームを記録`}
+                title={`${label} のキーフレームを記録`}
                 style={{
                   position: 'absolute',
                   top: -10,
