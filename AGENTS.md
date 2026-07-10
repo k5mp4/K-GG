@@ -34,5 +34,6 @@
 - `npm run docs:check` と `npm run docs:build` が成功する。
 - コード変更時は変更範囲に応じて `npm test`、`npm run lint`、`npm run build` を実行する。
 - コード、テスト、仕様、ADR、利用者向け説明に矛盾がない。
+- ユーザーがコミットまたは公開を明示的に依頼した場合は、対象差分を確認してコミット・pushし、特に指定がなければドラフトPull Requestまで作成する。Pull Requestのタイトルと本文は日本語で記述し、変更内容、影響、検証結果、未確認事項を明示する。
 
 テンプレートや詳しいフローは `docs/development/docdd.md` を参照する。

@@ -1,5 +1,6 @@
 import type { GradientConfig } from '../types/gradient';
-import type { NoiseDistortionConfig, BezierAxisConfig, DiffuseConfig, SlitScanConfig, StretchConfig, NormalMapConfig, RadonConfig, IridescenceConfig, ManualDistortConfig, PostprocessConfig, MatcapConfig } from '../types/distortion';
+import type { NoiseDistortionConfig, DiffuseConfig, SlitScanConfig, StretchConfig, NormalMapConfig, RadonConfig, IridescenceConfig, ManualDistortConfig, PostprocessConfig, MatcapConfig } from '../types/distortion';
+import { IMAGE_GRADIENT_DEFAULTS, type ImageGradientConfig } from '../types/imageGradient';
 import { GRADIENT_ANCHOR_DEFAULTS, defaultBezierControlsForAnchors } from '../store/gradientStore';
 import { buildRampTextureData, RAMP_TEX_WIDTH } from './gradientRampUtils';
 import noiseGLSL from '../shaders/noise.glsl?raw';
@@ -38,7 +39,6 @@ export type WebGLContext = {
   renderOptimization: RenderOptimization;
   program: WebGLProgram;
   uniforms: Record<string, WebGLUniformLocation | null>;
-  distanceTexture: WebGLTexture;    // TEXTURE0: ベジェ SDF
   gradientRampTexture: WebGLTexture; // TEXTURE1: グラデーションランプ
   manualDistortTexture: WebGLTexture; // TEXTURE5: 手作業UV変位マップ
   manualDistortDisplacement: number[] | null;
@@ -46,6 +46,8 @@ export type WebGLContext = {
   manualDistortMapResolution: number;
   sourceImageTexture: WebGLTexture; // TEXTURE4: 読み込み画像
   sourceImageCanvas: HTMLCanvasElement | null;
+  imageGradientTexture: WebGLTexture; // TEXTURE7: 再配色用入力画像
+  imageGradientSource: HTMLCanvasElement | null;
   imageMaskTexture: WebGLTexture; // TEXTURE6: IMAGE OVERLAY/MASK の alpha マスク
   imageMaskSource: TexImageSource | null;
   // ノーマルマップ別パス用
@@ -241,18 +243,15 @@ export async function initWebGL(canvas: HTMLCanvasElement): Promise<WebGLContext
     u_diffuseGrain: gl.getUniformLocation(program, 'u_diffuseGrain'),
     u_diffuseSeed: gl.getUniformLocation(program, 'u_diffuseSeed'),
     u_diffuseDitherThreshold: gl.getUniformLocation(program, 'u_diffuseDitherThreshold'),
-    u_bezierEnabled: gl.getUniformLocation(program, 'u_bezierEnabled'),
-    u_bezierDistanceMap: gl.getUniformLocation(program, 'u_bezierDistanceMap'),
-    u_bezierStrength: gl.getUniformLocation(program, 'u_bezierStrength'),
-    u_bezierRadius: gl.getUniformLocation(program, 'u_bezierRadius'),
-    u_curvatureInfluence: gl.getUniformLocation(program, 'u_curvatureInfluence'),
-    u_curvatureMode: gl.getUniformLocation(program, 'u_curvatureMode'),
-    u_bezierSide: gl.getUniformLocation(program, 'u_bezierSide'),
-    u_bezierBoundary: gl.getUniformLocation(program, 'u_bezierBoundary'),
     u_gradientRamp: gl.getUniformLocation(program, 'u_gradientRamp'),
     u_rampRepeat: gl.getUniformLocation(program, 'u_rampRepeat'),
     u_sourceImageEnabled: gl.getUniformLocation(program, 'u_sourceImageEnabled'),
     u_sourceImage: gl.getUniformLocation(program, 'u_sourceImage'),
+    u_imageGradientEnabled: gl.getUniformLocation(program, 'u_imageGradientEnabled'),
+    u_imageGradient: gl.getUniformLocation(program, 'u_imageGradient'),
+    u_imageGradientSize: gl.getUniformLocation(program, 'u_imageGradientSize'),
+    u_imageGradientChannel: gl.getUniformLocation(program, 'u_imageGradientChannel'),
+    u_imageGradientAnchorInfluence: gl.getUniformLocation(program, 'u_imageGradientAnchorInfluence'),
     u_imageMaskEnabled: gl.getUniformLocation(program, 'u_imageMaskEnabled'),
     u_imageMask: gl.getUniformLocation(program, 'u_imageMask'),
     u_slitEnabled: gl.getUniformLocation(program, 'u_slitEnabled'),
@@ -307,7 +306,6 @@ export async function initWebGL(canvas: HTMLCanvasElement): Promise<WebGLContext
     u_iridAngle: gl.getUniformLocation(program, 'u_iridAngle'),
     u_iridSpeed: gl.getUniformLocation(program, 'u_iridSpeed'),
     u_iridFreq: gl.getUniformLocation(program, 'u_iridFreq'),
-    u_iridBezierStrength: gl.getUniformLocation(program, 'u_iridBezierStrength'),
     u_iridStrength: gl.getUniformLocation(program, 'u_iridStrength'),
     u_manualDistortEnabled: gl.getUniformLocation(program, 'u_manualDistortEnabled'),
     u_manualDistortMap: gl.getUniformLocation(program, 'u_manualDistortMap'),
@@ -325,13 +323,6 @@ export async function initWebGL(canvas: HTMLCanvasElement): Promise<WebGLContext
     u_tileOffset: gl.getUniformLocation(program, 'u_tileOffset'),
     u_tileSize: gl.getUniformLocation(program, 'u_tileSize'),
   };
-  const distanceTexture = gl.createTexture()!;
-  gl.bindTexture(gl.TEXTURE_2D, distanceTexture);
-  gl.texImage2D(gl.TEXTURE_2D, 0, gl.RG8, 1, 1, 0, gl.RG, gl.UNSIGNED_BYTE, new Uint8Array([128, 0]));
-  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
-  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
-  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
-  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
   const imageMaskTexture = gl.createTexture()!;
   gl.bindTexture(gl.TEXTURE_2D, imageMaskTexture);
   gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, 1, 1, 0, gl.RGBA, gl.UNSIGNED_BYTE, new Uint8Array([255, 255, 255, 255]));
@@ -362,11 +353,18 @@ export async function initWebGL(canvas: HTMLCanvasElement): Promise<WebGLContext
   gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
   gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
   gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+  const imageGradientTexture = gl.createTexture()!;
+  gl.bindTexture(gl.TEXTURE_2D, imageGradientTexture);
+  gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, 1, 1, 0, gl.RGBA, gl.UNSIGNED_BYTE, new Uint8Array([0, 0, 0, 0]));
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
   gl.useProgram(program);
   const { fbo: normalFbo, tex: normalTexture } = createFboWithTexture(gl);
   const { fbo: hBlurFbo, tex: hBlurTexture } = createFboWithTexture(gl);
   const { fbo: gradFbo, tex: gradTexture } = createFboWithTexture(gl);
-  const ctx: WebGLContext = { gl, gpuDiagnostics, renderOptimization, program, uniforms, distanceTexture, gradientRampTexture, manualDistortTexture, manualDistortDisplacement: null, manualDistortSmoothMask: null, manualDistortMapResolution: 0, sourceImageTexture, sourceImageCanvas: null, imageMaskTexture, imageMaskSource: null, normalMapProgram: null, normalMapUniforms: {}, gradFbo, gradTexture, blurProgram: null, blurUniforms: {}, stretchProgram: null, stretchUniforms: {}, postprocessProgram: null, postprocessUniforms: {}, prismCompositeProgram: null, prismCompositeUniforms: {}, particleProgram: null, particleUniforms: {}, particleVao: null, particleQuadBuffer: null, particleInstanceBuffer: null, particleInstanceCount: 0, particleInstanceSeed: Number.NaN, normalFbo, normalTexture, hBlurFbo, hBlurTexture, fboSize: [0, 0], shaderCompileExt: ext, lazyProgramState: createLazyProgramState() };
+  const ctx: WebGLContext = { gl, gpuDiagnostics, renderOptimization, program, uniforms, gradientRampTexture, manualDistortTexture, manualDistortDisplacement: null, manualDistortSmoothMask: null, manualDistortMapResolution: 0, sourceImageTexture, sourceImageCanvas: null, imageGradientTexture, imageGradientSource: null, imageMaskTexture, imageMaskSource: null, normalMapProgram: null, normalMapUniforms: {}, gradFbo, gradTexture, blurProgram: null, blurUniforms: {}, stretchProgram: null, stretchUniforms: {}, postprocessProgram: null, postprocessUniforms: {}, prismCompositeProgram: null, prismCompositeUniforms: {}, particleProgram: null, particleUniforms: {}, particleVao: null, particleQuadBuffer: null, particleInstanceBuffer: null, particleInstanceCount: 0, particleInstanceSeed: Number.NaN, normalFbo, normalTexture, hBlurFbo, hBlurTexture, fboSize: [0, 0], shaderCompileExt: ext, lazyProgramState: createLazyProgramState() };
   return ctx;
 }
 
@@ -1243,7 +1241,6 @@ export function render(
   gradient: GradientConfig,
   noiseDistortion: NoiseDistortionConfig,
   diffuse: DiffuseConfig,
-  bezierAxis: BezierAxisConfig,
   slitScan: SlitScanConfig,
   stretch: StretchConfig,
   normalMap: NormalMapConfig,
@@ -1260,12 +1257,14 @@ export function render(
   stretchScanOverride?: number | null,
   tile?: TileRenderOptions,
   sourceImageCanvas?: HTMLCanvasElement | null,
+  imageGradientSource?: HTMLCanvasElement | null,
+  imageGradient: ImageGradientConfig = IMAGE_GRADIENT_DEFAULTS,
   noiseLoopPeriod = 1,
   animationSpeed = 1,
   imageMaskSource?: TexImageSource | null,
   imageMaskEnabled = false,
 ): void {
-  const { gl, program, uniforms, distanceTexture, gradientRampTexture, sourceImageTexture, imageMaskTexture } = ctx;
+  const { gl, program, uniforms, gradientRampTexture, sourceImageTexture, imageGradientTexture, imageMaskTexture } = ctx;
   noiseDistortion = optimizeNoiseDistortion(noiseDistortion, ctx.renderOptimization);
   stretch = optimizeStretch(stretch, ctx.renderOptimization);
   normalMap = optimizeNormalMap(normalMap, ctx.renderOptimization);
@@ -1368,18 +1367,6 @@ export function render(
   gl.uniform1f(uniforms.u_diffuseGrain, diffuse.grain * diffuseScale);
   gl.uniform1f(uniforms.u_diffuseSeed, diffuse.seed);
   gl.uniform1f(uniforms.u_diffuseDitherThreshold, diffuse.ditherThreshold ?? 0.5);
-  gl.activeTexture(gl.TEXTURE0);
-  gl.bindTexture(gl.TEXTURE_2D, distanceTexture);
-  gl.uniform1i(uniforms.u_bezierDistanceMap, 0);
-  gl.uniform1i(uniforms.u_bezierEnabled, bezierAxis.enabled ? 1 : 0);
-  gl.uniform1f(uniforms.u_bezierStrength, bezierAxis.strength);
-  gl.uniform1f(uniforms.u_bezierRadius, bezierAxis.radius);
-  gl.uniform1f(uniforms.u_curvatureInfluence, bezierAxis.curvatureInfluence);
-  gl.uniform1i(uniforms.u_curvatureMode, bezierAxis.curvatureMode === 'narrow' ? 1 : 0);
-  const SIDE_MAP = { both: 0, outer: 1, inner: 2 } as const;
-  gl.uniform1i(uniforms.u_bezierSide, SIDE_MAP[bezierAxis.bezierSide ?? 'both']);
-  const BOUNDARY_MAP = { clamp: 0, repeat: 1, mirror: 2 } as const;
-  gl.uniform1i(uniforms.u_bezierBoundary, BOUNDARY_MAP[bezierAxis.boundary] ?? 0);
   uploadGradientRampTexture(ctx, gradient);
   gl.activeTexture(gl.TEXTURE1);
   gl.bindTexture(gl.TEXTURE_2D, gradientRampTexture);
@@ -1396,6 +1383,22 @@ export function render(
   }
   gl.uniform1i(uniforms.u_sourceImage, 4);
   gl.uniform1i(uniforms.u_sourceImageEnabled, sourceImageCanvas ? 1 : 0);
+  gl.activeTexture(gl.TEXTURE7);
+  gl.bindTexture(gl.TEXTURE_2D, imageGradientTexture);
+  if (imageGradientSource && ctx.imageGradientSource !== imageGradientSource) {
+    gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, false);
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, imageGradientSource);
+    ctx.imageGradientSource = imageGradientSource;
+  } else if (!imageGradientSource) {
+    ctx.imageGradientSource = null;
+  }
+  const imageGradientActive = imageGradient.enabled && !!imageGradientSource;
+  const imageGradientChannel = { luminance: 0, red: 1, green: 2, blue: 3 } as const;
+  gl.uniform1i(uniforms.u_imageGradient, 7);
+  gl.uniform1i(uniforms.u_imageGradientEnabled, imageGradientActive ? 1 : 0);
+  gl.uniform2f(uniforms.u_imageGradientSize, imageGradientSource?.width ?? 1, imageGradientSource?.height ?? 1);
+  gl.uniform1i(uniforms.u_imageGradientChannel, imageGradientChannel[imageGradient.channel]);
+  gl.uniform1f(uniforms.u_imageGradientAnchorInfluence, Math.min(1, Math.max(0, imageGradient.anchorInfluence)));
   gl.activeTexture(gl.TEXTURE6);
   gl.bindTexture(gl.TEXTURE_2D, imageMaskTexture);
   if (imageMaskSource && ctx.imageMaskSource !== imageMaskSource) {
@@ -1502,7 +1505,6 @@ export function render(
   gl.uniform1f(uniforms.u_iridAngle, (iridescence.angle * Math.PI) / 180);
   gl.uniform1f(uniforms.u_iridSpeed, iridescence.speed);
   gl.uniform1f(uniforms.u_iridFreq, iridescence.frequency);
-  gl.uniform1f(uniforms.u_iridBezierStrength, iridescence.bezierWarpStrength);
   gl.uniform1f(uniforms.u_iridStrength, iridescence.strength);
   uploadManualDistortMap(ctx, manualDistort);
   gl.activeTexture(gl.TEXTURE5);

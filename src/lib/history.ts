@@ -21,7 +21,7 @@ function extractSnapshot(s: StoreState): HistorySnapshot {
     gradient: s.gradient,
     noiseDistortion: s.noiseDistortion,
     diffuse: s.diffuse,
-    bezierAxis: s.bezierAxis,
+    imageGradient: s.imageGradient,
     slitScan: s.slitScan,
     animation: s.animation,
     normalMap: s.normalMap,
@@ -61,7 +61,7 @@ class HistoryManager {
         state.gradient !== prev.gradient ||
         state.noiseDistortion !== prev.noiseDistortion ||
         state.diffuse !== prev.diffuse ||
-        state.bezierAxis !== prev.bezierAxis ||
+        state.imageGradient !== prev.imageGradient ||
         state.slitScan !== prev.slitScan ||
         state.animation !== prev.animation ||
         state.normalMap !== prev.normalMap ||
@@ -88,7 +88,7 @@ class HistoryManager {
       gradient: snap.gradient,
       noiseDistortion: snap.noiseDistortion,
       diffuse: snap.diffuse,
-      bezierAxis: snap.bezierAxis,
+      imageGradient: snap.imageGradient,
       slitScan: snap.slitScan,
       animation: snap.animation,
       normalMap: snap.normalMap,

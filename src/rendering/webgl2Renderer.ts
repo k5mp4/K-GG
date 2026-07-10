@@ -20,10 +20,10 @@ export class WebGL2RendererBackend implements RenderBackend {
       return;
     }
 
-    gl.deleteTexture(this.context.distanceTexture);
     gl.deleteTexture(this.context.gradientRampTexture);
     gl.deleteTexture(this.context.manualDistortTexture);
     gl.deleteTexture(this.context.sourceImageTexture);
+    gl.deleteTexture(this.context.imageGradientTexture);
     gl.deleteTexture(this.context.imageMaskTexture);
     gl.deleteTexture(this.context.gradTexture);
     gl.deleteTexture(this.context.normalTexture);

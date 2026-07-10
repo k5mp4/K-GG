@@ -1,6 +1,5 @@
 import type { LatestState } from '../types/latestState';
 import type {
-  BezierAxisConfig,
   DiffuseConfig,
   IridescenceConfig,
   PostprocessConfig,
@@ -22,7 +21,6 @@ export type EvaluatedScene = {
   gradient: GradientConfig;
   noiseDistortion: NoiseDistortionConfig;
   diffuse: DiffuseConfig;
-  bezierAxis: BezierAxisConfig;
   slitScan: SlitScanConfig;
   stretch: StretchConfig;
   radon: RadonConfig;
@@ -171,7 +169,6 @@ function propertyOwnerEnabled(state: LatestState, propertyId: string): boolean {
     return isPostprocessTimeAnimationActive(state.postprocess);
   }
   if (propertyId.startsWith('postprocess.')) return state.postprocess.enabled;
-  if (propertyId.startsWith('bezierAxis.')) return state.bezierAxis.enabled;
   return true;
 }
 
@@ -285,12 +282,6 @@ export function evaluateSceneAtTime(state: LatestState, normalizedTime: number):
     tracks,
     time,
   );
-  const bezierAxis = applyObjectTracks(
-    'bezierAxis',
-    { ...state.bezierAxis },
-    tracks,
-    time,
-  );
 
   const seedFrame = animation.enabled && diffuseMode === 'auto'
     ? Math.floor(autoTime * animation.duration * animation.fps)
@@ -304,7 +295,6 @@ export function evaluateSceneAtTime(state: LatestState, normalizedTime: number):
     gradient: applyGradientTracks(state.gradient, tracks, time),
     noiseDistortion,
     diffuse,
-    bezierAxis,
     slitScan,
     stretch,
     radon,

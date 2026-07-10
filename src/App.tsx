@@ -2,7 +2,6 @@ import { useState, useRef, useEffect, useLayoutEffect } from 'react';
 import './App.css';
 import { gsap } from 'gsap';
 import { GradientCanvas } from './components/GradientCanvas';
-import { BezierAxisEditor } from './components/BezierAxisEditor';
 import { GradientAnchorEditor } from './components/GradientAnchorEditor';
 import { TimelineBar } from './components/TimelineBar';
 import { BezierEasingEditor } from './components/BezierEasingEditor';
@@ -20,12 +19,10 @@ import { DistortOverlay } from './components/DistortOverlay';
 import { PostprocessOverlay } from './components/PostprocessOverlay';
 import { MatcapPanel } from './components/MatcapPanel';
 import { GradientRamp } from './components/GradientRamp';
+import { ImageGradientSourcePanel } from './components/ImageGradientSourcePanel';
 import { SliderField } from './components/SliderField';
-import { CustomSelect } from './components/CustomSelect';
 import { AnimatedButton } from './components/AnimatedButton';
-import { Toggle } from './components/Toggle';
-import { useGradientStore, STORE_DEFAULTS } from './store/gradientStore';
-import { bezierPresets } from './lib/bezierPresets';
+import { useGradientStore } from './store/gradientStore';
 import { useViewportControl } from './hooks/useViewportControl';
 import { useCanvasSize } from './hooks/useCanvasSize';
 import { useKeyboardShortcuts } from './hooks/useKeyboardShortcuts';
@@ -40,7 +37,6 @@ import { DockPanel } from './components/DockPanel';
 import { PanelEdgeToggle } from './components/PanelEdgeToggle';
 import { ColorPaletteGenerator } from './components/ColorPaletteGenerator';
 import { Icon } from './components/Icon';
-import { parseSvgPaths } from './lib/svgParser';
 import { undo, redo } from './lib/history';
 import type { GpuDiagnostics } from './lib/gpuDiagnostics';
 import { useAppUpdater } from './features/updater/useAppUpdater';
@@ -125,8 +121,6 @@ export default function App() {
   const store = useGradientStore();
   const updater = useAppUpdater();
   const {
-    bezierAxis,
-    setBezierAxis,
     matcap,
     animation,
     noiseDistortion,
@@ -155,6 +149,8 @@ export default function App() {
   const ffmpegCheckRequestRef = useRef(0);
   const [slitSourceImageCanvas, setSlitSourceImageCanvas] = useState<HTMLCanvasElement | null>(null);
   const [slitSourceImageName, setSlitSourceImageName] = useState('');
+  const [imageGradientSource, setImageGradientSource] = useState<HTMLCanvasElement | null>(null);
+  const [imageGradientSourceName, setImageGradientSourceName] = useState('');
 
   const {
     canvasW, setCanvasW,
@@ -338,22 +334,6 @@ export default function App() {
   }, []);
 
   const panelsContainerRef = useRef<HTMLDivElement>(null);
-  const fileInputRef = useRef<HTMLInputElement>(null);
-
-  const handleSvgImport = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    document.body.style.cursor = '';
-    const file = e.target.files?.[0];
-    if (!file) return;
-    try {
-      const paths = await parseSvgPaths(file, canvasW, canvasH);
-      setBezierAxis({ paths });
-    } catch (err) {
-      console.error('Failed to parse SVG:', err);
-      alert('SVGの解析に失敗しました。');
-    }
-    e.target.value = '';
-  };
-
   // パネルの水平スライド移動 (左サイドバー内)
   useLayoutEffect(() => {
     if (!panelsContainerRef.current) return;
@@ -365,7 +345,6 @@ export default function App() {
     });
   }, [leftTab]);
 
-  const [showBezierOverlay, setShowBezierOverlay] = useState(true);
   const [overlayImageSrc, setOverlayImageSrc] = useState<string | null>(null);
   const [overlayImageName, setOverlayImageName] = useState<string>('');
   const [overlayImageElement, setOverlayImageElement] = useState<HTMLImageElement | null>(null);
@@ -456,22 +435,21 @@ export default function App() {
 
   return (
     <InteractionSettingsProvider value={{ hoverInteractionsEnabled: tabHoverSwitchEnabled }}>
-    <div className="h-[100dvh] text-k-text flex flex-col overflow-hidden relative">
-      {/* 項目選択用のトップバー */}
-      <div className="z-30 flex shrink-0 items-center gap-2 border-b border-panel-border bg-k-bg/95 px-2 py-1.5">
-        <div className="inline-flex min-w-0 flex-1 bg-k-surface/80 overflow-x-auto no-scrollbar scroll-smooth">
-          {LEFT_TABS.map(({ value, label }) => {
-            const getEnabled = TAB_ENABLED_MAP[value];
-            const enabled = getEnabled ? getEnabled(store) : undefined;
-            const isPrimary = value === 'diffuse' || value === 'noise' || value === 'slit' || value === 'stretch';
-            const isUtility = value === 'export' || value === 'preset';
-            return (
-              <button
-                key={value}
-                onMouseEnter={() => handleTabMouseEnter(value)}
-                onClick={(e) => { handleTabClick(value); (e.currentTarget as HTMLButtonElement).blur(); }}
-                className={`h-10 w-[86px] !border-0 px-2 py-1 text-[10px] font-display font-semibold uppercase tracking-wider transition-all flex flex-col items-center justify-center gap-0.5 shrink-0 focus:outline-none focus-visible:ring-2 focus-visible:ring-fire ${
-                  isUtility
+      <div className="h-[100dvh] text-k-text flex flex-col overflow-hidden relative">
+        {/* 項目選択用のトップバー */}
+        <div className="z-30 flex shrink-0 items-center gap-2 border-b border-panel-border bg-k-bg/95 px-2 py-1.5">
+          <div className="inline-flex min-w-0 flex-1 bg-k-surface/80 overflow-x-auto no-scrollbar scroll-smooth">
+            {LEFT_TABS.map(({ value, label }) => {
+              const getEnabled = TAB_ENABLED_MAP[value];
+              const enabled = getEnabled ? getEnabled(store) : undefined;
+              const isPrimary = value === 'diffuse' || value === 'noise' || value === 'slit' || value === 'stretch';
+              const isUtility = value === 'export' || value === 'preset';
+              return (
+                <button
+                  key={value}
+                  onMouseEnter={() => handleTabMouseEnter(value)}
+                  onClick={(e) => { handleTabClick(value); (e.currentTarget as HTMLButtonElement).blur(); }}
+                  className={`h-10 w-[86px] !border-0 px-2 py-1 text-[10px] font-display font-semibold uppercase tracking-wider transition-all flex flex-col items-center justify-center gap-0.5 shrink-0 focus:outline-none focus-visible:ring-2 focus-visible:ring-fire ${isUtility
                     ? leftTab === value
                       ? 'text-k-text bg-deep/10'
                       : 'text-deep/80 hover:text-deep bg-k-bg hover:bg-k-bg'
@@ -480,361 +458,359 @@ export default function App() {
                       : isPrimary
                         ? 'text-fire/70 hover:text-fire hover:bg-k-surface'
                         : 'text-tab-inactive/60 hover:text-tab-inactive hover:bg-k-surface'
-                } ${tabHoverSwitchEnabled && isHoverLocked && leftTab !== value ? 'cursor-default opacity-80' : 'cursor-pointer'}`}
-              >
-                {label}
-                {enabled !== undefined && (
-                  <span className={`text-[8px] font-bold leading-none ${enabled ? 'text-emerald-400' : 'text-k-muted'}`}>
-                    {enabled ? 'ON' : 'OFF'}
-                  </span>
-                )}
-              </button>
-            );
-          })}
-        </div>
-
-        <div className="ml-auto flex h-10 shrink-0 items-stretch gap-1">
-          <div
-            className="hidden min-w-0 max-w-[240px] items-center gap-2 border border-cream/20 bg-k-surface px-3 text-tab-inactive md:flex"
-            title={gpuInfo.title}
-          >
-            <Icon name="memory" className="text-[16px] text-deep" />
-            <span className="truncate text-[9px] font-display font-semibold uppercase tracking-wider">
-              {gpuInfo.label}
-            </span>
+                    } ${tabHoverSwitchEnabled && isHoverLocked && leftTab !== value ? 'cursor-default opacity-80' : 'cursor-pointer'}`}
+                >
+                  {label}
+                  {enabled !== undefined && (
+                    <span className={`text-[8px] font-bold leading-none ${enabled ? 'text-emerald-400' : 'text-k-muted'}`}>
+                      {enabled ? 'ON' : 'OFF'}
+                    </span>
+                  )}
+                </button>
+              );
+            })}
           </div>
-          {updater.supported && (
-            <UpdateButton
-              status={updater.state.status}
-              onClick={updater.openDialog}
-            />
-          )}
-          <button
-            type="button"
-            onClick={(e) => { setShowPropertyModulesSettings(true); e.currentTarget.blur(); }}
-            className={`inline-flex min-w-10 items-center justify-center gap-2 border px-2 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-fire ${
-              tabHoverSwitchEnabled
+
+          <div className="ml-auto flex h-10 shrink-0 items-stretch gap-1">
+            <div
+              className="hidden min-w-0 max-w-[240px] items-center gap-2 border border-cream/20 bg-k-surface px-3 text-tab-inactive md:flex"
+              title={gpuInfo.title}
+            >
+              <Icon name="memory" className="text-[16px] text-deep" />
+              <span className="truncate text-[9px] font-display font-semibold uppercase tracking-wider">
+                {gpuInfo.label}
+              </span>
+            </div>
+            {updater.supported && (
+              <UpdateButton
+                status={updater.state.status}
+                onClick={updater.openDialog}
+              />
+            )}
+            <button
+              type="button"
+              onClick={(e) => { setShowPropertyModulesSettings(true); e.currentTarget.blur(); }}
+              className={`inline-flex min-w-10 items-center justify-center gap-2 border px-2 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-fire ${tabHoverSwitchEnabled
                 ? 'border-fire/55 bg-fire/10 text-fire hover:bg-fire/20'
                 : 'border-cream/25 bg-k-surface text-tab-inactive hover:border-cream/45 hover:text-k-text'
-            }`}
-            title={`Property module settings · ${tabHoverSwitchEnabled ? 'Hover' : 'Click only'}`}
-            aria-label="Open property module settings"
+                }`}
+              title={`Property module settings · ${tabHoverSwitchEnabled ? 'Hover' : 'Click only'}`}
+              aria-label="Open property module settings"
+            >
+              <Icon name="settings" className="text-[16px]" />
+              <span className="hidden text-[9px] font-display font-semibold uppercase tracking-wider xl:inline">
+                {tabHoverSwitchEnabled ? 'Hover' : 'Click only'}
+              </span>
+            </button>
+          </div>
+
+          {/* モバイル用右サイドバーボタン */}
+          <button
+            onClick={(e) => { setRightPanelOpen(true); setShowRightSidebar(!showRightSidebar); (e.currentTarget as HTMLButtonElement).blur(); }}
+            className="md:hidden ml-1 h-10 w-10 bg-k-surface border border-panel-border text-k-text hover:text-cream focus:outline-none focus-visible:ring-2 focus-visible:ring-fire"
           >
-            <Icon name="settings" className="text-[16px]" />
-            <span className="hidden text-[9px] font-display font-semibold uppercase tracking-wider xl:inline">
-              {tabHoverSwitchEnabled ? 'Hover' : 'Click only'}
-            </span>
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+              <line x1="3" y1="12" x2="21" y2="12"></line>
+              <line x1="3" y1="6" x2="21" y2="6"></line>
+              <line x1="3" y1="18" x2="21" y2="18"></line>
+            </svg>
           </button>
         </div>
 
-        {/* モバイル用右サイドバーボタン */}
-        <button
-          onClick={(e) => { setRightPanelOpen(true); setShowRightSidebar(!showRightSidebar); (e.currentTarget as HTMLButtonElement).blur(); }}
-          className="md:hidden ml-1 h-10 w-10 bg-k-surface border border-panel-border text-k-text hover:text-cream focus:outline-none focus-visible:ring-2 focus-visible:ring-fire"
-        >
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-            <line x1="3" y1="12" x2="21" y2="12"></line>
-            <line x1="3" y1="6" x2="21" y2="6"></line>
-            <line x1="3" y1="18" x2="21" y2="18"></line>
-          </svg>
-        </button>
-      </div>
+        <div className="flex-1 flex flex-row overflow-hidden relative">
+          {/* モバイル用左サイドバー開閉オーバーレイ */}
+          {showLeftSidebar && (
+            <div className="md:hidden absolute inset-0 bg-k-bg/50 z-20" onClick={() => setShowLeftSidebar(false)} />
+          )}
+          {/* モバイル用右サイドバー開閉オーバーレイ */}
+          {showRightSidebar && (
+            <div className="md:hidden absolute inset-0 bg-k-bg/50 z-20" onClick={() => setShowRightSidebar(false)} />
+          )}
 
-      <div className="flex-1 flex flex-row overflow-hidden relative">
-        {/* モバイル用左サイドバー開閉オーバーレイ */}
-        {showLeftSidebar && (
-          <div className="md:hidden absolute inset-0 bg-k-bg/50 z-20" onClick={() => setShowLeftSidebar(false)} />
-        )}
-        {/* モバイル用右サイドバー開閉オーバーレイ */}
-        {showRightSidebar && (
-          <div className="md:hidden absolute inset-0 bg-k-bg/50 z-20" onClick={() => setShowRightSidebar(false)} />
-        )}
-
-        {/* 詳細プロパティ表示用の左サイドバー */}
-        <DockPanel
-          id="property-modules-panel"
-          side="left"
-          title="Property Modules"
-          open={leftPanelOpen}
-          mobileOpen={showLeftSidebar}
-          width={leftPanelW}
-          onOpenChange={setLeftPanelOpen}
-          onMobileOpenChange={setShowLeftSidebar}
-          resizing={activeResizeSide === 'left'}
-          bodyClassName="overflow-hidden"
-          onResizeStart={(e) => {
+          {/* 詳細プロパティ表示用の左サイドバー */}
+          <DockPanel
+            id="property-modules-panel"
+            side="left"
+            title="Property Modules"
+            open={leftPanelOpen}
+            mobileOpen={showLeftSidebar}
+            width={leftPanelW}
+            onOpenChange={setLeftPanelOpen}
+            onMobileOpenChange={setShowLeftSidebar}
+            resizing={activeResizeSide === 'left'}
+            bodyClassName="overflow-hidden"
+            onResizeStart={(e) => {
               e.preventDefault();
               resizingRef.current = 'left';
               setActiveResizeSide('left');
               document.body.style.cursor = 'col-resize';
               e.currentTarget.setPointerCapture?.(e.pointerId);
             }}
-        >
-          <div className="relative h-full overflow-hidden">
-            <div
-              ref={panelsContainerRef}
-              className="flex flex-row h-full w-full"
-              style={{ width: '100%' }}
-            >
-              {LEFT_TABS.map(({ value }) => (
-                <div key={value} className="w-full h-full shrink-0 p-4 overflow-y-auto scrollbar-thin">
-                  {value === 'diffuse' && <DiffusePanel />}
-                  {value === 'noise' && <NoiseDistortionPanel />}
-                  {value === 'slit' && (
-                    <SlitScanPanel
-                      sourceImageName={slitSourceImageName}
-                      hasSourceImage={!!slitSourceImageCanvas}
-                      onSourceImageLoad={(canvas, name) => {
-                        setSlitSourceImageCanvas(canvas);
-                        setSlitSourceImageName(name);
-                      }}
-                      onSourceImageClear={() => {
-                        setSlitSourceImageCanvas(null);
-                        setSlitSourceImageName('');
-                      }}
-                    />
-                  )}
-                  {value === 'stretch' && <StretchPanel />}
-                  {value === 'normal' && <NormalMapPanel />}
-                  {value === 'distort' && <IridescencePanel />}
-                  {value === 'postprocess' && <PostprocessPanel />}
-                  {value === 'matcap' && <MatcapPanel />}
-                  {value === 'export' && (
-                    <ExportPanel
-                      onExportProgress={setExportProgress}
-                      onResizeCanvas={(w, h) => {
-                        setCanvasW(w);
-                        setCanvasH(h);
-                        aspectRatioRef.current = w / h;
-                      }}
-                      canvasRef={canvasRef}
-                      ffmpegStatus={ffmpegStatus}
-                      ffmpegChecking={ffmpegChecking}
-                      onCheckFfmpeg={refreshFfmpegStatus}
-                    />
-                  )}
-                  {value === 'preset' && <PresetPanel canvasW={canvasW} canvasH={canvasH} setCanvasW={setCanvasW} setCanvasH={setCanvasH} aspectRatioRef={aspectRatioRef} />}
-                </div>
+          >
+            <div className="relative h-full overflow-hidden">
+              <div
+                ref={panelsContainerRef}
+                className="flex flex-row h-full w-full"
+                style={{ width: '100%' }}
+              >
+                {LEFT_TABS.map(({ value }) => (
+                  <div key={value} className="w-full h-full shrink-0 p-4 overflow-y-auto scrollbar-thin">
+                    {value === 'diffuse' && <DiffusePanel />}
+                    {value === 'noise' && <NoiseDistortionPanel />}
+                    {value === 'slit' && (
+                      <SlitScanPanel
+                        sourceImageName={slitSourceImageName}
+                        hasSourceImage={!!slitSourceImageCanvas}
+                        onSourceImageLoad={(canvas, name) => {
+                          setSlitSourceImageCanvas(canvas);
+                          setSlitSourceImageName(name);
+                        }}
+                        onSourceImageClear={() => {
+                          setSlitSourceImageCanvas(null);
+                          setSlitSourceImageName('');
+                        }}
+                      />
+                    )}
+                    {value === 'stretch' && <StretchPanel />}
+                    {value === 'normal' && <NormalMapPanel />}
+                    {value === 'distort' && <IridescencePanel />}
+                    {value === 'postprocess' && <PostprocessPanel />}
+                    {value === 'matcap' && <MatcapPanel />}
+                    {value === 'export' && (
+                      <ExportPanel
+                        onExportProgress={setExportProgress}
+                        onResizeCanvas={(w, h) => {
+                          setCanvasW(w);
+                          setCanvasH(h);
+                          aspectRatioRef.current = w / h;
+                        }}
+                        canvasRef={canvasRef}
+                        ffmpegStatus={ffmpegStatus}
+                        ffmpegChecking={ffmpegChecking}
+                        onCheckFfmpeg={refreshFfmpegStatus}
+                      />
+                    )}
+                    {value === 'preset' && <PresetPanel canvasW={canvasW} canvasH={canvasH} setCanvasW={setCanvasW} setCanvasH={setCanvasH} aspectRatioRef={aspectRatioRef} />}
+                  </div>
+                ))}
+              </div>
+            </div>
+          </DockPanel>
+
+          {/* プレビューエリア */}
+          <div
+            ref={viewportRef}
+            className="flex-1 flex flex-col min-w-0 overflow-hidden relative"
+            style={{ cursor }}
+            onMouseDown={handleMiddleDown}
+            onMouseMove={handleMiddleMove}
+            onMouseUp={handleMiddleUp}
+            onMouseLeave={handleMiddleLeave}
+          >
+            <div className="pointer-events-none absolute inset-0 z-[80] overflow-hidden">
+              {gestureFeedbacks.map(feedback => (
+                <div
+                  key={feedback.id}
+                  className={`gesture-feedback-ring gesture-feedback-ring--${feedback.action}`}
+                  style={{
+                    left: feedback.x,
+                    top: feedback.y,
+                  }}
+                  aria-hidden="true"
+                />
               ))}
             </div>
-          </div>
-        </DockPanel>
 
-        {/* プレビューエリア */}
-        <div
-          ref={viewportRef}
-          className="flex-1 flex flex-col min-w-0 overflow-hidden relative"
-          style={{ cursor }}
-          onMouseDown={handleMiddleDown}
-          onMouseMove={handleMiddleMove}
-          onMouseUp={handleMiddleUp}
-          onMouseLeave={handleMiddleLeave}
-        >
-          <div className="pointer-events-none absolute inset-0 z-[80] overflow-hidden">
-            {gestureFeedbacks.map(feedback => (
-              <div
-                key={feedback.id}
-                className={`gesture-feedback-ring gesture-feedback-ring--${feedback.action}`}
-                style={{
-                  left: feedback.x,
-                  top: feedback.y,
-                }}
-                aria-hidden="true"
-              />
-            ))}
-          </div>
-
-          {/* モバイル用サイドバーボタン (左) */}
-          <button 
-            onClick={() => { setLeftPanelOpen(true); setShowLeftSidebar(true); }}
-            className={`md:hidden absolute top-4 left-4 p-3 bg-k-surface/80 border border-panel-border border-panel rounded-sm text-k-text z-10 transition-opacity ${showLeftSidebar || showRightSidebar ? 'opacity-0 pointer-events-none' : 'opacity-100'}`}
-          >
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-              <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
-              <line x1="9" y1="3" x2="9" y2="21"></line>
-            </svg>
-          </button>
-
-          {/* モバイル用 Undo/Redo ボタン */}
-          <div className={`md:hidden absolute top-4 right-4 flex gap-2 z-10 transition-opacity ${showLeftSidebar || showRightSidebar ? 'opacity-0 pointer-events-none' : 'opacity-100'}`}>
-            <button 
-              onClick={undo}
-              className="p-3 bg-k-surface/80 border border-panel-border border-panel rounded-sm text-k-text active:bg-fire active:text-k-text"
+            {/* モバイル用サイドバーボタン (左) */}
+            <button
+              onClick={() => { setLeftPanelOpen(true); setShowLeftSidebar(true); }}
+              className={`md:hidden absolute top-4 left-4 p-3 bg-k-surface/80 border border-panel-border border-panel rounded-sm text-k-text z-10 transition-opacity ${showLeftSidebar || showRightSidebar ? 'opacity-0 pointer-events-none' : 'opacity-100'}`}
             >
               <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M9 14L4 9L9 4"></path>
-                <path d="M20 20v-7a4 4 0 0 0-4-4H4"></path>
+                <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
+                <line x1="9" y1="3" x2="9" y2="21"></line>
               </svg>
             </button>
-            <button
-              onClick={redo}
-              className="p-3 bg-k-surface/80 border border-panel-border border-panel rounded-sm text-k-text active:bg-fire active:text-k-text"
-            >
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M15 14l5-5-5-5"></path>
-                <path d="M4 20v-7a4 4 0 0 1 4-4h12"></path>
-              </svg>
-            </button>
-          </div>
 
-          <div className="absolute top-6 right-6 z-20 hidden flex-col gap-2 md:flex">
-            <button
-              type="button"
-              onClick={(e) => { setShowFeedback(true); (e.currentTarget as HTMLButtonElement).blur(); }}
-              className="h-10 w-10 shrink-0 flex items-center justify-center border border-cream/30 bg-k-surface/85 p-0 text-fire shadow-[0_10px_24px_rgba(0,0,0,0.28)] backdrop-blur-sm transition-all duration-150 hover:border-fire hover:bg-fire/15 hover:text-k-text focus:outline-none focus-visible:ring-2 focus-visible:ring-fire"
-              title="Feedback"
-              aria-label="Open feedback form"
-            >
-              <svg className="shrink-0" width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M21 15a4 4 0 0 1-4 4H8l-5 3V7a4 4 0 0 1 4-4h10a4 4 0 0 1 4 4z" />
-                <path d="M8 9h8" />
-                <path d="M8 13h5" />
-              </svg>
-            </button>
-            <button
-              type="button"
-              onClick={(e) => { setShowGradientAnchors(!showGradientAnchors); (e.currentTarget as HTMLButtonElement).blur(); }}
-              className={`h-10 w-10 shrink-0 flex items-center justify-center border shadow-[0_10px_24px_rgba(0,0,0,0.28)] backdrop-blur-sm transition-all duration-150 focus:outline-none focus-visible:ring-2 focus-visible:ring-fire ${
-                showGradientAnchors
-                  ? 'border-fire bg-fire/15 text-fire hover:bg-fire/25 hover:border-fire'
-                  : 'border-cream/30 bg-k-surface/85 text-cream/70 hover:border-fire hover:bg-fire/15 hover:text-k-text'
-              }`}
-              title={showGradientAnchors ? 'グラデーションアンカーを非表示' : 'グラデーションアンカーを表示'}
-              aria-label={showGradientAnchors ? 'Hide Gradient Anchors' : 'Show Gradient Anchors'}
-            >
-              {showGradientAnchors ? (
-                <svg className="shrink-0" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                  <circle cx="12" cy="12" r="5" />
-                  <line x1="12" y1="2" x2="12" y2="6" />
-                  <line x1="12" y1="18" x2="12" y2="22" />
-                  <line x1="2" y1="12" x2="6" y2="12" />
-                  <line x1="18" y1="12" x2="22" y2="12" />
+            {/* モバイル用 Undo/Redo ボタン */}
+            <div className={`md:hidden absolute top-4 right-4 flex gap-2 z-10 transition-opacity ${showLeftSidebar || showRightSidebar ? 'opacity-0 pointer-events-none' : 'opacity-100'}`}>
+              <button
+                onClick={undo}
+                className="p-3 bg-k-surface/80 border border-panel-border border-panel rounded-sm text-k-text active:bg-fire active:text-k-text"
+              >
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M9 14L4 9L9 4"></path>
+                  <path d="M20 20v-7a4 4 0 0 0-4-4H4"></path>
                 </svg>
-              ) : (
-                <svg className="shrink-0" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                  <circle cx="12" cy="12" r="5" />
-                  <line x1="12" y1="2" x2="12" y2="6" />
-                  <line x1="12" y1="18" x2="12" y2="22" />
-                  <line x1="2" y1="12" x2="6" y2="12" />
-                  <line x1="18" y1="12" x2="22" y2="12" />
-                  <line x1="4" y1="4" x2="20" y2="20" />
+              </button>
+              <button
+                onClick={redo}
+                className="p-3 bg-k-surface/80 border border-panel-border border-panel rounded-sm text-k-text active:bg-fire active:text-k-text"
+              >
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M15 14l5-5-5-5"></path>
+                  <path d="M4 20v-7a4 4 0 0 1 4-4h12"></path>
                 </svg>
-              )}
-            </button>
-            <button
-              type="button"
-              onClick={(e) => { resetViewport(); (e.currentTarget as HTMLButtonElement).blur(); }}
-              className="h-10 w-10 shrink-0 flex items-center justify-center border border-cream/30 bg-k-surface/85 p-0 text-fire shadow-[0_10px_24px_rgba(0,0,0,0.28)] backdrop-blur-sm transition-all duration-150 hover:border-fire hover:bg-fire/15 hover:text-k-text focus:outline-none focus-visible:ring-2 focus-visible:ring-fire"
-              title="キャンバスの移動・ズームをリセット"
-              aria-label="Reset Viewport Zoom and Position"
-            >
-              <Icon name="restart" style={{ fontSize: 16 }} />
-            </button>
-          </div>
-
-          <div className="relative flex-1 flex items-center justify-center p-2 md:p-6 overflow-hidden">
-            <div style={{
-              position: 'relative',
-              width: displayW,
-              height: displayH,
-              overflow: 'visible',
-              transform: `translate(${pan.x}px, ${pan.y}px) scale(${zoom})`,
-              transformOrigin: 'center center',
-            }}>
-              <GradientCanvas
-                width={canvasW}
-                height={canvasH}
-                animLoopRef={animLoopRef}
-                seekVersion={seekVersion}
-                canvasRef={canvasRef}
-                sourceImageCanvas={slitSourceImageCanvas}
-                imageMaskSource={overlayImageElement}
-                imageMaskEnabled={overlayImageMode === 'mask'}
-              />
-              <DistortOverlay
-                active={leftTab === 'distort'}
-                width={displayW}
-                height={displayH}
-                canvasW={canvasW}
-                canvasH={canvasH}
-                manualDistort={manualDistort}
-                setManualDistort={setManualDistort}
-              />
-              <DistortOverlay
-                active={leftTab === 'postprocess' && postprocess.effectMode === 'distort'}
-                width={displayW}
-                height={displayH}
-                canvasW={canvasW}
-                canvasH={canvasH}
-                manualDistort={postprocess}
-                setManualDistort={setPostprocess}
-              />
-              <PostprocessOverlay
-                active={leftTab === 'postprocess' || (postprocess.enabled && (postprocess.effectMode === 'mirror' || postprocess.effectMode === 'kaleidoscope'))}
-                width={displayW}
-                height={displayH}
-                postprocess={postprocess}
-              />
-              {overlayImageSrc && overlayImageMode === 'overlay' && (
-                <img
-                  src={overlayImageSrc}
-                  style={{
-                    position: 'absolute',
-                    top: 0, left: 0,
-                    width: '100%', height: '100%',
-                    opacity: overlayOpacity,
-                    pointerEvents: 'none',
-                    objectFit: 'fill',
-                  }}
-                  alt=""
-                />
-              )}
-              {showGradientAnchors && <GradientAnchorEditor width={displayW} height={displayH} />}
-              <BezierAxisEditor width={displayW} height={displayH} showOverlay={showBezierOverlay} />
-              <SlitOverlay width={displayW} height={displayH} canvasW={canvasW} canvasH={canvasH} />
+              </button>
             </div>
-            <div
-              className="absolute right-4 bottom-4 w-[220px] max-h-[calc(100%-32px)] bg-k-bg/98 border border-panel-border/70 z-30 overflow-y-auto p-3 scrollbar-thin shadow-[0_18px_48px_rgba(0,0,0,0.35)]"
-              style={{ display: (showTimeRemap && exportProgress === null) ? 'block' : 'none' }}
-            >
+
+            <div className="absolute top-6 right-6 z-20 hidden flex-col gap-2 md:flex">
               <button
                 type="button"
-                className="absolute right-1 top-1 z-10 flex h-5 w-5 items-center justify-center bg-transparent text-tab-inactive hover:text-fire transition-colors"
-                onClick={() => setShowTimeRemap(false)}
-                aria-label="Close Loop Timing"
+                onClick={(e) => { setShowFeedback(true); (e.currentTarget as HTMLButtonElement).blur(); }}
+                className="h-10 w-10 shrink-0 flex items-center justify-center border border-cream/30 bg-k-surface/85 p-0 text-fire shadow-[0_10px_24px_rgba(0,0,0,0.28)] backdrop-blur-sm transition-all duration-150 hover:border-fire hover:bg-fire/15 hover:text-k-text focus:outline-none focus-visible:ring-2 focus-visible:ring-fire"
+                title="Feedback"
+                aria-label="Open feedback form"
               >
-                <Icon name="close" className="text-[12px]" />
+                <svg className="shrink-0" width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M21 15a4 4 0 0 1-4 4H8l-5 3V7a4 4 0 0 1 4-4h10a4 4 0 0 1 4 4z" />
+                  <path d="M8 9h8" />
+                  <path d="M8 13h5" />
+                </svg>
               </button>
-              <BezierEasingEditor compact />
+              <button
+                type="button"
+                onClick={(e) => { setShowGradientAnchors(!showGradientAnchors); (e.currentTarget as HTMLButtonElement).blur(); }}
+                className={`h-10 w-10 shrink-0 flex items-center justify-center border shadow-[0_10px_24px_rgba(0,0,0,0.28)] backdrop-blur-sm transition-all duration-150 focus:outline-none focus-visible:ring-2 focus-visible:ring-fire ${showGradientAnchors
+                  ? 'border-fire bg-fire/15 text-fire hover:bg-fire/25 hover:border-fire'
+                  : 'border-cream/30 bg-k-surface/85 text-cream/70 hover:border-fire hover:bg-fire/15 hover:text-k-text'
+                  }`}
+                title={showGradientAnchors ? 'グラデーションアンカーを非表示' : 'グラデーションアンカーを表示'}
+                aria-label={showGradientAnchors ? 'Hide Gradient Anchors' : 'Show Gradient Anchors'}
+              >
+                {showGradientAnchors ? (
+                  <svg className="shrink-0" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                    <circle cx="12" cy="12" r="5" />
+                    <line x1="12" y1="2" x2="12" y2="6" />
+                    <line x1="12" y1="18" x2="12" y2="22" />
+                    <line x1="2" y1="12" x2="6" y2="12" />
+                    <line x1="18" y1="12" x2="22" y2="12" />
+                  </svg>
+                ) : (
+                  <svg className="shrink-0" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                    <circle cx="12" cy="12" r="5" />
+                    <line x1="12" y1="2" x2="12" y2="6" />
+                    <line x1="12" y1="18" x2="12" y2="22" />
+                    <line x1="2" y1="12" x2="6" y2="12" />
+                    <line x1="18" y1="12" x2="22" y2="12" />
+                    <line x1="4" y1="4" x2="20" y2="20" />
+                  </svg>
+                )}
+              </button>
+              <button
+                type="button"
+                onClick={(e) => { resetViewport(); (e.currentTarget as HTMLButtonElement).blur(); }}
+                className="h-10 w-10 shrink-0 flex items-center justify-center border border-cream/30 bg-k-surface/85 p-0 text-fire shadow-[0_10px_24px_rgba(0,0,0,0.28)] backdrop-blur-sm transition-all duration-150 hover:border-fire hover:bg-fire/15 hover:text-k-text focus:outline-none focus-visible:ring-2 focus-visible:ring-fire"
+                title="キャンバスの移動・ズームをリセット"
+                aria-label="Reset Viewport Zoom and Position"
+              >
+                <Icon name="restart" style={{ fontSize: 16 }} />
+              </button>
             </div>
+
+            <div className="relative flex-1 flex items-center justify-center p-2 md:p-6 overflow-hidden">
+              <div style={{
+                position: 'relative',
+                width: displayW,
+                height: displayH,
+                overflow: 'visible',
+                transform: `translate(${pan.x}px, ${pan.y}px) scale(${zoom})`,
+                transformOrigin: 'center center',
+              }}>
+                <GradientCanvas
+                  width={canvasW}
+                  height={canvasH}
+                  animLoopRef={animLoopRef}
+                  seekVersion={seekVersion}
+                  canvasRef={canvasRef}
+                  sourceImageCanvas={slitSourceImageCanvas}
+                  imageGradientSource={imageGradientSource}
+                  imageMaskSource={overlayImageElement}
+                  imageMaskEnabled={overlayImageMode === 'mask'}
+                />
+                <DistortOverlay
+                  active={leftTab === 'distort'}
+                  width={displayW}
+                  height={displayH}
+                  canvasW={canvasW}
+                  canvasH={canvasH}
+                  manualDistort={manualDistort}
+                  setManualDistort={setManualDistort}
+                />
+                <DistortOverlay
+                  active={leftTab === 'postprocess' && postprocess.effectMode === 'distort'}
+                  width={displayW}
+                  height={displayH}
+                  canvasW={canvasW}
+                  canvasH={canvasH}
+                  manualDistort={postprocess}
+                  setManualDistort={setPostprocess}
+                />
+                <PostprocessOverlay
+                  active={leftTab === 'postprocess' || (postprocess.enabled && (postprocess.effectMode === 'mirror' || postprocess.effectMode === 'kaleidoscope'))}
+                  width={displayW}
+                  height={displayH}
+                  postprocess={postprocess}
+                />
+                {overlayImageSrc && overlayImageMode === 'overlay' && (
+                  <img
+                    src={overlayImageSrc}
+                    style={{
+                      position: 'absolute',
+                      top: 0, left: 0,
+                      width: '100%', height: '100%',
+                      opacity: overlayOpacity,
+                      pointerEvents: 'none',
+                      objectFit: 'fill',
+                    }}
+                    alt=""
+                  />
+                )}
+                <GradientAnchorEditor width={displayW} height={displayH} />
+                <SlitOverlay width={displayW} height={displayH} canvasW={canvasW} canvasH={canvasH} />
+              </div>
+              <div
+                className="absolute right-4 bottom-4 w-[220px] max-h-[calc(100%-32px)] bg-k-bg/98 border border-panel-border/70 z-30 overflow-y-auto p-3 scrollbar-thin shadow-[0_18px_48px_rgba(0,0,0,0.35)]"
+                style={{ display: (showTimeRemap && exportProgress === null) ? 'block' : 'none' }}
+              >
+                <button
+                  type="button"
+                  className="absolute right-1 top-1 z-10 flex h-5 w-5 items-center justify-center bg-transparent text-tab-inactive hover:text-fire transition-colors"
+                  onClick={() => setShowTimeRemap(false)}
+                  aria-label="Close Loop Timing"
+                >
+                  <Icon name="close" className="text-[12px]" />
+                </button>
+                <BezierEasingEditor compact />
+              </div>
+            </div>
+
+            <div className="hidden md:block absolute top-4 left-4 md:top-6 md:left-6 z-20 pointer-events-none transition-opacity">
+              <ColorHistogram sourceCanvasRef={canvasRef} />
+            </div>
+
           </div>
 
-          <div className="hidden md:block absolute top-4 left-4 md:top-6 md:left-6 z-20 pointer-events-none transition-opacity">
-            <ColorHistogram sourceCanvasRef={canvasRef} />
-          </div>
-
-        </div>
-
-        {/* 右サイドバー: グラデーション設定 */}
-        <DockPanel
-          id="gradient-settings-panel"
-          side="right"
-          title="Gradient Settings"
-          open={rightPanelOpen}
-          mobileOpen={showRightSidebar}
-          width={rightPanelW}
-          onOpenChange={setRightPanelOpen}
-          onMobileOpenChange={setShowRightSidebar}
-          resizing={activeResizeSide === 'right'}
-          bodyClassName="flex flex-col gap-6 overflow-y-auto p-6 scrollbar-thin"
-          onResizeStart={(e) => {
+          {/* 右サイドバー: グラデーション設定 */}
+          <DockPanel
+            id="gradient-settings-panel"
+            side="right"
+            title="Gradient Settings"
+            open={rightPanelOpen}
+            mobileOpen={showRightSidebar}
+            width={rightPanelW}
+            onOpenChange={setRightPanelOpen}
+            onMobileOpenChange={setShowRightSidebar}
+            resizing={activeResizeSide === 'right'}
+            bodyClassName="flex flex-col gap-6 overflow-y-auto p-6 scrollbar-thin"
+            onResizeStart={(e) => {
               e.preventDefault();
               resizingRef.current = 'right';
               setActiveResizeSide('right');
               document.body.style.cursor = 'col-resize';
               e.currentTarget.setPointerCapture?.(e.pointerId);
             }}
-        >
+          >
             <div className="flex justify-between items-start">
               <div className="min-w-0">
                 <h2 className="text-xl font-display font-bold uppercase tracking-wider leading-tight text-k-text">Kagaribi-15<br />Gradient Generator</h2>
@@ -860,7 +836,7 @@ export default function App() {
                 {([{ label: '800×800', w: 800, h: 800 }, { label: '1920×1080', w: 1920, h: 1080 }] as const).map((s) => (
                   <AnimatedButton
                     key={s.label}
-                    onClick={() => { setCanvasW(s.w); setCanvasH(s.h); aspectRatioRef.current = s.w/s.h;}}
+                    onClick={() => { setCanvasW(s.w); setCanvasH(s.h); aspectRatioRef.current = s.w / s.h; }}
                     isActive={canvasW === s.w && canvasH === s.h}
                     className="flex-1"
                   >
@@ -973,11 +949,10 @@ export default function App() {
                     type="button"
                     onClick={() => setOverlayImageMode(current => current === mode ? 'off' : mode)}
                     aria-pressed={overlayImageMode === mode}
-                    className={`px-2 py-1 text-[10px] font-display uppercase tracking-wider transition-colors duration-150 ${
-                      overlayImageMode === mode
-                        ? 'bg-cream text-k-bg border-cream'
-                        : 'bg-transparent text-deep hover:text-k-text hover:bg-cream/10'
-                    }`}
+                    className={`px-2 py-1 text-[10px] font-display uppercase tracking-wider transition-colors duration-150 ${overlayImageMode === mode
+                      ? 'bg-cream text-k-bg border-cream'
+                      : 'bg-transparent text-deep hover:text-k-text hover:bg-cream/10'
+                      }`}
                   >
                     {mode}
                   </button>
@@ -1006,204 +981,128 @@ export default function App() {
                 </div>
               )}
             </div>
+            <ColorPaletteGenerator overlayImageElement={overlayImageElement} />
+
+            <ImageGradientSourcePanel
+              sourceImageCanvas={imageGradientSource}
+              sourceImageName={imageGradientSourceName}
+              onSourceImageLoad={(canvas, name) => { setImageGradientSource(canvas); setImageGradientSourceName(name); }}
+              onSourceImageClear={() => { setImageGradientSource(null); setImageGradientSourceName(''); store.setImageGradient({ enabled: false }); }}
+            />
 
             <div className="border-t border-panel-border border-t-panel pt-4">
               <GradientRamp />
             </div>
-
-            {/* Bezier Distortion */}
-            <div className="border-t border-panel-border border-t-panel pt-4 space-y-3">
-              <div className="flex items-center justify-between">
-                <h2 className="text-xs font-display font-semibold uppercase tracking-wider text-k-text">Bezier Distortion</h2>
-                <div className="flex items-center gap-2">
-                  {bezierAxis.enabled && (
-                    <div className="flex items-center gap-3">
-                      <div className="flex items-center gap-1.5 text-xs text-deep select-none">
-                        <Toggle size="sm" checked={showBezierOverlay} onChange={setShowBezierOverlay} />
-                        表示
-                      </div>
-                    </div>
-                  )}
-                  <Toggle variant="switch" checked={bezierAxis.enabled} onChange={(v) => setBezierAxis({ enabled: v })} />
-                </div>
-              </div>
-
-              <Collapsible isOpen={bezierAxis.enabled}>
-                <div className="space-y-3 pt-1">
-                  <SliderField label="Strength" min={0} max={1} step={0.01} value={bezierAxis.strength} onChange={(v) => setBezierAxis({ strength: v })} format={(v) => v.toFixed(2)} defaultValue={STORE_DEFAULTS.bezierAxis.strength} />
-                  <SliderField label="Radius" min={0.01} max={3} step={0.01} value={bezierAxis.radius} onChange={(v) => setBezierAxis({ radius: v })} format={(v) => v.toFixed(2)} defaultValue={STORE_DEFAULTS.bezierAxis.radius} />
-                  <SliderField label="Curvature" min={0} max={1} step={0.01} value={bezierAxis.curvatureInfluence} onChange={(v) => setBezierAxis({ curvatureInfluence: v })} format={(v) => v.toFixed(2)} defaultValue={STORE_DEFAULTS.bezierAxis.curvatureInfluence} />
-                  <div className="flex gap-1">
-                    {(['wide', 'narrow'] as const).map((m) => (
-                      <AnimatedButton key={m} onClick={() => setBezierAxis({ curvatureMode: m })} isActive={(bezierAxis.curvatureMode ?? 'wide') === m} className="flex-1 py-1">{m === 'wide' ? 'Wide' : 'Narrow'}</AnimatedButton>
-                    ))}
-                  </div>
-                  <CustomSelect
-                    label="Side"
-                    value={bezierAxis.bezierSide ?? 'both'}
-                    options={[
-                      { value: 'both', label: 'Both' },
-                      { value: 'outer', label: 'Outer' },
-                      { value: 'inner', label: 'Inner' },
-                    ]}
-                    onChange={(v) => setBezierAxis({ bezierSide: v as 'both' | 'outer' | 'inner' })}
+          </DockPanel>
+        </div>
+        {/* TimelineBar sits below the sidebars so sidebar resizing does not change its footprint. */}
+        <div className="relative z-20 shrink-0">
+          <Collapsible isOpen={showTimeline}>
+            <div id="animation-timeline-panel" className="relative group/timeline border-t border-panel-border bg-k-bg/95">
+              <div
+                className="absolute top-0 left-0 right-0 h-1.5 cursor-row-resize z-[70] hover:bg-fire/40 transition-colors"
+                onPointerDown={(e) => {
+                  e.preventDefault();
+                  timelineResizingRef.current = true;
+                  document.body.style.cursor = 'row-resize';
+                  e.currentTarget.setPointerCapture?.(e.pointerId);
+                }}
+              />
+              <div className="flex min-h-0" style={{ height: timelineHeight }}>
+                <div className="min-w-0 flex-1">
+                  <TimelineBar
+                    animLoopRef={animLoopRef}
+                    onSeek={() => setSeekVersion(v => v + 1)}
+                    exportProgress={exportProgress}
+                    height={timelineHeight}
+                    showTimeRemap={showTimeRemap}
+                    onToggleTimeRemap={() => setShowTimeRemap(v => !v)}
+                    selectedEffectPrefix={TAB_ANIMATION_PREFIX[leftTab]}
                   />
-                  <div>
-                    <p className="text-xs text-deep mb-1">Boundary</p>
-                    <div className="flex gap-1">
-                      {(['clamp', 'repeat', 'mirror'] as const).map((b) => (
-                        <AnimatedButton key={b} onClick={() => setBezierAxis({ boundary: b })} isActive={bezierAxis.boundary === b} className="flex-1 py-1 capitalize">{b}</AnimatedButton>
-                      ))}
-                    </div>
-                  </div>
-                  <div>
-                    <p className="text-xs text-deep mb-2">プリセット</p>
-                    <div className="flex gap-1 flex-wrap">
-                      {Object.entries(bezierPresets).map(([name, paths]) => (
-                        <AnimatedButton key={name} onClick={() => setBezierAxis({ paths })} isActive={false} className="px-2 py-1">{name}</AnimatedButton>
-                      ))}
-                      <button onClick={() => setBezierAxis({ paths: [] })} className="text-xs text-k-text bg-red-900 hover:bg-red-800 px-2 py-1 rounded-none font-display uppercase tracking-wider">reset</button>
-                    </div>
-                  </div>
-                  <div className="flex gap-2">
-                    <AnimatedButton
-                      onClick={() => {
-                        const id = crypto.randomUUID();
-                        const newPath = { id, anchors: [{ x: 0.2, y: 0.5, cp1: [0.2, 0.3] as [number, number], cp2: [0.2, 0.7] as [number, number] }, { x: 0.8, y: 0.5, cp1: [0.8, 0.3] as [number, number], cp2: [0.8, 0.7] as [number, number] }], closed: false };
-                        setBezierAxis({ paths: [...bezierAxis.paths, newPath] });
-                      }}
-                      isActive={false}
-                      className="flex-1 py-1.5 font-medium"
-                    >
-                      + パスを追加
-                    </AnimatedButton>
-                    <button
-                      onClick={() => fileInputRef.current?.click()}
-                      className="flex-1 text-xs text-k-text bg-fire hover:brightness-110 active:scale-[0.98] py-1.5 rounded-none font-display uppercase tracking-wider transition-all duration-150 flex items-center justify-center gap-1.5"
-                    >
-                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
-                      SVG Import
-                    </button>
-                    <input ref={fileInputRef} type="file" accept=".svg" onChange={handleSvgImport} className="hidden" />
-                  </div>
-                  <p className="text-[10px] text-k-muted leading-tight opacity-70">
-                    クリック: 追加 / パス上クリック: 挿入 / Alt+パス上クリック: 直線化 / ダブルクリック: 削除 / Alt+ドラッグ: ハンドル延伸 / 右クリックドラッグ: 範囲選択 / Delete: 削除
-                  </p>
                 </div>
-              </Collapsible>
-            </div>
-
-            <ColorPaletteGenerator overlayImageElement={overlayImageElement} />
-        </DockPanel>
-      </div>
-      {/* TimelineBar sits below the sidebars so sidebar resizing does not change its footprint. */}
-      <div className="relative z-20 shrink-0">
-        <Collapsible isOpen={showTimeline}>
-          <div id="animation-timeline-panel" className="relative group/timeline border-t border-panel-border bg-k-bg/95">
-            <div
-              className="absolute top-0 left-0 right-0 h-1.5 cursor-row-resize z-[70] hover:bg-fire/40 transition-colors"
-              onPointerDown={(e) => {
-                e.preventDefault();
-                timelineResizingRef.current = true;
-                document.body.style.cursor = 'row-resize';
-                e.currentTarget.setPointerCapture?.(e.pointerId);
-              }}
-            />
-            <div className="flex min-h-0" style={{ height: timelineHeight }}>
-              <div className="min-w-0 flex-1">
-                <TimelineBar
-                  animLoopRef={animLoopRef}
-                  onSeek={() => setSeekVersion(v => v + 1)}
-                  exportProgress={exportProgress}
-                  height={timelineHeight}
-                  showTimeRemap={showTimeRemap}
-                  onToggleTimeRemap={() => setShowTimeRemap(v => !v)}
-                  selectedEffectPrefix={TAB_ANIMATION_PREFIX[leftTab]}
-                />
               </div>
             </div>
-          </div>
-        </Collapsible>
-        <PanelEdgeToggle
-          edge="bottom"
-          open={showTimeline}
-          panelTitle="Animation Timeline"
-          controlsId="animation-timeline-panel"
-          onToggle={() => setShowTimeline(value => !value)}
-        >
-          <span className="text-[10px] font-display font-semibold uppercase tracking-wider text-k-text">
-            Animation
-          </span>
-          <span
-            className={`h-1.5 w-1.5 rounded-full ${animation.enabled ? 'bg-emerald-400' : 'bg-k-muted'}`}
-            aria-hidden="true"
+          </Collapsible>
+          <PanelEdgeToggle
+            edge="bottom"
+            open={showTimeline}
+            panelTitle="Animation Timeline"
+            controlsId="animation-timeline-panel"
+            onToggle={() => setShowTimeline(value => !value)}
+          >
+            <span className="text-[10px] font-display font-semibold uppercase tracking-wider text-k-text">
+              Animation
+            </span>
+            <span
+              className={`h-1.5 w-1.5 rounded-full ${animation.enabled ? 'bg-emerald-400' : 'bg-k-muted'}`}
+              aria-hidden="true"
+            />
+          </PanelEdgeToggle>
+        </div>
+        {showHelp && (
+          <HelpPanel
+            onClose={() => setShowHelp(false)}
+            appVersion={updater.appVersion}
+            updateSupported={updater.supported}
+            updateStatus={updater.state.status}
+            onCheckForUpdates={() => {
+              setShowHelp(false);
+              updater.openDialog();
+            }}
           />
-        </PanelEdgeToggle>
-      </div>
-      {showHelp && (
-        <HelpPanel
-          onClose={() => setShowHelp(false)}
+        )}
+        {showFeedback && <FeedbackPanel onClose={() => setShowFeedback(false)} />}
+        {showPropertyModulesSettings && (
+          <PropertyModulesSettingsPanel
+            hoverSwitchEnabled={tabHoverSwitchEnabled}
+            onHoverSwitchChange={setTabHoverSwitchMode}
+            onClose={() => setShowPropertyModulesSettings(false)}
+          />
+        )}
+        <UpdateDialog
+          open={updater.dialogOpen}
+          state={updater.state}
           appVersion={updater.appVersion}
-          updateSupported={updater.supported}
-          updateStatus={updater.state.status}
-          onCheckForUpdates={() => {
-            setShowHelp(false);
-            updater.openDialog();
+          onClose={updater.closeDialog}
+          onRetry={updater.checkForUpdates}
+          onInstall={updater.installUpdate}
+        />
+        <FfmpegSetupDialog
+          open={ffmpegDialogOpen}
+          checking={ffmpegChecking}
+          status={ffmpegStatus}
+          onClose={() => setFfmpegDialogOpen(false)}
+          onCheckAgain={() => void refreshFfmpegStatus(true)}
+          onOpenBuildsPage={() => {
+            void openFfmpegBuildsPage().catch((error) => {
+              setFfmpegStatus((current) => ({
+                supported: true,
+                available: current?.available ?? false,
+                source: current?.source ?? null,
+                path: current?.path ?? null,
+                version: current?.version ?? null,
+                error: error instanceof Error ? error.message : String(error),
+                warning: current?.warning ?? null,
+                folderPath: current?.folderPath ?? null,
+              }));
+            });
+          }}
+          onOpenFolder={() => {
+            void openNativeFfmpegFolder().catch((error) => {
+              setFfmpegStatus((current) => ({
+                supported: true,
+                available: current?.available ?? false,
+                source: current?.source ?? null,
+                path: current?.path ?? null,
+                version: current?.version ?? null,
+                error: error instanceof Error ? error.message : String(error),
+                warning: current?.warning ?? null,
+                folderPath: current?.folderPath ?? null,
+              }));
+            });
           }}
         />
-      )}
-      {showFeedback && <FeedbackPanel onClose={() => setShowFeedback(false)} />}
-      {showPropertyModulesSettings && (
-        <PropertyModulesSettingsPanel
-          hoverSwitchEnabled={tabHoverSwitchEnabled}
-          onHoverSwitchChange={setTabHoverSwitchMode}
-          onClose={() => setShowPropertyModulesSettings(false)}
-        />
-      )}
-      <UpdateDialog
-        open={updater.dialogOpen}
-        state={updater.state}
-        appVersion={updater.appVersion}
-        onClose={updater.closeDialog}
-        onRetry={updater.checkForUpdates}
-        onInstall={updater.installUpdate}
-      />
-      <FfmpegSetupDialog
-        open={ffmpegDialogOpen}
-        checking={ffmpegChecking}
-        status={ffmpegStatus}
-        onClose={() => setFfmpegDialogOpen(false)}
-        onCheckAgain={() => void refreshFfmpegStatus(true)}
-        onOpenBuildsPage={() => {
-          void openFfmpegBuildsPage().catch((error) => {
-            setFfmpegStatus((current) => ({
-              supported: true,
-              available: current?.available ?? false,
-              source: current?.source ?? null,
-              path: current?.path ?? null,
-              version: current?.version ?? null,
-              error: error instanceof Error ? error.message : String(error),
-              warning: current?.warning ?? null,
-              folderPath: current?.folderPath ?? null,
-            }));
-          });
-        }}
-        onOpenFolder={() => {
-          void openNativeFfmpegFolder().catch((error) => {
-            setFfmpegStatus((current) => ({
-              supported: true,
-              available: current?.available ?? false,
-              source: current?.source ?? null,
-              path: current?.path ?? null,
-              version: current?.version ?? null,
-              error: error instanceof Error ? error.message : String(error),
-              warning: current?.warning ?? null,
-              folderPath: current?.folderPath ?? null,
-            }));
-          });
-        }}
-      />
-    </div>
+      </div>
     </InteractionSettingsProvider>
   );
 }

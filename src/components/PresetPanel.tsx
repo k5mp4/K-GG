@@ -1,5 +1,6 @@
 import { useEffect, useState, useRef, type MutableRefObject } from 'react';
 import { createEmptyManualDistortMap, createEmptyManualSmoothMask, normalizePostprocessConfig, STORE_DEFAULTS, useGradientStore } from '../store/gradientStore';
+import { normalizeImageGradientConfig } from '../types/imageGradient';
 import {
   loadPresets,
   savePreset,
@@ -40,7 +41,7 @@ export function PresetPanel({ canvasW, canvasH, setCanvasW, setCanvasH, aspectRa
     
     // store の中から snapshot に必要なものだけを抽出（関数などを除外）
     const { 
-      gradient, noiseDistortion, diffuse, bezierAxis, slitScan, stretch,
+      gradient, noiseDistortion, diffuse, imageGradient, slitScan, stretch,
       animation, normalMap, radon, iridescence, manualDistort, postprocess, matcap, keyframeTracks
     } = store;
 
@@ -48,7 +49,7 @@ export function PresetPanel({ canvasW, canvasH, setCanvasW, setCanvasH, aspectRa
     const slitScanToSave = { ...slitScan, selectedSlitIdx: -1 };
 
     await savePreset(trimmed, {
-      gradient, noiseDistortion, diffuse, bezierAxis,
+      gradient, noiseDistortion, diffuse, imageGradient,
       slitScan: slitScanToSave, stretch,
       animation, normalMap, radon, iridescence, manualDistort, postprocess, matcap,
       keyframeTracks,
@@ -66,7 +67,8 @@ export function PresetPanel({ canvasW, canvasH, setCanvasW, setCanvasH, aspectRa
     if (s.gradient) store.setGradient(s.gradient);
     if (s.noiseDistortion) store.setNoiseDistortion(s.noiseDistortion);
     if (s.diffuse) store.setDiffuse(s.diffuse);
-    if (s.bezierAxis) store.setBezierAxis(s.bezierAxis);
+    // anchorInfluenceがない旧プリセットは、従来の画像再配色を保つため0%として移行する。
+    store.setImageGradient(normalizeImageGradientConfig(s.imageGradient, s.imageGradient ? 0 : STORE_DEFAULTS.imageGradient.anchorInfluence));
     if (s.slitScan) store.setSlitScan({ ...STORE_DEFAULTS.slitScan, ...s.slitScan });
     if (s.stretch) store.setStretch(s.stretch);
     if (s.normalMap) store.setNormalMap(s.normalMap);

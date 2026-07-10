@@ -60,13 +60,6 @@ export type DiffuseConfig = {
   ditherThreshold: number; // 0–1 ディザのしきい値バイアス（0.5=標準）
 };
 
-export type BezierAnchor = {
-  x: number;
-  y: number;
-  cp1: [number, number];
-  cp2: [number, number];
-};
-
 export type SlitScanConfig = {
   enabled: boolean;
   mode: 'linear' | 'circular' | 'polygon' | 'wave'; // wave=波形UVワープ
@@ -130,7 +123,6 @@ export type IridescenceConfig = {
   speed: number;         // アニメーション速度
   frequency: number;     // 波の細かさ（スケール）
   angle: number;         // 歪みの方向（度）
-  bezierWarpStrength: number; // 0.0-1.0: ベジェ軸周辺の追加歪み強度
 };
 
 export type ManualDistortConfig = {
@@ -239,23 +231,4 @@ export type HistogramConfig = {
   enabled: boolean;
   showRampDistribution: boolean;
   scale: number; // 0.5 - 2.0
-};
-
-export type BezierBoundary = 'clamp' | 'repeat' | 'mirror';
-
-export type BezierPath = {
-  id: string;              // 各パスを識別するためのユニークID
-  anchors: BezierAnchor[];
-  closed: boolean;
-};
-
-export type BezierAxisConfig = {
-  enabled: boolean;
-  paths: BezierPath[];     // anchors: BezierAnchor[] から複数のパスを持つ paths 形式に変更
-  strength: number;
-  boundary: BezierBoundary;
-  radius: number;          // 0.01–3.0  グラデーション帯幅（1.0=SDFフル範囲）
-  curvatureInfluence: number; // 0.0–1.0  曲率の影響度
-  curvatureMode: 'wide' | 'narrow'; // wide=高曲率ほど色幅を広げる, narrow=高曲率ほど色幅を狭める
-  bezierSide: 'both' | 'outer' | 'inner'; // both=両側, outer=外側のみ(bezierT>0.5), inner=内側のみ(bezierT<0.5)
 };

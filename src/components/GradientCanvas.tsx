@@ -1,8 +1,7 @@
-import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { useGradientStore } from '../store/gradientStore';
 import { AnimationLoop } from '../lib/animation';
 import { useWebGL } from '../hooks/useWebGL';
-import { useSdfUpdate } from '../hooks/useSdfUpdate';
 import { buildRampTextureData, RAMP_TEX_WIDTH } from '../lib/gradientRampUtils';
 import { setTimelineTime } from '../lib/timelineClock';
 import { hasActiveAnimation } from '../lib/sceneEvaluation';
@@ -259,24 +258,22 @@ type Props = {
   seekVersion?: number;
   canvasRef: React.RefObject<HTMLCanvasElement | null>;
   sourceImageCanvas?: HTMLCanvasElement | null;
+  imageGradientSource?: HTMLCanvasElement | null;
   imageMaskSource?: TexImageSource | null;
   imageMaskEnabled?: boolean;
 };
 
-export function GradientCanvas({ width = 800, height = 800, animLoopRef, seekVersion = 0, canvasRef, sourceImageCanvas = null, imageMaskSource = null, imageMaskEnabled = false }: Props) {
+export function GradientCanvas({ width = 800, height = 800, animLoopRef, seekVersion = 0, canvasRef, sourceImageCanvas = null, imageGradientSource = null, imageMaskSource = null, imageMaskEnabled = false }: Props) {
   const fallbackCanvasRef = useRef<HTMLCanvasElement | null>(null);
   const staticRenderSchedulerRef = useRef<LatestFrameScheduler | null>(null);
   if (!staticRenderSchedulerRef.current) {
     staticRenderSchedulerRef.current = new LatestFrameScheduler();
   }
 
-  const { gradient, noiseDistortion, diffuse, bezierAxis, slitScan, stretch, animation, normalMap, radon, iridescence, manualDistort, postprocess, matcap, keyframeTracks, currentTime } = useGradientStore();
+  const { gradient, noiseDistortion, diffuse, imageGradient, slitScan, stretch, animation, normalMap, radon, iridescence, manualDistort, postprocess, matcap, keyframeTracks, currentTime } = useGradientStore();
 
-  const { webglRef, sdfReadyRef, latestRef, isWebGLReady } = useWebGL(canvasRef, animLoopRef, gradient);
+  const { webglRef, latestRef, isWebGLReady } = useWebGL(canvasRef, animLoopRef, gradient);
 
-  // SDF 生成完了時に静的レンダーを再実行するためのカウンター
-  const [sdfGenCount, setSdfGenCount] = useState(0);
-  const onSdfReady = useCallback(() => setSdfGenCount(c => c + 1), []);
   const [lazyProgramReadyCount, setLazyProgramReadyCount] = useState(0);
 
   useEffect(() => {
@@ -298,10 +295,8 @@ export function GradientCanvas({ width = 800, height = 800, animLoopRef, seekVer
 
   // latestRef を毎レンダー更新（ブラウザ描画前に同期更新し、RAFループが即座に最新値を参照できるようにする）
   useLayoutEffect(() => {
-    latestRef.current = { gradient, noiseDistortion, diffuse, bezierAxis, slitScan, stretch, normalMap, radon, iridescence, manualDistort, postprocess, matcap, animation, keyframeTracks, width, height, animDirection: animation.direction, sourceImageCanvas, imageMaskSource, imageMaskEnabled };
+    latestRef.current = { gradient, noiseDistortion, diffuse, imageGradient, slitScan, stretch, normalMap, radon, iridescence, manualDistort, postprocess, matcap, animation, keyframeTracks, width, height, animDirection: animation.direction, sourceImageCanvas, imageGradientSource, imageMaskSource, imageMaskEnabled };
   });
-
-  useSdfUpdate(webglRef, sdfReadyRef, latestRef, bezierAxis.paths, bezierAxis.enabled, width, height, onSdfReady);
 
   // 静止レンダリング（アニメーション停止中の状態変化に反応）
   useLayoutEffect(() => {
@@ -318,9 +313,9 @@ export function GradientCanvas({ width = 800, height = 800, animLoopRef, seekVer
       const normalizedTime = frameState.animation.enabled
         ? (animLoopRef.current?.currentNormalizedTime ?? useGradientStore.getState().currentTime)
         : 0;
-      renderSceneAtTime(ctx, frameState, normalizedTime, { sdfReady: sdfReadyRef.current });
+      renderSceneAtTime(ctx, frameState, normalizedTime, {});
     });
-  }, [gradient, noiseDistortion, diffuse, bezierAxis, slitScan, stretch, normalMap, radon, iridescence, manualDistort, postprocess, width, height, animation.enabled, animation.speed, animation.direction, animation.easing, animation.affectNoise, animation.affectSlit, animation.affectRamp, animation.affectStretch, keyframeTracks, currentTime, sdfGenCount, lazyProgramReadyCount, seekVersion, isWebGLReady, sourceImageCanvas, imageMaskSource, imageMaskEnabled]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [gradient, noiseDistortion, diffuse, imageGradient, slitScan, stretch, normalMap, radon, iridescence, manualDistort, postprocess, width, height, animation.enabled, animation.speed, animation.direction, animation.easing, animation.affectNoise, animation.affectSlit, animation.affectRamp, animation.affectStretch, keyframeTracks, currentTime, lazyProgramReadyCount, seekVersion, isWebGLReady, sourceImageCanvas, imageGradientSource, imageMaskSource, imageMaskEnabled]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // アニメーションループの管理
   useEffect(() => {
@@ -337,7 +332,7 @@ export function GradientCanvas({ width = 800, height = 800, animLoopRef, seekVer
           const ctx = webglRef.current;
           const frameState = latestRef.current;
           if (!ctx || !frameState) return;
-          renderSceneAtTime(ctx, frameState, normalizedTime, { sdfReady: sdfReadyRef.current });
+          renderSceneAtTime(ctx, frameState, normalizedTime, {});
         },
         {
           loop: animation.previewLoop ?? true,
@@ -357,7 +352,6 @@ export function GradientCanvas({ width = 800, height = 800, animLoopRef, seekVer
         renderSceneAtTime(ctx, frameState, frameState.animation.enabled
           ? useGradientStore.getState().currentTime
           : 0, {
-          sdfReady: sdfReadyRef.current,
         });
       });
     }

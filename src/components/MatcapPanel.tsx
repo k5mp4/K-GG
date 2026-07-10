@@ -22,7 +22,7 @@ export function MatcapPanel() {
           <div className="space-y-1 text-[10px] text-deep leading-relaxed">
             <p className="font-medium text-k-text/80 text-xs">Matcap 推奨設定</p>
             <p>• <span className="text-k-text">Normal Map</span> を有効にすると法線マップ形式のMatcapを生成できます</p>
-            <p>• グラデーションの <span className="text-k-text">Angle</span> や <span className="text-k-text">Bezier Distortion</span> でハイライト方向を制御</p>
+            <p>• グラデーションの <span className="text-k-text">Angle</span> でハイライト方向を制御</p>
             <p>• Export パネルから PNG でエクスポート（アルファチャンネル保持）</p>
           </div>
         </div>

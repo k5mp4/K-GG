@@ -1,6 +1,5 @@
 import type { AnimationConfig } from '../store/gradientStore';
 import type {
-  BezierAxisConfig,
   DiffuseConfig,
   IridescenceConfig,
   ManualDistortConfig,
@@ -12,6 +11,7 @@ import type {
   SlitScanConfig,
   StretchConfig,
 } from '../types/distortion';
+import type { ImageGradientConfig } from '../types/imageGradient';
 import type { GradientConfig } from '../types/gradient';
 import type { PropertyTrack } from '../types/keyframe';
 import type { UserColorPalette } from './colorPalettes';
@@ -20,7 +20,7 @@ export type StoreSnapshot = {
   gradient: GradientConfig;
   noiseDistortion: NoiseDistortionConfig;
   diffuse: DiffuseConfig;
-  bezierAxis: BezierAxisConfig;
+  imageGradient?: ImageGradientConfig;
   slitScan: SlitScanConfig;
   stretch?: StretchConfig;
   animation: AnimationConfig;
