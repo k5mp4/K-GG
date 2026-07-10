@@ -2,7 +2,7 @@ import { create } from 'zustand';
 import type { GradientConfig } from '../types/gradient';
 import type { NoiseDistortionConfig, DiffuseConfig, SlitScanConfig, StretchConfig, NormalMapConfig, RadonConfig, IridescenceConfig, ManualDistortConfig, PostprocessConfig, MatcapConfig, HistogramConfig } from '../types/distortion';
 import type { ImageGradientConfig } from '../types/imageGradient';
-import { IMAGE_GRADIENT_DEFAULTS } from '../types/imageGradient';
+import { IMAGE_GRADIENT_DEFAULTS, normalizeImageGradientConfig } from '../types/imageGradient';
 import { gradientRampPresets } from '../lib/gradientRampUtils';
 import type { AnimationMode, Keyframe, PropertyTrack } from '../types/keyframe';
 import { normalizePropertyTrack } from '../types/keyframe';
@@ -552,7 +552,7 @@ export const useGradientStore = create<GradientStore>((set) => ({
       : s.keyframeTracks;
     return { diffuse, keyframeTracks };
   }),
-  setImageGradient: (v) => set((s) => ({ imageGradient: { ...s.imageGradient, ...v } })),
+  setImageGradient: (v) => set((s) => ({ imageGradient: normalizeImageGradientConfig({ ...s.imageGradient, ...v }) })),
   setSlitScan: (v) => set((s) => {
     const slitScan = { ...s.slitScan, ...v };
     let keyframeTracks = s.keyframeTracks;

@@ -4,6 +4,7 @@ import { useGradientStore } from '../store/gradientStore';
 import type { ImageGradientChannel } from '../types/imageGradient';
 import { Toggle } from './Toggle';
 import { CustomSelect } from './CustomSelect';
+import { SliderField } from './SliderField';
 
 type Props = {
   sourceImageCanvas: HTMLCanvasElement | null;
@@ -27,7 +28,7 @@ export function ImageGradientSourcePanel({ sourceImageCanvas, sourceImageName, o
     try {
       const canvas = await imageFileToCanvas(file);
       onSourceImageLoad(canvas, file.name);
-      setImageGradient({ enabled: true });
+      setImageGradient({ enabled: true, anchorInfluence: 0.5 });
     } catch (cause) {
       console.error('Image gradient source load failed:', cause);
       setError('画像の読み込みに失敗しました。');
@@ -80,7 +81,17 @@ export function ImageGradientSourcePanel({ sourceImageCanvas, sourceImageName, o
         ]}
         onChange={(channel) => setImageGradient({ channel: channel as ImageGradientChannel })}
       />
-      <p className="text-[10px] text-tab-inactive">画像のトーンを現在のGradient Rampへ再配色します。中央基準のCoverで配置されます。</p>
+      <SliderField
+        label="Anchor Influence"
+        min={0}
+        max={100}
+        step={1}
+        value={imageGradient.anchorInfluence * 100}
+        onChange={(value) => setImageGradient({ anchorInfluence: value / 100 })}
+        format={(value) => `${value}%`}
+        defaultValue={50}
+      />
+      <p className="text-[10px] text-tab-inactive">画像は固定し、アンカー配色のみを歪ませます。中央基準のCoverで配置されます。</p>
       {error && <p className="text-[10px] text-red-400">{error}</p>}
     </div>
   );

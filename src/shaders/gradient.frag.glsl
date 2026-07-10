@@ -34,6 +34,7 @@
   uniform sampler2D u_imageGradient;
   uniform vec2 u_imageGradientSize;
   uniform int u_imageGradientChannel;
+  uniform float u_imageGradientAnchorInfluence;
   uniform bool u_imageMaskEnabled;
   uniform sampler2D u_imageMask;
 
@@ -560,6 +561,8 @@
     bool usePatternDither = u_diffuseEnabled && u_diffuseMode == 2;
     vec2 ditherCoord = ditherCellCenter(globalCoord);
     vec2 sampleCoord = usePatternDither ? ditherCoord : globalCoord;
+    // imageUVは画像そのものを固定する。以降に変形されるuvはアンカー配色だけに使う。
+    vec2 imageUV = globalCoord / u_resolution;
     vec2 uv = sampleCoord / u_resolution;
     vec2 manualDistortUV = uv;
     vec4 manualDistortSample = vec4(0.5, 0.5, 0.0, 1.0);
@@ -693,8 +696,10 @@
       return;
     }
 
-    float sourceAlpha = u_imageGradientEnabled ? sampleImageGradient(uv).a : 1.0;
-    float t = u_imageGradientEnabled ? imageGradientT(uv) : computeGradientT(uv);
+    float sourceAlpha = u_imageGradientEnabled ? sampleImageGradient(imageUV).a : 1.0;
+    float t = u_imageGradientEnabled
+      ? mix(imageGradientT(imageUV), computeGradientT(uv), u_imageGradientAnchorInfluence)
+      : computeGradientT(uv);
     if (u_manualDistortEnabled && !u_imageGradientEnabled) {
       float smoothPasses = manualSmoothMask * 8.0;
       if (smoothPasses > 0.001) {

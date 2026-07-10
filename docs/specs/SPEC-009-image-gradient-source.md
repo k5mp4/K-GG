@@ -6,8 +6,8 @@ owners: [maintainer]
 created: 2026-07-10
 updated: 2026-07-10
 depends_on: [SPEC-000]
-related_adrs: [ADR-0001]
-related_code: [src/components/ImageGradientSourcePanel.tsx, src/components/GradientCanvas.tsx, src/lib/webgl.ts, src/shaders/gradient.frag.glsl]
+related_adrs: [ADR-0001, ADR-0003]
+related_code: [src/components/ImageGradientSourcePanel.tsx, src/components/PresetPanel.tsx, src/types/imageGradient.ts, src/lib/imageGradient.ts, src/lib/webgl.ts, src/shaders/gradient.frag.glsl]
 related_tests: [src/lib/imageGradient.test.ts]
 human_review: completed
 ---
@@ -21,7 +21,7 @@ human_review: completed
 ## ゴール・成功条件
 
 - ラスタ画像を現在のGradient Rampで再配色し、プレビューと全出力経路で同じ結果を得る。
-- Noise、Diffuse、手描き歪み、Iridescence、Radon、Slit、Stretch、Normal、Postprocessを再配色結果へ適用する。
+- 画像本体を固定したまま、Noise、Diffuse、手描き歪み、Iridescence、Radon、Slitをアンカー配色フィールドへ適用する。
 - 画像本体をプリセットへ保存せず、設定だけを安全に再利用できる。
 
 ## スコープ
@@ -30,6 +30,7 @@ human_review: completed
 
 - 右サイドバーのImage Overlay/Mask直後に置くImage Gradient Sourceパネル
 - 輝度、Red、Green、Blueによるランプ入力値の選択
+- 画像チャンネル値とアンカー配色値の混合率（Anchor Influence）の調整
 - 中央基準Cover、入力アルファの維持、プリセット互換性
 - WebGL、プレビュー、タイル書出し、静止画・連番・動画出力の共有描画経路
 
@@ -41,21 +42,22 @@ human_review: completed
 
 ## 方針
 
-`ImageGradientConfig`は`enabled`と`channel`を持つ永続設定とし、画像Canvasと表示名はAppのローカル状態に置く。画像がないときは設定が有効でも通常グラデーションへ安全にフォールバックし、再読込を案内する。
+`ImageGradientConfig`は`enabled`、`channel`、`anchorInfluence`を持つ永続設定とし、画像Canvasと表示名はAppのローカル状態に置く。`anchorInfluence`は0〜1で、新規設定・新規画像読込時は0.5とする。画像がないときは設定が有効でも通常グラデーションへ安全にフォールバックし、再読込を案内する。
 
-レンダラーはRaw Source Imageとは別テクスチャを使用する。画像グラデーションは既存のUV変形後にCover座標で画像をサンプルし、選択チャンネルを既存ランプの入力値として再配色する。Rampの補間、カラー方式、繰返し、ミラーは既存実装を共有し、画像とランプのアルファを乗算する。
+レンダラーはRaw Source Imageとは別テクスチャを使用する。画像グラデーションでは、変形前の出力座標を`imageUV`としてCover座標の画像サンプル、チャンネル値、入力アルファに使用する。手描き歪み、Iridescence、Radon、Slit、Noise、Diffuse、パターンDitherによる座標変形は`gradientUV`だけに適用し、既存アンカー計算の入力にする。ランプ入力値は`mix(imageT, anchorT, anchorInfluence)`とし、Rampの補間、カラー方式、繰返し、ミラーは混合後の値で既存実装を共有する。画像とランプのアルファは乗算する。
 
 ## エラー・境界条件
 
 - 読込に失敗した画像は現在の入力と描画を変更せず、エラーを表示する。
 - 設定を含む旧・新プリセットを読込んだ後に画像がない場合、通常グラデーションを表示する。
 - 画像とキャンバスの縦横比が異なる場合は中央基準Coverで余白を作らない。
+- `anchorInfluence`がない旧プリセットは0として移行し、従来の画像再配色の見た目を維持する。
 
 ## 受け入れ条件
 
-- AC-001: 画像の読込、削除、有効切替、4チャンネル選択を操作できる。
-- AC-002: 各チャンネル値で現在のランプへ再配色され、入力画像の透明度を維持する。
-- AC-003: 各対象エフェクトを有効にすると、画像グラデーションにも適用される。
+- AC-001: 画像の読込、削除、有効切替、4チャンネル選択、0〜100%のAnchor Influenceを操作できる。
+- AC-002: 各チャンネル値とアンカー値をAnchor Influenceで混合して現在のランプへ再配色し、入力画像の透明度を維持する。
+- AC-003: 各対象UV歪みを有効にすると、画像の形・明暗・アルファ・Cover配置は維持したまま、アンカー配色だけが変化する。
 - AC-004: Preview、通常・タイル書出し、連番・動画出力で同じ描画経路を使用する。
 - AC-005: 設定だけを保存・再読込し、画像がない状態では安全にフォールバックする。
 
@@ -69,7 +71,7 @@ human_review: completed
 
 ## 移行・互換性
 
-旧プリセットに設定がなくても既定値へ補完する。画像本体は保存しないため、再起動または他環境では利用者が再読込する。
+`imageGradient`自体がない旧プリセットは新規既定値で補完する。`imageGradient`はあるが`anchorInfluence`がない旧プリセットは0へ移行する。画像本体は保存しないため、再起動または他環境では利用者が再読込する。
 
 ## 未決定事項
 

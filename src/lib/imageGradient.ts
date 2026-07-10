@@ -10,6 +10,16 @@ export function imageGradientChannelValue(
   return red * 0.299 + green * 0.587 + blue * 0.114;
 }
 
+/** 画像の明暗とアンカー配色の位置値を同じランプ入力へ混合する。 */
+export function blendImageGradientT(
+  imageT: number,
+  anchorT: number,
+  anchorInfluence: number,
+): number {
+  const influence = Math.min(1, Math.max(0, anchorInfluence));
+  return imageT * (1 - influence) + anchorT * influence;
+}
+
 /** Returns the centered UV transform used by the shader's Cover sampling. */
 export function coverImageUv(
   [u, v]: readonly [number, number],

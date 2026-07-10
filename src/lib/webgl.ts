@@ -1,6 +1,6 @@
 import type { GradientConfig } from '../types/gradient';
 import type { NoiseDistortionConfig, DiffuseConfig, SlitScanConfig, StretchConfig, NormalMapConfig, RadonConfig, IridescenceConfig, ManualDistortConfig, PostprocessConfig, MatcapConfig } from '../types/distortion';
-import type { ImageGradientConfig } from '../types/imageGradient';
+import { IMAGE_GRADIENT_DEFAULTS, type ImageGradientConfig } from '../types/imageGradient';
 import { GRADIENT_ANCHOR_DEFAULTS, defaultBezierControlsForAnchors } from '../store/gradientStore';
 import { buildRampTextureData, RAMP_TEX_WIDTH } from './gradientRampUtils';
 import noiseGLSL from '../shaders/noise.glsl?raw';
@@ -251,6 +251,7 @@ export async function initWebGL(canvas: HTMLCanvasElement): Promise<WebGLContext
     u_imageGradient: gl.getUniformLocation(program, 'u_imageGradient'),
     u_imageGradientSize: gl.getUniformLocation(program, 'u_imageGradientSize'),
     u_imageGradientChannel: gl.getUniformLocation(program, 'u_imageGradientChannel'),
+    u_imageGradientAnchorInfluence: gl.getUniformLocation(program, 'u_imageGradientAnchorInfluence'),
     u_imageMaskEnabled: gl.getUniformLocation(program, 'u_imageMaskEnabled'),
     u_imageMask: gl.getUniformLocation(program, 'u_imageMask'),
     u_slitEnabled: gl.getUniformLocation(program, 'u_slitEnabled'),
@@ -1257,7 +1258,7 @@ export function render(
   tile?: TileRenderOptions,
   sourceImageCanvas?: HTMLCanvasElement | null,
   imageGradientSource?: HTMLCanvasElement | null,
-  imageGradient: ImageGradientConfig = { enabled: false, channel: 'luminance' },
+  imageGradient: ImageGradientConfig = IMAGE_GRADIENT_DEFAULTS,
   noiseLoopPeriod = 1,
   animationSpeed = 1,
   imageMaskSource?: TexImageSource | null,
@@ -1397,6 +1398,7 @@ export function render(
   gl.uniform1i(uniforms.u_imageGradientEnabled, imageGradientActive ? 1 : 0);
   gl.uniform2f(uniforms.u_imageGradientSize, imageGradientSource?.width ?? 1, imageGradientSource?.height ?? 1);
   gl.uniform1i(uniforms.u_imageGradientChannel, imageGradientChannel[imageGradient.channel]);
+  gl.uniform1f(uniforms.u_imageGradientAnchorInfluence, Math.min(1, Math.max(0, imageGradient.anchorInfluence)));
   gl.activeTexture(gl.TEXTURE6);
   gl.bindTexture(gl.TEXTURE_2D, imageMaskTexture);
   if (imageMaskSource && ctx.imageMaskSource !== imageMaskSource) {

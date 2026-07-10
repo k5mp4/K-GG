@@ -1,5 +1,6 @@
 import { useEffect, useState, useRef, type MutableRefObject } from 'react';
 import { createEmptyManualDistortMap, createEmptyManualSmoothMask, normalizePostprocessConfig, STORE_DEFAULTS, useGradientStore } from '../store/gradientStore';
+import { normalizeImageGradientConfig } from '../types/imageGradient';
 import {
   loadPresets,
   savePreset,
@@ -66,7 +67,8 @@ export function PresetPanel({ canvasW, canvasH, setCanvasW, setCanvasH, aspectRa
     if (s.gradient) store.setGradient(s.gradient);
     if (s.noiseDistortion) store.setNoiseDistortion(s.noiseDistortion);
     if (s.diffuse) store.setDiffuse(s.diffuse);
-    store.setImageGradient({ ...STORE_DEFAULTS.imageGradient, ...s.imageGradient });
+    // anchorInfluenceがない旧プリセットは、従来の画像再配色を保つため0%として移行する。
+    store.setImageGradient(normalizeImageGradientConfig(s.imageGradient, s.imageGradient ? 0 : STORE_DEFAULTS.imageGradient.anchorInfluence));
     if (s.slitScan) store.setSlitScan({ ...STORE_DEFAULTS.slitScan, ...s.slitScan });
     if (s.stretch) store.setStretch(s.stretch);
     if (s.normalMap) store.setNormalMap(s.normalMap);
