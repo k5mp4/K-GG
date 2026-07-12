@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import type { GradientConfig } from '../types/gradient';
-import type { NoiseDistortionConfig, DiffuseConfig, SlitScanConfig, StretchConfig, NormalMapConfig, RadonConfig, IridescenceConfig, ManualDistortConfig, PostprocessConfig, MatcapConfig, HistogramConfig } from '../types/distortion';
+import type { NoiseDistortionConfig, DiffuseConfig, SlitScanConfig, StretchConfig, NormalMapConfig, RadonConfig, IridescenceConfig, ManualDistortConfig, PostprocessConfig, MatcapConfig, HistogramConfig, EffectPipelineConfig } from '../types/distortion';
 import type { ImageGradientConfig } from '../types/imageGradient';
 import { IMAGE_GRADIENT_DEFAULTS, normalizeImageGradientConfig } from '../types/imageGradient';
 import { gradientRampPresets } from '../lib/gradientRampUtils';
@@ -9,6 +9,8 @@ import { normalizePropertyTrack } from '../types/keyframe';
 import { computeAutoHandles } from '../lib/autoBezier';
 import { createAnimationTrack, getAnimationDefinition } from '../lib/animationRegistry';
 import { isPostprocessTimeAnimationActive } from '../lib/postprocessAnimation';
+import { createDefaultPostprocessStack, normalizePostprocessEffectStack } from '../lib/postprocessStack';
+import { createDefaultEffectPipeline, normalizeEffectPipelineConfig, updateEffectStackLayer } from '../lib/effectPipeline';
 
 export type AnimationEasing = {
   enabled: boolean;
@@ -58,6 +60,7 @@ type GradientStore = {
   iridescence: IridescenceConfig;
   manualDistort: ManualDistortConfig;
   postprocess: PostprocessConfig;
+  effectPipeline: EffectPipelineConfig;
   matcap: MatcapConfig;
   histogram: HistogramConfig;
 
@@ -84,6 +87,7 @@ type GradientStore = {
   setIridescence: (v: Partial<IridescenceConfig>) => void;
   setManualDistort: (v: Partial<ManualDistortConfig>) => void;
   setPostprocess: (v: Partial<PostprocessConfig>) => void;
+  setEffectPipeline: (v: Partial<EffectPipelineConfig>) => void;
   setMatcap: (v: Partial<MatcapConfig>) => void;
   setHistogram: (v: Partial<HistogramConfig>) => void;
   setKeyframeTracks: (v: Record<string, PropertyTrack> | ((prev: Record<string, PropertyTrack>) => Record<string, PropertyTrack>)) => void;
@@ -318,6 +322,7 @@ export const STORE_DEFAULTS = {
   postprocess: {
     enabled: false,
     effectMode: 'distort' as const,
+    effectStack: createDefaultPostprocessStack('distort'),
     mirrorMode: 'horizontal' as const,
     kaleidoscopeType: 'unfold' as const,
     kaleidoscopeSlices: 8,
@@ -402,6 +407,7 @@ export const STORE_DEFAULTS = {
     smoothRadius: 18,
     maxDisplacement: 1.0,
   },
+  effectPipeline: createDefaultEffectPipeline(),
   matcap: {
     enabled: false,
   },
@@ -415,16 +421,31 @@ export const STORE_DEFAULTS = {
 export function normalizePostprocessConfig(
   saved?: Partial<PostprocessConfig>,
 ): PostprocessConfig {
-  const resolution = saved?.mapResolution ?? STORE_DEFAULTS.postprocess.mapResolution;
+  const rawResolution = saved?.mapResolution;
+  const resolution = typeof rawResolution === 'number' && Number.isFinite(rawResolution)
+    ? Math.max(1, Math.min(512, Math.round(rawResolution)))
+    : STORE_DEFAULTS.postprocess.mapResolution;
+  const displacementLength = resolution * resolution * 2;
+  const smoothMaskLength = resolution * resolution;
+  const savedDisplacement = saved?.displacement;
+  const savedSmoothMask = saved?.smoothMask;
+  const validFiniteArray = (value: unknown, expectedLength: number): value is number[] => (
+    Array.isArray(value)
+    && value.length === expectedLength
+    && value.every(item => typeof item === 'number' && Number.isFinite(item))
+  );
+  const effectMode = saved?.effectMode ?? STORE_DEFAULTS.postprocess.effectMode;
   return {
     ...STORE_DEFAULTS.postprocess,
     ...saved,
+    effectMode,
+    effectStack: normalizePostprocessEffectStack(saved?.effectStack, effectMode),
     mapResolution: resolution,
-    displacement: saved?.displacement
-      ? [...saved.displacement]
+    displacement: validFiniteArray(savedDisplacement, displacementLength)
+      ? [...savedDisplacement]
       : createEmptyManualDistortMap(resolution),
-    smoothMask: saved?.smoothMask
-      ? [...saved.smoothMask]
+    smoothMask: validFiniteArray(savedSmoothMask, smoothMaskLength)
+      ? [...savedSmoothMask]
       : createEmptyManualSmoothMask(resolution),
   };
 }
@@ -496,8 +517,13 @@ export const useGradientStore = create<GradientStore>((set) => ({
   },
   postprocess: {
     ...STORE_DEFAULTS.postprocess,
+    effectStack: STORE_DEFAULTS.postprocess.effectStack.map(layer => ({ ...layer })),
     displacement: [...STORE_DEFAULTS.postprocess.displacement],
     smoothMask: [...STORE_DEFAULTS.postprocess.smoothMask],
+  },
+  effectPipeline: {
+    ...STORE_DEFAULTS.effectPipeline,
+    effectStack: STORE_DEFAULTS.effectPipeline.effectStack.map(layer => ({ ...layer })),
   },
   matcap: { ...STORE_DEFAULTS.matcap },
   histogram: { ...STORE_DEFAULTS.histogram },
@@ -543,14 +569,20 @@ export const useGradientStore = create<GradientStore>((set) => ({
     const keyframeTracks = s.animation.enabled && noiseDistortion.enabled
       ? ensureAutoTrack(s.keyframeTracks, 'noiseDistortion.evolution')
       : s.keyframeTracks;
-    return { noiseDistortion, keyframeTracks };
+    const effectPipeline = v.enabled !== undefined && s.effectPipeline.version === 'stack-v2'
+      ? { ...s.effectPipeline, effectStack: updateEffectStackLayer(s.effectPipeline.effectStack, 'noise', { enabled: v.enabled }) }
+      : s.effectPipeline;
+    return { noiseDistortion, keyframeTracks, effectPipeline };
   }),
   setDiffuse: (v) => set((s) => {
     const diffuse = { ...s.diffuse, ...v };
     const keyframeTracks = s.animation.enabled && diffuse.enabled && diffuse.seedAnimEnabled
       ? ensureAutoTrack(s.keyframeTracks, 'diffuse.seed')
       : s.keyframeTracks;
-    return { diffuse, keyframeTracks };
+    const effectPipeline = v.enabled !== undefined && s.effectPipeline.version === 'stack-v2'
+      ? { ...s.effectPipeline, effectStack: updateEffectStackLayer(s.effectPipeline.effectStack, 'diffuse', { enabled: v.enabled }) }
+      : s.effectPipeline;
+    return { diffuse, keyframeTracks, effectPipeline };
   }),
   setImageGradient: (v) => set((s) => ({ imageGradient: normalizeImageGradientConfig({ ...s.imageGradient, ...v }) })),
   setSlitScan: (v) => set((s) => {
@@ -560,14 +592,20 @@ export const useGradientStore = create<GradientStore>((set) => ({
       keyframeTracks = ensureAutoTrack(keyframeTracks, 'slitScan.offset');
       if (slitScan.phaseAnimEnabled) keyframeTracks = ensureAutoTrack(keyframeTracks, 'slitScan.slitPhase');
     }
-    return { slitScan, keyframeTracks };
+    const effectPipeline = v.enabled !== undefined && s.effectPipeline.version === 'stack-v2'
+      ? { ...s.effectPipeline, effectStack: updateEffectStackLayer(s.effectPipeline.effectStack, 'slit', { enabled: v.enabled }) }
+      : s.effectPipeline;
+    return { slitScan, keyframeTracks, effectPipeline };
   }),
   setStretch: (v) => set((s) => {
     const stretch = { ...s.stretch, ...v };
     const keyframeTracks = s.animation.enabled && stretch.enabled
       ? ensureAutoTrack(s.keyframeTracks, 'stretch.__scan')
       : s.keyframeTracks;
-    return { stretch, keyframeTracks };
+    const effectPipeline = v.enabled !== undefined && s.effectPipeline.version === 'stack-v2'
+      ? { ...s.effectPipeline, effectStack: updateEffectStackLayer(s.effectPipeline.effectStack, 'stretch', { enabled: v.enabled }) }
+      : s.effectPipeline;
+    return { stretch, keyframeTracks, effectPipeline };
   }),
   setAnimation: (v) => set((s) => {
     const nextAnimation = { ...s.animation, ...v };
@@ -612,7 +650,10 @@ export const useGradientStore = create<GradientStore>((set) => ({
       : v.mapResolution && v.mapResolution !== s.manualDistort.mapResolution
         ? createEmptyManualSmoothMask(resolution)
         : s.manualDistort.smoothMask ?? createEmptyManualSmoothMask(resolution);
-    return { manualDistort: { ...s.manualDistort, ...v, displacement, smoothMask } };
+    const effectPipeline = v.enabled !== undefined && s.effectPipeline.version === 'stack-v2'
+      ? { ...s.effectPipeline, effectStack: updateEffectStackLayer(s.effectPipeline.effectStack, 'distort', { enabled: v.enabled }) }
+      : s.effectPipeline;
+    return { manualDistort: { ...s.manualDistort, ...v, displacement, smoothMask }, effectPipeline };
   }),
   setPostprocess: (v) => set((s) => {
     const resolution = v.mapResolution ?? s.postprocess.mapResolution;
@@ -626,13 +667,34 @@ export const useGradientStore = create<GradientStore>((set) => ({
       : v.mapResolution && v.mapResolution !== s.postprocess.mapResolution
         ? createEmptyManualSmoothMask(resolution)
         : s.postprocess.smoothMask ?? createEmptyManualSmoothMask(resolution);
-    const next = { ...s.postprocess, ...v, displacement, smoothMask };
+    const effectMode = v.effectMode ?? s.postprocess.effectMode;
+    const effectStack = normalizePostprocessEffectStack(v.effectStack ?? s.postprocess.effectStack, effectMode);
+    const next = { ...s.postprocess, ...v, effectMode, effectStack, displacement, smoothMask };
     if ((next.particleEmitterType as string) === 'nexus') next.particleEmitterType = 'point';
     if (!next.particleEmitterPoint) next.particleEmitterPoint = [...STORE_DEFAULTS.postprocess.particleEmitterPoint] as [number, number];
     const keyframeTracks = s.animation.enabled && isPostprocessTimeAnimationActive(next)
       ? ensureAutoTrack(s.keyframeTracks, 'postprocess.__time')
       : s.keyframeTracks;
     return { postprocess: next, keyframeTracks };
+  }),
+  setEffectPipeline: (v) => set((s) => {
+    const effectPipeline = normalizeEffectPipelineConfig({
+      ...s.effectPipeline,
+      ...v,
+      effectStack: v.effectStack ?? s.effectPipeline.effectStack,
+    });
+    if (effectPipeline.version !== 'stack-v2') return { effectPipeline };
+    const enabled = (kind: import('../types/distortion').EffectStackKind) => (
+      effectPipeline.effectStack.some(layer => layer.kind === kind && layer.enabled)
+    );
+    return {
+      effectPipeline,
+      noiseDistortion: { ...s.noiseDistortion, enabled: enabled('noise') },
+      diffuse: { ...s.diffuse, enabled: enabled('diffuse') },
+      slitScan: { ...s.slitScan, enabled: enabled('slit') },
+      stretch: { ...s.stretch, enabled: enabled('stretch') },
+      manualDistort: { ...s.manualDistort, enabled: enabled('distort') },
+    };
   }),
   setMatcap: (v) => set((s) => ({ matcap: { ...s.matcap, ...v } })),
   setHistogram: (v) => set((s) => ({ histogram: { ...s.histogram, ...v } })),

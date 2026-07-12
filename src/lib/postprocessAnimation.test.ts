@@ -5,6 +5,7 @@ import type {
   PostprocessEffectMode,
 } from '../types/distortion';
 import { isPostprocessTimeAnimationActive } from './postprocessAnimation';
+import { createDefaultPostprocessStack } from './postprocessStack';
 
 function createPostprocess(
   effectMode: PostprocessEffectMode,
@@ -14,6 +15,7 @@ function createPostprocess(
     ...STORE_DEFAULTS.postprocess,
     enabled: true,
     effectMode,
+    effectStack: createDefaultPostprocessStack(effectMode),
     ...overrides,
   };
 }
@@ -73,5 +75,33 @@ describe('isPostprocessTimeAnimationActive', () => {
     expect(isPostprocessTimeAnimationActive(createPostprocess(
       'future-mode' as PostprocessEffectMode,
     ))).toBe(false);
+  });
+
+  it('uses active stack layers even when another layer is selected for editing', () => {
+    expect(isPostprocessTimeAnimationActive(createPostprocess('mirror', {
+      effectStack: [
+        { kind: 'glass', enabled: true },
+        { kind: 'mirror', enabled: false },
+        { kind: 'distort', enabled: false },
+        { kind: 'kaleidoscope', enabled: false },
+        { kind: 'prism', enabled: false },
+        { kind: 'voronoi', enabled: false },
+      ],
+      glassMotion: 0.2,
+    }))).toBe(true);
+  });
+
+  it('ignores disabled animated stack layers', () => {
+    expect(isPostprocessTimeAnimationActive(createPostprocess('glass', {
+      effectStack: [
+        { kind: 'glass', enabled: false },
+        { kind: 'prism', enabled: false },
+        { kind: 'distort', enabled: false },
+        { kind: 'mirror', enabled: false },
+        { kind: 'kaleidoscope', enabled: false },
+        { kind: 'voronoi', enabled: false },
+      ],
+      glassMotion: 1,
+    }))).toBe(false);
   });
 });

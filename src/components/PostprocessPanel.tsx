@@ -334,7 +334,7 @@ export function ManualDistortControls({ title, value: manualDistort, defaults = 
 }
 
 export function PostprocessPanel() {
-  const { gradient, setGradient, postprocess, setPostprocess } = useGradientStore();
+  const { gradient, setGradient, postprocess, setPostprocess, effectPipeline } = useGradientStore();
   const isDistort = postprocess.effectMode === 'distort';
   const particleEmitterType = ((postprocess.particleEmitterType as string) === 'nexus'
     ? 'point'
@@ -372,7 +372,7 @@ export function PostprocessPanel() {
       <Collapsible isOpen={postprocess.enabled}>
         <div className="space-y-4 pt-2">
           <CustomSelect
-            label="Mode"
+            label="Edit Layer"
             value={postprocess.effectMode}
             options={[
               { value: 'distort', label: 'Distort' },
@@ -1154,7 +1154,7 @@ export function PostprocessPanel() {
             </div>
           )}
 
-          {postprocess.effectMode !== 'particles' && (
+          {effectPipeline.version === 'legacy-v1' && postprocess.effectMode !== 'particles' && (
           <div className="border-t border-cream/40 pt-4 space-y-4">
             <div className="flex items-center justify-between">
               <span className="text-xs text-deep font-display uppercase tracking-wider">Post Diffuse</span>

@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import type { PostprocessConfig } from '../types/distortion';
 import {
   GLASS_LIMITS,
-  getGlassSamplePadding,
+  getPostprocessStackSamplePadding,
   smoothGlassNoiseBlend,
 } from './glass';
 
@@ -10,6 +10,14 @@ function glassConfig(overrides: Partial<PostprocessConfig> = {}): PostprocessCon
   return {
     enabled: true,
     effectMode: 'glass',
+    effectStack: [
+      { kind: 'glass', enabled: true },
+      { kind: 'distort', enabled: false },
+      { kind: 'mirror', enabled: false },
+      { kind: 'kaleidoscope', enabled: false },
+      { kind: 'prism', enabled: false },
+      { kind: 'voronoi', enabled: false },
+    ],
     glassMix: 1,
     glassRefraction: 32,
     glassChromaticAberration: 4,
@@ -18,19 +26,28 @@ function glassConfig(overrides: Partial<PostprocessConfig> = {}): PostprocessCon
   } as PostprocessConfig;
 }
 
-describe('getGlassSamplePadding', () => {
+describe('getPostprocessStackSamplePadding', () => {
   it('adds the bounded optical sample radii and safety pixels', () => {
-    expect(getGlassSamplePadding(glassConfig())).toBe(40);
+    expect(getPostprocessStackSamplePadding(glassConfig())).toBe(40);
   });
 
   it('returns no padding when Glass cannot affect the output', () => {
-    expect(getGlassSamplePadding(glassConfig({ enabled: false }))).toBe(0);
-    expect(getGlassSamplePadding(glassConfig({ effectMode: 'mirror' }))).toBe(0);
-    expect(getGlassSamplePadding(glassConfig({ glassMix: 0 }))).toBe(0);
+    expect(getPostprocessStackSamplePadding(glassConfig({ enabled: false }))).toBe(0);
+    expect(getPostprocessStackSamplePadding(glassConfig({
+      effectStack: [
+        { kind: 'mirror', enabled: true },
+        { kind: 'distort', enabled: false },
+        { kind: 'kaleidoscope', enabled: false },
+        { kind: 'prism', enabled: false },
+        { kind: 'voronoi', enabled: false },
+        { kind: 'glass', enabled: false },
+      ],
+    }))).toBe(0);
+    expect(getPostprocessStackSamplePadding(glassConfig({ glassMix: 0 }))).toBe(0);
   });
 
   it('clamps imported or directly entered values to renderer limits', () => {
-    expect(getGlassSamplePadding(glassConfig({
+    expect(getPostprocessStackSamplePadding(glassConfig({
       glassRefraction: 999,
       glassChromaticAberration: 999,
       glassRoughness: 999,

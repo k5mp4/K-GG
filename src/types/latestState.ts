@@ -1,6 +1,7 @@
 import type { AnimationConfig } from '../store/gradientStore';
 import type {
   DiffuseConfig,
+  EffectPipelineConfig,
   IridescenceConfig,
   ManualDistortConfig,
   PostprocessConfig,
@@ -27,6 +28,7 @@ export type LatestState = {
   iridescence: IridescenceConfig;
   manualDistort: ManualDistortConfig;
   postprocess: PostprocessConfig;
+  effectPipeline: EffectPipelineConfig;
   matcap: MatcapConfig;
   animation: AnimationConfig;
   keyframeTracks: Record<string, PropertyTrack>;

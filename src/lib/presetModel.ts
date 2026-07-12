@@ -1,6 +1,7 @@
 import type { AnimationConfig } from '../store/gradientStore';
 import type {
   DiffuseConfig,
+  EffectPipelineConfig,
   IridescenceConfig,
   ManualDistortConfig,
   MatcapConfig,
@@ -11,6 +12,7 @@ import type {
   SlitScanConfig,
   StretchConfig,
 } from '../types/distortion';
+import { createDefaultEffectPipeline, normalizeEffectPipelineConfig } from './effectPipeline';
 import type { ImageGradientConfig } from '../types/imageGradient';
 import type { GradientConfig } from '../types/gradient';
 import type { PropertyTrack } from '../types/keyframe';
@@ -29,6 +31,8 @@ export type StoreSnapshot = {
   iridescence?: IridescenceConfig;
   manualDistort?: ManualDistortConfig;
   postprocess?: Partial<PostprocessConfig>;
+  /** Omitted by presets saved before SPEC-012; those load through Legacy v1. */
+  effectPipeline?: EffectPipelineConfig;
   postprocessDistort?: Partial<PostprocessConfig>; // Backward compatibility for older preset files.
   matcap?: MatcapConfig;
   keyframeTracks?: Record<string, PropertyTrack>;
@@ -49,7 +53,12 @@ export function makePreset(name: string, state: StoreSnapshot): Preset {
     id: Math.random().toString(36).slice(2),
     name,
     createdAt: Date.now(),
-    state,
+    state: {
+      ...state,
+      effectPipeline: state.effectPipeline
+        ? normalizeEffectPipelineConfig(state.effectPipeline)
+        : createDefaultEffectPipeline(),
+    },
   };
 }
 

@@ -21,6 +21,8 @@ title: 機能仕様
 | SPEC-008 | [画像カラーパレット生成機能](./SPEC-008-color-palette-generator.md) | implemented |
 | SPEC-009 | [画像グラデーション入力](./SPEC-009-image-gradient-source.md) | implemented |
 | SPEC-010 | [Bezier Axisの廃止](./SPEC-010-remove-bezier-axis.md) | implemented |
+| SPEC-011 | [Postprocess Effect Stack](./SPEC-011-postprocess-effect-stack.md) | implemented |
+| SPEC-012 | [Unified Effect Stack V2](./SPEC-012-unified-effect-stack-v2.md) | approved |
 
 ## 新しい仕様の作り方
 

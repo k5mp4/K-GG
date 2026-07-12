@@ -13,8 +13,8 @@ import { SlitScanPanel } from './components/SlitScanPanel';
 import { StretchPanel } from './components/StretchPanel';
 import { PresetPanel } from './components/PresetPanel';
 import { NormalMapPanel } from './components/NormalMapPanel';
-import { IridescencePanel } from './components/IridescencePanel';
-import { PostprocessPanel } from './components/PostprocessPanel';
+import { ManualDistortControls, PostprocessPanel } from './components/PostprocessPanel';
+import { PostprocessStackPanel } from './components/PostprocessStackPanel';
 import { DistortOverlay } from './components/DistortOverlay';
 import { PostprocessOverlay } from './components/PostprocessOverlay';
 import { MatcapPanel } from './components/MatcapPanel';
@@ -43,6 +43,7 @@ import { useAppUpdater } from './features/updater/useAppUpdater';
 import { UpdateButton } from './features/updater/UpdateButton';
 import { UpdateDialog } from './features/updater/UpdateDialog';
 import { FfmpegSetupDialog } from './components/FfmpegSetupDialog';
+import { isPostprocessLayerEnabled } from './lib/postprocessStack';
 import {
   getNativeFfmpegStatus,
   nativeFfmpegSupported,
@@ -124,11 +125,11 @@ export default function App() {
     matcap,
     animation,
     noiseDistortion,
-    iridescence,
     manualDistort,
     setManualDistort,
     postprocess,
     setPostprocess,
+    effectPipeline,
     slitScan,
     stretch,
   } = store;
@@ -246,13 +247,26 @@ export default function App() {
   const [leftPanelOpen, setLeftPanelOpen] = useState(true);
   const [rightPanelOpen, setRightPanelOpen] = useState(true);
 
+  useEffect(() => {
+    if (effectPipeline.version !== 'stack-v2') return;
+    const tabByKind: Record<string, LeftTab> = {
+      diffuse: 'diffuse', noise: 'noise', slit: 'slit', stretch: 'stretch',
+      distort: 'distort', mirror: 'postprocess', kaleidoscope: 'postprocess', voronoi: 'postprocess', glass: 'postprocess',
+    };
+    const next = tabByKind[effectPipeline.selectedKind];
+    if (next && next !== activeLeftTabRef.current) {
+      activeLeftTabRef.current = next;
+      setLeftTab(next);
+    }
+  }, [effectPipeline.version, effectPipeline.selectedKind]);
+
   // アニメーションが有効化されたとき、または対象のいずれかが有効なときにタイムラインを自動で開く
   useEffect(() => {
-    if (animation.enabled && (noiseDistortion.enabled || iridescence.enabled || slitScan.animEnabled || stretch.enabled)) {
+    if (animation.enabled && (noiseDistortion.enabled || slitScan.animEnabled || stretch.enabled)) {
       const id = setTimeout(() => setShowTimeline(true), 180);
       return () => clearTimeout(id);
     }
-  }, [animation.enabled, noiseDistortion.enabled, iridescence.enabled, slitScan.animEnabled, stretch.enabled]);
+  }, [animation.enabled, noiseDistortion.enabled, slitScan.animEnabled, stretch.enabled]);
 
   const hoverLockTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -573,7 +587,13 @@ export default function App() {
                     )}
                     {value === 'stretch' && <StretchPanel />}
                     {value === 'normal' && <NormalMapPanel />}
-                    {value === 'distort' && <IridescencePanel />}
+                    {value === 'distort' && (
+                      <ManualDistortControls
+                        title="Distort"
+                        value={manualDistort}
+                        onChange={setManualDistort}
+                      />
+                    )}
                     {value === 'postprocess' && <PostprocessPanel />}
                     {value === 'matcap' && <MatcapPanel />}
                     {value === 'export' && (
@@ -709,6 +729,9 @@ export default function App() {
             </div>
 
             <div className="relative flex-1 flex items-center justify-center p-2 md:p-6 overflow-hidden">
+              <div className={`hidden md:block absolute left-4 top-4 z-30 transition-opacity ${showLeftSidebar || showRightSidebar ? 'opacity-0 pointer-events-none' : 'opacity-100'}`}>
+                <PostprocessStackPanel />
+              </div>
               <div style={{
                 position: 'relative',
                 width: displayW,
@@ -738,7 +761,7 @@ export default function App() {
                   setManualDistort={setManualDistort}
                 />
                 <DistortOverlay
-                  active={leftTab === 'postprocess' && postprocess.effectMode === 'distort'}
+                  active={effectPipeline.version === 'legacy-v1' && leftTab === 'postprocess' && isPostprocessLayerEnabled(postprocess, 'distort') && postprocess.effectMode === 'distort'}
                   width={displayW}
                   height={displayH}
                   canvasW={canvasW}
@@ -747,7 +770,13 @@ export default function App() {
                   setManualDistort={setPostprocess}
                 />
                 <PostprocessOverlay
-                  active={leftTab === 'postprocess' || (postprocess.enabled && (postprocess.effectMode === 'mirror' || postprocess.effectMode === 'kaleidoscope'))}
+                  active={
+                    leftTab === 'postprocess' &&
+                    (
+                      (postprocess.effectMode === 'mirror' && isPostprocessLayerEnabled(postprocess, 'mirror')) ||
+                      (postprocess.effectMode === 'kaleidoscope' && isPostprocessLayerEnabled(postprocess, 'kaleidoscope'))
+                    )
+                  }
                   width={displayW}
                   height={displayH}
                   postprocess={postprocess}
@@ -785,7 +814,7 @@ export default function App() {
               </div>
             </div>
 
-            <div className="hidden md:block absolute top-4 left-4 md:top-6 md:left-6 z-20 pointer-events-none transition-opacity">
+            <div className="hidden md:block absolute top-4 left-[264px] z-20 pointer-events-none transition-opacity">
               <ColorHistogram sourceCanvasRef={canvasRef} />
             </div>
 

@@ -1,5 +1,6 @@
 import { useEffect, useState, useRef, type MutableRefObject } from 'react';
 import { createEmptyManualDistortMap, createEmptyManualSmoothMask, normalizePostprocessConfig, STORE_DEFAULTS, useGradientStore } from '../store/gradientStore';
+import { normalizeEffectPipelineConfig } from '../lib/effectPipeline';
 import { normalizeImageGradientConfig } from '../types/imageGradient';
 import {
   loadPresets,
@@ -20,6 +21,18 @@ type PresetPanelProps = {
   setCanvasH: (h: number) => void;
   aspectRatioRef: MutableRefObject<number>;
 };
+
+function normalizeManualDistortResolution(value: unknown): number {
+  return typeof value === 'number' && Number.isFinite(value)
+    ? Math.max(1, Math.min(512, Math.round(value)))
+    : STORE_DEFAULTS.manualDistort.mapResolution;
+}
+
+function validFiniteArray(value: unknown, expectedLength: number): value is number[] {
+  return Array.isArray(value)
+    && value.length === expectedLength
+    && value.every(item => typeof item === 'number' && Number.isFinite(item));
+}
 
 export function PresetPanel({ canvasW, canvasH, setCanvasW, setCanvasH, aspectRatioRef }: PresetPanelProps) {
   const store = useGradientStore();
@@ -42,7 +55,7 @@ export function PresetPanel({ canvasW, canvasH, setCanvasW, setCanvasH, aspectRa
     // store の中から snapshot に必要なものだけを抽出（関数などを除外）
     const { 
       gradient, noiseDistortion, diffuse, imageGradient, slitScan, stretch,
-      animation, normalMap, radon, iridescence, manualDistort, postprocess, matcap, keyframeTracks
+      animation, normalMap, radon, iridescence, manualDistort, postprocess, effectPipeline, matcap, keyframeTracks
     } = store;
 
     // 保存時に、操作中の状態（選択中のインデックスなど）はリセットして保存するのが一般的
@@ -51,7 +64,7 @@ export function PresetPanel({ canvasW, canvasH, setCanvasW, setCanvasH, aspectRa
     await savePreset(trimmed, {
       gradient, noiseDistortion, diffuse, imageGradient,
       slitScan: slitScanToSave, stretch,
-      animation, normalMap, radon, iridescence, manualDistort, postprocess, matcap,
+      animation, normalMap, radon, iridescence, manualDistort, postprocess, effectPipeline, matcap,
       keyframeTracks,
       colorPalettes: loadUserColorPalettes(),
       resolution: { width: canvasW, height: canvasH },
@@ -72,30 +85,48 @@ export function PresetPanel({ canvasW, canvasH, setCanvasW, setCanvasH, aspectRa
     if (s.slitScan) store.setSlitScan({ ...STORE_DEFAULTS.slitScan, ...s.slitScan });
     if (s.stretch) store.setStretch(s.stretch);
     if (s.normalMap) store.setNormalMap(s.normalMap);
-    if (s.radon) store.setRadon(s.radon);
-    if (s.iridescence) store.setIridescence(s.iridescence);
+    // SPEC-012 removed these effects. Legacy files may still carry their
+    // settings, but loading them must never reactivate either effect.
+    store.setRadon({ ...STORE_DEFAULTS.radon, ...s.radon, enabled: false });
+    store.setIridescence({ ...STORE_DEFAULTS.iridescence, ...s.iridescence, enabled: false });
     {
-      const resolution = s.manualDistort?.mapResolution ?? STORE_DEFAULTS.manualDistort.mapResolution;
+      const resolution = normalizeManualDistortResolution(s.manualDistort?.mapResolution);
+      const displacementLength = resolution * resolution * 2;
+      const smoothMaskLength = resolution * resolution;
+      const savedDisplacement = s.manualDistort?.displacement;
+      const savedSmoothMask = s.manualDistort?.smoothMask;
       store.setManualDistort({
         ...STORE_DEFAULTS.manualDistort,
         ...s.manualDistort,
         mapResolution: resolution,
-        displacement: s.manualDistort?.displacement ?? createEmptyManualDistortMap(resolution),
-        smoothMask: s.manualDistort?.smoothMask ?? createEmptyManualSmoothMask(resolution),
+        displacement: validFiniteArray(savedDisplacement, displacementLength)
+          ? savedDisplacement
+          : createEmptyManualDistortMap(resolution),
+        smoothMask: validFiniteArray(savedSmoothMask, smoothMaskLength)
+          ? savedSmoothMask
+          : createEmptyManualSmoothMask(resolution),
       });
     }
     {
       const savedPostprocess = s.postprocess ?? s.postprocessDistort;
       store.setPostprocess(normalizePostprocessConfig(savedPostprocess));
     }
+    // Presets without this field predate SPEC-012 and intentionally retain the
+    // Legacy v1 renderer instead of being silently reinterpreted as V2.
+    store.setEffectPipeline(normalizeEffectPipelineConfig(s.effectPipeline));
     if (s.matcap) store.setMatcap(s.matcap);
     store.setKeyframeTracks(s.keyframeTracks ?? {});
     if (s.animation) store.setAnimation({ ...s.animation, previewLoop: s.animation.previewLoop ?? true });
     if (s.colorPalettes) mergeUserColorPalettes(s.colorPalettes);
     if (s.resolution) {
-      setCanvasW(s.resolution.width);
-      setCanvasH(s.resolution.height);
-      aspectRatioRef.current = s.resolution.width / s.resolution.height;
+      const normalizeResolution = (value: number) => (
+        Number.isFinite(value) ? Math.max(1, Math.min(4096, Math.round(value))) : 1024
+      );
+      const presetWidth = normalizeResolution(s.resolution.width);
+      const presetHeight = normalizeResolution(s.resolution.height);
+      setCanvasW(presetWidth);
+      setCanvasH(presetHeight);
+      aspectRatioRef.current = presetWidth / presetHeight;
     }
     store.setPresetName(preset.name);
   }
