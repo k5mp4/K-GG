@@ -1,4 +1,5 @@
 import type { PostprocessConfig } from '../types/distortion';
+import { getActivePostprocessStackLayers } from './postprocessStack';
 
 /**
  * Postprocessが共有時間トラックによる描画更新を必要とするか判定する。
@@ -10,14 +11,11 @@ export function isPostprocessTimeAnimationActive(
   postprocess: PostprocessConfig,
 ): boolean {
   if (!postprocess.enabled) return false;
+  if (postprocess.effectMode === 'particles') return true;
 
-  switch (postprocess.effectMode) {
-    case 'prism':
-    case 'particles':
-      return true;
-    case 'glass':
-      return postprocess.glassMotion > 0;
-    default:
-      return false;
+  for (const layer of getActivePostprocessStackLayers(postprocess)) {
+    if (layer.kind === 'prism') return true;
+    if (layer.kind === 'glass') return postprocess.glassMotion > 0;
   }
+  return false;
 }

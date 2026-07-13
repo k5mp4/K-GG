@@ -37,5 +37,6 @@ export function renderSceneAtTime(
     scene.animationSpeed,
     state.imageMaskSource ?? null,
     state.imageMaskEnabled ?? false,
+    state.effectPipeline,
   );
 }

@@ -146,9 +146,51 @@ export type PostprocessKaleidoscopeType = 'unfold' | 'flower' | 'starlish';
 export type PostprocessParticleBlendMode = 'alpha' | 'add';
 export type PostprocessParticleColorOverLifeMode = 'hue' | 'ramp';
 export type PostprocessParticleEmitterType = 'field' | 'line' | 'burst' | 'point';
+export type PostprocessStackKind = Exclude<PostprocessEffectMode, 'particles'>;
+export type PostprocessStackLayer = {
+  kind: PostprocessStackKind;
+  enabled: boolean;
+};
+
+/**
+ * Unified Effect Stack V2 の主スタックに含める効果。
+ *
+ * Surface (Normal/Matcap)、Prism、Particles は主スタック外の固定段階なので、
+ * ここには含めない。
+ */
+export type EffectStackKind =
+  | 'diffuse'
+  | 'noise'
+  | 'slit'
+  | 'stretch'
+  | 'distort'
+  | 'mirror'
+  | 'kaleidoscope'
+  | 'voronoi'
+  | 'glass';
+
+export type EffectStackLayer = {
+  kind: EffectStackKind;
+  enabled: boolean;
+};
+
+export type EffectPipelineVersion = 'legacy-v1' | 'stack-v2';
+
+/**
+ * 描画経路の選択と Unified Effect Stack V2 の永続状態。
+ * V2 では effectStack の enabled が主スタックの有効状態の唯一の一次情報となる。
+ */
+export type EffectPipelineConfig = {
+  version: EffectPipelineVersion;
+  effectStack: EffectStackLayer[];
+  selectedKind: EffectStackKind;
+  prismEnabled: boolean;
+  particlesEnabled: boolean;
+};
 
 export type PostprocessConfig = ManualDistortConfig & {
   effectMode: PostprocessEffectMode;
+  effectStack: PostprocessStackLayer[];
   mirrorMode: PostprocessMirrorMode;
   kaleidoscopeType: PostprocessKaleidoscopeType;
   kaleidoscopeSlices: number;

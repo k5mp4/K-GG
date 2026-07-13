@@ -1,4 +1,5 @@
 import type { PostprocessConfig } from '../types/distortion';
+import { isPostprocessLayerEnabled } from './postprocessStack';
 
 export const GLASS_LIMITS = {
   refraction: 120,
@@ -21,10 +22,10 @@ export function smoothGlassNoiseBlend(value: number): number {
   return t * t * t * (t * (t * 6 - 15) + 10);
 }
 
-export function getGlassSamplePadding(postprocess: PostprocessConfig | null | undefined): number {
+export function getPostprocessStackSamplePadding(postprocess: PostprocessConfig | null | undefined): number {
   if (
     !postprocess?.enabled ||
-    postprocess.effectMode !== 'glass' ||
+    !isPostprocessLayerEnabled(postprocess, 'glass') ||
     clamp(postprocess.glassMix, 0, 1) <= 0
   ) {
     return 0;
@@ -39,3 +40,5 @@ export function getGlassSamplePadding(postprocess: PostprocessConfig | null | un
   const roughness = clamp(postprocess.glassRoughness, 0, GLASS_LIMITS.roughness);
   return Math.ceil(refraction + chromaticAberration + roughness) + 2;
 }
+
+export const getGlassSamplePadding = getPostprocessStackSamplePadding;

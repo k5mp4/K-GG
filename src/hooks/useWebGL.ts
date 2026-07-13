@@ -5,7 +5,7 @@ import { renderBridge } from '../lib/renderBridge';
 import { AnimationLoop } from '../lib/animation';
 import { RAMP_TEX_WIDTH } from '../lib/constants';
 import { renderSceneAtTime } from '../lib/renderSceneAtTime';
-import { getGlassSamplePadding } from '../lib/glass';
+import { getPostprocessStackSamplePadding } from '../lib/glass';
 import { useGradientStore } from '../store/gradientStore';
 import type { WebGLContext } from '../lib/webgl';
 import type { GradientConfig } from '../types/gradient';
@@ -115,7 +115,7 @@ export function useWebGL(
       },
       () => { animLoopRef.current?.stop(); },
       () => { animLoopRef.current?.start(); },
-      () => getGlassSamplePadding(latestRef.current?.postprocess),
+      () => getPostprocessStackSamplePadding(latestRef.current?.postprocess),
     );
     renderBridge.registerPause(
       () => {

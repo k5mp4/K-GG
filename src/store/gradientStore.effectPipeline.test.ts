@@ -1,0 +1,105 @@
+import { beforeEach, describe, expect, it } from 'vitest';
+import { createDefaultEffectStack, updateEffectStackLayer } from '../lib/effectPipeline';
+import { useGradientStore } from './gradientStore';
+
+function layerEnabled(kind: 'diffuse' | 'noise' | 'slit'): boolean {
+  return useGradientStore.getState().effectPipeline.effectStack
+    .find(layer => layer.kind === kind)?.enabled ?? false;
+}
+
+describe('Gradient store Effect Pipeline V2 synchronization', () => {
+  beforeEach(() => {
+    useGradientStore.setState(useGradientStore.getInitialState(), true);
+  });
+
+  it('synchronizes V2 stack changes into the Diffuse, Noise, and Slit configs', () => {
+    let effectStack = createDefaultEffectStack();
+    effectStack = updateEffectStackLayer(effectStack, 'diffuse', { enabled: false });
+    effectStack = updateEffectStackLayer(effectStack, 'noise', { enabled: true });
+    effectStack = updateEffectStackLayer(effectStack, 'slit', { enabled: true });
+
+    useGradientStore.getState().setEffectPipeline({ effectStack });
+
+    const state = useGradientStore.getState();
+    expect(state.effectPipeline.version).toBe('stack-v2');
+    expect(state.diffuse.enabled).toBe(false);
+    expect(state.noiseDistortion.enabled).toBe(true);
+    expect(state.slitScan.enabled).toBe(true);
+  });
+
+  it('synchronizes Diffuse, Noise, and Slit config toggles back into the V2 stack', () => {
+    const store = useGradientStore.getState();
+    store.setDiffuse({ enabled: false });
+    store.setNoiseDistortion({ enabled: true });
+    store.setSlitScan({ enabled: true });
+
+    expect(layerEnabled('diffuse')).toBe(false);
+    expect(layerEnabled('noise')).toBe(true);
+    expect(layerEnabled('slit')).toBe(true);
+  });
+
+  it('keeps Diffuse panel parameters as the V2 source instead of legacy postprocess values', () => {
+    const store = useGradientStore.getState();
+    store.setPostprocess({
+      diffuseEnabled: false,
+      diffuseMode: 'block',
+      diffuseScatter: 4,
+      diffuseGrain: 1,
+      diffuseSeed: 2,
+      diffuseDitherThreshold: 0.1,
+    });
+    store.setDiffuse({
+      enabled: true,
+      mode: 'smooth',
+      scatter: 187,
+      grain: 3.75,
+      seed: 42,
+      ditherThreshold: 0.73,
+    });
+
+    useGradientStore.getState().setEffectPipeline({
+      version: 'stack-v2',
+      effectStack: updateEffectStackLayer(
+        useGradientStore.getState().effectPipeline.effectStack,
+        'diffuse',
+        { enabled: true },
+      ),
+    });
+
+    const state = useGradientStore.getState();
+    expect(state.diffuse).toMatchObject({
+      enabled: true,
+      mode: 'smooth',
+      scatter: 187,
+      grain: 3.75,
+      seed: 42,
+      ditherThreshold: 0.73,
+    });
+    expect(state.postprocess).toMatchObject({
+      diffuseEnabled: false,
+      diffuseMode: 'block',
+      diffuseScatter: 4,
+      diffuseGrain: 1,
+      diffuseSeed: 2,
+      diffuseDitherThreshold: 0.1,
+    });
+  });
+
+  it('keeps Legacy config toggles independent from the stored V2 layer flags', () => {
+    useGradientStore.getState().setEffectPipeline({ version: 'legacy-v1' });
+
+    const store = useGradientStore.getState();
+    store.setDiffuse({ enabled: false });
+    store.setNoiseDistortion({ enabled: true });
+    store.setSlitScan({ enabled: true });
+
+    const state = useGradientStore.getState();
+    expect(state.effectPipeline.version).toBe('legacy-v1');
+    expect(state.diffuse.enabled).toBe(false);
+    expect(state.noiseDistortion.enabled).toBe(true);
+    expect(state.slitScan.enabled).toBe(true);
+    expect(layerEnabled('diffuse')).toBe(true);
+    expect(layerEnabled('noise')).toBe(false);
+    expect(layerEnabled('slit')).toBe(false);
+  });
+});

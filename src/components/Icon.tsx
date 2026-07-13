@@ -9,6 +9,7 @@ export type IconName =
   | 'close'
   | 'error'
   | 'firstPage'
+  | 'gripVertical'
   | 'lastPage'
   | 'memory'
   | 'pause'
@@ -38,6 +39,7 @@ const PATHS: Record<IconName, string[]> = {
   close: ['M18 6 6 18', 'm6 6 12 12'],
   error: ['M12 8v4', 'M12 16h.01', 'M22 12a10 10 0 1 1-20 0 10 10 0 0 1 20 0Z'],
   firstPage: ['M6 5v14', 'm18 6-6 6 6 6'],
+  gripVertical: ['M9 5h.01', 'M15 5h.01', 'M9 12h.01', 'M15 12h.01', 'M9 19h.01', 'M15 19h.01'],
   lastPage: ['M18 5v14', 'm6-6 6 6-6 6'],
   memory: [
     'M7 7h10v10H7z',

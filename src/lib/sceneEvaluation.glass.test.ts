@@ -3,6 +3,7 @@ import { STORE_DEFAULTS } from '../store/gradientStore';
 import type { LatestState } from '../types/latestState';
 import { createAnimationTrack } from './animationRegistry';
 import { evaluateSceneAtTime, hasActiveAnimation } from './sceneEvaluation';
+import { createDefaultPostprocessStack } from './postprocessStack';
 
 function createGlassState(glassMotion: number): LatestState {
   return {
@@ -20,7 +21,12 @@ function createGlassState(glassMotion: number): LatestState {
       ...STORE_DEFAULTS.postprocess,
       enabled: true,
       effectMode: 'glass',
+      effectStack: createDefaultPostprocessStack('glass'),
       glassMotion,
+    },
+    effectPipeline: {
+      ...STORE_DEFAULTS.effectPipeline,
+      effectStack: STORE_DEFAULTS.effectPipeline.effectStack.map(layer => ({ ...layer })),
     },
     matcap: { ...STORE_DEFAULTS.matcap },
     animation: { ...STORE_DEFAULTS.animation, enabled: true },
