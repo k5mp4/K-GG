@@ -1,14 +1,14 @@
 ---
 id: SPEC-012
 title: Unified Effect Stack V2
-status: approved
+status: implemented
 owners: [maintainer]
 created: 2026-07-10
-updated: 2026-07-12
+updated: 2026-07-13
 depends_on: [SPEC-001, SPEC-003, SPEC-009, SPEC-011]
 related_adrs: [ADR-0005]
-related_code: [src/types/distortion.ts, src/store/gradientStore.ts, src/lib/effectPipeline.ts, src/lib/webgl.ts, src/components/PostprocessStackPanel.tsx, src/components/PostprocessPanel.tsx, src/components/PresetPanel.tsx]
-related_tests: [src/lib/effectPipeline.test.ts, src/lib/effectShaderParity.test.ts, src/store/gradientStore.effectPipeline.test.ts, src/store/gradientStore.postprocessStack.test.ts, src/lib/glass.test.ts, src/lib/postprocessAnimation.test.ts]
+related_code: [src/types/distortion.ts, src/store/gradientStore.ts, src/lib/effectPipeline.ts, src/lib/webgl.ts, src/lib/webglShaderSources.ts, src/components/PostprocessStackPanel.tsx, src/components/PostprocessPanel.tsx, src/components/PresetPanel.tsx]
+related_tests: [src/lib/effectPipeline.test.ts, src/lib/effectShaderParity.test.ts, src/lib/webglShaderSources.test.ts, src/store/gradientStore.effectPipeline.test.ts, src/store/gradientStore.postprocessStack.test.ts, src/lib/glass.test.ts, src/lib/postprocessAnimation.test.ts]
 human_review: completed
 ---
 
@@ -20,7 +20,7 @@ SPEC-011のPostprocess Stackは画像系6種類だけを順序化しており、
 
 ## ゴール・成功条件
 
-- Noise、Slit、Stretch、Distort、Mirror、Kaleidoscope、Voronoi、Glassを各1つ、任意順で描画し、Diffuseを画像系処理の最終段へ固定できる。
+- Noise、Slit、Stretch、Distort、Mirror、Kaleidoscope、Voronoi、Glass、Diffuseを各1つ、任意順で描画でき、Diffuseは既定で最後尾に配置される。
 - Surface (Normal/Matcap)、Prism、Particlesは主スタック外の固定順で描画できる。
 - 新規プリセットはV2、旧プリセットはLegacy v1の順序を維持して読込める。
 - Radon/Iridescenceを製品から削除し、旧プリセットでは無効化して安全に読込める。
@@ -30,7 +30,7 @@ SPEC-011のPostprocess Stackは画像系6種類だけを順序化しており、
 ### 対象
 
 - V2エフェクトパイプラインの状態、プリセット形式、正規化、UI、WebGL描画、タイル出力
-- 8種類の順序可変スタック、固定最終Diffuse、カテゴリ表示、選択中効果の詳細編集
+- 9種類の順序可変スタック、カテゴリ表示、選択中効果の詳細編集
 - Normal/Matcap、Prism、Particlesの固定順と時間アニメーション判定
 - Radon/Iridescenceの状態、UI、描画、アニメーション、保存からの削除
 
@@ -42,9 +42,9 @@ SPEC-011のPostprocess Stackは画像系6種類だけを順序化しており、
 
 ## 方針
 
-`EffectPipelineConfig`を永続状態へ追加する。`version`は`legacy-v1`または`stack-v2`、`effectStack`は8種類の順序可変レイヤーと末尾固定Diffuseの一意なレコード、`selectedKind`は詳細編集対象、Prism/Particlesは個別の有効状態を持つ。V2の有効状態はレイヤーだけを一次情報とし、既存詳細設定の重複した`enabled`はLegacy互換専用とする。
+`EffectPipelineConfig`を永続状態へ追加する。`version`は`legacy-v1`または`stack-v2`、`effectStack`は9種類の順序可変レイヤーの一意なレコード、`selectedKind`は詳細編集対象、Prism/Particlesは個別の有効状態を持つ。Diffuseは既定順で最後尾に置く。V2の有効状態はレイヤーだけを一次情報とし、既存詳細設定の重複した`enabled`はLegacy互換専用とする。
 
-V2はベース画像を生成した後、主スタックの各層を入力textureから出力textureへ順に描画する。固定順は`Base -> Surface (Normal/Matcap) -> Main Stack -> Prism -> Diffuse -> Particles`である。Diffuseは並べ替え対象にせず、画像系処理の最後に必ず1回だけ適用する。Glassは主スタックに含み、`glassNoiseInfluence`は主スタックのNoiseの有効状態・位置に依存しないGlass専用入力として残す。NormalはDiffuseの有効状態に依存しない。
+V2はベース画像を生成した後、主スタックの各層を入力textureから出力textureへ順に描画する。PrismとParticlesは主スタック外の固定段として描画し、Diffuseは主スタック内の指定位置で一度だけ適用する。既定順ではDiffuseが最後尾となる。Glassは主スタックに含み、`glassNoiseInfluence`は主スタックのNoiseの有効状態・位置に依存しないGlass専用入力として残す。NormalはDiffuseの有効状態に依存しない。
 
 新規V2の並べ替え可能な既定順は`Noise -> Slit -> Stretch -> Distort -> Mirror -> Kaleidoscope -> Voronoi -> Glass`、初期有効効果は固定最終段のDiffuseだけとする。V2のDiffuseは既存`DiffuseConfig`とDiffuseパネルのアルゴリズムを唯一の設定・描画源とし、旧Postprocess Diffuseは使わない。規則的な格子が目立たないよう、Diffuseの乱数場は決定的かつタイル連続な低周波ワープを加える。Distortは既存の生成側`ManualDistortConfig`を使う。
 
@@ -70,16 +70,16 @@ GlassとPrismは互いに独立した遅延コンパイルprogramへ分割し、
 
 ## 受け入れ条件
 
-- AC-001: 8種類を1本のEffect Stackで表示して任意順へドラッグでき、Diffuseは固定最終段として表示される。
+- AC-001: 9種類を1本のEffect Stackで表示して任意順へドラッグでき、Diffuseは既定で有効・最後尾に配置される。
 - AC-002: V2では各レイヤーのON/OFFだけが主スタックへの適用を決める。
-- AC-003: V2は`Base -> Surface -> Main Stack -> Prism -> Diffuse -> Particles`で描画する。
+- AC-003: V2は`Base -> Surface -> Main Stack -> Prism -> Particles`で描画し、DiffuseはMain Stackの指定位置で適用する。
 - AC-004: Normal/MatcapはDiffuseのON/OFFに関係なくSurface段で動作する。
 - AC-005: 新規プリセットはV2の順序、ON/OFF、選択中レイヤー、Prism/Particles状態を保存・再読込できる。
 - AC-006: 旧プリセットはLegacy順で読込め、Radon/Iridescenceだけを無効化する。
 - AC-007: Glassを含む任意順のV2スタックはタイル出力で必要なガターを確保する。
 - AC-008: Radon/IridescenceのUI、状態、描画、アニメーション、保存対象が残らない。
 - AC-009: V2のNoiseとSlitは、同じ設定と入力に対してLegacyと同じ座標変換結果になる。
-- AC-010: V2のDiffuseはDiffuseパネル設定だけを使い、規則的な格子を目立たせず、スタック順に関係なく画像系処理の最後に1回だけ適用される。
+- AC-010: V2のDiffuseはDiffuseパネル設定だけを使い、規則的な格子を目立たせず、Main Stackの指定位置に1回だけ適用される。
 - AC-011: 初期Diffuse-only状態とMain Stack初回有効化時は、軽量stack coreシェーダーの準備中も表示を維持してGPU初期化後に白画面へ遷移せず、Noise、Slit、Distort、Mirror、Kaleidoscope、Voronoi、Diffuse、copyだけではGlass/Prism programを要求せず、NormalとPrismが無効ならcore FBOだけを確保する。
 - AC-012: GlassとPrismは別々のprogramとして必要時だけコンパイルされ、一方の有効化が他方のコンパイルを要求しない。
 - AC-013: shader compile/link失敗、WebGL context loss、FBO不完全をログから識別でき、失敗時も白画面へ遷移せず直前の有効な表示を維持する。

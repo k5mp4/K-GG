@@ -4,10 +4,12 @@ import {
   createDefaultEffectPipeline,
   createDefaultEffectStack,
   getV2FramebufferAllocationMode,
+  getV2RenderPlan,
   isEffectStackLayerEnabled,
   moveEffectStackLayer,
   normalizeEffectPipelineConfig,
   normalizeEffectStack,
+  requiresV2StackCore,
   requiresHeavyV2Postprocess,
   updateEffectStackLayer,
 } from './effectPipeline';
@@ -86,6 +88,65 @@ describe('effectPipeline', () => {
     });
   });
 
+  describe('requiresV2StackCore', () => {
+    it('keeps the core program for every non-direct path because it owns the final copy', () => {
+      const pipeline = createDefaultEffectPipeline();
+      expect(requiresV2StackCore({
+        ...pipeline,
+        effectStack: updateEffectStackLayer(pipeline.effectStack, 'diffuse', { enabled: false }),
+      })).toBe(false);
+      expect(requiresV2StackCore({
+        ...pipeline,
+        effectStack: updateEffectStackLayer(pipeline.effectStack, 'stretch', { enabled: true }),
+      })).toBe(true);
+      expect(requiresV2StackCore({
+        ...pipeline,
+        effectStack: updateEffectStackLayer(
+          updateEffectStackLayer(pipeline.effectStack, 'diffuse', { enabled: false }),
+          'glass',
+          { enabled: true },
+        ),
+      })).toBe(true);
+      expect(requiresV2StackCore(pipeline, true)).toBe(true);
+    });
+  });
+
+  describe('getV2RenderPlan', () => {
+    it('derives one consistent resource plan from the normalized enabled layers', () => {
+      const pipeline = createDefaultEffectPipeline();
+      const glassPipeline = {
+        ...pipeline,
+        effectStack: updateEffectStackLayer(
+          updateEffectStackLayer(pipeline.effectStack, 'glass', { enabled: true }),
+          'diffuse',
+          { enabled: false },
+        ),
+        prismEnabled: true,
+        particlesEnabled: true,
+      };
+
+      const plan = getV2RenderPlan(glassPipeline, {
+        normalMapEnabled: true,
+        normalMapBlur: 1,
+        prismGlowRadius: 4,
+      });
+
+      expect(plan.enabledLayers.map(layer => layer.kind)).toEqual(['glass']);
+      expect(plan.diffuseEnabled).toBe(false);
+      expect(plan.framebufferAllocationMode).toBe('full');
+      expect(plan.programs).toEqual({
+        stackCore: true,
+        glass: true,
+        normalMap: true,
+        blur: true,
+        stretch: false,
+        prism: true,
+        prismComposite: true,
+        particles: true,
+      });
+    });
+  });
+
   it('creates the V2 stack in its canonical order with only Diffuse enabled', () => {
     expect(createDefaultEffectPipeline()).toEqual({
       version: 'stack-v2',
@@ -125,7 +186,7 @@ describe('effectPipeline', () => {
     ]);
   });
 
-  it('always normalizes Diffuse to the fixed final position without changing toggles', () => {
+  it('preserves the requested Diffuse position while filling missing layers', () => {
     const normalized = normalizeEffectStack([
       { kind: 'diffuse', enabled: false },
       { kind: 'glass', enabled: true },
@@ -139,6 +200,7 @@ describe('effectPipeline', () => {
     ]);
 
     expect(normalized.map(layer => layer.kind)).toEqual([
+      'diffuse',
       'glass',
       'noise',
       'slit',
@@ -147,9 +209,9 @@ describe('effectPipeline', () => {
       'mirror',
       'kaleidoscope',
       'voronoi',
-      'diffuse',
     ]);
     expect(Object.fromEntries(normalized.map(layer => [layer.kind, layer.enabled]))).toEqual({
+      diffuse: false,
       glass: true,
       noise: true,
       slit: false,
@@ -158,7 +220,6 @@ describe('effectPipeline', () => {
       mirror: true,
       kaleidoscope: false,
       voronoi: true,
-      diffuse: false,
     });
   });
 
@@ -188,7 +249,7 @@ describe('effectPipeline', () => {
       'diffuse',
     ]);
 
-    expect(moveEffectStackLayer(toggled, 'diffuse', 0)).toEqual(toggled);
+    expect(moveEffectStackLayer(toggled, 'diffuse', 0).at(0)).toEqual({ kind: 'diffuse', enabled: true });
     expect(isEffectStackLayerEnabled({
       version: 'stack-v2',
       effectStack: toggled,
@@ -205,10 +266,10 @@ describe('effectPipeline', () => {
     }, 'glass')).toBe(false);
   });
 
-  it('keeps Diffuse fixed and clamps every movable layer before it', () => {
+  it('allows Diffuse and other layers to move across the complete stack', () => {
     const stack = updateEffectStackLayer(createDefaultEffectStack(), 'noise', { enabled: true });
 
-    expect(moveEffectStackLayer(stack, 'diffuse', 0)).toEqual(stack);
+    expect(moveEffectStackLayer(stack, 'diffuse', 0).at(0)).toEqual({ kind: 'diffuse', enabled: true });
 
     const movedPastDiffuse = moveEffectStackLayer(stack, 'noise', Number.MAX_SAFE_INTEGER);
     expect(movedPastDiffuse.map(layer => layer.kind)).toEqual([
@@ -219,10 +280,10 @@ describe('effectPipeline', () => {
       'kaleidoscope',
       'voronoi',
       'glass',
-      'noise',
       'diffuse',
+      'noise',
     ]);
-    expect(movedPastDiffuse.at(-2)).toEqual({ kind: 'noise', enabled: true });
-    expect(movedPastDiffuse.at(-1)).toEqual({ kind: 'diffuse', enabled: true });
+    expect(movedPastDiffuse.at(-2)).toEqual({ kind: 'diffuse', enabled: true });
+    expect(movedPastDiffuse.at(-1)).toEqual({ kind: 'noise', enabled: true });
   });
 });

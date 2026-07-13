@@ -1,18 +1,14 @@
 import type { GradientConfig } from '../types/gradient';
-import type { NoiseDistortionConfig, DiffuseConfig, SlitScanConfig, StretchConfig, NormalMapConfig, RadonConfig, IridescenceConfig, ManualDistortConfig, PostprocessConfig, MatcapConfig, PostprocessStackKind, EffectPipelineConfig, EffectStackKind } from '../types/distortion';
+import type { NoiseDistortionConfig, DiffuseConfig, SlitScanConfig, StretchConfig, NormalMapConfig, RadonConfig, IridescenceConfig, ManualDistortConfig, PostprocessConfig, MatcapConfig, PostprocessStackKind, EffectPipelineConfig } from '../types/distortion';
 import { IMAGE_GRADIENT_DEFAULTS, type ImageGradientConfig } from '../types/imageGradient';
 import { GRADIENT_ANCHOR_DEFAULTS, defaultBezierControlsForAnchors } from '../store/gradientStore';
 import { buildRampTextureData, RAMP_TEX_WIDTH } from './gradientRampUtils';
-import noiseGLSL from '../shaders/noise.glsl?raw';
-import vertSrcGLSL from '../shaders/vertex.vert.glsl?raw';
-import fragSrcGLSL from '../shaders/gradient.frag.glsl?raw';
-import blurFragSrcGLSL from '../shaders/blur.frag.glsl?raw';
-import normalMapFragSrcGLSL from '../shaders/normalmap.frag.glsl?raw';
-import stretchFragSrcGLSL from '../shaders/stretch.frag.glsl?raw';
-import postprocessFragSrcGLSL from '../shaders/postprocess.frag.glsl?raw';
-import prismCompositeFragSrcGLSL from '../shaders/prismComposite.frag.glsl?raw';
-import particlesVertSrcGLSL from '../shaders/particles.vert.glsl?raw';
-import particlesFragSrcGLSL from '../shaders/particles.frag.glsl?raw';
+import {
+  getInitialProgramSource,
+  getProgramSource,
+  SHADER_VERSION,
+  type LazyProgramKey,
+} from './webglShaderSources';
 import {
   collectGpuDiagnostics,
   optimizeNoiseDistortion,
@@ -23,13 +19,11 @@ import {
 import type { GpuDiagnostics, RenderOptimization } from './gpuDiagnostics';
 import { GLASS_LIMITS, smoothGlassNoiseBlend } from './glass';
 import { getActivePostprocessStackLayers } from './postprocessStack';
-import { canRenderV2Direct, getV2FramebufferAllocationMode } from './effectPipeline';
+import { canRenderV2Direct, getV2RenderPlan } from './effectPipeline';
 
-// シェーダーソース変更検出用バージョン（HMR 対応: GLSL が変わると値が変わり再コンパイルをトリガーする）
-export const SHADER_VERSION = (fragSrcGLSL.length * 1000003 + noiseGLSL.length + normalMapFragSrcGLSL.length * 997 + stretchFragSrcGLSL.length * 313 + postprocessFragSrcGLSL.length * 191 + prismCompositeFragSrcGLSL.length * 127 + particlesVertSrcGLSL.length * 89 + particlesFragSrcGLSL.length * 83) | 0;
+export { SHADER_VERSION };
 
 type ShaderCompileExt = { COMPLETION_STATUS_KHR: number } | null;
-type LazyProgramKey = 'blur' | 'normalMap' | 'stretch' | 'stackCore' | 'glass' | 'prism' | 'postprocess' | 'prismComposite' | 'particles';
 type TextureStackKind = PostprocessStackKind | 'diffuse' | 'noise' | 'slit';
 type LazyProgramState = {
   promise: Promise<void> | null;
@@ -69,6 +63,7 @@ export type WebGLContext = {
   stackCoreUniforms: Record<string, WebGLUniformLocation | null>;
   glassProgram: WebGLProgram | null;
   glassUniforms: Record<string, WebGLUniformLocation | null>;
+  glassFallbackActive: boolean;
   prismProgram: WebGLProgram | null;
   prismUniforms: Record<string, WebGLUniformLocation | null>;
   prismCompositeProgram: WebGLProgram | null;
@@ -114,6 +109,7 @@ function diffuseResolutionScale(width: number, height: number): number {
 }
 
 function clampNumber(value: number, min: number, max: number): number {
+  if (Number.isNaN(value)) return min;
   return Math.max(min, Math.min(max, value));
 }
 
@@ -226,7 +222,8 @@ export async function initWebGL(canvas: HTMLCanvasElement): Promise<WebGLContext
   const ext = gl.getExtension('KHR_parallel_shader_compile') as ShaderCompileExt;
   // 初期表示はメインのグラデーションプログラムだけを待つ。
   // 補助プログラムは init 完了後に順次コンパイルし、最初のグラデーション表示を早める。
-  const program = await createProgramAsync(gl, noiseGLSL + '\n' + fragSrcGLSL, ext);
+  const initialSource = getInitialProgramSource();
+  const program = await createProgramAsync(gl, initialSource.fragment, ext, initialSource.vertex);
   setupGeometry(gl, program);
   const uniforms: Record<string, WebGLUniformLocation | null> = {
     u_gradientType: gl.getUniformLocation(program, 'u_gradientType'),
@@ -398,7 +395,7 @@ export async function initWebGL(canvas: HTMLCanvasElement): Promise<WebGLContext
   const { fbo: prismScratchFbo, tex: prismScratchTexture } = createFboWithTexture(gl);
   const { fbo: prismBlurFbo, tex: prismBlurTexture } = createFboWithTexture(gl);
   const { fbo: prismGlowFbo, tex: prismGlowTexture } = createFboWithTexture(gl);
-  const ctx: WebGLContext = { gl, gpuDiagnostics, renderOptimization, program, uniforms, gradientRampTexture, manualDistortTexture, manualDistortDisplacement: null, manualDistortSmoothMask: null, manualDistortMapResolution: 0, sourceImageTexture, sourceImageCanvas: null, imageGradientTexture, imageGradientSource: null, imageMaskTexture, imageMaskSource: null, normalMapProgram: null, normalMapUniforms: {}, gradFbo, gradTexture, blurProgram: null, blurUniforms: {}, stretchProgram: null, stretchUniforms: {}, stackCoreProgram: null, stackCoreUniforms: {}, glassProgram: null, glassUniforms: {}, prismProgram: null, prismUniforms: {}, postprocessProgram: null, postprocessUniforms: {}, prismCompositeProgram: null, prismCompositeUniforms: {}, particleProgram: null, particleUniforms: {}, particleVao: null, particleQuadBuffer: null, particleInstanceBuffer: null, particleInstanceCount: 0, particleInstanceSeed: Number.NaN, normalFbo, normalTexture, hBlurFbo, hBlurTexture, postprocessFboA, postprocessTextureA, postprocessFboB, postprocessTextureB, prismScratchFbo, prismScratchTexture, prismBlurFbo, prismBlurTexture, prismGlowFbo, prismGlowTexture, fboSize: [0, 0], v2CoreFboSize: [0, 0], shaderCompileExt: ext, lazyProgramState: createLazyProgramState(), hasPresentedFrame: false };
+  const ctx: WebGLContext = { gl, gpuDiagnostics, renderOptimization, program, uniforms, gradientRampTexture, manualDistortTexture, manualDistortDisplacement: null, manualDistortSmoothMask: null, manualDistortMapResolution: 0, sourceImageTexture, sourceImageCanvas: null, imageGradientTexture, imageGradientSource: null, imageMaskTexture, imageMaskSource: null, normalMapProgram: null, normalMapUniforms: {}, gradFbo, gradTexture, blurProgram: null, blurUniforms: {}, stretchProgram: null, stretchUniforms: {}, stackCoreProgram: null, stackCoreUniforms: {}, glassProgram: null, glassUniforms: {}, glassFallbackActive: false, prismProgram: null, prismUniforms: {}, postprocessProgram: null, postprocessUniforms: {}, prismCompositeProgram: null, prismCompositeUniforms: {}, particleProgram: null, particleUniforms: {}, particleVao: null, particleQuadBuffer: null, particleInstanceBuffer: null, particleInstanceCount: 0, particleInstanceSeed: Number.NaN, normalFbo, normalTexture, hBlurFbo, hBlurTexture, postprocessFboA, postprocessTextureA, postprocessFboB, postprocessTextureB, prismScratchFbo, prismScratchTexture, prismBlurFbo, prismBlurTexture, prismGlowFbo, prismGlowTexture, fboSize: [0, 0], v2CoreFboSize: [0, 0], shaderCompileExt: ext, lazyProgramState: createLazyProgramState(), hasPresentedFrame: false };
   return ctx;
 }
 
@@ -406,7 +403,7 @@ async function createProgramAsync(
   gl: WebGL2RenderingContext,
   fragSrc: string,
   ext: ShaderCompileExt,
-  vertSrc = vertSrcGLSL,
+  vertSrc: string,
   diagnosticLabel = 'gradient',
 ): Promise<WebGLProgram> {
   const compileStartedAt = performance.now();
@@ -701,17 +698,6 @@ function getParticleUniforms(gl: WebGL2RenderingContext, program: WebGLProgram):
   };
 }
 
-const specializedPostprocessUniforms = noiseGLSL
-  .slice(noiseGLSL.indexOf('uniform float u_time;'), noiseGLSL.indexOf('const float KG_TAU'))
-  .replace('uniform vec2 u_resolution;', 'uniform vec2 u_fullResolution;');
-
-function createSpecializedPostprocessSource(define: 'KGG_GLASS_ONLY' | 'KGG_PRISM_ONLY'): string {
-  return postprocessFragSrcGLSL.replace(
-    'precision highp float;',
-    `precision highp float;\n${specializedPostprocessUniforms}\n#define ${define}`,
-  );
-}
-
 async function compileLazyProgram(ctx: WebGLContext, key: LazyProgramKey): Promise<void> {
   const { gl } = ctx;
   if (gl.isContextLost()) return;
@@ -729,29 +715,8 @@ async function compileLazyProgram(ctx: WebGLContext, key: LazyProgramKey): Promi
     return;
   }
 
-  const fragSrc = key === 'blur'
-    ? blurFragSrcGLSL
-    : key === 'normalMap'
-      ? normalMapFragSrcGLSL
-      : key === 'stretch'
-        ? stretchFragSrcGLSL
-        : key === 'stackCore'
-          ? noiseGLSL
-            .replace('uniform vec2 u_resolution;', 'uniform vec2 u_fullResolution;')
-            .replaceAll('u_resolution', 'u_fullResolution')
-            + '\n#define KGG_LIGHTWEIGHT\n' + postprocessFragSrcGLSL
-        : key === 'glass'
-          ? createSpecializedPostprocessSource('KGG_GLASS_ONLY')
-        : key === 'prism'
-          ? createSpecializedPostprocessSource('KGG_PRISM_ONLY')
-        : key === 'postprocess'
-          ? noiseGLSL
-            .replace('uniform vec2 u_resolution;', 'uniform vec2 u_fullResolution;')
-            .replaceAll('u_resolution', 'u_fullResolution')
-            + '\n' + postprocessFragSrcGLSL
-          : key === 'prismComposite'
-            ? prismCompositeFragSrcGLSL
-            : particlesFragSrcGLSL;
+  const source = getProgramSource(key);
+  const fragSrc = source.fragment;
   const compileStartedAt = performance.now();
   let program: WebGLProgram;
   try {
@@ -759,7 +724,7 @@ async function compileLazyProgram(ctx: WebGLContext, key: LazyProgramKey): Promi
       gl,
       fragSrc,
       ctx.shaderCompileExt,
-      key === 'particles' ? particlesVertSrcGLSL : vertSrcGLSL,
+      source.vertex,
       key,
     );
   } catch (error) {
@@ -821,17 +786,50 @@ function requestLazyProgram(ctx: WebGLContext, key: LazyProgramKey): boolean {
 
   const state = ctx.lazyProgramState[key];
   if (!state.promise && !state.failed) {
+    window.dispatchEvent(new CustomEvent('kgg:webgl-lazy-program-state', {
+      detail: { key, state: 'loading' as const },
+    }));
     state.promise = compileLazyProgram(ctx, key).catch((error) => {
       state.failed = true;
       console.error(`[WebGL] Lazy shader compile failed (${key}):`, error);
+      window.dispatchEvent(new CustomEvent('kgg:webgl-lazy-program-state', {
+        detail: { key, state: 'failed' as const },
+      }));
     }).finally(() => {
       state.promise = null;
       if (!state.failed) {
+        window.dispatchEvent(new CustomEvent('kgg:webgl-lazy-program-state', {
+          detail: { key, state: 'ready' as const },
+        }));
         window.dispatchEvent(new CustomEvent('kgg:webgl-lazy-program-ready'));
       }
     });
   }
   return false;
+}
+
+/**
+ * GLASS is allowed to fall back to the general postprocess program when the
+ * specialized variant cannot link on a particular WebGL implementation.
+ * The fallback is still lazy, so the rest of the stack remains usable while
+ * it is compiling.
+ */
+function requestGlassProgram(ctx: WebGLContext): boolean {
+  if (ctx.glassProgram) return true;
+
+  const glassState = ctx.lazyProgramState.glass;
+  if (!glassState.failed) return requestLazyProgram(ctx, 'glass');
+
+  const fallbackReady = requestLazyProgram(ctx, 'postprocess');
+  if (!fallbackReady) return false;
+
+  if (!ctx.glassFallbackActive) {
+    ctx.glassFallbackActive = true;
+    window.dispatchEvent(new CustomEvent('kgg:webgl-lazy-program-state', {
+      detail: { key: 'glass', state: 'fallback' as const, fallback: true },
+    }));
+  }
+  return true;
 }
 
 function setupParticleGeometry(ctx: WebGLContext): void {
@@ -1068,9 +1066,9 @@ function drawStretchPass(
   width: number,
   height: number,
   targetFramebuffer: WebGLFramebuffer | null = null,
-): void {
+): boolean {
   const { gl } = ctx;
-  if (!ctx.stretchProgram) return;
+  if (!ctx.stretchProgram) return false;
   gl.useProgram(ctx.stretchProgram);
   gl.viewport(0, 0, width, height);
   gl.bindFramebuffer(gl.FRAMEBUFFER, targetFramebuffer);
@@ -1090,6 +1088,7 @@ function drawStretchPass(
   const [glowR, glowG, glowB] = hexToRgb(stretch.glowTint ?? '#F0EAD9');
   gl.uniform3f(ctx.stretchUniforms.u_glowTint, glowR, glowG, glowB);
   gl.drawArrays(gl.TRIANGLES, 0, 6);
+  return true;
 }
 
 function drawPostprocessPass(
@@ -1114,7 +1113,7 @@ function drawPostprocessPass(
   animDirectionDegrees = 0,
   slitAnimTimeOverride?: number | null,
   useV2Programs = false,
-): void {
+): boolean {
   const { gl } = ctx;
   const useStackCore = useV2Programs && Boolean(ctx.stackCoreProgram) && (
     effectMode === 'noise'
@@ -1125,23 +1124,23 @@ function drawPostprocessPass(
     || effectMode === 'voronoi'
     || effectMode === 'diffuse'
   );
-  const useGlassProgram = useV2Programs && effectMode === 'glass' && Boolean(ctx.glassProgram);
+  const useGlassProgram = useV2Programs && effectMode === 'glass' && Boolean(ctx.glassProgram || ctx.glassFallbackActive);
   const usePrismProgram = useV2Programs && effectMode === 'prism' && Boolean(ctx.prismProgram);
   const selectedProgram = useStackCore
     ? ctx.stackCoreProgram
     : useGlassProgram
-      ? ctx.glassProgram
+      ? (ctx.glassProgram ?? ctx.postprocessProgram)
       : usePrismProgram
         ? ctx.prismProgram
         : ctx.postprocessProgram;
   const selectedUniforms = useStackCore
     ? ctx.stackCoreUniforms
     : useGlassProgram
-      ? ctx.glassUniforms
+      ? (ctx.glassProgram ? ctx.glassUniforms : ctx.postprocessUniforms)
       : usePrismProgram
         ? ctx.prismUniforms
         : ctx.postprocessUniforms;
-  if (!selectedProgram) return;
+  if (!selectedProgram) return false;
   const previousProgram = ctx.postprocessProgram;
   const previousUniforms = ctx.postprocessUniforms;
   ctx.postprocessProgram = selectedProgram;
@@ -1354,6 +1353,7 @@ function drawPostprocessPass(
   if (targetFramebuffer === null) ctx.hasPresentedFrame = true;
   ctx.postprocessProgram = previousProgram;
   ctx.postprocessUniforms = previousUniforms;
+  return true;
 }
 
 function drawPrismCompositePass(
@@ -1935,14 +1935,18 @@ export function render(
   gl.uniform1f(uniforms.u_manualDistortSmoothRadius, manualDistort.smoothRadius ?? 18);
 
   if (isV2Pipeline && effectPipeline) {
-    const diffuseLayerEnabled = effectPipeline.effectStack.some(layer => layer.kind === 'diffuse' && layer.enabled);
-    const mainLayers = effectPipeline.effectStack.filter(layer => layer.enabled && layer.kind !== 'diffuse');
-    const mainKinds = new Set<EffectStackKind>(mainLayers.map(layer => layer.kind));
-    const normalRequested = normalMap.enabled;
-    const normalNeedsBlur = normalRequested && normalMap.blur >= 0.5;
-    const prismRequested = effectPipeline.prismEnabled;
-    const prismNeedsBlur = prismRequested && (postprocess.prismGlowRadius ?? 0) > 0.01;
-    const particlesRequested = effectPipeline.particlesEnabled;
+    const renderPlan = getV2RenderPlan(effectPipeline, {
+      normalMapEnabled: normalMap.enabled,
+      normalMapBlur: normalMap.blur,
+      prismGlowRadius: postprocess.prismGlowRadius ?? 0,
+    });
+    const diffuseLayerEnabled = renderPlan.diffuseEnabled;
+    const mainLayers = renderPlan.enabledLayers;
+    const normalRequested = renderPlan.normalRequested;
+    const normalNeedsBlur = renderPlan.normalNeedsBlur;
+    const prismRequested = renderPlan.prismRequested;
+    const prismNeedsBlur = renderPlan.prismNeedsBlur;
+    const particlesRequested = renderPlan.particlesRequested;
 
     // The V2 default is Diffuse-only. Base and Diffuse use the same panel
     // uniforms/algorithm, so no intermediate texture is needed when there are
@@ -1957,13 +1961,14 @@ export function render(
       return;
     }
 
-    const stackCoreReady = requestLazyProgram(ctx, 'stackCore');
-    const glassReady = !mainKinds.has('glass') || requestLazyProgram(ctx, 'glass');
+    const stackCoreRequested = renderPlan.programs.stackCore;
+    const stackCoreReady = !stackCoreRequested || requestLazyProgram(ctx, 'stackCore');
+    const glassReady = !renderPlan.programs.glass || requestGlassProgram(ctx);
     const normalReady = !normalRequested || (
       requestLazyProgram(ctx, 'normalMap') &&
       (!normalNeedsBlur || requestLazyProgram(ctx, 'blur'))
     );
-    const stretchReady = !mainKinds.has('stretch') || requestLazyProgram(ctx, 'stretch');
+    const stretchReady = !renderPlan.programs.stretch || requestLazyProgram(ctx, 'stretch');
     const prismReady = !prismRequested || (
       requestLazyProgram(ctx, 'prism') &&
       requestLazyProgram(ctx, 'prismComposite') &&
@@ -1974,13 +1979,14 @@ export function render(
     // Lazy programs compile asynchronously. Keep a usable base frame until every
     // requested V2 stage is available instead of presenting a partial stack.
     if (!stackCoreReady || !glassReady || !normalReady || !stretchReady || !prismReady || !particlesReady) {
-      if (!ctx.hasPresentedFrame) {
-        gl.uniform1i(uniforms.u_diffuseEnabled, diffuseLayerEnabled ? 1 : 0);
-        gl.uniform1i(uniforms.u_matcapEnabled, matcap.enabled ? 1 : 0);
-        gl.bindFramebuffer(gl.FRAMEBUFFER, null);
-        gl.drawArrays(gl.TRIANGLES, 0, 6);
-        ctx.hasPresentedFrame = true;
-      }
+      // Keep rendering the current base state while programs compile so
+      // anchor and parameter edits remain visible instead of freezing the
+      // first frame that happened to be presented.
+      gl.uniform1i(uniforms.u_diffuseEnabled, diffuseLayerEnabled ? 1 : 0);
+      gl.uniform1i(uniforms.u_matcapEnabled, matcap.enabled ? 1 : 0);
+      gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+      gl.drawArrays(gl.TRIANGLES, 0, 6);
+      ctx.hasPresentedFrame = true;
       return;
     }
 
@@ -1993,7 +1999,7 @@ export function render(
       gl.drawArrays(gl.TRIANGLES, 0, 6);
       return;
     }
-    const framebufferAllocationMode = getV2FramebufferAllocationMode(effectPipeline, normalRequested);
+    const framebufferAllocationMode = renderPlan.framebufferAllocationMode;
     if (framebufferAllocationMode === 'full') {
       if (ctx.fboSize[0] !== vpW || ctx.fboSize[1] !== vpH) resizeFboTextures(gl, ctx, vpW, vpH);
     } else if (framebufferAllocationMode === 'core' && (ctx.v2CoreFboSize[0] !== vpW || ctx.v2CoreFboSize[1] !== vpH)) {
@@ -2060,37 +2066,29 @@ export function render(
       ? { ...noiseDistortion, enabled: false }
       : noiseDistortion;
     for (const layer of mainLayers) {
+      if (layer.kind === 'glass' && !glassReady) continue;
       const target = choosePostprocessTarget(ctx, currentTexture);
+      let passRendered = false;
       if (layer.kind === 'stretch') {
-        drawStretchPass(ctx, currentTexture, stretch, stretchScanOverride ?? 0, stretchScanOverride != null ? stretch.seed + (1 - Math.cos((stretchScanOverride ?? 0) * Math.PI * 2)) * 0.5 : stretch.seed, vpW, vpH, target.fbo);
+        passRendered = drawStretchPass(ctx, currentTexture, stretch, stretchScanOverride ?? 0, stretchScanOverride != null ? stretch.seed + (1 - Math.cos((stretchScanOverride ?? 0) * Math.PI * 2)) * 0.5 : stretch.seed, vpW, vpH, target.fbo);
       } else {
         const layerNoise = layer.kind === 'noise'
           ? { ...noiseDistortion, enabled: true }
           : disabledStackNoise;
-        drawPostprocessPass(
+        passRendered = drawPostprocessPass(
           ctx, currentTexture, gradient, layerNoise, v2Postprocess, layer.kind,
           vpW, vpH, width, height, tileOx, tileOy, time, noiseLoopPeriod,
-          animationSpeed, false, target.fbo, slitScan, animDirection, slitAnimTimeOverride, true,
+          animationSpeed, layer.kind === 'diffuse', target.fbo, slitScan, animDirection, slitAnimTimeOverride, true,
         );
       }
-      currentTexture = target.texture;
+      if (passRendered) currentTexture = target.texture;
     }
 
-    // Prism, fixed final Diffuse, and particles intentionally stay outside the
-    // reorderable main stack.
+    // Prism and particles intentionally stay outside the reorderable main
+    // stack. Diffuse is applied by its own layer at the requested position.
     if (prismRequested) {
       const target = choosePostprocessTarget(ctx, currentTexture);
       drawPrismPostprocessPass(ctx, currentTexture, gradient, disabledStackNoise, v2Postprocess, vpW, vpH, width, height, tileOx, tileOy, time, noiseLoopPeriod, animationSpeed, false, target.fbo, true);
-      currentTexture = target.texture;
-    }
-
-    if (diffuseLayerEnabled) {
-      const target = choosePostprocessTarget(ctx, currentTexture);
-      drawPostprocessPass(
-        ctx, currentTexture, gradient, disabledStackNoise, v2Postprocess, 'diffuse',
-          vpW, vpH, width, height, tileOx, tileOy, time, noiseLoopPeriod,
-        animationSpeed, true, target.fbo, slitScan, animDirection, slitAnimTimeOverride, true,
-      );
       currentTexture = target.texture;
     }
 

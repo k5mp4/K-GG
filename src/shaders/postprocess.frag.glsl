@@ -95,6 +95,7 @@ uniform float u_curlSeed;
 
 const float PI = 3.141592653589793;
 
+#if !defined(KGG_GLASS_ONLY) && !defined(KGG_PRISM_ONLY)
 vec2 mirroredUv(vec2 uv) {
   if (u_mirrorMode == 0) {
     uv.x = uv.x <= 0.5 ? uv.x : 1.0 - uv.x;
@@ -134,18 +135,21 @@ vec2 kaleidoscopeUv(vec2 uv) {
   sampled.x /= aspect;
   return sampled + vec2(0.5);
 }
+#endif
 
 vec2 mirrorRepeatUv(vec2 uv) {
   vec2 f = fract(uv * 0.5) * 2.0;
   return 1.0 - abs(f - 1.0);
 }
 
+#if !defined(KGG_GLASS_ONLY) && !defined(KGG_PRISM_ONLY)
 vec2 rotateUnitUv(vec2 uv, float angle) {
   vec2 centered = uv - vec2(0.5);
   float c = cos(angle);
   float s = sin(angle);
   return vec2(c * centered.x - s * centered.y, s * centered.x + c * centered.y) + vec2(0.5);
 }
+#endif
 
 vec2 hash22(vec2 p, float seed) {
   p += vec2(seed * 31.17, seed * 73.41);
@@ -158,8 +162,12 @@ float hashWithSeed(float p, float seed) {
   return fract(sin(p * 127.1 + seed * 31.7) * 43758.5453123);
 }
 
+float finiteFloat(float value, float fallback) {
+  return value == value && abs(value) < 1000000000.0 ? value : fallback;
+}
+
 float prismLoopProgress() {
-  return fract(u_time / max(u_noiseLoopPeriod, 0.0001));
+  return fract(finiteFloat(u_time, 0.0) / max(finiteFloat(u_noiseLoopPeriod, 1.0), 0.0001));
 }
 
 #if !defined(KGG_LIGHTWEIGHT) && !defined(KGG_GLASS_ONLY)
@@ -292,6 +300,7 @@ vec4 prismRays(vec2 uv) {
 }
 #endif
 
+#if !defined(KGG_GLASS_ONLY) && !defined(KGG_PRISM_ONLY)
 vec4 voronoiGradient(vec2 uv) {
   float aspect = u_fullResolution.x / max(u_fullResolution.y, 1.0);
   vec2 p = uv * vec2(aspect, 1.0) * max(u_postVoronoiScale, 0.001);
@@ -338,6 +347,7 @@ vec4 voronoiGradient(vec2 uv) {
 
   return color;
 }
+#endif
 
 #if !defined(KGG_GLASS_ONLY) && !defined(KGG_PRISM_ONLY)
 vec2 applyStackCurlNoiseUv(vec2 uv, float evolution, float curlTime) {
@@ -703,44 +713,55 @@ vec4 applyDiffuseDither(vec4 color, vec2 globalCoord) {
 }
 
 #if !defined(KGG_LIGHTWEIGHT) && !defined(KGG_PRISM_ONLY)
+float glassFloat(float value, float fallback, float minimum, float maximum) {
+  return clamp(finiteFloat(value, fallback), minimum, maximum);
+}
+
 float glassHash(float value) {
-  return fract(sin(value * 127.1 + u_glassSeed * 311.7) * 43758.5453123);
+  return fract(sin(value * 127.1 + glassFloat(u_glassSeed, 0.0, 0.0, 99.0) * 311.7) * 43758.5453123);
 }
 
 float glassHeight(vec2 uv) {
+  float glassScale = glassFloat(u_glassScale, 3.2, 0.5, 12.0);
+  float glassStretch = glassFloat(u_glassStretch, 4.0, 0.25, 8.0);
+  float glassRotation = glassFloat(u_glassRotation, 0.0, -6.28318530718, 6.28318530718);
+  float glassComplexity = glassFloat(float(u_glassComplexity), 4.0, 1.0, 5.0);
+  float glassWarp = glassFloat(u_glassWarp, 0.55, 0.0, 1.0);
+  float glassEvolution = glassFloat(u_glassEvolution, 0.0, 0.0, 1.0);
+  float glassMotion = glassFloat(u_glassMotion, 0.35, 0.0, 1.0);
   float aspect = u_fullResolution.x / max(u_fullResolution.y, 1.0);
   vec2 p = uv - vec2(0.5);
   p.x *= aspect;
 
-  float c = cos(u_glassRotation);
-  float s = sin(u_glassRotation);
+  float c = cos(glassRotation);
+  float s = sin(glassRotation);
   p = mat2(c, -s, s, c) * p;
-  p *= max(u_glassScale, 0.001);
-  p.y /= max(u_glassStretch, 0.001);
+  p *= glassScale;
+  p.y /= glassStretch;
 
   float loopPhase = prismLoopProgress() * 2.0 * PI;
-  float evolutionPhase = u_glassEvolution * 2.0 * PI;
+  float evolutionPhase = glassEvolution * 2.0 * PI;
   float phase = loopPhase + evolutionPhase;
-  vec2 flow = vec2(sin(phase), cos(phase)) * u_glassMotion;
+  vec2 flow = vec2(sin(phase), cos(phase)) * glassMotion;
 
   float seedPhase = glassHash(7.0) * 2.0 * PI;
   vec2 domainWarp = vec2(
     sin(p.y * 1.37 + seedPhase + flow.x * 1.8),
     sin(p.x * 0.91 - seedPhase * 0.73 + flow.y * 1.6)
   );
-  p += domainWarp * u_glassWarp * 0.72;
+  p += domainWarp * glassWarp * 0.72;
 
   float height = 0.0;
   float amplitude = 0.58;
   float amplitudeSum = 0.0;
   float frequency = 1.0;
   for (int i = 0; i < 5; i++) {
-    if (i >= u_glassComplexity) break;
+    if (float(i) >= glassComplexity) break;
     float fi = float(i);
     float directionJitter = (glassHash(fi + 19.0) - 0.5) * 0.7;
     vec2 direction = normalize(vec2(1.0, directionJitter));
     float harmonic = fi + 1.0;
-    float animatedPhase = u_glassMotion * (
+    float animatedPhase = glassMotion * (
       sin(phase * harmonic + glassHash(fi + 31.0) * 2.0 * PI) +
       cos(phase * (harmonic + 1.0) + glassHash(fi + 47.0) * 2.0 * PI)
     );
@@ -765,7 +786,7 @@ vec2 glassNoiseDomain(vec2 uv) {
   float aspect = u_fullResolution.x / max(u_fullResolution.y, 1.0);
   vec2 p = uv - vec2(0.5);
   p.x *= aspect;
-  p *= max(u_noiseScale, 0.001);
+  p *= max(glassFloat(u_noiseScale, 1.0, 0.001, 1000000.0), 0.001);
 
   vec2 direction = length(u_animDir) > 0.0001
     ? normalize(u_animDir)
@@ -773,9 +794,9 @@ vec2 glassNoiseDomain(vec2 uv) {
   if (u_noiseLoopMode == 1) {
     float phase = prismLoopProgress() * 2.0 * PI;
     p += vec2(cos(phase), sin(phase)) * 0.72;
-    p += direction * u_noiseEvolution;
+    p += direction * glassFloat(u_noiseEvolution, 0.0, -1000000.0, 1000000.0);
   } else {
-    p += direction * (u_noiseEvolution + u_time);
+    p += direction * (glassFloat(u_noiseEvolution, 0.0, -1000000.0, 1000000.0) + glassFloat(u_time, 0.0, -1000000000.0, 1000000000.0));
   }
   return p;
 }
@@ -905,7 +926,7 @@ float glassNoiseHeight(vec2 uv) {
 }
 
 float glassSurfaceHeight(vec2 uv) {
-  float influence = clamp(u_glassNoiseInfluence, 0.0, 1.0);
+  float influence = glassFloat(u_glassNoiseInfluence, 0.0, 0.0, 1.0);
   if (influence <= 0.0) return glassHeight(uv);
   if (influence >= 1.0) return glassNoiseHeight(uv);
   return mix(glassHeight(uv), glassNoiseHeight(uv), influence);
@@ -927,6 +948,11 @@ vec4 sampleGlassSource(vec2 globalUv) {
 }
 
 vec4 organicGlass(vec2 globalUv, vec2 globalCoord) {
+  float glassRefraction = glassFloat(u_glassRefraction, 32.0, 0.0, 120.0);
+  float glassChromaticAberration = glassFloat(u_glassChromaticAberration, 4.0, 0.0, 40.0);
+  float glassRoughness = glassFloat(u_glassRoughness, 1.5, 0.0, 12.0);
+  float glassHighlight = glassFloat(u_glassHighlight, 0.45, 0.0, 2.0);
+  float glassMix = glassFloat(u_glassMix, 1.0, 0.0, 1.0);
   vec2 pixel = 1.0 / max(u_fullResolution, vec2(1.0));
   // 広めの中心差分で高周波リッジを空間的に安定化し、Scale/Rotation/Noiseの
   // 連続操作中に隣接ピクセル間で屈折方向が反転するのを抑える。
@@ -947,7 +973,7 @@ vec4 organicGlass(vec2 globalUv, vec2 globalCoord) {
   vec2 refractionDirection = slope > 0.00001
     ? boundedGradient / slope
     : vec2(0.0);
-  vec2 refractionPx = boundedGradient * u_glassRefraction;
+  vec2 refractionPx = boundedGradient * glassRefraction;
 
   vec2 centerGlobal = diffuseGlassGlobalUv(
     globalUv + refractionPx / max(u_fullResolution, vec2(1.0)),
@@ -956,25 +982,25 @@ vec4 organicGlass(vec2 globalUv, vec2 globalCoord) {
   vec4 center = sampleGlassSource(centerGlobal);
   vec3 opticalColor = center.rgb;
 
-  if (u_glassChromaticAberration > 0.0001 && gradientLength > 0.00001) {
-    vec2 aberrationUv = refractionDirection * u_glassChromaticAberration
+  if (glassChromaticAberration > 0.0001 && gradientLength > 0.00001) {
+    vec2 aberrationUv = refractionDirection * glassChromaticAberration
       / max(u_fullResolution, vec2(1.0));
     vec4 redSample = sampleGlassSource(centerGlobal + aberrationUv);
     vec4 blueSample = sampleGlassSource(centerGlobal - aberrationUv);
     opticalColor = vec3(redSample.r, center.g, blueSample.b);
   }
 
-  if (u_glassRoughness > 0.0001) {
+  if (glassRoughness > 0.0001) {
     vec2 tangent = gradientLength > 0.00001
       ? vec2(-refractionDirection.y, refractionDirection.x)
       : vec2(1.0, 0.0);
-    vec2 roughnessUv = tangent * u_glassRoughness / max(u_fullResolution, vec2(1.0));
+    vec2 roughnessUv = tangent * glassRoughness / max(u_fullResolution, vec2(1.0));
     vec3 roughColor = (
       center.rgb +
       sampleGlassSource(centerGlobal + roughnessUv).rgb +
       sampleGlassSource(centerGlobal - roughnessUv).rgb
     ) / 3.0;
-    opticalColor = mix(opticalColor, roughColor, clamp(u_glassRoughness / 12.0, 0.0, 1.0));
+    opticalColor = mix(opticalColor, roughColor, clamp(glassRoughness / 12.0, 0.0, 1.0));
   }
 
   vec3 surfaceNormal = normalize(vec3(-boundedGradient * 2.4, 1.0));
@@ -982,11 +1008,11 @@ vec4 organicGlass(vec2 globalUv, vec2 globalCoord) {
   // 広いローブにして、パラメータの微小変化でハイライトが点滅しないようにする。
   float specular = pow(max(dot(surfaceNormal, lightDirection), 0.0), 8.0);
   float fresnel = pow(clamp(1.0 - surfaceNormal.z, 0.0, 1.0), 2.0);
-  float highlight = clamp((specular * 0.72 + fresnel * 0.48 + slope * 0.08) * u_glassHighlight, 0.0, 1.0);
+  float highlight = clamp((specular * 0.72 + fresnel * 0.48 + slope * 0.08) * glassHighlight, 0.0, 1.0);
   vec3 highlighted = vec3(1.0) - (vec3(1.0) - opticalColor) * (vec3(1.0) - highlight);
 
   vec4 original = sampleGlassSource(diffuseGlassGlobalUv(globalUv, globalCoord));
-  vec4 result = vec4(mix(original.rgb, highlighted, u_glassMix), original.a);
+  vec4 result = vec4(mix(original.rgb, highlighted, glassMix), original.a);
   return applyDiffuseDither(result, globalCoord);
 }
 #endif
@@ -1048,6 +1074,22 @@ void main() {
 #endif
 #if !defined(KGG_LIGHTWEIGHT) && !defined(KGG_PRISM_ONLY)
   if (u_effectEnabled && u_effectMode == 5) {
+    // Glass is an identity operation when its mix or all optical terms are
+    // disabled. Avoid evaluating the four-point height field in that case;
+    // this is common while editing the stack and prevents needless unstable
+    // normal calculations at zero strength.
+    if (glassFloat(u_glassMix, 1.0, 0.0, 1.0) <= 0.0001 || (
+      glassFloat(u_glassRefraction, 32.0, 0.0, 120.0) <= 0.0001 &&
+      glassFloat(u_glassChromaticAberration, 4.0, 0.0, 40.0) <= 0.0001 &&
+      glassFloat(u_glassRoughness, 1.5, 0.0, 12.0) <= 0.0001 &&
+      glassFloat(u_glassHighlight, 0.45, 0.0, 2.0) <= 0.0001
+    )) {
+      // The Glass specialization owns the source-coordinate conversion. Keep
+      // this path on the same helper as the optical path so the specialized
+      // program does not depend on legacy postprocess helpers being compiled.
+      gl_FragColor = sampleGlassSource(globalUv);
+      return;
+    }
     gl_FragColor = organicGlass(globalUv, globalCoord);
     return;
   }

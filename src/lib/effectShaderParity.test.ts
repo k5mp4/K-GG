@@ -52,6 +52,18 @@ describe('V2 effect shader parity', () => {
     expect(postprocessShader).toContain('#if !defined(KGG_LIGHTWEIGHT)');
   });
 
+  it('keeps Glass-only compilation finite and excludes unrelated core functions', () => {
+    expect(postprocessShader).toContain('float finiteFloat(float value, float fallback)');
+    expect(postprocessShader).toContain('float glassFloat(float value, float fallback, float minimum, float maximum)');
+
+    const mirrorGuard = postprocessShader.slice(
+      postprocessShader.indexOf('#if !defined(KGG_GLASS_ONLY) && !defined(KGG_PRISM_ONLY)'),
+      postprocessShader.indexOf('vec2 mirrorRepeatUv'),
+    );
+    expect(mirrorGuard).toContain('vec2 mirroredUv');
+    expect(mirrorGuard).toContain('vec2 kaleidoscopeUv');
+  });
+
   it('keeps Dither cell-center and Bayer threshold behavior identical to the Diffuse panel', () => {
     for (const name of ['ditherCellSize', 'ditherCellIndex', 'ditherCellCenter']) {
       expect(compact(extractFunction(postprocessShader, name)))

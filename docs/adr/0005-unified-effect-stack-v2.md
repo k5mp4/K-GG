@@ -4,7 +4,7 @@ title: Unified Effect Stack V2を段階別ping-pong FBOで描画する
 status: accepted
 date: 2026-07-11
 deciders: [maintainer]
-related_specs: [SPEC-012]
+related_specs: [SPEC-012, SPEC-014]
 supersedes: [ADR-0004]
 ---
 
@@ -16,7 +16,7 @@ supersedes: [ADR-0004]
 
 ## 決定
 
-V2はベース画像を生成後、8種類の順序可変スタックをping-pong FBOで描画する。Diffuseは順序可変スタックから外し、Diffuseパネルの設定を使う固定最終画像段とする。固定順は`Base -> Surface -> Main Stack -> Prism -> Diffuse -> Particles`とする。旧プリセットは既存Legacy経路を維持する。
+V2はベース画像を生成後、9種類（Noise、Slit、Stretch、Distort、Mirror、Kaleidoscope、Voronoi、Glass、Diffuse）の順序可変スタックをping-pong FBOで描画する。Diffuseは既存のDiffuseパネル設定を使うMain Stackレイヤーとして、指定位置で一度だけ適用する。固定順は`Base -> Surface -> Main Stack -> Prism -> Particles`とする。旧プリセットは既存Legacy経路を維持する。
 
 ## 理由
 
@@ -32,7 +32,8 @@ V2はベース画像を生成後、8種類の順序可変スタックをping-pon
 
 ## 結果
 
-- 主スタックは任意順を表現でき、特殊効果は安定した段階で描画される。
+- 主スタックは9種類の任意順を表現でき、特殊効果は安定した段階で描画される。
+- DiffuseはMain Stack内の指定位置で適用され、旧来の固定最終段はLegacy経路に限る。
 - V2は各画像効果の参照距離を考慮したタイルガターを要する。
 - 同種複数インスタンス、特殊効果の自由順序化は将来の別設計とする。
 

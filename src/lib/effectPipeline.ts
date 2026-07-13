@@ -78,11 +78,7 @@ export function normalizeEffectStack(stack: unknown): EffectStackLayer[] {
   for (const kind of EFFECT_STACK_KINDS) {
     if (!seen.has(kind)) normalized.push({ kind, enabled: false });
   }
-  const diffuseLayer = normalized.find(layer => layer.kind === 'diffuse')!;
-  return [
-    ...normalized.filter(layer => layer.kind !== 'diffuse'),
-    diffuseLayer,
-  ];
+  return normalized;
 }
 
 /**
@@ -113,15 +109,12 @@ export function moveEffectStackLayer(
   targetIndex: number,
 ): EffectStackLayer[] {
   const normalized = normalizeEffectStack(stack);
-  if (kind === 'diffuse') return normalized;
-  const diffuseLayer = normalized.find(layer => layer.kind === 'diffuse')!;
-  const movable = normalized.filter(layer => layer.kind !== 'diffuse');
-  const fromIndex = movable.findIndex(layer => layer.kind === kind);
+  const fromIndex = normalized.findIndex(layer => layer.kind === kind);
   if (fromIndex < 0) return normalized;
-  const next = movable.filter(layer => layer.kind !== kind);
+  const next = normalized.filter(layer => layer.kind !== kind);
   const clampedIndex = Math.max(0, Math.min(next.length, Math.round(targetIndex)));
-  next.splice(clampedIndex, 0, movable[fromIndex]);
-  return [...next, diffuseLayer];
+  next.splice(clampedIndex, 0, normalized[fromIndex]);
+  return next;
 }
 
 export function updateEffectStackLayer(
@@ -146,11 +139,12 @@ export function canRenderV2Direct(
   pipeline: EffectPipelineConfig,
   normalMapEnabled: boolean,
 ): boolean {
+  const stack = normalizeEffectStack(pipeline.effectStack);
   return pipeline.version === 'stack-v2'
     && !normalMapEnabled
     && !pipeline.prismEnabled
     && !pipeline.particlesEnabled
-    && !pipeline.effectStack.some(layer => layer.kind !== 'diffuse' && layer.enabled);
+    && !stack.some(layer => layer.kind !== 'diffuse' && layer.enabled);
 }
 
 export function getV2FramebufferAllocationMode(
@@ -160,6 +154,92 @@ export function getV2FramebufferAllocationMode(
   if (canRenderV2Direct(pipeline, normalMapEnabled)) return 'direct';
   if (normalMapEnabled || pipeline.prismEnabled) return 'full';
   return 'core';
+}
+
+/**
+ * Returns whether the V2 lightweight texture program is needed. The core
+ * program also owns the final texture-to-screen copy, so every non-direct
+ * V2 path needs it even when its effect stages use dedicated programs.
+ */
+export function requiresV2StackCore(
+  pipeline: EffectPipelineConfig,
+  normalMapEnabled = false,
+): boolean {
+  return pipeline.version === 'stack-v2' && !canRenderV2Direct(pipeline, normalMapEnabled);
+}
+
+export type V2RenderPlanOptions = {
+  normalMapEnabled: boolean;
+  normalMapBlur: number;
+  prismGlowRadius: number;
+};
+
+export type V2RenderPlan = {
+  normalizedStack: EffectStackLayer[];
+  enabledLayers: EffectStackLayer[];
+  diffuseEnabled: boolean;
+  normalRequested: boolean;
+  normalNeedsBlur: boolean;
+  prismRequested: boolean;
+  prismNeedsBlur: boolean;
+  particlesRequested: boolean;
+  framebufferAllocationMode: 'direct' | 'core' | 'full';
+  programs: {
+    stackCore: boolean;
+    glass: boolean;
+    normalMap: boolean;
+    blur: boolean;
+    stretch: boolean;
+    prism: boolean;
+    prismComposite: boolean;
+    particles: boolean;
+  };
+};
+
+/**
+ * Builds the immutable V2 render contract once per frame.
+ *
+ * Keeping layer normalization, resource requirements, and FBO selection in
+ * one pure function prevents the renderer from making subtly different
+ * decisions in its readiness and draw loops.
+ */
+export function getV2RenderPlan(
+  pipeline: EffectPipelineConfig,
+  options: V2RenderPlanOptions,
+): V2RenderPlan {
+  const normalizedStack = normalizeEffectStack(pipeline.effectStack);
+  const enabledLayers = normalizedStack.filter(layer => layer.enabled);
+  const diffuseEnabled = enabledLayers.some(layer => layer.kind === 'diffuse');
+  const normalRequested = options.normalMapEnabled;
+  const normalNeedsBlur = normalRequested && options.normalMapBlur >= 0.5;
+  const prismRequested = pipeline.prismEnabled;
+  const prismNeedsBlur = prismRequested && Number.isFinite(options.prismGlowRadius)
+    && options.prismGlowRadius > 0.01;
+  const particlesRequested = pipeline.particlesEnabled;
+  const glassRequested = enabledLayers.some(layer => layer.kind === 'glass');
+  const stretchRequested = enabledLayers.some(layer => layer.kind === 'stretch');
+
+  return {
+    normalizedStack,
+    enabledLayers,
+    diffuseEnabled,
+    normalRequested,
+    normalNeedsBlur,
+    prismRequested,
+    prismNeedsBlur,
+    particlesRequested,
+    framebufferAllocationMode: getV2FramebufferAllocationMode(pipeline, normalRequested),
+    programs: {
+      stackCore: requiresV2StackCore(pipeline, normalRequested),
+      glass: glassRequested,
+      normalMap: normalRequested,
+      blur: normalNeedsBlur || prismNeedsBlur,
+      stretch: stretchRequested,
+      prism: prismRequested,
+      prismComposite: prismRequested,
+      particles: particlesRequested,
+    },
+  };
 }
 
 export function requiresHeavyV2Postprocess(
