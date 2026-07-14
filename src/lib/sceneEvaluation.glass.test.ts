@@ -4,6 +4,7 @@ import type { LatestState } from '../types/latestState';
 import { createAnimationTrack } from './animationRegistry';
 import { evaluateSceneAtTime, hasActiveAnimation } from './sceneEvaluation';
 import { createDefaultPostprocessStack } from './postprocessStack';
+import { updateEffectStackLayer } from './effectPipeline';
 
 function createGlassState(glassMotion: number): LatestState {
   return {
@@ -26,7 +27,11 @@ function createGlassState(glassMotion: number): LatestState {
     },
     effectPipeline: {
       ...STORE_DEFAULTS.effectPipeline,
-      effectStack: STORE_DEFAULTS.effectPipeline.effectStack.map(layer => ({ ...layer })),
+      effectStack: updateEffectStackLayer(
+        STORE_DEFAULTS.effectPipeline.effectStack.map(layer => ({ ...layer })),
+        'glass',
+        { enabled: true },
+      ),
     },
     matcap: { ...STORE_DEFAULTS.matcap },
     animation: { ...STORE_DEFAULTS.animation, enabled: true },
