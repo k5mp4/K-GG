@@ -115,7 +115,10 @@ export function useWebGL(
       },
       () => { animLoopRef.current?.stop(); },
       () => { animLoopRef.current?.start(); },
-      () => getPostprocessStackSamplePadding(latestRef.current?.postprocess),
+      () => getPostprocessStackSamplePadding(
+        latestRef.current?.postprocess,
+        latestRef.current?.effectPipeline,
+      ),
     );
     renderBridge.registerPause(
       () => {

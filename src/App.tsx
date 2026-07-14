@@ -314,7 +314,10 @@ export default function App() {
     activeLeftTabRef.current = value;
     setLeftTab(value);
     setLeftPanelOpen(true);
-    setShowLeftSidebar(true); // モバイルでタブをタップしたらサイドバーを表示
+    // `showLeftSidebar` is the mobile drawer state. Updating it on desktop
+    // also hides the canvas Effect Stack overlay, even though the drawer is
+    // not rendered there.
+    if (window.matchMedia('(max-width: 767px)').matches) setShowLeftSidebar(true);
     if (value === 'export') void refreshFfmpegStatus(true);
     if (!tabHoverSwitchEnabled) return;
     setIsHoverLocked(true);
@@ -1085,6 +1088,7 @@ export default function App() {
           <PropertyModulesSettingsPanel
             hoverSwitchEnabled={tabHoverSwitchEnabled}
             onHoverSwitchChange={setTabHoverSwitchMode}
+            onRefreshApp={() => window.location.reload()}
             onClose={() => setShowPropertyModulesSettings(false)}
           />
         )}

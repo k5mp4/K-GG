@@ -23,8 +23,9 @@ title: 機能仕様
 | SPEC-010 | [Bezier Axisの廃止](./SPEC-010-remove-bezier-axis.md) | implemented |
 | SPEC-011 | [Postprocess Effect Stack](./SPEC-011-postprocess-effect-stack.md) | implemented |
 | SPEC-012 | [Unified Effect Stack V2](./SPEC-012-unified-effect-stack-v2.md) | approved |
-| SPEC-013 | [Effect Stackの折りたたみと描画安定化・軽量化](./SPEC-013-effect-stack-stability-and-performance.md) | approved |
+| SPEC-013 | [Effect Stackの折りたたみと描画安定化・軽量化](./SPEC-013-effect-stack-stability-and-performance.md) | implemented |
 | SPEC-014 | [DiffuseのEffect Stackレイヤー化](./SPEC-014-configurable-diffuse-stack-position.md) | implemented |
+| SPEC-015 | [Effect Stack操作と描画リカバリー](./SPEC-015-effect-stack-interaction-and-render-recovery.md) | implemented |
 
 ## 新しい仕様の作り方
 

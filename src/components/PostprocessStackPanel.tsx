@@ -5,11 +5,17 @@ import {
   normalizeEffectStack,
   updateEffectStackLayer,
 } from '../lib/effectPipeline';
+import {
+  getEffectStackSettlingOffset,
+  getEffectStackTargetIndex,
+  type EffectStackDragState,
+} from '../lib/effectStackDrag';
 import { useGradientStore } from '../store/gradientStore';
 import { Toggle } from './Toggle';
 import { Icon } from './Icon';
 
 const ROW_HEIGHT = 38;
+const DRAG_SETTLE_MS = 150;
 const STACK_PANEL_SESSION_KEY = 'kgg.effect-stack-panel.collapsed';
 
 const LABELS: Record<EffectStackKind, string> = {
@@ -30,11 +36,9 @@ const CATEGORY: Record<EffectStackKind, string> = {
   voronoi: 'Structure', glass: 'Structure',
 };
 
-type DragState = {
+type DragState = Omit<EffectStackDragState, 'kind'> & {
   kind: EffectStackKind;
-  fromIndex: number;
-  targetIndex: number;
-  deltaY: number;
+  pointerId: number;
 };
 
 type LazyProgramKey = 'stackCore' | 'glass' | 'stretch' | 'prism' | 'prismComposite' | 'normalMap' | 'blur' | 'particles';
@@ -56,6 +60,8 @@ export function PostprocessStackPanel() {
   const movableStack = stack;
   const stackRef = useRef(stack);
   const draggingRef = useRef<DragState | null>(null);
+  const dragCleanupRef = useRef<(() => void) | null>(null);
+  const settleTimerRef = useRef<number | null>(null);
   const [dragging, setDragging] = useState<DragState | null>(null);
   const [collapsed, setCollapsed] = useState(() => {
     try {
@@ -69,6 +75,8 @@ export function PostprocessStackPanel() {
   stackRef.current = stack;
 
   useEffect(() => () => {
+    dragCleanupRef.current?.();
+    if (settleTimerRef.current !== null) window.clearTimeout(settleTimerRef.current);
     document.body.style.cursor = '';
   }, []);
 
@@ -97,56 +105,113 @@ export function PostprocessStackPanel() {
     }
   };
 
+  const cancelDrag = () => {
+    dragCleanupRef.current?.();
+    dragCleanupRef.current = null;
+    if (settleTimerRef.current !== null) {
+      window.clearTimeout(settleTimerRef.current);
+      settleTimerRef.current = null;
+    }
+    draggingRef.current = null;
+    setDragging(null);
+    document.body.style.cursor = '';
+  };
+
+  const commitDrag = (drag: DragState) => {
+    const current = useGradientStore.getState().effectPipeline;
+    useGradientStore.getState().setEffectPipeline({
+      selectedKind: drag.kind,
+      effectStack: moveEffectStackLayer(current.effectStack, drag.kind, drag.targetIndex),
+    });
+    draggingRef.current = null;
+    setDragging(null);
+    document.body.style.cursor = '';
+  };
+
+  const finishDrag = () => {
+    const current = draggingRef.current;
+    if (!current || current.phase !== 'dragging') return;
+    dragCleanupRef.current?.();
+    dragCleanupRef.current = null;
+
+    if (current.targetIndex === current.fromIndex) {
+      cancelDrag();
+      return;
+    }
+
+    const settling: DragState = {
+      ...current,
+      phase: 'settling',
+      deltaY: getEffectStackSettlingOffset(current.fromIndex, current.targetIndex, ROW_HEIGHT),
+    };
+    draggingRef.current = settling;
+    setDragging(settling);
+    settleTimerRef.current = window.setTimeout(() => {
+      settleTimerRef.current = null;
+      const settled = draggingRef.current;
+      if (!settled || settled.phase !== 'settling') return;
+      commitDrag(settled);
+    }, DRAG_SETTLE_MS);
+  };
+
   const startDrag = (e: React.PointerEvent, kind: EffectStackKind, fromIndex: number) => {
     if (e.button !== 0) return;
+    cancelDrag();
     e.preventDefault();
     e.stopPropagation();
     selectLayer(kind);
     const startY = e.clientY;
+    const captureTarget = e.currentTarget as HTMLElement;
     document.body.style.cursor = 'grabbing';
-    setDragging({ kind, fromIndex, targetIndex: fromIndex, deltaY: 0 });
-    draggingRef.current = { kind, fromIndex, targetIndex: fromIndex, deltaY: 0 };
+    const initialDrag: DragState = { kind, fromIndex, targetIndex: fromIndex, deltaY: 0, phase: 'dragging', pointerId: e.pointerId };
+    setDragging(initialDrag);
+    draggingRef.current = initialDrag;
+    e.currentTarget.setPointerCapture?.(e.pointerId);
 
     const onMove = (ev: PointerEvent) => {
+      if (ev.pointerId !== e.pointerId || draggingRef.current?.phase !== 'dragging') return;
       const deltaY = ev.clientY - startY;
-      const targetIndex = Math.max(
-        0,
-        Math.max(0, Math.min(movableStack.length - 1, Math.round((fromIndex * ROW_HEIGHT + deltaY) / ROW_HEIGHT))),
-      );
-      const nextDrag = { kind, fromIndex, targetIndex, deltaY };
+      const targetIndex = getEffectStackTargetIndex(fromIndex, deltaY, ROW_HEIGHT, movableStack.length);
+      const nextDrag: DragState = { kind, fromIndex, targetIndex, deltaY, phase: 'dragging', pointerId: e.pointerId };
       draggingRef.current = nextDrag;
       setDragging(nextDrag);
     };
 
-    const onUp = () => {
-      document.body.style.cursor = '';
+    const onUp = (ev: PointerEvent) => {
+      if (ev.pointerId !== e.pointerId) return;
+      finishDrag();
+    };
+
+    const onCancel = (ev: PointerEvent) => {
+      if (ev.pointerId !== e.pointerId) return;
+      cancelDrag();
+    };
+
+    const cleanup = () => {
       window.removeEventListener('pointermove', onMove);
       window.removeEventListener('pointerup', onUp);
-      window.removeEventListener('pointercancel', onUp);
-      const current = useGradientStore.getState().effectPipeline;
-      setEffectPipeline({
-        selectedKind: kind,
-        effectStack: moveEffectStackLayer(current.effectStack, kind, draggingRef.current?.targetIndex ?? fromIndex),
-      });
-      setDragging(null);
-      draggingRef.current = null;
+      window.removeEventListener('pointercancel', onCancel);
+      if (captureTarget.hasPointerCapture?.(e.pointerId)) {
+        captureTarget.releasePointerCapture?.(e.pointerId);
+      }
     };
+    dragCleanupRef.current = cleanup;
 
     window.addEventListener('pointermove', onMove);
     window.addEventListener('pointerup', onUp);
-    window.addEventListener('pointercancel', onUp);
+    window.addEventListener('pointercancel', onCancel);
   };
 
   const rowTransform = (kind: EffectStackKind, index: number) => {
     if (!dragging) return 'translateY(0px)';
-    if (kind === dragging.kind) return `translateY(${dragging.deltaY}px)`;
+    if (kind === dragging.kind) return `translate3d(0, ${dragging.deltaY}px, 0)`;
     if (dragging.targetIndex > dragging.fromIndex && index > dragging.fromIndex && index <= dragging.targetIndex) {
-      return `translateY(-${ROW_HEIGHT}px)`;
+      return `translate3d(0, -${ROW_HEIGHT}px, 0)`;
     }
     if (dragging.targetIndex < dragging.fromIndex && index < dragging.fromIndex && index >= dragging.targetIndex) {
-      return `translateY(${ROW_HEIGHT}px)`;
+      return `translate3d(0, ${ROW_HEIGHT}px, 0)`;
     }
-    return 'translateY(0px)';
+    return 'translate3d(0, 0, 0)';
   };
 
   const effectStatus = (kind: EffectStackKind, enabled: boolean) => {
@@ -163,7 +228,7 @@ export function PostprocessStackPanel() {
   };
 
   return (
-    <div className="w-[232px] overflow-hidden border border-cream/20 bg-k-bg/90 shadow-[0_18px_46px_rgba(0,0,0,0.36)] backdrop-blur-md">
+    <div data-effect-stack-panel className="min-h-8 w-[232px] overflow-hidden border border-cream/20 bg-k-bg/90 shadow-[0_18px_46px_rgba(0,0,0,0.36)] backdrop-blur-md">
       <div className="flex h-8 items-center justify-between border-b border-cream/15 px-2.5">
         <button
           type="button"
@@ -194,13 +259,15 @@ export function PostprocessStackPanel() {
               style={{
                 top: index * ROW_HEIGHT,
                 transform: rowTransform(layer.kind, index),
-                transitionDuration: isDragging ? '0ms' : '150ms',
+                transitionDuration: dragging
+                  ? (dragging.phase === 'dragging' && isDragging ? '0ms' : `${DRAG_SETTLE_MS}ms`)
+                  : '0ms',
               }}
               onClick={() => selectLayer(layer.kind)}
             >
               <button
                 type="button"
-                className="flex h-7 w-6 cursor-grab items-center justify-center text-cream/50 transition-colors hover:text-fire active:cursor-grabbing"
+                className="flex h-7 w-6 cursor-grab touch-none items-center justify-center text-cream/50 transition-colors hover:text-fire active:cursor-grabbing"
                 aria-label={`Drag ${LABELS[layer.kind]}`}
                 title={`Drag ${LABELS[layer.kind]}`}
                 onPointerDown={(e) => startDrag(e, layer.kind, index)}

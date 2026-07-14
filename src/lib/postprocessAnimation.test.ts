@@ -6,6 +6,7 @@ import type {
 } from '../types/distortion';
 import { isPostprocessTimeAnimationActive } from './postprocessAnimation';
 import { createDefaultPostprocessStack } from './postprocessStack';
+import { createDefaultEffectPipeline, updateEffectStackLayer } from './effectPipeline';
 
 function createPostprocess(
   effectMode: PostprocessEffectMode,
@@ -103,5 +104,21 @@ describe('isPostprocessTimeAnimationActive', () => {
       ],
       glassMotion: 1,
     }))).toBe(false);
+  });
+
+  it('uses the V2 Glass layer when deciding whether shared time is active', () => {
+    const pipeline = createDefaultEffectPipeline();
+    const glassPipeline = {
+      ...pipeline,
+      effectStack: updateEffectStackLayer(pipeline.effectStack, 'glass', { enabled: true }),
+    };
+    expect(isPostprocessTimeAnimationActive(
+      createPostprocess('distort', { glassMotion: 0.2 }),
+      glassPipeline,
+    )).toBe(true);
+    expect(isPostprocessTimeAnimationActive(
+      createPostprocess('distort', { glassMotion: 0 }),
+      glassPipeline,
+    )).toBe(false);
   });
 });
