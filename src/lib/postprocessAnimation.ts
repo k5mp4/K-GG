@@ -1,5 +1,6 @@
-import type { PostprocessConfig } from '../types/distortion';
+import type { EffectPipelineConfig, PostprocessConfig } from '../types/distortion';
 import { getActivePostprocessStackLayers } from './postprocessStack';
+import { isEffectStackLayerEnabled } from './effectPipeline';
 
 /**
  * Postprocessが共有時間トラックによる描画更新を必要とするか判定する。
@@ -9,7 +10,15 @@ import { getActivePostprocessStackLayers } from './postprocessStack';
  */
 export function isPostprocessTimeAnimationActive(
   postprocess: PostprocessConfig,
+  effectPipeline?: EffectPipelineConfig | null,
 ): boolean {
+  if (effectPipeline?.version === 'stack-v2') {
+    if (effectPipeline.particlesEnabled || effectPipeline.prismEnabled) return true;
+    return isEffectStackLayerEnabled(effectPipeline, 'glass')
+      && Number.isFinite(postprocess.glassMotion)
+      && postprocess.glassMotion > 0;
+  }
+
   if (!postprocess.enabled) return false;
   if (postprocess.effectMode === 'particles') return true;
 

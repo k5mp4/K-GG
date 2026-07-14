@@ -356,7 +356,7 @@ export function GradientCanvas({ width = 800, height = 800, animLoopRef, seekVer
       });
     }
     return () => { animLoopRef.current?.stop(); };
-  }, [animation.enabled, animation.duration, animation.previewLoop, animation.speed, keyframeTracks, noiseDistortion.enabled, iridescence.enabled, radon.enabled, slitScan.enabled, stretch.enabled, diffuse.enabled, diffuse.seedAnimEnabled, postprocess.enabled, postprocess.effectMode, postprocess.effectStack, postprocess.glassMotion]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [animation.enabled, animation.duration, animation.previewLoop, animation.speed, keyframeTracks, noiseDistortion.enabled, iridescence.enabled, radon.enabled, slitScan.enabled, stretch.enabled, diffuse.enabled, diffuse.seedAnimEnabled, postprocess.enabled, postprocess.effectMode, postprocess.effectStack, postprocess.glassMotion, effectPipeline]); // eslint-disable-line react-hooks/exhaustive-deps
 
   return (
     <div style={{ position: 'relative', width: '100%', height: '100%' }}>

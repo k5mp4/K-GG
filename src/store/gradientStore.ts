@@ -452,7 +452,7 @@ export function normalizePostprocessConfig(
 
 type AutoTrackState = Pick<
   GradientStore,
-  'noiseDistortion' | 'diffuse' | 'slitScan' | 'stretch' | 'radon' | 'iridescence' | 'postprocess'
+  'noiseDistortion' | 'diffuse' | 'slitScan' | 'stretch' | 'radon' | 'iridescence' | 'postprocess' | 'effectPipeline'
 >;
 
 function ensureAutoTrack(
@@ -484,7 +484,7 @@ function ensureDefaultAutoTracks(
   }
   if (state.stretch.enabled) tracks = ensureAutoTrack(tracks, 'stretch.__scan');
   if (state.diffuse.enabled && state.diffuse.seedAnimEnabled) tracks = ensureAutoTrack(tracks, 'diffuse.seed');
-  if (isPostprocessTimeAnimationActive(state.postprocess)) {
+  if (isPostprocessTimeAnimationActive(state.postprocess, state.effectPipeline)) {
     tracks = ensureAutoTrack(tracks, 'postprocess.__time');
   }
   return tracks;
@@ -672,7 +672,7 @@ export const useGradientStore = create<GradientStore>((set) => ({
     const next = { ...s.postprocess, ...v, effectMode, effectStack, displacement, smoothMask };
     if ((next.particleEmitterType as string) === 'nexus') next.particleEmitterType = 'point';
     if (!next.particleEmitterPoint) next.particleEmitterPoint = [...STORE_DEFAULTS.postprocess.particleEmitterPoint] as [number, number];
-    const keyframeTracks = s.animation.enabled && isPostprocessTimeAnimationActive(next)
+    const keyframeTracks = s.animation.enabled && isPostprocessTimeAnimationActive(next, s.effectPipeline)
       ? ensureAutoTrack(s.keyframeTracks, 'postprocess.__time')
       : s.keyframeTracks;
     return { postprocess: next, keyframeTracks };
@@ -687,6 +687,9 @@ export const useGradientStore = create<GradientStore>((set) => ({
     const enabled = (kind: import('../types/distortion').EffectStackKind) => (
       effectPipeline.effectStack.some(layer => layer.kind === kind && layer.enabled)
     );
+    const keyframeTracks = s.animation.enabled && isPostprocessTimeAnimationActive(s.postprocess, effectPipeline)
+      ? ensureAutoTrack(s.keyframeTracks, 'postprocess.__time')
+      : s.keyframeTracks;
     return {
       effectPipeline,
       noiseDistortion: { ...s.noiseDistortion, enabled: enabled('noise') },
@@ -694,6 +697,7 @@ export const useGradientStore = create<GradientStore>((set) => ({
       slitScan: { ...s.slitScan, enabled: enabled('slit') },
       stretch: { ...s.stretch, enabled: enabled('stretch') },
       manualDistort: { ...s.manualDistort, enabled: enabled('distort') },
+      keyframeTracks,
     };
   }),
   setMatcap: (v) => set((s) => ({ matcap: { ...s.matcap, ...v } })),

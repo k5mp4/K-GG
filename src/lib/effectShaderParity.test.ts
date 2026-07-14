@@ -64,6 +64,45 @@ describe('V2 effect shader parity', () => {
     expect(mirrorGuard).toContain('vec2 kaleidoscopeUv');
   });
 
+  it('keeps Glass sampling direction continuous near a flat gradient', () => {
+    const direction = extractFunction(postprocessShader, 'glassStableDirection');
+    const displacement = extractFunction(postprocessShader, 'glassStableDisplacement');
+    const optical = extractFunction(postprocessShader, 'glassOpticalColor');
+    expect(direction).toContain('const float directionSoftness = 0.02;');
+    expect(direction).toContain('boundedGradient / (slope + directionSoftness);');
+    expect(direction).not.toContain('boundedGradient / slope');
+    expect(displacement).toContain('boundedGradient / (1.0 + slope);');
+    expect(postprocessShader).toContain('float glassFilteredRidge(float phase)');
+    expect(postprocessShader).toContain('fwidth(phase)');
+    expect(postprocessShader).toContain('float bandLimit = smoothstep(0.65, 2.4, phaseFootprint);');
+    expect(optical).toContain('stableDirection * chromaticAberration');
+    expect(optical).toContain('vec2 tangent = vec2(-stableDirection.y, stableDirection.x);');
+  });
+
+  it('centralizes finite Glass inputs and separates field, optical, and composition stages', () => {
+    for (const name of ['glassResolution', 'glassTileSize', 'glassFiniteUv', 'glassSafeDirection', 'glassSafeNormal']) {
+      expect(postprocessShader).toContain(`${name}(`);
+    }
+    expect(postprocessShader).toContain('vec2 glassSurfaceGradient(');
+    expect(postprocessShader).toContain('vec2 glassBoundedGradient(');
+    expect(postprocessShader).toContain('vec3 glassOpticalColor(');
+    expect(extractFunction(postprocessShader, 'sampleGlassSource')).toContain('glassTileSize()');
+  });
+
+  it('keeps the Glass field and gradient finite before optical composition', () => {
+    expect(extractFunction(postprocessShader, 'glassSafeDirection')).toContain('finiteFloat(value.x, 0.0)');
+    expect(extractFunction(postprocessShader, 'glassBoundedGradient')).toContain('finiteFloat(gradient.x, 0.0)');
+    expect(extractFunction(postprocessShader, 'glassSurfaceHeight')).toContain('finiteFloat(mix(');
+    expect(extractFunction(postprocessShader, 'glassHeight')).toContain('finiteFloat(height /');
+    expect(extractFunction(postprocessShader, 'glassStableDisplacement')).toContain('finiteFloat(boundedGradient.x, 0.0)');
+  });
+
+  it('skips the Glass field at the identity endpoint', () => {
+    const main = postprocessShader.slice(postprocessShader.indexOf('void main()'));
+    expect(main).toContain('glassFloat(u_glassMix, 1.0, 0.0, 1.0) <= 0.0001');
+    expect(main).toContain('glassFloat(u_glassRefraction, 32.0, 0.0, 120.0) <= 0.0001');
+  });
+
   it('keeps Dither cell-center and Bayer threshold behavior identical to the Diffuse panel', () => {
     for (const name of ['ditherCellSize', 'ditherCellIndex', 'ditherCellCenter']) {
       expect(compact(extractFunction(postprocessShader, name)))

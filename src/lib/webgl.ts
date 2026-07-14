@@ -17,7 +17,7 @@ import {
   optimizeStretch,
 } from './gpuDiagnostics';
 import type { GpuDiagnostics, RenderOptimization } from './gpuDiagnostics';
-import { GLASS_LIMITS, smoothGlassNoiseBlend } from './glass';
+import { isGlassOpticallyIdentity, normalizeGlassRenderParameters } from './glass';
 import { getActivePostprocessStackLayers } from './postprocessStack';
 import { canRenderV2Direct, getV2RenderPlan } from './effectPipeline';
 
@@ -1240,23 +1240,21 @@ function drawPostprocessPass(
   gl.uniform1f(ctx.postprocessUniforms.u_postVoronoiGradientScale, postprocess.voronoiGradientScale ?? 1.15);
   gl.uniform1f(ctx.postprocessUniforms.u_postVoronoiEdgeWidth, postprocess.voronoiEdgeWidth ?? 0.025);
   gl.uniform1f(ctx.postprocessUniforms.u_postVoronoiSeed, postprocess.voronoiSeed ?? 0);
-  gl.uniform1f(ctx.postprocessUniforms.u_glassScale, clampNumber(postprocess.glassScale ?? 3.2, 0.5, 12));
-  gl.uniform1f(ctx.postprocessUniforms.u_glassStretch, clampNumber(postprocess.glassStretch ?? 4, 0.25, 8));
-  gl.uniform1f(ctx.postprocessUniforms.u_glassRotation, clampNumber(postprocess.glassRotation ?? 12, 0, 360) * Math.PI / 180);
-  gl.uniform1i(ctx.postprocessUniforms.u_glassComplexity, Math.round(clampNumber(postprocess.glassComplexity ?? 4, 1, 5)));
-  gl.uniform1f(ctx.postprocessUniforms.u_glassWarp, clampNumber(postprocess.glassWarp ?? 0.55, 0, 1));
-  gl.uniform1f(ctx.postprocessUniforms.u_glassSeed, Math.round(clampNumber(postprocess.glassSeed ?? 0, 0, 99)));
-  gl.uniform1f(
-    ctx.postprocessUniforms.u_glassNoiseInfluence,
-    smoothGlassNoiseBlend(postprocess.glassNoiseInfluence ?? 0),
-  );
-  gl.uniform1f(ctx.postprocessUniforms.u_glassRefraction, clampNumber(postprocess.glassRefraction ?? 32, 0, GLASS_LIMITS.refraction));
-  gl.uniform1f(ctx.postprocessUniforms.u_glassChromaticAberration, clampNumber(postprocess.glassChromaticAberration ?? 4, 0, GLASS_LIMITS.chromaticAberration));
-  gl.uniform1f(ctx.postprocessUniforms.u_glassRoughness, clampNumber(postprocess.glassRoughness ?? 1.5, 0, GLASS_LIMITS.roughness));
-  gl.uniform1f(ctx.postprocessUniforms.u_glassHighlight, clampNumber(postprocess.glassHighlight ?? 0.45, 0, 2));
-  gl.uniform1f(ctx.postprocessUniforms.u_glassMix, clampNumber(postprocess.glassMix ?? 1, 0, 1));
-  gl.uniform1f(ctx.postprocessUniforms.u_glassEvolution, clampNumber(postprocess.glassEvolution ?? 0, 0, 1));
-  gl.uniform1f(ctx.postprocessUniforms.u_glassMotion, clampNumber(postprocess.glassMotion ?? 0.35, 0, 1));
+  const glass = normalizeGlassRenderParameters(postprocess);
+  gl.uniform1f(ctx.postprocessUniforms.u_glassScale, glass.scale);
+  gl.uniform1f(ctx.postprocessUniforms.u_glassStretch, glass.stretch);
+  gl.uniform1f(ctx.postprocessUniforms.u_glassRotation, glass.rotationRadians);
+  gl.uniform1i(ctx.postprocessUniforms.u_glassComplexity, glass.complexity);
+  gl.uniform1f(ctx.postprocessUniforms.u_glassWarp, glass.warp);
+  gl.uniform1f(ctx.postprocessUniforms.u_glassSeed, glass.seed);
+  gl.uniform1f(ctx.postprocessUniforms.u_glassNoiseInfluence, glass.noiseInfluence);
+  gl.uniform1f(ctx.postprocessUniforms.u_glassRefraction, glass.refraction);
+  gl.uniform1f(ctx.postprocessUniforms.u_glassChromaticAberration, glass.chromaticAberration);
+  gl.uniform1f(ctx.postprocessUniforms.u_glassRoughness, glass.roughness);
+  gl.uniform1f(ctx.postprocessUniforms.u_glassHighlight, glass.highlight);
+  gl.uniform1f(ctx.postprocessUniforms.u_glassMix, glass.mix);
+  gl.uniform1f(ctx.postprocessUniforms.u_glassEvolution, glass.evolution);
+  gl.uniform1f(ctx.postprocessUniforms.u_glassMotion, glass.motion);
   const diffuseScale = diffuseResolutionScale(fullWidth, fullHeight);
   gl.uniform1i(ctx.postprocessUniforms.u_diffuseEnabled, applyPostDiffuse && postprocess.diffuseEnabled ? 1 : 0);
   gl.uniform1i(ctx.postprocessUniforms.u_diffuseMode, DIFFUSE_MODE_MAP[postprocess.diffuseMode ?? 'block'] ?? 0);
@@ -1487,7 +1485,9 @@ function drawPostprocessStackOutput(
   animationSpeed: number,
   outputToTexture: boolean,
 ): WebGLTexture | null {
-  const layers = getActivePostprocessStackLayers(postprocess);
+  const layers = getActivePostprocessStackLayers(postprocess).filter(layer => (
+    layer.kind !== 'glass' || !isGlassOpticallyIdentity(postprocess)
+  ));
   if (layers.length === 0) return null;
 
   let currentTexture = sourceTexture;
@@ -1947,6 +1947,7 @@ export function render(
     const prismRequested = renderPlan.prismRequested;
     const prismNeedsBlur = renderPlan.prismNeedsBlur;
     const particlesRequested = renderPlan.particlesRequested;
+    const glassIdentity = isGlassOpticallyIdentity(postprocess);
 
     // The V2 default is Diffuse-only. Base and Diffuse use the same panel
     // uniforms/algorithm, so no intermediate texture is needed when there are
@@ -1963,7 +1964,7 @@ export function render(
 
     const stackCoreRequested = renderPlan.programs.stackCore;
     const stackCoreReady = !stackCoreRequested || requestLazyProgram(ctx, 'stackCore');
-    const glassReady = !renderPlan.programs.glass || requestGlassProgram(ctx);
+    const glassReady = glassIdentity || !renderPlan.programs.glass || requestGlassProgram(ctx);
     const normalReady = !normalRequested || (
       requestLazyProgram(ctx, 'normalMap') &&
       (!normalNeedsBlur || requestLazyProgram(ctx, 'blur'))
@@ -2066,7 +2067,7 @@ export function render(
       ? { ...noiseDistortion, enabled: false }
       : noiseDistortion;
     for (const layer of mainLayers) {
-      if (layer.kind === 'glass' && !glassReady) continue;
+      if (layer.kind === 'glass' && (glassIdentity || !glassReady)) continue;
       const target = choosePostprocessTarget(ctx, currentTexture);
       let passRendered = false;
       if (layer.kind === 'stretch') {
@@ -2109,7 +2110,9 @@ export function render(
   const stretchActive = stretch.enabled && requestLazyProgram(ctx, 'stretch');
   const particleRequested = postprocess.enabled && postprocess.effectMode === 'particles';
   const particleActive = particleRequested && requestLazyProgram(ctx, 'particles');
-  const postprocessLayers = getActivePostprocessStackLayers(postprocess);
+  const postprocessLayers = getActivePostprocessStackLayers(postprocess).filter(layer => (
+    layer.kind !== 'glass' || !isGlassOpticallyIdentity(postprocess)
+  ));
   const postprocessRequested = postprocess.enabled && postprocessLayers.length > 0;
   const prismPostprocess = postprocessRequested && postprocessLayers.some(layer => layer.kind === 'prism');
   const prismNeedsBlur = prismPostprocess && (postprocess.prismGlowRadius ?? 0) > 0.01;

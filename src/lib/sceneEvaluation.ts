@@ -166,7 +166,7 @@ function propertyOwnerEnabled(state: LatestState, propertyId: string): boolean {
   if (propertyId.startsWith('radon.')) return state.radon.enabled;
   if (propertyId.startsWith('iridescence.')) return state.iridescence.enabled;
   if (propertyId === 'postprocess.__time') {
-    return isPostprocessTimeAnimationActive(state.postprocess);
+    return isPostprocessTimeAnimationActive(state.postprocess, state.effectPipeline);
   }
   if (propertyId.startsWith('postprocess.')) return state.postprocess.enabled;
   return true;
@@ -189,7 +189,7 @@ export function hasActiveAnimation(state: LatestState): boolean {
     (state.animation.affectStretch && state.stretch.enabled) ||
     state.animation.affectRamp ||
     (state.diffuse.enabled && Boolean(state.diffuse.seedAnimEnabled)) ||
-    isPostprocessTimeAnimationActive(state.postprocess)
+    isPostprocessTimeAnimationActive(state.postprocess, state.effectPipeline)
   );
 }
 
@@ -209,7 +209,7 @@ export function evaluateSceneAtTime(state: LatestState, normalizedTime: number):
   const postprocessMode = trackMode(
     state,
     'postprocess.__time',
-    isPostprocessTimeAnimationActive(state.postprocess),
+    isPostprocessTimeAnimationActive(state.postprocess, state.effectPipeline),
   );
 
   const anySharedAuto = (
