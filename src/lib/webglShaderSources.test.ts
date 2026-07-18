@@ -52,13 +52,16 @@ describe('webglShaderSources', () => {
     }
   });
 
-  it('removes the Diffuse implementation from the dedicated Glass compile', () => {
-    const specialized = getProgramSource('glass').fragment;
+  it('removes the Diffuse implementation from the dedicated Glass compiles', () => {
+    for (const key of ['glass', 'glassV2'] as const) {
+      const specialized = getProgramSource(key).fragment;
 
-    expect(specialized).toContain('#if defined(KGG_GLASS_ONLY)');
-    expect(specialized).toContain('vec2 diffusePanelDisplacement(vec2 globalCoord) {\n  return vec2(0.0);');
-    expect(specialized).toContain('vec4 applyDiffuseDither(vec4 color, vec2 globalCoord) {\n  return color;');
-    expect(specialized).toContain('#else\n#if defined(KGG_PRISM_ONLY)\nvec2 diffuseHash');
+      expect(specialized).toContain('#if defined(KGG_GLASS_ONLY)');
+      expect(specialized).toContain('vec2 diffusePanelDisplacement(vec2 globalCoord) {\n  return vec2(0.0);');
+      expect(specialized).toContain('vec4 applyDiffuseDither(vec4 color, vec2 globalCoord) {\n  return color;');
+      expect(specialized).toContain('#else\n#if defined(KGG_PRISM_ONLY)\nvec2 diffuseHash');
+      expect(specialized).not.toContain('vec2 diffuseDomainWarp(');
+    }
   });
 
   it('omits unrelated Prism and stack source from the dedicated Glass compile', () => {

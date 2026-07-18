@@ -100,6 +100,30 @@ uniform float u_aeContrast;
 uniform float u_aeBrightness;
 `;
 
+// Keep these symbols in the dedicated Glass sources explicitly instead of
+// depending on the full Diffuse module and its preprocessor branches. V2
+// renders Diffuse in a separate stack pass, so both Glass variants only need
+// identity implementations for the two functions they call.
+const GLASS_DIFFUSE_STUBS_GLSL = `
+#if defined(KGG_GLASS_ONLY)
+vec2 diffusePanelDisplacement(vec2 globalCoord) {
+  return vec2(0.0);
+}
+
+vec4 applyDiffuseDither(vec4 color, vec2 globalCoord) {
+  return color;
+}
+#else
+#if defined(KGG_PRISM_ONLY)
+vec2 diffuseHash(vec2 p) {
+  vec3 p3 = fract(vec3(p.xyx) * vec3(0.1031, 0.1030, 0.0973));
+  p3 += dot(p3, p3.yzx + 33.33);
+  return fract((p3.xx + p3.yz) * p3.zy) * 2.0 - 1.0;
+}
+#endif
+#endif
+`;
+
 function createSpecializedPostprocessSource(
   define: 'KGG_LEGACY_GLASS_ONLY' | 'KGG_GLASS_V2_ONLY' | 'KGG_PRISM_ONLY',
 ): string {
@@ -108,7 +132,7 @@ function createSpecializedPostprocessSource(
     ? [
         postprocessUniformsGLSL,
         postprocessSharedGLSL,
-        postprocessDiffuseGLSL,
+        GLASS_DIFFUSE_STUBS_GLSL,
         postprocessGlassFieldGLSL,
         postprocessGlassOpticsGLSL,
         postprocessMainGLSL,
