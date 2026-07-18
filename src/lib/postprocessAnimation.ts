@@ -14,7 +14,7 @@ export function isPostprocessTimeAnimationActive(
 ): boolean {
   if (effectPipeline?.version === 'stack-v2') {
     if (effectPipeline.particlesEnabled || effectPipeline.prismEnabled) return true;
-    return isEffectStackLayerEnabled(effectPipeline, 'glass')
+    return (isEffectStackLayerEnabled(effectPipeline, 'glass') || isEffectStackLayerEnabled(effectPipeline, 'glassV2'))
       && Number.isFinite(postprocess.glassMotion)
       && postprocess.glassMotion > 0;
   }
@@ -24,7 +24,7 @@ export function isPostprocessTimeAnimationActive(
 
   for (const layer of getActivePostprocessStackLayers(postprocess)) {
     if (layer.kind === 'prism') return true;
-    if (layer.kind === 'glass') return postprocess.glassMotion > 0;
+    if (layer.kind === 'glass' || layer.kind === 'glassV2') return postprocess.glassMotion > 0;
   }
   return false;
 }

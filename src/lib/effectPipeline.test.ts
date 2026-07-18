@@ -78,7 +78,7 @@ describe('effectPipeline', () => {
 
     it('requires the heavy program for heavy layers or Prism', () => {
       const stack = createDefaultEffectStack();
-      for (const kind of ['glass'] as const) {
+      for (const kind of ['glass', 'glassV2'] as const) {
         expect(requiresHeavyV2Postprocess(
           updateEffectStackLayer(stack, kind, { enabled: true }),
           false,
@@ -112,14 +112,32 @@ describe('effectPipeline', () => {
   });
 
   describe('getV2RenderPlan', () => {
+    it('requests the dedicated Noise program only when the Noise layer is enabled', () => {
+      const pipeline = createDefaultEffectPipeline();
+      const plan = getV2RenderPlan({
+        ...pipeline,
+        effectStack: updateEffectStackLayer(pipeline.effectStack, 'noise', { enabled: true }),
+      }, {
+        normalMapEnabled: false,
+        normalMapBlur: 0,
+        prismGlowRadius: 0,
+      });
+
+      expect(plan.programs.stackCore).toBe(true);
+      expect(plan.programs.noiseStack).toBe(true);
+    });
+
     it('derives one consistent resource plan from the normalized enabled layers', () => {
       const pipeline = createDefaultEffectPipeline();
       const glassPipeline = {
         ...pipeline,
         effectStack: updateEffectStackLayer(
-          updateEffectStackLayer(pipeline.effectStack, 'glass', { enabled: true }),
-          'diffuse',
-          { enabled: false },
+          updateEffectStackLayer(
+            updateEffectStackLayer(pipeline.effectStack, 'glass', { enabled: true }),
+            'glassV2',
+            { enabled: true },
+          ),
+          'diffuse', { enabled: false },
         ),
         prismEnabled: true,
         particlesEnabled: true,
@@ -131,12 +149,14 @@ describe('effectPipeline', () => {
         prismGlowRadius: 4,
       });
 
-      expect(plan.enabledLayers.map(layer => layer.kind)).toEqual(['glass']);
+      expect(plan.enabledLayers.map(layer => layer.kind)).toEqual(['glass', 'glassV2']);
       expect(plan.diffuseEnabled).toBe(false);
       expect(plan.framebufferAllocationMode).toBe('full');
       expect(plan.programs).toEqual({
         stackCore: true,
+        noiseStack: false,
         glass: true,
+        glassV2: true,
         normalMap: true,
         blur: true,
         stretch: false,
@@ -159,6 +179,7 @@ describe('effectPipeline', () => {
         { kind: 'kaleidoscope', enabled: false },
         { kind: 'voronoi', enabled: false },
         { kind: 'glass', enabled: false },
+        { kind: 'glassV2', enabled: false },
         { kind: 'diffuse', enabled: true },
       ],
       selectedKind: 'diffuse',
@@ -182,6 +203,7 @@ describe('effectPipeline', () => {
       { kind: 'distort', enabled: false },
       { kind: 'kaleidoscope', enabled: false },
       { kind: 'voronoi', enabled: false },
+      { kind: 'glassV2', enabled: false },
       { kind: 'diffuse', enabled: false },
     ]);
   });
@@ -209,6 +231,7 @@ describe('effectPipeline', () => {
       'mirror',
       'kaleidoscope',
       'voronoi',
+      'glassV2',
     ]);
     expect(Object.fromEntries(normalized.map(layer => [layer.kind, layer.enabled]))).toEqual({
       diffuse: false,
@@ -220,6 +243,7 @@ describe('effectPipeline', () => {
       mirror: true,
       kaleidoscope: false,
       voronoi: true,
+      glassV2: false,
     });
   });
 
@@ -246,6 +270,7 @@ describe('effectPipeline', () => {
       'mirror',
       'kaleidoscope',
       'voronoi',
+      'glassV2',
       'diffuse',
     ]);
 
@@ -280,6 +305,7 @@ describe('effectPipeline', () => {
       'kaleidoscope',
       'voronoi',
       'glass',
+      'glassV2',
       'diffuse',
       'noise',
     ]);

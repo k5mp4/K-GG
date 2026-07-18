@@ -12,6 +12,7 @@ export const POSTPROCESS_STACK_KINDS = [
   'prism',
   'voronoi',
   'glass',
+  'glassV2',
 ] as const satisfies readonly PostprocessStackKind[];
 
 const STACK_KIND_SET = new Set<string>(POSTPROCESS_STACK_KINDS);

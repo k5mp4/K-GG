@@ -49,6 +49,8 @@ UIは状態の編集と利用者操作に集中させ、時間評価やファイ
 - `src/lib/renderBridge.ts`: UI上の描画器をエクスポート処理から呼び出す境界である。
 - `src/lib/exportCanvas.ts`: 静止画エクスポートで共有するCanvas取得、タイル描画合成、PNG/JPEG/WebP Blob変換を担当する。
 
+Postprocessのフラグメントシェーダーは`src/shaders/postprocess/`でuniform、共通処理、Prism、主スタック、Diffuse、Glass高さ場、Glass光学合成、エントリポイントに分割する。`src/lib/webglShaderSources.ts`がこの依存順に連結し、Glass専用、Prism専用、軽量主スタック、Legacyの各プログラムへ同じ構成元を供給する。分割ファイルを単独の完結したシェーダーとして扱わず、連結順とプリプロセッサ定義をコンパイル契約として維持する。
+
 描画機能を追加するときは、型、既定値、UI、時刻評価、uniform、シェーダー、プリセット、エクスポート時の一致を確認します。
 
 ### プラットフォーム境界

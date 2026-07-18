@@ -381,6 +381,7 @@ export function PostprocessPanel() {
               { value: 'prism', label: 'Prism' },
               { value: 'voronoi', label: 'Voronoi' },
               { value: 'glass', label: 'Glass' },
+              { value: 'glassV2', label: 'Glass V2' },
               { value: 'particles', label: 'Particles' },
             ]}
             onChange={(value) => setEffectMode(value as typeof postprocess.effectMode)}
@@ -653,8 +654,13 @@ export function PostprocessPanel() {
                 defaultValue={STORE_DEFAULTS.postprocess.voronoiSeed}
               />
             </div>
-          ) : postprocess.effectMode === 'glass' ? (
+          ) : postprocess.effectMode === 'glass' || postprocess.effectMode === 'glassV2' ? (
             <div className="space-y-4">
+              {postprocess.effectMode === 'glassV2' && (
+                <p className="text-[10px] leading-relaxed text-tab-inactive">
+                  Smooth gradient noise, wavelength-dependent refraction, rough transmission, and Fresnel highlights are combined as a single-layer screen-space approximation.
+                </p>
+              )}
               <PostprocessControlGroup title="Surface">
                 <SliderField
                   label="Scale"

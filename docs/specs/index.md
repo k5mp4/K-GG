@@ -26,6 +26,9 @@ title: 機能仕様
 | SPEC-013 | [Effect Stackの折りたたみと描画安定化・軽量化](./SPEC-013-effect-stack-stability-and-performance.md) | implemented |
 | SPEC-014 | [DiffuseのEffect Stackレイヤー化](./SPEC-014-configurable-diffuse-stack-position.md) | implemented |
 | SPEC-015 | [Effect Stack操作と描画リカバリー](./SPEC-015-effect-stack-interaction-and-render-recovery.md) | implemented |
+| SPEC-016 | [Tweeqによるパラメータ入力コントロール](./SPEC-016-tweeq-controls.md) | implemented |
+| SPEC-017 | [Slit AngleへのTweeq InputAngle導入](./SPEC-017-tweeq-slit-angle.md) | implemented |
+| SPEC-018 | [Glass V2光学屈折エフェクト](./SPEC-018-glass-v2-optical-refraction.md) | implemented |
 
 ## 新しい仕様の作り方
 

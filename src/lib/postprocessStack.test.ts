@@ -15,7 +15,15 @@ describe('postprocessStack', () => {
       { kind: 'prism', enabled: false },
       { kind: 'voronoi', enabled: false },
       { kind: 'glass', enabled: true },
+      { kind: 'glassV2', enabled: false },
     ]);
+  });
+
+  it('creates Glass V2 as an independent selected legacy layer', () => {
+    const stack = createDefaultPostprocessStack('glassV2');
+
+    expect(stack.find(layer => layer.kind === 'glass')).toEqual({ kind: 'glass', enabled: false });
+    expect(stack.find(layer => layer.kind === 'glassV2')).toEqual({ kind: 'glassV2', enabled: true });
   });
 
   it('normalizes invalid, duplicate, and missing layers', () => {
@@ -31,6 +39,7 @@ describe('postprocessStack', () => {
       { kind: 'kaleidoscope', enabled: false },
       { kind: 'prism', enabled: false },
       { kind: 'voronoi', enabled: false },
+      { kind: 'glassV2', enabled: false },
     ]);
   });
 
@@ -43,6 +52,7 @@ describe('postprocessStack', () => {
       'kaleidoscope',
       'prism',
       'voronoi',
+      'glassV2',
     ]);
   });
 
@@ -55,6 +65,7 @@ describe('postprocessStack', () => {
       { kind: 'prism', enabled: false },
       { kind: 'voronoi', enabled: false },
       { kind: 'glass', enabled: true },
+      { kind: 'glassV2', enabled: false },
     ]);
   });
 });

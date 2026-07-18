@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { getPostprocessStackSamplePadding } from '../lib/glass';
 import { normalizePostprocessConfig, STORE_DEFAULTS } from './gradientStore';
 
 describe('Glass postprocess preset compatibility', () => {
@@ -17,6 +18,28 @@ describe('Glass postprocess preset compatibility', () => {
       STORE_DEFAULTS.postprocess.glassNoiseInfluence,
     );
     expect(loaded.effectMode).toBe('mirror');
+    expect(loaded.effectStack.find(layer => layer.kind === 'glassV2')).toEqual({
+      kind: 'glassV2',
+      enabled: false,
+    });
+  });
+
+  it('adds disabled Glass V2 to an old stack without changing Glass padding', () => {
+    const loaded = normalizePostprocessConfig({
+      enabled: true,
+      effectMode: 'glass',
+      effectStack: [
+        { kind: 'glass', enabled: true },
+        { kind: 'distort', enabled: false },
+        { kind: 'mirror', enabled: false },
+        { kind: 'kaleidoscope', enabled: false },
+        { kind: 'prism', enabled: false },
+        { kind: 'voronoi', enabled: false },
+      ],
+    });
+
+    expect(loaded.effectStack.at(-1)).toEqual({ kind: 'glassV2', enabled: false });
+    expect(getPostprocessStackSamplePadding(loaded)).toBe(40);
   });
 
   it('preserves Glass values through a JSON preset round trip', () => {
@@ -36,5 +59,33 @@ describe('Glass postprocess preset compatibility', () => {
     expect(loaded.glassNoiseInfluence).toBe(0.72);
     expect(loaded.glassRefraction).toBe(64);
     expect(loaded.glassEvolution).toBe(0.625);
+  });
+
+  it('preserves Glass V2 mode, layer order, and shared optics through a JSON round trip', () => {
+    const saved = JSON.parse(JSON.stringify({
+      ...STORE_DEFAULTS.postprocess,
+      enabled: true,
+      effectMode: 'glassV2',
+      effectStack: [
+        { kind: 'glassV2', enabled: true },
+        { kind: 'glass', enabled: false },
+        ...STORE_DEFAULTS.postprocess.effectStack.filter(layer => (
+          layer.kind !== 'glass' && layer.kind !== 'glassV2'
+        )),
+      ],
+      glassRefraction: 48,
+      glassChromaticAberration: 9,
+      glassRoughness: 3,
+    }));
+
+    const loaded = normalizePostprocessConfig(saved);
+    expect(loaded.effectMode).toBe('glassV2');
+    expect(loaded.effectStack.slice(0, 2)).toEqual([
+      { kind: 'glassV2', enabled: true },
+      { kind: 'glass', enabled: false },
+    ]);
+    expect(loaded.glassRefraction).toBe(48);
+    expect(loaded.glassChromaticAberration).toBe(9);
+    expect(loaded.glassRoughness).toBe(3);
   });
 });

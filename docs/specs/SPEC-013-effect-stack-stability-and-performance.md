@@ -4,10 +4,10 @@ title: Effect Stackの折りたたみと描画安定化・軽量化
 status: implemented
 owners: [maintainer]
 created: 2026-07-12
-updated: 2026-07-13
+updated: 2026-07-18
 depends_on: [SPEC-003, SPEC-011, SPEC-012]
 related_adrs: [ADR-0005]
-related_code: [src/App.tsx, src/components/PostprocessStackPanel.tsx, src/lib/effectPipeline.ts, src/lib/webgl.ts, src/lib/webglShaderSources.ts, src/lib/glass.ts, src/shaders/postprocess.frag.glsl, src/types/distortion.ts]
+related_code: [src/App.tsx, src/components/PostprocessStackPanel.tsx, src/lib/effectPipeline.ts, src/lib/webgl.ts, src/lib/webglShaderSources.ts, src/lib/glass.ts, src/shaders/postprocess/, src/types/distortion.ts]
 related_tests: [src/lib/effectPipeline.test.ts, src/lib/effectShaderParity.test.ts, src/lib/webglShaderSources.test.ts, src/lib/glass.test.ts, src/lib/postprocessStack.test.ts]
 human_review: completed
 ---
@@ -56,6 +56,8 @@ Unified Effect Stackパネルはキャンバス左上に常時表示され、作
 
 V2描画では、正規化済みの有効レイヤー列を一度だけ生成し、Direct/Core/Fullの割当をその列から決定する。GLASSとPrismが無効な場合は専用programを要求せず、無効レイヤーに対応するuniform・texture upload・FBO passを実行しない。既存の遅延コンパイル中の直前フレーム維持は変更しない。
 
+通常のV2テクスチャスタック用`stackCore`にはNoiseの手続き実装を含めず、Noiseレイヤーが有効な場合だけNoise専用programを遅延コンパイルする。これにより、Distort、Slit、Mirrorなどの有効化がNoiseの大きなコンパイル負荷やタイムアウトに巻き込まれない。Noise専用programも通常スタックと同じ入力texture、タイル座標、Noiseパラメータを使う。
+
 GLASSでは、入力値をCPU側・uniform設定側・GLSL側の各境界で有限値化する。法線用の高さ場評価は同一フラグメント内で共有できる中間値を使い、Mixが0または光学効果が実質無効な場合はサンプルを省略する。中心差分のステップと屈折ベクトルはタイル解像度に対して有界にし、色収差・粗さのサンプル座標をsource textureの有効領域へ安全にマッピングする。勾配がほぼゼロの領域では、色収差・粗さのサンプル方向を連続的に減衰させ、アンカー操作中にサンプル位置が飛ばないようにする。最適化は既存の端点、ガター、安全な直前フレーム維持を壊さない範囲に限る。
 
 DISTORTは変位配列の参照同一性、Smooth Mask、解像度を更新キーとして扱い、同じ入力に対する再アップロードを避ける。診断ログはprogram名、パス種別、FBOモード、GLエラー分類を識別できる粒度に保つ。
@@ -85,6 +87,7 @@ GLASS専用programがコンパイルまたはlinkに失敗した場合は、GLAS
 - AC-008: GLASSを含む遅延コンパイル中にグラデーションアンカーを動かすと、最新のベース描画が反映され、コンパイル完了後に対象エフェクトが自動適用される。
 - AC-009: Noise、Slit、Stretch、Distort、Mirror、Kaleidoscope、Voronoi、Glass、Prism、Particles、Diffuseについて、適用状態をLoading/Applied/Unavailable/Offのいずれかで識別できる。
 - AC-010: GLASS専用programが失敗しても他のreadyなEffect Stackレイヤーは描画され、汎用postprocess programが成功した場合はGLASSがフォールバック適用される。
+- AC-011: Noise以外のV2レイヤーを有効化した場合、通常スタックprogramのコンパイルがNoise実装のコンパイルで遅延・タイムアウトせず、Noiseを有効化した場合だけNoise専用programが要求される。
 
 ## 検証計画
 
@@ -95,6 +98,7 @@ GLASS専用programがコンパイルまたはlinkに失敗した場合は、GLAS
 | AC-004, AC-005 | GLASS境界値・有限値・サンプル条件テスト、WebGLプレビュー、タイル出力 | `glass.test.ts`, `tileRender.test.ts` |
 | AC-006 | 変位マップ更新キーのコードレビューとWebGLプレビュー | `webgl.ts` |
 | AC-007, AC-008, AC-009, AC-010 | ドキュメント検査、`npm test`, `npm run lint`, `npm run build`、遅延コンパイル中・GLSL失敗注入時の手動確認 | CI相当のローカル検証 |
+| AC-011 | programソース契約テスト、Noise/Distort/Slitを組み合わせた実ブラウザのWebGLコンパイルと適用確認 | `webglShaderSources.test.ts`, `effectPipeline.test.ts`, WebGLプレビュー |
 
 ## 決定事項
 
