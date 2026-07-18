@@ -15,6 +15,7 @@ export const EFFECT_STACK_KINDS = [
   'kaleidoscope',
   'voronoi',
   'glass',
+  'glassV2',
   'diffuse',
 ] as const satisfies readonly EffectStackKind[];
 
@@ -186,7 +187,9 @@ export type V2RenderPlan = {
   framebufferAllocationMode: 'direct' | 'core' | 'full';
   programs: {
     stackCore: boolean;
+    noiseStack: boolean;
     glass: boolean;
+    glassV2: boolean;
     normalMap: boolean;
     blur: boolean;
     stretch: boolean;
@@ -217,6 +220,8 @@ export function getV2RenderPlan(
     && options.prismGlowRadius > 0.01;
   const particlesRequested = pipeline.particlesEnabled;
   const glassRequested = enabledLayers.some(layer => layer.kind === 'glass');
+  const glassV2Requested = enabledLayers.some(layer => layer.kind === 'glassV2');
+  const noiseRequested = enabledLayers.some(layer => layer.kind === 'noise');
   const stretchRequested = enabledLayers.some(layer => layer.kind === 'stretch');
 
   return {
@@ -231,7 +236,9 @@ export function getV2RenderPlan(
     framebufferAllocationMode: getV2FramebufferAllocationMode(pipeline, normalRequested),
     programs: {
       stackCore: requiresV2StackCore(pipeline, normalRequested),
+      noiseStack: noiseRequested,
       glass: glassRequested,
+      glassV2: glassV2Requested,
       normalMap: normalRequested,
       blur: normalNeedsBlur || prismNeedsBlur,
       stretch: stretchRequested,
@@ -248,6 +255,6 @@ export function requiresHeavyV2Postprocess(
 ): boolean {
   if (prismEnabled) return true;
   return effectStack.some(layer => layer.enabled && (
-    layer.kind === 'glass'
+    layer.kind === 'glass' || layer.kind === 'glassV2'
   ));
 }

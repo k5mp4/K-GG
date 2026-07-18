@@ -208,6 +208,7 @@ export function SlitScanPanel({ sourceImageName, hasSourceImage, onSourceImageLo
             format={(v) => v + '°'}
             defaultValue={slitScan.mode === 'wave' ? WAVE_DEFAULT_DIRECTION : D.angle}
             trackId="slitScan.angle"
+            control={slitScan.mode === 'linear' ? 'angle' : 'number'}
           />
 
           {slitScan.mode === 'polygon' && (
@@ -251,6 +252,7 @@ export function SlitScanPanel({ sourceImageName, hasSourceImage, onSourceImageLo
               format={(v) => v + '°'}
               defaultValue={D.offsetAngle ?? 90}
               trackId="slitScan.offsetAngle"
+              control="angle"
             />
           )}
 

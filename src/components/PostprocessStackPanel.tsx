@@ -28,12 +28,13 @@ const LABELS: Record<EffectStackKind, string> = {
   kaleidoscope: 'Kaleidoscope',
   voronoi: 'Voronoi',
   glass: 'Glass',
+  glassV2: 'Glass V2',
 };
 
 const CATEGORY: Record<EffectStackKind, string> = {
   diffuse: 'Texture', noise: 'Texture',
   slit: 'Transform', stretch: 'Transform', distort: 'Transform', mirror: 'Transform', kaleidoscope: 'Transform',
-  voronoi: 'Structure', glass: 'Structure',
+  voronoi: 'Structure', glass: 'Structure', glassV2: 'Structure',
 };
 
 type DragState = Omit<EffectStackDragState, 'kind'> & {
@@ -41,7 +42,7 @@ type DragState = Omit<EffectStackDragState, 'kind'> & {
   pointerId: number;
 };
 
-type LazyProgramKey = 'stackCore' | 'glass' | 'stretch' | 'prism' | 'prismComposite' | 'normalMap' | 'blur' | 'particles';
+type LazyProgramKey = 'stackCore' | 'glass' | 'glassV2' | 'stretch' | 'prism' | 'prismComposite' | 'normalMap' | 'blur' | 'particles';
 type LazyProgramStatus = 'loading' | 'ready' | 'failed' | 'fallback';
 
 const CORE_EFFECTS = new Set<EffectStackKind>([
@@ -51,6 +52,7 @@ const CORE_EFFECTS = new Set<EffectStackKind>([
 function programKeyForEffect(kind: EffectStackKind): LazyProgramKey {
   if (CORE_EFFECTS.has(kind)) return 'stackCore';
   if (kind === 'glass') return 'glass';
+  if (kind === 'glassV2') return 'glassV2';
   return 'stretch';
 }
 
@@ -100,7 +102,7 @@ export function PostprocessStackPanel() {
 
   const selectLayer = (kind: EffectStackKind) => {
     setEffectPipeline({ selectedKind: kind });
-    if (kind === 'distort' || kind === 'mirror' || kind === 'kaleidoscope' || kind === 'voronoi' || kind === 'glass') {
+    if (kind === 'distort' || kind === 'mirror' || kind === 'kaleidoscope' || kind === 'voronoi' || kind === 'glass' || kind === 'glassV2') {
       setPostprocess({ enabled: true, effectMode: kind as PostprocessStackKind });
     }
   };

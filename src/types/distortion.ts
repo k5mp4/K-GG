@@ -140,7 +140,7 @@ export type ManualDistortConfig = {
   maxDisplacement: number; // max UV displacement represented by +/-1 in the map
 };
 
-export type PostprocessEffectMode = 'distort' | 'mirror' | 'kaleidoscope' | 'prism' | 'voronoi' | 'glass' | 'particles';
+export type PostprocessEffectMode = 'distort' | 'mirror' | 'kaleidoscope' | 'prism' | 'voronoi' | 'glass' | 'glassV2' | 'particles';
 export type PostprocessMirrorMode = 'horizontal' | 'vertical' | 'quad';
 export type PostprocessKaleidoscopeType = 'unfold' | 'flower' | 'starlish';
 export type PostprocessParticleBlendMode = 'alpha' | 'add';
@@ -167,7 +167,8 @@ export type EffectStackKind =
   | 'mirror'
   | 'kaleidoscope'
   | 'voronoi'
-  | 'glass';
+  | 'glass'
+  | 'glassV2';
 
 export type EffectStackLayer = {
   kind: EffectStackKind;

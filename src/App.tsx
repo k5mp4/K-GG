@@ -251,7 +251,7 @@ export default function App() {
     if (effectPipeline.version !== 'stack-v2') return;
     const tabByKind: Record<string, LeftTab> = {
       diffuse: 'diffuse', noise: 'noise', slit: 'slit', stretch: 'stretch',
-      distort: 'distort', mirror: 'postprocess', kaleidoscope: 'postprocess', voronoi: 'postprocess', glass: 'postprocess',
+      distort: 'distort', mirror: 'postprocess', kaleidoscope: 'postprocess', voronoi: 'postprocess', glass: 'postprocess', glassV2: 'postprocess',
     };
     const next = tabByKind[effectPipeline.selectedKind];
     if (next && next !== activeLeftTabRef.current) {

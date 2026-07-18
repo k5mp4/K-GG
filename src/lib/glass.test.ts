@@ -50,16 +50,36 @@ describe('getPostprocessStackSamplePadding', () => {
     expect(getPostprocessStackSamplePadding(glassConfig({ glassMix: 0 }))).toBe(0);
   });
 
-  it('uses the V2 Glass layer as the authoritative padding source', () => {
+  it.each(['glass', 'glassV2'] as const)(
+    'uses the V2 %s layer as the authoritative padding source',
+    (kind) => {
+      const pipeline = createDefaultEffectPipeline();
+      const glassPipeline = {
+        ...pipeline,
+        effectStack: updateEffectStackLayer(pipeline.effectStack, kind, { enabled: true }),
+      };
+      expect(getPostprocessStackSamplePadding(
+        glassConfig({ enabled: false }),
+        glassPipeline,
+      )).toBe(40);
+    },
+  );
+
+  it('adds the dependency radius when Glass and Glass V2 are both active', () => {
     const pipeline = createDefaultEffectPipeline();
-    const glassPipeline = {
+    const bothGlassPipeline = {
       ...pipeline,
-      effectStack: updateEffectStackLayer(pipeline.effectStack, 'glass', { enabled: true }),
+      effectStack: updateEffectStackLayer(
+        updateEffectStackLayer(pipeline.effectStack, 'glass', { enabled: true }),
+        'glassV2',
+        { enabled: true },
+      ),
     };
+
     expect(getPostprocessStackSamplePadding(
       glassConfig({ enabled: false }),
-      glassPipeline,
-    )).toBe(40);
+      bothGlassPipeline,
+    )).toBe(80);
   });
 
   it('clamps imported or directly entered values to renderer limits', () => {

@@ -24,10 +24,13 @@ import { canRenderV2Direct, getV2RenderPlan } from './effectPipeline';
 export { SHADER_VERSION };
 
 type ShaderCompileExt = { COMPLETION_STATUS_KHR: number } | null;
+const PARALLEL_SHADER_COMPILE_TIMEOUT_MS = 30_000;
+const GLASS_PARALLEL_SHADER_COMPILE_TIMEOUT_MS = Number.POSITIVE_INFINITY;
 type TextureStackKind = PostprocessStackKind | 'diffuse' | 'noise' | 'slit';
 type LazyProgramState = {
   promise: Promise<void> | null;
   failed: boolean;
+  timedOut: boolean;
 };
 
 export type WebGLContext = {
@@ -61,9 +64,14 @@ export type WebGLContext = {
   postprocessUniforms: Record<string, WebGLUniformLocation | null>;
   stackCoreProgram: WebGLProgram | null;
   stackCoreUniforms: Record<string, WebGLUniformLocation | null>;
+  noiseStackProgram: WebGLProgram | null;
+  noiseStackUniforms: Record<string, WebGLUniformLocation | null>;
   glassProgram: WebGLProgram | null;
   glassUniforms: Record<string, WebGLUniformLocation | null>;
   glassFallbackActive: boolean;
+  glassV2Program: WebGLProgram | null;
+  glassV2Uniforms: Record<string, WebGLUniformLocation | null>;
+  glassV2FallbackActive: boolean;
   prismProgram: WebGLProgram | null;
   prismUniforms: Record<string, WebGLUniformLocation | null>;
   prismCompositeProgram: WebGLProgram | null;
@@ -395,7 +403,7 @@ export async function initWebGL(canvas: HTMLCanvasElement): Promise<WebGLContext
   const { fbo: prismScratchFbo, tex: prismScratchTexture } = createFboWithTexture(gl);
   const { fbo: prismBlurFbo, tex: prismBlurTexture } = createFboWithTexture(gl);
   const { fbo: prismGlowFbo, tex: prismGlowTexture } = createFboWithTexture(gl);
-  const ctx: WebGLContext = { gl, gpuDiagnostics, renderOptimization, program, uniforms, gradientRampTexture, manualDistortTexture, manualDistortDisplacement: null, manualDistortSmoothMask: null, manualDistortMapResolution: 0, sourceImageTexture, sourceImageCanvas: null, imageGradientTexture, imageGradientSource: null, imageMaskTexture, imageMaskSource: null, normalMapProgram: null, normalMapUniforms: {}, gradFbo, gradTexture, blurProgram: null, blurUniforms: {}, stretchProgram: null, stretchUniforms: {}, stackCoreProgram: null, stackCoreUniforms: {}, glassProgram: null, glassUniforms: {}, glassFallbackActive: false, prismProgram: null, prismUniforms: {}, postprocessProgram: null, postprocessUniforms: {}, prismCompositeProgram: null, prismCompositeUniforms: {}, particleProgram: null, particleUniforms: {}, particleVao: null, particleQuadBuffer: null, particleInstanceBuffer: null, particleInstanceCount: 0, particleInstanceSeed: Number.NaN, normalFbo, normalTexture, hBlurFbo, hBlurTexture, postprocessFboA, postprocessTextureA, postprocessFboB, postprocessTextureB, prismScratchFbo, prismScratchTexture, prismBlurFbo, prismBlurTexture, prismGlowFbo, prismGlowTexture, fboSize: [0, 0], v2CoreFboSize: [0, 0], shaderCompileExt: ext, lazyProgramState: createLazyProgramState(), hasPresentedFrame: false };
+  const ctx: WebGLContext = { gl, gpuDiagnostics, renderOptimization, program, uniforms, gradientRampTexture, manualDistortTexture, manualDistortDisplacement: null, manualDistortSmoothMask: null, manualDistortMapResolution: 0, sourceImageTexture, sourceImageCanvas: null, imageGradientTexture, imageGradientSource: null, imageMaskTexture, imageMaskSource: null, normalMapProgram: null, normalMapUniforms: {}, gradFbo, gradTexture, blurProgram: null, blurUniforms: {}, stretchProgram: null, stretchUniforms: {}, stackCoreProgram: null, stackCoreUniforms: {}, noiseStackProgram: null, noiseStackUniforms: {}, glassProgram: null, glassUniforms: {}, glassFallbackActive: false, glassV2Program: null, glassV2Uniforms: {}, glassV2FallbackActive: false, prismProgram: null, prismUniforms: {}, postprocessProgram: null, postprocessUniforms: {}, prismCompositeProgram: null, prismCompositeUniforms: {}, particleProgram: null, particleUniforms: {}, particleVao: null, particleQuadBuffer: null, particleInstanceBuffer: null, particleInstanceCount: 0, particleInstanceSeed: Number.NaN, normalFbo, normalTexture, hBlurFbo, hBlurTexture, postprocessFboA, postprocessTextureA, postprocessFboB, postprocessTextureB, prismScratchFbo, prismScratchTexture, prismBlurFbo, prismBlurTexture, prismGlowFbo, prismGlowTexture, fboSize: [0, 0], v2CoreFboSize: [0, 0], shaderCompileExt: ext, lazyProgramState: createLazyProgramState(), hasPresentedFrame: false };
   return ctx;
 }
 
@@ -405,6 +413,7 @@ async function createProgramAsync(
   ext: ShaderCompileExt,
   vertSrc: string,
   diagnosticLabel = 'gradient',
+  compileTimeoutMs = PARALLEL_SHADER_COMPILE_TIMEOUT_MS,
 ): Promise<WebGLProgram> {
   const compileStartedAt = performance.now();
   console.info('[WebGL shader] compile requested', {
@@ -425,14 +434,27 @@ async function createProgramAsync(
   gl.bindAttribLocation(program, 0, 'a_position');
   gl.linkProgram(program);
   if (ext) {
-    // KHR_parallel_shader_compile: rAF でポーリングしてコンパイル完了を待つ（メインスレッドをブロックしない）
+    // KHR_parallel_shader_compile の完了前に COMPILE_STATUS / LINK_STATUS を
+    // 読むと同期的に待たされる。特に大きい Glass shader では、従来の
+    // 600-frame 打ち切り後のステータス参照が WebView 全体を停止させていた。
+    // タイムアウト時も同期参照へ進まず、現在のベース描画を維持して失敗扱いにする。
+    // Do not touch an object that the driver is still compiling when this
+    // promise rejects. The context owns it until disposal; deleting it here
+    // can itself re-enter the stalled driver on affected WebViews.
     await new Promise<void>((resolve, reject) => {
-      let frames = 0;
       const poll = () => {
-        if (gl.isContextLost()) { reject(new Error('WebGL context lost during compilation')); return; }
-        if (gl.getProgramParameter(program, ext.COMPLETION_STATUS_KHR)) { resolve(); return; }
-        frames++;
-        if (frames > 600) { resolve(); return; } // ~10秒フォールバックタイムアウト (60fps 基準)
+        if (gl.isContextLost()) {
+          reject(new Error('WebGL context lost during compilation'));
+          return;
+        }
+        if (gl.getProgramParameter(program, ext.COMPLETION_STATUS_KHR)) {
+          resolve();
+          return;
+        }
+        if (Number.isFinite(compileTimeoutMs) && performance.now() - compileStartedAt >= compileTimeoutMs) {
+          reject(new Error(`Parallel shader compile timed out (${diagnosticLabel})`));
+          return;
+        }
         requestAnimationFrame(poll);
       };
       requestAnimationFrame(poll);
@@ -466,15 +488,17 @@ async function createProgramAsync(
 
 function createLazyProgramState(): Record<LazyProgramKey, LazyProgramState> {
   return {
-    blur: { promise: null, failed: false },
-    normalMap: { promise: null, failed: false },
-    stretch: { promise: null, failed: false },
-    stackCore: { promise: null, failed: false },
-    glass: { promise: null, failed: false },
-    prism: { promise: null, failed: false },
-    postprocess: { promise: null, failed: false },
-    prismComposite: { promise: null, failed: false },
-    particles: { promise: null, failed: false },
+    blur: { promise: null, failed: false, timedOut: false },
+    normalMap: { promise: null, failed: false, timedOut: false },
+    stretch: { promise: null, failed: false, timedOut: false },
+    stackCore: { promise: null, failed: false, timedOut: false },
+    noiseStack: { promise: null, failed: false, timedOut: false },
+    glass: { promise: null, failed: false, timedOut: false },
+    glassV2: { promise: null, failed: false, timedOut: false },
+    prism: { promise: null, failed: false, timedOut: false },
+    postprocess: { promise: null, failed: false, timedOut: false },
+    prismComposite: { promise: null, failed: false, timedOut: false },
+    particles: { promise: null, failed: false, timedOut: false },
   };
 }
 
@@ -706,7 +730,9 @@ async function compileLazyProgram(ctx: WebGLContext, key: LazyProgramKey): Promi
     (key === 'normalMap' && ctx.normalMapProgram) ||
     (key === 'stretch' && ctx.stretchProgram) ||
     (key === 'stackCore' && ctx.stackCoreProgram) ||
+    (key === 'noiseStack' && ctx.noiseStackProgram) ||
     (key === 'glass' && ctx.glassProgram) ||
+    (key === 'glassV2' && ctx.glassV2Program) ||
     (key === 'prism' && ctx.prismProgram) ||
     (key === 'postprocess' && ctx.postprocessProgram) ||
     (key === 'prismComposite' && ctx.prismCompositeProgram) ||
@@ -726,6 +752,9 @@ async function compileLazyProgram(ctx: WebGLContext, key: LazyProgramKey): Promi
       ctx.shaderCompileExt,
       source.vertex,
       key,
+      key === 'glass' || key === 'glassV2'
+        ? GLASS_PARALLEL_SHADER_COMPILE_TIMEOUT_MS
+        : PARALLEL_SHADER_COMPILE_TIMEOUT_MS,
     );
   } catch (error) {
     console.error('[WebGL shader] compile failed', {
@@ -751,9 +780,15 @@ async function compileLazyProgram(ctx: WebGLContext, key: LazyProgramKey): Promi
   } else if (key === 'stackCore') {
     ctx.stackCoreProgram = program;
     ctx.stackCoreUniforms = getPostprocessUniforms(gl, program);
+  } else if (key === 'noiseStack') {
+    ctx.noiseStackProgram = program;
+    ctx.noiseStackUniforms = getPostprocessUniforms(gl, program);
   } else if (key === 'glass') {
     ctx.glassProgram = program;
     ctx.glassUniforms = getPostprocessUniforms(gl, program);
+  } else if (key === 'glassV2') {
+    ctx.glassV2Program = program;
+    ctx.glassV2Uniforms = getPostprocessUniforms(gl, program);
   } else if (key === 'prism') {
     ctx.prismProgram = program;
     ctx.prismUniforms = getPostprocessUniforms(gl, program);
@@ -776,7 +811,9 @@ function requestLazyProgram(ctx: WebGLContext, key: LazyProgramKey): boolean {
     (key === 'normalMap' && ctx.normalMapProgram) ||
     (key === 'stretch' && ctx.stretchProgram) ||
     (key === 'stackCore' && ctx.stackCoreProgram) ||
+    (key === 'noiseStack' && ctx.noiseStackProgram) ||
     (key === 'glass' && ctx.glassProgram) ||
+    (key === 'glassV2' && ctx.glassV2Program) ||
     (key === 'prism' && ctx.prismProgram) ||
     (key === 'postprocess' && ctx.postprocessProgram) ||
     (key === 'prismComposite' && ctx.prismCompositeProgram) ||
@@ -791,6 +828,8 @@ function requestLazyProgram(ctx: WebGLContext, key: LazyProgramKey): boolean {
     }));
     state.promise = compileLazyProgram(ctx, key).catch((error) => {
       state.failed = true;
+      state.timedOut = error instanceof Error
+        && error.message.startsWith('Parallel shader compile timed out');
       console.error(`[WebGL] Lazy shader compile failed (${key}):`, error);
       window.dispatchEvent(new CustomEvent('kgg:webgl-lazy-program-state', {
         detail: { key, state: 'failed' as const },
@@ -814,19 +853,26 @@ function requestLazyProgram(ctx: WebGLContext, key: LazyProgramKey): boolean {
  * The fallback is still lazy, so the rest of the stack remains usable while
  * it is compiling.
  */
-function requestGlassProgram(ctx: WebGLContext): boolean {
-  if (ctx.glassProgram) return true;
+function requestGlassProgram(ctx: WebGLContext, key: 'glass' | 'glassV2'): boolean {
+  const dedicatedProgram = key === 'glass' ? ctx.glassProgram : ctx.glassV2Program;
+  if (dedicatedProgram) return true;
 
-  const glassState = ctx.lazyProgramState.glass;
-  if (!glassState.failed) return requestLazyProgram(ctx, 'glass');
+  const glassState = ctx.lazyProgramState[key];
+  if (!glassState.failed) return requestLazyProgram(ctx, key);
+  // A timeout means the driver is already saturated by the dedicated Glass
+  // compile. Starting the larger general fallback immediately would repeat
+  // the same GPU stall. Explicit compile/link failures may still fall back.
+  if (glassState.timedOut) return false;
 
   const fallbackReady = requestLazyProgram(ctx, 'postprocess');
   if (!fallbackReady) return false;
 
-  if (!ctx.glassFallbackActive) {
-    ctx.glassFallbackActive = true;
+  const fallbackActive = key === 'glass' ? ctx.glassFallbackActive : ctx.glassV2FallbackActive;
+  if (!fallbackActive) {
+    if (key === 'glass') ctx.glassFallbackActive = true;
+    else ctx.glassV2FallbackActive = true;
     window.dispatchEvent(new CustomEvent('kgg:webgl-lazy-program-state', {
-      detail: { key: 'glass', state: 'fallback' as const, fallback: true },
+      detail: { key, state: 'fallback' as const, fallback: true },
     }));
   }
   return true;
@@ -1115,28 +1161,41 @@ function drawPostprocessPass(
   useV2Programs = false,
 ): boolean {
   const { gl } = ctx;
+  const useNoiseStack = useV2Programs && effectMode === 'noise' && Boolean(ctx.noiseStackProgram);
   const useStackCore = useV2Programs && Boolean(ctx.stackCoreProgram) && (
-    effectMode === 'noise'
-    || effectMode === 'slit'
+    effectMode === 'slit'
     || effectMode === 'distort'
     || effectMode === 'mirror'
     || effectMode === 'kaleidoscope'
     || effectMode === 'voronoi'
     || effectMode === 'diffuse'
   );
-  const useGlassProgram = useV2Programs && effectMode === 'glass' && Boolean(ctx.glassProgram || ctx.glassFallbackActive);
+  const glassProgram = effectMode === 'glass'
+    ? ctx.glassProgram
+    : effectMode === 'glassV2'
+      ? ctx.glassV2Program
+      : null;
+  const glassUniforms = effectMode === 'glass' ? ctx.glassUniforms : ctx.glassV2Uniforms;
+  const glassFallbackActive = effectMode === 'glass'
+    ? ctx.glassFallbackActive
+    : effectMode === 'glassV2' && ctx.glassV2FallbackActive;
+  const useGlassProgram = useV2Programs && (effectMode === 'glass' || effectMode === 'glassV2') && Boolean(glassProgram || glassFallbackActive);
   const usePrismProgram = useV2Programs && effectMode === 'prism' && Boolean(ctx.prismProgram);
-  const selectedProgram = useStackCore
-    ? ctx.stackCoreProgram
+  const selectedProgram = useNoiseStack
+    ? ctx.noiseStackProgram
+    : useStackCore
+      ? ctx.stackCoreProgram
     : useGlassProgram
-      ? (ctx.glassProgram ?? ctx.postprocessProgram)
+      ? (glassProgram ?? ctx.postprocessProgram)
       : usePrismProgram
         ? ctx.prismProgram
         : ctx.postprocessProgram;
-  const selectedUniforms = useStackCore
-    ? ctx.stackCoreUniforms
+  const selectedUniforms = useNoiseStack
+    ? ctx.noiseStackUniforms
+    : useStackCore
+      ? ctx.stackCoreUniforms
     : useGlassProgram
-      ? (ctx.glassProgram ? ctx.glassUniforms : ctx.postprocessUniforms)
+      ? (glassProgram ? glassUniforms : ctx.postprocessUniforms)
       : usePrismProgram
         ? ctx.prismUniforms
         : ctx.postprocessUniforms;
@@ -1166,7 +1225,7 @@ function drawPostprocessPass(
   gl.uniform2f(ctx.postprocessUniforms.u_gradAnchor1, anchors[1][0], anchors[1][1]);
   gl.uniform1f(ctx.postprocessUniforms.u_maxDisplacement, postprocess.maxDisplacement);
   gl.uniform1i(ctx.postprocessUniforms.u_effectEnabled, 1);
-  const effectModeMap = { distort: 0, mirror: 1, kaleidoscope: 2, prism: 3, voronoi: 4, glass: 5, diffuse: 6, noise: 7, slit: 8, particles: 0 } as const;
+  const effectModeMap = { distort: 0, mirror: 1, kaleidoscope: 2, prism: 3, voronoi: 4, glass: 5, diffuse: 6, noise: 7, slit: 8, glassV2: 9, particles: 0 } as const;
   gl.uniform1i(ctx.postprocessUniforms.u_effectMode, effectModeMap[effectMode]);
   gl.uniform1i(ctx.postprocessUniforms.u_noiseEnabled, noiseDistortion.enabled ? 1 : 0);
   gl.uniform1i(ctx.postprocessUniforms.u_noiseType, NOISE_TYPE_MAP[noiseDistortion.type]);
@@ -1486,7 +1545,7 @@ function drawPostprocessStackOutput(
   outputToTexture: boolean,
 ): WebGLTexture | null {
   const layers = getActivePostprocessStackLayers(postprocess).filter(layer => (
-    layer.kind !== 'glass' || !isGlassOpticallyIdentity(postprocess)
+    (layer.kind !== 'glass' && layer.kind !== 'glassV2') || !isGlassOpticallyIdentity(postprocess)
   ));
   if (layers.length === 0) return null;
 
@@ -1964,7 +2023,20 @@ export function render(
 
     const stackCoreRequested = renderPlan.programs.stackCore;
     const stackCoreReady = !stackCoreRequested || requestLazyProgram(ctx, 'stackCore');
-    const glassReady = glassIdentity || !renderPlan.programs.glass || requestGlassProgram(ctx);
+    const noiseStackReady = !renderPlan.programs.noiseStack || (
+      stackCoreReady && requestLazyProgram(ctx, 'noiseStack')
+    );
+    // These programs are substantial on ANGLE/WebView. Request them strictly
+    // in stackCore -> Glass -> Glass V2 order to avoid saturating the driver.
+    // Their readiness is intentionally not a global render gate: while either
+    // Glass variant is compiling, every other ready layer remains active.
+    const glassReady = glassIdentity || !renderPlan.programs.glass || (
+      stackCoreReady && noiseStackReady && requestGlassProgram(ctx, 'glass')
+    );
+    const glassCompileSettled = glassReady || ctx.lazyProgramState.glass.failed;
+    const glassV2Ready = glassIdentity || !renderPlan.programs.glassV2 || (
+      stackCoreReady && noiseStackReady && glassCompileSettled && requestGlassProgram(ctx, 'glassV2')
+    );
     const normalReady = !normalRequested || (
       requestLazyProgram(ctx, 'normalMap') &&
       (!normalNeedsBlur || requestLazyProgram(ctx, 'blur'))
@@ -1977,9 +2049,10 @@ export function render(
     );
     const particlesReady = !particlesRequested || requestLazyProgram(ctx, 'particles');
 
-    // Lazy programs compile asynchronously. Keep a usable base frame until every
-    // requested V2 stage is available instead of presenting a partial stack.
-    if (!stackCoreReady || !glassReady || !normalReady || !stretchReady || !prismReady || !particlesReady) {
+    // Stages that cannot be skipped still gate the full pipeline. Glass is
+    // different: its layer is skipped below until ready, so it must never
+    // cancel already-available Effect Stack processing.
+    if (!stackCoreReady || !noiseStackReady || !normalReady || !stretchReady || !prismReady || !particlesReady) {
       // Keep rendering the current base state while programs compile so
       // anchor and parameter edits remain visible instead of freezing the
       // first frame that happened to be presented.
@@ -2068,6 +2141,7 @@ export function render(
       : noiseDistortion;
     for (const layer of mainLayers) {
       if (layer.kind === 'glass' && (glassIdentity || !glassReady)) continue;
+      if (layer.kind === 'glassV2' && (glassIdentity || !glassV2Ready)) continue;
       const target = choosePostprocessTarget(ctx, currentTexture);
       let passRendered = false;
       if (layer.kind === 'stretch') {
@@ -2111,7 +2185,7 @@ export function render(
   const particleRequested = postprocess.enabled && postprocess.effectMode === 'particles';
   const particleActive = particleRequested && requestLazyProgram(ctx, 'particles');
   const postprocessLayers = getActivePostprocessStackLayers(postprocess).filter(layer => (
-    layer.kind !== 'glass' || !isGlassOpticallyIdentity(postprocess)
+    (layer.kind !== 'glass' && layer.kind !== 'glassV2') || !isGlassOpticallyIdentity(postprocess)
   ));
   const postprocessRequested = postprocess.enabled && postprocessLayers.length > 0;
   const prismPostprocess = postprocessRequested && postprocessLayers.some(layer => layer.kind === 'prism');

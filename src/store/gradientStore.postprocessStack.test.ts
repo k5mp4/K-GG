@@ -39,6 +39,7 @@ describe('Postprocess stack preset compatibility', () => {
       'kaleidoscope',
       'prism',
       'voronoi',
+      'glassV2',
     ]);
     expect(loaded.effectStack.filter(layer => layer.enabled).map(layer => layer.kind)).toEqual([
       'glass',
@@ -63,6 +64,7 @@ describe('Postprocess stack preset compatibility', () => {
       { kind: 'prism', enabled: false },
       { kind: 'voronoi', enabled: false },
       { kind: 'glass', enabled: false },
+      { kind: 'glassV2', enabled: false },
     ]);
   });
 

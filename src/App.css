@@ -6,6 +6,244 @@
   }
 }
 
+/* Tweeq theme: 篝火の炭色、生成り、火種レッドを入力UIへ継承する。 */
+.TqViewport {
+  --tq-color-accent: var(--color-fire);
+  --tq-color-on-accent: #fff7ec;
+  --tq-color-accent-hover: #ef3d24;
+  --tq-color-accent-soft: color-mix(in srgb, var(--color-fire) 22%, transparent);
+  --tq-color-accent-soft-hover: color-mix(in srgb, var(--color-fire) 34%, transparent);
+
+  --tq-color-background: var(--color-k-bg);
+  --tq-color-text: var(--color-k-text);
+  --tq-color-text-mute: color-mix(in srgb, var(--color-cream) 58%, transparent);
+  --tq-color-text-subtle: color-mix(in srgb, var(--color-cream) 36%, transparent);
+  --tq-color-surface: color-mix(in srgb, var(--color-k-surface) 94%, transparent);
+  --tq-color-border: color-mix(in srgb, var(--color-cream) 18%, transparent);
+  --tq-color-border-subtle: color-mix(in srgb, var(--color-cream) 10%, transparent);
+  --tq-color-shadow: rgba(0, 0, 0, 0.78);
+
+  --tq-color-input: color-mix(in srgb, var(--color-k-bg) 90%, var(--color-cream) 10%);
+  --tq-color-input-hover: color-mix(in srgb, var(--color-k-bg) 82%, var(--color-cream) 18%);
+  --tq-color-neutral: var(--color-k-muted);
+  --tq-color-neutral-hover: color-mix(in srgb, var(--color-k-muted) 78%, var(--color-cream) 22%);
+  --tq-color-selection: color-mix(in srgb, var(--color-fire) 36%, var(--color-k-bg));
+  --tq-color-on-selection: var(--color-cream);
+
+  --tq-font-ui: var(--font-body);
+  --tq-font-heading: var(--font-display);
+  --tq-font-numeric: var(--font-display);
+  --tq-font-code: var(--font-display);
+  --tq-rem: 12px;
+
+  --tq-input-height: 26px;
+  --tq-radius-input: 3px;
+  --tq-radius-popup: 7px;
+  --tq-radius-pane: 7px;
+  --tq-popup-width: 252px;
+  --tq-popup-padding: 10px;
+  --tq-popup-blur: 10px;
+  --tq-gap-group: 4px;
+  --tq-gap-related: 6px;
+  --tq-gap-control: 8px;
+  --tq-gap-section: 16px;
+  --tq-scrollbar-width: 5px;
+  --tq-hover-transition-duration: 150ms;
+  --tq-active-transition-duration: 90ms;
+  color-scheme: dark;
+}
+
+.TqViewport .tq-input-number {
+  border: 1px solid color-mix(in srgb, var(--color-cream) 12%, transparent);
+  border-radius: var(--tq-radius-input);
+  box-shadow: inset 0 1px 0 rgba(255, 247, 236, 0.035);
+  transition: border-color 150ms ease, box-shadow 150ms ease, background 150ms ease;
+}
+
+.TqViewport .tq-input-number:hover {
+  border-color: color-mix(in srgb, var(--color-cream) 26%, transparent);
+  box-shadow: inset 0 1px 0 rgba(255, 247, 236, 0.05), 0 3px 12px rgba(0, 0, 0, 0.18);
+}
+
+.TqViewport .tq-input-number:focus-within {
+  border-color: color-mix(in srgb, var(--color-fire) 78%, var(--color-cream));
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--color-fire) 42%, transparent),
+    inset 0 1px 0 rgba(255, 247, 236, 0.06);
+}
+
+.TqViewport .tq-input-number input {
+  color: var(--color-k-text);
+  caret-color: var(--color-fire);
+  font-family: var(--font-display);
+  font-size: 12px;
+  letter-spacing: 0.015em;
+}
+
+.TqViewport .tq-input-number input::selection {
+  background: color-mix(in srgb, var(--color-fire) 62%, transparent);
+  color: var(--color-cream);
+}
+
+.TqViewport .tq-input-number [data-number-scrub] {
+  cursor: ew-resize;
+}
+
+.TqViewport .tq-input-number-shell {
+  position: relative;
+  width: 100%;
+}
+
+.TqViewport .tq-input-number-shell::after {
+  position: absolute;
+  z-index: 2;
+  top: 1px;
+  bottom: 1px;
+  left: var(--tq-value-position);
+  width: 0;
+  border-left: 1px dashed var(--color-fire);
+  opacity: 0;
+  pointer-events: none;
+  content: '';
+  transition: opacity 120ms ease;
+}
+
+.TqViewport .tq-input-number-shell:focus-within::after,
+.TqViewport .tq-input-number-shell:has([class*='tweaking'])::after {
+  opacity: 0.9;
+}
+
+/* Tweeq's gesture scale is an SVG overlay without an intrinsic viewport. */
+.TqViewport .tq-input-number > svg[class*='overlay'] {
+  top: 50%;
+  left: 0;
+  width: 100%;
+  height: 1px;
+  overflow: visible;
+  transform: translateY(-50%);
+}
+
+.TqViewport .tq-input-angle,
+.TqViewport .tq-input-angle > div {
+  width: 100%;
+  min-width: 0;
+}
+
+.TqViewport .tq-input-angle > div {
+  display: flex;
+  flex: 1 1 auto;
+  align-items: center;
+  flex-direction: row-reverse;
+  justify-content: space-between;
+  gap: var(--tq-gap-control);
+  overflow: visible;
+}
+
+.TqViewport .tq-input-angle > div > button[tweak-mode] {
+  flex: 0 0 var(--tq-input-height);
+  min-width: 0;
+  max-width: var(--tq-input-height);
+  width: var(--tq-input-height);
+  height: var(--tq-input-height);
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: var(--tq-color-input);
+  box-shadow: none;
+  outline: none;
+  transition: background 150ms ease, box-shadow 150ms ease;
+}
+
+.TqViewport .tq-input-angle > div > button[tweak-mode]:hover,
+.TqViewport .tq-input-angle > div > button[tweak-mode]:focus-visible {
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--color-fire) 22%, transparent);
+}
+
+.TqViewport .tq-input-angle > div > button[tweak-mode]::before {
+  display: none;
+}
+
+.TqViewport .tq-input-angle > div > [font='numeric'] {
+  flex: 1 1 auto;
+  width: auto;
+  min-width: 0;
+  border: 1px solid color-mix(in srgb, var(--color-cream) 12%, transparent);
+  border-radius: var(--tq-radius-input);
+  box-shadow: inset 0 1px 0 rgba(255, 247, 236, 0.035);
+  transition: border-color 150ms ease, box-shadow 150ms ease, background 150ms ease;
+}
+
+.TqViewport .tq-input-angle > div > [font='numeric']:hover {
+  border-color: color-mix(in srgb, var(--color-cream) 26%, transparent);
+}
+
+.TqViewport .tq-input-angle > div > [font='numeric']:focus-within {
+  border-color: color-mix(in srgb, var(--color-fire) 78%, var(--color-cream));
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--color-fire) 42%, transparent),
+    inset 0 1px 0 rgba(255, 247, 236, 0.06);
+}
+
+.TqViewport .tq-input-angle input {
+  color: var(--color-k-text);
+  caret-color: var(--color-fire);
+  font-family: var(--font-display);
+  font-size: 12px;
+  letter-spacing: 0.015em;
+}
+
+.k-color-picker {
+  position: relative;
+  overflow: hidden;
+  background: color-mix(in srgb, var(--color-k-surface) 92%, var(--color-fire) 8%) !important;
+  border-color: color-mix(in srgb, var(--color-cream) 18%, transparent) !important;
+  box-shadow: 0 18px 42px rgba(0, 0, 0, 0.52), inset 0 1px 0 rgba(255, 247, 236, 0.05) !important;
+}
+
+.k-color-picker::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 16px;
+  right: 16px;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, var(--color-fire), transparent);
+  opacity: 0.72;
+  pointer-events: none;
+}
+
+.k-color-picker__title {
+  color: color-mix(in srgb, var(--color-cream) 54%, transparent) !important;
+}
+
+.k-color-picker__close {
+  color: color-mix(in srgb, var(--color-cream) 56%, transparent) !important;
+}
+
+.k-color-picker__close:hover {
+  color: var(--color-cream) !important;
+  background-color: color-mix(in srgb, var(--color-fire) 18%, transparent) !important;
+}
+
+.k-color-picker .tq-color-input > button {
+  border-radius: var(--tq-radius-input);
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--color-cream) 16%, transparent);
+  transition: box-shadow 150ms ease, transform 150ms ease;
+}
+
+.k-color-picker .tq-color-input > button:hover,
+.k-color-picker .tq-color-input > button:focus-visible {
+  box-shadow: 0 0 0 1px var(--color-cream), 0 5px 16px rgba(209, 20, 2, 0.2);
+  transform: translateY(-1px);
+}
+
+.k-color-picker .tq-color-input > button:focus-visible {
+  outline: 1px solid var(--color-fire);
+  outline-offset: 3px;
+}
+
+.k-color-picker .tq-color-input > button > div {
+  border-radius: var(--tq-radius-input);
+}
+
 /* カスタムスライダー */
 @utility slider {
   -webkit-appearance: none;
