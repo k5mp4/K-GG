@@ -29,6 +29,7 @@ describe('isPostprocessTimeAnimationActive', () => {
     'prism',
     'voronoi',
     'glass',
+    'glassV2',
     'particles',
   ];
 

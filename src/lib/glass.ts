@@ -116,15 +116,19 @@ export function getPostprocessStackSamplePadding(
   postprocess: PostprocessConfig | null | undefined,
   effectPipeline?: EffectPipelineConfig | null,
 ): number {
-  const glassActive = effectPipeline?.version === 'stack-v2'
-    ? isEffectStackLayerEnabled(effectPipeline, 'glass')
-    : Boolean(postprocess?.enabled && postprocess && isPostprocessLayerEnabled(postprocess, 'glass'));
-  if (!glassActive || !postprocess || isGlassOpticallyIdentity(postprocess)) {
+  const glassLayerCount = effectPipeline?.version === 'stack-v2'
+    ? Number(isEffectStackLayerEnabled(effectPipeline, 'glass'))
+      + Number(isEffectStackLayerEnabled(effectPipeline, 'glassV2'))
+    : postprocess?.enabled && postprocess
+      ? Number(isPostprocessLayerEnabled(postprocess, 'glass'))
+        + Number(isPostprocessLayerEnabled(postprocess, 'glassV2'))
+      : 0;
+  if (glassLayerCount === 0 || !postprocess || isGlassOpticallyIdentity(postprocess)) {
     return 0;
   }
 
   const params = normalizeGlassRenderParameters(postprocess);
-  return Math.ceil(params.refraction + params.chromaticAberration + params.roughness) + 2;
+  return glassLayerCount * (Math.ceil(params.refraction + params.chromaticAberration + params.roughness) + 2);
 }
 
 export const getGlassSamplePadding = getPostprocessStackSamplePadding;

@@ -1,0 +1,26 @@
+{
+  "name": "tweeq",
+  "version": "0.0.0-kgg.1",
+  "private": true,
+  "type": "module",
+  "module": "./index.es.js",
+  "main": "./index.cjs",
+  "types": "./index.d.ts",
+  "style": "./style.css",
+  "exports": {
+    ".": {
+      "types": "./index.d.ts",
+      "import": "./index.es.js",
+      "require": "./index.cjs"
+    },
+    "./style.css": "./style.css"
+  },
+  "sideEffects": ["./style.css"],
+  "peerDependencies": {
+    "react": ">=18.0.0",
+    "react-dom": ">=18.0.0"
+  },
+  "repository": "https://github.com/arcatdmz/tweeq",
+  "license": "MIT",
+  "gitHead": "d859beddb0228b56d7ea5dbd1a5f904f559b81fa"
+}

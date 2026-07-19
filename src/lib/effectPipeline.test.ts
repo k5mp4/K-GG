@@ -137,6 +137,7 @@ describe('effectPipeline', () => {
       expect(plan.programs).toEqual({
         stackCore: true,
         glass: true,
+        glassV2: false,
         normalMap: true,
         blur: true,
         stretch: false,
@@ -158,8 +159,9 @@ describe('effectPipeline', () => {
         { kind: 'mirror', enabled: false },
         { kind: 'kaleidoscope', enabled: false },
         { kind: 'voronoi', enabled: false },
-        { kind: 'glass', enabled: false },
-        { kind: 'diffuse', enabled: true },
+      { kind: 'glass', enabled: false },
+      { kind: 'glassV2', enabled: false },
+      { kind: 'diffuse', enabled: true },
       ],
       selectedKind: 'diffuse',
       prismEnabled: false,
@@ -182,6 +184,7 @@ describe('effectPipeline', () => {
       { kind: 'distort', enabled: false },
       { kind: 'kaleidoscope', enabled: false },
       { kind: 'voronoi', enabled: false },
+      { kind: 'glassV2', enabled: false },
       { kind: 'diffuse', enabled: false },
     ]);
   });
@@ -209,6 +212,7 @@ describe('effectPipeline', () => {
       'mirror',
       'kaleidoscope',
       'voronoi',
+      'glassV2',
     ]);
     expect(Object.fromEntries(normalized.map(layer => [layer.kind, layer.enabled]))).toEqual({
       diffuse: false,
@@ -220,6 +224,7 @@ describe('effectPipeline', () => {
       mirror: true,
       kaleidoscope: false,
       voronoi: true,
+      glassV2: false,
     });
   });
 
@@ -246,6 +251,7 @@ describe('effectPipeline', () => {
       'mirror',
       'kaleidoscope',
       'voronoi',
+      'glassV2',
       'diffuse',
     ]);
 
@@ -280,6 +286,7 @@ describe('effectPipeline', () => {
       'kaleidoscope',
       'voronoi',
       'glass',
+      'glassV2',
       'diffuse',
       'noise',
     ]);

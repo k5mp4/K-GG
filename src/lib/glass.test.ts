@@ -62,6 +62,17 @@ describe('getPostprocessStackSamplePadding', () => {
     )).toBe(40);
   });
 
+  it('adds the two independent Glass layer sample radii when both are enabled', () => {
+    const pipeline = createDefaultEffectPipeline();
+    const bothGlassLayers = {
+      ...pipeline,
+      effectStack: pipeline.effectStack.map(layer => (
+        layer.kind === 'glass' || layer.kind === 'glassV2' ? { ...layer, enabled: true } : layer
+      )),
+    };
+    expect(getPostprocessStackSamplePadding(glassConfig({ enabled: false }), bothGlassLayers)).toBe(80);
+  });
+
   it('clamps imported or directly entered values to renderer limits', () => {
     expect(getPostprocessStackSamplePadding(glassConfig({
       glassRefraction: 999,

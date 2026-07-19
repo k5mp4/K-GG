@@ -23,7 +23,8 @@ const NOISE_TYPES = [
   { value: 'voronoi',          label: 'Voronoi' },
   { value: 'ridged_fbm',       label: 'Aura Ridges' },
   { value: 'ae_fractal',       label: 'Fractal Drift' },
-  { value: 'curl',             label: 'Curl' },
+  { value: 'curl',             label: 'Curl (Legacy)' },
+  { value: 'fast_curl',        label: 'Fast Curl' },
   { value: 'domain_warp_anim', label: 'Domain Warp' },
   { value: 'seamless',         label: 'Seamless'},
 ] as { value: string; label: string; hidden?: boolean }[];
@@ -59,10 +60,13 @@ export function NoiseDistortionPanel() {
   const isVoronoi = noiseDistortion.type === 'voronoi';
   const isRidged = noiseDistortion.type === 'ridged_fbm';
   const isAeFractal = noiseDistortion.type === 'ae_fractal';
+  const isCurl = noiseDistortion.type === 'curl';
+  const isFastCurl = noiseDistortion.type === 'fast_curl';
   const hasOctaves = noiseDistortion.type === 'fbm' ||
                     noiseDistortion.type === 'ridged_fbm' ||
                     noiseDistortion.type === 'ae_fractal' ||
-                    noiseDistortion.type === 'curl' ||
+                    isCurl ||
+                    isFastCurl ||
                     noiseDistortion.type === 'domain_warp_anim' ||
                     (isSeamless && (noiseDistortion.seamlessType === 'fbm' || noiseDistortion.seamlessType === 'curl'));
 
@@ -315,7 +319,7 @@ export function NoiseDistortionPanel() {
             />
           )}
 
-          {noiseDistortion.type !== 'curl' && (
+          {!isCurl && !isFastCurl && (
             <div className="flex items-end gap-2">
               <div className="flex-1">
                 <SliderField
@@ -338,7 +342,7 @@ export function NoiseDistortionPanel() {
             </div>
           )}
 
-          {noiseDistortion.type === 'curl' && (
+          {(isCurl || isFastCurl) && (
             <>
               <SliderField
                 label="Flow Steps"
@@ -350,7 +354,7 @@ export function NoiseDistortionPanel() {
                 trackId="noiseDistortion.curlSteps"
               />
               <SliderField
-                label="Flow Speed"
+                label={isFastCurl ? 'Flow Strength' : 'Flow Speed'}
                 min={0} max={2.0} step={0.01}
                 value={noiseDistortion.curlSpeed ?? 0.5}
                 onChange={(v) => setNoiseDistortion({ curlSpeed: v })}
@@ -358,7 +362,7 @@ export function NoiseDistortionPanel() {
                 defaultValue={D.curlSpeed ?? 0.5}
                 trackId="noiseDistortion.curlSpeed"
               />
-              <SliderField
+              {isCurl && <SliderField
                 label="Curl Eps"
                 min={0.001} max={0.2} step={0.001}
                 value={noiseDistortion.curlEps ?? 0.01}
@@ -366,7 +370,7 @@ export function NoiseDistortionPanel() {
                 format={(v) => v.toFixed(3)}
                 defaultValue={D.curlEps ?? 0.01}
                 trackId="noiseDistortion.curlEps"
-              />
+              />}
               <div className="flex items-end gap-2">
                 <div className="flex-1">
                   <SliderField

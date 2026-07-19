@@ -21,11 +21,16 @@ title: 機能仕様
 | SPEC-008 | [画像カラーパレット生成機能](./SPEC-008-color-palette-generator.md) | implemented |
 | SPEC-009 | [画像グラデーション入力](./SPEC-009-image-gradient-source.md) | implemented |
 | SPEC-010 | [Bezier Axisの廃止](./SPEC-010-remove-bezier-axis.md) | implemented |
-| SPEC-011 | [Postprocess Effect Stack](./SPEC-011-postprocess-effect-stack.md) | implemented |
-| SPEC-012 | [Unified Effect Stack V2](./SPEC-012-unified-effect-stack-v2.md) | approved |
-| SPEC-013 | [Effect Stackの折りたたみと描画安定化・軽量化](./SPEC-013-effect-stack-stability-and-performance.md) | implemented |
-| SPEC-014 | [DiffuseのEffect Stackレイヤー化](./SPEC-014-configurable-diffuse-stack-position.md) | implemented |
-| SPEC-015 | [Effect Stack操作と描画リカバリー](./SPEC-015-effect-stack-interaction-and-render-recovery.md) | implemented |
+| SPEC-011 | [右サイドバーの情報設計とキャンバス解像度プリセット](./SPEC-011-right-sidebar-organization.md) | implemented |
+| SPEC-012 | [Postprocess Effect Stack](./SPEC-012-postprocess-effect-stack.md) | implemented |
+| SPEC-013 | [Unified Effect Stack V2](./SPEC-013-unified-effect-stack-v2.md) | implemented |
+| SPEC-014 | [Effect Stackの折りたたみと描画安定化・軽量化](./SPEC-014-effect-stack-stability-and-performance.md) | implemented |
+| SPEC-015 | [DiffuseのEffect Stackレイヤー化](./SPEC-015-configurable-diffuse-stack-position.md) | implemented |
+| SPEC-016 | [Effect Stack操作と描画リカバリー](./SPEC-016-effect-stack-interaction-and-render-recovery.md) | implemented |
+| SPEC-017 | [Effect StackとColor Histogramのワークスペース配置](./SPEC-017-effect-stack-workspace-layout.md) | draft |
+| SPEC-018 | [Glass V2光学屈折エフェクト](./SPEC-018-glass-v2-optical-refraction.md) | implemented |
+| SPEC-019 | [Gradient Rampのプロポーショナルストップ編集](./SPEC-019-proportional-gradient-stop-editing.md) | implemented |
+| SPEC-020 | [Fast Curl Noiseの追加と軽量化](./SPEC-020-fast-curl-noise.md) | approved |
 
 ## 新しい仕様の作り方
 

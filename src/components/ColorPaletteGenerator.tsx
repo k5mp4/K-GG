@@ -12,9 +12,10 @@ import {
 
 interface ColorPaletteGeneratorProps {
   overlayImageElement: HTMLImageElement | null;
+  embedded?: boolean;
 }
 
-export function ColorPaletteGenerator({ overlayImageElement }: ColorPaletteGeneratorProps) {
+export function ColorPaletteGenerator({ overlayImageElement, embedded = false }: ColorPaletteGeneratorProps) {
   const setGradient = useGradientStore((state) => state.setGradient);
 
   const [colorCount, setColorCount] = useState<number>(5);
@@ -135,23 +136,29 @@ export function ColorPaletteGenerator({ overlayImageElement }: ColorPaletteGener
     setGradient({ stops });
   };
 
+  const overlayImportButton = overlayImageElement ? (
+    <button
+      type="button"
+      onClick={handleLoadFromOverlay}
+      className="text-[10px] text-cream hover:text-k-text px-2 py-0.5 rounded-none bg-cream/10 hover:bg-cream/20 transition-all duration-150 cursor-pointer"
+      title="現在設定されているOverlay/Mask画像から色を抽出します"
+    >
+      Overlayから取得
+    </button>
+  ) : null;
+
   return (
-    <div className="border-t border-panel-border border-t-panel pt-4 space-y-4">
-      <div className="flex items-center justify-between">
-        <h2 className="text-xs font-display font-semibold uppercase tracking-wider text-k-text">
-          Color Palette Generator
-        </h2>
-        {overlayImageElement && (
-          <button
-            type="button"
-            onClick={handleLoadFromOverlay}
-            className="text-[10px] text-cream hover:text-k-text px-2 py-0.5 rounded-none bg-cream/10 hover:bg-cream/20 transition-all duration-150 cursor-pointer"
-            title="現在設定されているOverlay/Mask画像から色を抽出します"
-          >
-            Overlayから取得
-          </button>
-        )}
-      </div>
+    <div className={`${embedded ? 'space-y-4' : 'border-t border-panel-border border-t-panel pt-4 space-y-4'}`}>
+      {embedded ? (
+        overlayImportButton && <div className="flex justify-end">{overlayImportButton}</div>
+      ) : (
+        <div className="flex items-center justify-between">
+          <h2 className="text-xs font-display font-semibold uppercase tracking-wider text-k-text">
+            Color Palette Generator
+          </h2>
+          {overlayImportButton}
+        </div>
+      )}
 
       {/* ドラッグ＆ドロップ領域 */}
       <div

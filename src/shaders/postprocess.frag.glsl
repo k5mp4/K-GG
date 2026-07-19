@@ -68,6 +68,7 @@ uniform float u_stackSlitWidth;
 uniform float u_stackSlitOffset;
 uniform float u_stackSlitVariance;
 uniform vec2 u_stackSlitParams;
+uniform bool u_stackSlitDiffuseAfter;
 uniform vec4 u_stackSlitDelta01;
 uniform vec4 u_stackSlitDelta23;
 uniform vec4 u_stackSlitDelta45;
@@ -329,19 +330,27 @@ vec4 voronoiGradient(vec2 uv) {
 
   float cellPhase = hashWithSeed(dot(nearestCell, vec2(17.0, 59.0)), u_postVoronoiSeed);
   float cellAngle = u_postVoronoiAngle + (cellPhase - 0.5) * PI * clamp(u_postVoronoiRandomness, 0.0, 1.0);
-  vec2 anchorA = rotateUnitUv(u_gradAnchor0, cellAngle);
-  vec2 anchorB = rotateUnitUv(u_gradAnchor1, cellAngle);
-  vec2 axis = anchorB - anchorA;
-  vec2 localUv = p - nearestCell;
-  float t = dot(localUv - anchorA, axis) / max(dot(axis, axis), 0.0001);
-  t = (t - 0.5) * max(u_postVoronoiGradientScale, 0.001) + 0.5;
-  t += (cellPhase - 0.5) * 0.18;
-  vec4 color = texture2D(u_gradientRamp, vec2(clamp(t, 0.0, 1.0), 0.5));
+  // Map the complete input texture into every Voronoi cell. The preceding
+  // stack result is therefore tiled by the cells instead of being drawn as a
+  // ramp-colored overlay on top of the original gradient.
+  vec2 cellLocal = p - nearestCell - 0.5;
+  float cosAngle = cos(-cellAngle);
+  float sinAngle = sin(-cellAngle);
+  vec2 rotatedLocal = vec2(
+    cellLocal.x * cosAngle - cellLocal.y * sinAngle,
+    cellLocal.x * sinAngle + cellLocal.y * cosAngle
+  );
+  vec2 tiledUv = fract(rotatedLocal + 0.5 + vec2(cellPhase, cellPhase * 0.731));
+  vec4 sourceColor = texture2D(u_sourceTex, tiledUv);
+
+  // The preceding stack texture is the only color source. Do not overlay the
+  // original gradient here; Voronoi should reshape the already-processed image.
+  vec4 color = sourceColor;
 
   float edgeWidth = clamp(u_postVoronoiEdgeWidth, 0.0, 0.2);
   if (edgeWidth > 0.0) {
     float edge = smoothstep(0.0, edgeWidth, f2 - f1);
-    vec3 edgeColor = texture2D(u_gradientRamp, vec2(clamp(cellPhase, 0.0, 1.0), 0.5)).rgb;
+    vec3 edgeColor = sourceColor.rgb * 0.58;
     color.rgb = mix(edgeColor, color.rgb, edge);
   }
 
@@ -367,6 +376,15 @@ vec2 applyStackCurlNoiseUv(vec2 uv, float evolution, float curlTime) {
   return uv;
 }
 
+vec2 applyStackFastCurlNoiseUv(vec2 uv, float evolution) {
+  float dt = u_noiseAmount / max(float(u_curlSteps), 1.0);
+  for (int stepIndex = 0; stepIndex < 8; stepIndex++) {
+    if (stepIndex >= u_curlSteps) break;
+    uv -= fastCurlField(uv, u_noiseScale, evolution, u_noiseOctaves) * dt;
+  }
+  return uv;
+}
+
 vec2 stackNoiseUv(vec2 uv) {
   if (!u_noiseEnabled) return uv;
   float evolution = u_noiseEvolution + u_time;
@@ -380,6 +398,9 @@ vec2 stackNoiseUv(vec2 uv) {
       (u_time - u_noiseLoopPeriod) * u_curlSpeed
     );
     return mix(current, wrapped, blend);
+  }
+  if (u_noiseType == 8) {
+    return applyStackFastCurlNoiseUv(uv, evolution);
   }
   vec2 offset = noiseDisplace(uv, u_noiseScale, evolution, u_noiseType, u_noiseOctaves);
   return uv + offset * u_noiseAmount;
@@ -724,6 +745,12 @@ vec2 glassResolution() {
   ), vec2(1.0));
 }
 
+float glassUvPixelFootprint(float scale, float stretch, vec2 resolution) {
+  float aspect = resolution.x / max(resolution.y, 1.0);
+  float axisScale = max(aspect, 1.0) * max(1.0, 1.0 / max(stretch, 0.001));
+  return finiteFloat(scale * axisScale / max(min(resolution.x, resolution.y), 1.0), 0.0);
+}
+
 vec2 glassTileSize() {
   return max(vec2(
     finiteFloat(u_tileResolution.x, 1.0),
@@ -1022,7 +1049,9 @@ vec2 glassBoundedGradient(vec2 gradient) {
   gradient = vec2(finiteFloat(gradient.x, 0.0), finiteFloat(gradient.y, 0.0));
   float gradientLength = length(gradient);
   if (!(gradientLength > 0.000001) || gradientLength >= 1000000000.0) return vec2(0.0);
-  return gradient * (0.085 / (1.0 + gradientLength * 0.085));
+  // Preserve small slopes at approximately unit gain; only large gradients
+  // are compressed to keep refraction bounded and continuous.
+  return gradient / (1.0 + gradientLength * 0.085);
 }
 
 vec2 glassStableDirection(vec2 boundedGradient) {
@@ -1116,6 +1145,190 @@ vec4 organicGlass(vec2 globalUv, vec2 globalCoord) {
   vec4 result = vec4(mix(original.rgb, highlighted, glassMix), original.a);
   return applyDiffuseDither(result, globalCoord);
 }
+
+// Glass V2 uses a quintic gradient-noise field and wavelength-dependent
+// screen-space refraction. It shares the bounded sampling contract with the
+// original Glass effect, but keeps its field and optical composition
+// independent so both layers can coexist in one stack.
+vec2 glassV2Gradient(vec2 cell, float seedOffset) {
+  vec2 gradient = hash22(cell, glassFloat(u_glassSeed, 0.0, 0.0, 99.0) + seedOffset) * 2.0 - 1.0;
+  float lengthSquared = dot(gradient, gradient);
+  if (!(lengthSquared > 0.000001) || lengthSquared >= 1000000000.0) return vec2(1.0, 0.0);
+  return gradient * inversesqrt(lengthSquared);
+}
+
+vec2 glassV2QuinticFade(vec2 t) {
+  return t * t * t * (t * (t * 6.0 - 15.0) + 10.0);
+}
+
+float glassV2GradientNoise(vec2 p, float seedOffset) {
+  vec2 cell = floor(p);
+  vec2 local = fract(p);
+  vec2 fade = glassV2QuinticFade(local);
+  float n00 = dot(glassV2Gradient(cell, seedOffset), local);
+  float n10 = dot(glassV2Gradient(cell + vec2(1.0, 0.0), seedOffset), local - vec2(1.0, 0.0));
+  float n01 = dot(glassV2Gradient(cell + vec2(0.0, 1.0), seedOffset), local - vec2(0.0, 1.0));
+  float n11 = dot(glassV2Gradient(cell + vec2(1.0, 1.0), seedOffset), local - vec2(1.0, 1.0));
+  return finiteFloat(mix(mix(n00, n10, fade.x), mix(n01, n11, fade.x), fade.y), 0.0);
+}
+
+float glassV2Height(vec2 uv) {
+  float scale = glassFloat(u_glassScale, 3.2, 0.5, 12.0);
+  float stretch = glassFloat(u_glassStretch, 4.0, 0.25, 8.0);
+  float rotation = glassFloat(u_glassRotation, 0.0, -6.28318530718, 6.28318530718);
+  float complexity = glassFloat(float(u_glassComplexity), 4.0, 1.0, 5.0);
+  float warp = glassFloat(u_glassWarp, 0.55, 0.0, 1.0);
+  float evolution = glassFloat(u_glassEvolution, 0.0, 0.0, 1.0);
+  float motion = glassFloat(u_glassMotion, 0.35, 0.0, 1.0);
+  vec2 resolution = glassResolution();
+  vec2 p = uv - vec2(0.5);
+  p.x *= resolution.x / resolution.y;
+  float c = cos(rotation);
+  float s = sin(rotation);
+  p = mat2(c, -s, s, c) * p * scale;
+  p.y /= stretch;
+
+  float phase = prismLoopProgress() * 2.0 * PI + evolution * 2.0 * PI;
+  vec2 loopOffset = vec2(cos(phase), sin(phase)) * motion * 0.42;
+  vec2 warpField = vec2(
+    glassV2GradientNoise(p * 0.73 + loopOffset, 17.0),
+    glassV2GradientNoise(p * 0.73 - loopOffset.yx, 43.0)
+  );
+  p += warpField * warp * 0.85 + loopOffset;
+
+  float value = 0.0;
+  float weight = 0.56;
+  float weightSum = 0.0;
+  float footprint = glassUvPixelFootprint(scale, stretch, resolution) * (1.0 + warp * 0.85);
+  for (int i = 0; i < 5; i++) {
+    if (float(i) >= complexity) break;
+    float fi = float(i);
+    float bandLimit = 1.0 - smoothstep(0.35, 0.9, clamp(finiteFloat(footprint, 0.0), 0.0, 100.0));
+    value += glassV2GradientNoise(p, 71.0 + fi * 29.0) * weight * bandLimit;
+    weightSum += weight * bandLimit;
+    p = mat2(0.8, -0.6, 0.6, 0.8) * p * 1.93
+      + vec2(11.7, -8.3) + loopOffset * (0.17 + fi * 0.04);
+    footprint *= 1.93;
+    weight *= 0.52;
+  }
+  return finiteFloat(0.5 + 0.42 * value / max(weightSum, 0.0001), 0.5);
+}
+
+float glassV2SurfaceHeight(vec2 uv) {
+  uv = glassFiniteUv(uv);
+  float influence = glassFloat(u_glassNoiseInfluence, 0.0, 0.0, 1.0);
+  if (influence <= 0.0) return glassV2Height(uv);
+  if (influence >= 1.0) return glassNoiseHeight(uv);
+  return finiteFloat(mix(glassV2Height(uv), glassNoiseHeight(uv), influence), 0.5);
+}
+
+vec2 glassV2SurfaceGradient(vec2 globalUv, vec2 resolution, float radiusPx) {
+  vec2 stepUv = radiusPx / resolution;
+  float hLeft = glassV2SurfaceHeight(globalUv - vec2(stepUv.x, 0.0));
+  float hRight = glassV2SurfaceHeight(globalUv + vec2(stepUv.x, 0.0));
+  float hDown = glassV2SurfaceHeight(globalUv - vec2(0.0, stepUv.y));
+  float hUp = glassV2SurfaceHeight(globalUv + vec2(0.0, stepUv.y));
+  return vec2(hRight - hLeft, hUp - hDown) / (radiusPx * 2.0) * min(resolution.x, resolution.y);
+}
+
+vec2 glassV2RefractDirection(vec3 incident, vec3 normal, float ior) {
+  vec3 transmitted = refract(incident, normal, 1.0 / glassFloat(ior, 1.5, 1.0, 2.5));
+  float lengthSquared = dot(transmitted, transmitted);
+  if (!(lengthSquared > 0.000001) || lengthSquared >= 1000000000.0) return vec2(0.0);
+  vec2 direction = vec2(finiteFloat(transmitted.x, 0.0), finiteFloat(transmitted.y, 0.0));
+  float directionLength = length(direction);
+  if (!(directionLength >= 0.0) || directionLength >= 1000000000.0) return vec2(0.0);
+  return direction / max(1.0, directionLength);
+}
+
+float glassCauchyIor(float wavelengthMicrometers, float chromaticAberration) {
+  const float nD = 1.5;
+  const float lambdaD = 0.5876;
+  const float lambdaF = 0.4861;
+  const float lambdaC = 0.6563;
+  float amount = clamp(chromaticAberration / 40.0, 0.0, 1.0);
+  float deltaFC = (nD - 1.0) * amount / 8.0;
+  float inverseF = 1.0 / (lambdaF * lambdaF);
+  float inverseC = 1.0 / (lambdaC * lambdaC);
+  float cauchyB = deltaFC / max(inverseF - inverseC, 0.000001);
+  float cauchyA = nD - cauchyB / (lambdaD * lambdaD);
+  float wavelength = clamp(wavelengthMicrometers, 0.4, 0.7);
+  return cauchyA + cauchyB / (wavelength * wavelength);
+}
+
+vec3 glassV2Transmission(
+  vec2 baseUv,
+  vec2 redOffset,
+  vec2 yellowOffset,
+  vec2 greenOffset,
+  vec2 cyanOffset,
+  vec2 blueOffset,
+  vec2 roughnessOffset,
+  float roughness
+) {
+  vec3 red = sampleGlassSource(baseUv + redOffset).rgb;
+  vec3 yellow = sampleGlassSource(baseUv + yellowOffset).rgb;
+  vec3 green = sampleGlassSource(baseUv + greenOffset).rgb;
+  vec3 cyan = sampleGlassSource(baseUv + cyanOffset).rgb;
+  vec3 blue = sampleGlassSource(baseUv + blueOffset).rgb;
+  vec3 color = vec3(
+    red.r * 0.72 + yellow.r * 0.28,
+    yellow.g * 0.22 + green.g * 0.56 + cyan.g * 0.22,
+    cyan.b * 0.28 + blue.b * 0.72
+  );
+  if (roughness <= 0.0001) return color;
+  vec3 roughColor = (
+    green +
+    sampleGlassSource(baseUv + greenOffset + roughnessOffset).rgb +
+    sampleGlassSource(baseUv + greenOffset - roughnessOffset).rgb
+  ) / 3.0;
+  return mix(color, roughColor, clamp(roughness / 12.0, 0.0, 1.0));
+}
+
+vec4 opticalGlassV2(vec2 globalUv, vec2 globalCoord) {
+  float refractionPx = glassFloat(u_glassRefraction, 32.0, 0.0, 120.0);
+  float chromaticPx = glassFloat(u_glassChromaticAberration, 4.0, 0.0, 40.0);
+  float roughnessPx = glassFloat(u_glassRoughness, 1.5, 0.0, 12.0);
+  float highlightAmount = glassFloat(u_glassHighlight, 0.45, 0.0, 2.0);
+  float mixAmount = glassFloat(u_glassMix, 1.0, 0.0, 1.0);
+  vec2 resolution = glassResolution();
+  vec2 gradient = glassV2SurfaceGradient(globalUv, resolution, 2.0);
+  vec2 boundedGradient = glassBoundedGradient(gradient);
+  vec3 normal = glassSafeNormal(boundedGradient);
+  vec3 incident = vec3(0.0, 0.0, -1.0);
+  float redIor = glassCauchyIor(0.6563, chromaticPx);
+  float yellowIor = glassCauchyIor(0.5893, chromaticPx);
+  float greenIor = glassCauchyIor(0.5461, chromaticPx);
+  float cyanIor = glassCauchyIor(0.4861, chromaticPx);
+  float blueIor = glassCauchyIor(0.4358, chromaticPx);
+  vec2 redDirection = glassV2RefractDirection(incident, normal, redIor);
+  vec2 yellowDirection = glassV2RefractDirection(incident, normal, yellowIor);
+  vec2 greenDirection = glassV2RefractDirection(incident, normal, greenIor);
+  vec2 cyanDirection = glassV2RefractDirection(incident, normal, cyanIor);
+  vec2 blueDirection = glassV2RefractDirection(incident, normal, blueIor);
+  vec2 redOffset = redDirection * (refractionPx + chromaticPx) / resolution;
+  vec2 yellowOffset = yellowDirection * (refractionPx + chromaticPx) / resolution;
+  vec2 greenOffset = greenDirection * refractionPx / resolution;
+  vec2 cyanOffset = cyanDirection * (refractionPx + chromaticPx) / resolution;
+  vec2 blueOffset = blueDirection * (refractionPx + chromaticPx) / resolution;
+  vec2 tangent = glassSafeDirection(vec2(-boundedGradient.y, boundedGradient.x));
+  if (length(tangent) <= 0.0001) tangent = vec2(1.0, 0.0);
+  vec2 roughnessOffset = tangent * roughnessPx / resolution;
+  vec2 baseUv = diffuseGlassGlobalUv(globalUv, globalCoord);
+  vec3 transmission = glassV2Transmission(
+    baseUv, redOffset, yellowOffset, greenOffset, cyanOffset, blueOffset, roughnessOffset, roughnessPx
+  );
+  float f0 = pow((greenIor - 1.0) / (greenIor + 1.0), 2.0);
+  float cosTheta = clamp(dot(-incident, normal), 0.0, 1.0);
+  float fresnel = f0 + (1.0 - f0) * pow(1.0 - cosTheta, 5.0);
+  vec3 lightDirection = normalize(vec3(-0.38, 0.48, 0.79));
+  vec3 halfVector = normalize(lightDirection + vec3(0.0, 0.0, 1.0));
+  float broadSpecular = pow(max(dot(normal, halfVector), 0.0), 8.0);
+  float highlight = clamp((fresnel * 0.72 + broadSpecular * 0.58) * highlightAmount, 0.0, 1.0);
+  vec3 highlighted = vec3(1.0) - (vec3(1.0) - transmission) * (vec3(1.0) - highlight);
+  vec4 original = sampleGlassSource(baseUv);
+  return applyDiffuseDither(vec4(mix(original.rgb, highlighted, mixAmount), original.a), globalCoord);
+}
 #endif
 
 void main() {
@@ -1147,7 +1360,13 @@ void main() {
   }
   if (u_effectEnabled && u_effectMode == 8) {
     vec2 slitUv = stackSlitUv(globalUv, globalCoord);
-    gl_FragColor = texture2D(u_sourceTex, sourceUvFromGlobal(slitUv));
+    vec2 sampleUv = u_stackSlitDiffuseAfter
+      ? diffuseGlobalUv(slitUv, globalCoord)
+      : slitUv;
+    vec4 slitColor = texture2D(u_sourceTex, sourceUvFromGlobal(sampleUv));
+    gl_FragColor = u_stackSlitDiffuseAfter
+      ? applyDiffuseDither(slitColor, globalCoord)
+      : slitColor;
     return;
   }
   if (u_effectEnabled && u_effectMode == 1) {
@@ -1182,7 +1401,13 @@ void main() {
   }
 #endif
 #if !defined(KGG_LIGHTWEIGHT) && !defined(KGG_PRISM_ONLY)
+#if defined(KGG_GLASS_V2_ONLY)
+  if (u_effectEnabled && u_effectMode == 9) {
+#elif defined(KGG_GLASS_ONLY)
   if (u_effectEnabled && u_effectMode == 5) {
+#else
+  if (u_effectEnabled && (u_effectMode == 5 || u_effectMode == 9)) {
+#endif
     // Glass is an identity operation when its mix or all optical terms are
     // disabled. Avoid evaluating the four-point height field in that case;
     // this is common while editing the stack and prevents needless unstable
@@ -1199,7 +1424,13 @@ void main() {
       gl_FragColor = sampleGlassSource(globalUv);
       return;
     }
-    gl_FragColor = organicGlass(globalUv, globalCoord);
+#if defined(KGG_GLASS_V2_ONLY)
+    gl_FragColor = opticalGlassV2(globalUv, globalCoord);
+#else
+    gl_FragColor = u_effectMode == 9
+      ? opticalGlassV2(globalUv, globalCoord)
+      : organicGlass(globalUv, globalCoord);
+#endif
     return;
   }
 #endif

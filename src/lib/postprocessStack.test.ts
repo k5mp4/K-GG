@@ -15,6 +15,7 @@ describe('postprocessStack', () => {
       { kind: 'prism', enabled: false },
       { kind: 'voronoi', enabled: false },
       { kind: 'glass', enabled: true },
+      { kind: 'glassV2', enabled: false },
     ]);
   });
 
@@ -31,6 +32,7 @@ describe('postprocessStack', () => {
       { kind: 'kaleidoscope', enabled: false },
       { kind: 'prism', enabled: false },
       { kind: 'voronoi', enabled: false },
+      { kind: 'glassV2', enabled: false },
     ]);
   });
 
@@ -43,6 +45,7 @@ describe('postprocessStack', () => {
       'kaleidoscope',
       'prism',
       'voronoi',
+      'glassV2',
     ]);
   });
 
@@ -55,6 +58,7 @@ describe('postprocessStack', () => {
       { kind: 'prism', enabled: false },
       { kind: 'voronoi', enabled: false },
       { kind: 'glass', enabled: true },
+      { kind: 'glassV2', enabled: false },
     ]);
   });
 });

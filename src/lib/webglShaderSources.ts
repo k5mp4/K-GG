@@ -5,16 +5,24 @@ import blurGLSL from '../shaders/blur.frag.glsl?raw';
 import normalMapGLSL from '../shaders/normalmap.frag.glsl?raw';
 import stretchGLSL from '../shaders/stretch.frag.glsl?raw';
 import postprocessGLSL from '../shaders/postprocess.frag.glsl?raw';
+import postprocessUniformsGLSL from '../shaders/postprocess/uniforms.glsl?raw';
+import postprocessSharedGLSL from '../shaders/postprocess/shared.glsl?raw';
+import postprocessDiffuseGLSL from '../shaders/postprocess/diffuse.glsl?raw';
+import postprocessGlassFieldGLSL from '../shaders/postprocess/glass-field.glsl?raw';
+import postprocessGlassOpticsGLSL from '../shaders/postprocess/glass-optics.glsl?raw';
+import postprocessMainGLSL from '../shaders/postprocess/main.glsl?raw';
 import prismCompositeGLSL from '../shaders/prismComposite.frag.glsl?raw';
 import particlesVertexGLSL from '../shaders/particles.vert.glsl?raw';
 import particlesFragmentGLSL from '../shaders/particles.frag.glsl?raw';
 
 export type LazyProgramKey =
+  | 'generator'
   | 'blur'
   | 'normalMap'
   | 'stretch'
   | 'stackCore'
   | 'glass'
+  | 'glassV2'
   | 'prism'
   | 'postprocess'
   | 'prismComposite'
@@ -32,6 +40,9 @@ export const SHADER_VERSION = (
   + normalMapGLSL.length * 997
   + stretchGLSL.length * 313
   + postprocessGLSL.length * 191
+  + postprocessGlassFieldGLSL.length * 173
+  + postprocessGlassOpticsGLSL.length * 157
+  + postprocessMainGLSL.length * 149
   + prismCompositeGLSL.length * 127
   + particlesVertexGLSL.length * 89
   + particlesFragmentGLSL.length * 83
@@ -79,11 +90,22 @@ uniform float u_aeBrightness;
 `;
 
 function createSpecializedPostprocessSource(
-  define: 'KGG_GLASS_ONLY' | 'KGG_PRISM_ONLY',
+  define: 'KGG_LEGACY_GLASS_ONLY' | 'KGG_GLASS_V2_ONLY' | 'KGG_PRISM_ONLY',
 ): string {
-  return postprocessGLSL.replace(
+  const glassOnly = define === 'KGG_LEGACY_GLASS_ONLY' || define === 'KGG_GLASS_V2_ONLY';
+  const specializedSource = glassOnly
+    ? [
+        postprocessUniformsGLSL,
+        postprocessSharedGLSL,
+        postprocessDiffuseGLSL,
+        postprocessGlassFieldGLSL,
+        postprocessGlassOpticsGLSL,
+        postprocessMainGLSL,
+      ].join('')
+    : postprocessGLSL;
+  return specializedSource.replace(
     'precision highp float;',
-    `precision highp float;\n${SPECIALIZED_NOISE_UNIFORMS}\n#define ${define}`,
+    `precision highp float;\n${SPECIALIZED_NOISE_UNIFORMS}\n${glassOnly ? '#define KGG_GLASS_ONLY\n' : ''}#define ${define}`,
   );
 }
 
@@ -109,11 +131,13 @@ function createGeneralPostprocessSource(): string {
  * WebGL context.
  */
 export function getProgramSource(key: LazyProgramKey): ProgramSource {
+  if (key === 'generator') return { vertex: vertexGLSL, fragment: `${noiseGLSL}\n${gradientGLSL}` };
   if (key === 'blur') return { vertex: vertexGLSL, fragment: blurGLSL };
   if (key === 'normalMap') return { vertex: vertexGLSL, fragment: normalMapGLSL };
   if (key === 'stretch') return { vertex: vertexGLSL, fragment: stretchGLSL };
   if (key === 'stackCore') return { vertex: vertexGLSL, fragment: createStackCoreSource() };
-  if (key === 'glass') return { vertex: vertexGLSL, fragment: createSpecializedPostprocessSource('KGG_GLASS_ONLY') };
+  if (key === 'glass') return { vertex: vertexGLSL, fragment: createSpecializedPostprocessSource('KGG_LEGACY_GLASS_ONLY') };
+  if (key === 'glassV2') return { vertex: vertexGLSL, fragment: createSpecializedPostprocessSource('KGG_GLASS_V2_ONLY') };
   if (key === 'prism') return { vertex: vertexGLSL, fragment: createSpecializedPostprocessSource('KGG_PRISM_ONLY') };
   if (key === 'postprocess') return { vertex: vertexGLSL, fragment: createGeneralPostprocessSource() };
   if (key === 'prismComposite') return { vertex: vertexGLSL, fragment: prismCompositeGLSL };
@@ -121,5 +145,13 @@ export function getProgramSource(key: LazyProgramKey): ProgramSource {
 }
 
 export function getInitialProgramSource(): ProgramSource {
-  return { vertex: vertexGLSL, fragment: `${noiseGLSL}\n${gradientGLSL}` };
+  // The bootstrap program keeps the canvas out of the CPU-only fallback while
+  // the full generator remains lazy. Its noise transform is an
+  // identity, but base gradients, source images, Slit, and Diffuse stay live.
+  const begin = noiseGLSL.indexOf('// KGG_BOOTSTRAP_NOISE_BEGIN');
+  const end = noiseGLSL.indexOf('// KGG_BOOTSTRAP_NOISE_END');
+  const bootstrapNoise = begin >= 0 && end >= begin
+    ? noiseGLSL.slice(0, begin) + noiseGLSL.slice(end + '// KGG_BOOTSTRAP_NOISE_END'.length)
+    : noiseGLSL;
+  return { vertex: vertexGLSL, fragment: `${bootstrapNoise}\n#define KGG_BOOTSTRAP\n${gradientGLSL}` };
 }

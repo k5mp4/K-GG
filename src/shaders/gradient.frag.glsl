@@ -243,6 +243,7 @@
     return clamp(computeGradientBase(sampleUV), 0.0, 1.0);
   }
 
+#if !defined(KGG_BOOTSTRAP)
   vec2 applyCurlNoiseUV(vec2 uv, float evo, float curlTime) {
       float dt = u_noiseAmount / max(float(u_curlSteps), 1.0);
       vec3 seedOffset = vec3(u_curlSeed, u_curlSeed * 1.37, u_curlSeed * 0.71);
@@ -260,7 +261,20 @@
       return uv;
   }
 
+  vec2 applyFastCurlNoiseUV(vec2 uv, float evo) {
+      float dt = u_noiseAmount / max(float(u_curlSteps), 1.0);
+      for (int s = 0; s < 8; s++) {
+        if (s >= u_curlSteps) break;
+        uv -= fastCurlField(uv, u_noiseScale, evo, u_noiseOctaves) * dt;
+      }
+      return uv;
+  }
+#endif
+
   vec2 applyNoiseUV(vec2 uv) {
+#if defined(KGG_BOOTSTRAP)
+    return uv;
+#else
     if (!u_noiseEnabled) return uv;
     float evo = u_noiseEvolution + u_time;
     if (u_noiseType == 3) {
@@ -269,10 +283,13 @@
       if (blend <= 0.0001) return current;
       vec2 wrapped = applyCurlNoiseUV(uv, evo - u_noiseLoopPeriod, (u_time - u_noiseLoopPeriod) * u_curlSpeed);
       return mix(current, wrapped, blend);
+    } else if (u_noiseType == 8) {
+      return applyFastCurlNoiseUV(uv, evo);
     } else {
       vec2 offset = noiseDisplace(uv, u_noiseScale, evo, u_noiseType, u_noiseOctaves);
       return uv + offset * u_noiseAmount;
     }
+#endif
   }
 
   float slitHash(float n) {

@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 import { createDefaultEffectStack, updateEffectStackLayer } from '../lib/effectPipeline';
+import { optimizeNoiseDistortion, type RenderOptimization } from '../lib/gpuDiagnostics';
 import { useGradientStore } from './gradientStore';
 
 function layerEnabled(kind: 'diffuse' | 'noise' | 'slit'): boolean {
@@ -101,5 +102,34 @@ describe('Gradient store Effect Pipeline V2 synchronization', () => {
     expect(layerEnabled('diffuse')).toBe(true);
     expect(layerEnabled('noise')).toBe(false);
     expect(layerEnabled('slit')).toBe(false);
+  });
+
+  it('keeps Legacy Curl and applies the lightweight Fast Curl preset independently', () => {
+    const store = useGradientStore.getState();
+    store.setNoiseDistortion({ type: 'curl' });
+    expect(useGradientStore.getState().noiseDistortion).toMatchObject({
+      type: 'curl', curlSteps: 4, curlEps: 0.01,
+    });
+
+    store.setNoiseDistortion({ type: 'fast_curl' });
+    expect(useGradientStore.getState().noiseDistortion).toMatchObject({
+      type: 'fast_curl', amount: 0.30, scale: 0.5, octaves: 3, curlSteps: 2, curlSpeed: 0.5,
+    });
+
+    store.setNoiseDistortion({ type: 'curl' });
+    expect(useGradientStore.getState().noiseDistortion.type).toBe('curl');
+  });
+
+  it('applies GPU-tier octave and step limits to Fast Curl', () => {
+    const medium: RenderOptimization = {
+      tier: 'medium', reasons: [], maxNoiseOctaves: 6, maxCurlSteps: 5,
+      maxBlurRadius: 48, maxPrismRays: 64, maxKaleidoscopeSlices: 48,
+      maxGlassComplexity: 4, maxStretchGlowRadius: 48,
+    };
+    const optimized = optimizeNoiseDistortion({
+      ...useGradientStore.getState().noiseDistortion,
+      type: 'fast_curl', octaves: 8, curlSteps: 8,
+    }, medium);
+    expect(optimized).toMatchObject({ type: 'fast_curl', octaves: 6, curlSteps: 5 });
   });
 });

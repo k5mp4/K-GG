@@ -120,6 +120,16 @@ export function SlitScanPanel({ sourceImageName, hasSourceImage, onSourceImageLo
             </div>
           </div>
 
+          <SliderField
+            label="Offset"
+            min={0} max={1.0} step={0.001}
+            value={slitScan.offset}
+            onChange={(v) => setSlitScan({ offset: v })}
+            format={(v) => v.toFixed(3)}
+            defaultValue={D.offset}
+            trackId="slitScan.offset"
+          />
+
           {/* Mode toggle */}
           <div>
             <p className="text-xs text-deep mb-1">Mode</p>
@@ -176,29 +186,6 @@ export function SlitScanPanel({ sourceImageName, hasSourceImage, onSourceImageLo
             {imageError && <p className="text-[10px] text-red-400">{imageError}</p>}
           </div>
 
-          {/* Noise order toggle */}
-          <div>
-            <p className="text-xs text-deep mb-1">Noise Order</p>
-            <div className="flex gap-1">
-              <AnimatedButton
-                onClick={() => setSlitScan({ noiseAfterSlit: false })}
-                isActive={!slitScan.noiseAfterSlit}
-                className="flex-1 py-1"
-                title="Slit を先に適用し、その後に Noise を適用"
-              >
-                SLIT → NOISE
-              </AnimatedButton>
-              <AnimatedButton
-                onClick={() => setSlitScan({ noiseAfterSlit: true })}
-                isActive={slitScan.noiseAfterSlit}
-                className="flex-1 py-1"
-                title="Noise を先に適用し、その後に Slit を適用"
-              >
-                NOISE → SLIT
-              </AnimatedButton>
-            </div>
-          </div>
-
           {/* Angle / Twist */}
           <SliderField
             label={slitScan.mode === 'linear' ? 'Angle' : slitScan.mode === 'polygon' ? 'Rotation / Twist' : slitScan.mode === 'wave' ? 'Direction' : 'Twist'}
@@ -208,6 +195,7 @@ export function SlitScanPanel({ sourceImageName, hasSourceImage, onSourceImageLo
             format={(v) => v + '°'}
             defaultValue={slitScan.mode === 'wave' ? WAVE_DEFAULT_DIRECTION : D.angle}
             trackId="slitScan.angle"
+            control={slitScan.mode === 'linear' ? 'angle' : 'number'}
           />
 
           {slitScan.mode === 'polygon' && (
@@ -251,6 +239,7 @@ export function SlitScanPanel({ sourceImageName, hasSourceImage, onSourceImageLo
               format={(v) => v + '°'}
               defaultValue={D.offsetAngle ?? 90}
               trackId="slitScan.offsetAngle"
+              control="angle"
             />
           )}
 
@@ -263,18 +252,6 @@ export function SlitScanPanel({ sourceImageName, hasSourceImage, onSourceImageLo
             defaultValue={slitScan.mode === 'wave' ? WAVE_DEFAULT_WIDTH : D.slitWidth}
             trackId="slitScan.slitWidth"
           />
-
-          {slitScan.mode !== 'wave' && (
-            <SliderField
-              label="Offset"
-              min={0} max={1.0} step={0.001}
-              value={slitScan.offset}
-              onChange={(v) => setSlitScan({ offset: v })}
-              format={(v) => v.toFixed(3)}
-              defaultValue={D.offset}
-              trackId="slitScan.offset"
-            />
-          )}
 
           {/* Auto modifier settings. Activation is controlled by property mode. */}
           <div className="space-y-3 border-t border-panel-border/30 pt-3">
