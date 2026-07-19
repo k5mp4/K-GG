@@ -2,8 +2,19 @@ type PositionedStop = {
   position: number;
 };
 
+const POSITION_DECIMAL_PLACES = 12;
+const POSITION_SCALE = 10 ** POSITION_DECIMAL_PLACES;
+
 function clamp(value: number, min: number, max: number): number {
   return Math.max(min, Math.min(max, value));
+}
+
+function normalizePosition(value: number): number {
+  return Math.round(value * POSITION_SCALE) / POSITION_SCALE;
+}
+
+function clampPosition(value: number, min: number, max: number): number {
+  return clamp(normalizePosition(value), min, max);
 }
 
 /**
@@ -39,12 +50,12 @@ export function moveStopsProportionally<T extends PositionedStop>(
 
   return stops.map((stop, index) => {
     if (selectedIndexes.has(index)) {
-      return { ...stop, position: clamp(stop.position + effectiveDelta, 0, maxPosition) };
+      return { ...stop, position: clampPosition(stop.position + effectiveDelta, 0, maxPosition) };
     }
 
     const nearestDistance = Math.min(...selectedPositions.map(position => Math.abs(stop.position - position)));
     const normalizedDistance = clamp(nearestDistance / maxPosition, 0, 1);
     const weight = (1 - normalizedDistance) ** 2;
-    return { ...stop, position: clamp(stop.position + effectiveDelta * weight, 0, maxPosition) };
+    return { ...stop, position: clampPosition(stop.position + effectiveDelta * weight, 0, maxPosition) };
   });
 }
