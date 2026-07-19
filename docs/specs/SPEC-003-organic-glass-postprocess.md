@@ -4,10 +4,10 @@ title: Organic Glass Postprocessエフェクト
 status: implemented
 owners: [maintainer]
 created: 2026-07-04
-updated: 2026-07-04
+updated: 2026-07-16
 depends_on: [SPEC-001]
 related_adrs: [ADR-0001]
-related_code: [src/types/distortion.ts, src/store/gradientStore.ts, src/components/PostprocessPanel.tsx, src/components/PresetPanel.tsx, src/lib/glass.ts, src/lib/sceneEvaluation.ts, src/lib/renderBridge.ts, src/lib/tileRender.ts, src/lib/webgl.ts, src/shaders/postprocess.frag.glsl]
+related_code: [src/types/distortion.ts, src/store/gradientStore.ts, src/components/PostprocessPanel.tsx, src/components/PresetPanel.tsx, src/lib/glass.ts, src/lib/sceneEvaluation.ts, src/lib/renderBridge.ts, src/lib/tileRender.ts, src/lib/webgl.ts, src/lib/webglShaderSources.ts, src/shaders/postprocess/]
 related_tests: [src/lib/glass.test.ts, src/lib/sceneEvaluation.glass.test.ts, src/lib/tileRender.test.ts, src/store/gradientStore.glass.test.ts]
 human_review: completed
 ---
@@ -78,6 +78,7 @@ Glass設定は既存`PostprocessConfig`へ追加し、読込時に
 - AC-005: タイル出力が必要なガターを計算し、コア領域を正しい座標へ合成する。
 - AC-006: GPU性能Tierに応じてGlass Complexityを上限以内へ制限する。
 - AC-007: テスト、lint、Webビルドが成功する。
+- AC-008: Refraction既定値付近でも表面勾配を一律に過小化せず、屈折量の変更が画面へ視認可能に反映される。
 
 ## 検証計画
 
@@ -89,6 +90,7 @@ Glass設定は既存`PostprocessConfig`へ追加し、読込時に
 | AC-004 | プリセット互換テスト | `src/store/gradientStore.glass.test.ts` |
 | AC-005 | ガター計算テストと代表的なエクスポート | `src/lib/tileRender.test.ts` |
 | AC-007 | 自動検証 | `npm test`, `npm run lint`, `npm run build` |
+| AC-008 | シェーダー契約テストと手動プレビュー | `src/lib/effectShaderParity.test.ts`, WebGLプレビュー |
 
 ## 移行・互換性
 

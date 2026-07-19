@@ -19,6 +19,13 @@ describe('postprocessStack', () => {
     ]);
   });
 
+  it('creates Glass V2 as an independent selected legacy layer', () => {
+    const stack = createDefaultPostprocessStack('glassV2');
+
+    expect(stack.find(layer => layer.kind === 'glass')).toEqual({ kind: 'glass', enabled: false });
+    expect(stack.find(layer => layer.kind === 'glassV2')).toEqual({ kind: 'glassV2', enabled: true });
+  });
+
   it('normalizes invalid, duplicate, and missing layers', () => {
     expect(normalizePostprocessEffectStack([
       { kind: 'glass', enabled: true },

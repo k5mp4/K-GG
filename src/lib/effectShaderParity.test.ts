@@ -1,8 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import gradientShader from '../shaders/gradient.frag.glsl?raw';
 import noiseShader from '../shaders/noise.glsl?raw';
-import postprocessShader from '../shaders/postprocess.frag.glsl?raw';
-import { getProgramSource } from './webglShaderSources';
+import webglSource from './webgl.ts?raw';
+import { getPostprocessFragmentSource, getProgramSource } from './webglShaderSources';
+
+const postprocessShader = getPostprocessFragmentSource();
 
 function extractFunction(source: string, name: string): string {
   const signature = new RegExp(`\\b(?:float|vec2|vec3|vec4)\\s+${name}\\s*\\(`).exec(source);
@@ -78,16 +80,115 @@ describe('V2 effect shader parity', () => {
   it('keeps Glass sampling direction continuous near a flat gradient', () => {
     const direction = extractFunction(postprocessShader, 'glassStableDirection');
     const displacement = extractFunction(postprocessShader, 'glassStableDisplacement');
-    const optical = extractFunction(postprocessShader, 'glassOpticalColor');
+    const optical = extractFunction(postprocessShader, 'glassSpectralColor');
     expect(direction).toContain('const float directionSoftness = 0.02;');
     expect(direction).toContain('boundedGradient / (slope + directionSoftness);');
     expect(direction).not.toContain('boundedGradient / slope');
     expect(displacement).toContain('boundedGradient / (1.0 + slope);');
-    expect(postprocessShader).toContain('float glassFilteredRidge(float phase)');
-    expect(postprocessShader).toContain('fwidth(phase)');
+    expect(postprocessShader).toContain(
+      'float glassFilteredRidge(float phase, float phaseFootprint)',
+    );
+    expect(postprocessShader).toContain(
+      'float glassUvPixelFootprint(float scale, float stretch, vec2 resolution)',
+    );
+    expect(postprocessShader).not.toMatch(/\b(?:fwidth|dFdx|dFdy)\s*\(/);
     expect(postprocessShader).toContain('float bandLimit = smoothstep(0.65, 2.4, phaseFootprint);');
     expect(optical).toContain('stableDirection * chromaticAberration');
     expect(optical).toContain('vec2 tangent = vec2(-stableDirection.y, stableDirection.x);');
+  });
+
+  it('preserves near-unit gain for legacy Glass slopes and only saturates large gradients', () => {
+    const boundedGradient = compact(extractFunction(postprocessShader, 'glassBoundedGradient'));
+    expect(boundedGradient).toContain(compact(
+      'return gradient / (1.0 + gradientLength * 0.085);',
+    ));
+    expect(boundedGradient).not.toContain(compact('return gradient * 0.085;'));
+
+    const displacement = compact(extractFunction(postprocessShader, 'glassStableDisplacement'));
+    expect(displacement).toContain(compact('return boundedGradient / (1.0 + slope);'));
+  });
+
+  it('uses quintic fade for the Glass V2 gradient-noise lattice', () => {
+    const fade = compact(extractFunction(postprocessShader, 'glassV2QuinticFade'));
+    const noise = compact(extractFunction(postprocessShader, 'glassV2GradientNoise'));
+
+    expect(fade).toContain(compact(
+      'return t * t * t * (t * (t * 6.0 - 15.0) + 10.0);',
+    ));
+    expect(noise).toContain(compact('vec2 fade = glassV2QuinticFade(local);'));
+    expect(noise).toContain(compact(
+      'mix(mix(n00, n10, fade.x), mix(n01, n11, fade.x), fade.y)',
+    ));
+  });
+
+  it('derives five Glass V2 wavelength samples from Cauchy dispersion with a zero-dispersion endpoint', () => {
+    const refractDirection = compact(extractFunction(postprocessShader, 'glassV2RefractDirection'));
+    const cauchyIor = compact(extractFunction(postprocessShader, 'glassCauchyIor'));
+    const optical = compact(extractFunction(postprocessShader, 'opticalGlassV2'));
+
+    expect(refractDirection).toContain(compact(
+      'vec3 transmitted = refract(incident, normal, 1.0 / safeIor);',
+    ));
+    expect(refractDirection).toContain(compact(
+      'if (!(lengthSquared > 0.000001) || lengthSquared >= 1000000000.0) return vec2(0.0);',
+    ));
+    expect(cauchyIor).toContain(compact('float deltaFC = (nD - 1.0) * amount / 8.0;'));
+    expect(cauchyIor).toContain(compact('return cauchyA + cauchyB / (wavelength * wavelength);'));
+    expect(optical).toContain(compact('float redIor = glassCauchyIor(0.6563, chromaticPx);'));
+    expect(optical).toContain(compact('float yellowIor = glassCauchyIor(0.5893, chromaticPx);'));
+    expect(optical).toContain(compact('float greenIor = glassCauchyIor(0.5461, chromaticPx);'));
+    expect(optical).toContain(compact('float cyanIor = glassCauchyIor(0.4861, chromaticPx);'));
+    expect(optical).toContain(compact('float blueIor = glassCauchyIor(0.4358, chromaticPx);'));
+    expect(optical).toContain(compact(
+      'vec2 redDirection = glassV2RefractDirection(incident, normal, redIor);',
+    ));
+    expect(optical).toContain(compact(
+      'vec2 greenDirection = glassV2RefractDirection(incident, normal, greenIor);',
+    ));
+    expect(optical).toContain(compact(
+      'vec2 cyanDirection = glassV2RefractDirection(incident, normal, cyanIor);',
+    ));
+    expect(optical).toContain(compact(
+      'vec2 blueDirection = glassV2RefractDirection(incident, normal, blueIor);',
+    ));
+    expect(optical).toContain(compact('float chromaticTravelPx = chromaticPx;'));
+  });
+
+  it('uses fixed roughness taps and Schlick Fresnel in Glass V2 composition', () => {
+    const transmission = compact(extractFunction(postprocessShader, 'glassV2Transmission'));
+    const optical = compact(extractFunction(postprocessShader, 'opticalGlassV2'));
+
+    expect(transmission).toContain(compact('if (roughness <= 0.0001) return color;'));
+    expect(transmission).toContain(compact(
+      'sampleGlassSource(baseUv + greenOffset + roughnessOffset).rgb',
+    ));
+    expect(transmission).toContain(compact(
+      'sampleGlassSource(baseUv + greenOffset - roughnessOffset).rgb',
+    ));
+    expect(transmission).toContain(compact(
+      'return mix(color, blurred, clamp(roughness / 12.0, 0.0, 1.0));',
+    ));
+    expect(optical).toContain(compact(
+      'float f0 = pow((greenIor - 1.0) / (greenIor + 1.0), 2.0);',
+    ));
+    expect(optical).toContain(compact(
+      'float fresnel = f0 + (1.0 - f0) * pow(1.0 - cosTheta, 5.0);',
+    ));
+    expect(optical).toContain(compact(
+      'vec4 result = vec4(mix(original.rgb, highlighted, mixAmount), original.a);',
+    ));
+  });
+
+  it('routes effect mode 9 to Glass V2 while retaining mode 5 for legacy Glass', () => {
+    const main = compact(postprocessShader.slice(postprocessShader.indexOf('void main()')));
+    expect(compact(webglSource)).toContain(compact('glass: 5'));
+    expect(compact(webglSource)).toContain(compact('glassV2: 9'));
+    expect(main).toContain(compact(
+      'if (u_effectEnabled && (u_effectMode == 5 || u_effectMode == 9))',
+    ));
+    expect(main).toContain(compact(
+      'gl_FragColor = u_effectMode == 9 ? opticalGlassV2(globalUv, globalCoord) : organicGlass(globalUv, globalCoord);',
+    ));
   });
 
   it('centralizes finite Glass inputs and separates field, optical, and composition stages', () => {
@@ -96,7 +197,7 @@ describe('V2 effect shader parity', () => {
     }
     expect(postprocessShader).toContain('vec2 glassSurfaceGradient(');
     expect(postprocessShader).toContain('vec2 glassBoundedGradient(');
-    expect(postprocessShader).toContain('vec3 glassOpticalColor(');
+    expect(postprocessShader).toContain('vec3 glassSpectralColor(');
     expect(extractFunction(postprocessShader, 'sampleGlassSource')).toContain('glassTileSize()');
   });
 

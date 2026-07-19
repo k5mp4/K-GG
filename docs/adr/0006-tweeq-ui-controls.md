@@ -4,7 +4,7 @@ title: Tweeqを共通入力コントロールとして採用する
 status: accepted
 date: 2026-07-15
 deciders: [maintainer]
-related_specs: [SPEC-016]
+related_specs: [SPEC-021, SPEC-022]
 supersedes: []
 ---
 

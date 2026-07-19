@@ -116,19 +116,25 @@ export function getPostprocessStackSamplePadding(
   postprocess: PostprocessConfig | null | undefined,
   effectPipeline?: EffectPipelineConfig | null,
 ): number {
-  const glassLayerCount = effectPipeline?.version === 'stack-v2'
+  const activeGlassLayerCount = effectPipeline?.version === 'stack-v2'
     ? Number(isEffectStackLayerEnabled(effectPipeline, 'glass'))
       + Number(isEffectStackLayerEnabled(effectPipeline, 'glassV2'))
     : postprocess?.enabled && postprocess
       ? Number(isPostprocessLayerEnabled(postprocess, 'glass'))
         + Number(isPostprocessLayerEnabled(postprocess, 'glassV2'))
       : 0;
-  if (glassLayerCount === 0 || !postprocess || isGlassOpticallyIdentity(postprocess)) {
+  if (activeGlassLayerCount === 0 || !postprocess || isGlassOpticallyIdentity(postprocess)) {
     return 0;
   }
 
   const params = normalizeGlassRenderParameters(postprocess);
-  return glassLayerCount * (Math.ceil(params.refraction + params.chromaticAberration + params.roughness) + 2);
+  const perLayerPadding = Math.ceil(
+    params.refraction + params.chromaticAberration + params.roughness,
+  ) + 2;
+  // Consecutive sampling layers expand the source dependency radius. Reserve
+  // the sum so Glass -> Glass V2 (or the reverse) cannot clamp the first
+  // layer's result at an export tile boundary.
+  return perLayerPadding * activeGlassLayerCount;
 }
 
 export const getGlassSamplePadding = getPostprocessStackSamplePadding;

@@ -7,7 +7,7 @@ created: 2026-07-12
 updated: 2026-07-18
 depends_on: [SPEC-013]
 related_adrs: [ADR-0005]
-related_code: [src/types/distortion.ts, src/lib/effectPipeline.ts, src/lib/webgl.ts, src/shaders/postprocess.frag.glsl, src/components/PostprocessStackPanel.tsx, src/components/SlitScanPanel.tsx, src/store/gradientStore.ts]
+related_code: [src/types/distortion.ts, src/lib/effectPipeline.ts, src/lib/webgl.ts, src/shaders/postprocess/, src/components/PostprocessStackPanel.tsx, src/components/SlitScanPanel.tsx, src/store/gradientStore.ts]
 related_tests: [src/lib/effectPipeline.test.ts, src/lib/effectShaderParity.test.ts, src/store/gradientStore.effectPipeline.test.ts]
 human_review: completed
 ---

@@ -7,7 +7,7 @@ created: 2026-07-14
 updated: 2026-07-19
 depends_on: [SPEC-013, SPEC-014, SPEC-015]
 related_adrs: [ADR-0005]
-related_code: [src/components/PostprocessStackPanel.tsx, src/components/PropertyModulesSettingsPanel.tsx, src/components/GradientCanvas.tsx, src/App.tsx, src/hooks/useWebGL.ts, src/lib/effectStackDrag.ts, src/lib/glass.ts, src/lib/postprocessAnimation.ts, src/lib/webgl.ts, src/shaders/postprocess.frag.glsl]
+related_code: [src/components/PostprocessStackPanel.tsx, src/components/PropertyModulesSettingsPanel.tsx, src/components/GradientCanvas.tsx, src/App.tsx, src/hooks/useWebGL.ts, src/lib/effectStackDrag.ts, src/lib/glass.ts, src/lib/postprocessAnimation.ts, src/lib/webgl.ts, src/lib/webglShaderSources.ts, src/shaders/postprocess/]
 related_tests: [src/lib/effectStackDrag.test.ts, src/lib/glass.test.ts, src/lib/effectShaderParity.test.ts, src/lib/postprocessAnimation.test.ts]
 human_review: completed
 ---

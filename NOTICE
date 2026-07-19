@@ -17,7 +17,7 @@ Notable direct/runtime dependencies:
 - fflate: MIT
 - ogl: Unlicense
 - zustand: MIT
-- react-colorful: MIT
+- tweeq (vendored from arcatdmz/tweeq): MIT
 - react-markdown and unified ecosystem packages: mostly MIT
 - GSAP: Standard "no charge" license, https://gsap.com/standard-license/
 

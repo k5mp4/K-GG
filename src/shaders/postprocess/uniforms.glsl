@@ -68,6 +68,7 @@ uniform float u_stackSlitWidth;
 uniform float u_stackSlitOffset;
 uniform float u_stackSlitVariance;
 uniform vec2 u_stackSlitParams;
+uniform bool u_stackSlitDiffuseAfter;
 uniform vec4 u_stackSlitDelta01;
 uniform vec4 u_stackSlitDelta23;
 uniform vec4 u_stackSlitDelta45;
@@ -94,4 +95,3 @@ uniform float u_curlEps;
 uniform float u_curlSeed;
 
 const float PI = 3.141592653589793;
-

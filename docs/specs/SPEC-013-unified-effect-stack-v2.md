@@ -7,7 +7,7 @@ created: 2026-07-10
 updated: 2026-07-19
 depends_on: [SPEC-001, SPEC-003, SPEC-009, SPEC-012]
 related_adrs: [ADR-0005]
-related_code: [src/types/distortion.ts, src/store/gradientStore.ts, src/lib/effectPipeline.ts, src/lib/sceneEvaluation.ts, src/lib/webgl.ts, src/lib/webglShaderSources.ts, src/shaders/noise.glsl, src/shaders/gradient.frag.glsl, src/shaders/postprocess.frag.glsl, src/components/PostprocessStackPanel.tsx, src/components/PostprocessPanel.tsx, src/components/SlitScanPanel.tsx, src/components/PresetPanel.tsx]
+related_code: [src/types/distortion.ts, src/store/gradientStore.ts, src/lib/effectPipeline.ts, src/lib/sceneEvaluation.ts, src/lib/webgl.ts, src/lib/webglShaderSources.ts, src/shaders/noise.glsl, src/shaders/gradient.frag.glsl, src/shaders/postprocess/, src/components/PostprocessStackPanel.tsx, src/components/PostprocessPanel.tsx, src/components/SlitScanPanel.tsx, src/components/PresetPanel.tsx]
 related_tests: [src/lib/effectPipeline.test.ts, src/lib/effectShaderParity.test.ts, src/lib/webglShaderSources.test.ts, src/store/gradientStore.effectPipeline.test.ts, src/store/gradientStore.postprocessStack.test.ts, src/lib/glass.test.ts, src/lib/postprocessAnimation.test.ts, src/lib/sceneEvaluation.glass.test.ts]
 human_review: completed
 ---
