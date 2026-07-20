@@ -11,6 +11,7 @@ describe('webglShaderSources', () => {
     expect(source.vertex).toContain('a_position');
     expect(source.fragment).toContain('u_gradientType');
     expect(source.fragment).toContain('#define KGG_BOOTSTRAP');
+    expect(source.fragment).not.toContain('\r');
     expect(source.fragment).not.toContain('float simplex3D(');
     expect(source.fragment).not.toContain('vec2 fastCurlField(');
     expect(source.fragment).toContain('#if !defined(KGG_BOOTSTRAP)\n    if (u_iridEnabled');

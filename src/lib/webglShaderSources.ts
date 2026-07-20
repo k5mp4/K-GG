@@ -47,6 +47,10 @@ export type ProgramSource = {
   fragment: string;
 };
 
+function normalizeShaderLineEndings(source: string): string {
+  return source.replace(/\r\n?/g, '\n');
+}
+
 /** Bump this automatically when any shader source changes. */
 export const SHADER_VERSION = (
   gradientGLSL.length * 1000003
@@ -238,5 +242,8 @@ export function getInitialProgramSource(): ProgramSource {
   const bootstrapNoise = begin >= 0 && end >= begin
     ? noiseGLSL.slice(0, begin) + noiseGLSL.slice(end + '// KGG_BOOTSTRAP_NOISE_END'.length)
     : noiseGLSL;
-  return { vertex: vertexGLSL, fragment: `${bootstrapNoise}\n#define KGG_BOOTSTRAP\n${gradientGLSL}` };
+  return {
+    vertex: normalizeShaderLineEndings(vertexGLSL),
+    fragment: normalizeShaderLineEndings(`${bootstrapNoise}\n#define KGG_BOOTSTRAP\n${gradientGLSL}`),
+  };
 }
