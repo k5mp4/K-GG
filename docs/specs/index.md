@@ -30,7 +30,7 @@ title: 機能仕様
 | SPEC-017 | [Effect StackとColor Histogramのワークスペース配置](./SPEC-017-effect-stack-workspace-layout.md) | draft |
 | SPEC-018 | [Glass V2光学屈折エフェクト](./SPEC-018-glass-v2-optical-refraction.md) | implemented |
 | SPEC-019 | [Gradient Rampのプロポーショナルストップ編集](./SPEC-019-proportional-gradient-stop-editing.md) | implemented |
-| SPEC-020 | [Fast Curl Noiseの追加と軽量化](./SPEC-020-fast-curl-noise.md) | approved |
+| SPEC-020 | [Fast Curl Noiseの追加と軽量化](./SPEC-020-fast-curl-noise.md) | implemented |
 | SPEC-021 | [Tweeqによるパラメータ入力コントロール](./SPEC-021-tweeq-controls.md) | implemented |
 | SPEC-022 | [Slit AngleへのTweeq InputAngle導入](./SPEC-022-tweeq-slit-angle.md) | implemented |
 

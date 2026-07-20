@@ -13,10 +13,38 @@ describe('webglShaderSources', () => {
     expect(source.fragment).toContain('#define KGG_BOOTSTRAP');
     expect(source.fragment).not.toContain('float simplex3D(');
     expect(source.fragment).not.toContain('vec2 fastCurlField(');
+    expect(source.fragment).toContain('#if !defined(KGG_BOOTSTRAP)\n    if (u_iridEnabled');
 
     const generator = getProgramSource('generator');
     expect(generator.fragment).toContain('float simplex3D(');
     expect(generator.fragment).toContain('vec2 fastCurlField(');
+
+    const noiseStack = getProgramSource('noiseStack').fragment;
+    expect(noiseStack).toContain('#define KGG_STACK_NOISE_ONLY');
+    expect(noiseStack.match(/uniform float u_time;/g)).toHaveLength(1);
+    expect(noiseStack).toContain('uniform sampler2D u_sourceTex;');
+    expect(noiseStack).toContain('uniform vec2 u_tileResolution;');
+    for (const declaration of [
+      'uniform int u_curlSteps;',
+      'uniform float u_curlSpeed;',
+      'uniform float u_curlEps;',
+      'uniform float u_curlSeed;',
+    ]) {
+      expect(noiseStack.match(new RegExp(declaration.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'g'))).toHaveLength(1);
+      expect(noiseStack.indexOf(declaration)).toBeLessThan(noiseStack.indexOf('vec2 fastCurlField('));
+    }
+    expect(noiseStack).toContain('fract(evolution / loopPeriod)');
+    expect(noiseStack).not.toContain('fract((u_time + u_noiseEvolution) / loopPeriod)');
+
+    const general = getProgramSource('postprocess').fragment;
+    for (const declaration of [
+      'uniform int u_curlSteps;',
+      'uniform float u_curlSpeed;',
+      'uniform float u_curlEps;',
+      'uniform float u_curlSeed;',
+    ]) {
+      expect(general.match(new RegExp(declaration.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'g'))).toHaveLength(1);
+    }
   });
 
   it('keeps Glass and Prism compile boundaries independent', () => {

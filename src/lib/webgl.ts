@@ -775,7 +775,7 @@ async function compileLazyProgram(ctx: WebGLContext, key: LazyProgramKey): Promi
       ctx.shaderCompileExt,
       source.vertex,
       key,
-      key === 'glass' || key === 'glassV2'
+      key === 'glass' || key === 'glassV2' || key === 'noiseStack'
         ? GLASS_PARALLEL_SHADER_COMPILE_TIMEOUT_MS
         : PARALLEL_SHADER_COMPILE_TIMEOUT_MS,
     );
@@ -1766,10 +1766,11 @@ export function render(
   effectPipeline?: EffectPipelineConfig,
 ): void {
   const isV2Pipeline = effectPipeline?.version === 'stack-v2';
-  // Start the complete generator only after the lightweight bootstrap has
-  // presented a GPU frame. This is also required by V2 because its Base stage
-  // supplies the texture consumed by the Effect Stack.
-  const generatorReady = requestLazyProgram(ctx, 'generator');
+  // Only Legacy uses the full generator. V2 deliberately keeps its Base stage
+  // on the Bootstrap shader, then applies Noise/Slit/Distort in texture-stack
+  // passes. Waiting for the Legacy generator here can otherwise leave every
+  // V2 layer visually stuck at Base-only while it compiles or times out.
+  if (!isV2Pipeline) requestLazyProgram(ctx, 'generator');
   const { gl, program, uniforms, gradientRampTexture, sourceImageTexture, imageGradientTexture, imageMaskTexture } = ctx;
   noiseDistortion = optimizeNoiseDistortion(noiseDistortion, ctx.renderOptimization);
   stretch = optimizeStretch(stretch, ctx.renderOptimization);
@@ -2051,12 +2052,9 @@ export function render(
     }
 
     const stackCoreRequested = renderPlan.programs.stackCore;
-    // The generator and core both include the noise library. Serialize the
-    // first heavyweight compile so drivers are not saturated immediately
-    // after Bootstrap becomes visible.
-    const stackCoreReady = generatorReady && (
-      !stackCoreRequested || requestLazyProgram(ctx, 'stackCore')
-    );
+    // V2's texture stack has its own specialized programs. It must not wait
+    // for the Legacy generator, which is intentionally not requested by V2.
+    const stackCoreReady = !stackCoreRequested || requestLazyProgram(ctx, 'stackCore');
     const noiseStackReady = !renderPlan.programs.noiseStack || (
       stackCoreReady && requestLazyProgram(ctx, 'noiseStack')
     );
@@ -2083,7 +2081,7 @@ export function render(
 
     // Lazy programs compile asynchronously. Keep a usable base frame until every
     // requested V2 stage is available instead of presenting a partial stack.
-    if (!stackCoreReady || !noiseStackReady || !normalReady || !stretchReady || !prismReady || !particlesReady) {
+    if (!stackCoreReady || !normalReady || !stretchReady || !prismReady || !particlesReady) {
       // Keep rendering the current base state while programs compile so
       // anchor and parameter edits remain visible instead of freezing the
       // first frame that happened to be presented.
@@ -2172,6 +2170,10 @@ export function render(
       : noiseDistortion;
     for (let layerIndex = 0; layerIndex < mainLayers.length; layerIndex++) {
       const layer = mainLayers[layerIndex];
+      // Noise has its own heavy shader. Keep rendering the remaining V2
+      // layers while that program compiles (or if this driver rejects it),
+      // rather than pinning Slit/Distort/etc. to the Base-only fallback.
+      if (layer.kind === 'noise' && !noiseStackReady) continue;
       if (layer.kind === 'glass' && (glassIdentity || !glassReady)) continue;
       if (layer.kind === 'glassV2' && (glassIdentity || !glassV2Ready)) continue;
       // A Diffuse immediately before Slit is evaluated in Slit's destination

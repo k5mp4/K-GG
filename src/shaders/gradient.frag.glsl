@@ -14,11 +14,6 @@
   uniform float u_noiseScale;
   uniform int u_noiseOctaves;
   uniform float u_noiseEvolution;
-  uniform int u_curlSteps;
-  uniform float u_curlSpeed;
-  uniform float u_curlEps;
-  uniform float u_curlSeed;
-
   uniform bool u_diffuseEnabled;
   uniform int  u_diffuseMode;
   uniform float u_diffuseScatter;
@@ -595,7 +590,10 @@
       uv += distortOffset;
     }
 
-    // Fluid Warp UV Warp (Early) - 画像全体を歪ませる
+    // Fluid Warp UV Warp (Early) - 画像全体を歪ませる。
+    // Bootstrap は重い fbm 群を含めないため、完全 generator が準備できる
+    // まで旧 Iridescence の分岐もコンパイル対象から外す。
+#if !defined(KGG_BOOTSTRAP)
     if (u_iridEnabled && !rawSourceActive) {
       float iTime = u_time * 0.1 * u_iridSpeed;
       vec2 flowDir = vec2(cos(u_iridAngle), sin(u_iridAngle));
@@ -603,6 +601,7 @@
       float warpAmt = 0.15 * u_iridStrength;
       uv += vec2(cos(f * 6.28), sin(f * 6.28)) * warpAmt;
     }
+#endif
 
     if (u_radonEnabled && !rawSourceActive) {
       float rEvo = u_radonEvolution + u_time * u_radonSpeed;

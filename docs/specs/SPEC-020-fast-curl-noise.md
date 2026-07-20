@@ -1,14 +1,14 @@
 ---
 id: SPEC-020
 title: Fast Curl Noiseの追加と軽量化
-status: approved
+status: implemented
 owners: [maintainer]
 created: 2026-07-19
-updated: 2026-07-19
+updated: 2026-07-20
 depends_on: [SPEC-001, SPEC-013, SPEC-014]
 related_adrs: [ADR-0005]
-related_code: [src/types/distortion.ts, src/store/gradientStore.ts, src/components/NoiseDistortionPanel.tsx, src/lib/webgl.ts, src/shaders/noise.glsl, src/shaders/gradient.frag.glsl, src/shaders/postprocess/]
-related_tests: [src/store/gradientStore.effectPipeline.test.ts, src/lib/effectShaderParity.test.ts]
+related_code: [src/types/distortion.ts, src/store/gradientStore.ts, src/components/NoiseDistortionPanel.tsx, src/lib/webgl.ts, src/lib/webglShaderSources.ts, src/shaders/noise.glsl, src/shaders/gradient.frag.glsl, src/shaders/postprocess/]
+related_tests: [src/store/gradientStore.effectPipeline.test.ts, src/lib/effectShaderParity.test.ts, src/lib/webglShaderSources.test.ts]
 human_review: completed
 ---
 

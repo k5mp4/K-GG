@@ -89,9 +89,4 @@ uniform bool u_stackSlitAnimEnabled;
 uniform float u_stackSlitAnimTime;
 uniform int u_stackSlitAnimMode;
 uniform bool u_stackSlitPixelPerfect;
-uniform int u_curlSteps;
-uniform float u_curlSpeed;
-uniform float u_curlEps;
-uniform float u_curlSeed;
-
 const float PI = 3.141592653589793;

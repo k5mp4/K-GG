@@ -25,6 +25,10 @@
   uniform float u_voronoiMinkowskiExp;
 
   uniform float u_noiseSeed;       // 汎用シード (curl 以外)
+  uniform int u_curlSteps;
+  uniform float u_curlSpeed;
+  uniform float u_curlEps;
+  uniform float u_curlSeed;
 
   uniform float u_ridgeSharpness;
   uniform float u_ridgeGain;
@@ -386,8 +390,11 @@
   vec2 fastCurlField(vec2 uv, float scale, float evolution, int octaves) {
     vec2 p = uv * max(scale, 0.001) + vec2(u_curlSeed * 0.173, u_curlSeed * 0.271);
     float loopPeriod = max(u_noiseLoopPeriod, 0.0001);
+    // The wrapper supplies time-adjusted evolution at every call site.
+    // Keep this shared field independent from uniforms declared by the
+    // generator/stack wrapper that is appended after noise.glsl.
     float phase = u_noiseLoopMode == 1
-      ? KG_TAU * fract((u_time + u_noiseEvolution) / loopPeriod)
+      ? KG_TAU * fract(evolution / loopPeriod)
       : evolution;
     vec2 derivative = vec2(0.0);
     float amplitude = 0.5;

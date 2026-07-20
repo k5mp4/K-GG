@@ -252,6 +252,8 @@ describe('V2 effect shader parity', () => {
 
     const field = extractFunction(noiseShader, 'fastCurlField');
     expect(field).toContain('psrdnoise2D(');
+    expect(field).toContain('fract(evolution / loopPeriod)');
+    expect(field).not.toContain('u_noiseEvolution');
     expect(field).not.toContain('fbm3D(');
     expect(field).not.toContain('u_curlEps');
     expect(field).not.toContain('loopBlendWeight');

@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import type { EffectStackKind, PostprocessStackKind } from '../types/distortion';
 import {
+  canRenderV2Direct,
   moveEffectStackLayer,
   normalizeEffectStack,
   updateEffectStackLayer,
@@ -43,7 +44,7 @@ type DragState = Omit<EffectStackDragState, 'kind'> & {
   pointerId: number;
 };
 
-type LazyProgramKey = 'stackCore' | 'glass' | 'glassV2' | 'stretch' | 'prism' | 'prismComposite' | 'normalMap' | 'blur' | 'particles';
+type LazyProgramKey = 'stackCore' | 'noiseStack' | 'glass' | 'glassV2' | 'stretch' | 'prism' | 'prismComposite' | 'normalMap' | 'blur' | 'particles';
 type LazyProgramStatus = 'loading' | 'ready' | 'failed' | 'fallback';
 
 const CORE_EFFECTS = new Set<EffectStackKind>([
@@ -59,6 +60,7 @@ type Props = {
 };
 
 function programKeyForEffect(kind: EffectStackKind): LazyProgramKey {
+  if (kind === 'noise') return 'noiseStack';
   if (CORE_EFFECTS.has(kind)) return 'stackCore';
   if (kind === 'glass') return 'glass';
   if (kind === 'glassV2') return 'glassV2';
@@ -66,7 +68,7 @@ function programKeyForEffect(kind: EffectStackKind): LazyProgramKey {
 }
 
 export function PostprocessStackPanel({ onSwapWorkspace }: Props = {}) {
-  const { setPostprocess, effectPipeline, setEffectPipeline } = useGradientStore();
+  const { setPostprocess, effectPipeline, normalMap, setEffectPipeline } = useGradientStore();
   const stack = normalizeEffectStack(effectPipeline.effectStack);
   const movableStack = stack;
   const stackRef = useRef(stack);
@@ -316,6 +318,12 @@ export function PostprocessStackPanel({ onSwapWorkspace }: Props = {}) {
   };
 
   const effectStatus = (kind: EffectStackKind, enabled: boolean) => {
+    // Diffuse-only V2 is drawn directly by the Bootstrap generator and never
+    // requests stackCore, so it is genuinely applied without a lazy-program
+    // ready event.
+    if (enabled && kind === 'diffuse' && canRenderV2Direct(effectPipeline, normalMap.enabled)) {
+      return { label: 'Applied', className: 'text-emerald-300' };
+    }
     return programStatusLabel(programKeyForEffect(kind), enabled);
   };
 
@@ -325,7 +333,8 @@ export function PostprocessStackPanel({ onSwapWorkspace }: Props = {}) {
     if (status === 'loading') return { label: 'Loading…', className: 'text-amber-300' };
     if (status === 'failed') return { label: 'Unavailable', className: 'text-red-300' };
     if (status === 'fallback') return { label: 'Applied (Fallback)', className: 'text-cyan-300' };
-    return { label: 'Applied', className: 'text-emerald-300' };
+    if (status === 'ready') return { label: 'Applied', className: 'text-emerald-300' };
+    return { label: 'Preparing…', className: 'text-amber-300' };
   };
 
   const panel = (

@@ -1,10 +1,10 @@
 ---
 id: SPEC-013
 title: Unified Effect Stack V2
-status: approved
+status: implemented
 owners: [maintainer]
 created: 2026-07-10
-updated: 2026-07-19
+updated: 2026-07-20
 depends_on: [SPEC-001, SPEC-003, SPEC-009, SPEC-012]
 related_adrs: [ADR-0005]
 related_code: [src/types/distortion.ts, src/store/gradientStore.ts, src/lib/effectPipeline.ts, src/lib/sceneEvaluation.ts, src/lib/webgl.ts, src/lib/webglShaderSources.ts, src/shaders/noise.glsl, src/shaders/gradient.frag.glsl, src/shaders/postprocess/, src/components/PostprocessStackPanel.tsx, src/components/PostprocessPanel.tsx, src/components/SlitScanPanel.tsx, src/components/PresetPanel.tsx]
@@ -64,7 +64,9 @@ GlassとPrismは互いに独立した遅延コンパイルprogramへ分割し、
 - 有効な順序可変レイヤーが0件でもSurface、Prism、Diffuse、Particlesは各自の有効状態に従って描画する。
 - Diffuseだけが有効で中間段がない場合は、統合シェーダーやFBOの準備を待たず、同じDiffuse設定で直接描画する。
 - Main Stackの初回有効化時は、軽量stack coreシェーダーの準備中もDiffuseを含むベース表示を維持する。
-- 初期WebGL programは、不要な全ノイズ関数のコンパイルを待たずにBootstrap shaderでGPU表示へ遷移する。完全生成programはBase段の初回描画後に遅延準備し、V2のcoreは完全生成programの準備後に遅延コンパイルする。
+- 初期WebGL programは、不要な全ノイズ関数のコンパイルを待たずにBootstrap shaderでGPU表示へ遷移する。Bootstrap shaderには除外したノイズ関数への参照を残さず、shader compile/link失敗によるCPU fallbackを起こさない。Legacyの完全生成programはBase段の初回描画後に遅延準備する。V2のcoreとNoise専用programはBootstrap後に独立して遅延コンパイルし、Legacy generatorの準備や失敗を待たない。
+- V2のNoise専用programは、`noise.glsl` が所有するuniformを再定義せず、texture stack固有の最小uniformだけを追加する。Noise有効化時のGLSL compile/link失敗を`Unavailable`として隠さない。
+- Noise専用programの長い並列コンパイルは通常の短いtimeoutで失敗扱いにしない。Noiseが準備中または利用不可でも、V2のSlit、Distort、Mirror、Kaleidoscope、Voronoi、Diffuseなど準備済みレイヤーは描画を継続する。
 - 各遅延programのコンパイル中または失敗時は、未完成programで描画せず直前の有効な表示を維持する。
 - WebGL context loss、shader compile/link失敗、FBO不完全を診断ログで区別できる。
 - NormalとPrismが無効なMain Stackはcore FBO 3枚だけを確保し、不要な全FBOを一括確保しない。
@@ -85,7 +87,8 @@ GlassとPrismは互いに独立した遅延コンパイルprogramへ分割し、
 - AC-012: Glass、Glass V2、Prismは別々のprogramとして必要時だけコンパイルされ、一方の有効化が他方のコンパイルを要求しない。
 - AC-013: shader compile/link失敗、WebGL context loss、FBO不完全をログから識別でき、失敗時も白画面へ遷移せず直前の有効な表示を維持する。
 - AC-014: Voronoiは直前レイヤーの入力テクスチャだけを各セルへタイル配置し、元のGradient Rampを重ねるオーバーレイを生成しない。
-- AC-015: 初期化中の`PREVIEW / BASE ONLY`はBootstrap shaderの準備完了後に終了し、V2のEffect Stack program待ちはGPU描画状態で継続する。初期programが未使用の重いノイズ関数のコンパイルを待たない。
+- AC-015: 初期化中の`PREVIEW / BASE ONLY`はBootstrap shaderの準備完了後に終了し、V2のEffect Stack program待ちはGPU描画状態で継続する。初期programが未使用の重いノイズ関数のコンパイルを待たず、除外した関数を参照してcompile/linkに失敗しない。V2の有効レイヤーはLegacy generatorのcompile待ち・失敗でBase-onlyに留まらない。
+- AC-016: V2のNoise専用programは重い並列コンパイル中に通常timeoutで`Unavailable`にならず、Noiseの準備中・失敗時も準備済みの他スタックレイヤーをBase-onlyへ巻き戻さない。
 
 ## 検証計画
 
@@ -102,6 +105,7 @@ GlassとPrismは互いに独立した遅延コンパイルprogramへ分割し、
 | AC-013 | compile/link/FBO/context lossの診断テスト、失敗注入時の表示維持確認 | WebGLテスト、WebGLプレビュー |
 | AC-014 | Voronoi単体、およびNoise/Diffuse/Slit後の入力テクスチャを使ったセル内タイル表示の確認 | `effectShaderParity.test.ts`、WebGLプレビュー、タイル書き出し |
 | AC-015 | Bootstrap/完全生成shaderのsource境界テスト、WebGLプレビューの初期化確認 | `webglShaderSources.test.ts`、WebGLプレビュー |
+| AC-016 | Noise shaderの長時間コンパイル、失敗注入時の他レイヤー描画継続確認 | WebGLプレビュー、手動確認 |
 
 ## 既知の制約
 

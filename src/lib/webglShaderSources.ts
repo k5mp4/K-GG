@@ -101,6 +101,22 @@ uniform float u_aeContrast;
 uniform float u_aeBrightness;
 `;
 
+// noise.glsl owns the time, loop, fractal, and seamless-noise uniforms. The
+// dedicated V2 Noise pass must add only its texture interface and the few
+// controls that belong to the stack layer; appending postprocess/uniforms.glsl
+// would redeclare those noise uniforms and fail GLSL compilation.
+const NOISE_STACK_UNIFORMS = `
+uniform sampler2D u_sourceTex;
+uniform vec2 u_tileResolution;
+uniform vec2 u_tileOffset;
+uniform bool u_noiseEnabled;
+uniform int u_noiseType;
+uniform float u_noiseAmount;
+uniform float u_noiseScale;
+uniform int u_noiseOctaves;
+uniform float u_noiseEvolution;
+`;
+
 // Keep these symbols in the dedicated Glass sources explicitly instead of
 // depending on the full Diffuse module and its preprocessor branches. V2
 // renders Diffuse in a separate stack pass, so both Glass variants only need
@@ -174,7 +190,7 @@ function createNoiseStackSource(): string {
   return [
     noiseSource,
     '\n#define KGG_LIGHTWEIGHT\n#define KGG_STACK_NOISE_ONLY\n',
-    postprocessUniformsGLSL,
+    NOISE_STACK_UNIFORMS,
     postprocessStackGLSL,
     postprocessNoiseMainGLSL,
   ].join('');
