@@ -1,18 +1,18 @@
 ---
-id: SPEC-017
+id: SPEC-022
 title: Slit AngleへのTweeq InputAngle導入
 status: implemented
 owners: [maintainer]
 created: 2026-07-15
 updated: 2026-07-15
-depends_on: [SPEC-016]
+depends_on: [SPEC-021]
 related_adrs: [ADR-0006]
 related_code: [vendor/tweeq/index.es.js, vendor/tweeq/index.cjs, vendor/tweeq/index.d.ts, vendor/tweeq/style.css, src/App.css, src/components/SliderField.tsx, src/components/SlitScanPanel.tsx, src/lib/tweeqAngle.ts]
 related_tests: [src/lib/tweeqAngle.test.ts]
 human_review: completed
 ---
 
-# SPEC-017: Slit AngleへのTweeq InputAngle導入
+# SPEC-022: Slit AngleへのTweeq InputAngle導入
 
 ## 背景・問題
 

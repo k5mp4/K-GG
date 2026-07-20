@@ -1,5 +1,5 @@
 ---
-id: SPEC-011
+id: SPEC-012
 title: Postprocess Effect Stack
 status: implemented
 owners: [maintainer]
@@ -12,7 +12,7 @@ related_tests: [src/lib/postprocessStack.test.ts, src/store/gradientStore.postpr
 human_review: completed
 ---
 
-# SPEC-011: Postprocess Effect Stack
+# SPEC-012: Postprocess Effect Stack
 
 ## 背景・問題
 

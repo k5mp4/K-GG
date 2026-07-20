@@ -54,16 +54,22 @@ export function SliderField({
   const toModel = (displayValue: number) => (
     formatInfo ? (displayValue - formatInfo.offset) / formatInfo.scale : displayValue
   );
-  const angleInputValue = control === 'angle' ? toTweeqAngle(value) : value;
+  const lowerBound = Math.min(min, max);
+  const upperBound = Math.max(min, max);
+  const boundedValue = Number.isFinite(value)
+    ? Math.min(upperBound, Math.max(lowerBound, value))
+    : lowerBound;
+  const angleInputValue = control === 'angle' ? toTweeqAngle(boundedValue) : boundedValue;
   const displayed = format
-    ? format(control === 'angle' ? angleInputValue : value)
-    : String(control === 'angle' ? angleInputValue : value);
-  const isDirty = defaultValue !== undefined && Math.abs(value - defaultValue) > 1e-9;
+    ? format(control === 'angle' ? angleInputValue : boundedValue)
+    : String(control === 'angle' ? angleInputValue : boundedValue);
+  const isDirty = defaultValue !== undefined && Math.abs(boundedValue - defaultValue) > 1e-9;
 
   // Auto-keyframing remains at the K-GG adapter boundary; Tweeq only owns the input gesture.
   const handleValueChange = (displayValue: number) => {
-    const next = control === 'angle' ? fromTweeqAngle(displayValue) : toModel(displayValue);
-    if (!Number.isFinite(next)) return;
+    const rawNext = control === 'angle' ? fromTweeqAngle(displayValue) : toModel(displayValue);
+    if (!Number.isFinite(rawNext)) return;
+    const next = Math.min(upperBound, Math.max(lowerBound, rawNext));
     onChange(next);
 
     if (isKeyframed && trackId && track) {
@@ -77,7 +83,7 @@ export function SliderField({
     }
   };
 
-  const displayValue = toDisplay(value);
+  const displayValue = toDisplay(boundedValue);
   const displayMin = toDisplay(min);
   const displayMax = toDisplay(max);
   const displayStep = Math.abs((formatInfo?.scale ?? 1) * step) || step;
@@ -143,11 +149,12 @@ export function SliderField({
             prefix={formatInfo?.prefix}
             suffix={formatInfo?.suffix}
             bar={displayBar}
-            clampMin={false}
-            clampMax={false}
+            clampMin
+            clampMax
             default={displayDefault}
             aria-label={`${label}: ${displayed}`}
             title={displayed}
+            onBlur={() => handleValueChange(displayValue)}
             onChange={handleValueChange}
           />
         </div>

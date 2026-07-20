@@ -1,6 +1,8 @@
 import { useEffect, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import type { EffectStackKind, PostprocessStackKind } from '../types/distortion';
 import {
+  canRenderV2Direct,
   moveEffectStackLayer,
   normalizeEffectStack,
   updateEffectStackLayer,
@@ -42,22 +44,31 @@ type DragState = Omit<EffectStackDragState, 'kind'> & {
   pointerId: number;
 };
 
-type LazyProgramKey = 'stackCore' | 'glass' | 'glassV2' | 'stretch' | 'prism' | 'prismComposite' | 'normalMap' | 'blur' | 'particles';
+type LazyProgramKey = 'stackCore' | 'noiseStack' | 'glass' | 'glassV2' | 'stretch' | 'prism' | 'prismComposite' | 'normalMap' | 'blur' | 'particles';
 type LazyProgramStatus = 'loading' | 'ready' | 'failed' | 'fallback';
 
 const CORE_EFFECTS = new Set<EffectStackKind>([
   'diffuse', 'noise', 'slit', 'distort', 'mirror', 'kaleidoscope', 'voronoi',
 ]);
 
+type DocumentPictureInPictureApi = {
+  requestWindow: (options?: { width?: number; height?: number }) => Promise<Window>;
+};
+
+type Props = {
+  onSwapWorkspace?: () => void;
+};
+
 function programKeyForEffect(kind: EffectStackKind): LazyProgramKey {
+  if (kind === 'noise') return 'noiseStack';
   if (CORE_EFFECTS.has(kind)) return 'stackCore';
   if (kind === 'glass') return 'glass';
   if (kind === 'glassV2') return 'glassV2';
   return 'stretch';
 }
 
-export function PostprocessStackPanel() {
-  const { setPostprocess, effectPipeline, setEffectPipeline } = useGradientStore();
+export function PostprocessStackPanel({ onSwapWorkspace }: Props = {}) {
+  const { setPostprocess, effectPipeline, normalMap, setEffectPipeline } = useGradientStore();
   const stack = normalizeEffectStack(effectPipeline.effectStack);
   const movableStack = stack;
   const stackRef = useRef(stack);
@@ -74,12 +85,19 @@ export function PostprocessStackPanel() {
     }
   });
   const [programStatus, setProgramStatus] = useState<Partial<Record<LazyProgramKey, LazyProgramStatus>>>({});
+  const [pipWindow, setPipWindow] = useState<Window | null>(null);
+  const [pipMount, setPipMount] = useState<HTMLElement | null>(null);
+  const pipWindowRef = useRef<Window | null>(null);
+  const externalWindowCleanupRef = useRef<(() => void) | null>(null);
   stackRef.current = stack;
+  pipWindowRef.current = pipWindow;
 
   useEffect(() => () => {
     dragCleanupRef.current?.();
     if (settleTimerRef.current !== null) window.clearTimeout(settleTimerRef.current);
     document.body.style.cursor = '';
+    externalWindowCleanupRef.current?.();
+    pipWindowRef.current?.close();
   }, []);
 
   useEffect(() => {
@@ -99,6 +117,89 @@ export function PostprocessStackPanel() {
     window.addEventListener('kgg:webgl-lazy-program-state', handleProgramState);
     return () => window.removeEventListener('kgg:webgl-lazy-program-state', handleProgramState);
   }, []);
+
+  const togglePiP = async () => {
+    if (pipWindow) {
+      externalWindowCleanupRef.current?.();
+      pipWindow.close();
+      setPipWindow(null);
+      setPipMount(null);
+      return;
+    }
+
+    const api = (window as Window & {
+      documentPictureInPicture?: DocumentPictureInPictureApi;
+    }).documentPictureInPicture;
+    let nextWindow: Window | null = null;
+    let usingPictureInPicture = false;
+    try {
+      if (api) {
+        try {
+          nextWindow = await api.requestWindow({ width: 360, height: 620 });
+          usingPictureInPicture = true;
+        } catch {
+          // Some embedded browsers expose the API but reject the request.
+          // Continue with the ordinary-window fallback below.
+          nextWindow = window.open('', 'kgg-effect-stack', 'popup,width=360,height=620,resizable=yes');
+        }
+      } else {
+        nextWindow = window.open('', 'kgg-effect-stack', 'popup,width=360,height=620,resizable=yes');
+      }
+      if (!nextWindow) throw new Error('Effect Stackの別ウィンドウを作成できませんでした。');
+      const openedWindow = nextWindow;
+
+      [...document.styleSheets].forEach((sheet) => {
+        try {
+          const cssRules = [...sheet.cssRules].map(rule => rule.cssText).join('');
+          const style = document.createElement('style');
+          style.textContent = cssRules;
+          openedWindow.document.head.appendChild(style);
+        } catch {
+          if (sheet.href) {
+            const link = document.createElement('link');
+            link.rel = 'stylesheet';
+            link.href = sheet.href;
+            openedWindow.document.head.appendChild(link);
+          }
+        }
+      });
+      const mount = openedWindow.document.createElement('div');
+      mount.dataset.effectStackPortal = 'true';
+      mount.style.minHeight = '100vh';
+      openedWindow.document.body.appendChild(mount);
+      openedWindow.document.title = 'Effect Stack';
+      openedWindow.document.body.style.margin = '0';
+      openedWindow.document.body.style.minHeight = '100vh';
+      openedWindow.document.body.style.backgroundColor = '#141414';
+      openedWindow.document.body.style.overflow = 'hidden';
+      let monitorId: number | null = null;
+      let externalClosed = false;
+      const handleExternalClose = () => {
+        if (externalClosed) return;
+        externalClosed = true;
+        if (monitorId !== null) window.clearInterval(monitorId);
+        if (externalWindowCleanupRef.current === handleExternalClose) {
+          externalWindowCleanupRef.current = null;
+        }
+        setPipWindow(current => current === openedWindow ? null : current);
+        setPipMount(current => current === mount ? null : current);
+      };
+      externalWindowCleanupRef.current = handleExternalClose;
+      openedWindow.addEventListener('pagehide', handleExternalClose, { once: true });
+      openedWindow.addEventListener('beforeunload', handleExternalClose, { once: true });
+      if (!usingPictureInPicture) {
+        monitorId = window.setInterval(() => {
+          if (openedWindow.closed) handleExternalClose();
+        }, 250);
+      }
+      setPipMount(mount);
+      setPipWindow(openedWindow);
+    } catch (error) {
+      nextWindow?.close();
+      console.error('Failed to open Effect Stack window:', error);
+      window.alert('Effect Stackの別ウィンドウ表示を開始できませんでした。インライン表示を維持します。');
+    }
+  };
 
   const selectLayer = (kind: EffectStackKind) => {
     setEffectPipeline({ selectedKind: kind });
@@ -217,6 +318,12 @@ export function PostprocessStackPanel() {
   };
 
   const effectStatus = (kind: EffectStackKind, enabled: boolean) => {
+    // Diffuse-only V2 is drawn directly by the Bootstrap generator and never
+    // requests stackCore, so it is genuinely applied without a lazy-program
+    // ready event.
+    if (enabled && kind === 'diffuse' && canRenderV2Direct(effectPipeline, normalMap.enabled)) {
+      return { label: 'Applied', className: 'text-emerald-300' };
+    }
     return programStatusLabel(programKeyForEffect(kind), enabled);
   };
 
@@ -226,11 +333,12 @@ export function PostprocessStackPanel() {
     if (status === 'loading') return { label: 'Loading…', className: 'text-amber-300' };
     if (status === 'failed') return { label: 'Unavailable', className: 'text-red-300' };
     if (status === 'fallback') return { label: 'Applied (Fallback)', className: 'text-cyan-300' };
-    return { label: 'Applied', className: 'text-emerald-300' };
+    if (status === 'ready') return { label: 'Applied', className: 'text-emerald-300' };
+    return { label: 'Preparing…', className: 'text-amber-300' };
   };
 
-  return (
-    <div data-effect-stack-panel className="min-h-8 w-[232px] overflow-hidden border border-cream/20 bg-k-bg/90 shadow-[0_18px_46px_rgba(0,0,0,0.36)] backdrop-blur-md">
+  const panel = (
+    <div data-effect-stack-panel className={`min-h-8 ${pipWindow ? 'w-full' : 'w-[232px]'} overflow-hidden border border-cream/20 bg-k-bg/90 shadow-[0_18px_46px_rgba(0,0,0,0.36)] backdrop-blur-md`}>
       <div className="flex h-8 items-center justify-between border-b border-cream/15 px-2.5">
         <button
           type="button"
@@ -242,9 +350,29 @@ export function PostprocessStackPanel() {
           <Icon name={collapsed ? 'chevronRight' : 'chevronDown'} className="shrink-0 text-[12px]" />
           <span className="truncate font-display text-[9px] font-bold uppercase tracking-wider">Effect Stack</span>
         </button>
-        <span className="text-[8px] font-bold uppercase text-emerald-300">
-          Stack V2
-        </span>
+        <div className="flex items-center gap-1.5">
+          {onSwapWorkspace && (
+            <button
+              type="button"
+              className="rounded px-1 text-[12px] leading-none text-cream/55 transition-colors hover:bg-cream/10 hover:text-fire focus:outline-none focus-visible:ring-2 focus-visible:ring-fire"
+              title="Color Histogramと位置を交換"
+              aria-label="Color Histogramと位置を交換"
+              onClick={onSwapWorkspace}
+            >
+              ⇄
+            </button>
+          )}
+          <button
+            type="button"
+            className="rounded px-1 text-[12px] leading-none text-cream/55 transition-colors hover:bg-cream/10 hover:text-fire focus:outline-none focus-visible:ring-2 focus-visible:ring-fire"
+            title={pipWindow ? 'Effect Stackを元の位置へ戻す' : 'Effect Stackを別ウィンドウで表示'}
+            aria-label={pipWindow ? 'Effect Stackを元の位置へ戻す' : 'Effect Stackを別ウィンドウで表示'}
+            onClick={togglePiP}
+          >
+            ↗
+          </button>
+          <span className="text-[8px] font-bold uppercase text-emerald-300">Stack V2</span>
+        </div>
       </div>
       <div id="kgg-effect-stack-content" hidden={collapsed}>
       <div className="relative" style={{ height: movableStack.length * ROW_HEIGHT }}>
@@ -313,5 +441,12 @@ export function PostprocessStackPanel() {
       </div>
       </div>
     </div>
+  );
+
+  return (
+    <>
+      {!pipWindow && panel}
+      {pipWindow && pipMount && createPortal(panel, pipMount)}
+    </>
   );
 }

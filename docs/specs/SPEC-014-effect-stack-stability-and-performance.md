@@ -1,18 +1,18 @@
 ---
-id: SPEC-013
+id: SPEC-014
 title: Effect Stackの折りたたみと描画安定化・軽量化
 status: implemented
 owners: [maintainer]
 created: 2026-07-12
-updated: 2026-07-18
-depends_on: [SPEC-003, SPEC-011, SPEC-012]
+updated: 2026-07-13
+depends_on: [SPEC-003, SPEC-012, SPEC-013]
 related_adrs: [ADR-0005]
 related_code: [src/App.tsx, src/components/PostprocessStackPanel.tsx, src/lib/effectPipeline.ts, src/lib/webgl.ts, src/lib/webglShaderSources.ts, src/lib/glass.ts, src/shaders/postprocess/, src/types/distortion.ts]
 related_tests: [src/lib/effectPipeline.test.ts, src/lib/effectShaderParity.test.ts, src/lib/webglShaderSources.test.ts, src/lib/glass.test.ts, src/lib/postprocessStack.test.ts]
 human_review: completed
 ---
 
-# SPEC-013: Effect Stackの折りたたみと描画安定化・軽量化
+# SPEC-014: Effect Stackの折りたたみと描画安定化・軽量化
 
 ## 背景・問題
 

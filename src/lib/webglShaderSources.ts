@@ -29,6 +29,7 @@ const postprocessGLSL = [
 ].join('');
 
 export type LazyProgramKey =
+  | 'generator'
   | 'blur'
   | 'normalMap'
   | 'stretch'
@@ -45,6 +46,10 @@ export type ProgramSource = {
   vertex: string;
   fragment: string;
 };
+
+function normalizeShaderLineEndings(source: string): string {
+  return source.replace(/\r\n?/g, '\n');
+}
 
 /** Bump this automatically when any shader source changes. */
 export const SHADER_VERSION = (
@@ -98,6 +103,22 @@ uniform float u_aeSubScaling;
 uniform float u_aeSubRotation;
 uniform float u_aeContrast;
 uniform float u_aeBrightness;
+`;
+
+// noise.glsl owns the time, loop, fractal, and seamless-noise uniforms. The
+// dedicated V2 Noise pass must add only its texture interface and the few
+// controls that belong to the stack layer; appending postprocess/uniforms.glsl
+// would redeclare those noise uniforms and fail GLSL compilation.
+const NOISE_STACK_UNIFORMS = `
+uniform sampler2D u_sourceTex;
+uniform vec2 u_tileResolution;
+uniform vec2 u_tileOffset;
+uniform bool u_noiseEnabled;
+uniform int u_noiseType;
+uniform float u_noiseAmount;
+uniform float u_noiseScale;
+uniform int u_noiseOctaves;
+uniform float u_noiseEvolution;
 `;
 
 // Keep these symbols in the dedicated Glass sources explicitly instead of
@@ -173,7 +194,7 @@ function createNoiseStackSource(): string {
   return [
     noiseSource,
     '\n#define KGG_LIGHTWEIGHT\n#define KGG_STACK_NOISE_ONLY\n',
-    postprocessUniformsGLSL,
+    NOISE_STACK_UNIFORMS,
     postprocessStackGLSL,
     postprocessNoiseMainGLSL,
   ].join('');
@@ -198,6 +219,7 @@ export function getPostprocessFragmentSource(): string {
  * WebGL context.
  */
 export function getProgramSource(key: LazyProgramKey): ProgramSource {
+  if (key === 'generator') return { vertex: vertexGLSL, fragment: `${noiseGLSL}\n${gradientGLSL}` };
   if (key === 'blur') return { vertex: vertexGLSL, fragment: blurGLSL };
   if (key === 'normalMap') return { vertex: vertexGLSL, fragment: normalMapGLSL };
   if (key === 'stretch') return { vertex: vertexGLSL, fragment: stretchGLSL };
@@ -212,5 +234,16 @@ export function getProgramSource(key: LazyProgramKey): ProgramSource {
 }
 
 export function getInitialProgramSource(): ProgramSource {
-  return { vertex: vertexGLSL, fragment: `${noiseGLSL}\n${gradientGLSL}` };
+  // The bootstrap program keeps the canvas out of the CPU-only fallback while
+  // the full generator remains lazy. Its noise transform is an
+  // identity, but base gradients, source images, Slit, and Diffuse stay live.
+  const begin = noiseGLSL.indexOf('// KGG_BOOTSTRAP_NOISE_BEGIN');
+  const end = noiseGLSL.indexOf('// KGG_BOOTSTRAP_NOISE_END');
+  const bootstrapNoise = begin >= 0 && end >= begin
+    ? noiseGLSL.slice(0, begin) + noiseGLSL.slice(end + '// KGG_BOOTSTRAP_NOISE_END'.length)
+    : noiseGLSL;
+  return {
+    vertex: normalizeShaderLineEndings(vertexGLSL),
+    fragment: normalizeShaderLineEndings(`${bootstrapNoise}\n#define KGG_BOOTSTRAP\n${gradientGLSL}`),
+  };
 }

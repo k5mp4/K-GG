@@ -25,6 +25,10 @@
   uniform float u_voronoiMinkowskiExp;
 
   uniform float u_noiseSeed;       // 汎用シード (curl 以外)
+  uniform int u_curlSteps;
+  uniform float u_curlSpeed;
+  uniform float u_curlEps;
+  uniform float u_curlSeed;
 
   uniform float u_ridgeSharpness;
   uniform float u_ridgeGain;
@@ -75,6 +79,9 @@
     return fract((p3.xx + p3.yz) * p3.zy) * 2.0 - 1.0;
   }
 
+// KGG_BOOTSTRAP_NOISE_BEGIN
+#if !defined(KGG_BOOTSTRAP)
+
   float simplex2D(vec2 v) {
     const vec4 C = vec4(0.211324865405187, 0.366025403784439,
                         -0.577350269189626, 0.024390243902439);
@@ -97,6 +104,48 @@
     g.x  = a0.x  * x0.x   + h.x  * x0.y;
     g.yz = a0.yz * x12.xz + h.yz * x12.yw;
     return 130.0 * dot(m, g);
+  }
+
+  // Rotating-gradient simplex noise with analytic derivatives. The returned
+  // value is (noise, d/dx, d/dy); rotating the lattice gradients by alpha
+  // makes the field exactly periodic in time without sampling a second field.
+  vec3 psrdnoise2D(vec2 v, float alpha) {
+    const vec4 C = vec4(0.211324865405187, 0.366025403784439,
+                        -0.577350269189626, 0.024390243902439);
+    vec2 i = floor(v + dot(v, C.yy));
+    vec2 x0 = v - i + dot(i, C.xx);
+    vec2 i1 = (x0.x > x0.y) ? vec2(1.0, 0.0) : vec2(0.0, 1.0);
+    vec4 x12 = x0.xyxy + C.xxzz;
+    x12.xy -= i1;
+    i = mod(i, 289.0);
+    vec3 p = fract(((i.y + vec3(0.0, i1.y, 1.0)) * 34.0 + 1.0)
+                 * fract((i.x + vec3(0.0, i1.x, 1.0)) * 34.0 + 1.0) / 289.0) * 289.0;
+    vec3 attenuation = max(0.5 - vec3(dot(x0, x0), dot(x12.xy, x12.xy), dot(x12.zw, x12.zw)), 0.0);
+    vec3 x = 2.0 * fract(p * C.www) - 1.0;
+    vec3 h = abs(x) - 0.5;
+    vec3 ox = floor(x + 0.5);
+    vec3 gx = x - ox;
+    vec3 gy = h;
+    vec3 normalization = 1.79284291400159 - 0.85373472095314 * (gx * gx + gy * gy);
+    gx *= normalization;
+    gy *= normalization;
+
+    float c = cos(alpha);
+    float s = sin(alpha);
+    vec2 g0 = vec2(gx.x * c - gy.x * s, gx.x * s + gy.x * c);
+    vec2 g1 = vec2(gx.y * c - gy.y * s, gx.y * s + gy.y * c);
+    vec2 g2 = vec2(gx.z * c - gy.z * s, gx.z * s + gy.z * c);
+    vec3 gradients = vec3(dot(g0, x0), dot(g1, x12.xy), dot(g2, x12.zw));
+    vec3 attenuation2 = attenuation * attenuation;
+    vec3 attenuation3 = attenuation2 * attenuation;
+    vec3 attenuation4 = attenuation2 * attenuation2;
+    float value = 130.0 * dot(attenuation4, gradients);
+    vec2 derivative = 130.0 * (
+      attenuation4.x * g0 - 8.0 * attenuation3.x * x0 * gradients.x +
+      attenuation4.y * g1 - 8.0 * attenuation3.y * x12.xy * gradients.y +
+      attenuation4.z * g2 - 8.0 * attenuation3.z * x12.zw * gradients.z
+    );
+    return vec3(value, derivative);
   }
 
   float fbm(vec2 p, int octaves) {
@@ -335,6 +384,31 @@
     return value;
   }
 
+  // A divergence-free 2D vector field from the perpendicular of an analytic
+  // scalar-field gradient. This replaces the four finite-difference fBM calls
+  // used by Legacy Curl with one derivative simplex evaluation per octave.
+  vec2 fastCurlField(vec2 uv, float scale, float evolution, int octaves) {
+    vec2 p = uv * max(scale, 0.001) + vec2(u_curlSeed * 0.173, u_curlSeed * 0.271);
+    float loopPeriod = max(u_noiseLoopPeriod, 0.0001);
+    // The wrapper supplies time-adjusted evolution at every call site.
+    // Keep this shared field independent from uniforms declared by the
+    // generator/stack wrapper that is appended after noise.glsl.
+    float phase = u_noiseLoopMode == 1
+      ? KG_TAU * fract(evolution / loopPeriod)
+      : evolution;
+    vec2 derivative = vec2(0.0);
+    float amplitude = 0.5;
+    float frequency = 1.0;
+    for (int i = 0; i < 8; i++) {
+      if (i >= octaves) break;
+      vec3 sample = psrdnoise2D(p * frequency, phase + float(i) * 0.731);
+      derivative += sample.yz * (amplitude * frequency);
+      amplitude *= 0.5;
+      frequency *= 2.0;
+    }
+    return vec2(derivative.y, -derivative.x) * max(u_curlSpeed, 0.0);
+  }
+
   vec2 noiseDisplaceRaw(vec2 uv, float scale, float evolution, int noiseType, int octaves) {
     vec2 p = uv * scale + linearDrift(noiseAnimDir(), evolution, 1.0);
     p += vec2(u_noiseSeed * 127.1, u_noiseSeed * 311.7);
@@ -433,3 +507,5 @@
     vec2 wrapped = noiseDisplaceRaw(uv, scale, evolution - u_noiseLoopPeriod, noiseType, octaves);
     return mix(current, wrapped, blend);
   }
+#endif
+// KGG_BOOTSTRAP_NOISE_END

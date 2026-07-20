@@ -27,19 +27,24 @@ vec4 voronoiGradient(vec2 uv) {
 
   float cellPhase = hashWithSeed(dot(nearestCell, vec2(17.0, 59.0)), u_postVoronoiSeed);
   float cellAngle = u_postVoronoiAngle + (cellPhase - 0.5) * PI * clamp(u_postVoronoiRandomness, 0.0, 1.0);
-  vec2 anchorA = rotateUnitUv(u_gradAnchor0, cellAngle);
-  vec2 anchorB = rotateUnitUv(u_gradAnchor1, cellAngle);
-  vec2 axis = anchorB - anchorA;
-  vec2 localUv = p - nearestCell;
-  float t = dot(localUv - anchorA, axis) / max(dot(axis, axis), 0.0001);
-  t = (t - 0.5) * max(u_postVoronoiGradientScale, 0.001) + 0.5;
-  t += (cellPhase - 0.5) * 0.18;
-  vec4 color = texture2D(u_gradientRamp, vec2(clamp(t, 0.0, 1.0), 0.5));
+  // Tile the preceding stack texture into each Voronoi cell. Voronoi must
+  // reshape the already-processed image instead of overlaying a second copy
+  // of the original gradient ramp.
+  vec2 cellLocal = p - nearestCell - 0.5;
+  float cosAngle = cos(-cellAngle);
+  float sinAngle = sin(-cellAngle);
+  vec2 rotatedLocal = vec2(
+    cellLocal.x * cosAngle - cellLocal.y * sinAngle,
+    cellLocal.x * sinAngle + cellLocal.y * cosAngle
+  );
+  vec2 tiledUv = fract(rotatedLocal + 0.5 + vec2(cellPhase, cellPhase * 0.731));
+  vec4 sourceColor = texture2D(u_sourceTex, tiledUv);
+  vec4 color = sourceColor;
 
   float edgeWidth = clamp(u_postVoronoiEdgeWidth, 0.0, 0.2);
   if (edgeWidth > 0.0) {
     float edge = smoothstep(0.0, edgeWidth, f2 - f1);
-    vec3 edgeColor = texture2D(u_gradientRamp, vec2(clamp(cellPhase, 0.0, 1.0), 0.5)).rgb;
+    vec3 edgeColor = sourceColor.rgb * 0.58;
     color.rgb = mix(edgeColor, color.rgb, edge);
   }
 
@@ -65,7 +70,28 @@ vec2 applyStackCurlNoiseUv(vec2 uv, float evolution, float curlTime) {
   return uv;
 }
 
+vec2 applyFastCurlNoiseUV(vec2 uv, float evolution) {
+  float dt = u_noiseAmount / max(float(u_curlSteps), 1.0);
+  for (int stepIndex = 0; stepIndex < 8; stepIndex++) {
+    if (stepIndex >= u_curlSteps) break;
+    uv -= fastCurlField(uv, u_noiseScale, evolution, u_noiseOctaves) * dt;
+  }
+  return uv;
+}
+
+vec2 applyStackFastCurlNoiseUv(vec2 uv, float evolution) {
+  float dt = u_noiseAmount / max(float(u_curlSteps), 1.0);
+  for (int stepIndex = 0; stepIndex < 8; stepIndex++) {
+    if (stepIndex >= u_curlSteps) break;
+    uv -= fastCurlField(uv, u_noiseScale, evolution, u_noiseOctaves) * dt;
+  }
+  return uv;
+}
+
 vec2 stackNoiseUv(vec2 uv) {
+#if defined(KGG_BOOTSTRAP)
+  return uv;
+#else
   if (!u_noiseEnabled) return uv;
   float evolution = u_noiseEvolution + u_time;
   if (u_noiseType == 3) {
@@ -79,8 +105,12 @@ vec2 stackNoiseUv(vec2 uv) {
     );
     return mix(current, wrapped, blend);
   }
+  if (u_noiseType == 8) {
+    return applyFastCurlNoiseUV(uv, evolution);
+  }
   vec2 offset = noiseDisplace(uv, u_noiseScale, evolution, u_noiseType, u_noiseOctaves);
   return uv + offset * u_noiseAmount;
+#endif
 }
 
 // Legacy postprocess consumers (not the V2 Noise layer) keep their historical

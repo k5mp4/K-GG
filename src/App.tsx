@@ -14,14 +14,13 @@ import { StretchPanel } from './components/StretchPanel';
 import { PresetPanel } from './components/PresetPanel';
 import { NormalMapPanel } from './components/NormalMapPanel';
 import { ManualDistortControls, PostprocessPanel } from './components/PostprocessPanel';
-import { PostprocessStackPanel } from './components/PostprocessStackPanel';
+import { EffectStackWorkspace } from './components/EffectStackWorkspace';
 import { DistortOverlay } from './components/DistortOverlay';
 import { PostprocessOverlay } from './components/PostprocessOverlay';
 import { MatcapPanel } from './components/MatcapPanel';
 import { GradientRamp } from './components/GradientRamp';
 import { ImageGradientSourcePanel } from './components/ImageGradientSourcePanel';
 import { SliderField } from './components/SliderField';
-import { AnimatedButton } from './components/AnimatedButton';
 import { useGradientStore } from './store/gradientStore';
 import { useViewportControl } from './hooks/useViewportControl';
 import { useCanvasSize } from './hooks/useCanvasSize';
@@ -31,11 +30,10 @@ import { FeedbackPanel } from './components/FeedbackPanel';
 import { PropertyModulesSettingsPanel } from './components/PropertyModulesSettingsPanel';
 import { InteractionSettingsProvider } from './components/InteractionSettingsContext';
 import { Collapsible } from './components/Collapsible';
-import { ColorHistogram } from './components/ColorHistogram';
 import { SlitOverlay } from './components/SlitOverlay';
 import { DockPanel } from './components/DockPanel';
 import { PanelEdgeToggle } from './components/PanelEdgeToggle';
-import { ColorPaletteGenerator } from './components/ColorPaletteGenerator';
+import { SidebarSection } from './components/SidebarSection';
 import { Icon } from './components/Icon';
 import { undo, redo } from './lib/history';
 import type { GpuDiagnostics } from './lib/gpuDiagnostics';
@@ -53,6 +51,13 @@ import {
 import type { NativeFfmpegStatus } from './adapters';
 
 const MAX_DISPLAY_W = 1000;
+
+const CANVAS_SIZE_PRESETS = [
+  { value: 'full-hd', label: 'Full HD', width: 1920, height: 1080 },
+  { value: 'hd', label: 'HD', width: 1280, height: 720 },
+  { value: 'square-400', label: '400×400', width: 400, height: 400 },
+  { value: 'square-800', label: '800×800', width: 800, height: 800 },
+] as const;
 
 type LeftTab = 'diffuse' | 'noise' | 'slit' | 'stretch' | 'normal' | 'distort' | 'postprocess' | 'matcap' | 'export' | 'preset';
 type OverlayImageMode = 'overlay' | 'mask' | 'off';
@@ -188,6 +193,17 @@ export default function App() {
     }
   }
 
+  const activeCanvasPreset = CANVAS_SIZE_PRESETS.find((preset) => preset.width === canvasW && preset.height === canvasH);
+  const canvasPresetValue = activeCanvasPreset?.value ?? 'custom';
+
+  function applyCanvasPreset(value: string) {
+    const preset = CANVAS_SIZE_PRESETS.find((candidate) => candidate.value === value);
+    if (!preset) return;
+    setCanvasW(preset.width);
+    setCanvasH(preset.height);
+    aspectRatioRef.current = preset.width / preset.height;
+  }
+
   function swapCanvasSize() {
     const nextW = canvasH;
     const nextH = canvasW;
@@ -246,6 +262,9 @@ export default function App() {
   const timelineResizingRef = useRef(false);
   const [leftPanelOpen, setLeftPanelOpen] = useState(true);
   const [rightPanelOpen, setRightPanelOpen] = useState(true);
+  const [showGradientRamp, setShowGradientRamp] = useState(true);
+  const [showOverlaySettings, setShowOverlaySettings] = useState(false);
+  const [showImageGradientSource, setShowImageGradientSource] = useState(false);
 
   useEffect(() => {
     if (effectPipeline.version !== 'stack-v2') return;
@@ -732,9 +751,10 @@ export default function App() {
             </div>
 
             <div className="relative flex-1 flex items-center justify-center p-2 md:p-6 overflow-hidden">
-              <div className={`hidden md:block absolute left-4 top-4 z-30 transition-opacity ${showLeftSidebar || showRightSidebar ? 'opacity-0 pointer-events-none' : 'opacity-100'}`}>
-                <PostprocessStackPanel />
-              </div>
+              <EffectStackWorkspace
+                sourceCanvasRef={canvasRef}
+                hidden={showLeftSidebar || showRightSidebar}
+              />
               <div style={{
                 position: 'relative',
                 width: displayW,
@@ -817,24 +837,20 @@ export default function App() {
               </div>
             </div>
 
-            <div className="hidden md:block absolute top-4 left-[264px] z-20 pointer-events-none transition-opacity">
-              <ColorHistogram sourceCanvasRef={canvasRef} />
-            </div>
-
           </div>
 
           {/* 右サイドバー: グラデーション設定 */}
           <DockPanel
             id="gradient-settings-panel"
             side="right"
-            title="Gradient Settings"
+            title="K-GG"
             open={rightPanelOpen}
             mobileOpen={showRightSidebar}
             width={rightPanelW}
             onOpenChange={setRightPanelOpen}
             onMobileOpenChange={setShowRightSidebar}
             resizing={activeResizeSide === 'right'}
-            bodyClassName="flex flex-col gap-6 overflow-y-auto p-6 scrollbar-thin"
+            bodyClassName="flex flex-col overflow-y-auto px-6 pb-8 scrollbar-thin"
             onResizeStart={(e) => {
               e.preventDefault();
               resizingRef.current = 'right';
@@ -843,39 +859,65 @@ export default function App() {
               e.currentTarget.setPointerCapture?.(e.pointerId);
             }}
           >
-            <div className="flex justify-between items-start">
-              <div className="min-w-0">
-                <h2 className="text-xl font-display font-bold uppercase tracking-wider leading-tight text-k-text">Kagaribi-15<br />Gradient Generator</h2>
-                <p className="mt-3 text-[10px] font-body tracking-normal leading-tight text-tab-inactive">© 2026 ke-go. All rights reserved.</p>
+            <div className="space-y-6 pt-6">
+              <div className="flex items-start justify-between gap-4">
+                <div className="min-w-0">
+                  <p className="mb-2 text-[9px] font-display font-semibold uppercase tracking-[0.24em] text-fire">Gradient workspace</p>
+                  <h2 className="text-2xl font-display font-bold uppercase tracking-[0.18em] leading-none text-k-text">K-GG</h2>
+                  <p className="mt-3 text-[10px] font-body tracking-normal leading-tight text-tab-inactive">© 2026 ke-go. All rights reserved.</p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setShowHelp(true)}
+                  className="shrink-0 p-2 text-deep hover:bg-k-border hover:text-k-text rounded-none transition-all duration-150 focus:outline-none focus-visible:ring-2 focus-visible:ring-fire"
+                  title="使い方を表示"
+                  aria-label="使い方を表示"
+                >
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                    <circle cx="12" cy="12" r="10"></circle>
+                    <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"></path>
+                    <line x1="12" y1="17" x2="12.01" y2="17"></line>
+                  </svg>
+                </button>
               </div>
-              <button
-                onClick={() => setShowHelp(true)}
-                className="p-2 text-deep hover:text-k-text hover:bg-k-border rounded-none transition-all duration-150"
-                title="使い方を表示"
-              >
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                  <circle cx="12" cy="12" r="10"></circle>
-                  <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"></path>
-                  <line x1="12" y1="17" x2="12.01" y2="17"></line>
-                </svg>
-              </button>
-            </div>
 
-            {/* Canvas Size */}
-            <div className="space-y-2">
-              <label className="block text-xs font-display font-semibold uppercase tracking-wider text-k-text">Canvas Size</label>
-              <div className="flex gap-2">
-                {([{ label: '800×800', w: 800, h: 800 }, { label: '1920×1080', w: 1920, h: 1080 }] as const).map((s) => (
-                  <AnimatedButton
-                    key={s.label}
-                    onClick={() => { setCanvasW(s.w); setCanvasH(s.h); aspectRatioRef.current = s.w / s.h; }}
-                    isActive={canvasW === s.w && canvasH === s.h}
-                    className="flex-1"
+              <div className="space-y-3 border border-fire/25 bg-fire/[0.04] p-3">
+                <div className="flex items-end justify-between gap-3">
+                  <div>
+                    <p className="mb-1 text-[9px] font-display font-semibold uppercase tracking-[0.2em] text-fire">01 / Primary</p>
+                    <label htmlFor="canvas-size-preset" className="block text-xs font-display font-semibold uppercase tracking-wider text-k-text">Canvas Size</label>
+                  </div>
+                  <span className="text-[9px] font-display uppercase tracking-widest text-tab-inactive">Output</span>
+                </div>
+                <div className="relative">
+                  <select
+                    id="canvas-size-preset"
+                    value={canvasPresetValue}
+                    onChange={(e) => applyCanvasPreset(e.target.value)}
+                    className="w-full appearance-none bg-k-surface border border-panel-border/70 text-k-text text-sm rounded-none px-3 py-2.5 pr-9 focus:border-fire focus:outline-none focus-visible:ring-1 focus-visible:ring-fire"
                   >
-                    {s.label}
-                  </AnimatedButton>
-                ))}
+                    {CANVAS_SIZE_PRESETS.map((preset) => (
+                      <option key={preset.value} value={preset.value}>
+                        {preset.label} · {preset.width}×{preset.height}
+                      </option>
+                    ))}
+                    <option value="custom">Custom · {canvasW}×{canvasH}</option>
+                  </select>
+                  <svg className="pointer-events-none absolute right-3 top-1/2 h-3 w-3 -translate-y-1/2 text-fire" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                    <path d="m4 6 4 4 4-4" />
+                  </svg>
+                </div>
+                <p className="text-[9px] leading-relaxed text-tab-inactive">
+                  {activeCanvasPreset ? `${activeCanvasPreset.label} · ${activeCanvasPreset.width}×${activeCanvasPreset.height}` : `Custom · ${canvasW}×${canvasH}`}
+                  {' '}— custom values remain available below.
+                </p>
               </div>
+
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <span className="text-[9px] font-display uppercase tracking-[0.18em] text-tab-inactive">Custom dimensions</span>
+                  <span className="text-[9px] font-display uppercase tracking-widest text-tab-inactive">px</span>
+                </div>
               <div className="flex items-center gap-1">
                 <div className="flex-1 space-y-1">
                   <div>
@@ -946,14 +988,28 @@ export default function App() {
                 </div>
               </div>
             </div>
+              <SidebarSection
+                id="gradient-ramp"
+                title="Gradient Ramp"
+                description="Primary color control"
+                open={showGradientRamp}
+                onToggle={() => setShowGradientRamp(value => !value)}
+              >
+                <GradientRamp overlayImageElement={overlayImageElement} showHeader={false} />
+              </SidebarSection>
 
-            {/* Image Overlay */}
-            <div className="border-t border-panel-border border-t-panel pt-4 space-y-3">
-              <div className="flex items-center justify-between">
-                <h2 className="text-xs font-display font-semibold uppercase tracking-wider text-k-text">Image Overlay/Mask</h2>
-                <div className="flex items-center gap-2">
+              <SidebarSection
+                id="image-overlay"
+                title="Image Overlay / Mask"
+                description="Overlay and alpha source"
+                open={showOverlaySettings}
+                onToggle={() => setShowOverlaySettings(value => !value)}
+              >
+                <div className="space-y-3">
+                  <div className="flex items-center justify-end gap-2">
                   {overlayImageSrc && (
                     <button
+                      type="button"
                       onClick={() => { overlayImageLoadIdRef.current += 1; URL.revokeObjectURL(overlayImageSrc); setOverlayImageSrc(null); setOverlayImageName(''); setOverlayImageElement(null); }}
                       className="text-[10px] text-red-400 hover:text-red-300 px-2 py-0.5 rounded-none bg-red-900/30 hover:bg-red-900/50 transition-colors duration-150"
                     >
@@ -961,69 +1017,75 @@ export default function App() {
                     </button>
                   )}
                   <button
+                    type="button"
                     onClick={() => overlayImageInputRef.current?.click()}
                     className="text-[10px] text-cream hover:text-k-text px-2 py-0.5 rounded-none bg-cream/10 hover:bg-cream/20 transition-all duration-150"
                   >
                     読み込み
                   </button>
                   <input ref={overlayImageInputRef} type="file" accept="image/*" onChange={handleOverlayImageChange} className="hidden" />
+                  </div>
+                  {overlayImageSrc ? (
+                    <p className="text-[10px] text-deep truncate">{overlayImageName}</p>
+                  ) : (
+                    <p className="text-[10px] text-k-muted">画像未選択</p>
+                  )}
+                  <div className="grid grid-cols-2 gap-1 border border-panel-border/60 bg-k-bg/40 p-1">
+                    {(['overlay', 'mask'] as const).map((mode) => (
+                      <button
+                        key={mode}
+                        type="button"
+                        onClick={() => setOverlayImageMode(current => current === mode ? 'off' : mode)}
+                        aria-pressed={overlayImageMode === mode}
+                        className={`px-2 py-1 text-[10px] font-display uppercase tracking-wider transition-colors duration-150 ${overlayImageMode === mode
+                          ? 'bg-cream text-k-bg border-cream'
+                          : 'bg-transparent text-deep hover:text-k-text hover:bg-cream/10'
+                          }`}
+                      >
+                        {mode}
+                      </button>
+                    ))}
+                  </div>
+                  {overlayImageMode === 'overlay' ? (
+                    <SliderField
+                      label="Opacity"
+                      min={0} max={1} step={0.01}
+                      value={overlayOpacity}
+                      onChange={setOverlayOpacity}
+                      format={(v) => v.toFixed(2)}
+                      defaultValue={0.5}
+                    />
+                  ) : overlayImageMode === 'mask' ? (
+                    <div className="flex items-center justify-between text-[10px] text-deep">
+                      <span>Mask Source</span>
+                      <span className={overlayImageElement ? 'text-cream' : 'text-k-muted'}>
+                        {overlayImageElement ? 'Alpha Ready' : 'No Image'}
+                      </span>
+                    </div>
+                  ) : (
+                    <div className="flex items-center justify-between text-[10px] text-deep">
+                      <span>Mode</span>
+                      <span className="text-k-muted">Off</span>
+                    </div>
+                  )}
                 </div>
-              </div>
-              {overlayImageSrc ? (
-                <p className="text-[10px] text-deep truncate">{overlayImageName}</p>
-              ) : (
-                <p className="text-[10px] text-k-muted">画像未選択</p>
-              )}
-              <div className="grid grid-cols-2 gap-1 border border-panel-border/60 bg-k-bg/40 p-1">
-                {(['overlay', 'mask'] as const).map((mode) => (
-                  <button
-                    key={mode}
-                    type="button"
-                    onClick={() => setOverlayImageMode(current => current === mode ? 'off' : mode)}
-                    aria-pressed={overlayImageMode === mode}
-                    className={`px-2 py-1 text-[10px] font-display uppercase tracking-wider transition-colors duration-150 ${overlayImageMode === mode
-                      ? 'bg-cream text-k-bg border-cream'
-                      : 'bg-transparent text-deep hover:text-k-text hover:bg-cream/10'
-                      }`}
-                  >
-                    {mode}
-                  </button>
-                ))}
-              </div>
-              {overlayImageMode === 'overlay' ? (
-                <SliderField
-                  label="Opacity"
-                  min={0} max={1} step={0.01}
-                  value={overlayOpacity}
-                  onChange={setOverlayOpacity}
-                  format={(v) => v.toFixed(2)}
-                  defaultValue={0.5}
+              </SidebarSection>
+
+              <SidebarSection
+                id="image-gradient-source"
+                title="Image Gradient Source"
+                description="Use an image as ramp input"
+                open={showImageGradientSource}
+                onToggle={() => setShowImageGradientSource(value => !value)}
+              >
+                <ImageGradientSourcePanel
+                  sourceImageCanvas={imageGradientSource}
+                  sourceImageName={imageGradientSourceName}
+                  embedded
+                  onSourceImageLoad={(canvas, name) => { setImageGradientSource(canvas); setImageGradientSourceName(name); }}
+                  onSourceImageClear={() => { setImageGradientSource(null); setImageGradientSourceName(''); store.setImageGradient({ enabled: false }); }}
                 />
-              ) : overlayImageMode === 'mask' ? (
-                <div className="flex items-center justify-between text-[10px] text-deep">
-                  <span>Mask Source</span>
-                  <span className={overlayImageElement ? 'text-cream' : 'text-k-muted'}>
-                    {overlayImageElement ? 'Alpha Ready' : 'No Image'}
-                  </span>
-                </div>
-              ) : (
-                <div className="flex items-center justify-between text-[10px] text-deep">
-                  <span>Mode</span>
-                  <span className="text-k-muted">Off</span>
-                </div>
-              )}
-            </div>
-            <ColorPaletteGenerator overlayImageElement={overlayImageElement} />
-
-            <ImageGradientSourcePanel
-              sourceImageCanvas={imageGradientSource}
-              sourceImageName={imageGradientSourceName}
-              onSourceImageLoad={(canvas, name) => { setImageGradientSource(canvas); setImageGradientSourceName(name); }}
-              onSourceImageClear={() => { setImageGradientSource(null); setImageGradientSourceName(''); store.setImageGradient({ enabled: false }); }}
-            />
-
-            <div className="border-t border-panel-border border-t-panel pt-4">
-              <GradientRamp />
+              </SidebarSection>
             </div>
           </DockPanel>
         </div>

@@ -4,7 +4,7 @@ title: Postprocess Stackをping-pong FBOで描画する
 status: accepted
 date: 2026-07-08
 deciders: [maintainer]
-related_specs: [SPEC-011]
+related_specs: [SPEC-012]
 supersedes: []
 ---
 

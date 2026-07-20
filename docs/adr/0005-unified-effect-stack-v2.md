@@ -4,7 +4,7 @@ title: Unified Effect Stack V2を段階別ping-pong FBOで描画する
 status: accepted
 date: 2026-07-11
 deciders: [maintainer]
-related_specs: [SPEC-012, SPEC-014, SPEC-018]
+related_specs: [SPEC-012, SPEC-013, SPEC-014, SPEC-015, SPEC-018]
 supersedes: [ADR-0004]
 ---
 

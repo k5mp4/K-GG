@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import gradientShader from '../shaders/gradient.frag.glsl?raw';
+import noiseShader from '../shaders/noise.glsl?raw';
 import webglSource from './webgl.ts?raw';
-import { getPostprocessFragmentSource } from './webglShaderSources';
+import { getPostprocessFragmentSource, getProgramSource } from './webglShaderSources';
 
 const postprocessShader = getPostprocessFragmentSource();
 
@@ -40,6 +41,15 @@ function canonicalNoise(source: string): string {
     .replace(/\bphi_d\b/g, 'phiDown')
     .replace(/\bcurlVec\b/g, 'curlVector')
     .replace(/\belse\b/g, ''))
+    .replace(/[{}]/g, '');
+}
+
+function canonicalFastCurl(source: string): string {
+  return compact(source
+    .replaceAll('applyFastCurlNoiseUV', 'fastCurlNoise')
+    .replaceAll('applyStackFastCurlNoiseUv', 'fastCurlNoise')
+    .replace(/\bevo\b/g, 'evolution')
+    .replace(/\bs\b/g, 'stepIndex'))
     .replace(/[{}]/g, '');
 }
 
@@ -205,6 +215,17 @@ describe('V2 effect shader parity', () => {
     expect(main).toContain('glassFloat(u_glassRefraction, 32.0, 0.0, 120.0) <= 0.0001');
   });
 
+  it('restores Glass V2 as an independent optical program and stack mode', () => {
+    const glassV2 = getProgramSource('glassV2').fragment;
+    const main = glassV2.slice(glassV2.indexOf('void main()'));
+    expect(glassV2).toContain('#define KGG_GLASS_V2_ONLY');
+    expect(glassV2).toContain('float glassV2GradientNoise(');
+    expect(glassV2).toContain('float glassCauchyIor(');
+    expect(glassV2).toContain('vec4 opticalGlassV2(');
+    expect(main).toContain('u_effectMode == 9');
+    expect(main).toContain('opticalGlassV2(globalUv, globalCoord)');
+  });
+
   it('keeps Dither cell-center and Bayer threshold behavior identical to the Diffuse panel', () => {
     for (const name of ['ditherCellSize', 'ditherCellIndex', 'ditherCellCenter']) {
       expect(compact(extractFunction(postprocessShader, name)))
@@ -222,6 +243,43 @@ describe('V2 effect shader parity', () => {
       .toBe(canonicalNoise(extractFunction(gradientShader, 'applyCurlNoiseUV')));
     expect(canonicalNoise(extractFunction(postprocessShader, 'stackNoiseUv')))
       .toBe(canonicalNoise(extractFunction(gradientShader, 'applyNoiseUV')));
+  });
+
+  it('uses analytic derivatives for Fast Curl and keeps its Legacy/V2 wrappers equivalent', () => {
+    const legacy = extractFunction(gradientShader, 'applyFastCurlNoiseUV');
+    const stack = extractFunction(postprocessShader, 'applyStackFastCurlNoiseUv');
+    expect(canonicalFastCurl(stack)).toBe(canonicalFastCurl(legacy));
+
+    const field = extractFunction(noiseShader, 'fastCurlField');
+    expect(field).toContain('psrdnoise2D(');
+    expect(field).toContain('fract(evolution / loopPeriod)');
+    expect(field).not.toContain('u_noiseEvolution');
+    expect(field).not.toContain('fbm3D(');
+    expect(field).not.toContain('u_curlEps');
+    expect(field).not.toContain('loopBlendWeight');
+    expect(field).not.toContain('wrapped');
+    expect(extractFunction(noiseShader, 'psrdnoise2D')).toContain('vec3(value, derivative)');
+
+    const legacyCurl = extractFunction(gradientShader, 'applyCurlNoiseUV');
+    expect(legacyCurl).toContain('fbm3D(');
+    expect(legacyCurl).toContain('u_curlEps');
+  });
+
+  it('keeps Diffuse independent from upstream Noise UVs and covers a following Slit extension', () => {
+    const main = postprocessShader.slice(postprocessShader.indexOf('void main()'));
+    expect(main).toContain('vec2 diffuseUv = diffuseGlobalUv(diffuseSampleCoord / u_fullResolution, globalCoord);');
+    expect(main).toContain('u_stackSlitDiffuseAfter');
+    expect(main).toContain('diffuseGlobalUv(slitUv, globalCoord)');
+  });
+
+  it('uses only the preceding stack texture as Voronoi color input', () => {
+    const voronoi = extractFunction(postprocessShader, 'voronoiGradient');
+    expect(voronoi).toContain('vec2 tiledUv = fract(rotatedLocal + 0.5 + vec2(cellPhase, cellPhase * 0.731));');
+    expect(voronoi).toContain('texture2D(u_sourceTex, tiledUv)');
+    expect(voronoi).toContain('vec4 color = sourceColor;');
+    expect(voronoi).not.toContain('texture2D(u_gradientRamp');
+    expect(voronoi).not.toContain('cellPattern');
+    expect(voronoi).not.toContain('edgePattern');
   });
 
   it('keeps Slit hashing and pixel-perfect snapping equivalent to Legacy', () => {

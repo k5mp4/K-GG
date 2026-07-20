@@ -284,9 +284,17 @@ export function GradientCanvas({ width = 800, height = 800, animLoopRef, seekVer
   }, [isWebGLReady, gradient, width, height]);
 
   useEffect(() => {
-    const handleReady = () => setLazyProgramReadyCount(c => c + 1);
-    window.addEventListener('kgg:webgl-lazy-program-ready', handleReady);
-    return () => window.removeEventListener('kgg:webgl-lazy-program-ready', handleReady);
+    const handleProgramState = (event: Event) => {
+      const state = (event as CustomEvent<{ state?: string }>).detail?.state;
+      // A failed optional program changes which V2 layers can be presented.
+      // Re-evaluate the render plan so ready Core layers are not left showing
+      // the Base frame that was drawn while the failed program was pending.
+      if (state === 'ready' || state === 'failed' || state === 'fallback') {
+        setLazyProgramReadyCount(c => c + 1);
+      }
+    };
+    window.addEventListener('kgg:webgl-lazy-program-state', handleProgramState);
+    return () => window.removeEventListener('kgg:webgl-lazy-program-state', handleProgramState);
   }, []);
 
   useEffect(() => () => {

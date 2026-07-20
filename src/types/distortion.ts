@@ -1,14 +1,14 @@
 // Phase 2 で実装。Phase 1 では型定義のみ。
 export type NoiseDistortionConfig = {
   enabled: boolean;
-  type: 'simplex' | 'fbm' | 'voronoi' | 'curl' | 'domain_warp_anim' | 'seamless' | 'ridged_fbm' | 'ae_fractal';
+  type: 'simplex' | 'fbm' | 'voronoi' | 'curl' | 'fast_curl' | 'domain_warp_anim' | 'seamless' | 'ridged_fbm' | 'ae_fractal';
   amount: number;
   scale: number;
   octaves: number;
   evolution: number;
   speed: number;
   curlSteps: number;     // 1–8: curl 多段階アドベクションのステップ数
-  curlSpeed: number;     // curl 時間進行速度
+  curlSpeed: number;     // Legacy Curlの時間進行速度 / Fast Curlの流れ強度
   curlEps: number;       // curl 数値微分幅 (0.001-0.1)
   curlSeed: number;      // curl 乱数シード (0-100)
   noiseSeed: number;     // 汎用乱数シード (0-100) curl 以外の全ノイズタイプに適用
@@ -79,7 +79,6 @@ export type SlitScanConfig = {
   slitPhase: number;       // スリット帯域の位置オフセット（px）
   selectedSlitIdx: number; // 選択中スリットのインデックス（-1=なし、UI ハイライト用）
   slitDeltas: Record<number, number>; // スリットごとの幅オフセット（px）。slit index → delta
-  noiseAfterSlit: boolean; // false=Slit -> Noise / true=Noise -> Slit
   pixelPerfect: boolean;   // true=スリット位置・幅・移動量をキャンバス1px単位に丸める
   offsetAngle: number;     // 0–360 deg, スリットオフセット方向（スリット角度からの相対角度）
 };

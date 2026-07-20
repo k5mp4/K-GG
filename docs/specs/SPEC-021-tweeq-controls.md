@@ -1,5 +1,5 @@
 ---
-id: SPEC-016
+id: SPEC-021
 title: Tweeqによるパラメータ入力コントロール
 status: implemented
 owners: [maintainer]
@@ -12,7 +12,7 @@ related_tests: [src/lib/tweeqNumberFormat.test.ts, src/lib/tweeqNumberPosition.t
 human_review: completed
 ---
 
-# SPEC-016: Tweeqによるパラメータ入力コントロール
+# SPEC-021: Tweeqによるパラメータ入力コントロール
 
 ## 背景・問題
 

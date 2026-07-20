@@ -29,7 +29,13 @@ void main() {
 #endif
   if (u_effectEnabled && u_effectMode == 8) {
     vec2 slitUv = stackSlitUv(globalUv, globalCoord);
-    gl_FragColor = texture2D(u_sourceTex, sourceUvFromGlobal(slitUv));
+    vec2 sampleUv = u_stackSlitDiffuseAfter
+      ? diffuseGlobalUv(slitUv, globalCoord)
+      : slitUv;
+    vec4 slitColor = texture2D(u_sourceTex, sourceUvFromGlobal(sampleUv));
+    gl_FragColor = u_stackSlitDiffuseAfter
+      ? applyDiffuseDither(slitColor, globalCoord)
+      : slitColor;
     return;
   }
   if (u_effectEnabled && u_effectMode == 1) {

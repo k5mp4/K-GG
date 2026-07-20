@@ -3,6 +3,7 @@ import { createPortal } from 'react-dom';
 import { gsap } from 'gsap';
 import { useGradientStore, GRADIENT_ANCHOR_DEFAULTS, defaultBezierControlsForAnchors } from '../store/gradientStore';
 import { gradientRampPresets, getColorAtPosition, getOpacityAtPosition, applyMirrorT, normalizeRampSettings } from '../lib/gradientRampUtils';
+import { moveStopsProportionally } from '../lib/proportionalRampEdit';
 import { RAMP_W, RAMP_BAR_H, RAMP_HANDLE_AREA, RAMP_HANDLE_HALF, RAMP_WHEEL_STEP } from '../lib/constants';
 import type { ColorStop, OpacityStop, RampColorMode, RampInterpolation, GradientType } from '../types/gradient';
 import { CustomSelect } from './CustomSelect';
@@ -17,6 +18,8 @@ import {
 } from '../lib/colorPalettes';
 
 import { ColorPicker } from './ColorPicker';
+import { ColorPaletteGenerator } from './ColorPaletteGenerator';
+import { SidebarSection } from './SidebarSection';
 
 const BAR_H = RAMP_BAR_H;
 const HANDLE_AREA = RAMP_HANDLE_AREA;
@@ -337,13 +340,19 @@ function AnimatedOpacityControls({ visible, children }: { visible: boolean; chil
   );
 }
 
-export function GradientRamp() {
+type GradientRampProps = {
+  overlayImageElement?: HTMLImageElement | null;
+  showHeader?: boolean;
+};
+
+export function GradientRamp({ overlayImageElement = null, showHeader = true }: GradientRampProps = {}) {
   const { gradient, setGradient, isSlitAdjusting, selectedStops, setSelectedStops, keyframeTracks, setKeyframeTracks, addKeyframe, setKeyframe, currentTime } = useGradientStore();
   const selectedIdxs = new Set(selectedStops);
   const [selectedOpacityStops, setSelectedOpacityStops] = useState<number[]>([]);
   const selectedOpacityIdxs = new Set(selectedOpacityStops);
   const [isOpacityControlsDismissed, setIsOpacityControlsDismissed] = useState(false);
   const [isPickerOpen, setIsPickerOpen] = useState(false);
+  const [showPaletteGenerator, setShowPaletteGenerator] = useState(false);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [pipWindow, setPipWindow] = useState<Window | null>(null);
   const [paletteName, setPaletteName] = useState('');
@@ -593,6 +602,7 @@ export function GradientRamp() {
   const dragStartPosRef = useRef(0);
   const dragStartStopsRef = useRef<ColorStop[]>([]);
   const dragStartOpacityStopsRef = useRef<OpacityStop[]>([]);
+  const pendingShiftSelectionToggleRef = useRef<number | null>(null);
 
   // ===== ピッカーアニメーション =====
   useEffect(() => {
@@ -744,6 +754,7 @@ export function GradientRamp() {
     }
     didDragRef.current = false;
     didPointerDownOnHandleRef.current = false;
+    pendingShiftSelectionToggleRef.current = null;
     const pos = sidebarPos(e);
     const rect = canvasRef.current!.getBoundingClientRect();
     const localY = e.clientY - rect.top;
@@ -781,7 +792,11 @@ export function GradientRamp() {
       let newSel: Set<number>;
       if (e.shiftKey) {
         newSel = new Set(selectedIdxs);
-        if (newSel.has(hit)) newSel.delete(hit); else newSel.add(hit);
+        if (newSel.has(hit)) {
+          pendingShiftSelectionToggleRef.current = hit;
+        } else {
+          newSel.add(hit);
+        }
       } else if (selectedIdxs.has(hit)) {
         newSel = selectedIdxs;
       } else {
@@ -840,7 +855,13 @@ export function GradientRamp() {
     const idxs = selectedIdxsRef.current;
     const maxPos = gradient.rampMirror ? 0.5 : 1;
     const activeIdx = draggingRef.current;
-    const activePosition = Math.max(0, Math.min(maxPos, dragStartStopsRef.current[activeIdx].position + delta));
+    if (didDragRef.current) pendingShiftSelectionToggleRef.current = null;
+    const nextStops = e.shiftKey
+      ? moveStopsProportionally(dragStartStopsRef.current, idxs, activeIdx, delta, maxPos)
+      : gradient.stops.map((s, i): ColorStop =>
+        idxs.has(i) ? { ...s, position: Math.max(0, Math.min(maxPos, dragStartStopsRef.current[i].position + delta)) } : s
+      );
+    const activePosition = nextStops[activeIdx].position;
     const rect = canvasRef.current!.getBoundingClientRect();
     const rampW = Math.max(1, rect.width - RAMP_EDGE_PAD * 2);
     setRampHover({
@@ -851,11 +872,7 @@ export function GradientRamp() {
       x: RAMP_EDGE_PAD + activePosition * rampW,
       y: OPACITY_HANDLE_AREA + BAR_H + HANDLE_AREA + 8,
     });
-    setGradient({
-      stops: gradient.stops.map((s, i): ColorStop =>
-        idxs.has(i) ? { ...s, position: Math.max(0, Math.min(maxPos, dragStartStopsRef.current[i].position + delta)) } : s
-      )
-    });
+    setGradient({ stops: nextStops });
   };
 
   function addSidebarStopAt(e: { clientX: number; clientY: number; detail?: number }) {
@@ -898,6 +915,13 @@ export function GradientRamp() {
       e.stopPropagation();
     }
     const shouldAddStop = e.pointerType === 'touch' && !didDragRef.current && !didPointerDownOnHandleRef.current;
+    if (!didDragRef.current && pendingShiftSelectionToggleRef.current !== null) {
+      const newSel = new Set(selectedIdxsRef.current);
+      newSel.delete(pendingShiftSelectionToggleRef.current);
+      updateSelectedStops(newSel);
+      selectedIdxsRef.current = newSel;
+    }
+    pendingShiftSelectionToggleRef.current = null;
     if (draggingRef.current !== null) e.currentTarget?.releasePointerCapture?.(e.pointerId);
     if (opacityDraggingRef.current !== null) e.currentTarget?.releasePointerCapture?.(e.pointerId);
     draggingRef.current = null;
@@ -1045,6 +1069,7 @@ export function GradientRamp() {
     }
     didDragRef.current = false;
     didPointerDownOnHandleRef.current = false;
+    pendingShiftSelectionToggleRef.current = null;
     const pos = modalPos(e);
     const rect = mCanvasRef.current!.getBoundingClientRect();
     const localY = e.clientY - rect.top;
@@ -1082,7 +1107,11 @@ export function GradientRamp() {
       let newSel: Set<number>;
       if (e.shiftKey) {
         newSel = new Set(selectedIdxs);
-        if (newSel.has(hit)) newSel.delete(hit); else newSel.add(hit);
+        if (newSel.has(hit)) {
+          pendingShiftSelectionToggleRef.current = hit;
+        } else {
+          newSel.add(hit);
+        }
       } else if (selectedIdxs.has(hit)) {
         newSel = selectedIdxs;
       } else {
@@ -1141,7 +1170,13 @@ export function GradientRamp() {
     const idxs = selectedIdxsRef.current;
     const maxPos = gradient.rampMirror ? 0.5 : 1;
     const activeIdx = draggingRef.current;
-    const activePosition = Math.max(0, Math.min(maxPos, dragStartStopsRef.current[activeIdx].position + delta));
+    if (didDragRef.current) pendingShiftSelectionToggleRef.current = null;
+    const nextStops = e.shiftKey
+      ? moveStopsProportionally(dragStartStopsRef.current, idxs, activeIdx, delta, maxPos)
+      : gradient.stops.map((s, i): ColorStop =>
+        idxs.has(i) ? { ...s, position: Math.max(0, Math.min(maxPos, dragStartStopsRef.current[i].position + delta)) } : s
+      );
+    const activePosition = nextStops[activeIdx].position;
     const rect = mCanvasRef.current!.getBoundingClientRect();
     const rampW = Math.max(1, rect.width - RAMP_EDGE_PAD * 2);
     setRampHover({
@@ -1152,11 +1187,7 @@ export function GradientRamp() {
       x: RAMP_EDGE_PAD + activePosition * rampW,
       y: OPACITY_HANDLE_AREA + MODAL_BAR_H + HANDLE_AREA + 8,
     });
-    setGradient({
-      stops: gradient.stops.map((s, i): ColorStop =>
-        idxs.has(i) ? { ...s, position: Math.max(0, Math.min(maxPos, dragStartStopsRef.current[i].position + delta)) } : s
-      )
-    });
+    setGradient({ stops: nextStops });
   };
 
   function addModalStopAt(e: { clientX: number; clientY: number; detail?: number }) {
@@ -1199,6 +1230,13 @@ export function GradientRamp() {
       e.stopPropagation();
     }
     const shouldAddStop = e.pointerType === 'touch' && !didDragRef.current && !didPointerDownOnHandleRef.current;
+    if (!didDragRef.current && pendingShiftSelectionToggleRef.current !== null) {
+      const newSel = new Set(selectedIdxsRef.current);
+      newSel.delete(pendingShiftSelectionToggleRef.current);
+      updateSelectedStops(newSel);
+      selectedIdxsRef.current = newSel;
+    }
+    pendingShiftSelectionToggleRef.current = null;
     if (draggingRef.current !== null) e.currentTarget?.releasePointerCapture?.(e.pointerId);
     if (opacityDraggingRef.current !== null) e.currentTarget?.releasePointerCapture?.(e.pointerId);
     draggingRef.current = null;
@@ -1624,31 +1662,31 @@ export function GradientRamp() {
         onPointerUp={stopTouchPropagation}
         onPointerCancel={stopTouchPropagation}
       >
-        <div className="flex items-center justify-between mb-1">
-          <h2 className="font-semibold text-sm text-k-text tracking-wide">Gradient Ramp</h2>
+        <div className={`flex items-center mb-1 ${showHeader ? 'justify-between' : 'justify-end'}`}>
+          {showHeader && <h2 className="font-semibold text-sm text-k-text tracking-wide">Gradient Ramp</h2>}
           <div className="flex items-center gap-1">
-            <button
-              onClick={togglePiP}
-              onTouchEnd={(e) => runTouchAction(e, togglePiP)}
-              className="flex items-center justify-center w-7 h-7 p-0 bg-[#2A2A2A] border border-white/10 text-[#F0EAD9] hover:bg-[#3A3A3A] hover:border-white/20 transition-all duration-200"
-              title="別ウィンドウで開く"
-            >
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#F0EAD9" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ pointerEvents: 'none' }}>
-                <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" />
-                <polyline points="15 3 21 3 21 9" />
-                <line x1="10" y1="14" x2="21" y2="3" />
-              </svg>
-            </button>
-            <button
-              onClick={() => setIsModalOpen(true)}
-              onTouchEnd={(e) => runTouchAction(e, () => setIsModalOpen(true))}
-              className="flex items-center justify-center w-7 h-7 p-0 bg-[#2A2A2A] border border-white/10 text-[#F0EAD9] hover:bg-[#3A3A3A] hover:border-white/20 transition-all duration-200"
-              title="拡大表示"
-            >
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#F0EAD9" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ pointerEvents: 'none', display: 'block' }}>
-                <path d="M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7" />
-              </svg>
-            </button>
+              <button
+                onClick={togglePiP}
+                onTouchEnd={(e) => runTouchAction(e, togglePiP)}
+                className="flex items-center justify-center w-7 h-7 p-0 bg-[#2A2A2A] border border-white/10 text-[#F0EAD9] hover:bg-[#3A3A3A] hover:border-white/20 transition-all duration-200"
+                title="別ウィンドウで開く"
+              >
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#F0EAD9" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ pointerEvents: 'none' }}>
+                  <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" />
+                  <polyline points="15 3 21 3 21 9" />
+                  <line x1="10" y1="14" x2="21" y2="3" />
+                </svg>
+              </button>
+              <button
+                onClick={() => setIsModalOpen(true)}
+                onTouchEnd={(e) => runTouchAction(e, () => setIsModalOpen(true))}
+                className="flex items-center justify-center w-7 h-7 p-0 bg-[#2A2A2A] border border-white/10 text-[#F0EAD9] hover:bg-[#3A3A3A] hover:border-white/20 transition-all duration-200"
+                title="拡大表示"
+              >
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#F0EAD9" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ pointerEvents: 'none', display: 'block' }}>
+                  <path d="M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7" />
+                </svg>
+              </button>
           </div>
         </div>
 
@@ -1771,7 +1809,7 @@ export function GradientRamp() {
           </div>
 
           <p className="text-xs text-tab-inactive">
-            クリックで追加 / Shift+クリックで複数選択 / ホイールで位置調整
+            クリックで追加 / Shift+クリックで複数選択 / Shift+ドラッグで近接ストップを比例移動 / ホイールで位置調整
           </p>
 
           <div className="relative space-y-1">
@@ -1808,6 +1846,17 @@ export function GradientRamp() {
             </div>
             {stopOpButtons}
           </div>
+
+          <SidebarSection
+            id="gradient-palette-generator"
+            title="Color Palette Generator"
+            description="Generate stops from an image"
+            open={showPaletteGenerator}
+            onToggle={() => setShowPaletteGenerator(value => !value)}
+            nested
+          >
+            <ColorPaletteGenerator overlayImageElement={overlayImageElement} embedded />
+          </SidebarSection>
 
           {/* プリセット */}
           <div className="space-y-2">
