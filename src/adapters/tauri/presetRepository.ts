@@ -1,71 +1,108 @@
 import { invoke } from '@tauri-apps/api/core';
 import { save as saveDialog } from '@tauri-apps/plugin-dialog';
-import { writeTextFile } from '@tauri-apps/plugin-fs';
-import { isPreset, makePreset } from '../../lib/presetModel';
+import { writeFile } from '@tauri-apps/plugin-fs';
+import { makePreset } from '../../lib/presetModel';
 import type { Preset, StoreSnapshot } from '../../lib/presetModel';
+import {
+  createEmptyPresetLibrary,
+  createFolder as createLibraryFolder,
+  decodePresetPackage,
+  deleteFolder as deleteLibraryFolder,
+  encodePresetExport,
+  mergePresetLibrary,
+  moveFolder as moveLibraryFolder,
+  movePreset as moveLibraryPreset,
+  normalizePresetLibrary,
+  renameFolder as renameLibraryFolder,
+  type PresetExportScope,
+  type PresetFolder,
+  type PresetLibrary,
+} from '../../lib/presetLibrary';
 import type { PresetRepository } from '../types';
 
-async function readAll(): Promise<Preset[]> {
-  const presets = await invoke<unknown>('load_presets_file');
-  if (!Array.isArray(presets) || !presets.every(isPreset)) {
-    throw new Error('Invalid preset file');
-  }
-  return presets;
+async function readLibrary(): Promise<PresetLibrary> {
+  const raw = await invoke<unknown>('load_presets_file');
+  return normalizePresetLibrary(raw);
 }
 
-async function writeAll(presets: Preset[]): Promise<void> {
-  await invoke('save_presets_file', { presets });
-}
-
-async function loadPresets(): Promise<Preset[]> {
+async function loadPresetLibrary(): Promise<PresetLibrary> {
   try {
-    return await readAll();
-  } catch (e) {
-    console.error('Failed to load presets:', e);
-    return [];
+    return await readLibrary();
+  } catch (error) {
+    console.error('Failed to load presets:', error);
+    return createEmptyPresetLibrary();
   }
 }
 
-async function savePreset(name: string, state: StoreSnapshot): Promise<Preset> {
-  const preset = makePreset(name, state);
-  const presets = await loadPresets();
-  await writeAll([...presets, preset]);
+async function writeLibrary(library: PresetLibrary): Promise<void> {
+  await invoke('save_presets_file', { presets: library });
+}
+
+function nextPresetOrder(library: PresetLibrary, folderId: string | null): number {
+  return Math.max(-1, ...library.presets.filter(preset => (preset.folderId ?? null) === folderId).map(preset => preset.order ?? 0)) + 1;
+}
+
+async function savePreset(name: string, state: StoreSnapshot, folderId: string | null, thumbnail?: string): Promise<Preset> {
+  const library = await loadPresetLibrary();
+  const preset = makePreset(name, state, { folderId, order: nextPresetOrder(library, folderId), thumbnail });
+  await writeLibrary({ ...library, presets: [...library.presets, preset] });
   return preset;
 }
 
 async function deletePreset(id: string): Promise<void> {
-  const presets = await loadPresets();
-  await writeAll(presets.filter((p) => p.id !== id));
+  const library = await loadPresetLibrary();
+  await writeLibrary({ ...library, presets: library.presets.filter(preset => preset.id !== id) });
 }
 
-async function exportPresetsJSON(stem?: string): Promise<void> {
-  const presets = await loadPresets();
-  const filename = stem ? `gradPreset_${stem}.json` : 'gradPreset.json';
+async function movePreset(id: string, folderId: string | null): Promise<void> {
+  await writeLibrary(moveLibraryPreset(await loadPresetLibrary(), id, folderId));
+}
+
+async function createFolder(name: string, parentId: string | null): Promise<PresetFolder> {
+  const result = createLibraryFolder(await loadPresetLibrary(), name, parentId);
+  await writeLibrary(result.library);
+  return result.folder;
+}
+
+async function renameFolder(id: string, name: string): Promise<void> {
+  await writeLibrary(renameLibraryFolder(await loadPresetLibrary(), id, name));
+}
+
+async function moveFolder(id: string, parentId: string | null): Promise<void> {
+  await writeLibrary(moveLibraryFolder(await loadPresetLibrary(), id, parentId));
+}
+
+async function deleteFolder(id: string): Promise<void> {
+  await writeLibrary(deleteLibraryFolder(await loadPresetLibrary(), id));
+}
+
+async function exportPresetPackage(scope: PresetExportScope): Promise<void> {
+  const exported = encodePresetExport(await loadPresetLibrary(), scope);
+  const extension = exported.mimeType === 'application/zip' ? 'zip' : 'json';
   const target = await saveDialog({
     title: 'プリセットを書き出し',
-    defaultPath: filename,
-    filters: [{ name: 'JSON', extensions: ['json'] }],
+    defaultPath: exported.filename,
+    filters: [{ name: extension === 'zip' ? 'K-GG Presets' : 'JSON', extensions: [extension] }],
     canCreateDirectories: true,
   });
   if (!target) return;
-  await writeTextFile(target, JSON.stringify(presets, null, 2));
+  await writeFile(target, exported.bytes);
 }
 
-async function importPresetsJSON(file: File, merge: boolean): Promise<void> {
-  const text = await file.text();
-  const parsed: unknown = JSON.parse(text);
-  if (!Array.isArray(parsed) || !parsed.every(isPreset)) throw new Error('Invalid preset file');
-
-  const existing = merge ? await loadPresets() : [];
-  const existingIds = new Set(existing.map((p) => p.id));
-  const toAdd = parsed.filter((p) => !existingIds.has(p.id));
-  await writeAll([...existing, ...toAdd]);
+async function importPresetPackage(file: File, targetFolderId: string | null): Promise<void> {
+  const imported = decodePresetPackage(new Uint8Array(await file.arrayBuffer()), file.name);
+  await writeLibrary(mergePresetLibrary(await loadPresetLibrary(), imported, targetFolderId));
 }
 
 export const tauriPresetRepository: PresetRepository = {
-  loadPresets,
+  loadPresetLibrary,
   savePreset,
   deletePreset,
-  exportPresetsJSON,
-  importPresetsJSON,
+  movePreset,
+  createFolder,
+  renameFolder,
+  moveFolder,
+  deleteFolder,
+  exportPresetPackage,
+  importPresetPackage,
 };

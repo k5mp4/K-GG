@@ -33,6 +33,10 @@ title: 機能仕様
 | SPEC-020 | [Fast Curl Noiseの追加と軽量化](./SPEC-020-fast-curl-noise.md) | implemented |
 | SPEC-021 | [Tweeqによるパラメータ入力コントロール](./SPEC-021-tweeq-controls.md) | implemented |
 | SPEC-022 | [Slit AngleへのTweeq InputAngle導入](./SPEC-022-tweeq-slit-angle.md) | implemented |
+| SPEC-023 | [動画書き出しUXとMP4品質設定の改善](./SPEC-023-video-export-ux-and-mp4-quality.md) | implemented |
+| SPEC-024 | [動画書き出しFFmpeg待機の応答性改善](./SPEC-024-video-export-encode-responsiveness.md) | implemented |
+| SPEC-025 | [プリセットライブラリとフォルダ階層](./SPEC-025-preset-library-and-folders.md) | implemented |
+| SPEC-026 | [プリセットライブラリの操作性と描画サムネイル](./SPEC-026-preset-library-ux-and-rendered-thumbnails.md) | implemented |
 
 ## 新しい仕様の作り方
 

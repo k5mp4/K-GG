@@ -66,34 +66,30 @@ async function writePngSequenceToTempDir(
   tempPath: string,
   totalFrames: number,
 ): Promise<void> {
-  const { canvas, speed, duration, easing, signal, onProgress = () => {} } = config;
+  const { canvas, speed, duration, easing, signal, onProgress = () => {}, onStage } = config;
   const fullW = canvas.width;
   const fullH = canvas.height;
   const useTiled = needsTiledRender(canvas, fullW, fullH);
 
-  renderBridge.stopAnimation();
-  try {
-    for (let i = 0; i < totalFrames; i++) {
-      if (signal?.aborted) throw new DOMException('Export cancelled', 'AbortError');
-      const nt = calcExportNormalizedTime(i, totalFrames);
-      const t = calcTimeFromNormalized(nt, speed, duration, easing);
-      const frameBaseProgress = i / totalFrames;
-      const blob = await captureBlob(
-        canvas,
-        fullW,
-        fullH,
-        t,
-        nt,
-        signal,
-        useTiled ? (tileProgress) => onProgress((frameBaseProgress + tileProgress / totalFrames) * 0.7) : undefined,
-      );
-      const filename = `frame_${String(i).padStart(4, '0')}.png`;
-      await writeFile(await join(tempPath, filename), new Uint8Array(await blob.arrayBuffer()));
-      onProgress(((i + 1) / totalFrames) * 0.7);
-      if (i % 5 === 0) await new Promise(resolve => setTimeout(resolve, 0));
-    }
-  } finally {
-    renderBridge.startAnimation();
+  onStage?.('rendering');
+  for (let i = 0; i < totalFrames; i++) {
+    if (signal?.aborted) throw new DOMException('Export cancelled', 'AbortError');
+    const nt = calcExportNormalizedTime(i, totalFrames);
+    const t = calcTimeFromNormalized(nt, speed, duration, easing);
+    const frameBaseProgress = i / totalFrames;
+    const blob = await captureBlob(
+      canvas,
+      fullW,
+      fullH,
+      t,
+      nt,
+      signal,
+      useTiled ? (tileProgress) => onProgress((frameBaseProgress + tileProgress / totalFrames) * 0.7) : undefined,
+    );
+    const filename = `frame_${String(i).padStart(4, '0')}.png`;
+    await writeFile(await join(tempPath, filename), new Uint8Array(await blob.arrayBuffer()));
+    onProgress(((i + 1) / totalFrames) * 0.7);
+    if (i % 5 === 0) await new Promise(resolve => setTimeout(resolve, 0));
   }
 }
 
@@ -119,15 +115,16 @@ export const tauriVideoExportService: VideoExportService = {
 
     try {
       await writePngSequenceToTempDir(config, exportTemp, totalFrames);
-      config.onProgress?.(0.72);
+      config.onProgress?.(0.7);
+      config.onStage?.('encoding');
       await invoke('encode_qtrle_mov', {
         inputPattern: await join(exportTemp, 'frame_%04d.png'),
         outputPath,
         fps: config.fps,
       });
       config.onProgress?.(0.95);
+      config.onStage?.('saving');
       const movieBytes = await readFile(outputPath);
-      config.onProgress?.(1);
       return new Blob([movieBytes], { type: 'video/quicktime' });
     } finally {
       await remove(exportTemp, { recursive: true }).catch(() => undefined);
@@ -143,15 +140,17 @@ export const tauriVideoExportService: VideoExportService = {
 
     try {
       await writePngSequenceToTempDir(config, exportTemp, totalFrames);
-      config.onProgress?.(0.72);
+      config.onProgress?.(0.7);
+      config.onStage?.('encoding');
       await invoke('encode_h264_rgb_mp4', {
         inputPattern: await join(exportTemp, 'frame_%04d.png'),
         outputPath,
         fps: config.fps,
+        quality: config.mp4Quality ?? 'high',
       });
       config.onProgress?.(0.95);
+      config.onStage?.('saving');
       const movieBytes = await readFile(outputPath);
-      config.onProgress?.(1);
       return new Blob([movieBytes], { type: 'video/mp4' });
     } finally {
       await remove(exportTemp, { recursive: true }).catch(() => undefined);

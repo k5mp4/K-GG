@@ -57,6 +57,7 @@ type DocumentPictureInPictureApi = {
 
 type Props = {
   onSwapWorkspace?: () => void;
+  onSelectEffectStack?: (kind: EffectStackKind) => void;
 };
 
 function programKeyForEffect(kind: EffectStackKind): LazyProgramKey {
@@ -67,7 +68,7 @@ function programKeyForEffect(kind: EffectStackKind): LazyProgramKey {
   return 'stretch';
 }
 
-export function PostprocessStackPanel({ onSwapWorkspace }: Props = {}) {
+export function PostprocessStackPanel({ onSwapWorkspace, onSelectEffectStack }: Props = {}) {
   const { setPostprocess, effectPipeline, normalMap, setEffectPipeline } = useGradientStore();
   const stack = normalizeEffectStack(effectPipeline.effectStack);
   const movableStack = stack;
@@ -202,6 +203,7 @@ export function PostprocessStackPanel({ onSwapWorkspace }: Props = {}) {
   };
 
   const selectLayer = (kind: EffectStackKind) => {
+    onSelectEffectStack?.(kind);
     setEffectPipeline({ selectedKind: kind });
     if (kind === 'distort' || kind === 'mirror' || kind === 'kaleidoscope' || kind === 'voronoi' || kind === 'glass' || kind === 'glassV2') {
       setPostprocess({ enabled: true, effectMode: kind as PostprocessStackKind });

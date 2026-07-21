@@ -9,11 +9,14 @@ import { getTrackMode, type Keyframe } from '../types/keyframe';
 import { Icon } from './Icon';
 import { getAnimationGroup } from '../lib/animationRegistry';
 import { AnimationPropertyControls } from './AnimationPropertyControls';
+import type { ExportStage } from '../adapters';
+import { exportStageLabel } from '../lib/exportProgress';
 
 type Props = {
   animLoopRef: React.MutableRefObject<AnimationLoop | null>;
   onSeek?: () => void;
   exportProgress?: number | null;
+  exportStage?: ExportStage;
   height?: number;
   showTimeRemap?: boolean;
   onToggleTimeRemap?: () => void;
@@ -33,7 +36,7 @@ function formatSeconds(seconds: number): string {
   return `${seconds.toFixed(2)}s`;
 }
 
-export function TimelineBar({ animLoopRef, onSeek, exportProgress = null, height = 300, showTimeRemap = false, onToggleTimeRemap, selectedEffectPrefix = '' }: Props) {
+export function TimelineBar({ animLoopRef, onSeek, exportProgress = null, exportStage = 'preparing', height = 300, showTimeRemap = false, onToggleTimeRemap, selectedEffectPrefix = '' }: Props) {
   const isExporting = exportProgress !== null;
   const {
     animation, keyframeTracks, currentTime,
@@ -797,7 +800,7 @@ export function TimelineBar({ animLoopRef, onSeek, exportProgress = null, height
               className="text-[9px] text-amber-400 tabular-nums truncate min-w-0"
               style={{ display: isExporting ? 'inline' : 'none' }}
             >
-              {Math.round((exportProgress ?? 0) * 100)}%
+              {exportStageLabel(exportStage)}
             </span>
             <span
               ref={timeTextRef}

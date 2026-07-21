@@ -27,9 +27,12 @@ export type {
   AppAdapters,
   ColorPaletteRepository,
   ExportDirectoryHandle,
+  ExportStage,
   ExportService,
+  Mp4QualityPreset,
   NativeFfmpegStatus,
   PresetRepository,
   VideoExportConfig,
   VideoExportService,
 } from './types';
+export { MP4_QUALITY_PRESETS } from './types';

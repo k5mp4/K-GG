@@ -2,6 +2,7 @@ import { useCallback, useLayoutEffect, useRef, useState, type RefObject } from '
 import { gsap } from 'gsap';
 import { ColorHistogram } from './ColorHistogram';
 import { PostprocessStackPanel } from './PostprocessStackPanel';
+import type { EffectStackKind } from '../types/distortion';
 
 const WORKSPACE_ORDER_KEY = 'kgg.effect-stack-workspace.order';
 const STACK_SLOT_X = 0;
@@ -22,9 +23,10 @@ function readWorkspaceOrder(): WorkspaceOrder {
 type Props = {
   sourceCanvasRef: RefObject<HTMLCanvasElement | null>;
   hidden?: boolean;
+  onSelectEffectStack?: (kind: EffectStackKind) => void;
 };
 
-export function EffectStackWorkspace({ sourceCanvasRef, hidden = false }: Props) {
+export function EffectStackWorkspace({ sourceCanvasRef, hidden = false, onSelectEffectStack }: Props) {
   const [order, setOrder] = useState<WorkspaceOrder>(readWorkspaceOrder);
   const stackRef = useRef<HTMLDivElement>(null);
   const histogramRef = useRef<HTMLDivElement>(null);
@@ -68,7 +70,7 @@ export function EffectStackWorkspace({ sourceCanvasRef, hidden = false }: Props)
     >
       <div className="relative h-full min-w-[480px]">
         <div ref={stackRef} className={`absolute left-0 top-0 ${hidden ? 'pointer-events-none' : 'pointer-events-auto'}`}>
-          <PostprocessStackPanel onSwapWorkspace={swapOrder} />
+          <PostprocessStackPanel onSwapWorkspace={swapOrder} onSelectEffectStack={onSelectEffectStack} />
         </div>
         <div ref={histogramRef} className={`absolute left-0 top-0 ${hidden ? 'pointer-events-none' : 'pointer-events-auto'}`}>
           <ColorHistogram sourceCanvasRef={sourceCanvasRef} />

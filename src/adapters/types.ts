@@ -1,17 +1,30 @@
 import type { AnimationEasing } from '../store/gradientStore';
 import type { ColorStop } from '../types/gradient';
 import type { Preset, StoreSnapshot } from '../lib/presetModel';
+import type { PresetExportScope, PresetFolder, PresetLibrary } from '../lib/presetLibrary';
 import type { UserColorPalette } from '../lib/colorPalettes';
 
 export type MaybePromise<T> = T | Promise<T>;
 export type ExportDirectoryHandle = FileSystemDirectoryHandle | string;
+export const MP4_QUALITY_PRESETS = [
+  { value: 'high', label: 'High', crf: 18, description: '画質優先' },
+  { value: 'balanced', label: 'Balanced', crf: 22, description: 'バランス' },
+  { value: 'small', label: 'Small', crf: 27, description: 'サイズ優先' },
+] as const;
+export type Mp4QualityPreset = (typeof MP4_QUALITY_PRESETS)[number]['value'];
+export type ExportStage = 'preparing' | 'rendering' | 'encoding' | 'saving';
 
 export interface PresetRepository {
-  loadPresets(): MaybePromise<Preset[]>;
-  savePreset(name: string, state: StoreSnapshot): MaybePromise<Preset>;
+  loadPresetLibrary(): MaybePromise<PresetLibrary>;
+  savePreset(name: string, state: StoreSnapshot, folderId: string | null, thumbnail?: string): MaybePromise<Preset>;
   deletePreset(id: string): MaybePromise<void>;
-  exportPresetsJSON(stem?: string): MaybePromise<void>;
-  importPresetsJSON(file: File, merge: boolean): Promise<void>;
+  movePreset(id: string, folderId: string | null): MaybePromise<void>;
+  createFolder(name: string, parentId: string | null): MaybePromise<PresetFolder>;
+  renameFolder(id: string, name: string): MaybePromise<void>;
+  moveFolder(id: string, parentId: string | null): MaybePromise<void>;
+  deleteFolder(id: string): MaybePromise<void>;
+  exportPresetPackage(scope: PresetExportScope): MaybePromise<void>;
+  importPresetPackage(file: File, targetFolderId: string | null): Promise<void>;
 }
 
 export interface ColorPaletteRepository {
@@ -60,8 +73,10 @@ export type VideoExportConfig = {
   duration: number;
   speed: number;
   easing?: AnimationEasing;
+  mp4Quality?: Mp4QualityPreset;
   signal?: AbortSignal;
   onProgress?: (p: number) => void;
+  onStage?: (stage: ExportStage) => void;
 };
 
 export type NativeFfmpegStatus = {
