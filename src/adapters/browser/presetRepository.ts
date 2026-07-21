@@ -1,61 +1,105 @@
-import { isPreset, makePreset } from '../../lib/presetModel';
+import { makePreset } from '../../lib/presetModel';
 import type { Preset, StoreSnapshot } from '../../lib/presetModel';
+import {
+  createEmptyPresetLibrary,
+  createFolder as createLibraryFolder,
+  decodePresetPackage,
+  deleteFolder as deleteLibraryFolder,
+  encodePresetExport,
+  mergePresetLibrary,
+  moveFolder as moveLibraryFolder,
+  movePreset as moveLibraryPreset,
+  normalizePresetLibrary,
+  renameFolder as renameLibraryFolder,
+  type PresetExportScope,
+  type PresetFolder,
+  type PresetLibrary,
+} from '../../lib/presetLibrary';
 import type { PresetRepository } from '../types';
 
 const STORAGE_KEY = 'kagaribi15_presets';
 
-function loadPresets(): Preset[] {
+function loadPresetLibrary(): PresetLibrary {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
-    return raw ? (JSON.parse(raw) as Preset[]) : [];
+    return raw ? normalizePresetLibrary(JSON.parse(raw) as unknown) : createEmptyPresetLibrary();
   } catch {
-    return [];
+    return createEmptyPresetLibrary();
   }
 }
 
-function saveAll(presets: Preset[]): void {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(presets));
+function savePresetLibrary(library: PresetLibrary): void {
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(library));
 }
 
-function savePreset(name: string, state: StoreSnapshot): Preset {
-  const preset = makePreset(name, state);
-  const presets = loadPresets();
-  saveAll([...presets, preset]);
+function nextPresetOrder(library: PresetLibrary, folderId: string | null): number {
+  return Math.max(-1, ...library.presets.filter(preset => (preset.folderId ?? null) === folderId).map(preset => preset.order ?? 0)) + 1;
+}
+
+function downloadExport(bytes: Uint8Array, filename: string, mimeType: string): void {
+  const blob = new Blob([bytes.buffer as ArrayBuffer], { type: mimeType });
+  const url = URL.createObjectURL(blob);
+  const anchor = document.createElement('a');
+  anchor.href = url;
+  anchor.download = filename;
+  anchor.click();
+  window.setTimeout(() => URL.revokeObjectURL(url), 0);
+}
+
+async function savePreset(name: string, state: StoreSnapshot, folderId: string | null, thumbnail?: string): Promise<Preset> {
+  const library = loadPresetLibrary();
+  const preset = makePreset(name, state, { folderId, order: nextPresetOrder(library, folderId), thumbnail });
+  savePresetLibrary({ ...library, presets: [...library.presets, preset] });
   return preset;
 }
 
 function deletePreset(id: string): void {
-  saveAll(loadPresets().filter((p) => p.id !== id));
+  const library = loadPresetLibrary();
+  savePresetLibrary({ ...library, presets: library.presets.filter(preset => preset.id !== id) });
 }
 
-function exportPresetsJSON(stem?: string): void {
-  const presets = loadPresets();
-  const blob = new Blob([JSON.stringify(presets, null, 2)], { type: 'application/json' });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url;
-  const filename = stem ? `gradPreset_${stem}.json` : 'gradPreset.json';
-  a.download = filename;
-  a.click();
-  URL.revokeObjectURL(url);
+function movePreset(id: string, folderId: string | null): void {
+  savePresetLibrary(moveLibraryPreset(loadPresetLibrary(), id, folderId));
 }
 
-async function importPresetsJSON(file: File, merge: boolean): Promise<void> {
-  const text = await file.text();
-  const parsed: unknown = JSON.parse(text);
-  if (!Array.isArray(parsed) || !parsed.every(isPreset)) throw new Error('Invalid preset file');
-  const imported = parsed;
-  const existing = merge ? loadPresets() : [];
-  // マージ時は id 衝突を避けるため重複を除外
-  const existingIds = new Set(existing.map((p) => p.id));
-  const toAdd = imported.filter((p) => !existingIds.has(p.id));
-  saveAll([...existing, ...toAdd]);
+function createFolder(name: string, parentId: string | null): PresetFolder {
+  const result = createLibraryFolder(loadPresetLibrary(), name, parentId);
+  savePresetLibrary(result.library);
+  return result.folder;
+}
+
+function renameFolder(id: string, name: string): void {
+  savePresetLibrary(renameLibraryFolder(loadPresetLibrary(), id, name));
+}
+
+function moveFolder(id: string, parentId: string | null): void {
+  savePresetLibrary(moveLibraryFolder(loadPresetLibrary(), id, parentId));
+}
+
+function deleteFolder(id: string): void {
+  savePresetLibrary(deleteLibraryFolder(loadPresetLibrary(), id));
+}
+
+function exportPresetPackage(scope: PresetExportScope): void {
+  const exported = encodePresetExport(loadPresetLibrary(), scope);
+  downloadExport(exported.bytes, exported.filename, exported.mimeType);
+}
+
+async function importPresetPackage(file: File, targetFolderId: string | null): Promise<void> {
+  const bytes = new Uint8Array(await file.arrayBuffer());
+  const imported = decodePresetPackage(bytes, file.name);
+  savePresetLibrary(mergePresetLibrary(loadPresetLibrary(), imported, targetFolderId));
 }
 
 export const browserPresetRepository: PresetRepository = {
-  loadPresets,
+  loadPresetLibrary,
   savePreset,
   deletePreset,
-  exportPresetsJSON,
-  importPresetsJSON,
+  movePreset,
+  createFolder,
+  renameFolder,
+  moveFolder,
+  deleteFolder,
+  exportPresetPackage,
+  importPresetPackage,
 };

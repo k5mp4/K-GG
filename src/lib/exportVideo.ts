@@ -3,6 +3,17 @@ import { adapters, type NativeFfmpegStatus, type VideoExportConfig } from '../ad
 export type ExportConfig = VideoExportConfig;
 const FFMPEG_BUILDS_URL = 'https://www.gyan.dev/ffmpeg/builds/#release-builds';
 
+export function shouldSimulateMissingFfmpeg(isDev: boolean, flag: string | undefined): boolean {
+  return isDev && flag === '1';
+}
+
+function isFfmpegMissingDebugEnabled(): boolean {
+  return shouldSimulateMissingFfmpeg(
+    import.meta.env.DEV,
+    import.meta.env.VITE_KGG_DEBUG_FFMPEG_MISSING,
+  );
+}
+
 export async function exportLosslessMOV(config: ExportConfig): Promise<Blob> {
   return await adapters.videoExportService.exportLosslessMOV(config);
 }
@@ -20,6 +31,18 @@ export function nativeFfmpegSupported(): boolean {
 }
 
 export async function getNativeFfmpegStatus(): Promise<NativeFfmpegStatus> {
+  if (isFfmpegMissingDebugEnabled()) {
+    return {
+      supported: true,
+      available: false,
+      source: null,
+      path: null,
+      version: null,
+      error: null,
+      warning: null,
+      folderPath: null,
+    };
+  }
   if (adapters.videoExportService.getNativeFfmpegStatus) {
     return await adapters.videoExportService.getNativeFfmpegStatus();
   }

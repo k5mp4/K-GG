@@ -98,7 +98,6 @@ async function captureFrameZipChunks(
     });
 
     void (async () => {
-      renderBridge.stopAnimation();
       try {
         // WebGL canvas は単一の描画先なので、通常パスもタイルパスも逐次処理する。
         for (let i = 0; i < totalFrames; i++) {
@@ -129,8 +128,6 @@ async function captureFrameZipChunks(
       } catch (e) {
         zip.terminate();
         reject(e);
-      } finally {
-        renderBridge.startAnimation();
       }
     })();
   });
@@ -169,7 +166,6 @@ export async function exportFrameZip(config: ExportConfig): Promise<Blob> {
     signal,
   );
 
-  onProgress(1);
   return blob;
 }
 

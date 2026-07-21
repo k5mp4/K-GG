@@ -10,6 +10,8 @@ type VoidFn = () => void;
 type BoolFn = () => boolean;
 type NumberFn = () => number;
 type TilePaddingFn = () => number;
+type PauseAnimationFn = () => boolean;
+type ResumeAnimationFn = () => void;
 
 let _renderAtTime: RenderAtTimeFn | null = null;
 let _stopAnim: VoidFn | null = null;
@@ -20,6 +22,9 @@ let _getCurrentTime: NumberFn | null = null;
 let _getCurrentNormalizedTime: NumberFn | null = null;
 let _seekTo: ((normalizedTime: number) => void) | null = null;
 let _getTilePadding: TilePaddingFn | null = null;
+let _pauseAnimation: PauseAnimationFn | null = null;
+let _resumeAnimation: ResumeAnimationFn | null = null;
+let _animationSuspended = false;
 
 export const renderBridge = {
   register(
@@ -39,12 +44,16 @@ export const renderBridge = {
     getCurrentTime: NumberFn,
     seekTo?: (normalizedTime: number) => void,
     getCurrentNormalizedTime?: NumberFn,
+    pauseAnimation?: PauseAnimationFn,
+    resumeAnimation?: ResumeAnimationFn,
   ): void {
     _togglePause = togglePause;
     _isPaused = isPaused;
     _getCurrentTime = getCurrentTime;
     _getCurrentNormalizedTime = getCurrentNormalizedTime ?? null;
     _seekTo = seekTo ?? null;
+    _pauseAnimation = pauseAnimation ?? null;
+    _resumeAnimation = resumeAnimation ?? null;
   },
   renderAtTime(t: number, nt?: number, tile?: TileRenderOptions): void {
     _renderAtTime?.(t, nt, tile);
@@ -53,7 +62,22 @@ export const renderBridge = {
     _stopAnim?.();
   },
   startAnimation(): void {
+    if (_animationSuspended) return;
     _startAnim?.();
+  },
+  /** Export中のプレビュー再生を止め、開始前に再生中だったかを返す。 */
+  suspendAnimation(): boolean {
+    if (_animationSuspended) return false;
+    _animationSuspended = true;
+    return _pauseAnimation?.() ?? false;
+  },
+  /** Export終了後に、開始前に再生中だった場合だけ再開する。 */
+  resumeAnimation(wasPlaying: boolean): void {
+    _animationSuspended = false;
+    if (wasPlaying) _resumeAnimation?.();
+  },
+  isAnimationSuspended(): boolean {
+    return _animationSuspended;
   },
   /** アニメーションが再生中のときだけ一時停止/再開トグルを行う。未登録時は何もしない */
   togglePause(): void {

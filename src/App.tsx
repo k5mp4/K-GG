@@ -37,6 +37,7 @@ import { SidebarSection } from './components/SidebarSection';
 import { Icon } from './components/Icon';
 import { undo, redo } from './lib/history';
 import type { GpuDiagnostics } from './lib/gpuDiagnostics';
+import type { EffectStackKind } from './types/distortion';
 import { useAppUpdater } from './features/updater/useAppUpdater';
 import { UpdateButton } from './features/updater/UpdateButton';
 import { UpdateDialog } from './features/updater/UpdateDialog';
@@ -48,7 +49,7 @@ import {
   openFfmpegBuildsPage,
   openNativeFfmpegFolder,
 } from './lib/exportVideo';
-import type { NativeFfmpegStatus } from './adapters';
+import type { ExportStage, NativeFfmpegStatus } from './adapters';
 
 const MAX_DISPLAY_W = 1000;
 
@@ -149,6 +150,7 @@ export default function App() {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const [seekVersion, setSeekVersion] = useState(0);
   const [exportProgress, setExportProgress] = useState<number | null>(null);
+  const [exportStage, setExportStage] = useState<ExportStage>('preparing');
   const [ffmpegStatus, setFfmpegStatus] = useState<NativeFfmpegStatus | null>(null);
   const [ffmpegChecking, setFfmpegChecking] = useState(false);
   const [ffmpegDialogOpen, setFfmpegDialogOpen] = useState(false);
@@ -266,18 +268,22 @@ export default function App() {
   const [showOverlaySettings, setShowOverlaySettings] = useState(false);
   const [showImageGradientSource, setShowImageGradientSource] = useState(false);
 
-  useEffect(() => {
-    if (effectPipeline.version !== 'stack-v2') return;
-    const tabByKind: Record<string, LeftTab> = {
-      diffuse: 'diffuse', noise: 'noise', slit: 'slit', stretch: 'stretch',
-      distort: 'distort', mirror: 'postprocess', kaleidoscope: 'postprocess', voronoi: 'postprocess', glass: 'postprocess', glassV2: 'postprocess',
-    };
-    const next = tabByKind[effectPipeline.selectedKind];
-    if (next && next !== activeLeftTabRef.current) {
-      activeLeftTabRef.current = next;
-      setLeftTab(next);
-    }
-  }, [effectPipeline.version, effectPipeline.selectedKind]);
+  const handleEffectStackSelection = (kind: EffectStackKind) => {
+    const nextTab: LeftTab = kind === 'diffuse'
+      ? 'diffuse'
+      : kind === 'noise'
+        ? 'noise'
+        : kind === 'slit'
+          ? 'slit'
+          : kind === 'stretch'
+            ? 'stretch'
+            : kind === 'distort'
+              ? 'distort'
+              : 'postprocess';
+    activeLeftTabRef.current = nextTab;
+    setLeftTab(nextTab);
+    setLeftPanelOpen(true);
+  };
 
   // アニメーションが有効化されたとき、または対象のいずれかが有効なときにタイムラインを自動で開く
   useEffect(() => {
@@ -621,6 +627,7 @@ export default function App() {
                     {value === 'export' && (
                       <ExportPanel
                         onExportProgress={setExportProgress}
+                        onExportStage={setExportStage}
                         onResizeCanvas={(w, h) => {
                           setCanvasW(w);
                           setCanvasH(h);
@@ -754,6 +761,7 @@ export default function App() {
               <EffectStackWorkspace
                 sourceCanvasRef={canvasRef}
                 hidden={showLeftSidebar || showRightSidebar}
+                onSelectEffectStack={handleEffectStackSelection}
               />
               <div style={{
                 position: 'relative',
@@ -1108,6 +1116,7 @@ export default function App() {
                     animLoopRef={animLoopRef}
                     onSeek={() => setSeekVersion(v => v + 1)}
                     exportProgress={exportProgress}
+                    exportStage={exportStage}
                     height={timelineHeight}
                     showTimeRemap={showTimeRemap}
                     onToggleTimeRemap={() => setShowTimeRemap(v => !v)}

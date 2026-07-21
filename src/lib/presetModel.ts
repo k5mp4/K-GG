@@ -46,13 +46,26 @@ export type Preset = {
   name: string;
   createdAt: number;
   state: StoreSnapshot;
+  /** Virtual folder. null is the library root. Optional for legacy JSON. */
+  folderId?: string | null;
+  /** Stable sibling ordering. Optional for legacy JSON. */
+  order?: number;
+  /** Optional PNG data URL captured from the effect stack at save time. */
+  thumbnail?: string;
 };
 
-export function makePreset(name: string, state: StoreSnapshot): Preset {
+export function makePreset(
+  name: string,
+  state: StoreSnapshot,
+  metadata: { folderId?: string | null; order?: number; thumbnail?: string } = {},
+): Preset {
   return {
     id: Math.random().toString(36).slice(2),
     name,
     createdAt: Date.now(),
+    folderId: metadata.folderId ?? null,
+    order: metadata.order ?? 0,
+    ...(metadata.thumbnail ? { thumbnail: metadata.thumbnail } : {}),
     state: {
       ...state,
       effectPipeline: state.effectPipeline
@@ -63,11 +76,16 @@ export function makePreset(name: string, state: StoreSnapshot): Preset {
 }
 
 export function isPreset(value: unknown): value is Preset {
+  if (typeof value !== 'object' || value === null) return false;
+  const preset = value as Preset;
+  const thumbnail = preset.thumbnail;
   return (
-    typeof value === 'object' && value !== null &&
-    typeof (value as Preset).id === 'string' &&
-    typeof (value as Preset).name === 'string' &&
-    typeof (value as Preset).createdAt === 'number' &&
-    typeof (value as Preset).state === 'object' && (value as Preset).state !== null
+    typeof preset.id === 'string' &&
+    typeof preset.name === 'string' &&
+    typeof preset.createdAt === 'number' &&
+    typeof preset.state === 'object' && preset.state !== null &&
+    (typeof preset.folderId === 'string' || preset.folderId === null || preset.folderId === undefined) &&
+    (typeof preset.order === 'number' && Number.isFinite(preset.order) || preset.order === undefined) &&
+    (thumbnail === undefined || typeof thumbnail === 'string' && thumbnail.length <= 2_000_000)
   );
 }

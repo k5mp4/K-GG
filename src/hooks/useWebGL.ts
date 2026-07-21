@@ -142,6 +142,18 @@ export function useWebGL(
         }
       },
       () => animLoopRef.current?.currentNormalizedTime ?? useGradientStore.getState().currentTime,
+      () => {
+        const loop = animLoopRef.current;
+        if (!loop || loop.isPaused) return false;
+        loop.pause();
+        return true;
+      },
+      () => {
+        const loop = animLoopRef.current;
+        if (!loop) return;
+        if (loop.isPaused) loop.resume();
+        else loop.start();
+      },
     );
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 

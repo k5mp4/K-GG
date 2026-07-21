@@ -19,14 +19,18 @@ import {
   aePing, aeImportImage, aeImportVideo, aeBridgeAvailable,
   aeGetSaveDir, aeChooseSaveDir, aeClearSaveDir,
 } from '../lib/aftereffectsExport';
-import type { ExportDirectoryHandle, NativeFfmpegStatus } from '../adapters';
+import { MP4_QUALITY_PRESETS } from '../adapters';
+import type { ExportDirectoryHandle, ExportStage, Mp4QualityPreset, NativeFfmpegStatus } from '../adapters';
 import type { AeSaveDirStatus, AeStatus } from '../lib/aftereffectsExport';
+import { renderBridge } from '../lib/renderBridge';
+import { exportDisplayProgress, exportProgressPercent, exportStageLabel } from '../lib/exportProgress';
 
 type ExportJob = 'mov' | 'mp4' | 'zip' | 'slits' | null;
 type VideoExt = 'mov' | 'mp4';
 
 type Props = {
   onExportProgress?: (progress: number | null) => void;
+  onExportStage?: (stage: ExportStage) => void;
   onResizeCanvas?: (w: number, h: number) => void;
   canvasRef: React.RefObject<HTMLCanvasElement | null>;
   ffmpegStatus: NativeFfmpegStatus | null;
@@ -36,6 +40,7 @@ type Props = {
 
 export function ExportPanel({
   onExportProgress,
+  onExportStage,
   onResizeCanvas,
   canvasRef,
   ffmpegStatus,
@@ -48,11 +53,14 @@ export function ExportPanel({
   const [fileName, setFileName] = useState(sanitizeStem(presetName || 'gradient'));
   const [exportJob, setExportJob] = useState<ExportJob>(null);
   const [exportProgress, setExportProgress] = useState(0);
+  const [exportStage, setExportStage] = useState<ExportStage>('preparing');
+  const [mp4Quality, setMp4Quality] = useState<Mp4QualityPreset>('high');
   const lastReportedProgressRef = useRef(0);
   const [exportError, setExportError] = useState<string | null>(null);
   const [savedFormats, setSavedFormats] = useState<Record<string, boolean>>({});
   const [slitTrimMode, setSlitTrimMode] = useState(false);
   const abortControllerRef = useRef<AbortController | null>(null);
+  const previewWasPlayingRef = useRef<boolean | null>(null);
 
   // After Effects 連携
   const [aeStatus, setAeStatus] = useState<AeStatus | 'idle' | 'sending'>('idle');
@@ -94,11 +102,37 @@ export function ExportPanel({
     onExportProgress?.(p);
   }
 
+  function reportStage(stage: ExportStage) {
+    setExportStage(stage);
+    onExportStage?.(stage);
+  }
+
+  function beginExport(job: Exclude<ExportJob, null>): AbortController {
+    const controller = new AbortController();
+    previewWasPlayingRef.current = renderBridge.suspendAnimation();
+    abortControllerRef.current = controller;
+    setExportJob(job);
+    reportStage('preparing');
+    lastReportedProgressRef.current = 0;
+    setExportProgress(0);
+    onExportProgress?.(0);
+    return controller;
+  }
+
   function reportDone() {
     setExportJob(null);
     setExportProgress(0);
+    reportStage('preparing');
     lastReportedProgressRef.current = 0;
     onExportProgress?.(null);
+  }
+
+  function finishExport() {
+    abortControllerRef.current = null;
+    reportDone();
+    const wasPlaying = previewWasPlayingRef.current;
+    previewWasPlayingRef.current = null;
+    renderBridge.resumeAnimation(wasPlaying ?? false);
   }
 
   function handleCancel() {
@@ -198,20 +232,13 @@ export function ExportPanel({
     if (!canvas || exportJob) return;
     if (!await ensureNativeVideoEncodeReady()) return;
 
+    const controller = beginExport('mov');
+
     // キャンバスが描画されるまで待機（高解像度で WebGL 初期化が遅延する場合がある）
     console.log(`[Export] Canvas size: ${canvas.width}×${canvas.height}`);
     await new Promise<void>((resolve) => {
       setTimeout(resolve, 500);
     });
-
-    // 非同期処理の前に即座に 0% を通知して isExporting フラグを確定させる
-    onExportProgress?.(0);
-
-    const controller = new AbortController();
-    abortControllerRef.current = controller;
-    setExportJob('mov');
-    lastReportedProgressRef.current = 0;
-    setExportProgress(0);
 
     try {
       const blob = await exportLosslessMOV({
@@ -222,8 +249,11 @@ export function ExportPanel({
         easing: animation.easing,
         signal: controller.signal,
         onProgress: reportProgress,
+        onStage: reportStage,
       });
+      reportStage('saving');
       await saveBlobToDir(blob, `${stem}.mov`, dirHandleRef.current);
+      reportProgress(1);
       lastVideoRef.current = { blob, ext: 'mov' };
       flashSaved('mov');
       if (sendToAe) await sendVideoToAe(blob, 'mov');
@@ -238,7 +268,7 @@ export function ExportPanel({
         setTimeout(() => setExportError(null), 8000);
       }
     } finally {
-      reportDone();
+      finishExport();
     }
   }
 
@@ -247,18 +277,12 @@ export function ExportPanel({
     if (!canvas || exportJob) return;
     if (!await ensureNativeVideoEncodeReady()) return;
 
+    const controller = beginExport('mp4');
+
     console.log(`[Export] Canvas size: ${canvas.width}×${canvas.height}`);
     await new Promise<void>((resolve) => {
       setTimeout(resolve, 500);
     });
-
-    onExportProgress?.(0);
-
-    const controller = new AbortController();
-    abortControllerRef.current = controller;
-    setExportJob('mp4');
-    lastReportedProgressRef.current = 0;
-    setExportProgress(0);
 
     try {
       const blob = await exportHighQualityMP4({
@@ -267,10 +291,14 @@ export function ExportPanel({
         duration: animation.duration,
         speed: animation.speed,
         easing: animation.easing,
+        mp4Quality,
         signal: controller.signal,
         onProgress: reportProgress,
+        onStage: reportStage,
       });
+      reportStage('saving');
       await saveBlobToDir(blob, `${stem}_h264rgb.mp4`, dirHandleRef.current);
+      reportProgress(1);
       lastVideoRef.current = { blob, ext: 'mp4' };
       flashSaved('mp4');
       if (sendToAe) await sendVideoToAe(blob, 'mp4');
@@ -283,7 +311,7 @@ export function ExportPanel({
         setTimeout(() => setExportError(null), 8000);
       }
     } finally {
-      reportDone();
+      finishExport();
     }
   }
 
@@ -291,22 +319,16 @@ export function ExportPanel({
     const canvas = canvasRef.current;
     if (!canvas || exportJob) return;
 
+    const controller = beginExport('zip');
+
     // キャンバスが描画されるまで待機
     console.log(`[Export] Canvas size: ${canvas.width}×${canvas.height}`);
     await new Promise<void>((resolve) => {
       setTimeout(resolve, 500);
     });
 
-    // 非同期処理の前に即座に 0% を通知して isExporting フラグを確定させる
-    onExportProgress?.(0);
-
-    const controller = new AbortController();
-    abortControllerRef.current = controller;
-    setExportJob('zip');
-    lastReportedProgressRef.current = 0;
-    setExportProgress(0);
-
     try {
+      reportStage('rendering');
       const blob = await exportFrameZip({
         canvas,
         fps: animation.fps,
@@ -316,7 +338,9 @@ export function ExportPanel({
         signal: controller.signal,
         onProgress: reportProgress,
       });
+      reportStage('saving');
       await saveBlobToDir(blob, `${stem}_frames.zip`, dirHandleRef.current);
+      reportProgress(1);
       flashSaved('zip');
     } catch (e) {
       if (e instanceof DOMException && e.name === 'AbortError') { /* cancelled */ }
@@ -326,7 +350,7 @@ export function ExportPanel({
         setTimeout(() => setExportError(null), 5000);
       }
     } finally {
-      reportDone();
+      finishExport();
     }
   }
 
@@ -335,22 +359,16 @@ export function ExportPanel({
     const canvas = canvasRef.current;
     if (!canvas || exportJob) return;
 
+    const controller = beginExport('slits');
+
     // キャンバスが描画されるまで待機
     console.log(`[Export] Canvas size: ${canvas.width}×${canvas.height}`);
     await new Promise<void>((resolve) => {
       setTimeout(resolve, 500);
     });
 
-    // 非同期処理の前に即座に 0% を通知して isExporting フラグを確定させる
-    onExportProgress?.(0);
-
-    const controller = new AbortController();
-    abortControllerRef.current = controller;
-    setExportJob('slits');
-    lastReportedProgressRef.current = 0;
-    setExportProgress(0);
-
     try {
+      reportStage('rendering');
       await exportSlits({
         canvas,
         slitScan,
@@ -360,6 +378,8 @@ export function ExportPanel({
         onProgress: reportProgress,
         trimToSlit: slitTrimMode,
       });
+      reportStage('saving');
+      reportProgress(1);
       flashSaved('slits');
     } catch (e) {
       if (e instanceof DOMException && e.name === 'AbortError') { /* cancelled */ }
@@ -369,7 +389,7 @@ export function ExportPanel({
         setTimeout(() => setExportError(null), 5000);
       }
     } finally {
-      reportDone();
+      finishExport();
     }
   }
 
@@ -470,7 +490,8 @@ export function ExportPanel({
           <div className="relative min-h-[40px]">
             <div style={{ display: exportJob === 'slits' ? 'block' : 'none' }}>
               <ProgressBar
-                label={`Slits ${Math.round(exportProgress * 100)}%`}
+                label="Slits"
+                stage={exportStage}
                 progress={exportProgress}
                 onCancel={handleCancel}
               />
@@ -546,6 +567,25 @@ export function ExportPanel({
           </div>
         )}
 
+        {nativeFfmpegAvailable && (
+          <div className="space-y-1.5 border border-panel-border/60 bg-k-bg/35 p-3">
+            <label htmlFor="mp4-quality" className="block text-xs text-deep">MP4品質</label>
+            <select
+              id="mp4-quality"
+              value={mp4Quality}
+              onChange={(event) => setMp4Quality(event.target.value as Mp4QualityPreset)}
+              className="w-full border border-panel-border bg-k-surface px-2 py-1.5 text-xs text-k-text focus:border-fire focus:outline-none"
+            >
+              {MP4_QUALITY_PRESETS.map(({ value, label, crf, description }) => (
+                <option key={value} value={value}>{label} — {description}（CRF {crf}）</option>
+              ))}
+            </select>
+            <p className="text-[10px] leading-relaxed text-tab-inactive">
+              RGB色空間を維持したまま圧縮します。Highを既定値として、従来の完全無劣化出力より小さいファイルを生成します。
+            </p>
+          </div>
+        )}
+
         {/* オフライン書き出し */}
         <div className="space-y-1.5">
           <p className="text-xs text-tab-inactive">動画ファイル</p>
@@ -553,7 +593,7 @@ export function ExportPanel({
           <div className="relative min-h-[40px]">
             {/* MOV Section */}
             <div style={{ display: exportJob === 'mov' ? 'block' : 'none' }}>
-              <ProgressBar label={`MOV ${Math.round(exportProgress * 100)}%`} progress={exportProgress} onCancel={handleCancel} />
+              <ProgressBar label="MOV" stage={exportStage} progress={exportProgress} onCancel={handleCancel} />
             </div>
             <div style={{ display: exportJob === null ? 'block' : 'none' }}>
               <button
@@ -568,7 +608,7 @@ export function ExportPanel({
 
           <div className="relative min-h-[40px]">
             <div style={{ display: exportJob === 'mp4' ? 'block' : 'none' }}>
-              <ProgressBar label={`MP4 ${Math.round(exportProgress * 100)}%`} progress={exportProgress} onCancel={handleCancel} />
+              <ProgressBar label="MP4" stage={exportStage} progress={exportProgress} onCancel={handleCancel} />
             </div>
             <div style={{ display: exportJob === null ? 'block' : 'none' }}>
               <button
@@ -586,7 +626,7 @@ export function ExportPanel({
           <div className="relative min-h-[40px]">
             {/* ZIP Section */}
             <div style={{ display: exportJob === 'zip' ? 'block' : 'none' }}>
-              <ProgressBar label={`ZIP ${Math.round(exportProgress * 100)}%`} progress={exportProgress} onCancel={handleCancel} />
+              <ProgressBar label="ZIP" stage={exportStage} progress={exportProgress} onCancel={handleCancel} />
             </div>
             <div style={{ display: exportJob === null ? 'block' : 'none' }}>
               <button
@@ -718,11 +758,13 @@ export function ExportPanel({
   );
 }
 
-function ProgressBar({ label, progress, onCancel }: { label: string; progress: number; onCancel?: () => void }) {
+function ProgressBar({ label, stage, progress, onCancel }: { label: string; stage: ExportStage; progress: number; onCancel?: () => void }) {
+  const percent = exportProgressPercent(stage, progress);
+  const displayProgress = exportDisplayProgress(stage, progress);
   return (
     <div className="space-y-1.5">
       <div className="flex items-center justify-between">
-        <span className="text-xs text-deep">{label}</span>
+        <span className="text-xs text-deep">{label} · {exportStageLabel(stage)}{percent}</span>
         {onCancel && (
           <button
             onClick={onCancel}
@@ -734,8 +776,8 @@ function ProgressBar({ label, progress, onCancel }: { label: string; progress: n
       </div>
       <div className="w-full bg-k-muted rounded-full h-1.5">
         <div
-          className="bg-fire h-1.5 rounded-full transition-all"
-          style={{ width: `${progress * 100}%` }}
+          className={`bg-fire h-1.5 rounded-full transition-all ${stage === 'encoding' ? 'animate-pulse' : ''}`}
+          style={{ width: `${displayProgress * 100}%` }}
         />
       </div>
     </div>

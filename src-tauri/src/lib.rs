@@ -7,9 +7,15 @@ use std::thread;
 use std::time::{Duration, Instant};
 use tauri::Manager;
 
+#[cfg(windows)]
+use std::os::windows::process::CommandExt;
+
 const FFMPEG_CHECK_TIMEOUT: Duration = Duration::from_secs(5);
 const FFMPEG_BUILDS_URL: &str = "https://www.gyan.dev/ffmpeg/builds/#release-builds";
 const VIDEO_EXPORT_TEMP_DIR: &str = "kagaribi-grad";
+
+#[cfg(windows)]
+const CREATE_NO_WINDOW: u32 = 0x08000000;
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
@@ -122,16 +128,24 @@ fn ensure_ffmpeg_dir(app: &tauri::AppHandle) -> Result<PathBuf, String> {
     Ok(dir)
 }
 
+fn configure_hidden_command(command: &mut Command) {
+    #[cfg(windows)]
+    command.creation_flags(CREATE_NO_WINDOW);
+}
+
 fn run_command_with_timeout(
     executable: &Path,
     args: &[&str],
     timeout: Duration,
 ) -> Result<CommandResult, String> {
-    let mut child = Command::new(executable)
+    let mut command = Command::new(executable);
+    command
         .args(args)
         .stdin(Stdio::null())
         .stdout(Stdio::piped())
-        .stderr(Stdio::piped())
+        .stderr(Stdio::piped());
+    configure_hidden_command(&mut command);
+    let mut child = command
         .spawn()
         .map_err(|err| format!("起動できませんでした: {err}"))?;
 
@@ -226,6 +240,15 @@ fn encoder_list_has(output: &str, encoder: &str) -> bool {
     output
         .lines()
         .any(|line| line.split_whitespace().nth(1) == Some(encoder))
+}
+
+fn mp4_crf_for_quality(quality: &str) -> Result<u8, String> {
+    match quality {
+        "high" => Ok(18),
+        "balanced" => Ok(22),
+        "small" => Ok(27),
+        _ => Err(format!("MP4品質設定が不正です: {quality}")),
+    }
 }
 
 fn validate_ffmpeg(path: &Path) -> Result<ValidatedFfmpeg, String> {
@@ -370,11 +393,12 @@ fn windows_registry_path_values() -> Vec<String> {
     ]
     .into_iter()
     .filter_map(|(key, value_name)| {
-        let output = Command::new(&reg)
+        let mut command = Command::new(&reg);
+        command
             .args(["query", key, "/v", value_name])
-            .stdin(Stdio::null())
-            .output()
-            .ok()?;
+            .stdin(Stdio::null());
+        configure_hidden_command(&mut command);
+        let output = command.output().ok()?;
         if !output.status.success() {
             return None;
         }
@@ -635,6 +659,20 @@ fn replace_presets_file(path: &Path, text: &str) -> Result<(), String> {
     Ok(())
 }
 
+fn is_supported_preset_document(value: &serde_json::Value) -> bool {
+    if value.is_array() {
+        return true;
+    }
+    value.get("format").and_then(serde_json::Value::as_str) == Some("kgg-preset-library")
+        && value.get("version").and_then(serde_json::Value::as_u64) == Some(2)
+        && value
+            .get("folders")
+            .is_some_and(serde_json::Value::is_array)
+        && value
+            .get("presets")
+            .is_some_and(serde_json::Value::is_array)
+}
+
 fn migrate_legacy_presets(path: &Path, legacy_path: &Path) -> Result<(), String> {
     if path.exists() || !legacy_path.exists() {
         return Ok(());
@@ -660,10 +698,10 @@ fn load_presets_file(app: tauri::AppHandle) -> Result<serde_json::Value, String>
         Ok(text) => {
             let parsed: serde_json::Value = serde_json::from_str(&text)
                 .map_err(|err| format!("プリセットファイルの読み込みに失敗しました: {err}"))?;
-            if parsed.is_array() {
+            if is_supported_preset_document(&parsed) {
                 Ok(parsed)
             } else {
-                Err("プリセットファイルの形式が不正です。".to_string())
+                Err("プリセットファイルの形式またはバージョンが不正です。".to_string())
             }
         }
         Err(err) if err.kind() == std::io::ErrorKind::NotFound => {
@@ -675,8 +713,8 @@ fn load_presets_file(app: tauri::AppHandle) -> Result<serde_json::Value, String>
 
 #[tauri::command]
 fn save_presets_file(app: tauri::AppHandle, presets: serde_json::Value) -> Result<(), String> {
-    if !presets.is_array() {
-        return Err("プリセットデータの形式が不正です。".to_string());
+    if !is_supported_preset_document(&presets) {
+        return Err("プリセットデータの形式またはバージョンが不正です。".to_string());
     }
 
     let path = presets_file_path(&app)?;
@@ -717,8 +755,7 @@ fn validate_video_export_path(
     Ok(path)
 }
 
-#[tauri::command]
-fn encode_qtrle_mov(
+fn encode_qtrle_mov_blocking(
     app: tauri::AppHandle,
     input_pattern: String,
     output_path: String,
@@ -731,7 +768,8 @@ fn encode_qtrle_mov(
         validate_video_export_path(&input_pattern, "frame_%04d.png", "入力パターン")?;
     let output_path = validate_video_export_path(&output_path, "output.mov", "出力ファイル")?;
     let fps_string = fps.to_string();
-    let output = Command::new(&ffmpeg_path)
+    let mut command = Command::new(&ffmpeg_path);
+    command
         .arg("-y")
         .arg("-hide_banner")
         .arg("-loglevel")
@@ -746,7 +784,9 @@ fn encode_qtrle_mov(
         .arg("qtrle")
         .arg("-pix_fmt")
         .arg("rgb24")
-        .arg(&output_path)
+        .arg(&output_path);
+    configure_hidden_command(&mut command);
+    let output = command
         .output()
         .map_err(|err| format!("FFmpeg の起動に失敗しました: {err}"))?;
 
@@ -762,12 +802,12 @@ fn encode_qtrle_mov(
     })
 }
 
-#[tauri::command]
-fn encode_h264_rgb_mp4(
+fn encode_h264_rgb_mp4_blocking(
     app: tauri::AppHandle,
     input_pattern: String,
     output_path: String,
     fps: u32,
+    quality: String,
 ) -> Result<(), String> {
     let ffmpeg_path = native_ffmpeg_status(&app)
         .path
@@ -775,8 +815,10 @@ fn encode_h264_rgb_mp4(
     let input_pattern =
         validate_video_export_path(&input_pattern, "frame_%04d.png", "入力パターン")?;
     let output_path = validate_video_export_path(&output_path, "output.mp4", "出力ファイル")?;
+    let crf_string = mp4_crf_for_quality(&quality)?.to_string();
     let fps_string = fps.to_string();
-    let output = Command::new(&ffmpeg_path)
+    let mut command = Command::new(&ffmpeg_path);
+    command
         .arg("-y")
         .arg("-hide_banner")
         .arg("-loglevel")
@@ -790,14 +832,16 @@ fn encode_h264_rgb_mp4(
         .arg("-c:v")
         .arg("libx264rgb")
         .arg("-crf")
-        .arg("0")
+        .arg(&crf_string)
         .arg("-preset")
         .arg("slow")
         .arg("-pix_fmt")
         .arg("rgb24")
         .arg("-movflags")
         .arg("+faststart")
-        .arg(&output_path)
+        .arg(&output_path);
+    configure_hidden_command(&mut command);
+    let output = command
         .output()
         .map_err(|err| format!("FFmpeg の起動に失敗しました: {err}"))?;
 
@@ -813,12 +857,41 @@ fn encode_h264_rgb_mp4(
     })
 }
 
+#[tauri::command]
+async fn encode_qtrle_mov(
+    app: tauri::AppHandle,
+    input_pattern: String,
+    output_path: String,
+    fps: u32,
+) -> Result<(), String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        encode_qtrle_mov_blocking(app, input_pattern, output_path, fps)
+    })
+    .await
+    .map_err(|err| format!("FFmpeg処理スレッドが終了しました: {err}"))?
+}
+
+#[tauri::command]
+async fn encode_h264_rgb_mp4(
+    app: tauri::AppHandle,
+    input_pattern: String,
+    output_path: String,
+    fps: u32,
+    quality: String,
+) -> Result<(), String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        encode_h264_rgb_mp4_blocking(app, input_pattern, output_path, fps, quality)
+    })
+    .await
+    .map_err(|err| format!("FFmpeg処理スレッドが終了しました: {err}"))?
+}
+
 #[cfg(test)]
 mod tests {
     use super::{
         append_ffmpeg_candidates_from_path_value, backup_path, choose_candidate, encoder_list_has,
-        migrate_legacy_presets, recover_interrupted_write, replace_presets_file,
-        validate_video_export_path, VIDEO_EXPORT_TEMP_DIR,
+        migrate_legacy_presets, mp4_crf_for_quality, recover_interrupted_write,
+        replace_presets_file, validate_video_export_path, VIDEO_EXPORT_TEMP_DIR,
     };
     use std::path::PathBuf;
     use std::time::{SystemTime, UNIX_EPOCH};
@@ -857,6 +930,14 @@ mod tests {
         assert!(encoder_list_has(output, "qtrle"));
         assert!(encoder_list_has(output, "libx264rgb"));
         assert!(!encoder_list_has(output, "libx264"));
+    }
+
+    #[test]
+    fn maps_mp4_quality_presets_to_crf_values() {
+        assert_eq!(mp4_crf_for_quality("high").unwrap(), 18);
+        assert_eq!(mp4_crf_for_quality("balanced").unwrap(), 22);
+        assert_eq!(mp4_crf_for_quality("small").unwrap(), 27);
+        assert!(mp4_crf_for_quality("unknown").is_err());
     }
 
     #[test]
