@@ -439,6 +439,8 @@ export function PostprocessPanel() {
                 onChange={(v) => setPostprocess({ kaleidoscopeRotation: v })}
                 format={(v) => `${Math.round(v)}°`}
                 defaultValue={STORE_DEFAULTS.postprocess.kaleidoscopeRotation}
+                control="angle"
+                limitKey="postprocess.kaleidoscopeRotation"
               />
               <SliderField
                 label="Zoom"
@@ -623,6 +625,8 @@ export function PostprocessPanel() {
                 onChange={(v) => setPostprocess({ voronoiAngle: v })}
                 format={(v) => `${Math.round(v)}°`}
                 defaultValue={STORE_DEFAULTS.postprocess.voronoiAngle}
+                control="angle"
+                limitKey="postprocess.voronoiAngle"
               />
               <SliderField
                 label="Gradient Scale"
@@ -694,6 +698,8 @@ export function PostprocessPanel() {
                   format={(v) => `${Math.round(v)}°`}
                   defaultValue={STORE_DEFAULTS.postprocess.glassRotation}
                   trackId="postprocess.glassRotation"
+                  control="angle"
+                  limitKey="postprocess.glassRotation"
                 />
                 <SliderField
                   label="Complexity"
@@ -985,8 +991,10 @@ export function PostprocessPanel() {
                   step={1}
                   value={postprocess.particleDirection}
                   onChange={(v) => setPostprocess({ particleDirection: v })}
-                  format={(v) => `${Math.round(v)}°`}
-                  defaultValue={STORE_DEFAULTS.postprocess.particleDirection}
+                 format={(v) => `${Math.round(v)}°`}
+                 defaultValue={STORE_DEFAULTS.postprocess.particleDirection}
+                 control="angle"
+                 limitKey="postprocess.particleDirection"
                 />
                 <SliderField
                   label="Spread"

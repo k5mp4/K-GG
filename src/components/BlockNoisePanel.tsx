@@ -5,6 +5,8 @@ import { AnimatedButton } from './AnimatedButton';
 import { Toggle } from './Toggle';
 import type { DiffuseConfig } from '../types/distortion';
 import { Icon } from './Icon';
+import { DiffuseCurveEditor } from './DiffuseCurveEditor';
+import { normalizeDiffuseCurve } from '../lib/diffuseCurve';
 
 const D = STORE_DEFAULTS.diffuse;
 const isDiffuseDirty = (value: DiffuseConfig) =>
@@ -70,6 +72,7 @@ export function DiffusePanel() {
                 onChange={(v) => setDiffuse({ scatter: v })}
                 format={(v) => v + 'px'}
                 defaultValue={D.scatter}
+                limitKey="diffuse.scatter"
               />
             )}
 
@@ -80,6 +83,7 @@ export function DiffusePanel() {
               onChange={(v) => setDiffuse({ grain: v })}
               format={(v) => v.toFixed(2) + 'px'}
               defaultValue={D.grain}
+              limitKey={diffuse.mode === 'dither' ? 'diffuse.ditherGrain' : 'diffuse.grain'}
             />
 
             {diffuse.mode === 'dither' && (
@@ -90,8 +94,28 @@ export function DiffusePanel() {
                 onChange={(v) => setDiffuse({ ditherThreshold: v })}
                 format={(v) => Math.round(v * 100) + '%'}
                 defaultValue={D.ditherThreshold}
+                limitKey="diffuse.ditherThreshold"
               />
             )}
+
+            <div className="flex items-center justify-between border-t border-k-muted/40 pt-3">
+              <div>
+                <p className="text-xs text-deep">Adaptive Luminance</p>
+                <p className="text-[10px] text-tab-inactive">輝度に応じて拡散量を変化</p>
+              </div>
+              <Toggle checked={diffuse.adaptiveEnabled ?? false} onChange={(v) => setDiffuse({ adaptiveEnabled: v })} />
+            </div>
+            <DiffuseCurveEditor
+              value={diffuse.luminanceCurve}
+              onChange={(luminanceCurve) => setDiffuse({ luminanceCurve })}
+            />
+            <button
+              type="button"
+              className="w-full border border-k-muted/60 bg-k-surface px-2 py-1 text-[10px] text-tab-inactive hover:border-k-text hover:text-k-text"
+              onClick={() => setDiffuse({ luminanceCurve: normalizeDiffuseCurve(undefined) })}
+            >
+              Reset Luminance Curve
+            </button>
 
             <SliderField
               label="Seed"
@@ -100,6 +124,7 @@ export function DiffusePanel() {
               onChange={(v) => setDiffuse({ seed: v })}
               defaultValue={D.seed}
               trackId="diffuse.seed"
+              limitKey="diffuse.seed"
             />
           </div>
         </Collapsible>
