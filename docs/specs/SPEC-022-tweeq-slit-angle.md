@@ -4,11 +4,11 @@ title: Slit AngleへのTweeq InputAngle導入
 status: implemented
 owners: [maintainer]
 created: 2026-07-15
-updated: 2026-07-15
+updated: 2026-07-21
 depends_on: [SPEC-021]
-related_adrs: [ADR-0006]
+related_adrs: [ADR-0006, ADR-0009]
 related_code: [vendor/tweeq/index.es.js, vendor/tweeq/index.cjs, vendor/tweeq/index.d.ts, vendor/tweeq/style.css, src/App.css, src/components/SliderField.tsx, src/components/SlitScanPanel.tsx, src/lib/tweeqAngle.ts]
-related_tests: [src/lib/tweeqAngle.test.ts]
+related_tests: [src/lib/tweeqAngle.test.ts, src/lib/parameterLimits.test.ts, 'manual: all Slit angle-mode controls']
 human_review: completed
 ---
 
@@ -74,7 +74,7 @@ Slitの線形モードにある`Angle`は現在、他の数値パラメータと
 - AC-002: 回転ダイヤル、直接入力、キーボード操作で変更した値が`slitScan.angle`へ反映され、キャンバスのSlit方向が更新される。
 - AC-003: `slitScan.angle`がKeysモードのとき、InputAngleの変更が既存の時刻のキー更新またはキー追加経路を通る。
 - AC-004: Angleのリセットで既存のモード別デフォルト値へ戻り、プリセットJSONと描画計算の形式は変わらない。
-- AC-005: Polygon、Wave、Circularの角度系フィールドは本仕様で変更せず、既存の数値フィールドを表示する。
+- AC-005: Polygon、Wave、CircularのRotation、Direction、Twist相当フィールドも意味が角度の場合は`InputAngle`で表示し、強度を意味する`Twist`は数値入力のまま維持する。
 - AC-006: K-GGのテーマ変数がInputAngleのダイヤル、度数入力、フォーカス状態に適用される。
 - AC-007: Angleの回転ダイヤルはK-GGの共通`button`スタイルに影響されず、度数入力と同じ行内で正円として表示される。
 - AC-008: Tweeqの数値フィールドをドラッグしている間、値とハンドルが更新され、操作中の点線スケールオーバーレイが表示される。TweeqのバンドルまたはCSSが読み込まれない場合は受け入れ不可とする。

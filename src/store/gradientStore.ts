@@ -11,6 +11,8 @@ import { createAnimationTrack, getAnimationDefinition } from '../lib/animationRe
 import { isPostprocessTimeAnimationActive } from '../lib/postprocessAnimation';
 import { createDefaultPostprocessStack, normalizePostprocessEffectStack } from '../lib/postprocessStack';
 import { createDefaultEffectPipeline, normalizeEffectPipelineConfig, updateEffectStackLayer } from '../lib/effectPipeline';
+import { normalizeDiffuseCurve } from '../lib/diffuseCurve';
+import { clampParameter, getParameterLimit, normalizeTrackValue } from '../lib/parameterLimits';
 
 export type AnimationEasing = {
   enabled: boolean;
@@ -219,6 +221,8 @@ export const STORE_DEFAULTS = {
     seed: 0,
     seedAnimEnabled: false,
     ditherThreshold: 0.5,
+    adaptiveEnabled: false,
+    luminanceCurve: normalizeDiffuseCurve(undefined),
   },
   imageGradient: IMAGE_GRADIENT_DEFAULTS,
   slitScan: {
@@ -435,7 +439,7 @@ export function normalizePostprocessConfig(
     && value.every(item => typeof item === 'number' && Number.isFinite(item))
   );
   const effectMode = saved?.effectMode ?? STORE_DEFAULTS.postprocess.effectMode;
-  return {
+  const normalized: PostprocessConfig = {
     ...STORE_DEFAULTS.postprocess,
     ...saved,
     effectMode,
@@ -448,6 +452,11 @@ export function normalizePostprocessConfig(
       ? [...savedSmoothMask]
       : createEmptyManualSmoothMask(resolution),
   };
+  normalized.kaleidoscopeRotation = clampParameter(normalized.kaleidoscopeRotation, STORE_DEFAULTS.postprocess.kaleidoscopeRotation, getParameterLimit('postprocess.kaleidoscopeRotation'));
+  normalized.voronoiAngle = clampParameter(normalized.voronoiAngle, STORE_DEFAULTS.postprocess.voronoiAngle, getParameterLimit('postprocess.voronoiAngle'));
+  normalized.glassRotation = clampParameter(normalized.glassRotation, STORE_DEFAULTS.postprocess.glassRotation, getParameterLimit('postprocess.glassRotation'));
+  normalized.particleDirection = clampParameter(normalized.particleDirection, STORE_DEFAULTS.postprocess.particleDirection, getParameterLimit('postprocess.particleDirection'));
+  return normalized;
 }
 
 type AutoTrackState = Pick<
@@ -495,7 +504,16 @@ export function migratePropertyTracks(
 ): Record<string, PropertyTrack> {
   if (!tracks) return {};
   return Object.fromEntries(
-    Object.entries(tracks).map(([id, track]) => [id, normalizePropertyTrack(track)]),
+    Object.entries(tracks).map(([id, track]) => {
+      const normalized = normalizePropertyTrack(track);
+      return [id, {
+        ...normalized,
+        keyframes: normalized.keyframes.map(keyframe => ({
+          ...keyframe,
+          value: normalizeTrackValue(id, keyframe.value),
+        })),
+      }];
+    }),
   );
 }
 
@@ -546,6 +564,7 @@ export const useGradientStore = create<GradientStore>((set) => ({
       ...(v.stops ? { stops: ensureStopIds(v.stops) } : {}),
       ...(v.opacityStops ? { opacityStops: ensureOpacityStopIds(v.opacityStops) } : {}),
     };
+    next.angle = clampParameter(next.angle, s.gradient.angle, getParameterLimit('gradient.angle'));
     if (next.gradientType && next.gradientType !== s.gradient.gradientType) {
       const anchors = GRADIENT_ANCHOR_DEFAULTS[next.gradientType];
       return {
@@ -572,10 +591,22 @@ export const useGradientStore = create<GradientStore>((set) => ({
     const effectPipeline = v.enabled !== undefined && s.effectPipeline.version === 'stack-v2'
       ? { ...s.effectPipeline, effectStack: updateEffectStackLayer(s.effectPipeline.effectStack, 'noise', { enabled: v.enabled }) }
       : s.effectPipeline;
+    noiseDistortion.dwRotAngle1 = clampParameter(noiseDistortion.dwRotAngle1, s.noiseDistortion.dwRotAngle1, getParameterLimit('noise.dwRotAngle1'));
+    noiseDistortion.dwRotAngle2 = clampParameter(noiseDistortion.dwRotAngle2, s.noiseDistortion.dwRotAngle2, getParameterLimit('noise.dwRotAngle2'));
+    noiseDistortion.dwDriftAngle = clampParameter(noiseDistortion.dwDriftAngle, s.noiseDistortion.dwDriftAngle, getParameterLimit('noise.dwDriftAngle'));
+    noiseDistortion.aeSubRotation = clampParameter(noiseDistortion.aeSubRotation, s.noiseDistortion.aeSubRotation, getParameterLimit('noise.aeSubRotation'));
     return { noiseDistortion, keyframeTracks, effectPipeline };
   }),
   setDiffuse: (v) => set((s) => {
     const diffuse = { ...s.diffuse, ...v };
+    diffuse.scatter = clampParameter(diffuse.scatter, s.diffuse.scatter, getParameterLimit('diffuse.scatter'));
+    diffuse.grain = clampParameter(diffuse.grain, s.diffuse.grain, {
+      ...getParameterLimit(diffuse.mode === 'dither' ? 'diffuse.ditherGrain' : 'diffuse.grain'),
+    });
+    diffuse.seed = clampParameter(diffuse.seed, s.diffuse.seed, getParameterLimit('diffuse.seed'));
+    diffuse.ditherThreshold = clampParameter(diffuse.ditherThreshold, s.diffuse.ditherThreshold, getParameterLimit('diffuse.ditherThreshold'));
+    diffuse.adaptiveEnabled = Boolean(diffuse.adaptiveEnabled);
+    diffuse.luminanceCurve = normalizeDiffuseCurve(diffuse.luminanceCurve);
     const keyframeTracks = s.animation.enabled && diffuse.enabled && diffuse.seedAnimEnabled
       ? ensureAutoTrack(s.keyframeTracks, 'diffuse.seed')
       : s.keyframeTracks;
@@ -587,6 +618,8 @@ export const useGradientStore = create<GradientStore>((set) => ({
   setImageGradient: (v) => set((s) => ({ imageGradient: normalizeImageGradientConfig({ ...s.imageGradient, ...v }) })),
   setSlitScan: (v) => set((s) => {
     const slitScan = { ...s.slitScan, ...v };
+    slitScan.angle = clampParameter(slitScan.angle, s.slitScan.angle, getParameterLimit('slit.angle'));
+    slitScan.offsetAngle = clampParameter(slitScan.offsetAngle, s.slitScan.offsetAngle ?? 0, getParameterLimit('slit.offsetAngle'));
     let keyframeTracks = s.keyframeTracks;
     if (s.animation.enabled && slitScan.enabled) {
       keyframeTracks = ensureAutoTrack(keyframeTracks, 'slitScan.offset');
@@ -616,6 +649,7 @@ export const useGradientStore = create<GradientStore>((set) => ({
       previewLoop: nextAnimation.previewLoop ?? true,
       duration: beatSyncEnabled ? getBeatSyncDurationSeconds(beatSync?.bpm ?? 120) : nextAnimation.duration,
     };
+    animation.direction = clampParameter(animation.direction, s.animation.direction, getParameterLimit('animation.direction'));
     return {
       animation,
       keyframeTracks: animation.enabled
@@ -623,9 +657,10 @@ export const useGradientStore = create<GradientStore>((set) => ({
         : s.keyframeTracks,
     };
   }),
-  setNormalMap: (v) => set((s) => ({ normalMap: { ...s.normalMap, ...v } })),
+  setNormalMap: (v) => set((s) => ({ normalMap: { ...s.normalMap, ...v, angle: clampParameter(v.angle ?? s.normalMap.angle, s.normalMap.angle, getParameterLimit('normalMap.angle')) } })),
   setRadon: (v) => set((s) => {
     const radon = { ...s.radon, ...v };
+    radon.angle = clampParameter(radon.angle, s.radon.angle, getParameterLimit('radon.angle'));
     const keyframeTracks = s.animation.enabled && radon.enabled
       ? ensureAutoTrack(s.keyframeTracks, 'radon.evolution')
       : s.keyframeTracks;
@@ -633,6 +668,7 @@ export const useGradientStore = create<GradientStore>((set) => ({
   }),
   setIridescence: (v) => set((s) => {
     const iridescence = { ...s.iridescence, ...v };
+    iridescence.angle = clampParameter(iridescence.angle, s.iridescence.angle, getParameterLimit('iridescence.angle'));
     const keyframeTracks = s.animation.enabled && iridescence.enabled
       ? ensureAutoTrack(s.keyframeTracks, 'iridescence.__time')
       : s.keyframeTracks;
@@ -670,6 +706,10 @@ export const useGradientStore = create<GradientStore>((set) => ({
     const effectMode = v.effectMode ?? s.postprocess.effectMode;
     const effectStack = normalizePostprocessEffectStack(v.effectStack ?? s.postprocess.effectStack, effectMode);
     const next = { ...s.postprocess, ...v, effectMode, effectStack, displacement, smoothMask };
+    next.kaleidoscopeRotation = clampParameter(next.kaleidoscopeRotation, s.postprocess.kaleidoscopeRotation, getParameterLimit('postprocess.kaleidoscopeRotation'));
+    next.voronoiAngle = clampParameter(next.voronoiAngle, s.postprocess.voronoiAngle, getParameterLimit('postprocess.voronoiAngle'));
+    next.glassRotation = clampParameter(next.glassRotation, s.postprocess.glassRotation, getParameterLimit('postprocess.glassRotation'));
+    next.particleDirection = clampParameter(next.particleDirection, s.postprocess.particleDirection, getParameterLimit('postprocess.particleDirection'));
     if ((next.particleEmitterType as string) === 'nexus') next.particleEmitterType = 'point';
     if (!next.particleEmitterPoint) next.particleEmitterPoint = [...STORE_DEFAULTS.postprocess.particleEmitterPoint] as [number, number];
     const keyframeTracks = s.animation.enabled && isPostprocessTimeAnimationActive(next, s.effectPipeline)
@@ -719,7 +759,7 @@ export const useGradientStore = create<GradientStore>((set) => ({
       keyframes = [{
         id: crypto.randomUUID(),
         time: Math.max(0, Math.min(1, options?.time ?? s.currentTime)),
-        value: options?.value ?? 0,
+        value: normalizeTrackValue(trackId, options?.value ?? 0),
         interpolation: 'linear',
       }];
     }
@@ -739,7 +779,7 @@ export const useGradientStore = create<GradientStore>((set) => ({
   setKeyframe: (trackId, kf) => set((s) => {
     const track = s.keyframeTracks[trackId];
     if (!track) return s;
-    const nextKeyframes = track.keyframes.map(k => k.id === kf.id ? { ...k, ...kf } : k);
+    const nextKeyframes = track.keyframes.map(k => k.id === kf.id ? { ...k, ...kf, value: normalizeTrackValue(trackId, kf.value ?? k.value) } : k);
     return { keyframeTracks: { ...s.keyframeTracks, [trackId]: { ...track, mode: 'keys', enabled: true, keyframes: nextKeyframes } } };
   }),
   removeKeyframe: (trackId, kfId) => set((s) => {
@@ -755,7 +795,7 @@ export const useGradientStore = create<GradientStore>((set) => ({
   addKeyframe: (trackId, kf, options) => set((s) => {
     const track = s.keyframeTracks[trackId];
     if (!track) return s;
-    const newKf: Keyframe = { ...kf, id: crypto.randomUUID() };
+    const newKf: Keyframe = { ...kf, value: normalizeTrackValue(trackId, kf.value), id: crypto.randomUUID() };
     let nextKeyframes = [...track.keyframes, newKf].sort((a, b) => a.time - b.time);
     
     // bezier キーフレームが含まれ、かつ preserveHandles が false の場合のみハンドルを自動計算

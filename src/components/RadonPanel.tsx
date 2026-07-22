@@ -73,6 +73,8 @@ export function RadonPanel() {
             onChange={(v) => setRadon({ angle: v })}
             format={(v) => v + '°'}
             defaultValue={D.angle}
+            control="angle"
+            limitKey="radon.angle"
           />
 
           <SliderField
