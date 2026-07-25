@@ -1,10 +1,18 @@
 import { useEffect, useRef, useState, useCallback, useLayoutEffect } from 'react';
 import { InputAngle } from 'tweeq';
-import { useGradientStore, STORE_DEFAULTS } from '../store/gradientStore';
+import {
+  useGradientStore,
+  STORE_DEFAULTS,
+  ANIMATION_DURATION_MIN,
+  ANIMATION_DURATION_MAX,
+  ANIMATION_SPEED_MIN,
+  ANIMATION_SPEED_MAX,
+} from '../store/gradientStore';
 import { AnimationLoop } from '../lib/animation';
 import { GraphEditor, GRAPH_COLORS } from './GraphEditor';
 import { solveBezierU, splitBezier } from '../lib/easingBezier';
-import { interpolateKeyframes } from '../lib/keyframeInterpolator';
+import { interpolateKeyframesWithLoop } from '../lib/loopKeyframes';
+import { getDisplayKeyframes, getKeyframeEditTime, LOOP_KEYFRAME_END } from '../lib/loopKeyframes';
 import { getTimelineTime, setTimelineTime } from '../lib/timelineClock';
 import { getTrackMode, type Keyframe } from '../types/keyframe';
 import { Icon } from './Icon';
@@ -12,8 +20,10 @@ import { getAnimationGroup } from '../lib/animationRegistry';
 import { AnimationPropertyControls } from './AnimationPropertyControls';
 import { fromTweeqAngle, toTweeqAngle } from '../lib/tweeqAngle';
 import { clampParameter, getParameterLimit } from '../lib/parameterLimits';
+import { SliderField } from './SliderField';
 import type { ExportStage } from '../adapters';
 import { exportStageLabel } from '../lib/exportProgress';
+import { renderBridge } from '../lib/renderBridge';
 
 type Props = {
   animLoopRef: React.MutableRefObject<AnimationLoop | null>;
@@ -32,7 +42,6 @@ const TRACK_GAP    = 6;
 const ROW_TOTAL    = TRACK_ROW_H + TRACK_GAP;
 const BODY_PAD_TOP = 8;
 const PAD_X        = 20; // GraphEditor と合わせる
-
 function kfKey(trackId: string, kfId: string) { return `${trackId}::${kfId}`; }
 
 function formatSeconds(seconds: number): string {
@@ -60,7 +69,7 @@ export function TimelineBar({ animLoopRef, onSeek, exportProgress = null, export
   const [marquee,       setMarquee]       = useState<{ sx: number; sy: number; ex: number; ey: number } | null>(null);
 
   // ── その他の state ──
-  const [isPaused,      setIsPaused]      = useState(false);
+  const [isPaused,      setIsPaused]      = useState(true);
 
   // ── refs ──
   const clipboardRef          = useRef<Omit<Keyframe<number>, 'id'> | null>(null);
@@ -74,10 +83,11 @@ export function TimelineBar({ animLoopRef, onSeek, exportProgress = null, export
   const trackFillRef          = useRef<HTMLDivElement>(null);
   const thumbRef              = useRef<HTMLDivElement>(null);
   const timeTextRef           = useRef<HTMLSpanElement>(null);
+  const trackValueRefs        = useRef(new Map<string, HTMLSpanElement>());
   const seekingRef            = useRef(false);
   const trackRef              = useRef<HTMLDivElement>(null);
   const rafRef                = useRef<number | null>(null);
-  const lastPausedRef         = useRef(false);
+  const lastPausedRef         = useRef(true);
   const displayedTimeRef      = useRef(currentTime);
 
   const allTracks = Object.values(keyframeTracks);
@@ -91,10 +101,15 @@ export function TimelineBar({ animLoopRef, onSeek, exportProgress = null, export
   const graphTracks = activeTracks.filter(track => getTrackMode(track) === 'keys');
   const beatSync = animation.easing.beatSync;
   const beatSyncEnabled = beatSync?.enabled ?? false;
+  const loopEnabled = animation.previewLoop ?? true;
   const beatMarkerCount = beatSync?.subdivision === 3 ? 3 : 4;
   const beatFractions = beatSyncEnabled
     ? Array.from({ length: beatMarkerCount + 1 }, (_, i) => i / beatMarkerCount)
     : [];
+  const frameCount = Math.max(1, Math.ceil(animation.duration * animation.fps));
+  const frameMajorStep = frameCount <= 60 ? 1 : frameCount <= 180 ? 5 : frameCount <= 360 ? 10 : 20;
+  const frameFractions = Array.from({ length: frameCount + 1 }, (_, frame) => frame / frameCount);
+  const majorFrameFractions = frameFractions.filter((_, frame) => frame % frameMajorStep === 0 || frame === frameCount);
 
   // ── refs を最新状態に同期 ──
   useEffect(() => { activeTracksRef.current = activeTracks; });
@@ -140,6 +155,12 @@ export function TimelineBar({ animLoopRef, onSeek, exportProgress = null, export
     return obj?.[field] ?? 0;
   }, []);
 
+  const getTrackDisplayValue = useCallback((track: (typeof allTracks)[number], time: number): number => {
+    return getTrackMode(track) === 'keys' && track.keyframes.length > 0
+      ? interpolateKeyframesWithLoop(time, track.keyframes, loopEnabled)
+      : getPropertyValue(track.propertyId);
+  }, [getPropertyValue, loopEnabled]);
+
   // ────────── RAF: タイムライン UI を更新 ──────────
   useEffect(() => {
     const update = () => {
@@ -156,6 +177,12 @@ export function TimelineBar({ animLoopRef, onSeek, exportProgress = null, export
         if (timeTextRef.current) {
           timeTextRef.current.textContent = `${formatSeconds(nt * animation.duration)} / ${formatSeconds(animation.duration)}`;
         }
+        activeTracksRef.current.forEach(track => {
+          const element = trackValueRefs.current.get(track.propertyId);
+          if (!element) return;
+          const value = getTrackDisplayValue(track, nt);
+          element.textContent = Number.isFinite(value) ? value.toFixed(2) : '—';
+        });
         if (loop.isPaused !== lastPausedRef.current) {
           lastPausedRef.current = loop.isPaused;
           setIsPaused(loop.isPaused);
@@ -166,7 +193,7 @@ export function TimelineBar({ animLoopRef, onSeek, exportProgress = null, export
     };
     rafRef.current = requestAnimationFrame(update);
     return () => { if (rafRef.current !== null) cancelAnimationFrame(rafRef.current); };
-  }, [animLoopRef, animation.duration, setCurrentTime, isExporting]);
+  }, [animLoopRef, animation.duration, getTrackDisplayValue, setCurrentTime, isExporting]);
 
   // エクスポート中の UI 更新 (React のレンダリングに同期)
   useLayoutEffect(() => {
@@ -190,9 +217,9 @@ export function TimelineBar({ animLoopRef, onSeek, exportProgress = null, export
 
       if (e.key === 'PageUp' || e.key === 'PageDown') {
         e.preventDefault();
-        const frameTime = 1 / (animation.fps || 24);
-        const delta = (e.key === 'PageUp' ? -frameTime : frameTime) * (e.shiftKey ? 10 : 1);
-        const nextTime = Math.max(0, Math.min(1, loop.currentNormalizedTime + delta / animation.duration));
+        const frameStep = 1 / frameCount;
+        const delta = (e.key === 'PageUp' ? -frameStep : frameStep) * (e.shiftKey ? 10 : 1);
+        const nextTime = Math.max(0, Math.min(1, loop.currentNormalizedTime + delta));
         loop.seekTo(nextTime);
         updateThumb(nextTime);
         setCurrentTime(nextTime);
@@ -283,7 +310,7 @@ export function TimelineBar({ animLoopRef, onSeek, exportProgress = null, export
     };
     window.addEventListener('keydown', onKeyDown);
     return () => window.removeEventListener('keydown', onKeyDown);
-  }, [animLoopRef, animation.duration, animation.fps, viewMode, graphSelected, graphTrackId, activeTracks, keyframeTracks, addKeyframe, removeKeyframe, setCurrentTime, onSeek]);
+  }, [animLoopRef, animation.duration, animation.fps, frameCount, viewMode, graphSelected, graphTrackId, activeTracks, keyframeTracks, addKeyframe, removeKeyframe, setCurrentTime, onSeek]);
 
   // ────────── シーク (transport バー) ──────────
   const getFraction = (e: MouseEvent | PointerEvent | React.PointerEvent): number => {
@@ -300,17 +327,19 @@ export function TimelineBar({ animLoopRef, onSeek, exportProgress = null, export
     seekingRef.current = true;
     const f = getFraction(e);
     animLoopRef.current?.seekTo(f);
-    if (f >= 0.999999) animLoopRef.current?.pause();
-    updateThumb(f);
-    setCurrentTime(f);
+    const snapped = animLoopRef.current?.currentNormalizedTime ?? snapToFrame(f);
+    if (snapped >= 0.999999) animLoopRef.current?.pause();
+    updateThumb(snapped);
+    setCurrentTime(snapped);
     if (animLoopRef.current?.isPaused) onSeek?.();
 
     const onMove = (ev: PointerEvent) => {
       const f2 = getFraction(ev);
       animLoopRef.current?.seekTo(f2);
-      if (f2 >= 0.999999) animLoopRef.current?.pause();
-      updateThumb(f2);
-      setCurrentTime(f2);
+      const snapped2 = animLoopRef.current?.currentNormalizedTime ?? snapToFrame(f2);
+      if (snapped2 >= 0.999999) animLoopRef.current?.pause();
+      updateThumb(snapped2);
+      setCurrentTime(snapped2);
       if (animLoopRef.current?.isPaused) onSeek?.();
     };
     const onUp = () => {
@@ -341,9 +370,19 @@ export function TimelineBar({ animLoopRef, onSeek, exportProgress = null, export
     }
   };
 
+  const snapToFrame = (fraction: number): number => {
+    const normalized = Math.max(0, Math.min(1, fraction));
+    if (normalized >= 1) return 1;
+    return Math.floor(normalized * frameCount) / frameCount;
+  };
+
   const togglePause = () => {
     const loop = animLoopRef.current;
-    if (!loop) return;
+    if (!animation.enabled || !loop) {
+      renderBridge.requestPlay();
+      setAnimation({ enabled: true });
+      return;
+    }
     if (loop.isPaused && loop.currentNormalizedTime >= 0.999999) {
       loop.seekTo(0);
       updateThumb(0);
@@ -356,7 +395,7 @@ export function TimelineBar({ animLoopRef, onSeek, exportProgress = null, export
   };
 
   const seekToNormalized = (nt: number) => {
-    const nextTime = Math.max(0, Math.min(1, nt));
+    const nextTime = snapToFrame(nt);
     animLoopRef.current?.seekTo(nextTime);
     if (nextTime >= 0.999999) animLoopRef.current?.pause();
     updateThumb(nextTime);
@@ -365,9 +404,8 @@ export function TimelineBar({ animLoopRef, onSeek, exportProgress = null, export
   };
 
   const nudgeFrame = (direction: -1 | 1) => {
-    const frameTime = 1 / (animation.fps || 24);
     const current = animLoopRef.current?.currentNormalizedTime ?? currentTime;
-    seekToNormalized(current + (direction * frameTime) / animation.duration);
+    seekToNormalized(current + direction / frameCount);
   };
 
   const seekToEnd = () => {
@@ -395,8 +433,9 @@ export function TimelineBar({ animLoopRef, onSeek, exportProgress = null, export
   };
 
   const insertKeyframeAtCurrentTime = (trackId: string) => {
-    const nt = getDisplayedTimelineTime();
+    const nt = getKeyframeEditTime(getDisplayedTimelineTime(), loopEnabled);
     displayedTimeRef.current = nt;
+    animLoopRef.current?.seekTo(nt);
     setTimelineTime(nt);
     setCurrentTime(nt);
     const track = keyframeTracks[trackId];
@@ -404,7 +443,7 @@ export function TimelineBar({ animLoopRef, onSeek, exportProgress = null, export
 
     // 現在時刻における補間値を取得。キーフレームが0個の場合は現在の実効値を使う
     const val = track.keyframes.length > 0 
-      ? interpolateKeyframes(nt, track.keyframes)
+      ? interpolateKeyframesWithLoop(nt, track.keyframes, loopEnabled)
       : getPropertyValue(trackId);
 
     const existing = track.keyframes.find(k => Math.abs(k.time - nt) < 1e-4);
@@ -609,7 +648,10 @@ export function TimelineBar({ animLoopRef, onSeek, exportProgress = null, export
       const dt = (ev.clientX - drag.startX) / drag.trackVisualWidth;
       drag.initTimes.forEach((initTime, k) => {
         const [tId, kfId] = k.split('::');
-        setKeyframe(tId, { id: kfId, time: Math.max(0, Math.min(1, initTime + dt)) });
+        setKeyframe(tId, {
+          id: kfId,
+          time: getKeyframeEditTime(initTime + dt, loopEnabled),
+        });
       });
     };
     const onUp = () => {
@@ -638,21 +680,7 @@ export function TimelineBar({ animLoopRef, onSeek, exportProgress = null, export
       className="relative shrink-0 overflow-hidden bg-k-bg/95 backdrop-blur-md border-t border-panel-border flex flex-col"
       style={{ height }}
     >
-      <div className="flex h-10 shrink-0 items-center gap-2 border-b border-panel-border/60 bg-k-surface/80 px-3">
-        <button
-          type="button"
-          onClick={() => setAnimation({ enabled: !animation.enabled })}
-          className={`flex h-6 items-center gap-1.5 border px-2 text-[9px] font-display font-semibold uppercase tracking-wider transition-colors ${
-            animation.enabled
-              ? 'border-emerald-400/60 bg-emerald-400/10 text-emerald-300'
-              : 'border-k-muted/60 bg-k-bg text-tab-inactive'
-          }`}
-          title="Animation ON/OFF"
-        >
-          <span className={`h-1.5 w-1.5 rounded-full ${animation.enabled ? 'bg-emerald-400' : 'bg-k-muted'}`} />
-          Animation
-        </button>
-
+      <div className="flex min-h-10 shrink-0 items-center gap-2 border-b border-panel-border/60 bg-k-surface/80 px-3 py-1.5">
         <div className="flex items-center border border-k-muted/50 bg-k-bg">
           {(['moving', 'selected', 'all'] as const).map(filter => (
             <button
@@ -668,45 +696,47 @@ export function TimelineBar({ animLoopRef, onSeek, exportProgress = null, export
           ))}
         </div>
 
-        <div className="ml-auto flex items-center gap-1.5">
-          <label className="flex items-center gap-1 text-[8px] uppercase tracking-wider text-tab-inactive">
-            Duration
-            <input
-              type="number"
-              min={0.1}
-              max={300}
-              step={0.1}
-              value={Number(animation.duration.toFixed(2))}
-              disabled={beatSyncEnabled}
-              onChange={event => setAnimation({ duration: Math.max(0.1, Math.min(300, Number(event.target.value) || 0.1)) })}
-              className="h-5 w-14 border border-k-muted/60 bg-k-bg px-1 text-right text-[9px] tabular-nums text-k-text outline-none focus:border-fire disabled:opacity-50"
-            />
-            <span className="normal-case">s</span>
-          </label>
-          <label className="flex items-center gap-1 text-[8px] uppercase tracking-wider text-tab-inactive">
-            FPS
+        <div className="ml-auto flex min-w-0 items-center gap-2">
+          <SliderField
+            label="Duration"
+            labelClassName="text-[8px] text-tab-inactive uppercase tracking-wider"
+            min={ANIMATION_DURATION_MIN}
+            max={ANIMATION_DURATION_MAX}
+            step={0.1}
+            value={animation.duration}
+            onChange={value => setAnimation({ duration: value })}
+            format={value => `${value.toFixed(2)}s`}
+            defaultValue={STORE_DEFAULTS.animation.duration}
+            compact
+            disabled={beatSyncEnabled}
+            className="hidden w-[182px] items-center sm:flex"
+          />
+          <div className="flex items-center gap-1 text-[8px] uppercase tracking-wider text-tab-inactive">
+            <span>FPS</span>
             <select
               value={animation.fps}
               onChange={event => setAnimation({ fps: Number(event.target.value) as 24 | 30 | 60 })}
-              className="h-5 border border-k-muted/60 bg-k-bg px-1 text-[9px] text-k-text outline-none focus:border-fire"
+              className="h-5 w-[62px] border border-k-muted/60 bg-k-bg px-1 text-[9px] text-k-text outline-none focus:border-fire"
+              aria-label="FPS"
             >
               <option value={24}>24</option>
               <option value={30}>30</option>
               <option value={60}>60</option>
             </select>
-          </label>
-          <label className="hidden items-center gap-1 text-[8px] uppercase tracking-wider text-tab-inactive lg:flex">
-            Speed
-            <input
-              type="number"
-              min={getParameterLimit('animation.speed').min}
-              max={getParameterLimit('animation.speed').max}
-              step={getParameterLimit('animation.speed').step}
-              value={Number(clampParameter(animation.speed, STORE_DEFAULTS.animation.speed, getParameterLimit('animation.speed')).toFixed(2))}
-              onChange={event => setAnimation({ speed: clampParameter(Number(event.target.value), STORE_DEFAULTS.animation.speed, getParameterLimit('animation.speed')) })}
-              className="h-5 w-12 border border-k-muted/60 bg-k-bg px-1 text-right text-[9px] tabular-nums text-k-text outline-none focus:border-fire"
-            />
-          </label>
+          </div>
+          <SliderField
+            label="Speed"
+            labelClassName="text-[8px] text-tab-inactive uppercase tracking-wider"
+            min={ANIMATION_SPEED_MIN}
+            max={ANIMATION_SPEED_MAX}
+            step={0.01}
+            value={animation.speed}
+            onChange={value => setAnimation({ speed: value })}
+            format={value => `${value.toFixed(2)}×`}
+            defaultValue={STORE_DEFAULTS.animation.speed}
+            compact
+            className="hidden w-[166px] items-center lg:flex"
+          />
           <label className="hidden items-center gap-1 text-[8px] uppercase tracking-wider text-tab-inactive xl:flex">
             Direction
             <span className="tq-input-angle h-5 w-14" title="Animation Direction">
@@ -819,6 +849,37 @@ export function TimelineBar({ animLoopRef, onSeek, exportProgress = null, export
             className={`flex-1 h-6 flex items-center relative min-w-[180px] ${isExporting ? 'cursor-default' : 'cursor-pointer'} touch-none`}
             onPointerDown={isExporting ? undefined : startSeek}
           >
+          {frameFractions.map((fraction, frame) => (
+            <div
+              key={`scrub-frame-${frame}`}
+              className="absolute top-0 bottom-0 z-[5] w-px pointer-events-none"
+              style={{
+                left: `calc(${PAD_X}px + ${fraction} * (100% - ${PAD_X * 2}px))`,
+                background: frame % frameMajorStep === 0 || frame === frameCount
+                  ? 'rgba(236,219,190,0.18)'
+                  : 'rgba(236,219,190,0.06)',
+              }}
+            />
+          ))}
+          {majorFrameFractions.map(fraction => {
+            const frame = Math.round(fraction * frameCount);
+            return (
+              <span
+                key={`scrub-frame-label-${frame}`}
+                className="absolute top-0 z-[6] -translate-x-1/2 text-[7px] leading-none text-tab-inactive/70 tabular-nums pointer-events-none"
+                style={{ left: `calc(${PAD_X}px + ${fraction} * (100% - ${PAD_X * 2}px))` }}
+              >
+                {frame}
+              </span>
+            );
+          })}
+          {loopEnabled && (
+            <div
+              className="absolute top-0 bottom-0 z-[8] w-px bg-fire/50 pointer-events-none"
+              style={{ left: `calc(${PAD_X}px + ${LOOP_KEYFRAME_END} * (100% - ${PAD_X * 2}px))` }}
+              title="Loop keyframe edit boundary"
+            />
+          )}
           <div className="absolute inset-y-0 left-0 right-0 flex items-center">
             <div className="w-full h-1.5 bg-k-muted/50 rounded-full relative overflow-hidden">
               <div
@@ -886,6 +947,47 @@ export function TimelineBar({ animLoopRef, onSeek, exportProgress = null, export
 
       {/* ── Main body ── */}
       <div className="flex-1 relative min-h-0">
+        <div
+          className="absolute inset-y-0 z-0 pointer-events-none"
+          style={{
+            left: `calc(1rem + 9rem + 0.75rem + ${PAD_X}px)`,
+            right: `calc(1rem + 92px + 0.75rem + ${PAD_X}px)`,
+          }}
+          aria-hidden="true"
+        >
+          {frameFractions.map((fraction, frame) => (
+            <div
+              key={`body-frame-${frame}`}
+              className="absolute top-0 bottom-0 w-px"
+              style={{
+                left: `${fraction * 100}%`,
+                background: frame % frameMajorStep === 0 || frame === frameCount
+                  ? 'rgba(236,219,190,0.12)'
+                  : 'rgba(236,219,190,0.045)',
+              }}
+            />
+          ))}
+          {majorFrameFractions.map(fraction => {
+            const frame = Math.round(fraction * frameCount);
+            return (
+              <span
+                key={`body-frame-label-${frame}`}
+                className="absolute top-1 z-[1] -translate-x-1/2 text-[7px] text-tab-inactive/60 tabular-nums"
+                style={{ left: `${fraction * 100}%` }}
+              >
+                {frame}
+              </span>
+            );
+          })}
+          {loopEnabled && (
+            <div
+              className="absolute top-0 bottom-0 w-px bg-fire/35"
+              style={{ left: `${LOOP_KEYFRAME_END * 100}%` }}
+            >
+              <span className="absolute top-1 left-1 text-[7px] text-fire/60 uppercase tracking-wider">mirror</span>
+            </div>
+          )}
+        </div>
         {beatFractions.length > 0 && (
           <div
             className="absolute inset-y-0 z-30 pointer-events-none"
@@ -953,13 +1055,22 @@ export function TimelineBar({ animLoopRef, onSeek, exportProgress = null, export
                     >
                       {/* カラーインジケータ */}
                       <div className="w-1.5 h-1.5 rounded-full shrink-0 mr-1" style={{ backgroundColor: color }} />
-                      <span
-                        className="flex-1 text-[10px] font-display font-semibold text-k-text/90 truncate uppercase tracking-wider"
-                        title={`${group} / ${track.label}`}
-                      >
-                        <span className="text-tab-inactive">{group}</span>
-                        <span className="px-1 text-k-muted">/</span>
-                        {track.label}
+                      <span className="flex min-w-0 flex-1 flex-col leading-none" title={`${group} / ${track.label}`}>
+                        <span className="truncate text-[10px] font-display font-semibold text-k-text/90 uppercase tracking-wider">
+                          <span className="text-tab-inactive">{group}</span>
+                          <span className="px-1 text-k-muted">/</span>
+                          {track.label}
+                        </span>
+                        <span
+                          ref={element => {
+                            if (element) trackValueRefs.current.set(track.propertyId, element);
+                            else trackValueRefs.current.delete(track.propertyId);
+                          }}
+                          className={`mt-0.5 text-[8px] tabular-nums ${mode === 'keys' ? 'text-fire' : 'text-deep'}`}
+                          title="現在時刻の評価値"
+                        >
+                          {getTrackDisplayValue(track, getTimelineTime(currentTime)).toFixed(2)}
+                        </span>
                       </span>
                       <button
                         onClick={() => insertKeyframeAtCurrentTime(track.propertyId)}
@@ -987,20 +1098,21 @@ export function TimelineBar({ animLoopRef, onSeek, exportProgress = null, export
                         </div>
                       )}
 
-                      {mode === 'keys' && track.keyframes.map(kf => {
+                      {mode === 'keys' && getDisplayKeyframes(track.keyframes, loopEnabled).map(displayKeyframe => {
+                        const kf = displayKeyframe.keyframe;
                         const key        = kfKey(track.propertyId, kf.id);
                         const isSelected = selectedKfIds.has(key);
                         return (
                           <div
-                            key={kf.id}
-                            className="absolute top-1/2 -translate-y-1/2 -translate-x-1/2 cursor-pointer z-10 p-1.5"
-                            style={{ left: `calc(${PAD_X}px + ${kf.time} * (100% - ${PAD_X * 2}px))` }}
-                            onPointerDown={e => startKfDrag(e, track.propertyId, kf)}
+                            key={`${kf.id}-${displayKeyframe.isMirror ? 'mirror' : 'source'}`}
+                            className={`absolute top-1/2 -translate-y-1/2 -translate-x-1/2 z-10 p-1.5 ${displayKeyframe.isMirror ? 'cursor-default opacity-45' : 'cursor-pointer'}`}
+                            style={{ left: `calc(${PAD_X}px + ${displayKeyframe.time} * (100% - ${PAD_X * 2}px))` }}
+                            onPointerDown={displayKeyframe.isMirror ? e => e.stopPropagation() : e => startKfDrag(e, track.propertyId, kf)}
                             onContextMenu={e => {
                               e.preventDefault();
-                              removeKeyframe(track.propertyId, kf.id);
+                              if (!displayKeyframe.isMirror) removeKeyframe(track.propertyId, kf.id);
                             }}
-                            title={`${(kf.time * animation.duration).toFixed(2)}s: ${kf.value.toFixed(2)}`}
+                            title={`${displayKeyframe.isMirror ? 'Mirror ' : ''}${(displayKeyframe.time * animation.duration).toFixed(2)}s: ${kf.value.toFixed(2)}`}
                           >
                             {kf.interpolation === 'bezier' ? (
                               <div className={`relative w-3 h-3 transition-transform ${isSelected ? 'scale-125' : 'scale-100'}`}>

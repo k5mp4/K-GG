@@ -123,7 +123,12 @@ export function useWebGL(
     renderBridge.registerPause(
       () => {
         const loop = animLoopRef.current;
-        if (!loop) return;
+        const state = useGradientStore.getState();
+        if (!loop || !state.animation.enabled) {
+          renderBridge.requestPlay();
+          state.setAnimation({ enabled: true });
+          return;
+        }
         if (loop.isPaused && loop.currentNormalizedTime >= 0.999999) {
           loop.seekTo(0);
         }
@@ -133,12 +138,14 @@ export function useWebGL(
       () => animLoopRef.current?.isPaused ?? false,
       () => animLoopRef.current?.currentLoopTime ?? 0,
       (normalizedTime: number) => {
-        animLoopRef.current?.seekTo(normalizedTime);
-        useGradientStore.getState().setCurrentTime(normalizedTime);
+        const loop = animLoopRef.current;
+        loop?.seekTo(normalizedTime);
+        const snappedTime = loop?.currentNormalizedTime ?? normalizedTime;
+        useGradientStore.getState().setCurrentTime(snappedTime);
         const ctx = webglRef.current;
         const latest = latestRef.current;
         if (ctx && latest) {
-          renderSceneAtTime(ctx, latest, normalizedTime, {});
+          renderSceneAtTime(ctx, latest, snappedTime, {});
         }
       },
       () => animLoopRef.current?.currentNormalizedTime ?? useGradientStore.getState().currentTime,

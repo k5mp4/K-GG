@@ -25,6 +25,7 @@ type Props = {
 export function GradientCanvas({ width = 800, height = 800, animLoopRef, seekVersion = 0, canvasRef, sourceImageCanvas = null, imageGradientSource = null, imageMaskSource = null, imageMaskEnabled = false }: Props) {
   const fallbackCanvasRef = useRef<HTMLCanvasElement | null>(null);
   const staticRenderSchedulerRef = useRef<LatestFrameScheduler | null>(null);
+  const previousPlaybackRef = useRef<{ time: number; playing: boolean } | null>(null);
   if (!staticRenderSchedulerRef.current) {
     staticRenderSchedulerRef.current = new LatestFrameScheduler();
   }
@@ -88,12 +89,23 @@ export function GradientCanvas({ width = 800, height = 800, animLoopRef, seekVer
   useEffect(() => {
     if (!webglRef.current) return;
     if (renderBridge.isAnimationSuspended()) return;
-    const resumeTime = animLoopRef.current?.currentNormalizedTime ?? currentTime;
-    animLoopRef.current?.stop();
-    animLoopRef.current = null;
+    const previousLoop = animLoopRef.current;
+    const previousPlayback = previousPlaybackRef.current ?? (
+      previousLoop
+        ? { time: previousLoop.currentNormalizedTime, playing: !previousLoop.isPaused }
+        : null
+    );
+    previousPlaybackRef.current = null;
+    const resumeTime = previousPlayback?.time ?? currentTime;
     const latest = latestRef.current;
-    if (latest && hasActiveAnimation(latest)) {
-      animLoopRef.current = new AnimationLoop(
+    const playRequested = latest?.animation.enabled
+      ? renderBridge.consumePlayRequest()
+      : false;
+    const wasPlaying = playRequested || (previousPlayback?.playing ?? false);
+    previousLoop?.stop();
+    animLoopRef.current = null;
+    if (latest && latest.animation.enabled) {
+      const loop = new AnimationLoop(
         animation.duration,
         (_loopTime, normalizedTime) => {
           setTimelineTime(normalizedTime);
@@ -104,12 +116,20 @@ export function GradientCanvas({ width = 800, height = 800, animLoopRef, seekVer
         },
         {
           loop: animation.previewLoop ?? true,
-          onEnd: () => useGradientStore.getState().setCurrentTime(1),
+          fps: animation.fps,
+          onEnd: () => useGradientStore.getState().setCurrentTime(animLoopRef.current?.currentNormalizedTime ?? 1),
         },
       );
 
-      animLoopRef.current.start();
-      if (resumeTime > 0 && resumeTime < 1) animLoopRef.current.seekTo(resumeTime);
+      animLoopRef.current = loop;
+      // 初回は停止状態でフレームだけ描画する。設定変更時は、直前に
+      // 利用者が再生していた場合だけ再生状態を引き継ぐ。
+      loop.start({ paused: !wasPlaying });
+      const nextTime = Math.max(0, Math.min(1, resumeTime));
+      if (nextTime > 0) {
+        loop.seekTo(nextTime);
+        loop.renderFrame(nextTime);
+      }
     } else if (latest) {
       // effectMode/Motion切替時も静止描画を同期発行しない。
       // 上のlayout effectと同じフレームへ集約し、WebView2へ二重描画を投入しない。
@@ -123,8 +143,17 @@ export function GradientCanvas({ width = 800, height = 800, animLoopRef, seekVer
         });
       });
     }
-    return () => { animLoopRef.current?.stop(); };
-  }, [animation.enabled, animation.duration, animation.previewLoop, animation.speed, keyframeTracks, noiseDistortion.enabled, iridescence.enabled, radon.enabled, slitScan.enabled, stretch.enabled, diffuse.enabled, diffuse.seedAnimEnabled, postprocess.enabled, postprocess.effectMode, postprocess.effectStack, postprocess.glassMotion, effectPipeline]); // eslint-disable-line react-hooks/exhaustive-deps
+    return () => {
+      const loop = animLoopRef.current;
+      if (loop) {
+        previousPlaybackRef.current = {
+          time: loop.currentNormalizedTime,
+          playing: !loop.isPaused,
+        };
+        loop.stop();
+      }
+    };
+  }, [animation.enabled, animation.duration, animation.previewLoop, animation.speed, animation.fps, keyframeTracks, noiseDistortion.enabled, iridescence.enabled, radon.enabled, slitScan.enabled, stretch.enabled, diffuse.enabled, diffuse.seedAnimEnabled, postprocess.enabled, postprocess.effectMode, postprocess.effectStack, postprocess.glassMotion, effectPipeline, isWebGLReady]); // eslint-disable-line react-hooks/exhaustive-deps
 
   return (
     <div style={{ position: 'relative', width: '100%', height: '100%' }}>
