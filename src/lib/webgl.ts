@@ -249,6 +249,7 @@ export async function initWebGL(canvas: HTMLCanvasElement): Promise<WebGLContext
     u_noiseScale: gl.getUniformLocation(program, 'u_noiseScale'),
     u_noiseOctaves: gl.getUniformLocation(program, 'u_noiseOctaves'),
     u_noiseEvolution: gl.getUniformLocation(program, 'u_noiseEvolution'),
+    u_noiseSpeed: gl.getUniformLocation(program, 'u_noiseSpeed'),
     u_noiseSeamlessType: gl.getUniformLocation(program, 'u_noiseSeamlessType'),
     u_seamlessAnimation: gl.getUniformLocation(program, 'u_seamlessAnimation'),
     u_seamlessTwist: gl.getUniformLocation(program, 'u_seamlessTwist'),
@@ -275,6 +276,21 @@ export async function initWebGL(canvas: HTMLCanvasElement): Promise<WebGLContext
     u_aeSubRotation: gl.getUniformLocation(program, 'u_aeSubRotation'),
     u_aeContrast: gl.getUniformLocation(program, 'u_aeContrast'),
     u_aeBrightness: gl.getUniformLocation(program, 'u_aeBrightness'),
+    u_causticsDepth: gl.getUniformLocation(program, 'u_causticsDepth'),
+    u_causticsRefraction: gl.getUniformLocation(program, 'u_causticsRefraction'),
+    u_causticsSharpness: gl.getUniformLocation(program, 'u_causticsSharpness'),
+    u_causticsComplexity: gl.getUniformLocation(program, 'u_causticsComplexity'),
+    u_causticsWaveSpread: gl.getUniformLocation(program, 'u_causticsWaveSpread'),
+    u_causticsBoundaryWidth: gl.getUniformLocation(program, 'u_causticsBoundaryWidth'),
+    u_phasorFrequency: gl.getUniformLocation(program, 'u_phasorFrequency'),
+    u_phasorBandwidth: gl.getUniformLocation(program, 'u_phasorBandwidth'),
+    u_phasorDirection: gl.getUniformLocation(program, 'u_phasorDirection'),
+    u_phasorDirectionSpread: gl.getUniformLocation(program, 'u_phasorDirectionSpread'),
+    u_phasorSharpness: gl.getUniformLocation(program, 'u_phasorSharpness'),
+    u_phasorWarpStrength: gl.getUniformLocation(program, 'u_phasorWarpStrength'),
+    u_phasorTangentMix: gl.getUniformLocation(program, 'u_phasorTangentMix'),
+    u_phasorKernelDensity: gl.getUniformLocation(program, 'u_phasorKernelDensity'),
+    u_phasorDirectionMode: gl.getUniformLocation(program, 'u_phasorDirectionMode'),
     u_time: gl.getUniformLocation(program, 'u_time'),
     u_noiseLoopPeriod: gl.getUniformLocation(program, 'u_noiseLoopPeriod'),
     u_animDir: gl.getUniformLocation(program, 'u_animDir'),
@@ -581,6 +597,7 @@ function getPostprocessUniforms(gl: WebGL2RenderingContext, program: WebGLProgra
     u_noiseOctaves: gl.getUniformLocation(program, 'u_noiseOctaves'),
     u_noiseEvolution: gl.getUniformLocation(program, 'u_noiseEvolution'),
     u_noiseSeed: gl.getUniformLocation(program, 'u_noiseSeed'),
+    u_noiseSpeed: gl.getUniformLocation(program, 'u_noiseSpeed'),
     u_time: gl.getUniformLocation(program, 'u_time'),
     u_noiseLoopPeriod: gl.getUniformLocation(program, 'u_noiseLoopPeriod'),
     u_noiseLoopMode: gl.getUniformLocation(program, 'u_noiseLoopMode'),
@@ -613,6 +630,21 @@ function getPostprocessUniforms(gl: WebGL2RenderingContext, program: WebGLProgra
     u_aeSubRotation: gl.getUniformLocation(program, 'u_aeSubRotation'),
     u_aeContrast: gl.getUniformLocation(program, 'u_aeContrast'),
     u_aeBrightness: gl.getUniformLocation(program, 'u_aeBrightness'),
+    u_causticsDepth: gl.getUniformLocation(program, 'u_causticsDepth'),
+    u_causticsRefraction: gl.getUniformLocation(program, 'u_causticsRefraction'),
+    u_causticsSharpness: gl.getUniformLocation(program, 'u_causticsSharpness'),
+    u_causticsComplexity: gl.getUniformLocation(program, 'u_causticsComplexity'),
+    u_causticsWaveSpread: gl.getUniformLocation(program, 'u_causticsWaveSpread'),
+    u_causticsBoundaryWidth: gl.getUniformLocation(program, 'u_causticsBoundaryWidth'),
+    u_phasorFrequency: gl.getUniformLocation(program, 'u_phasorFrequency'),
+    u_phasorBandwidth: gl.getUniformLocation(program, 'u_phasorBandwidth'),
+    u_phasorDirection: gl.getUniformLocation(program, 'u_phasorDirection'),
+    u_phasorDirectionSpread: gl.getUniformLocation(program, 'u_phasorDirectionSpread'),
+    u_phasorSharpness: gl.getUniformLocation(program, 'u_phasorSharpness'),
+    u_phasorWarpStrength: gl.getUniformLocation(program, 'u_phasorWarpStrength'),
+    u_phasorTangentMix: gl.getUniformLocation(program, 'u_phasorTangentMix'),
+    u_phasorKernelDensity: gl.getUniformLocation(program, 'u_phasorKernelDensity'),
+    u_phasorDirectionMode: gl.getUniformLocation(program, 'u_phasorDirectionMode'),
     u_curlSteps: gl.getUniformLocation(program, 'u_curlSteps'),
     u_curlSpeed: gl.getUniformLocation(program, 'u_curlSpeed'),
     u_curlEps: gl.getUniformLocation(program, 'u_curlEps'),
@@ -1072,10 +1104,15 @@ export function hexToRgb(hex: string): [number, number, number] {
   return [r, g, b];
 }
 
-const NOISE_TYPE_MAP = { simplex: 0, fbm: 1, voronoi: 2, curl: 3, domain_warp_anim: 4, seamless: 5, ridged_fbm: 6, ae_fractal: 7, fast_curl: 8 } as const;
+export const NOISE_TYPE_MAP = { simplex: 0, fbm: 1, voronoi: 2, curl: 3, domain_warp_anim: 4, seamless: 5, ridged_fbm: 6, ae_fractal: 7, fast_curl: 8, caustics: 9, phasor: 10 } as const;
 const GRADIENT_TYPE_MAP = { linear: 0, radial: 1, fourcolor: 2, diamond: 3, angle: 4, bezier: 5 } as const;
 const DIFFUSE_MODE_MAP = { block: 0, smooth: 1, dither: 2 } as const;
 const PARTICLE_EMITTER_TYPE_MAP = { field: 0, line: 1, burst: 2, point: 3 } as const;
+
+function finiteClamp(value: number | undefined, fallback: number, min: number, max: number): number {
+  if (typeof value !== 'number' || !Number.isFinite(value)) return fallback;
+  return Math.min(max, Math.max(min, value));
+}
 
 function uploadGradientRampTexture(ctx: WebGLContext, gradient: GradientConfig): void {
   const { gl } = ctx;
@@ -1371,6 +1408,7 @@ function drawPostprocessPass(
   gl.uniform1f(ctx.postprocessUniforms.u_noiseScale, noiseDistortion.scale ?? 1);
   gl.uniform1i(ctx.postprocessUniforms.u_noiseOctaves, noiseDistortion.octaves ?? 3);
   gl.uniform1f(ctx.postprocessUniforms.u_noiseEvolution, noiseDistortion.evolution ?? 0);
+  gl.uniform1f(ctx.postprocessUniforms.u_noiseSpeed, finiteClamp(noiseDistortion.speed, 0.5, 0, 4));
   gl.uniform1f(ctx.postprocessUniforms.u_noiseSeed, noiseDistortion.noiseSeed ?? 0);
   gl.uniform1f(ctx.postprocessUniforms.u_time, time);
   gl.uniform1f(ctx.postprocessUniforms.u_noiseLoopPeriod, Math.max(Math.abs(noiseLoopPeriod), 0.0001));
@@ -1408,6 +1446,22 @@ function drawPostprocessPass(
   gl.uniform1f(ctx.postprocessUniforms.u_aeSubRotation, (noiseDistortion.aeSubRotation ?? 0) * Math.PI / 180);
   gl.uniform1f(ctx.postprocessUniforms.u_aeContrast, noiseDistortion.aeContrast ?? 1);
   gl.uniform1f(ctx.postprocessUniforms.u_aeBrightness, noiseDistortion.aeBrightness ?? 0);
+  gl.uniform1f(ctx.postprocessUniforms.u_causticsDepth, finiteClamp(noiseDistortion.causticsDepth, 0.65, 0.05, 3));
+  gl.uniform1f(ctx.postprocessUniforms.u_causticsRefraction, 1.0);
+  gl.uniform1f(ctx.postprocessUniforms.u_causticsSharpness, finiteClamp(noiseDistortion.causticsSharpness, 2.5, 0.5, 8));
+  gl.uniform1i(ctx.postprocessUniforms.u_causticsComplexity, Math.round(finiteClamp(noiseDistortion.causticsComplexity, 4, 2, 8)));
+  gl.uniform1f(ctx.postprocessUniforms.u_causticsWaveSpread, finiteClamp(noiseDistortion.causticsWaveSpread, 0.75, 0, 1));
+  gl.uniform1f(ctx.postprocessUniforms.u_causticsBoundaryWidth, finiteClamp(noiseDistortion.causticsBoundaryWidth, 0.75, 0.05, 1));
+  const phasorDirectionMode = { directional: 0, radial: 1, swirl: 2 } as const;
+  gl.uniform1f(ctx.postprocessUniforms.u_phasorFrequency, finiteClamp(noiseDistortion.phasorFrequency, 5.0, 0.5, 20));
+  gl.uniform1f(ctx.postprocessUniforms.u_phasorBandwidth, finiteClamp(noiseDistortion.phasorBandwidth, 0.8, 0.1, 2));
+  gl.uniform1f(ctx.postprocessUniforms.u_phasorDirection, finiteClamp(noiseDistortion.phasorDirection, 28, 0, 360) * Math.PI / 180);
+  gl.uniform1f(ctx.postprocessUniforms.u_phasorDirectionSpread, finiteClamp(noiseDistortion.phasorDirectionSpread, 0.35, 0, 1));
+  gl.uniform1f(ctx.postprocessUniforms.u_phasorSharpness, finiteClamp(noiseDistortion.phasorSharpness, 3.0, 0.5, 10));
+  gl.uniform1f(ctx.postprocessUniforms.u_phasorWarpStrength, finiteClamp(noiseDistortion.phasorWarpStrength, 0.18, 0, 1));
+  gl.uniform1f(ctx.postprocessUniforms.u_phasorTangentMix, finiteClamp(noiseDistortion.phasorTangentMix, 0.65, 0, 1));
+  gl.uniform1f(ctx.postprocessUniforms.u_phasorKernelDensity, finiteClamp(noiseDistortion.phasorKernelDensity, 1.0, 0.25, 2));
+  gl.uniform1i(ctx.postprocessUniforms.u_phasorDirectionMode, phasorDirectionMode[noiseDistortion.phasorDirectionMode] ?? 0);
   gl.uniform1i(ctx.postprocessUniforms.u_curlSteps, noiseDistortion.curlSteps);
   gl.uniform1f(ctx.postprocessUniforms.u_curlSpeed, noiseDistortion.curlSpeed ?? 1);
   gl.uniform1f(ctx.postprocessUniforms.u_curlEps, noiseDistortion.curlEps ?? 0.01);
@@ -1894,6 +1948,14 @@ export function render(
     dwRotAngle2: clampParameter(noiseDistortion.dwRotAngle2, 0.1, getParameterLimit('noise.dwRotAngle2')),
     dwDriftAngle: clampParameter(noiseDistortion.dwDriftAngle, 45, getParameterLimit('noise.dwDriftAngle')),
     aeSubRotation: clampParameter(noiseDistortion.aeSubRotation, 45, getParameterLimit('noise.aeSubRotation')),
+    phasorFrequency: clampParameter(noiseDistortion.phasorFrequency, 5, getParameterLimit('noise.phasorFrequency')),
+    phasorBandwidth: clampParameter(noiseDistortion.phasorBandwidth, 0.8, getParameterLimit('noise.phasorBandwidth')),
+    phasorDirection: clampParameter(noiseDistortion.phasorDirection, 28, getParameterLimit('noise.phasorDirection')),
+    phasorDirectionSpread: clampParameter(noiseDistortion.phasorDirectionSpread, 0.35, getParameterLimit('noise.phasorDirectionSpread')),
+    phasorSharpness: clampParameter(noiseDistortion.phasorSharpness, 3, getParameterLimit('noise.phasorSharpness')),
+    phasorWarpStrength: clampParameter(noiseDistortion.phasorWarpStrength, 0.18, getParameterLimit('noise.phasorWarpStrength')),
+    phasorTangentMix: clampParameter(noiseDistortion.phasorTangentMix, 0.65, getParameterLimit('noise.phasorTangentMix')),
+    phasorKernelDensity: clampParameter(noiseDistortion.phasorKernelDensity, 1, getParameterLimit('noise.phasorKernelDensity')),
   };
   diffuse = {
     ...diffuse,
@@ -1981,6 +2043,7 @@ export function render(
   gl.uniform1f(uniforms.u_noiseScale, noiseDistortion.scale);
   gl.uniform1i(uniforms.u_noiseOctaves, noiseDistortion.octaves);
   gl.uniform1f(uniforms.u_noiseEvolution, noiseDistortion.evolution);
+  gl.uniform1f(uniforms.u_noiseSpeed, finiteClamp(noiseDistortion.speed, 0.5, 0, 4));
   const stMap = { simplex: 0, fbm: 1, curl: 2 };
   gl.uniform1i(uniforms.u_noiseSeamlessType, stMap[noiseDistortion.seamlessType] ?? 0);
   gl.uniform1i(uniforms.u_seamlessAnimation, noiseDistortion.seamlessAnimation === 'radial' ? 1 : 0);
@@ -2010,6 +2073,22 @@ export function render(
   gl.uniform1f(uniforms.u_aeSubRotation, ((noiseDistortion.aeSubRotation ?? 0) * Math.PI) / 180);
   gl.uniform1f(uniforms.u_aeContrast, noiseDistortion.aeContrast ?? 1.0);
   gl.uniform1f(uniforms.u_aeBrightness, noiseDistortion.aeBrightness ?? 0.0);
+  gl.uniform1f(uniforms.u_causticsDepth, finiteClamp(noiseDistortion.causticsDepth, 0.65, 0.05, 3));
+  gl.uniform1f(uniforms.u_causticsRefraction, 1.0);
+  gl.uniform1f(uniforms.u_causticsSharpness, finiteClamp(noiseDistortion.causticsSharpness, 2.5, 0.5, 8));
+  gl.uniform1i(uniforms.u_causticsComplexity, Math.round(finiteClamp(noiseDistortion.causticsComplexity, 4, 2, 8)));
+  gl.uniform1f(uniforms.u_causticsWaveSpread, finiteClamp(noiseDistortion.causticsWaveSpread, 0.75, 0, 1));
+  gl.uniform1f(uniforms.u_causticsBoundaryWidth, finiteClamp(noiseDistortion.causticsBoundaryWidth, 0.75, 0.05, 1));
+  const phasorDirectionMode = { directional: 0, radial: 1, swirl: 2 } as const;
+  gl.uniform1f(uniforms.u_phasorFrequency, finiteClamp(noiseDistortion.phasorFrequency, 5.0, 0.5, 20));
+  gl.uniform1f(uniforms.u_phasorBandwidth, finiteClamp(noiseDistortion.phasorBandwidth, 0.8, 0.1, 2));
+  gl.uniform1f(uniforms.u_phasorDirection, finiteClamp(noiseDistortion.phasorDirection, 28, 0, 360) * Math.PI / 180);
+  gl.uniform1f(uniforms.u_phasorDirectionSpread, finiteClamp(noiseDistortion.phasorDirectionSpread, 0.35, 0, 1));
+  gl.uniform1f(uniforms.u_phasorSharpness, finiteClamp(noiseDistortion.phasorSharpness, 3.0, 0.5, 10));
+  gl.uniform1f(uniforms.u_phasorWarpStrength, finiteClamp(noiseDistortion.phasorWarpStrength, 0.18, 0, 1));
+  gl.uniform1f(uniforms.u_phasorTangentMix, finiteClamp(noiseDistortion.phasorTangentMix, 0.65, 0, 1));
+  gl.uniform1f(uniforms.u_phasorKernelDensity, finiteClamp(noiseDistortion.phasorKernelDensity, 1.0, 0.25, 2));
+  gl.uniform1i(uniforms.u_phasorDirectionMode, phasorDirectionMode[noiseDistortion.phasorDirectionMode] ?? 0);
   gl.uniform1f(uniforms.u_time, time);
   gl.uniform1f(uniforms.u_noiseLoopPeriod, Math.max(Math.abs(noiseLoopPeriod), 0.0001));
   const animRad = (animDirection * Math.PI) / 180;

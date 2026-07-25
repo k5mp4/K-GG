@@ -25,6 +25,7 @@
   uniform float u_voronoiMinkowskiExp;
 
   uniform float u_noiseSeed;       // 汎用シード (curl 以外)
+  uniform float u_noiseSpeed;      // Causticsの時間進行速度
   uniform int u_curlSteps;
   uniform float u_curlSpeed;
   uniform float u_curlEps;
@@ -44,6 +45,23 @@
   uniform float u_aeSubRotation;     // rotation per octave (radians)
   uniform float u_aeContrast;        // output contrast
   uniform float u_aeBrightness;      // output brightness shift
+
+  uniform float u_causticsDepth;
+  uniform float u_causticsRefraction;
+  uniform float u_causticsSharpness;
+  uniform int u_causticsComplexity;
+  uniform float u_causticsWaveSpread;
+  uniform float u_causticsBoundaryWidth;
+
+  uniform float u_phasorFrequency;
+  uniform float u_phasorBandwidth;
+  uniform float u_phasorDirection;
+  uniform float u_phasorDirectionSpread;
+  uniform float u_phasorSharpness;
+  uniform float u_phasorWarpStrength;
+  uniform float u_phasorTangentMix;
+  uniform float u_phasorKernelDensity;
+  uniform int u_phasorDirectionMode;
 
   const float KG_TAU = 6.28318530718;
 
@@ -371,6 +389,337 @@
     return clamp(norm, 0.0, 1.0);
   }
 
+  const float PHASOR_EPSILON = 0.00001;
+  const float PHASOR_MAX_GRADIENT = 32.0;
+  const int PHASOR_NOISE_TYPE = 10;
+
+  float phasorFinite(float value, float fallback) {
+    return value == value && abs(value) < 1000000.0 ? value : fallback;
+  }
+
+  // One deterministic random position per lattice cell. The other random
+  // attributes use the same hash with translated input, so a tile never
+  // changes the kernel identity or phase.
+  vec2 phasorKernelHash(vec2 cell, float seed) {
+    return hash2(cell + vec2(seed * 0.173, seed * 0.271)) * 0.5 + 0.5;
+  }
+
+  vec2 phasorDirectionForKernel(vec2 kernelPosition, vec2 randomValue, vec2 center) {
+    float baseAngle = phasorFinite(u_phasorDirection, 0.0);
+    if (u_phasorDirectionMode == 1 || u_phasorDirectionMode == 2) {
+      vec2 radial = kernelPosition - center;
+      float radialLength = length(radial);
+      if (radialLength > PHASOR_EPSILON) {
+        baseAngle = atan(radial.y, radial.x);
+        if (u_phasorDirectionMode == 2) baseAngle += 1.57079632679;
+      }
+    }
+    float spread = clamp(phasorFinite(u_phasorDirectionSpread, 0.35), 0.0, 1.0);
+    float angle = baseAngle + (randomValue.x - 0.5) * spread * KG_TAU;
+    return vec2(cos(angle), sin(angle));
+  }
+
+  float phasorTemporalPhase(float time) {
+    float speed = clamp(phasorFinite(u_noiseSpeed, 0.5), 0.0, 4.0);
+    if (u_noiseLoopMode == 1) {
+      float cycle = fract(time / max(phasorFinite(u_noiseLoopPeriod, 1.0), 0.0001));
+      // A sinusoidal phase is periodic at both ends even when Speed is not an
+      // integer. It also keeps Speed=0 exactly static.
+      return sin(cycle * KG_TAU) * speed;
+    }
+    return time * speed;
+  }
+
+  // Evaluates the complex field and both spatial derivatives in one pass.
+  // The fixed 3x3 neighborhood is the important cost boundary: every octave
+  // reuses the same nine nearby cells and never scans an unbounded kernel list.
+  void phasorComplexField(
+    vec2 p,
+    float time,
+    int octaveLimit,
+    out vec2 phasor,
+    out vec2 derivativeX,
+    out vec2 derivativeY
+  ) {
+    float seed = phasorFinite(u_noiseSeed, 0.0);
+    float bandwidth = clamp(phasorFinite(u_phasorBandwidth, 0.8), 0.1, 2.0);
+    float density = clamp(phasorFinite(u_phasorKernelDensity, 1.0), 0.25, 2.0);
+    float baseFrequency = clamp(phasorFinite(u_phasorFrequency, 5.0), 0.5, 20.0);
+    float timePhase = phasorTemporalPhase(time);
+    int safeOctaves = octaveLimit;
+    if (safeOctaves < 1) safeOctaves = 1;
+    if (safeOctaves > 4) safeOctaves = 4;
+
+    phasor = vec2(0.0);
+    derivativeX = vec2(0.0);
+    derivativeY = vec2(0.0);
+    for (int octave = 0; octave < 4; octave++) {
+      if (octave >= safeOctaves) break;
+      float octaveIndex = float(octave);
+      float layerScale = pow(1.72, octaveIndex);
+      vec2 layerP = p * layerScale;
+      vec2 baseCell = floor(layerP);
+      float layerFrequency = baseFrequency * pow(1.24, octaveIndex);
+      float layerAmplitude = pow(0.5, octaveIndex);
+      float directionSpread = clamp(phasorFinite(u_phasorDirectionSpread, 0.35), 0.0, 1.0)
+        * (1.0 + octaveIndex * 0.12);
+      float sigma = (0.35 + bandwidth * 0.28) * sqrt(density) / (1.0 + octaveIndex * 0.08);
+      float sigma2 = max(sigma * sigma, 0.02);
+
+      for (int y = -1; y <= 1; y++) {
+        for (int x = -1; x <= 1; x++) {
+          vec2 cell = baseCell + vec2(float(x), float(y));
+          vec2 randomValue = phasorKernelHash(
+            cell + vec2(octaveIndex * 7.31, -octaveIndex * 4.17),
+            seed + octaveIndex * 17.31
+          );
+          vec2 kernelPosition = cell + randomValue;
+          vec2 delta = layerP - kernelPosition;
+          float weight = exp(-dot(delta, delta) / (2.0 * sigma2)) * layerAmplitude * density;
+          vec2 direction = phasorDirectionForKernel(kernelPosition, randomValue, vec2(0.0));
+          float directionAngle = atan(direction.y, direction.x)
+            + sin(timePhase + randomValue.y * KG_TAU + octaveIndex) * directionSpread * 0.08;
+          direction = vec2(cos(directionAngle), sin(directionAngle));
+          vec2 phaseGradient = direction * (KG_TAU * layerFrequency);
+          float phaseRandom = phasorKernelHash(
+            cell + vec2(19.1, 43.7),
+            seed + octaveIndex * 23.17
+          ).x;
+          float phase = dot(delta, phaseGradient)
+            + phaseRandom * KG_TAU
+            + timePhase * (0.32 + octaveIndex * 0.09);
+          float sine = sin(phase);
+          float cosine = cos(phase);
+          vec2 wave = vec2(cosine, sine);
+          vec2 waveDerivative = vec2(-sine, cosine);
+          vec2 weightDerivative = -delta * (weight / sigma2);
+
+          phasor += weight * wave;
+          derivativeX += weightDerivative.x * wave + weight * waveDerivative * phaseGradient.x;
+          derivativeY += weightDerivative.y * wave + weight * waveDerivative * phaseGradient.y;
+        }
+      }
+    }
+  }
+
+  float phasorPhase(vec2 p, float time, int octaveLimit) {
+    vec2 field;
+    vec2 derivativeX;
+    vec2 derivativeY;
+    phasorComplexField(p, time, octaveLimit, field, derivativeX, derivativeY);
+    return length(field) > PHASOR_EPSILON ? atan(field.y, field.x) : 0.0;
+  }
+
+  vec2 phasorPhaseGradient(vec2 p, float time, int octaveLimit) {
+    vec2 field;
+    vec2 derivativeX;
+    vec2 derivativeY;
+    phasorComplexField(p, time, octaveLimit, field, derivativeX, derivativeY);
+    float fieldLength2 = max(dot(field, field), PHASOR_EPSILON);
+    return vec2(
+      field.x * derivativeX.y - field.y * derivativeX.x,
+      field.x * derivativeY.y - field.y * derivativeY.x
+    ) / fieldLength2;
+  }
+
+  float phasorLineMask(float phase, float amplitude) {
+    float wave = cos(phase * 2.0);
+    float ridge = 1.0 - abs(wave);
+    // Keep the shared General/Glass source free of derivative instructions.
+    // The global resolution still gives a stable analytic pixel footprint for
+    // both the preview and high-resolution tile renders.
+    float pixelFootprint = 1.0 / max(min(u_resolution.x, u_resolution.y), 1.0);
+    float antiAlias = max(pixelFootprint * clamp(phasorFinite(u_phasorFrequency, 5.0), 0.5, 20.0) * 2.0, 0.002);
+    float softness = max(0.012 * clamp(phasorFinite(u_phasorSharpness, 3.0), 0.5, 10.0), antiAlias);
+    float sharpLine = smoothstep(antiAlias, antiAlias + softness, ridge);
+    return sharpLine * clamp(amplitude * 0.9, 0.0, 1.0);
+  }
+
+  vec2 phasorDistortion(vec2 uv, float time, float scale, int octaves) {
+    float warpStrength = clamp(phasorFinite(u_phasorWarpStrength, 0.18), 0.0, 1.0);
+    if (warpStrength <= 0.0) return vec2(0.0);
+    float safeScale = clamp(abs(phasorFinite(scale, 2.8)), 0.001, 10.0);
+    // Centered global UV keeps Radial/Swirl centered across tile renders.
+    vec2 p = (uv - vec2(0.5)) * safeScale;
+    vec2 field;
+    vec2 derivativeX;
+    vec2 derivativeY;
+    phasorComplexField(p, time, octaves, field, derivativeX, derivativeY);
+    float amplitude = length(field);
+    if (amplitude <= PHASOR_EPSILON) return vec2(0.0);
+
+    float fieldLength2 = max(dot(field, field), PHASOR_EPSILON);
+    vec2 phaseGradient = vec2(
+      field.x * derivativeX.y - field.y * derivativeX.x,
+      field.x * derivativeY.y - field.y * derivativeY.x
+    ) / fieldLength2;
+    float gradientLength = length(phaseGradient);
+    if (gradientLength > PHASOR_MAX_GRADIENT) {
+      phaseGradient *= PHASOR_MAX_GRADIENT / gradientLength;
+      gradientLength = PHASOR_MAX_GRADIENT;
+    }
+    vec2 fallback = vec2(cos(phasorFinite(u_phasorDirection, 0.0)), sin(phasorFinite(u_phasorDirection, 0.0)));
+    vec2 normalDirection = gradientLength > PHASOR_EPSILON ? phaseGradient / gradientLength : fallback;
+    vec2 tangentDirection = vec2(-normalDirection.y, normalDirection.x);
+    float tangentMix = clamp(phasorFinite(u_phasorTangentMix, 0.65), 0.0, 1.0);
+    vec2 flowDirection = normalDirection + tangentDirection * tangentMix;
+    float flowLength = length(flowDirection);
+    flowDirection = flowLength > PHASOR_EPSILON ? flowDirection / flowLength : fallback;
+
+    float phase = atan(field.y, field.x);
+    float lineMask = phasorLineMask(phase, amplitude);
+    float signedLine = sin(phase * 2.0) * lineMask;
+    float amplitudeMask = clamp(amplitude * 0.72, 0.0, 1.0);
+    return flowDirection * signedLine * amplitudeMask * warpStrength * 0.28;
+  }
+
+  const float CAUSTICS_EPSILON = 0.0001;
+  const float CAUSTICS_HESSIAN_SCALE = 0.006;
+  const float CAUSTICS_MAX_CONCENTRATION = 24.0;
+  const int CAUSTICS_NOISE_TYPE = 9;
+
+  float causticsFinite(float value, float fallback) {
+    return value == value && abs(value) < 1000000.0 ? value : fallback;
+  }
+
+  vec2 causticsBaseWave(int index) {
+    if (index == 1) return vec2(-2.0, 4.0);
+    if (index == 2) return vec2(5.0, -3.0);
+    if (index == 3) return vec2(4.0, 5.0);
+    if (index == 4) return vec2(-6.0, -1.0);
+    if (index == 5) return vec2(7.0, 3.0);
+    if (index == 6) return vec2(-5.0, 6.0);
+    if (index == 7) return vec2(8.0, -4.0);
+    return vec2(3.0, 1.0);
+  }
+
+  // The returned Hessian is ordered as (hxx, hxy, hyy).
+  void causticsField(
+    vec2 p,
+    float time,
+    float seed,
+    int octaveLimit,
+    out float height,
+    out vec2 gradient,
+    out vec3 hessian
+  ) {
+    highp float safeSeed = causticsFinite(seed, 0.0);
+    highp float safeTime = causticsFinite(time, 0.0);
+    highp float spread = clamp(causticsFinite(u_causticsWaveSpread, 0.75), 0.0, 1.0);
+    // Some WebGL2/GLSL ES drivers do not expose integer overloads for
+    // clamp/min/max. Keep these bounds branch-based so the shader compiles
+    // consistently across the supported implementations.
+    int complexity = u_causticsComplexity;
+    if (complexity < 2) complexity = 2;
+    if (complexity > 8) complexity = 8;
+    int safeOctaveLimit = octaveLimit;
+    if (safeOctaveLimit < 1) safeOctaveLimit = 1;
+    if (safeOctaveLimit > 8) safeOctaveLimit = 8;
+    int waveCount = complexity;
+    int octaveWaveLimit = safeOctaveLimit * 2;
+    if (waveCount > octaveWaveLimit) waveCount = octaveWaveLimit;
+
+    height = 0.0;
+    gradient = vec2(0.0);
+    hessian = vec3(0.0);
+    for (int i = 0; i < 8; i++) {
+      if (i >= waveCount) break;
+      highp float octave = floor(float(i) * 0.5);
+      highp float frequency = 0.82 + octave * (0.58 + spread * 0.18);
+      highp float amplitude = (i < 2 ? 0.42 : 0.28) * pow(0.56, octave);
+      highp vec2 baseWave = causticsBaseWave(i);
+      highp vec2 tangentWave = vec2(-baseWave.y, baseWave.x);
+      highp float directionJitter = sin(safeSeed * 12.9898 + float(i) * 78.233);
+      highp vec2 wave = (baseWave + tangentWave * directionJitter * spread * 0.18) * frequency;
+      highp float phase = dot(p, wave) * KG_TAU
+        + safeTime * (0.42 + float(i) * 0.071)
+        + safeSeed * (0.37 + float(i) * 1.17);
+      highp float sine = sin(phase);
+      highp float cosine = cos(phase);
+      highp vec2 phaseGradient = wave * KG_TAU;
+      highp float waveAmplitude = amplitude / (1.0 + frequency * frequency * 0.24);
+
+      height += waveAmplitude * sine;
+      gradient += waveAmplitude * cosine * phaseGradient;
+      hessian.x += -waveAmplitude * sine * phaseGradient.x * phaseGradient.x;
+      hessian.y += -waveAmplitude * sine * phaseGradient.x * phaseGradient.y;
+      hessian.z += -waveAmplitude * sine * phaseGradient.y * phaseGradient.y;
+    }
+    hessian *= CAUSTICS_HESSIAN_SCALE;
+  }
+
+  float causticsHeightField(vec2 p, float time, float seed, int octaveLimit) {
+    float height;
+    vec2 gradient;
+    vec3 hessian;
+    causticsField(p, time, seed, octaveLimit, height, gradient, hessian);
+    return height;
+  }
+
+  vec2 causticsHeightGradient(vec2 p, float time, float seed, int octaveLimit) {
+    float height;
+    vec2 gradient;
+    vec3 hessian;
+    causticsField(p, time, seed, octaveLimit, height, gradient, hessian);
+    return gradient;
+  }
+
+  // Returns (hxx, hxy, hyy) for the analytic water height field.
+  vec3 causticsHessian(vec2 p, float time, float seed, int octaveLimit) {
+    float height;
+    vec2 gradient;
+    vec3 hessian;
+    causticsField(p, time, seed, octaveLimit, height, gradient, hessian);
+    return hessian;
+  }
+
+  vec2 causticsDistortion(vec2 uv, float time, float scale, int octaves) {
+    highp float depth = clamp(causticsFinite(u_causticsDepth, 0.65), 0.05, 3.0);
+    highp float refraction = clamp(causticsFinite(u_causticsRefraction, 0.18), 0.0, 1.0);
+    highp float sharpness = clamp(causticsFinite(u_causticsSharpness, 2.5), 0.5, 8.0);
+    highp float boundaryWidth = clamp(causticsFinite(u_causticsBoundaryWidth, 0.75), 0.05, 1.0);
+    if (refraction <= 0.0) return vec2(0.0);
+    highp float safeScale = max(clamp(abs(causticsFinite(scale, 1.0)), 0.0, 3.0), 0.001);
+    highp float seed = causticsFinite(u_noiseSeed, 0.0);
+    highp vec2 p = uv * safeScale + vec2(seed * 17.3, seed * 7.1);
+    float height;
+    highp vec2 gradient;
+    highp vec3 hessian;
+    causticsField(p, time, seed, octaves, height, gradient, hessian);
+
+    highp float j00 = 1.0 + depth * hessian.x;
+    highp float j01 = depth * hessian.y;
+    highp float j10 = j01;
+    highp float j11 = 1.0 + depth * hessian.z;
+    highp float detJ = j00 * j11 - j01 * j10;
+    detJ = causticsFinite(detJ, 1.0);
+    highp float concentration = min(1.0 / max(abs(detJ), CAUSTICS_EPSILON), CAUSTICS_MAX_CONCENTRATION);
+    highp float mappedConcentration = 1.0 - exp(-max(concentration - 1.0, 0.0) * 0.42);
+    // Concentration is used as a distance-like field: 1 is on a fold line,
+    // 0 is away from it. Boundary Width controls how far that field reaches.
+    highp float boundaryDistance = 1.0 - mappedConcentration;
+    highp float boundaryInfluence = 1.0 - smoothstep(0.0, boundaryWidth, boundaryDistance);
+    highp float lineMask = pow(boundaryInfluence, max(sharpness * 0.65, 0.5));
+
+    highp float gradientLength = length(gradient);
+    highp vec2 direction = gradientLength > CAUSTICS_EPSILON
+      ? gradient / gradientLength
+      : vec2(0.0);
+    highp vec2 tangent = vec2(-direction.y, direction.x);
+    highp float tangentMix = clamp(causticsFinite(u_causticsWaveSpread, 0.75), 0.0, 1.0) * 0.68;
+    highp vec2 flow = direction + tangent * tangentMix;
+    highp float flowLength = length(flow);
+    flow = flowLength > CAUSTICS_EPSILON ? flow / flowLength : vec2(0.0);
+    highp float foldDirection = detJ < 0.0 ? -1.0 : 1.0;
+    // Keep a low-amplitude field active inside every cell so the source
+    // gradient does not remain as a large untouched area. Boundary Width
+    // then expands the stronger fold displacement around each caustic line.
+    highp float broadField = 0.18 + boundaryInfluence * (0.72 + mappedConcentration * 0.28);
+    highp float lineField = lineMask * (0.75 + mappedConcentration * 0.25);
+    highp float intensity = (broadField + lineField) * refraction * depth;
+    return flow * foldDirection * min(intensity * 0.42, 0.9);
+  }
+
   float fbm3D(vec3 p, int octaves) {
     float value = 0.0;
     float amplitude = 0.5;
@@ -459,6 +808,13 @@
       // AE Fractal Noise: 各オクターブに累積回転を適用したfbm
       nx = aeFractalNoise(p, octaves) * 2.0 - 1.0;
       ny = aeFractalNoise(p + vec2(43.7, 17.3), octaves) * 2.0 - 1.0;
+    } else if (noiseType == PHASOR_NOISE_TYPE) {
+      // Phasor is already a phase-gradient vector field; do not duplicate its
+      // scalar line signal into X/Y like the legacy scalar noise types.
+      return phasorDistortion(uv, evolution, scale, octaves);
+    } else if (noiseType == CAUSTICS_NOISE_TYPE) {
+      // Caustics is already a vector field; keep it out of scalar duplication.
+      return causticsDistortion(uv, evolution, scale, octaves);
     } else {
       float aspect = u_resolution.x / u_resolution.y;
       vec2 ctr = uv - 0.5;
@@ -504,7 +860,11 @@
     vec2 current = noiseDisplaceRaw(uv, scale, evolution, noiseType, octaves);
     float blend = loopBlendWeight();
     if (blend <= 0.0001) return current;
-    vec2 wrapped = noiseDisplaceRaw(uv, scale, evolution - u_noiseLoopPeriod, noiseType, octaves);
+    if (noiseType == PHASOR_NOISE_TYPE && u_noiseLoopMode == 1) return current;
+    float wrapPeriod = noiseType == CAUSTICS_NOISE_TYPE
+      ? u_noiseLoopPeriod * clamp(causticsFinite(u_noiseSpeed, 0.5), 0.0, 4.0)
+      : u_noiseLoopPeriod;
+    vec2 wrapped = noiseDisplaceRaw(uv, scale, evolution - wrapPeriod, noiseType, octaves);
     return mix(current, wrapped, blend);
   }
 #endif

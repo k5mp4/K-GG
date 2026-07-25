@@ -121,9 +121,13 @@ Linear/Radial/4-color/Diamond/Angleの5種類のグラデーションタイプ�
 ## Noise (ノイズ歪み)
 - 各種ノイズを用いて、グラデーションを複雑に歪ませます
 - `Type`
-  - Curl/Domain Warp Anim/Seamless/Voronoiの4種類のノイズタイプがあります。
+  - Simplex/fBm/Voronoi/Aura Ridges/Phasor Lines/Fractal Drift/Curl/Fast Curl/Domain Warp/Seamless/Causticsを選択できます。
 - `Seed`
   - 各ノイズタイプではseed値を変更可能です。
+- `Caustics`
+  - 複数の周期的な波面から解析的な集光場を作り、Depth/Boundary Width/Sharpness/Complexity/Wave Spreadで水面コースティクス風の強いUV歪みを調整できます。Boundary Widthは境界線から歪みを広げる距離です。Refractionは常に1です。
+- `Phasor Lines`
+  - 3×3近傍の決定論的な局所波を複素Phasorとして合成し、連続した線状構造と位相勾配からUVを歪ませます。Direction Mode（Directional/Radial/Swirl）、Frequency、Direction Spread、Sharpness、Warp Strength、Tangent Mix、Bandwidth、Kernel Densityで調整できます。
 
 ::: tip
 Diceボタンを押すことでランダムなノイズを生成することができます。

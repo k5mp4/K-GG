@@ -282,6 +282,9 @@
       return mix(current, wrapped, blend);
     } else if (u_noiseType == 8) {
       return applyFastCurlNoiseUV(uv, evo);
+    } else if ((u_noiseType == CAUSTICS_NOISE_TYPE && u_noiseAmount == 0.0)
+      || (u_noiseType == PHASOR_NOISE_TYPE && (u_noiseAmount == 0.0 || u_phasorWarpStrength == 0.0))) {
+      return uv;
     } else {
       vec2 offset = noiseDisplace(uv, u_noiseScale, evo, u_noiseType, u_noiseOctaves);
       return uv + offset * u_noiseAmount;

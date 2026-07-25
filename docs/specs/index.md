@@ -41,6 +41,8 @@ title: 機能仕様
 | SPEC-028 | [意味的角度入力のInputAngle統一](./SPEC-028-semantic-angle-inputs.md) | implemented |
 | SPEC-029 | [エフェクトパラメータ制限の一元化](./SPEC-029-unified-parameter-limits.md) | implemented |
 | SPEC-030 | [Image Gradient Sourceの保護描画](./SPEC-030-image-gradient-protected-rendering.md) | implemented |
+| SPEC-031 | [Noise DistortionへのCaustics追加](./SPEC-031-caustics-noise.md) | implemented |
+| SPEC-032 | [Noise DistortionへのPhasor Lines追加](./SPEC-032-phasor-noise.md) | implemented |
 
 ## 新しい仕様の作り方
 

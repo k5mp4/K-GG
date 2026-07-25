@@ -1,4 +1,4 @@
-import { createEmptyManualDistortMap, createEmptyManualSmoothMask, normalizePostprocessConfig, STORE_DEFAULTS } from '../store/gradientStore';
+import { createEmptyManualDistortMap, createEmptyManualSmoothMask, normalizeNoiseDistortionConfig, normalizePostprocessConfig, STORE_DEFAULTS } from '../store/gradientStore';
 import { normalizeEffectPipelineConfig } from './effectPipeline';
 import type { StoreSnapshot } from './presetModel';
 import { renderSceneAtTime } from './renderSceneAtTime';
@@ -44,7 +44,7 @@ export function createPresetThumbnailState(snapshot: StoreSnapshot): LatestState
 
   return {
     gradient: snapshot.gradient,
-    noiseDistortion: { ...STORE_DEFAULTS.noiseDistortion, ...snapshot.noiseDistortion },
+    noiseDistortion: normalizeNoiseDistortionConfig(snapshot.noiseDistortion),
     diffuse: { ...STORE_DEFAULTS.diffuse, ...snapshot.diffuse },
     imageGradient: normalizeImageGradientConfig(snapshot.imageGradient, snapshot.imageGradient ? 0 : STORE_DEFAULTS.imageGradient.anchorInfluence),
     slitScan: { ...STORE_DEFAULTS.slitScan, ...snapshot.slitScan },
