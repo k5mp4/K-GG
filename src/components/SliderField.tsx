@@ -1,7 +1,8 @@
-import { useMemo, useRef, useState, type CSSProperties } from 'react';
+import { useMemo, useRef, useState, useSyncExternalStore, type CSSProperties } from 'react';
 import { InputAngle, InputNumber } from 'tweeq';
 import { useGradientStore } from '../store/gradientStore';
-import { getTimelineTime } from '../lib/timelineClock';
+import { getTimelineTime, getTimelineTimeSnapshot, subscribeTimelineTime } from '../lib/timelineClock';
+import { interpolateKeyframesWithLoop, getKeyframeEditTime } from '../lib/loopKeyframes';
 import { inferFormatInfo } from '../lib/tweeqNumberFormat';
 import { getTweeqValuePosition } from '../lib/tweeqNumberPosition';
 import { fromTweeqAngle, toTweeqAngle } from '../lib/tweeqAngle';
@@ -25,12 +26,18 @@ type Props = {
   control?: 'number' | 'angle';
   angleUnit?: 'degrees' | 'radians';
   limitKey?: ParameterLimitKey;
+  compact?: boolean;
+  disabled?: boolean;
+  className?: string;
 };
 
 function decimalPlaces(value: number): number {
   const text = String(value);
   return text.includes('.') ? text.length - text.indexOf('.') - 1 : 0;
 }
+
+const noopSubscribe = () => () => {};
+const zeroSnapshot = () => 0;
 
 export function SliderField({
   label,
@@ -46,10 +53,20 @@ export function SliderField({
   control = 'number',
   angleUnit = 'degrees',
   limitKey,
+  compact = false,
+  disabled = false,
+  className = '',
 }: Props) {
-  const { keyframeTracks, addKeyframe, setKeyframe } = useGradientStore();
+  const { keyframeTracks, currentTime, animation, addKeyframe, setKeyframe } = useGradientStore();
   const track = trackId ? keyframeTracks[trackId] : null;
   const isKeyframed = getTrackMode(track) === 'keys';
+  const loopEnabled = animation.previewLoop ?? true;
+  useSyncExternalStore(
+    isKeyframed ? subscribeTimelineTime : noopSubscribe,
+    isKeyframed ? getTimelineTimeSnapshot : zeroSnapshot,
+    isKeyframed ? getTimelineTimeSnapshot : zeroSnapshot,
+  );
+  const timelineTime = getTimelineTime(currentTime);
   const configuredLimit = limitKey ? getParameterLimit(limitKey) : null;
   const effectiveMin = configuredLimit?.min ?? min;
   const effectiveMax = configuredLimit?.max ?? max;
@@ -74,15 +91,25 @@ export function SliderField({
       ? angleUnit === 'radians' ? wrapAngleRadians(value) : wrapAngleDegrees(value)
       : clampSliderValue(value, lowerBound, upperBound)
     : lowerBound;
-  const angleDegrees = angleUnit === 'radians' ? boundedValue * 180 / Math.PI : boundedValue;
-  const angleInputValue = control === 'angle' ? toTweeqAngle(angleDegrees) : boundedValue;
+  const liveValue = isKeyframed && track && track.keyframes.length > 0
+    ? interpolateKeyframesWithLoop(timelineTime, track.keyframes, loopEnabled)
+    : boundedValue;
+  const boundedLiveValue = Number.isFinite(liveValue)
+    ? control === 'angle'
+      ? angleUnit === 'radians' ? wrapAngleRadians(liveValue) : wrapAngleDegrees(liveValue)
+      : clampSliderValue(liveValue, lowerBound, upperBound)
+    : boundedValue;
+  const inputValue = isKeyframed && Boolean(track?.keyframes.length) ? boundedLiveValue : boundedValue;
+  const angleDegrees = angleUnit === 'radians' ? inputValue * 180 / Math.PI : inputValue;
+  const angleInputValue = control === 'angle' ? toTweeqAngle(angleDegrees) : inputValue;
   const displayed = format
-    ? format(control === 'angle' ? angleDegrees : boundedValue)
-    : String(control === 'angle' ? angleDegrees : boundedValue);
+    ? format(control === 'angle' ? angleDegrees : inputValue)
+    : String(control === 'angle' ? angleDegrees : inputValue);
   const isDirty = defaultValue !== undefined && Math.abs(boundedValue - defaultValue) > 1e-9;
 
   // Auto-keyframing remains at the K-GG adapter boundary; Tweeq only owns the input gesture.
   const handleValueChange = (displayValue: number) => {
+    if (disabled) return;
     const rawAngleDegrees = control === 'angle' ? fromTweeqAngle(displayValue) : 0;
     const rawNext = control === 'angle'
       ? angleUnit === 'radians' ? rawAngleDegrees * Math.PI / 180 : rawAngleDegrees
@@ -102,20 +129,25 @@ export function SliderField({
     const next = control === 'angle'
       ? angleUnit === 'radians' ? wrapAngleRadians(rawNext) : wrapAngleDegrees(rawNext)
       : clampSliderValue(rawNext, lowerBound, upperBound);
-    onChange(next);
 
-    if (isKeyframed && trackId && track) {
-      const nt = getTimelineTime(useGradientStore.getState().currentTime);
-      const existingKf = track.keyframes.find(k => Math.abs(k.time - nt) < 0.01);
+    if (isKeyframed && trackId) {
+      const state = useGradientStore.getState();
+      const currentTrack = state.keyframeTracks[trackId];
+      const editTime = getKeyframeEditTime(
+        getTimelineTime(state.currentTime),
+        state.animation.previewLoop ?? true,
+      );
+      const existingKf = currentTrack?.keyframes.find(k => Math.abs(k.time - editTime) < 0.005);
       if (existingKf) {
         setKeyframe(trackId, { id: existingKf.id, value: next });
       } else {
-        addKeyframe(trackId, { time: nt, value: next, interpolation: 'linear' });
+        addKeyframe(trackId, { time: editTime, value: next, interpolation: 'linear' });
       }
     }
+    onChange(next);
   };
 
-  const displayValue = toDisplay(boundedValue);
+  const displayValue = toDisplay(inputValue);
   const displayMin = toDisplay(effectiveMin);
   const displayMax = toDisplay(effectiveMax);
   const displayStep = Math.abs((formatInfo?.scale ?? 1) * effectiveStep) || effectiveStep;
@@ -133,8 +165,8 @@ export function SliderField({
   const numberShellStyle = { '--tq-value-position': `${valuePosition * 100}%` } as CSSProperties;
 
   return (
-    <div className="group/row">
-      <div className="mb-1.5 flex items-center justify-between">
+    <div className={`group/row ${compact ? 'flex min-w-0 items-center gap-1' : ''} ${disabled ? 'opacity-50' : ''} ${className}`}>
+      <div className={`${compact ? 'mb-0 shrink-0' : 'mb-1.5'} flex items-center justify-between`}>
         <div className="flex items-center gap-1.5">
           <label
             className={`select-none cursor-default font-body ${labelClassName}`}
@@ -157,7 +189,7 @@ export function SliderField({
             title={`デフォルト値 (${defaultValue}) にリセット`}
             style={{ width: 40, height: 20, padding: 0, background: 'none' }}
             className={`inline-flex items-center justify-center shrink-0 rounded text-sm transition-opacity ${
-              isDirty
+              isDirty && !disabled
                 ? 'opacity-30 group-hover/row:opacity-100 text-tab-inactive hover:text-k-text cursor-pointer'
                 : 'opacity-0 pointer-events-none'
             }`}
@@ -167,7 +199,7 @@ export function SliderField({
         )}
       </div>
       {control === 'angle' ? (
-        <div className="tq-input-angle w-full" title={displayed}>
+        <div className={`${compact ? 'w-[104px]' : 'w-full'} tq-input-angle ${disabled ? 'pointer-events-none' : ''}`} title={displayed}>
           <InputAngle
             value={angleInputValue}
             snap={15}
@@ -176,7 +208,7 @@ export function SliderField({
           />
         </div>
       ) : (
-        <div className="tq-input-number-shell" style={numberShellStyle}>
+        <div className={`${compact ? 'w-[118px]' : 'w-full'} tq-input-number-shell ${disabled ? 'pointer-events-none' : ''}`} style={numberShellStyle}>
           <InputNumber
             key={`bounded-input-${inputRevision}`}
             className="tq-input-number w-full"
@@ -193,7 +225,7 @@ export function SliderField({
             default={displayDefault}
             aria-label={`${label}: ${displayed}`}
             title={displayed}
-            onBlur={() => handleValueChange(displayValue)}
+            aria-disabled={disabled}
             onChange={handleValueChange}
           />
         </div>

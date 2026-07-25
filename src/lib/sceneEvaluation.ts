@@ -11,7 +11,7 @@ import type {
 import type { GradientConfig } from '../types/gradient';
 import type { PropertyTrack } from '../types/keyframe';
 import { getTrackMode } from '../types/keyframe';
-import { interpolateKeyframes } from './keyframeInterpolator';
+import { interpolateKeyframesWithLoop } from './loopKeyframes';
 import { applyTimeRemap } from './timeRemap';
 import { hexToRgb255, rgb255ToHex } from './gradientRampUtils';
 import { withAnimatedDiffuseSeed } from './diffuseSeed';
@@ -42,6 +42,7 @@ function applyGradientTracks(
   gradient: GradientConfig,
   tracks: Record<string, PropertyTrack>,
   time: number,
+  loopEnabled: boolean,
 ): GradientConfig {
   const stopOverrides = new Map<string, { position?: number; r?: number; g?: number; b?: number }>();
   const opacityOverrides = new Map<string, { position?: number; opacity?: number }>();
@@ -49,7 +50,7 @@ function applyGradientTracks(
 
   for (const track of Object.values(tracks)) {
     if (!isKeysTrack(track)) continue;
-    const value = interpolateKeyframes(time, track.keyframes);
+    const value = interpolateKeyframesWithLoop(time, track.keyframes, loopEnabled);
     const parts = track.propertyId.split('.');
     if (parts.length !== 3) continue;
 
@@ -132,6 +133,7 @@ function applyObjectTracks<T extends object>(
   source: T,
   tracks: Record<string, PropertyTrack>,
   time: number,
+  loopEnabled: boolean,
 ): T {
   let result = source;
   const sourceRecord = source as Record<string, unknown>;
@@ -141,7 +143,7 @@ function applyObjectTracks<T extends object>(
     if (trackCategory !== category || !(field in sourceRecord)) continue;
     result = {
       ...result,
-      [field]: interpolateKeyframes(time, track.keyframes),
+      [field]: interpolateKeyframesWithLoop(time, track.keyframes, loopEnabled),
     } as T;
   }
   return result;
@@ -175,7 +177,7 @@ function propertyOwnerEnabled(state: LatestState, propertyId: string): boolean {
 function keyedTrackValue(state: LatestState, propertyId: string, time: number): number | null {
   const track = state.keyframeTracks[propertyId];
   if (!track || getTrackMode(track) !== 'keys' || track.keyframes.length === 0) return null;
-  return interpolateKeyframes(time, track.keyframes);
+  return interpolateKeyframesWithLoop(time, track.keyframes, state.animation.previewLoop ?? true);
 }
 
 export function hasActiveAnimation(state: LatestState): boolean {
@@ -232,13 +234,15 @@ export function evaluateSceneAtTime(state: LatestState, normalizedTime: number):
     { ...state.noiseDistortion },
     tracks,
     time,
+    animation.previewLoop ?? true,
   );
-  let radon = applyObjectTracks('radon', { ...state.radon }, tracks, time);
+  let radon = applyObjectTracks('radon', { ...state.radon }, tracks, time, animation.previewLoop ?? true);
   let iridescence = applyObjectTracks(
     'iridescence',
     { ...state.iridescence },
     tracks,
     time,
+    animation.previewLoop ?? true,
   );
 
   if (noiseMode !== 'auto') {
@@ -264,6 +268,7 @@ export function evaluateSceneAtTime(state: LatestState, normalizedTime: number):
     { ...state.slitScan },
     tracks,
     time,
+    animation.previewLoop ?? true,
   );
   slitScan = {
     ...slitScan,
@@ -275,12 +280,14 @@ export function evaluateSceneAtTime(state: LatestState, normalizedTime: number):
     { ...state.stretch },
     tracks,
     time,
+    animation.previewLoop ?? true,
   );
   const postprocess = applyObjectTracks(
     'postprocess',
     { ...state.postprocess },
     tracks,
     time,
+    animation.previewLoop ?? true,
   );
 
   const seedFrame = animation.enabled && diffuseMode === 'auto'
@@ -292,7 +299,7 @@ export function evaluateSceneAtTime(state: LatestState, normalizedTime: number):
   );
 
   return {
-    gradient: applyGradientTracks(state.gradient, tracks, time),
+    gradient: applyGradientTracks(state.gradient, tracks, time, animation.previewLoop ?? true),
     noiseDistortion,
     diffuse,
     slitScan,

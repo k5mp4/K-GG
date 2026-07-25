@@ -41,6 +41,9 @@ title: 機能仕様
 | SPEC-028 | [意味的角度入力のInputAngle統一](./SPEC-028-semantic-angle-inputs.md) | implemented |
 | SPEC-029 | [エフェクトパラメータ制限の一元化](./SPEC-029-unified-parameter-limits.md) | implemented |
 | SPEC-030 | [Image Gradient Sourceの保護描画](./SPEC-030-image-gradient-protected-rendering.md) | implemented |
+| SPEC-031 | [アニメーションプレビューとタイムライン操作の改善](./SPEC-031-animation-preview-controls.md) | implemented |
+| SPEC-032 | [アニメーション入力範囲とキーフレーム編集・Loopミラー改善](./SPEC-032-animation-keyframe-editing-and-loop-mirror.md) | implemented |
+| SPEC-033 | [FPSグリッド同期プレビュー](./SPEC-033-fps-synchronized-preview.md) | implemented |
 
 ## 新しい仕様の作り方
 

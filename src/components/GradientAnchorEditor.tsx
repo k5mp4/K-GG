@@ -1,6 +1,7 @@
 import { useRef, useEffect } from 'react';
 import { useGradientStore, GRADIENT_ANCHOR_DEFAULTS, defaultBezierControlsForAnchors } from '../store/gradientStore';
-import { interpolateKeyframes } from '../lib/keyframeInterpolator';
+import { interpolateKeyframesWithLoop } from '../lib/loopKeyframes';
+import { getKeyframeEditTime } from '../lib/loopKeyframes';
 import { getTrackMode } from '../types/keyframe';
 import { Icon } from './Icon';
 import { getColorAtPosition } from '../lib/gradientRampUtils';
@@ -153,7 +154,7 @@ export function GradientAnchorEditor({ width, height }: Props) {
       uvPos = snapToGuidelines(uvPos, index);
 
       const state = useGradientStore.getState();
-      const nt = state.currentTime;
+      const nt = getKeyframeEditTime(state.currentTime, state.animation.previewLoop ?? true);
       const xTrackId = `gradientAnchor.${index}.x`;
       const yTrackId = `gradientAnchor.${index}.y`;
       const xTrack = state.keyframeTracks[xTrackId];
@@ -258,7 +259,7 @@ export function GradientAnchorEditor({ width, height }: Props) {
 
   function recordAnchorKeyframe(index: number) {
     const anchor = anchors[index];
-    const nt = currentTime;
+    const nt = getKeyframeEditTime(currentTime, animation.previewLoop ?? true);
     const label = ['A', 'B', 'C', 'D'][index] ?? String(index);
     const fields: Array<{ field: 'x' | 'y'; value: number }> = [
       { field: 'x', value: anchor[0] },
@@ -292,10 +293,10 @@ export function GradientAnchorEditor({ width, height }: Props) {
         const xTrack = keyframeTracks[`gradientAnchor.${idx}.x`];
         const yTrack = keyframeTracks[`gradientAnchor.${idx}.y`];
         const x = xTrack && getTrackMode(xTrack) === 'keys' && xTrack.keyframes.length > 0
-          ? interpolateKeyframes(currentTime, xTrack.keyframes)
+          ? interpolateKeyframesWithLoop(currentTime, xTrack.keyframes, animation.previewLoop ?? true)
           : anchor[0];
         const y = yTrack && getTrackMode(yTrack) === 'keys' && yTrack.keyframes.length > 0
-          ? interpolateKeyframes(currentTime, yTrack.keyframes)
+          ? interpolateKeyframesWithLoop(currentTime, yTrack.keyframes, animation.previewLoop ?? true)
           : anchor[1];
         return [x, y] as [number, number];
       }) as typeof anchors;
