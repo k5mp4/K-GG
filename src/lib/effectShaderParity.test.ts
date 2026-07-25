@@ -265,6 +265,17 @@ describe('V2 effect shader parity', () => {
     expect(legacyCurl).toContain('u_curlEps');
   });
 
+  it('keeps Phasor as a complex phase-gradient field rather than scalar noise duplication', () => {
+    expect(noiseShader).toContain('vec2 phasorKernelHash(');
+    expect(noiseShader).toContain('void phasorComplexField(');
+    expect(noiseShader).toContain('field.x * derivativeX.y - field.y * derivativeX.x');
+    expect(noiseShader).toContain('vec2 tangentDirection = vec2(-normalDirection.y, normalDirection.x);');
+    expect(noiseShader).toContain('u_phasorDirectionMode == 1 || u_phasorDirectionMode == 2');
+    expect(noiseShader).toContain('if (noiseType == PHASOR_NOISE_TYPE)');
+    expect(gradientShader).toContain('u_noiseType == PHASOR_NOISE_TYPE');
+    expect(postprocessShader).toContain('u_noiseType == PHASOR_NOISE_TYPE');
+  });
+
   it('keeps Diffuse independent from upstream Noise UVs and covers a following Slit extension', () => {
     const main = postprocessShader.slice(postprocessShader.indexOf('void main()'));
     expect(main).toContain('vec2 diffuseUv = diffuseGlobalUv(diffuseSampleCoord / u_fullResolution, globalCoord);');

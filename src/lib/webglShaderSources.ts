@@ -105,6 +105,10 @@ uniform float u_aeContrast;
 uniform float u_aeBrightness;
 `;
 
+// Caustics and Phasor uniforms are intentionally absent here: specialized
+// Glass/Prism programs do not evaluate Noise. The full generator, general
+// postprocess, and V2 noiseStack receive them from noise.glsl exactly once.
+
 // noise.glsl owns the time, loop, fractal, and seamless-noise uniforms. The
 // dedicated V2 Noise pass must add only its texture interface and the few
 // controls that belong to the stack layer; appending postprocess/uniforms.glsl

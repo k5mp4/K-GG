@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState, type ChangeEvent, type DragEvent, type MutableRefObject } from 'react';
-import { createEmptyManualDistortMap, createEmptyManualSmoothMask, normalizePostprocessConfig, STORE_DEFAULTS, useGradientStore } from '../store/gradientStore';
+import { createEmptyManualDistortMap, createEmptyManualSmoothMask, normalizeNoiseDistortionConfig, normalizePostprocessConfig, STORE_DEFAULTS, useGradientStore } from '../store/gradientStore';
 import { normalizeEffectPipelineConfig } from '../lib/effectPipeline';
 import { normalizeImageGradientConfig } from '../types/imageGradient';
 import {
@@ -287,7 +287,7 @@ export function PresetPanel({ canvasW, canvasH, setCanvasW, setCanvasH, aspectRa
   function handleLoad(preset: Preset) {
     const s = preset.state;
     if (s.gradient) store.setGradient(s.gradient);
-    if (s.noiseDistortion) store.setNoiseDistortion(s.noiseDistortion);
+    if (s.noiseDistortion) store.setNoiseDistortion(normalizeNoiseDistortionConfig(s.noiseDistortion));
     // Always pass Diffuse through STORE_DEFAULTS so legacy presets receive
     // adaptiveEnabled=false and the identity luminance curve.
     store.setDiffuse({ ...STORE_DEFAULTS.diffuse, ...(s.diffuse ?? {}) });

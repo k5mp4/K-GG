@@ -21,7 +21,9 @@ const NOISE_TYPES = [
   { value: 'simplex',          label: 'Simplex' },
   { value: 'fbm',              label: 'fBm' },
   { value: 'voronoi',          label: 'Voronoi' },
+  { value: 'caustics',         label: 'Caustics' },
   { value: 'ridged_fbm',       label: 'Aura Ridges' },
+  { value: 'phasor',           label: 'Phasor Lines' },
   { value: 'ae_fractal',       label: 'Fractal Drift' },
   { value: 'curl',             label: 'Curl (Legacy)' },
   { value: 'fast_curl',        label: 'Fast Curl' },
@@ -52,6 +54,17 @@ const VORONOI_METRICS = [
   { value: 'minkowski', label: 'Minkowski' },
 ];
 
+const NOISE_LOOP_MODES = [
+  { value: 'legacy', label: 'Legacy' },
+  { value: 'seamless', label: 'Seamless' },
+];
+
+const PHASOR_DIRECTION_MODES = [
+  { value: 'directional', label: 'Directional' },
+  { value: 'radial', label: 'Radial' },
+  { value: 'swirl', label: 'Swirl' },
+];
+
 export function NoiseDistortionPanel() {
   const { noiseDistortion, setNoiseDistortion } = useGradientStore();
   const canReset = isNoiseDirty(noiseDistortion);
@@ -62,11 +75,15 @@ export function NoiseDistortionPanel() {
   const isAeFractal = noiseDistortion.type === 'ae_fractal';
   const isCurl = noiseDistortion.type === 'curl';
   const isFastCurl = noiseDistortion.type === 'fast_curl';
+  const isCaustics = noiseDistortion.type === 'caustics';
+  const isPhasor = noiseDistortion.type === 'phasor';
   const hasOctaves = noiseDistortion.type === 'fbm' ||
                     noiseDistortion.type === 'ridged_fbm' ||
                     noiseDistortion.type === 'ae_fractal' ||
                     isCurl ||
                     isFastCurl ||
+                    isCaustics ||
+                    isPhasor ||
                     noiseDistortion.type === 'domain_warp_anim' ||
                     (isSeamless && (noiseDistortion.seamlessType === 'fbm' || noiseDistortion.seamlessType === 'curl'));
 
@@ -169,6 +186,153 @@ export function NoiseDistortionPanel() {
                 format={(v) => v.toFixed(2)}
                 defaultValue={D.voronoiRandomness}
                 trackId="noiseDistortion.voronoiRandomness"
+              />
+            </>
+          )}
+
+          {isCaustics && (
+            <>
+              <SliderField
+                label="Depth"
+                min={0.05} max={3} step={0.01}
+                value={noiseDistortion.causticsDepth ?? D.causticsDepth}
+                onChange={(v) => setNoiseDistortion({ causticsDepth: v })}
+                format={(v) => v.toFixed(2)}
+                defaultValue={D.causticsDepth}
+                trackId="noiseDistortion.causticsDepth"
+                limitKey="noise.causticsDepth"
+              />
+              <SliderField
+                label="Boundary Width"
+                min={0.05} max={1} step={0.01}
+                value={noiseDistortion.causticsBoundaryWidth ?? D.causticsBoundaryWidth}
+                onChange={(v) => setNoiseDistortion({ causticsBoundaryWidth: v })}
+                format={(v) => v.toFixed(2)}
+                defaultValue={D.causticsBoundaryWidth}
+                trackId="noiseDistortion.causticsBoundaryWidth"
+                limitKey="noise.causticsBoundaryWidth"
+              />
+              <SliderField
+                label="Sharpness"
+                min={0.5} max={8} step={0.05}
+                value={noiseDistortion.causticsSharpness ?? D.causticsSharpness}
+                onChange={(v) => setNoiseDistortion({ causticsSharpness: v })}
+                format={(v) => v.toFixed(2)}
+                defaultValue={D.causticsSharpness}
+                trackId="noiseDistortion.causticsSharpness"
+                limitKey="noise.causticsSharpness"
+              />
+              <SliderField
+                label="Complexity"
+                min={2} max={8} step={1}
+                value={noiseDistortion.causticsComplexity ?? D.causticsComplexity}
+                onChange={(v) => setNoiseDistortion({ causticsComplexity: v })}
+                format={(v) => `${Math.round(v)}`}
+                defaultValue={D.causticsComplexity}
+                trackId="noiseDistortion.causticsComplexity"
+                limitKey="noise.causticsComplexity"
+              />
+              <SliderField
+                label="Wave Spread"
+                min={0} max={1} step={0.01}
+                value={noiseDistortion.causticsWaveSpread ?? D.causticsWaveSpread}
+                onChange={(v) => setNoiseDistortion({ causticsWaveSpread: v })}
+                format={(v) => v.toFixed(2)}
+                defaultValue={D.causticsWaveSpread}
+                trackId="noiseDistortion.causticsWaveSpread"
+                limitKey="noise.causticsWaveSpread"
+              />
+            </>
+          )}
+
+          {isPhasor && (
+            <>
+              <CustomSelect
+                label="Direction Mode"
+                value={noiseDistortion.phasorDirectionMode}
+                options={PHASOR_DIRECTION_MODES}
+                onChange={(val) => setNoiseDistortion({ phasorDirectionMode: val as NoiseDistortionConfig['phasorDirectionMode'] })}
+              />
+              <SliderField
+                label="Frequency"
+                min={0.5} max={20} step={0.05}
+                value={noiseDistortion.phasorFrequency ?? D.phasorFrequency}
+                onChange={(v) => setNoiseDistortion({ phasorFrequency: v })}
+                format={(v) => v.toFixed(2)}
+                defaultValue={D.phasorFrequency}
+                trackId="noiseDistortion.phasorFrequency"
+                limitKey="noise.phasorFrequency"
+              />
+              <SliderField
+                label="Direction"
+                min={0} max={360} step={1}
+                value={noiseDistortion.phasorDirection ?? D.phasorDirection}
+                onChange={(v) => setNoiseDistortion({ phasorDirection: v })}
+                format={(v) => `${Math.round(v)}°`}
+                defaultValue={D.phasorDirection}
+                trackId="noiseDistortion.phasorDirection"
+                control="angle"
+                limitKey="noise.phasorDirection"
+              />
+              <SliderField
+                label="Direction Spread"
+                min={0} max={1} step={0.01}
+                value={noiseDistortion.phasorDirectionSpread ?? D.phasorDirectionSpread}
+                onChange={(v) => setNoiseDistortion({ phasorDirectionSpread: v })}
+                format={(v) => v.toFixed(2)}
+                defaultValue={D.phasorDirectionSpread}
+                trackId="noiseDistortion.phasorDirectionSpread"
+                limitKey="noise.phasorDirectionSpread"
+              />
+              <SliderField
+                label="Sharpness"
+                min={0.5} max={10} step={0.05}
+                value={noiseDistortion.phasorSharpness ?? D.phasorSharpness}
+                onChange={(v) => setNoiseDistortion({ phasorSharpness: v })}
+                format={(v) => v.toFixed(2)}
+                defaultValue={D.phasorSharpness}
+                trackId="noiseDistortion.phasorSharpness"
+                limitKey="noise.phasorSharpness"
+              />
+              <SliderField
+                label="Warp Strength"
+                min={0} max={1} step={0.01}
+                value={noiseDistortion.phasorWarpStrength ?? D.phasorWarpStrength}
+                onChange={(v) => setNoiseDistortion({ phasorWarpStrength: v })}
+                format={(v) => v.toFixed(2)}
+                defaultValue={D.phasorWarpStrength}
+                trackId="noiseDistortion.phasorWarpStrength"
+                limitKey="noise.phasorWarpStrength"
+              />
+              <SliderField
+                label="Tangent Mix"
+                min={0} max={1} step={0.01}
+                value={noiseDistortion.phasorTangentMix ?? D.phasorTangentMix}
+                onChange={(v) => setNoiseDistortion({ phasorTangentMix: v })}
+                format={(v) => v.toFixed(2)}
+                defaultValue={D.phasorTangentMix}
+                trackId="noiseDistortion.phasorTangentMix"
+                limitKey="noise.phasorTangentMix"
+              />
+              <SliderField
+                label="Bandwidth"
+                min={0.1} max={2} step={0.01}
+                value={noiseDistortion.phasorBandwidth ?? D.phasorBandwidth}
+                onChange={(v) => setNoiseDistortion({ phasorBandwidth: v })}
+                format={(v) => v.toFixed(2)}
+                defaultValue={D.phasorBandwidth}
+                trackId="noiseDistortion.phasorBandwidth"
+                limitKey="noise.phasorBandwidth"
+              />
+              <SliderField
+                label="Kernel Density"
+                min={0.25} max={2} step={0.01}
+                value={noiseDistortion.phasorKernelDensity ?? D.phasorKernelDensity}
+                onChange={(v) => setNoiseDistortion({ phasorKernelDensity: v })}
+                format={(v) => v.toFixed(2)}
+                defaultValue={D.phasorKernelDensity}
+                trackId="noiseDistortion.phasorKernelDensity"
+                limitKey="noise.phasorKernelDensity"
               />
             </>
           )}
@@ -302,10 +466,10 @@ export function NoiseDistortionPanel() {
 
           <SliderField
             label="Scale"
-            min={0.01} max={10} step={0.01}
+            min={isCaustics ? 0 : 0.01} max={isCaustics ? 3 : 10} step={0.01}
             value={noiseDistortion.scale}
             onChange={(v) => setNoiseDistortion({ scale: v })}
-            format={(v) => v.toFixed(1)}
+            format={(v) => v.toFixed(isCaustics ? 2 : 1)}
             defaultValue={D.scale}
             trackId="noiseDistortion.scale"
           />
@@ -342,6 +506,26 @@ export function NoiseDistortionPanel() {
                 Dice
               </button>
             </div>
+          )}
+
+          {(isCaustics || isPhasor) && (
+            <>
+              <SliderField
+                label="Speed"
+                min={0} max={2} step={0.01}
+                value={noiseDistortion.speed ?? D.speed}
+                onChange={(v) => setNoiseDistortion({ speed: v })}
+                format={(v) => v.toFixed(2)}
+                defaultValue={D.speed}
+                trackId="noiseDistortion.speed"
+              />
+              <CustomSelect
+                label="Loop Mode"
+                value={noiseDistortion.noiseLoopMode}
+                options={NOISE_LOOP_MODES}
+                onChange={(val) => setNoiseDistortion({ noiseLoopMode: val as NoiseDistortionConfig['noiseLoopMode'] })}
+              />
+            </>
           )}
 
           {(isCurl || isFastCurl) && (

@@ -44,6 +44,8 @@ title: 機能仕様
 | SPEC-031 | [アニメーションプレビューとタイムライン操作の改善](./SPEC-031-animation-preview-controls.md) | implemented |
 | SPEC-032 | [アニメーション入力範囲とキーフレーム編集・Loopミラー改善](./SPEC-032-animation-keyframe-editing-and-loop-mirror.md) | implemented |
 | SPEC-033 | [FPSグリッド同期プレビュー](./SPEC-033-fps-synchronized-preview.md) | implemented |
+| SPEC-034 | [Noise DistortionへのCaustics追加](./SPEC-034-caustics-noise.md) | implemented |
+| SPEC-035 | [Noise DistortionへのPhasor Lines追加](./SPEC-035-phasor-noise.md) | implemented |
 
 ## 新しい仕様の作り方
 

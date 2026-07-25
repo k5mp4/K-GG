@@ -66,4 +66,25 @@ describe('Glass scene animation', () => {
     expect(startPhase).toBeCloseTo(0);
     expect(endPhase % 1).toBeCloseTo(0);
   });
+
+  it('keeps Caustics static at Speed 0 while preserving its manual Evolution phase', () => {
+    const state = createGlassState(0);
+    state.noiseDistortion = {
+      ...STORE_DEFAULTS.noiseDistortion,
+      type: 'caustics',
+      evolution: 1.75,
+      speed: 0,
+      enabled: true,
+    };
+    state.keyframeTracks['noiseDistortion.evolution'] = createAnimationTrack(
+      'noiseDistortion.evolution',
+      'Noise Evolution',
+      'auto',
+    );
+
+    const start = evaluateSceneAtTime(state, 0);
+    const later = evaluateSceneAtTime(state, 0.5);
+    expect(start.noiseDistortion.evolution + start.renderTime).toBeCloseTo(1.75);
+    expect(later.noiseDistortion.evolution + later.renderTime).toBeCloseTo(1.75);
+  });
 });

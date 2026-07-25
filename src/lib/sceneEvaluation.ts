@@ -245,7 +245,19 @@ export function evaluateSceneAtTime(state: LatestState, normalizedTime: number):
     animation.previewLoop ?? true,
   );
 
-  if (noiseMode !== 'auto') {
+  if (noiseDistortion.type === 'caustics') {
+    // The shader receives the shared render time. Bake Caustics' per-type
+    // speed into evolution so manual/keyed Evolution remains a phase offset,
+    // while Speed=0 produces a static field in both Auto and keyed modes.
+    const causticsSpeed = typeof noiseDistortion.speed === 'number' && Number.isFinite(noiseDistortion.speed)
+      ? Math.min(4, Math.max(0, noiseDistortion.speed))
+      : 0.5;
+    noiseDistortion = {
+      ...noiseDistortion,
+      evolution: noiseDistortion.evolution - renderTime * (1 - causticsSpeed),
+      curlSpeed: 0,
+    };
+  } else if (noiseMode !== 'auto') {
     noiseDistortion = {
       ...noiseDistortion,
       evolution: noiseDistortion.evolution - renderTime,

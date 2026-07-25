@@ -4,6 +4,7 @@ import {
   getPostprocessFragmentSource,
   getProgramSource,
 } from './webglShaderSources';
+import { NOISE_TYPE_MAP } from './webgl';
 
 describe('webglShaderSources', () => {
   it('keeps the initial program on the base generator source', () => {
@@ -19,6 +20,7 @@ describe('webglShaderSources', () => {
     const generator = getProgramSource('generator');
     expect(generator.fragment).toContain('float simplex3D(');
     expect(generator.fragment).toContain('vec2 fastCurlField(');
+    expect(generator.fragment).toContain('vec2 causticsDistortion(');
 
     const noiseStack = getProgramSource('noiseStack').fragment;
     expect(noiseStack).toContain('#define KGG_STACK_NOISE_ONLY');
@@ -75,7 +77,74 @@ describe('webglShaderSources', () => {
     expect(core).not.toContain('vec2 noiseDisplaceRaw(');
     expect(noiseStack).toContain('#define KGG_STACK_NOISE_ONLY');
     expect(noiseStack).toContain('vec2 noiseDisplaceRaw(');
+    expect(noiseStack).toContain('vec2 causticsDistortion(');
     expect(noiseStack).toContain('void main()');
+  });
+
+  it('declares Caustics and Phasor uniforms once in generator and Noise Stack sources', () => {
+    const declarations = [
+      'uniform float u_noiseSpeed;',
+      'uniform float u_causticsDepth;',
+      'uniform float u_causticsRefraction;',
+      'uniform float u_causticsSharpness;',
+      'uniform int u_causticsComplexity;',
+      'uniform float u_causticsWaveSpread;',
+      'uniform float u_causticsBoundaryWidth;',
+      'uniform float u_phasorFrequency;',
+      'uniform float u_phasorBandwidth;',
+      'uniform float u_phasorDirection;',
+      'uniform float u_phasorDirectionSpread;',
+      'uniform float u_phasorSharpness;',
+      'uniform float u_phasorWarpStrength;',
+      'uniform float u_phasorTangentMix;',
+      'uniform float u_phasorKernelDensity;',
+      'uniform int u_phasorDirectionMode;',
+    ];
+    const generator = getProgramSource('generator').fragment;
+    const noiseStack = getProgramSource('noiseStack').fragment;
+    const general = getProgramSource('postprocess').fragment;
+    for (const declaration of declarations) {
+      const escaped = declaration.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      expect(generator.match(new RegExp(escaped, 'g'))).toHaveLength(1);
+      expect(noiseStack.match(new RegExp(escaped, 'g'))).toHaveLength(1);
+      expect(general.match(new RegExp(escaped, 'g'))).toHaveLength(1);
+    }
+    expect(getProgramSource('glassV2').fragment).not.toContain('causticsDistortion(');
+  });
+
+  it('keeps the Caustics TypeScript and GLSL integer mapping at the end', () => {
+    expect(NOISE_TYPE_MAP).toMatchObject({ simplex: 0, fast_curl: 8, caustics: 9 });
+    const generator = getProgramSource('generator').fragment;
+    expect(generator).toContain('const int CAUSTICS_NOISE_TYPE = 9;');
+    expect(generator).toContain('noiseType == CAUSTICS_NOISE_TYPE');
+    expect(generator).toContain('return causticsDistortion(uv, evolution, scale, octaves);');
+    expect(generator).toContain('if (complexity < 2) complexity = 2;');
+    expect(generator).not.toContain('int complexity = clamp(');
+    expect(generator).toContain('evolution - wrapPeriod');
+    expect(generator).toContain('boundaryInfluence');
+  });
+
+  it('keeps Phasor Lines at the end of the Noise type mapping and includes its field contract', () => {
+    expect(NOISE_TYPE_MAP).toMatchObject({ caustics: 9, phasor: 10 });
+    const generator = getProgramSource('generator').fragment;
+    const noiseStack = getProgramSource('noiseStack').fragment;
+    for (const source of [generator, noiseStack]) {
+      expect(source).toContain('const int PHASOR_NOISE_TYPE = 10;');
+      expect(source).toContain('vec2 phasorKernelHash(');
+      expect(source).toContain('void phasorComplexField(');
+      expect(source).toContain('vec2 phasorPhaseGradient(');
+      expect(source).toContain('float phasorLineMask(');
+      expect(source).toContain('vec2 phasorDistortion(');
+      const phaseHelpers = source.slice(source.indexOf('float phasorPhase('), source.indexOf('float phasorLineMask('));
+      expect(phaseHelpers).not.toContain('u_noiseOctaves');
+      expect(source).toContain('for (int y = -1; y <= 1; y++)');
+      expect(source).toMatch(
+        /float pixelFootprint = 1\.0 \/ max\(min\(u_(?:resolution|fullResolution)\.x, u_(?:resolution|fullResolution)\.y\), 1\.0\);/,
+      );
+    }
+    expect(generator).toContain('noiseType == PHASOR_NOISE_TYPE');
+    expect(noiseStack).toContain('u_phasorWarpStrength == 0.0');
+    expect(getProgramSource('glassV2').fragment).not.toContain('phasorDistortion(');
   });
 
   it('guards mode-specific Glass code while keeping both modes in the general fallback', () => {

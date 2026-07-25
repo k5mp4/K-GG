@@ -224,10 +224,32 @@ export function optimizeNoiseDistortion(
   optimization: RenderOptimization,
 ): NoiseDistortionConfig {
   if (optimization.tier === 'high') return config;
+  const phasorDensityLimit = optimization.tier === 'low' ? 0.75 : 1.25;
+  const phasorSpreadLimit = optimization.tier === 'low' ? 0.6 : 0.85;
   return {
     ...config,
     octaves: Math.min(config.octaves, optimization.maxNoiseOctaves),
     curlSteps: Math.min(config.curlSteps, optimization.maxCurlSteps),
+    ...(config.type === 'caustics' ? {
+      causticsComplexity: Math.min(
+        Number.isFinite(config.causticsComplexity) ? config.causticsComplexity : 4,
+        optimization.maxNoiseOctaves * 2,
+      ),
+      causticsSharpness: Math.min(
+        Number.isFinite(config.causticsSharpness) ? config.causticsSharpness : 2.5,
+        optimization.tier === 'low' ? 5 : 6.5,
+      ),
+    } : {}),
+    ...(config.type === 'phasor' ? {
+      phasorKernelDensity: Math.min(
+        Number.isFinite(config.phasorKernelDensity) ? config.phasorKernelDensity : 1,
+        phasorDensityLimit,
+      ),
+      phasorDirectionSpread: Math.min(
+        Number.isFinite(config.phasorDirectionSpread) ? config.phasorDirectionSpread : 0.35,
+        phasorSpreadLimit,
+      ),
+    } : {}),
   };
 }
 

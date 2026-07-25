@@ -108,6 +108,10 @@ vec2 stackNoiseUv(vec2 uv) {
   if (u_noiseType == 8) {
     return applyFastCurlNoiseUV(uv, evolution);
   }
+  if ((u_noiseType == CAUSTICS_NOISE_TYPE && u_noiseAmount == 0.0)
+    || (u_noiseType == PHASOR_NOISE_TYPE && (u_noiseAmount == 0.0 || u_phasorWarpStrength == 0.0))) {
+    return uv;
+  }
   vec2 offset = noiseDisplace(uv, u_noiseScale, evolution, u_noiseType, u_noiseOctaves);
   return uv + offset * u_noiseAmount;
 #endif

@@ -1,7 +1,9 @@
 // Phase 2 で実装。Phase 1 では型定義のみ。
+export type PhasorDirectionMode = 'directional' | 'radial' | 'swirl';
+
 export type NoiseDistortionConfig = {
   enabled: boolean;
-  type: 'simplex' | 'fbm' | 'voronoi' | 'curl' | 'fast_curl' | 'domain_warp_anim' | 'seamless' | 'ridged_fbm' | 'ae_fractal';
+  type: 'simplex' | 'fbm' | 'voronoi' | 'curl' | 'fast_curl' | 'domain_warp_anim' | 'seamless' | 'ridged_fbm' | 'ae_fractal' | 'caustics' | 'phasor';
   amount: number;
   scale: number;
   octaves: number;
@@ -45,6 +47,23 @@ export type NoiseDistortionConfig = {
   aeSubRotation: number;     // 0–360°: オクターブごとの累積回転 (AE: Sub Rotation) ← 核心
   aeContrast: number;        // 0.5–4.0: 出力コントラスト (AE: Contrast)
   aeBrightness: number;      // -1.0–1.0: 出力明度オフセット (AE: Brightness)
+  // Caustics Noise 専用パラメータ
+  causticsDepth: number;       // 0.05–3.0: 仮想的な水深と集光構造の強さ
+  causticsRefraction: number;  // 保存互換用。Causticsでは常に1.0
+  causticsSharpness: number;   // 0.5–8.0: 集光線の細さ
+  causticsComplexity: number;  // 2–8: 波面成分数
+  causticsWaveSpread: number;  // 0.0–1.0: 波方向と接線方向の分散
+  causticsBoundaryWidth: number; // 0.05–1.0: 境界線から変位を広げる距離
+  // Phasor Lines Noise 専用パラメータ
+  phasorFrequency: number;       // 0.5–20.0: カーネル内部の縞密度
+  phasorBandwidth: number;       // 0.1–2.0: 局所カーネルの幅
+  phasorDirection: number;       // 0–360°: 基本方向
+  phasorDirectionSpread: number; // 0.0–1.0: カーネル方向の分散
+  phasorSharpness: number;       // 0.5–10.0: 線の細さ
+  phasorWarpStrength: number;    // 0.0–1.0: Phasor固有の変位強度
+  phasorTangentMix: number;      // 0.0–1.0: 法線から接線への混合
+  phasorKernelDensity: number;   // 0.25–2.0: カーネルの重なり密度
+  phasorDirectionMode: PhasorDirectionMode;
 };
 
 export type DiffuseDitherMode = 'pattern_dither';

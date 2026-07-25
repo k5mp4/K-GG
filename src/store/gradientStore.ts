@@ -147,6 +147,8 @@ export const NOISE_TYPE_PRESETS: Record<NoiseDistortionConfig['type'], Partial<N
   seamless: { amount: 0.30, scale: 0.5, octaves: 4, seamlessType: 'simplex', seamlessAnimation: 'drift', seamlessTwist: 0.0, noiseLoopMode: 'seamless', noiseLoopBlend: 0.75 },
   ridged_fbm: { amount: 0.40, scale: 2.5, octaves: 5, ridgeSharpness: 2.0, ridgeGain: 0.0, ridgeLacunarity: 2.0, ridgePersistence: 0.6, ridgeOffset: 1.0, ridgeWarp: 1.0 },
   ae_fractal: { amount: 0.30, scale: 2.0, octaves: 6, aeFractalType: 'basic', aeSubInfluence: 0.7, aeSubScaling: 1.78, aeSubRotation: 45, aeContrast: 1.0, aeBrightness: 0.0 },
+  caustics: { amount: 0.45, scale: 2.4, octaves: 4, speed: 0.5, noiseLoopMode: 'seamless', noiseLoopBlend: 0.75, causticsDepth: 0.65, causticsRefraction: 1.0, causticsSharpness: 2.5, causticsComplexity: 4, causticsWaveSpread: 0.75, causticsBoundaryWidth: 0.75 },
+  phasor: { amount: 0.24, scale: 2.8, octaves: 3, speed: 0.5, noiseLoopMode: 'seamless', noiseLoopBlend: 0.75, phasorFrequency: 5.0, phasorBandwidth: 0.8, phasorDirection: 28, phasorDirectionSpread: 0.35, phasorSharpness: 3.0, phasorWarpStrength: 0.18, phasorTangentMix: 0.65, phasorKernelDensity: 1.0, phasorDirectionMode: 'directional' },
 };
 
 const MANUAL_DISTORT_MAP_RESOLUTION = 64;
@@ -216,6 +218,21 @@ export const STORE_DEFAULTS = {
     aeSubRotation: 45,
     aeContrast: 1.0,
     aeBrightness: 0.0,
+    causticsDepth: 0.65,
+    causticsRefraction: 1.0,
+    causticsSharpness: 2.5,
+    causticsComplexity: 4,
+    causticsWaveSpread: 0.75,
+    causticsBoundaryWidth: 0.75,
+    phasorFrequency: 5.0,
+    phasorBandwidth: 0.8,
+    phasorDirection: 28,
+    phasorDirectionSpread: 0.35,
+    phasorSharpness: 3.0,
+    phasorWarpStrength: 0.18,
+    phasorTangentMix: 0.65,
+    phasorKernelDensity: 1.0,
+    phasorDirectionMode: 'directional' as const,
   },
   diffuse: {
     enabled: true,
@@ -427,6 +444,52 @@ export const STORE_DEFAULTS = {
   },
 };
 
+/**
+ * Completes persisted Noise Distortion data before it reaches rendering or
+ * history. This keeps presets written before a Noise type gained fields
+ * forward-compatible without relying on a type assertion alone.
+ */
+export function normalizeNoiseDistortionConfig(
+  saved?: Partial<NoiseDistortionConfig>,
+): NoiseDistortionConfig {
+  const normalized: NoiseDistortionConfig = {
+    ...STORE_DEFAULTS.noiseDistortion,
+    ...saved,
+  };
+  normalized.dwRotAngle1 = clampParameter(normalized.dwRotAngle1, STORE_DEFAULTS.noiseDistortion.dwRotAngle1, getParameterLimit('noise.dwRotAngle1'));
+  normalized.dwRotAngle2 = clampParameter(normalized.dwRotAngle2, STORE_DEFAULTS.noiseDistortion.dwRotAngle2, getParameterLimit('noise.dwRotAngle2'));
+  normalized.dwDriftAngle = clampParameter(normalized.dwDriftAngle, STORE_DEFAULTS.noiseDistortion.dwDriftAngle, getParameterLimit('noise.dwDriftAngle'));
+  normalized.aeSubRotation = clampParameter(normalized.aeSubRotation, STORE_DEFAULTS.noiseDistortion.aeSubRotation, getParameterLimit('noise.aeSubRotation'));
+  if (normalized.type === 'caustics') {
+    normalized.scale = typeof normalized.scale === 'number' && Number.isFinite(normalized.scale)
+      ? Math.min(3.0, Math.max(0.0, normalized.scale))
+      : STORE_DEFAULTS.noiseDistortion.scale;
+  }
+  normalized.causticsDepth = clampParameter(normalized.causticsDepth, STORE_DEFAULTS.noiseDistortion.causticsDepth, getParameterLimit('noise.causticsDepth'));
+  // Refraction is intentionally fixed at 1 for Caustics. Keep the field in
+  // persisted data so older presets remain readable, but do not expose an
+  // obsolete user-controlled degree of freedom.
+  normalized.causticsRefraction = normalized.type === 'caustics'
+    ? 1.0
+    : clampParameter(normalized.causticsRefraction, STORE_DEFAULTS.noiseDistortion.causticsRefraction, getParameterLimit('noise.causticsRefraction'));
+  normalized.causticsSharpness = clampParameter(normalized.causticsSharpness, STORE_DEFAULTS.noiseDistortion.causticsSharpness, getParameterLimit('noise.causticsSharpness'));
+  normalized.causticsComplexity = clampParameter(normalized.causticsComplexity, STORE_DEFAULTS.noiseDistortion.causticsComplexity, getParameterLimit('noise.causticsComplexity'));
+  normalized.causticsWaveSpread = clampParameter(normalized.causticsWaveSpread, STORE_DEFAULTS.noiseDistortion.causticsWaveSpread, getParameterLimit('noise.causticsWaveSpread'));
+  normalized.causticsBoundaryWidth = clampParameter(normalized.causticsBoundaryWidth, STORE_DEFAULTS.noiseDistortion.causticsBoundaryWidth, getParameterLimit('noise.causticsBoundaryWidth'));
+  normalized.phasorFrequency = clampParameter(normalized.phasorFrequency, STORE_DEFAULTS.noiseDistortion.phasorFrequency, getParameterLimit('noise.phasorFrequency'));
+  normalized.phasorBandwidth = clampParameter(normalized.phasorBandwidth, STORE_DEFAULTS.noiseDistortion.phasorBandwidth, getParameterLimit('noise.phasorBandwidth'));
+  normalized.phasorDirection = clampParameter(normalized.phasorDirection, STORE_DEFAULTS.noiseDistortion.phasorDirection, getParameterLimit('noise.phasorDirection'));
+  normalized.phasorDirectionSpread = clampParameter(normalized.phasorDirectionSpread, STORE_DEFAULTS.noiseDistortion.phasorDirectionSpread, getParameterLimit('noise.phasorDirectionSpread'));
+  normalized.phasorSharpness = clampParameter(normalized.phasorSharpness, STORE_DEFAULTS.noiseDistortion.phasorSharpness, getParameterLimit('noise.phasorSharpness'));
+  normalized.phasorWarpStrength = clampParameter(normalized.phasorWarpStrength, STORE_DEFAULTS.noiseDistortion.phasorWarpStrength, getParameterLimit('noise.phasorWarpStrength'));
+  normalized.phasorTangentMix = clampParameter(normalized.phasorTangentMix, STORE_DEFAULTS.noiseDistortion.phasorTangentMix, getParameterLimit('noise.phasorTangentMix'));
+  normalized.phasorKernelDensity = clampParameter(normalized.phasorKernelDensity, STORE_DEFAULTS.noiseDistortion.phasorKernelDensity, getParameterLimit('noise.phasorKernelDensity'));
+  if (normalized.phasorDirectionMode !== 'radial' && normalized.phasorDirectionMode !== 'swirl') {
+    normalized.phasorDirectionMode = 'directional';
+  }
+  return normalized;
+}
+
 export function normalizePostprocessConfig(
   saved?: Partial<PostprocessConfig>,
 ): PostprocessConfig {
@@ -584,22 +647,19 @@ export const useGradientStore = create<GradientStore>((set) => ({
     return { gradient: { ...s.gradient, ...next } };
   }),
   setNoiseDistortion: (v) => set((s) => {
-    let noiseDistortion: NoiseDistortionConfig;
+    let nextNoiseDistortion: Partial<NoiseDistortionConfig>;
     if (v.type && v.type !== s.noiseDistortion.type) {
-      noiseDistortion = { ...s.noiseDistortion, ...NOISE_TYPE_PRESETS[v.type], ...v };
+      nextNoiseDistortion = { ...s.noiseDistortion, ...NOISE_TYPE_PRESETS[v.type], ...v };
     } else {
-      noiseDistortion = { ...s.noiseDistortion, ...v };
+      nextNoiseDistortion = { ...s.noiseDistortion, ...v };
     }
+    const noiseDistortion = normalizeNoiseDistortionConfig(nextNoiseDistortion);
     const keyframeTracks = s.animation.enabled && noiseDistortion.enabled
       ? ensureAutoTrack(s.keyframeTracks, 'noiseDistortion.evolution')
       : s.keyframeTracks;
     const effectPipeline = v.enabled !== undefined && s.effectPipeline.version === 'stack-v2'
       ? { ...s.effectPipeline, effectStack: updateEffectStackLayer(s.effectPipeline.effectStack, 'noise', { enabled: v.enabled }) }
       : s.effectPipeline;
-    noiseDistortion.dwRotAngle1 = clampParameter(noiseDistortion.dwRotAngle1, s.noiseDistortion.dwRotAngle1, getParameterLimit('noise.dwRotAngle1'));
-    noiseDistortion.dwRotAngle2 = clampParameter(noiseDistortion.dwRotAngle2, s.noiseDistortion.dwRotAngle2, getParameterLimit('noise.dwRotAngle2'));
-    noiseDistortion.dwDriftAngle = clampParameter(noiseDistortion.dwDriftAngle, s.noiseDistortion.dwDriftAngle, getParameterLimit('noise.dwDriftAngle'));
-    noiseDistortion.aeSubRotation = clampParameter(noiseDistortion.aeSubRotation, s.noiseDistortion.aeSubRotation, getParameterLimit('noise.aeSubRotation'));
     return { noiseDistortion, keyframeTracks, effectPipeline };
   }),
   setDiffuse: (v) => set((s) => {

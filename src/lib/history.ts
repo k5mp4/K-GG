@@ -1,4 +1,4 @@
-import { useGradientStore } from '../store/gradientStore';
+import { normalizeNoiseDistortionConfig, useGradientStore } from '../store/gradientStore';
 import type { StoreSnapshot as PresetStoreSnapshot } from './presets';
 import { MAX_HISTORY, HISTORY_DEBOUNCE_MS } from './constants';
 import { debounce } from './debounce';
@@ -86,7 +86,7 @@ class HistoryManager {
     this.applyingSnapshot = true;
     useGradientStore.setState({
       gradient: snap.gradient,
-      noiseDistortion: snap.noiseDistortion,
+      noiseDistortion: normalizeNoiseDistortionConfig(snap.noiseDistortion),
       diffuse: snap.diffuse,
       imageGradient: snap.imageGradient,
       slitScan: snap.slitScan,
