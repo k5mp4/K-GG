@@ -288,7 +288,9 @@ export function PresetPanel({ canvasW, canvasH, setCanvasW, setCanvasH, aspectRa
     const s = preset.state;
     if (s.gradient) store.setGradient(s.gradient);
     if (s.noiseDistortion) store.setNoiseDistortion(s.noiseDistortion);
-    if (s.diffuse) store.setDiffuse(s.diffuse);
+    // Always pass Diffuse through STORE_DEFAULTS so legacy presets receive
+    // adaptiveEnabled=false and the identity luminance curve.
+    store.setDiffuse({ ...STORE_DEFAULTS.diffuse, ...(s.diffuse ?? {}) });
     store.setImageGradient(normalizeImageGradientConfig(s.imageGradient, s.imageGradient ? 0 : STORE_DEFAULTS.imageGradient.anchorInfluence));
     if (s.slitScan) store.setSlitScan({ ...STORE_DEFAULTS.slitScan, ...s.slitScan });
     if (s.stretch) store.setStretch(s.stretch);

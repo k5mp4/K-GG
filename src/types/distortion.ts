@@ -49,6 +49,11 @@ export type NoiseDistortionConfig = {
 
 export type DiffuseDitherMode = 'pattern_dither';
 
+export type DiffuseCurvePoint = {
+  x: number;
+  y: number;
+};
+
 export type DiffuseConfig = {
   enabled: boolean;
   mode: 'block' | 'smooth' | 'dither'; // block=矩形ノイズ, smooth=有機的ドットノイズ, dither=ディザパターン
@@ -58,6 +63,8 @@ export type DiffuseConfig = {
   seed: number;     // 0–99   ハッシュシード
   seedAnimEnabled?: boolean; // true=描画フレームごとに seed を進める
   ditherThreshold: number; // 0–1 ディザのしきい値バイアス（0.5=標準）
+  adaptiveEnabled?: boolean;
+  luminanceCurve?: DiffuseCurvePoint[];
 };
 
 export type SlitScanConfig = {
@@ -191,6 +198,9 @@ export type EffectPipelineConfig = {
 export type PostprocessConfig = ManualDistortConfig & {
   effectMode: PostprocessEffectMode;
   effectStack: PostprocessStackLayer[];
+  /** Diffuse parameters mirrored into the V2 postprocess boundary. */
+  diffuseAdaptiveEnabled?: boolean;
+  diffuseLuminanceCurve?: DiffuseCurvePoint[];
   mirrorMode: PostprocessMirrorMode;
   kaleidoscopeType: PostprocessKaleidoscopeType;
   kaleidoscopeSlices: number;

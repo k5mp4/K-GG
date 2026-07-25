@@ -20,6 +20,7 @@ import {
 import { ColorPicker } from './ColorPicker';
 import { ColorPaletteGenerator } from './ColorPaletteGenerator';
 import { SidebarSection } from './SidebarSection';
+import { SliderField } from './SliderField';
 
 const BAR_H = RAMP_BAR_H;
 const HANDLE_AREA = RAMP_HANDLE_AREA;
@@ -1731,6 +1732,22 @@ export function GradientRamp({ overlayImageElement = null, showHeader = true }: 
               title="アンカーをリセット"
             >↺</button>
           </div>
+
+          {gradient.gradientType === 'angle' && (
+            <SliderField
+              label="Angle"
+              min={0}
+              max={360}
+              step={1}
+              value={gradient.angle}
+              onChange={(angle) => setGradient({ angle })}
+              format={(value) => `${Math.round(value)}°`}
+              defaultValue={0}
+              trackId="gradient.angle"
+              control="angle"
+              limitKey="gradient.angle"
+            />
+          )}
 
           {/* カラーモード / 補間モード選択 */}
           <div className="grid grid-cols-2 gap-2">

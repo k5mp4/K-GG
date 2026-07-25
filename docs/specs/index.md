@@ -27,7 +27,7 @@ title: 機能仕様
 | SPEC-014 | [Effect Stackの折りたたみと描画安定化・軽量化](./SPEC-014-effect-stack-stability-and-performance.md) | implemented |
 | SPEC-015 | [DiffuseのEffect Stackレイヤー化](./SPEC-015-configurable-diffuse-stack-position.md) | implemented |
 | SPEC-016 | [Effect Stack操作と描画リカバリー](./SPEC-016-effect-stack-interaction-and-render-recovery.md) | implemented |
-| SPEC-017 | [Effect StackとColor Histogramのワークスペース配置](./SPEC-017-effect-stack-workspace-layout.md) | draft |
+| SPEC-017 | [Effect StackとColor Histogramのワークスペース配置](./SPEC-017-effect-stack-workspace-layout.md) | implemented |
 | SPEC-018 | [Glass V2光学屈折エフェクト](./SPEC-018-glass-v2-optical-refraction.md) | implemented |
 | SPEC-019 | [Gradient Rampのプロポーショナルストップ編集](./SPEC-019-proportional-gradient-stop-editing.md) | implemented |
 | SPEC-020 | [Fast Curl Noiseの追加と軽量化](./SPEC-020-fast-curl-noise.md) | implemented |
@@ -37,6 +37,10 @@ title: 機能仕様
 | SPEC-024 | [動画書き出しFFmpeg待機の応答性改善](./SPEC-024-video-export-encode-responsiveness.md) | implemented |
 | SPEC-025 | [プリセットライブラリとフォルダ階層](./SPEC-025-preset-library-and-folders.md) | implemented |
 | SPEC-026 | [プリセットライブラリの操作性と描画サムネイル](./SPEC-026-preset-library-ux-and-rendered-thumbnails.md) | implemented |
+| SPEC-027 | [Diffuse輝度カーブ制御](./SPEC-027-diffuse-luminance-curve.md) | implemented |
+| SPEC-028 | [意味的角度入力のInputAngle統一](./SPEC-028-semantic-angle-inputs.md) | implemented |
+| SPEC-029 | [エフェクトパラメータ制限の一元化](./SPEC-029-unified-parameter-limits.md) | implemented |
+| SPEC-030 | [Image Gradient Sourceの保護描画](./SPEC-030-image-gradient-protected-rendering.md) | implemented |
 
 ## 新しい仕様の作り方
 

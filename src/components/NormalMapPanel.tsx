@@ -88,6 +88,8 @@ export function NormalMapPanel() {
             onChange={(v) => setNormalMap({ angle: v })}
             format={(v) => v.toFixed(0) + '°'}
             defaultValue={D.angle}
+            control="angle"
+            limitKey="normalMap.angle"
           />
 
           <SliderField

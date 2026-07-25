@@ -1,4 +1,4 @@
-import { useMemo, type CSSProperties } from 'react';
+import { useMemo, useRef, useState, type CSSProperties } from 'react';
 import { InputAngle, InputNumber } from 'tweeq';
 import { useGradientStore } from '../store/gradientStore';
 import { getTimelineTime } from '../lib/timelineClock';
@@ -7,6 +7,9 @@ import { getTweeqValuePosition } from '../lib/tweeqNumberPosition';
 import { fromTweeqAngle, toTweeqAngle } from '../lib/tweeqAngle';
 import { getTrackMode } from '../types/keyframe';
 import { AnimationPropertyControls } from './AnimationPropertyControls';
+import type { ParameterLimitKey } from '../lib/parameterLimits';
+import { getParameterLimit, wrapAngleDegrees, wrapAngleRadians } from '../lib/parameterLimits';
+import { clampSliderValue, isSliderValueOutOfRange } from '../lib/sliderValue';
 
 type Props = {
   label: string;
@@ -20,6 +23,8 @@ type Props = {
   defaultValue?: number;
   trackId?: string;
   control?: 'number' | 'angle';
+  angleUnit?: 'degrees' | 'radians';
+  limitKey?: ParameterLimitKey;
 };
 
 function decimalPlaces(value: number): number {
@@ -39,13 +44,21 @@ export function SliderField({
   defaultValue,
   trackId,
   control = 'number',
+  angleUnit = 'degrees',
+  limitKey,
 }: Props) {
   const { keyframeTracks, addKeyframe, setKeyframe } = useGradientStore();
   const track = trackId ? keyframeTracks[trackId] : null;
   const isKeyframed = getTrackMode(track) === 'keys';
+  const configuredLimit = limitKey ? getParameterLimit(limitKey) : null;
+  const effectiveMin = configuredLimit?.min ?? min;
+  const effectiveMax = configuredLimit?.max ?? max;
+  const effectiveStep = configuredLimit?.step ?? step;
+  const [inputRevision, setInputRevision] = useState(0);
+  const inputOutOfRangeRef = useRef(false);
   const formatInfo = useMemo(
-    () => inferFormatInfo(format, value, min, max, step),
-    [format, max, min, step, value],
+    () => inferFormatInfo(format, value, effectiveMin, effectiveMax, effectiveStep),
+    [effectiveMax, effectiveMin, effectiveStep, format, value],
   );
 
   const toDisplay = (modelValue: number) => (
@@ -54,22 +67,41 @@ export function SliderField({
   const toModel = (displayValue: number) => (
     formatInfo ? (displayValue - formatInfo.offset) / formatInfo.scale : displayValue
   );
-  const lowerBound = Math.min(min, max);
-  const upperBound = Math.max(min, max);
+  const lowerBound = Math.min(effectiveMin, effectiveMax);
+  const upperBound = Math.max(effectiveMin, effectiveMax);
   const boundedValue = Number.isFinite(value)
-    ? Math.min(upperBound, Math.max(lowerBound, value))
+    ? control === 'angle'
+      ? angleUnit === 'radians' ? wrapAngleRadians(value) : wrapAngleDegrees(value)
+      : clampSliderValue(value, lowerBound, upperBound)
     : lowerBound;
-  const angleInputValue = control === 'angle' ? toTweeqAngle(boundedValue) : boundedValue;
+  const angleDegrees = angleUnit === 'radians' ? boundedValue * 180 / Math.PI : boundedValue;
+  const angleInputValue = control === 'angle' ? toTweeqAngle(angleDegrees) : boundedValue;
   const displayed = format
-    ? format(control === 'angle' ? angleInputValue : boundedValue)
-    : String(control === 'angle' ? angleInputValue : boundedValue);
+    ? format(control === 'angle' ? angleDegrees : boundedValue)
+    : String(control === 'angle' ? angleDegrees : boundedValue);
   const isDirty = defaultValue !== undefined && Math.abs(boundedValue - defaultValue) > 1e-9;
 
   // Auto-keyframing remains at the K-GG adapter boundary; Tweeq only owns the input gesture.
   const handleValueChange = (displayValue: number) => {
-    const rawNext = control === 'angle' ? fromTweeqAngle(displayValue) : toModel(displayValue);
+    const rawAngleDegrees = control === 'angle' ? fromTweeqAngle(displayValue) : 0;
+    const rawNext = control === 'angle'
+      ? angleUnit === 'radians' ? rawAngleDegrees * Math.PI / 180 : rawAngleDegrees
+      : toModel(displayValue);
     if (!Number.isFinite(rawNext)) return;
-    const next = Math.min(upperBound, Math.max(lowerBound, rawNext));
+    if (control !== 'angle') {
+      const outOfRange = isSliderValueOutOfRange(rawNext, lowerBound, upperBound);
+      if (outOfRange && !inputOutOfRangeRef.current) {
+        // Tweeq updates its internal draft before invoking onChange. Remounting
+        // once at the boundary replaces that draft with the clamped controlled value.
+        inputOutOfRangeRef.current = true;
+        setInputRevision(revision => revision + 1);
+      } else if (!outOfRange) {
+        inputOutOfRangeRef.current = false;
+      }
+    }
+    const next = control === 'angle'
+      ? angleUnit === 'radians' ? wrapAngleRadians(rawNext) : wrapAngleDegrees(rawNext)
+      : clampSliderValue(rawNext, lowerBound, upperBound);
     onChange(next);
 
     if (isKeyframed && trackId && track) {
@@ -84,10 +116,14 @@ export function SliderField({
   };
 
   const displayValue = toDisplay(boundedValue);
-  const displayMin = toDisplay(min);
-  const displayMax = toDisplay(max);
-  const displayStep = Math.abs((formatInfo?.scale ?? 1) * step) || step;
-  const displayDefault = defaultValue === undefined ? undefined : toDisplay(defaultValue);
+  const displayMin = toDisplay(effectiveMin);
+  const displayMax = toDisplay(effectiveMax);
+  const displayStep = Math.abs((formatInfo?.scale ?? 1) * effectiveStep) || effectiveStep;
+  const displayDefault = defaultValue === undefined
+    ? undefined
+    : control === 'angle'
+      ? toTweeqAngle(angleUnit === 'radians' ? defaultValue * 180 / Math.PI : defaultValue)
+      : toDisplay(defaultValue);
   const displayBar = formatInfo ? toDisplay(0) : 0;
   const valuePosition = getTweeqValuePosition(
     displayValue,
@@ -114,7 +150,9 @@ export function SliderField({
           <button
             type="button"
             onClick={() => isDirty && handleValueChange(
-              control === 'angle' ? toTweeqAngle(defaultValue) : toDisplay(defaultValue),
+              control === 'angle'
+                ? toTweeqAngle(angleUnit === 'radians' ? defaultValue * 180 / Math.PI : defaultValue)
+                : toDisplay(defaultValue),
             )}
             title={`デフォルト値 (${defaultValue}) にリセット`}
             style={{ width: 40, height: 20, padding: 0, background: 'none' }}
@@ -140,6 +178,7 @@ export function SliderField({
       ) : (
         <div className="tq-input-number-shell" style={numberShellStyle}>
           <InputNumber
+            key={`bounded-input-${inputRevision}`}
             className="tq-input-number w-full"
             value={displayValue}
             min={Math.min(displayMin, displayMax)}

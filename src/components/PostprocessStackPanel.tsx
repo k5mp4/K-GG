@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
-import { createPortal } from 'react-dom';
+import { createRoot, type Root } from 'react-dom/client';
+import type { WebviewWindow } from '@tauri-apps/api/webviewWindow';
 import type { EffectStackKind, PostprocessStackKind } from '../types/distortion';
 import {
   canRenderV2Direct,
@@ -15,6 +16,20 @@ import {
 import { useGradientStore } from '../store/gradientStore';
 import { Toggle } from './Toggle';
 import { Icon } from './Icon';
+import {
+  closeCurrentEffectStackWindow,
+  createEffectStackSnapshot,
+  EFFECT_STACK_CLOSE_EVENT,
+  EFFECT_STACK_READY_EVENT,
+  EFFECT_STACK_STATE_EVENT,
+  EFFECT_STACK_STATE_UPDATE_EVENT,
+  EFFECT_STACK_SWAP_EVENT,
+  EFFECT_STACK_WINDOW_LABEL,
+  effectStackSnapshotSignature,
+  isTauriRuntime,
+  openEffectStackWindow,
+  type EffectStackSnapshot,
+} from '../lib/effectStackWindow';
 
 const ROW_HEIGHT = 38;
 const DRAG_SETTLE_MS = 150;
@@ -50,6 +65,9 @@ type LazyProgramStatus = 'loading' | 'ready' | 'failed' | 'fallback';
 const CORE_EFFECTS = new Set<EffectStackKind>([
   'diffuse', 'noise', 'slit', 'distort', 'mirror', 'kaleidoscope', 'voronoi',
 ]);
+const IMAGE_GRADIENT_PROTECTED_EFFECTS = new Set<EffectStackKind>([
+  'stretch', 'distort', 'mirror', 'kaleidoscope', 'voronoi', 'glass', 'glassV2',
+]);
 
 type DocumentPictureInPictureApi = {
   requestWindow: (options?: { width?: number; height?: number }) => Promise<Window>;
@@ -58,6 +76,7 @@ type DocumentPictureInPictureApi = {
 type Props = {
   onSwapWorkspace?: () => void;
   onSelectEffectStack?: (kind: EffectStackKind) => void;
+  detached?: boolean;
 };
 
 function programKeyForEffect(kind: EffectStackKind): LazyProgramKey {
@@ -68,8 +87,8 @@ function programKeyForEffect(kind: EffectStackKind): LazyProgramKey {
   return 'stretch';
 }
 
-export function PostprocessStackPanel({ onSwapWorkspace, onSelectEffectStack }: Props = {}) {
-  const { setPostprocess, effectPipeline, normalMap, setEffectPipeline } = useGradientStore();
+export function PostprocessStackPanel({ onSwapWorkspace, onSelectEffectStack, detached = false }: Props = {}) {
+  const { setPostprocess, effectPipeline, normalMap, imageGradient, setEffectPipeline } = useGradientStore();
   const stack = normalizeEffectStack(effectPipeline.effectStack);
   const movableStack = stack;
   const stackRef = useRef(stack);
@@ -88,17 +107,145 @@ export function PostprocessStackPanel({ onSwapWorkspace, onSelectEffectStack }: 
   const [programStatus, setProgramStatus] = useState<Partial<Record<LazyProgramKey, LazyProgramStatus>>>({});
   const [pipWindow, setPipWindow] = useState<Window | null>(null);
   const [pipMount, setPipMount] = useState<HTMLElement | null>(null);
+  const [tauriWindowOpen, setTauriWindowOpen] = useState(false);
+  const pipRootRef = useRef<Root | null>(null);
   const pipWindowRef = useRef<Window | null>(null);
+  const tauriWindowRef = useRef<WebviewWindow | null>(null);
+  const applyingRemoteStateRef = useRef(false);
+  const swapWorkspaceRef = useRef(onSwapWorkspace);
+  const selectEffectStackRef = useRef(onSelectEffectStack);
   const externalWindowCleanupRef = useRef<(() => void) | null>(null);
   stackRef.current = stack;
   pipWindowRef.current = pipWindow;
+  swapWorkspaceRef.current = onSwapWorkspace;
+  selectEffectStackRef.current = onSelectEffectStack;
+
+  // Tauri creates a second native WebviewWindow, so the Zustand store is not
+  // shared automatically. The two roots exchange only the Effect Stack
+  // state; the panel keeps all controls and drag behavior in one component.
+  useEffect(() => {
+    if (detached || !isTauriRuntime()) return;
+    let disposed = false;
+    const cleanups: Array<() => void> = [];
+    const sendSnapshot = async () => {
+      try {
+        const { emitTo } = await import('@tauri-apps/api/event');
+        if (disposed) return;
+        await emitTo(EFFECT_STACK_WINDOW_LABEL, EFFECT_STACK_STATE_EVENT, createEffectStackSnapshot(useGradientStore.getState()));
+      } catch {
+        // The native window may not exist yet or may already be closing.
+      }
+    };
+
+    const setupHost = async () => {
+      const { listen } = await import('@tauri-apps/api/event');
+      if (disposed) return;
+      const readyCleanup = await listen(EFFECT_STACK_READY_EVENT, () => { void sendSnapshot(); });
+      if (disposed) {
+        readyCleanup();
+        return;
+      }
+      const updateCleanup = await listen<EffectStackSnapshot>(EFFECT_STACK_STATE_UPDATE_EVENT, event => {
+        const snapshot = event.payload;
+        if (!snapshot?.effectPipeline || !snapshot.postprocess || !snapshot.normalMap || !snapshot.imageGradient) return;
+        useGradientStore.setState({
+          effectPipeline: snapshot.effectPipeline,
+          postprocess: snapshot.postprocess,
+          normalMap: snapshot.normalMap,
+          imageGradient: snapshot.imageGradient,
+        });
+      });
+      const closeCleanup = await listen(EFFECT_STACK_CLOSE_EVENT, () => {
+        setTauriWindowOpen(false);
+        tauriWindowRef.current = null;
+      });
+      const swapCleanup = await listen(EFFECT_STACK_SWAP_EVENT, () => {
+        swapWorkspaceRef.current?.();
+      });
+      if (disposed) {
+        readyCleanup();
+        updateCleanup();
+        closeCleanup();
+        swapCleanup();
+      } else {
+        cleanups.push(readyCleanup, updateCleanup, closeCleanup, swapCleanup);
+      }
+    };
+    void setupHost();
+
+    let hostSnapshotSignature = '';
+    const unsubscribe = useGradientStore.subscribe(state => {
+      const snapshot = createEffectStackSnapshot(state);
+      const signature = effectStackSnapshotSignature(snapshot);
+      if (signature === hostSnapshotSignature) return;
+      hostSnapshotSignature = signature;
+      void sendSnapshot();
+    });
+    return () => {
+      disposed = true;
+      unsubscribe();
+      cleanups.forEach(cleanup => cleanup());
+    };
+  }, [detached]);
+
+  useEffect(() => {
+    if (!detached || !isTauriRuntime()) return;
+    let disposed = false;
+    const cleanups: Array<() => void> = [];
+    const sendUpdate = async () => {
+      try {
+        const { emitTo } = await import('@tauri-apps/api/event');
+        if (disposed || applyingRemoteStateRef.current) return;
+        await emitTo('main', EFFECT_STACK_STATE_UPDATE_EVENT, createEffectStackSnapshot(useGradientStore.getState()));
+      } catch {
+        // The main window can close before this WebviewWindow does.
+      }
+    };
+    const setupDetached = async () => {
+      const { listen, emitTo } = await import('@tauri-apps/api/event');
+      if (disposed) return;
+      const stateCleanup = await listen<EffectStackSnapshot>(EFFECT_STACK_STATE_EVENT, event => {
+        const snapshot = event.payload;
+        if (!snapshot?.effectPipeline || !snapshot.postprocess || !snapshot.normalMap || !snapshot.imageGradient) return;
+        applyingRemoteStateRef.current = true;
+        useGradientStore.setState({
+          effectPipeline: snapshot.effectPipeline,
+          postprocess: snapshot.postprocess,
+          normalMap: snapshot.normalMap,
+          imageGradient: snapshot.imageGradient,
+        });
+        selectEffectStackRef.current?.(snapshot.effectPipeline.selectedKind);
+        queueMicrotask(() => { applyingRemoteStateRef.current = false; });
+      });
+      if (disposed) {
+        stateCleanup();
+        return;
+      }
+      const unsubscribe = useGradientStore.subscribe(() => { void sendUpdate(); });
+      if (disposed) {
+        stateCleanup();
+        unsubscribe();
+        return;
+      }
+      cleanups.push(stateCleanup, unsubscribe);
+      if (!disposed) await emitTo('main', EFFECT_STACK_READY_EVENT);
+    };
+    void setupDetached();
+    return () => {
+      disposed = true;
+      cleanups.forEach(cleanup => cleanup());
+    };
+  }, [detached]);
 
   useEffect(() => () => {
     dragCleanupRef.current?.();
     if (settleTimerRef.current !== null) window.clearTimeout(settleTimerRef.current);
     document.body.style.cursor = '';
     externalWindowCleanupRef.current?.();
+    pipRootRef.current?.unmount();
+    pipRootRef.current = null;
     pipWindowRef.current?.close();
+    void tauriWindowRef.current?.close();
   }, []);
 
   useEffect(() => {
@@ -120,6 +267,31 @@ export function PostprocessStackPanel({ onSwapWorkspace, onSelectEffectStack }: 
   }, []);
 
   const togglePiP = async () => {
+    if (detached) {
+      await closeCurrentEffectStackWindow();
+      return;
+    }
+    if (isTauriRuntime()) {
+      if (tauriWindowRef.current || tauriWindowOpen) {
+        await tauriWindowRef.current?.close();
+        tauriWindowRef.current = null;
+        setTauriWindowOpen(false);
+        return;
+      }
+      try {
+        const nextWindow = await openEffectStackWindow();
+        tauriWindowRef.current = nextWindow;
+        setTauriWindowOpen(true);
+        void nextWindow.once('tauri://destroyed', () => {
+          tauriWindowRef.current = null;
+          setTauriWindowOpen(false);
+        });
+      } catch (error) {
+        console.error('Failed to open Effect Stack Tauri window:', error);
+        window.alert('Effect Stackの別ウィンドウを開始できませんでした。インライン表示を維持します。');
+      }
+      return;
+    }
     if (pipWindow) {
       externalWindowCleanupRef.current?.();
       pipWindow.close();
@@ -165,7 +337,7 @@ export function PostprocessStackPanel({ onSwapWorkspace, onSelectEffectStack }: 
         }
       });
       const mount = openedWindow.document.createElement('div');
-      mount.dataset.effectStackPortal = 'true';
+      mount.dataset.effectStackRoot = 'true';
       mount.style.minHeight = '100vh';
       openedWindow.document.body.appendChild(mount);
       openedWindow.document.title = 'Effect Stack';
@@ -182,6 +354,8 @@ export function PostprocessStackPanel({ onSwapWorkspace, onSelectEffectStack }: 
         if (externalWindowCleanupRef.current === handleExternalClose) {
           externalWindowCleanupRef.current = null;
         }
+        pipRootRef.current?.unmount();
+        pipRootRef.current = null;
         setPipWindow(current => current === openedWindow ? null : current);
         setPipMount(current => current === mount ? null : current);
       };
@@ -193,6 +367,7 @@ export function PostprocessStackPanel({ onSwapWorkspace, onSelectEffectStack }: 
           if (openedWindow.closed) handleExternalClose();
         }, 250);
       }
+      pipRootRef.current = createRoot(mount);
       setPipMount(mount);
       setPipWindow(openedWindow);
     } catch (error) {
@@ -207,6 +382,16 @@ export function PostprocessStackPanel({ onSwapWorkspace, onSelectEffectStack }: 
     setEffectPipeline({ selectedKind: kind });
     if (kind === 'distort' || kind === 'mirror' || kind === 'kaleidoscope' || kind === 'voronoi' || kind === 'glass' || kind === 'glassV2') {
       setPostprocess({ enabled: true, effectMode: kind as PostprocessStackKind });
+    }
+  };
+
+  const swapWorkspace = () => {
+    if (onSwapWorkspace) {
+      onSwapWorkspace();
+      return;
+    }
+    if (detached) {
+      void import('@tauri-apps/api/event').then(({ emitTo }) => emitTo('main', EFFECT_STACK_SWAP_EVENT));
     }
   };
 
@@ -320,6 +505,9 @@ export function PostprocessStackPanel({ onSwapWorkspace, onSelectEffectStack }: 
   };
 
   const effectStatus = (kind: EffectStackKind, enabled: boolean) => {
+    if (imageGradient.enabled && IMAGE_GRADIENT_PROTECTED_EFFECTS.has(kind)) {
+      return { label: 'Protected', className: 'text-amber-300' };
+    }
     // Diffuse-only V2 is drawn directly by the Bootstrap generator and never
     // requests stackCore, so it is genuinely applied without a lazy-program
     // ready event.
@@ -340,7 +528,7 @@ export function PostprocessStackPanel({ onSwapWorkspace, onSelectEffectStack }: 
   };
 
   const panel = (
-    <div data-effect-stack-panel className={`min-h-8 ${pipWindow ? 'w-full' : 'w-[232px]'} overflow-hidden border border-cream/20 bg-k-bg/90 shadow-[0_18px_46px_rgba(0,0,0,0.36)] backdrop-blur-md`}>
+    <div data-effect-stack-panel className={`min-h-8 ${detached || pipWindow || tauriWindowOpen ? 'w-full' : 'w-[232px]'} overflow-hidden border border-cream/20 bg-k-bg/90 shadow-[0_18px_46px_rgba(0,0,0,0.36)] backdrop-blur-md`}>
       <div className="flex h-8 items-center justify-between border-b border-cream/15 px-2.5">
         <button
           type="button"
@@ -353,13 +541,13 @@ export function PostprocessStackPanel({ onSwapWorkspace, onSelectEffectStack }: 
           <span className="truncate font-display text-[9px] font-bold uppercase tracking-wider">Effect Stack</span>
         </button>
         <div className="flex items-center gap-1.5">
-          {onSwapWorkspace && (
+          {(onSwapWorkspace || detached) && (
             <button
               type="button"
               className="rounded px-1 text-[12px] leading-none text-cream/55 transition-colors hover:bg-cream/10 hover:text-fire focus:outline-none focus-visible:ring-2 focus-visible:ring-fire"
               title="Color Histogramと位置を交換"
               aria-label="Color Histogramと位置を交換"
-              onClick={onSwapWorkspace}
+              onClick={swapWorkspace}
             >
               ⇄
             </button>
@@ -367,8 +555,8 @@ export function PostprocessStackPanel({ onSwapWorkspace, onSelectEffectStack }: 
           <button
             type="button"
             className="rounded px-1 text-[12px] leading-none text-cream/55 transition-colors hover:bg-cream/10 hover:text-fire focus:outline-none focus-visible:ring-2 focus-visible:ring-fire"
-            title={pipWindow ? 'Effect Stackを元の位置へ戻す' : 'Effect Stackを別ウィンドウで表示'}
-            aria-label={pipWindow ? 'Effect Stackを元の位置へ戻す' : 'Effect Stackを別ウィンドウで表示'}
+            title={detached || pipWindow || tauriWindowOpen ? 'Effect Stackを元の位置へ戻す' : 'Effect Stackを別ウィンドウで表示'}
+            aria-label={detached || pipWindow || tauriWindowOpen ? 'Effect Stackを元の位置へ戻す' : 'Effect Stackを別ウィンドウで表示'}
             onClick={togglePiP}
           >
             ↗
@@ -432,6 +620,9 @@ export function PostprocessStackPanel({ onSwapWorkspace, onSelectEffectStack }: 
       </div>
       <div className="border-t border-cream/15 px-2 py-1.5 text-[8px] uppercase tracking-wider text-cream/55">
         <div className="mb-1">Fixed: Surface → Prism → Particles</div>
+        {imageGradient.enabled && (
+          <div className="mb-1 text-amber-300/90 normal-case">Image Gradient: geometry-resampling layers are protected</div>
+        )}
         <div className="flex items-center justify-between py-0.5 text-cream/75">
           <span className="flex items-center gap-2">Prism <span className={`text-[8px] ${programStatusLabel('prism', effectPipeline.prismEnabled).className}`}>{programStatusLabel('prism', effectPipeline.prismEnabled).label}</span></span>
           <Toggle variant="switch" size="xs" checked={effectPipeline.prismEnabled} onChange={(prismEnabled) => setEffectPipeline({ prismEnabled })} />
@@ -445,10 +636,18 @@ export function PostprocessStackPanel({ onSwapWorkspace, onSelectEffectStack }: 
     </div>
   );
 
+  // The external document owns a real React root. Rendering a portal here
+  // would keep React's event delegation attached to the opener document,
+  // which made toggles and pointer gestures inert in the detached window.
+  useEffect(() => {
+    if (pipWindow && pipMount && pipRootRef.current) {
+      pipRootRef.current.render(panel);
+    }
+  }, [panel, pipMount, pipWindow]);
+
   return (
     <>
-      {!pipWindow && panel}
-      {pipWindow && pipMount && createPortal(panel, pipMount)}
+      {!pipWindow && !tauriWindowOpen && panel}
     </>
   );
 }

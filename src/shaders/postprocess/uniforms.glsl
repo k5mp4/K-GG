@@ -58,6 +58,8 @@ uniform float u_diffuseScatter;
 uniform float u_diffuseGrain;
 uniform float u_diffuseSeed;
 uniform float u_diffuseDitherThreshold;
+uniform bool u_diffuseAdaptiveEnabled;
+uniform sampler2D u_diffuseCurve;
 uniform int u_stackSlitMode;
 uniform float u_stackSlitAngle;
 uniform int u_stackSlitWaveType;

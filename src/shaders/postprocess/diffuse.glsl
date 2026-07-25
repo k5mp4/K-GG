@@ -146,21 +146,33 @@ vec2 ditherCellCenter(vec2 coord) {
 vec2 diffuseSampleUv(vec2 sampleUv, vec2 globalCoord) {
   if (!u_diffuseEnabled || u_diffuseMode == 2) return sampleUv;
   vec2 sampleGlobalCoord = sampleUv * u_tileResolution + u_tileOffset;
-  sampleGlobalCoord += diffusePanelDisplacement(globalCoord) * u_diffuseScatter;
+  float luminance = dot(texture2D(u_sourceTex, clamp(sampleUv, 0.0, 1.0)).rgb, vec3(0.299, 0.587, 0.114));
+  float adaptiveFactor = u_diffuseAdaptiveEnabled
+    ? texture2D(u_diffuseCurve, vec2(clamp(luminance, 0.0, 1.0), 0.5)).r
+    : 1.0;
+  sampleGlobalCoord += diffusePanelDisplacement(globalCoord) * clamp(u_diffuseScatter, 0.0, 300.0) * adaptiveFactor;
   return clamp((sampleGlobalCoord - u_tileOffset) / u_tileResolution, 0.0, 1.0);
 }
 
 vec2 diffuseSampleUvMirrorRepeat(vec2 sampleUv, vec2 globalCoord) {
   if (!u_diffuseEnabled || u_diffuseMode == 2) return sampleUv;
   vec2 sampleGlobalCoord = sampleUv * u_tileResolution + u_tileOffset;
-  sampleGlobalCoord += diffusePanelDisplacement(globalCoord) * u_diffuseScatter;
+  float luminance = dot(texture2D(u_sourceTex, clamp(sampleUv, 0.0, 1.0)).rgb, vec3(0.299, 0.587, 0.114));
+  float adaptiveFactor = u_diffuseAdaptiveEnabled
+    ? texture2D(u_diffuseCurve, vec2(clamp(luminance, 0.0, 1.0), 0.5)).r
+    : 1.0;
+  sampleGlobalCoord += diffusePanelDisplacement(globalCoord) * clamp(u_diffuseScatter, 0.0, 300.0) * adaptiveFactor;
   return mirrorRepeatUv((sampleGlobalCoord - u_tileOffset) / u_tileResolution);
 }
 
 vec2 diffuseGlobalUv(vec2 uv, vec2 globalCoord) {
   if (!u_diffuseEnabled || u_diffuseMode == 2) return uv;
   vec2 sampleGlobalCoord = uv * u_fullResolution
-    + diffusePanelDisplacement(globalCoord) * u_diffuseScatter;
+    + diffusePanelDisplacement(globalCoord) * clamp(u_diffuseScatter, 0.0, 300.0) * (
+      u_diffuseAdaptiveEnabled
+        ? texture2D(u_diffuseCurve, vec2(clamp(dot(texture2D(u_sourceTex, clamp(uv, 0.0, 1.0)).rgb, vec3(0.299, 0.587, 0.114)), 0.0, 1.0), 0.5)).r
+        : 1.0
+    );
   return clamp(sampleGlobalCoord / u_fullResolution, 0.0, 1.0);
 }
 
@@ -176,7 +188,10 @@ vec4 applyDiffuseDither(vec4 color, vec2 globalCoord) {
   float upperMix = step(threshold, fract(scaledT));
   float ditherT = (lower + upperMix) / (paletteSteps - 1.0);
   vec3 paletteColor = texture2D(u_gradientRamp, vec2(clamp(ditherT, 0.0, 1.0), 0.5)).rgb;
-  float amount = clamp(u_diffuseScatter / 100.0, 0.0, 1.0);
+  float adaptiveFactor = u_diffuseAdaptiveEnabled
+    ? texture2D(u_diffuseCurve, vec2(clamp(paletteT, 0.0, 1.0), 0.5)).r
+    : 1.0;
+  float amount = clamp(u_diffuseScatter / 100.0, 0.0, 1.0) * adaptiveFactor;
   return vec4(mix(color.rgb, paletteColor, amount), color.a);
 }
 #endif

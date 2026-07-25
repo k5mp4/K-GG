@@ -183,12 +183,14 @@ export function NoiseDistortionPanel() {
               />
               <SliderField
                 label="Sub Rotation"
-                min={0} max={180} step={1}
+                min={0} max={360} step={1}
                 value={noiseDistortion.aeSubRotation ?? 45}
                 onChange={(v) => setNoiseDistortion({ aeSubRotation: v })}
                 format={(v) => `${v}°`}
                 defaultValue={D.aeSubRotation}
                 trackId="noiseDistortion.aeSubRotation"
+                control="angle"
+                limitKey="noise.aeSubRotation"
               />
               <SliderField
                 label="Sub Influence"
@@ -431,21 +433,27 @@ export function NoiseDistortionPanel() {
                 />
                 <SliderField
                   label="Rot Angle 1"
-                  min={0} max={3.14} step={0.01}
+                  min={0} max={Math.PI * 2} step={Math.PI / 180}
                   value={noiseDistortion.dwRotAngle1}
                   onChange={(v) => setNoiseDistortion({ dwRotAngle1: v })}
-                  format={(v) => v.toFixed(2)}
+                  format={(v) => `${Math.round(v * 180 / Math.PI)}°`}
                   defaultValue={D.dwRotAngle1}
                   trackId="noiseDistortion.dwRotAngle1"
+                  control="angle"
+                  angleUnit="radians"
+                  limitKey="noise.dwRotAngle1"
                 />
                 <SliderField
                   label="Rot Angle 2"
-                  min={0} max={3.14} step={0.01}
+                  min={0} max={Math.PI * 2} step={Math.PI / 180}
                   value={noiseDistortion.dwRotAngle2}
                   onChange={(v) => setNoiseDistortion({ dwRotAngle2: v })}
-                  format={(v) => v.toFixed(2)}
+                  format={(v) => `${Math.round(v * 180 / Math.PI)}°`}
                   defaultValue={D.dwRotAngle2}
                   trackId="noiseDistortion.dwRotAngle2"
+                  control="angle"
+                  angleUnit="radians"
+                  limitKey="noise.dwRotAngle2"
                 />
                 <SliderField
                   label="Drift Angle"
@@ -455,6 +463,8 @@ export function NoiseDistortionPanel() {
                   format={(v) => v + '°'}
                   defaultValue={D.dwDriftAngle}
                   trackId="noiseDistortion.dwDriftAngle"
+                  control="angle"
+                  limitKey="noise.dwDriftAngle"
                 />
                 <SliderField
                   label="Drift Speed"

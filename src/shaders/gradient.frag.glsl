@@ -20,6 +20,8 @@
   uniform float u_diffuseGrain;
   uniform float u_diffuseSeed;
   uniform float u_diffuseDitherThreshold;
+  uniform bool u_diffuseAdaptiveEnabled;
+  uniform sampler2D u_diffuseCurve;
 
   uniform sampler2D u_gradientRamp;
   uniform float u_rampRepeat;
@@ -477,7 +479,10 @@
     float upperMix = step(threshold, fract(scaledT));
     float ditherT = (lower + upperMix) / (paletteSteps - 1.0);
     vec3 paletteColor = texture2D(u_gradientRamp, vec2(clamp(ditherT, 0.0, 1.0), 0.5)).rgb;
-    float amount = clamp(u_diffuseScatter / 100.0, 0.0, 1.0);
+    float adaptiveFactor = u_diffuseAdaptiveEnabled
+      ? texture2D(u_diffuseCurve, vec2(clamp(paletteT, 0.0, 1.0), 0.5)).r
+      : 1.0;
+    float amount = clamp(u_diffuseScatter / 100.0, 0.0, 1.0) * adaptiveFactor;
     return mix(color, paletteColor, amount);
   }
 
@@ -664,7 +669,13 @@
         vec2 cell = floor(globalCoord / max(u_diffuseGrain, 0.01));
         disp = diffuseHash(cell + seedOff);
       }
-      uv += disp * u_diffuseScatter / u_resolution;
+      float adaptiveLuminance = u_imageGradientEnabled
+        ? dot(sampleImageGradient(imageUV).rgb, vec3(0.299, 0.587, 0.114))
+        : dot(texture2D(u_gradientRamp, vec2(clamp(computeGradientT(uv), 0.0, 1.0), 0.5)).rgb, vec3(0.299, 0.587, 0.114));
+      float adaptiveFactor = u_diffuseAdaptiveEnabled
+        ? texture2D(u_diffuseCurve, vec2(clamp(adaptiveLuminance, 0.0, 1.0), 0.5)).r
+        : 1.0;
+      uv += disp * clamp(u_diffuseScatter, 0.0, 300.0) * adaptiveFactor / u_resolution;
     }
     // ── Slit scan (旧動作: Noise 後) ──────────────────────────────────────────
     // u_slitNoiseAfter=true のとき: 従来どおりノイズ・Diffuse 適用後にスリットを行う。

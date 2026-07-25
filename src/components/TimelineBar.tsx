@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState, useCallback, useLayoutEffect } from 'react';
+import { InputAngle } from 'tweeq';
 import { useGradientStore, STORE_DEFAULTS } from '../store/gradientStore';
 import { AnimationLoop } from '../lib/animation';
 import { GraphEditor, GRAPH_COLORS } from './GraphEditor';
@@ -9,6 +10,8 @@ import { getTrackMode, type Keyframe } from '../types/keyframe';
 import { Icon } from './Icon';
 import { getAnimationGroup } from '../lib/animationRegistry';
 import { AnimationPropertyControls } from './AnimationPropertyControls';
+import { fromTweeqAngle, toTweeqAngle } from '../lib/tweeqAngle';
+import { clampParameter, getParameterLimit } from '../lib/parameterLimits';
 import type { ExportStage } from '../adapters';
 import { exportStageLabel } from '../lib/exportProgress';
 
@@ -696,25 +699,24 @@ export function TimelineBar({ animLoopRef, onSeek, exportProgress = null, export
             Speed
             <input
               type="number"
-              min={0.01}
-              max={8}
-              step={0.01}
-              value={Number(animation.speed.toFixed(2))}
-              onChange={event => setAnimation({ speed: Math.max(0.01, Math.min(8, Number(event.target.value) || 0.01)) })}
+              min={getParameterLimit('animation.speed').min}
+              max={getParameterLimit('animation.speed').max}
+              step={getParameterLimit('animation.speed').step}
+              value={Number(clampParameter(animation.speed, STORE_DEFAULTS.animation.speed, getParameterLimit('animation.speed')).toFixed(2))}
+              onChange={event => setAnimation({ speed: clampParameter(Number(event.target.value), STORE_DEFAULTS.animation.speed, getParameterLimit('animation.speed')) })}
               className="h-5 w-12 border border-k-muted/60 bg-k-bg px-1 text-right text-[9px] tabular-nums text-k-text outline-none focus:border-fire"
             />
           </label>
           <label className="hidden items-center gap-1 text-[8px] uppercase tracking-wider text-tab-inactive xl:flex">
             Direction
-            <input
-              type="number"
-              min={0}
-              max={360}
-              step={1}
-              value={Math.round(animation.direction)}
-              onChange={event => setAnimation({ direction: ((Number(event.target.value) || 0) % 360 + 360) % 360 })}
-              className="h-5 w-12 border border-k-muted/60 bg-k-bg px-1 text-right text-[9px] tabular-nums text-k-text outline-none focus:border-fire"
-            />
+            <span className="tq-input-angle h-5 w-14" title="Animation Direction">
+              <InputAngle
+                value={toTweeqAngle(clampParameter(animation.direction, 0, getParameterLimit('animation.direction')))}
+                snap={15}
+                angleOffset={-90}
+                onChange={value => setAnimation({ direction: clampParameter(fromTweeqAngle(value), 0, getParameterLimit('animation.direction')) })}
+              />
+            </span>
           </label>
           <button
             type="button"

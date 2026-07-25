@@ -4,11 +4,11 @@ title: 画像グラデーション入力
 status: implemented
 owners: [maintainer]
 created: 2026-07-10
-updated: 2026-07-10
+updated: 2026-07-21
 depends_on: [SPEC-000]
-related_adrs: [ADR-0001, ADR-0003]
+related_adrs: [ADR-0001, ADR-0003, ADR-0010]
 related_code: [src/components/ImageGradientSourcePanel.tsx, src/components/PresetPanel.tsx, src/types/imageGradient.ts, src/lib/imageGradient.ts, src/lib/webgl.ts, src/shaders/gradient.frag.glsl]
-related_tests: [src/lib/imageGradient.test.ts]
+related_tests: [src/lib/imageGradient.test.ts, src/lib/effectShaderParity.test.ts, 'manual: Image Gradient protected V2 path']
 human_review: completed
 ---
 
@@ -44,7 +44,7 @@ human_review: completed
 
 `ImageGradientConfig`は`enabled`、`channel`、`anchorInfluence`を持つ永続設定とし、画像Canvasと表示名はAppのローカル状態に置く。`anchorInfluence`は0〜1で、新規設定・新規画像読込時は0.5とする。画像がないときは設定が有効でも通常グラデーションへ安全にフォールバックし、再読込を案内する。
 
-レンダラーはRaw Source Imageとは別テクスチャを使用する。画像グラデーションでは、変形前の出力座標を`imageUV`としてCover座標の画像サンプル、チャンネル値、入力アルファに使用する。手描き歪み、Iridescence、Radon、Slit、Noise、Diffuse、パターンDitherによる座標変形は`gradientUV`だけに適用し、既存アンカー計算の入力にする。ランプ入力値は`mix(imageT, anchorT, anchorInfluence)`とし、Rampの補間、カラー方式、繰返し、ミラーは混合後の値で既存実装を共有する。画像とランプのアルファは乗算する。
+レンダラーはRaw Source Imageとは別テクスチャを使用する。画像グラデーションでは、変形前の出力座標を`imageUV`としてCover座標の画像サンプル、チャンネル値、入力アルファに使用する。手描き歪み、Iridescence、Radon、Slit、Noise、Diffuse、パターンDitherによる座標変形は`gradientUV`だけに適用し、既存アンカー計算の入力にする。V2では元画像テクスチャと色場バッファを分離し、Stretch、Distort、Mirror、Kaleidoscope、Voronoi、Glass、Glass V2の再サンプリングを元画像へ適用しない。ランプ入力値は`mix(imageT, anchorT, anchorInfluence)`とし、Rampの補間、カラー方式、繰返し、ミラーは混合後の値で既存実装を共有する。画像とランプのアルファは乗算する。
 
 ## エラー・境界条件
 
@@ -60,6 +60,7 @@ human_review: completed
 - AC-003: 各対象UV歪みを有効にすると、画像の形・明暗・アルファ・Cover配置は維持したまま、アンカー配色だけが変化する。
 - AC-004: Preview、通常・タイル書出し、連番・動画出力で同じ描画経路を使用する。
 - AC-005: 設定だけを保存・再読込し、画像がない状態では安全にフォールバックする。
+- AC-006: V2の形状変形系レイヤーを有効にしても、元画像の形状・アルファ・Cover配置を変えず、色場だけを処理する。
 
 ## 検証計画
 

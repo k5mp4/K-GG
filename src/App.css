@@ -53,6 +53,15 @@
   color-scheme: dark;
 }
 
+/* Keep rectangular controls visually consistent with Tweeq's input radius. */
+.TqViewport button:not(.rounded-full):not([role='switch']) {
+  border-radius: var(--tq-radius-input);
+}
+
+.TqViewport .rounded-none {
+  border-radius: var(--tq-radius-input);
+}
+
 .TqViewport .tq-input-number {
   border: 1px solid color-mix(in srgb, var(--color-cream) 12%, transparent);
   border-radius: var(--tq-radius-input);

@@ -4,7 +4,7 @@ title: Tweeqによるパラメータ入力コントロール
 status: implemented
 owners: [maintainer]
 created: 2026-07-15
-updated: 2026-07-15
+updated: 2026-07-22
 depends_on: []
 related_adrs: [ADR-0006]
 related_code: [package.json, package-lock.json, vendor/tweeq/package.json, vendor/tweeq/index.es.js, vendor/tweeq/index.cjs, vendor/tweeq/style.css, src/main.tsx, src/App.css, src/components/SliderField.tsx, src/components/ColorPicker.tsx, src/lib/tweeqNumberFormat.ts, src/lib/tweeqNumberPosition.ts]
@@ -81,6 +81,7 @@ K-GGのパラメータ編集UIは、独自の`SliderField`、HTMLの数値入力
 - AC-006: ブラウザ版とTauri版でアプリを起動したとき、Tweeqのスタイルが表示され、既存のパネル・キャンバス・タイムラインの配置とWebGL描画が壊れない。
 - AC-007: 既存プリセットを読み込み、Tweeqの入力で変更して保存・再読込したとき、Tweeq導入前と同じ状態形式で復元される。
 - AC-008: `InputNumber`をフォーカスまたはドラッグしている間、現在値に対応する点線ガイドが表示され、値の変更に合わせて同じ位置へ追従する。フォーカスが外れた状態ではガイドを表示しない。
+- AC-009: Diceボタンを含む矩形コントロールがTweeqの入力面と同じ角丸トークンを使い、画面全体で角丸の見た目が揃う。
 
 ## 検証計画
 
@@ -92,6 +93,7 @@ K-GGのパラメータ編集UIは、独自の`SliderField`、HTMLの数値入力
 | AC-006 | `npm run build`、ブラウザ版とTauri版の手動確認 | `src/main.tsx`, `src/index.css` |
 | AC-007 | 既存プリセットテスト、手動で読込・変更・保存・再読込 | `src/lib/presetModel.ts`, 対象アダプター |
 | AC-008 | 値位置ヘルパーのユニットテスト、ブラウザでフォーカス・ドラッグ中の表示と追従を確認 | `src/lib/tweeqNumberPosition.test.ts`, `src/components/SliderField.tsx`, `src/App.css` |
+| AC-009 | `npm run build`、ブラウザでDiceボタンと矩形コントロールの角丸を確認 | `src/App.css`, 各エフェクトパネル |
 
 ## 移行・互換性
 

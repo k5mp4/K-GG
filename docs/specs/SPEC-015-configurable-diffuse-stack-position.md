@@ -4,11 +4,11 @@ title: DiffuseのEffect Stackレイヤー化
 status: implemented
 owners: [maintainer]
 created: 2026-07-12
-updated: 2026-07-18
+updated: 2026-07-21
 depends_on: [SPEC-013]
-related_adrs: [ADR-0005]
+related_adrs: [ADR-0005, ADR-0009]
 related_code: [src/types/distortion.ts, src/lib/effectPipeline.ts, src/lib/webgl.ts, src/shaders/postprocess/, src/components/PostprocessStackPanel.tsx, src/components/SlitScanPanel.tsx, src/store/gradientStore.ts]
-related_tests: [src/lib/effectPipeline.test.ts, src/lib/effectShaderParity.test.ts, src/store/gradientStore.effectPipeline.test.ts]
+related_tests: [src/lib/effectPipeline.test.ts, src/lib/effectShaderParity.test.ts, src/store/gradientStore.effectPipeline.test.ts, src/lib/diffuseCurve.test.ts]
 human_review: completed
 ---
 
