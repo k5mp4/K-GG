@@ -387,9 +387,10 @@ export function GraphEditor({
         } else if (e.button === 0) {
           const nf = frX(ev.clientX - rect.left);
           animLoopRef.current?.seekTo(nf);
-          setTimelineTime(nf);
-          setGraphTime(nf);
-          setCurrentTime(nf);
+          const snapped = animLoopRef.current?.currentNormalizedTime ?? nf;
+          setTimelineTime(snapped);
+          setGraphTime(snapped);
+          setCurrentTime(snapped);
           onSeek?.();
         }
       };
@@ -410,9 +411,10 @@ export function GraphEditor({
         } else if (e.button === 0) {
           const nf = frX(ev.clientX - rect.left);
           animLoopRef.current?.seekTo(nf);
-          setTimelineTime(nf);
-          setGraphTime(nf);
-          setCurrentTime(nf);
+          const snapped = animLoopRef.current?.currentNormalizedTime ?? nf;
+          setTimelineTime(snapped);
+          setGraphTime(snapped);
+          setCurrentTime(snapped);
           onSeek?.();
           onSelectKeyframes(new Set());
         }

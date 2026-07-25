@@ -44,4 +44,12 @@ describe('renderBridge export suspension', () => {
     expect(resumeCalls).toBe(1);
     expect(renderBridge.isAnimationSuspended()).toBe(false);
   });
+
+  it('keeps an initial play request until the animation loop exists', () => {
+    renderBridge.requestPlay();
+
+    expect(startCalls).toBe(1);
+    expect(renderBridge.consumePlayRequest()).toBe(true);
+    expect(renderBridge.consumePlayRequest()).toBe(false);
+  });
 });

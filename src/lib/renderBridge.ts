@@ -25,6 +25,7 @@ let _getTilePadding: TilePaddingFn | null = null;
 let _pauseAnimation: PauseAnimationFn | null = null;
 let _resumeAnimation: ResumeAnimationFn | null = null;
 let _animationSuspended = false;
+let _playOnNextLoop = false;
 
 export const renderBridge = {
   register(
@@ -64,6 +65,17 @@ export const renderBridge = {
   startAnimation(): void {
     if (_animationSuspended) return;
     _startAnim?.();
+  },
+  /** AnimationLoopがまだ生成されていない状態からの再生要求を保持する。 */
+  requestPlay(): void {
+    if (_animationSuspended) return;
+    _playOnNextLoop = true;
+    _startAnim?.();
+  },
+  consumePlayRequest(): boolean {
+    const requested = _playOnNextLoop;
+    _playOnNextLoop = false;
+    return requested;
   },
   /** Export中のプレビュー再生を止め、開始前に再生中だったかを返す。 */
   suspendAnimation(): boolean {

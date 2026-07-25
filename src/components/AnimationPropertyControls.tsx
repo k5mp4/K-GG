@@ -2,6 +2,7 @@ import { useGradientStore } from '../store/gradientStore';
 import { getTrackMode, type AnimationMode } from '../types/keyframe';
 import { isAutoCapableProperty } from '../lib/animationRegistry';
 import { getTimelineTime, setTimelineTime } from '../lib/timelineClock';
+import { getKeyframeEditTime } from '../lib/loopKeyframes';
 import { renderBridge } from '../lib/renderBridge';
 
 type Props = {
@@ -16,16 +17,26 @@ export function AnimationPropertyControls({ trackId, label, value, compact = fal
   const track = keyframeTracks[trackId];
   const mode = getTrackMode(track);
   const autoCapable = isAutoCapableProperty(trackId);
-  const displayTime = getTimelineTime(useGradientStore.getState().currentTime);
+  const loopEnabled = animation.previewLoop ?? true;
+  const displayTime = getKeyframeEditTime(
+    getTimelineTime(useGradientStore.getState().currentTime),
+    loopEnabled,
+  );
   const keyAtTime = track?.keyframes.find(keyframe => Math.abs(keyframe.time - displayTime) < 0.005);
 
   const changeMode = (nextMode: AnimationMode) => {
-    const time = getTimelineTime(useGradientStore.getState().currentTime);
+    const time = getKeyframeEditTime(
+      getTimelineTime(useGradientStore.getState().currentTime),
+      loopEnabled,
+    );
     setTrackMode(trackId, nextMode, { label, value, time });
   };
 
   const toggleKeyAtTime = () => {
-    const time = getTimelineTime(useGradientStore.getState().currentTime);
+    const time = getKeyframeEditTime(
+      getTimelineTime(useGradientStore.getState().currentTime),
+      loopEnabled,
+    );
     const currentTrack = useGradientStore.getState().keyframeTracks[trackId];
     const currentKey = currentTrack?.keyframes.find(keyframe => Math.abs(keyframe.time - time) < 0.005);
     if (currentKey) {
@@ -40,7 +51,10 @@ export function AnimationPropertyControls({ trackId, label, value, compact = fal
   };
 
   const moveToKey = (direction: -1 | 1) => {
-    const time = getTimelineTime(useGradientStore.getState().currentTime);
+    const time = getKeyframeEditTime(
+      getTimelineTime(useGradientStore.getState().currentTime),
+      loopEnabled,
+    );
     const keys = [...(useGradientStore.getState().keyframeTracks[trackId]?.keyframes ?? [])]
       .sort((a, b) => a.time - b.time);
     const target = direction < 0

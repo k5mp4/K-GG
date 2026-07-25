@@ -8,6 +8,7 @@ import type { AnimationMode, Keyframe, PropertyTrack } from '../types/keyframe';
 import { normalizePropertyTrack } from '../types/keyframe';
 import { computeAutoHandles } from '../lib/autoBezier';
 import { createAnimationTrack, getAnimationDefinition } from '../lib/animationRegistry';
+import { clampKeyframeTime } from '../lib/loopKeyframes';
 import { isPostprocessTimeAnimationActive } from '../lib/postprocessAnimation';
 import { createDefaultPostprocessStack, normalizePostprocessEffectStack } from '../lib/postprocessStack';
 import { createDefaultEffectPipeline, normalizeEffectPipelineConfig, updateEffectStackLayer } from '../lib/effectPipeline';
@@ -43,6 +44,10 @@ export type AnimationConfig = {
 };
 
 export const BEAT_SYNC_BEATS_PER_LOOP = 4;
+export const ANIMATION_DURATION_MIN = 1;
+export const ANIMATION_DURATION_MAX = 10;
+export const ANIMATION_SPEED_MIN = 1;
+export const ANIMATION_SPEED_MAX = 5;
 
 export function getBeatSyncDurationSeconds(bpm: number): number {
   const safeBpm = Math.max(1, Math.min(999, Number.isFinite(bpm) ? bpm : 120));
@@ -279,7 +284,7 @@ export const STORE_DEFAULTS = {
   animation: {
     enabled: false,
     previewLoop: true,
-    speed: 0.3,
+    speed: 1,
     intensity: 0.5,
     duration: 5,
     fps: 24 as 24 | 30 | 60,
@@ -707,7 +712,10 @@ export const useGradientStore = create<GradientStore>((set) => ({
     const animation = {
       ...nextAnimation,
       previewLoop: nextAnimation.previewLoop ?? true,
-      duration: beatSyncEnabled ? getBeatSyncDurationSeconds(beatSync?.bpm ?? 120) : nextAnimation.duration,
+      speed: Math.max(ANIMATION_SPEED_MIN, Math.min(ANIMATION_SPEED_MAX, Number.isFinite(nextAnimation.speed) ? nextAnimation.speed : ANIMATION_SPEED_MIN)),
+      duration: beatSyncEnabled
+        ? getBeatSyncDurationSeconds(beatSync?.bpm ?? 120)
+        : Math.max(ANIMATION_DURATION_MIN, Math.min(ANIMATION_DURATION_MAX, Number.isFinite(nextAnimation.duration) ? nextAnimation.duration : ANIMATION_DURATION_MIN)),
     };
     animation.direction = clampParameter(animation.direction, s.animation.direction, getParameterLimit('animation.direction'));
     return {
@@ -818,7 +826,7 @@ export const useGradientStore = create<GradientStore>((set) => ({
     if (mode === 'keys' && keyframes.length === 0 && typeof options?.value === 'number' && Number.isFinite(options.value)) {
       keyframes = [{
         id: crypto.randomUUID(),
-        time: Math.max(0, Math.min(1, options?.time ?? s.currentTime)),
+        time: clampKeyframeTime(options?.time ?? s.currentTime, s.animation.previewLoop ?? true),
         value: normalizeTrackValue(trackId, options?.value ?? 0),
         interpolation: 'linear',
       }];
@@ -839,7 +847,15 @@ export const useGradientStore = create<GradientStore>((set) => ({
   setKeyframe: (trackId, kf) => set((s) => {
     const track = s.keyframeTracks[trackId];
     if (!track) return s;
-    const nextKeyframes = track.keyframes.map(k => k.id === kf.id ? { ...k, ...kf, value: normalizeTrackValue(trackId, kf.value ?? k.value) } : k);
+    const nextKeyframes = track.keyframes.map(k => {
+      if (k.id !== kf.id) return k;
+      const next = { ...k, ...kf };
+      return {
+        ...next,
+        value: normalizeTrackValue(trackId, kf.value ?? k.value),
+        time: clampKeyframeTime(next.time, s.animation.previewLoop ?? true),
+      };
+    });
     return { keyframeTracks: { ...s.keyframeTracks, [trackId]: { ...track, mode: 'keys', enabled: true, keyframes: nextKeyframes } } };
   }),
   removeKeyframe: (trackId, kfId) => set((s) => {
@@ -855,7 +871,12 @@ export const useGradientStore = create<GradientStore>((set) => ({
   addKeyframe: (trackId, kf, options) => set((s) => {
     const track = s.keyframeTracks[trackId];
     if (!track) return s;
-    const newKf: Keyframe = { ...kf, value: normalizeTrackValue(trackId, kf.value), id: crypto.randomUUID() };
+    const newKf: Keyframe = {
+      ...kf,
+      id: crypto.randomUUID(),
+      value: normalizeTrackValue(trackId, kf.value),
+      time: clampKeyframeTime(kf.time, s.animation.previewLoop ?? true),
+    };
     let nextKeyframes = [...track.keyframes, newKf].sort((a, b) => a.time - b.time);
     
     // bezier キーフレームが含まれ、かつ preserveHandles が false の場合のみハンドルを自動計算

@@ -1,5 +1,5 @@
 ---
-id: SPEC-031
+id: SPEC-034
 title: Noise DistortionへのCaustics追加
 status: implemented
 owners: [maintainer]
@@ -12,7 +12,7 @@ related_tests: [src/store/gradientStore.effectPipeline.test.ts, src/lib/sceneEva
 human_review: completed
 ---
 
-# SPEC-031: Noise DistortionへのCaustics追加
+# SPEC-034: Noise DistortionへのCaustics追加
 
 ## 背景・問題
 

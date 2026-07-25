@@ -22,6 +22,7 @@ import { getActivePostprocessStackLayers } from './postprocessStack';
 import { canRenderV2Direct, getV2RenderPlan } from './effectPipeline';
 import { buildDiffuseCurveLut, normalizeDiffuseCurve } from './diffuseCurve';
 import { clampParameter, getParameterLimit } from './parameterLimits';
+import { getAnimationDirectionVector } from './animationDirection';
 
 export { SHADER_VERSION };
 
@@ -1414,8 +1415,8 @@ function drawPostprocessPass(
   gl.uniform1f(ctx.postprocessUniforms.u_noiseLoopPeriod, Math.max(Math.abs(noiseLoopPeriod), 0.0001));
   gl.uniform1i(ctx.postprocessUniforms.u_noiseLoopMode, noiseDistortion.noiseLoopMode === 'seamless' ? 1 : 0);
   gl.uniform1f(ctx.postprocessUniforms.u_noiseLoopBlend, Math.min(Math.max(noiseDistortion.noiseLoopBlend ?? 0.75, 0.001), 1));
-  const noiseDirectionRadians = (animDirectionDegrees * Math.PI) / 180;
-  gl.uniform2f(ctx.postprocessUniforms.u_animDir, -Math.sin(noiseDirectionRadians), -Math.cos(noiseDirectionRadians));
+  const [postprocessAnimDirX, postprocessAnimDirY] = getAnimationDirectionVector(animDirectionDegrees);
+  gl.uniform2f(ctx.postprocessUniforms.u_animDir, postprocessAnimDirX, postprocessAnimDirY);
   gl.uniform1f(ctx.postprocessUniforms.u_dwInitVal, noiseDistortion.dwInitVal);
   gl.uniform1f(ctx.postprocessUniforms.u_dwInitAmp, noiseDistortion.dwInitAmp);
   gl.uniform1f(ctx.postprocessUniforms.u_dwRotAngle1, noiseDistortion.dwRotAngle1);
@@ -2091,8 +2092,8 @@ export function render(
   gl.uniform1i(uniforms.u_phasorDirectionMode, phasorDirectionMode[noiseDistortion.phasorDirectionMode] ?? 0);
   gl.uniform1f(uniforms.u_time, time);
   gl.uniform1f(uniforms.u_noiseLoopPeriod, Math.max(Math.abs(noiseLoopPeriod), 0.0001));
-  const animRad = (animDirection * Math.PI) / 180;
-  gl.uniform2f(uniforms.u_animDir, -Math.sin(animRad), -Math.cos(animRad));
+  const [animDirX, animDirY] = getAnimationDirectionVector(animDirection);
+  gl.uniform2f(uniforms.u_animDir, animDirX, animDirY);
   const diffuseScale = diffuseResolutionScale(width, height);
   gl.uniform1i(uniforms.u_diffuseEnabled, generatorColorFieldEnabled && diffuse.enabled ? 1 : 0);
   gl.uniform1i(uniforms.u_diffuseMode, DIFFUSE_MODE_MAP[diffuse.mode ?? 'block'] ?? 0);

@@ -4,11 +4,11 @@ title: 意味的角度入力のInputAngle統一
 status: implemented
 owners: [maintainer]
 created: 2026-07-21
-updated: 2026-07-21
+updated: 2026-07-25
 depends_on: [SPEC-021, SPEC-022]
 related_adrs: [ADR-0006, ADR-0009]
-related_code: [src/components/SliderField.tsx, src/lib/tweeqAngle.ts, src/lib/parameterLimits.ts, src/components/GradientRamp.tsx, src/components/NoiseDistortionPanel.tsx, src/components/SlitScanPanel.tsx, src/components/NormalMapPanel.tsx, src/components/RadonPanel.tsx, src/components/IridescencePanel.tsx, src/components/PostprocessPanel.tsx, src/components/TimelineBar.tsx]
-related_tests: [src/lib/tweeqAngle.test.ts, src/lib/parameterLimits.test.ts, 'manual: semantic angle controls']
+related_code: [src/components/SliderField.tsx, src/lib/tweeqAngle.ts, src/lib/parameterLimits.ts, src/lib/animationDirection.ts, src/lib/webgl.ts, src/components/GradientRamp.tsx, src/components/NoiseDistortionPanel.tsx, src/components/SlitScanPanel.tsx, src/components/NormalMapPanel.tsx, src/components/RadonPanel.tsx, src/components/IridescencePanel.tsx, src/components/PostprocessPanel.tsx, src/components/TimelineBar.tsx]
+related_tests: [src/lib/tweeqAngle.test.ts, src/lib/parameterLimits.test.ts, src/lib/animationDirection.test.ts, 'manual: semantic angle controls']
 human_review: completed
 ---
 
@@ -32,6 +32,7 @@ Gradient Angle、SlitのAngle/Offset Angle/モード別方向、NoiseのDomain W
 - AC-002: ダイヤル、直接入力、キーフレーム、プリセット読込が既存の状態・描画単位と互換する。
 - AC-003: Domain Warpのラジアン保存値が度数UIと相互変換される。
 - AC-004: 負値・多回転値・非有限値は安全に正規化される。
+- AC-005: Animation DirectionはUIと描画方向が同じ時計回りになり、90°設定時はノイズが右方向へ進む。
 
 ## 移行・互換性
 

@@ -1,5 +1,5 @@
 ---
-id: SPEC-032
+id: SPEC-035
 title: Noise DistortionへのPhasor Lines追加
 status: implemented
 owners: [maintainer]
@@ -12,7 +12,7 @@ related_tests: [src/store/gradientStore.effectPipeline.test.ts, src/lib/effectSh
 human_review: completed
 ---
 
-# SPEC-032: Noise DistortionへのPhasor Lines追加
+# SPEC-035: Noise DistortionへのPhasor Lines追加
 
 ## 背景・問題
 
