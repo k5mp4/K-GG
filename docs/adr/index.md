@@ -22,6 +22,7 @@ ADRは、複数の機能や将来の実装を拘束する重要な技術判断�
 | ADR-0010 | [Image Gradient Sourceは画像テクスチャと色場を分離して描画する](./0010-image-gradient-color-field-rendering.md) | accepted |
 | ADR-0011 | [Tweeq vendorを固定上流ソースから最小構成で生成する](./0011-tweeq-vendor-source-and-api.md) | accepted |
 | ADR-0012 | [型付き辞書と意味的アイコンをUI表記の基盤とする](./0012-typed-localization-and-icon-semantics.md) | accepted |
+| ADR-0013 | [Mesh Gradationを単一Coons Patchの構造化データとして保持する](./0013-mesh-gradient-data-model.md) | accepted |
 
 ## 作成基準
 

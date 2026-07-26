@@ -352,7 +352,7 @@ type GradientRampProps = {
 
 export function GradientRamp({ overlayImageElement = null, showHeader = true }: GradientRampProps = {}) {
   const { t } = useLanguage();
-  const { gradient, setGradient, isSlitAdjusting, selectedStops, setSelectedStops, keyframeTracks, setKeyframeTracks, addKeyframe, setKeyframe, currentTime } = useGradientStore();
+  const { gradient, setGradient, resetMeshGradient, isSlitAdjusting, selectedStops, setSelectedStops, keyframeTracks, setKeyframeTracks, addKeyframe, setKeyframe, currentTime } = useGradientStore();
   const selectedIdxs = new Set(selectedStops);
   const [selectedOpacityStops, setSelectedOpacityStops] = useState<number[]>([]);
   const selectedOpacityIdxs = new Set(selectedOpacityStops);
@@ -1670,6 +1670,10 @@ export function GradientRamp({ overlayImageElement = null, showHeader = true }: 
               icon="restart"
               label={t('common.reset')}
               onClick={() => {
+                if (gradient.gradientType === 'mesh') {
+                  resetMeshGradient();
+                  return;
+                }
                 const anchors = GRADIENT_ANCHOR_DEFAULTS[gradient.gradientType ?? 'linear'];
                 setGradient({
                   anchors,
@@ -1679,6 +1683,10 @@ export function GradientRamp({ overlayImageElement = null, showHeader = true }: 
                 });
               }}
               onTouchEnd={(e) => runTouchAction(e, () => {
+                if (gradient.gradientType === 'mesh') {
+                  resetMeshGradient();
+                  return;
+                }
                 const anchors = GRADIENT_ANCHOR_DEFAULTS[gradient.gradientType ?? 'linear'];
                 setGradient({
                   anchors,

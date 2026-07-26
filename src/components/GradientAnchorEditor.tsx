@@ -5,6 +5,7 @@ import { getKeyframeEditTime } from '../lib/loopKeyframes';
 import { getTrackMode } from '../types/keyframe';
 import { Icon } from './Icon';
 import { getColorAtPosition } from '../lib/gradientRampUtils';
+import { MeshGradientEditor } from './MeshGradientEditor';
 
 // デバッグ用：ブラウザコンソールから調整可能
 const SNAP_CONFIG = {
@@ -290,6 +291,7 @@ export function GradientAnchorEditor({ width, height, visible = true }: Props) {
   const showKfButton = animation.enabled;
 
   if (!visible) return null;
+  if (gradientType === 'mesh') return <MeshGradientEditor width={width} height={height} visible={visible} />;
 
   // アニメーション再生中はキーフレームを補間した位置を使用
   const effectiveAnchors: typeof anchors = anchors.map((anchor, idx) => {

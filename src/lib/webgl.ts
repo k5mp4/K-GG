@@ -2,6 +2,7 @@ import type { GradientConfig } from '../types/gradient';
 import type { NoiseDistortionConfig, DiffuseConfig, SlitScanConfig, StretchConfig, NormalMapConfig, RadonConfig, IridescenceConfig, ManualDistortConfig, PostprocessConfig, MatcapConfig, PostprocessStackKind, EffectPipelineConfig } from '../types/distortion';
 import { IMAGE_GRADIENT_DEFAULTS, type ImageGradientConfig } from '../types/imageGradient';
 import { GRADIENT_ANCHOR_DEFAULTS, defaultBezierControlsForAnchors } from '../store/gradientStore';
+import { normalizeMeshGradientConfig, type MeshGradientConfig } from '../types/gradient';
 import { buildRampTextureData, RAMP_TEX_WIDTH } from './gradientRampUtils';
 import {
   getInitialProgramSource,
@@ -21,6 +22,7 @@ import { isGlassOpticallyIdentity, normalizeGlassRenderParameters } from './glas
 import { getActivePostprocessStackLayers } from './postprocessStack';
 import { canRenderV2Direct, getV2RenderPlan } from './effectPipeline';
 import { buildDiffuseBezierLut, normalizeDiffuseBezier } from './diffuseCurve';
+import { buildMeshGradientField, MESH_FIELD_SIZE, MESH_FIELD_SUBDIVISIONS } from './meshGradientField';
 import { noiseAngleDegreesForShader, noiseAngleRadiansForShader } from './noiseAngle';
 import { clampParameter, getParameterLimit } from './parameterLimits';
 import { getAnimationDirectionVector } from './animationDirection';
@@ -46,6 +48,8 @@ export type WebGLContext = {
   generatorProgram: WebGLProgram | null;
   generatorUniforms: Record<string, WebGLUniformLocation | null>;
   gradientRampTexture: WebGLTexture; // TEXTURE1: グラデーションランプ
+  meshGradientTexture: WebGLTexture; // TEXTURE2: 前方向テッセレーション済みMeshフィールド
+  meshGradientTextureSignature: string;
   diffuseCurveTexture: WebGLTexture; // TEXTURE8: Diffuse輝度カーブLUT
   diffuseCurveSignature: string;
   diffuseHistogramAt: number;
@@ -305,6 +309,7 @@ export async function initWebGL(canvas: HTMLCanvasElement): Promise<WebGLContext
     u_diffuseAdaptiveEnabled: gl.getUniformLocation(program, 'u_diffuseAdaptiveEnabled'),
     u_diffuseCurve: gl.getUniformLocation(program, 'u_diffuseCurve'),
     u_gradientRamp: gl.getUniformLocation(program, 'u_gradientRamp'),
+    u_meshGradient: gl.getUniformLocation(program, 'u_meshGradient'),
     u_rampRepeat: gl.getUniformLocation(program, 'u_rampRepeat'),
     u_sourceImageEnabled: gl.getUniformLocation(program, 'u_sourceImageEnabled'),
     u_sourceImage: gl.getUniformLocation(program, 'u_sourceImage'),
@@ -380,6 +385,19 @@ export async function initWebGL(canvas: HTMLCanvasElement): Promise<WebGLContext
     u_gradAnchor3: gl.getUniformLocation(program, 'u_gradAnchor3'),
     u_gradBezierCp0: gl.getUniformLocation(program, 'u_gradBezierCp0'),
     u_gradBezierCp1: gl.getUniformLocation(program, 'u_gradBezierCp1'),
+    u_meshCorner0: gl.getUniformLocation(program, 'u_meshCorner0'),
+    u_meshCorner1: gl.getUniformLocation(program, 'u_meshCorner1'),
+    u_meshCorner2: gl.getUniformLocation(program, 'u_meshCorner2'),
+    u_meshCorner3: gl.getUniformLocation(program, 'u_meshCorner3'),
+    u_meshBottomCp0: gl.getUniformLocation(program, 'u_meshBottomCp0'),
+    u_meshBottomCp1: gl.getUniformLocation(program, 'u_meshBottomCp1'),
+    u_meshRightCp0: gl.getUniformLocation(program, 'u_meshRightCp0'),
+    u_meshRightCp1: gl.getUniformLocation(program, 'u_meshRightCp1'),
+    u_meshTopCp0: gl.getUniformLocation(program, 'u_meshTopCp0'),
+    u_meshTopCp1: gl.getUniformLocation(program, 'u_meshTopCp1'),
+    u_meshLeftCp0: gl.getUniformLocation(program, 'u_meshLeftCp0'),
+    u_meshLeftCp1: gl.getUniformLocation(program, 'u_meshLeftCp1'),
+    u_meshColorPositions: gl.getUniformLocation(program, 'u_meshColorPositions'),
     u_gradDir: gl.getUniformLocation(program, 'u_gradDir'),
     u_tileOffset: gl.getUniformLocation(program, 'u_tileOffset'),
     u_tileSize: gl.getUniformLocation(program, 'u_tileSize'),
@@ -396,6 +414,13 @@ export async function initWebGL(canvas: HTMLCanvasElement): Promise<WebGLContext
   const initRamp = new Uint8Array(256 * 4);
   for (let i = 0; i < 256; i++) { initRamp[i * 4] = i; initRamp[i * 4 + 1] = i; initRamp[i * 4 + 2] = i; initRamp[i * 4 + 3] = 255; }
   gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, 256, 1, 0, gl.RGBA, gl.UNSIGNED_BYTE, initRamp);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+  const meshGradientTexture = gl.createTexture()!;
+  gl.bindTexture(gl.TEXTURE_2D, meshGradientTexture);
+  gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, MESH_FIELD_SIZE, MESH_FIELD_SIZE, 0, gl.RGBA, gl.UNSIGNED_BYTE, new Uint8Array(MESH_FIELD_SIZE * MESH_FIELD_SIZE * 4));
   gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
   gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
   gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
@@ -444,7 +469,7 @@ export async function initWebGL(canvas: HTMLCanvasElement): Promise<WebGLContext
   const { fbo: prismScratchFbo, tex: prismScratchTexture } = createFboWithTexture(gl);
   const { fbo: prismBlurFbo, tex: prismBlurTexture } = createFboWithTexture(gl);
   const { fbo: prismGlowFbo, tex: prismGlowTexture } = createFboWithTexture(gl);
-  const ctx: WebGLContext = { gl, gpuDiagnostics, renderOptimization, program, uniforms, generatorProgram: null, generatorUniforms: {}, gradientRampTexture, diffuseCurveTexture, diffuseCurveSignature: '', diffuseHistogramAt: 0, manualDistortTexture, manualDistortDisplacement: null, manualDistortSmoothMask: null, manualDistortMapResolution: 0, sourceImageTexture, sourceImageCanvas: null, imageGradientTexture, imageGradientSource: null, imageMaskTexture, imageMaskSource: null, normalMapProgram: null, normalMapUniforms: {}, gradFbo, gradTexture, blurProgram: null, blurUniforms: {}, stretchProgram: null, stretchUniforms: {}, stackCoreProgram: null, stackCoreUniforms: {}, noiseStackProgram: null, noiseStackUniforms: {}, glassProgram: null, glassUniforms: {}, glassFallbackActive: false, glassV2Program: null, glassV2Uniforms: {}, glassV2FallbackActive: false, prismProgram: null, prismUniforms: {}, postprocessProgram: null, postprocessUniforms: {}, prismCompositeProgram: null, prismCompositeUniforms: {}, particleProgram: null, particleUniforms: {}, particleVao: null, particleQuadBuffer: null, particleInstanceBuffer: null, particleInstanceCount: 0, particleInstanceSeed: Number.NaN, normalFbo, normalTexture, hBlurFbo, hBlurTexture, postprocessFboA, postprocessTextureA, postprocessFboB, postprocessTextureB, prismScratchFbo, prismScratchTexture, prismBlurFbo, prismBlurTexture, prismGlowFbo, prismGlowTexture, fboSize: [0, 0], v2CoreFboSize: [0, 0], shaderCompileExt: ext, lazyProgramState: createLazyProgramState(), hasPresentedFrame: false };
+  const ctx: WebGLContext = { gl, gpuDiagnostics, renderOptimization, program, uniforms, generatorProgram: null, generatorUniforms: {}, gradientRampTexture, meshGradientTexture, meshGradientTextureSignature: '', diffuseCurveTexture, diffuseCurveSignature: '', diffuseHistogramAt: 0, manualDistortTexture, manualDistortDisplacement: null, manualDistortSmoothMask: null, manualDistortMapResolution: 0, sourceImageTexture, sourceImageCanvas: null, imageGradientTexture, imageGradientSource: null, imageMaskTexture, imageMaskSource: null, normalMapProgram: null, normalMapUniforms: {}, gradFbo, gradTexture, blurProgram: null, blurUniforms: {}, stretchProgram: null, stretchUniforms: {}, stackCoreProgram: null, stackCoreUniforms: {}, noiseStackProgram: null, noiseStackUniforms: {}, glassProgram: null, glassUniforms: {}, glassFallbackActive: false, glassV2Program: null, glassV2Uniforms: {}, glassV2FallbackActive: false, prismProgram: null, prismUniforms: {}, postprocessProgram: null, postprocessUniforms: {}, prismCompositeProgram: null, prismCompositeUniforms: {}, particleProgram: null, particleUniforms: {}, particleVao: null, particleQuadBuffer: null, particleInstanceBuffer: null, particleInstanceCount: 0, particleInstanceSeed: Number.NaN, normalFbo, normalTexture, hBlurFbo, hBlurTexture, postprocessFboA, postprocessTextureA, postprocessFboB, postprocessTextureB, prismScratchFbo, prismScratchTexture, prismBlurFbo, prismBlurTexture, prismGlowFbo, prismGlowTexture, fboSize: [0, 0], v2CoreFboSize: [0, 0], shaderCompileExt: ext, lazyProgramState: createLazyProgramState(), hasPresentedFrame: false };
   return ctx;
 }
 
@@ -1107,7 +1132,7 @@ export function hexToRgb(hex: string): [number, number, number] {
 }
 
 export const NOISE_TYPE_MAP = { simplex: 0, fbm: 1, voronoi: 2, curl: 3, domain_warp_anim: 4, seamless: 5, ridged_fbm: 6, ae_fractal: 7, fast_curl: 8, caustics: 9, phasor: 10 } as const;
-const GRADIENT_TYPE_MAP = { linear: 0, radial: 1, fourcolor: 2, diamond: 3, angle: 4, bezier: 5 } as const;
+export const GRADIENT_TYPE_MAP = { linear: 0, radial: 1, fourcolor: 2, diamond: 3, angle: 4, bezier: 5, mesh: 6 } as const;
 const DIFFUSE_MODE_MAP = { block: 0, smooth: 1, dither: 2 } as const;
 const PARTICLE_EMITTER_TYPE_MAP = { field: 0, line: 1, burst: 2, point: 3 } as const;
 
@@ -1116,9 +1141,36 @@ function finiteClamp(value: number | undefined, fallback: number, min: number, m
   return Math.min(max, Math.max(min, value));
 }
 
-function uploadGradientRampTexture(ctx: WebGLContext, gradient: GradientConfig): void {
-  const { gl } = ctx;
-  const data = buildRampTextureData(
+export function applyMeshGradientUniforms(
+  gl: WebGL2RenderingContext,
+  uniforms: Record<string, WebGLUniformLocation | null>,
+  config: MeshGradientConfig | undefined,
+): void {
+  const mesh = normalizeMeshGradientConfig(config);
+  const setPoint = (name: string, point: [number, number]) => gl.uniform2f(uniforms[name], point[0], point[1]);
+  setPoint('u_meshCorner0', mesh.corners[0]);
+  setPoint('u_meshCorner1', mesh.corners[1]);
+  setPoint('u_meshCorner2', mesh.corners[2]);
+  setPoint('u_meshCorner3', mesh.corners[3]);
+  setPoint('u_meshBottomCp0', mesh.handles.bottom[0]);
+  setPoint('u_meshBottomCp1', mesh.handles.bottom[1]);
+  setPoint('u_meshRightCp0', mesh.handles.right[0]);
+  setPoint('u_meshRightCp1', mesh.handles.right[1]);
+  setPoint('u_meshTopCp0', mesh.handles.top[0]);
+  setPoint('u_meshTopCp1', mesh.handles.top[1]);
+  setPoint('u_meshLeftCp0', mesh.handles.left[0]);
+  setPoint('u_meshLeftCp1', mesh.handles.left[1]);
+  gl.uniform4f(
+    uniforms.u_meshColorPositions,
+    mesh.colorPositions[0],
+    mesh.colorPositions[1],
+    mesh.colorPositions[2],
+    mesh.colorPositions[3],
+  );
+}
+
+function buildGradientRampData(gradient: GradientConfig): Uint8Array {
+  return buildRampTextureData(
     gradient.stops,
     gradient.rampInterpolation,
     gradient.rampMirror ?? false,
@@ -1127,9 +1179,38 @@ function uploadGradientRampTexture(ctx: WebGLContext, gradient: GradientConfig):
     gradient.rampVariable ?? 0,
     gradient.rampRepeat ?? 1,
   );
+}
+
+function uploadGradientRampTexture(ctx: WebGLContext, data: Uint8Array): void {
+  const { gl } = ctx;
   gl.activeTexture(gl.TEXTURE1);
   gl.bindTexture(gl.TEXTURE_2D, ctx.gradientRampTexture);
   gl.texSubImage2D(gl.TEXTURE_2D, 0, 0, 0, RAMP_TEX_WIDTH, 1, gl.RGBA, gl.UNSIGNED_BYTE, data);
+}
+
+function meshFieldSignature(mesh: MeshGradientConfig, rampData: Uint8Array): string {
+  let hash = 2166136261;
+  for (let index = 0; index < rampData.length; index += 1) {
+    hash ^= rampData[index];
+    hash = Math.imul(hash, 16777619);
+  }
+  return `${JSON.stringify(mesh)}:${hash >>> 0}:${MESH_FIELD_SIZE}:${MESH_FIELD_SUBDIVISIONS}`;
+}
+
+function uploadMeshGradientTexture(ctx: WebGLContext, gradient: GradientConfig, rampData: Uint8Array): void {
+  const mesh = normalizeMeshGradientConfig(gradient.mesh);
+  const signature = meshFieldSignature(mesh, rampData);
+  if (ctx.meshGradientTextureSignature === signature) return;
+  const field = buildMeshGradientField(mesh, rampData, RAMP_TEX_WIDTH, {
+    width: MESH_FIELD_SIZE,
+    height: MESH_FIELD_SIZE,
+    subdivisions: MESH_FIELD_SUBDIVISIONS,
+  });
+  const { gl } = ctx;
+  gl.activeTexture(gl.TEXTURE2);
+  gl.bindTexture(gl.TEXTURE_2D, ctx.meshGradientTexture);
+  gl.texSubImage2D(gl.TEXTURE_2D, 0, 0, 0, MESH_FIELD_SIZE, MESH_FIELD_SIZE, gl.RGBA, gl.UNSIGNED_BYTE, field);
+  ctx.meshGradientTextureSignature = signature;
 }
 
 function uploadDiffuseCurveTexture(ctx: WebGLContext, diffuse: Pick<DiffuseConfig, 'luminanceBezier'>): void {
@@ -1945,7 +2026,7 @@ export function render(
   // passes. Waiting for the Legacy generator here can otherwise leave every
   // V2 layer visually stuck at Base-only while it compiles or times out.
   if (!isV2Pipeline || imageGradientProtected) requestLazyProgram(ctx, 'generator');
-  const { gl, program, uniforms, gradientRampTexture, sourceImageTexture, imageGradientTexture, imageMaskTexture } = ctx;
+  const { gl, program, uniforms, gradientRampTexture, meshGradientTexture, sourceImageTexture, imageGradientTexture, imageMaskTexture } = ctx;
   gradient = { ...gradient, angle: clampParameter(gradient.angle, 0, getParameterLimit('gradient.angle')) };
   noiseDistortion = {
     ...noiseDistortion,
@@ -2027,6 +2108,7 @@ export function render(
   const bezierControls = gradient.bezierControls ?? defaultBezierControlsForAnchors(anchors);
   gl.uniform2f(uniforms.u_gradBezierCp0, bezierControls[0][0], bezierControls[0][1]);
   gl.uniform2f(uniforms.u_gradBezierCp1, bezierControls[1][0], bezierControls[1][1]);
+  applyMeshGradientUniforms(gl, uniforms, gradient.mesh);
 
   // グラデーション方向ベクトル（ベジェワープ・Radon用）
   let gradDirX: number, gradDirY: number;
@@ -2110,11 +2192,16 @@ export function render(
   gl.bindTexture(gl.TEXTURE_2D, ctx.diffuseCurveTexture);
   gl.uniform1i(uniforms.u_diffuseCurve, 8);
   gl.uniform1i(uniforms.u_diffuseAdaptiveEnabled, diffuse.adaptiveEnabled ? 1 : 0);
-  uploadGradientRampTexture(ctx, gradient);
+  const rampData = buildGradientRampData(gradient);
+  uploadGradientRampTexture(ctx, rampData);
+  if ((gradient.gradientType ?? 'linear') === 'mesh') uploadMeshGradientTexture(ctx, gradient, rampData);
   if (diffuse.enabled && !isV2Pipeline) publishDiffuseInputHistogram(ctx, gradient, imageGradientSource ?? sourceImageCanvas);
   gl.activeTexture(gl.TEXTURE1);
   gl.bindTexture(gl.TEXTURE_2D, gradientRampTexture);
   gl.uniform1i(uniforms.u_gradientRamp, 1);
+  gl.activeTexture(gl.TEXTURE2);
+  gl.bindTexture(gl.TEXTURE_2D, meshGradientTexture);
+  gl.uniform1i(uniforms.u_meshGradient, 2);
   gl.uniform1f(uniforms.u_rampRepeat, Math.max(1, Math.min(20, Math.round(gradient.rampRepeat ?? 1))));
   gl.activeTexture(gl.TEXTURE4);
   gl.bindTexture(gl.TEXTURE_2D, sourceImageTexture);

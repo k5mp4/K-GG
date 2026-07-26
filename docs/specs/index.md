@@ -50,6 +50,7 @@ title: 機能仕様
 | SPEC-037 | [日英切替とアイコン中心UI](./SPEC-037-bilingual-icon-ui.md) | implemented |
 | SPEC-038 | [UI英語表記・角度描画・キャンバスサイズ操作の回帰修正](./SPEC-038-ui-language-rotation-and-wheel-safety.md) | implemented |
 | SPEC-039 | [Tweeq入力UIの安定化とローカル開発サーバー再利用](./SPEC-039-tweeq-input-ui-and-local-dev-recovery.md) | implemented |
+| SPEC-040 | [Mesh Gradation（単一Coons Patch）](./SPEC-040-mesh-gradation.md) | implemented |
 
 ## 新しい仕様の作り方
 

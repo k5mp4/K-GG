@@ -8,7 +8,7 @@ import type {
   StretchConfig,
   NoiseDistortionConfig,
 } from '../types/distortion';
-import type { GradientConfig } from '../types/gradient';
+import { normalizeMeshGradientConfig, type GradientConfig } from '../types/gradient';
 import type { PropertyTrack } from '../types/keyframe';
 import { getTrackMode } from '../types/keyframe';
 import { interpolateKeyframesWithLoop } from './loopKeyframes';
@@ -47,11 +47,21 @@ function applyGradientTracks(
   const stopOverrides = new Map<string, { position?: number; r?: number; g?: number; b?: number }>();
   const opacityOverrides = new Map<string, { position?: number; opacity?: number }>();
   const anchorOverrides = new Map<number, { x?: number; y?: number }>();
+  const meshCornerOverrides = new Map<number, { x?: number; y?: number }>();
 
   for (const track of Object.values(tracks)) {
     if (!isKeysTrack(track)) continue;
     const value = interpolateKeyframesWithLoop(time, track.keyframes, loopEnabled);
     const parts = track.propertyId.split('.');
+    if (parts[0] === 'mesh' && parts[1] === 'corner' && parts.length === 4) {
+      const index = Number(parts[2]);
+      if (!Number.isInteger(index) || index < 0 || index > 3) continue;
+      const current = meshCornerOverrides.get(index) ?? {};
+      if (parts[3] === 'x') current.x = value;
+      if (parts[3] === 'y') current.y = value;
+      meshCornerOverrides.set(index, current);
+      continue;
+    }
     if (parts.length !== 3) continue;
 
     if (parts[0] === 'gradientStop') {
@@ -125,6 +135,23 @@ function applyGradientTracks(
       }) as typeof result.anchors,
     };
   }
+  if (meshCornerOverrides.size > 0 && result.mesh) {
+    const mesh = normalizeMeshGradientConfig(result.mesh);
+    result = {
+      ...result,
+      mesh: {
+        ...mesh,
+        corners: mesh.corners.map((corner, index) => {
+          const override = meshCornerOverrides.get(index);
+          if (!override) return corner;
+          return [
+            override.x === undefined ? corner[0] : override.x,
+            override.y === undefined ? corner[1] : override.y,
+          ] as [number, number];
+        }) as typeof mesh.corners,
+      },
+    };
+  }
   return result;
 }
 
@@ -160,7 +187,7 @@ function trackMode(
 }
 
 function propertyOwnerEnabled(state: LatestState, propertyId: string): boolean {
-  if (propertyId.startsWith('gradientStop.') || propertyId.startsWith('opacityStop.') || propertyId.startsWith('gradientAnchor.')) return true;
+  if (propertyId.startsWith('gradientStop.') || propertyId.startsWith('opacityStop.') || propertyId.startsWith('gradientAnchor.') || propertyId.startsWith('mesh.corner.')) return true;
   if (propertyId.startsWith('noiseDistortion.')) return state.noiseDistortion.enabled;
   if (propertyId.startsWith('diffuse.')) return state.diffuse.enabled;
   if (propertyId.startsWith('slitScan.')) return state.slitScan.enabled;

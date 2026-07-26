@@ -15,7 +15,7 @@ import type {
 import { createDefaultEffectPipeline, normalizeEffectPipelineConfig } from './effectPipeline';
 import { resolveDiffuseBezier } from './diffuseCurve';
 import type { ImageGradientConfig } from '../types/imageGradient';
-import type { GradientConfig } from '../types/gradient';
+import { normalizeMeshGradientConfig, type GradientConfig } from '../types/gradient';
 import type { PropertyTrack } from '../types/keyframe';
 import type { UserColorPalette } from './colorPalettes';
 
@@ -65,6 +65,9 @@ export function makePreset(
     luminanceBezier: resolveDiffuseBezier(state.diffuse.luminanceBezier, state.diffuse.luminanceCurve),
   };
   delete diffuse.luminanceCurve;
+  const gradient = state.gradient?.gradientType === 'mesh'
+    ? { ...state.gradient, mesh: normalizeMeshGradientConfig(state.gradient.mesh) }
+    : state.gradient;
   return {
     id: Math.random().toString(36).slice(2),
     name,
@@ -74,6 +77,7 @@ export function makePreset(
     ...(metadata.thumbnail ? { thumbnail: metadata.thumbnail } : {}),
     state: {
       ...state,
+      gradient,
       diffuse,
       effectPipeline: state.effectPipeline
         ? normalizeEffectPipelineConfig(state.effectPipeline)

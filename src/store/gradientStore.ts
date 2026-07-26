@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import type { GradientConfig } from '../types/gradient';
+import { DEFAULT_MESH_GRADIENT, normalizeMeshGradientConfig, type GradientConfig, type MeshEdge, type Vec2Tuple } from '../types/gradient';
 import type { NoiseDistortionConfig, DiffuseConfig, SlitScanConfig, StretchConfig, NormalMapConfig, RadonConfig, IridescenceConfig, ManualDistortConfig, PostprocessConfig, MatcapConfig, HistogramConfig, EffectPipelineConfig } from '../types/distortion';
 import type { ImageGradientConfig } from '../types/imageGradient';
 import { IMAGE_GRADIENT_DEFAULTS, normalizeImageGradientConfig } from '../types/imageGradient';
@@ -83,6 +83,11 @@ type GradientStore = {
   isGradientAnchorDragging: boolean;
 
   setGradient: (v: Partial<GradientConfig>) => void;
+  setMeshCorner: (index: number, position: Vec2Tuple) => void;
+  setMeshHandle: (edge: MeshEdge, index: 0 | 1, position: Vec2Tuple) => void;
+  setMeshColorPosition: (index: number, value: number) => void;
+  resetMeshGradient: () => void;
+  straightenMeshHandles: () => void;
   setNoiseDistortion: (v: Partial<NoiseDistortionConfig>) => void;
   setDiffuse: (v: Partial<DiffuseConfig>) => void;
   setImageGradient: (v: Partial<ImageGradientConfig>) => void;
@@ -119,6 +124,7 @@ export const GRADIENT_ANCHOR_DEFAULTS: Record<import('../types/gradient').Gradie
   diamond:   [[0.5, 0.5], [1.0, 0.5], [0.5, 0.5], [0.5, 0.5]], // 中心、右端
   angle:     [[0.5, 0.5], [1.0, 0.5], [0.5, 0.5], [0.5, 0.5]], // 中心、角度基準点
   bezier:    [[0.5, 0.0], [0.5, 1.0], [0.5, 0.5], [0.5, 0.5]], // A/B端点を使うベジェ軸
+  mesh:      [[0.0, 0.0], [1.0, 0.0], [0.0, 1.0], [1.0, 1.0]], // Meshは専用のgradient.meshを一次情報とする
 };
 
 export function defaultBezierControlsForAnchors(
@@ -134,6 +140,12 @@ export function defaultBezierControlsForAnchors(
       anchors[0][1] + (anchors[1][1] - anchors[0][1]) * 2 / 3,
     ],
   ];
+}
+
+const GRADIENT_TYPES = ['linear', 'radial', 'fourcolor', 'diamond', 'angle', 'bezier', 'mesh'] as const;
+
+function isGradientType(value: unknown): value is import('../types/gradient').GradientType {
+  return typeof value === 'string' && (GRADIENT_TYPES as readonly string[]).includes(value);
 }
 
 /** ノイズタイプ切り替え時に自動適用するタイプ別初期値 */
@@ -633,18 +645,67 @@ export const useGradientStore = create<GradientStore>((set) => ({
       ...(v.opacityStops ? { opacityStops: ensureOpacityStopIds(v.opacityStops) } : {}),
     };
     next.angle = clampParameter(next.angle, s.gradient.angle, getParameterLimit('gradient.angle'));
-    if (next.gradientType && next.gradientType !== s.gradient.gradientType) {
-      const anchors = GRADIENT_ANCHOR_DEFAULTS[next.gradientType];
-      return {
-        gradient: {
-          ...s.gradient,
-          anchors,
-          ...(next.gradientType === 'bezier' ? { bezierControls: defaultBezierControlsForAnchors(anchors) } : {}),
-          ...next,
-        },
-      };
-    }
-    return { gradient: { ...s.gradient, ...next } };
+    const requestedType = next.gradientType;
+    const nextType = isGradientType(requestedType)
+      ? requestedType
+      : s.gradient.gradientType;
+    if (requestedType !== undefined && requestedType !== nextType) next.gradientType = nextType;
+    const hasMeshValue = Object.prototype.hasOwnProperty.call(v, 'mesh');
+    const currentMesh = normalizeMeshGradientConfig(s.gradient.mesh);
+    const mesh = nextType === 'mesh'
+      ? normalizeMeshGradientConfig(hasMeshValue ? v.mesh : currentMesh)
+      : undefined;
+    const anchors = next.gradientType && next.gradientType !== s.gradient.gradientType
+      ? GRADIENT_ANCHOR_DEFAULTS[next.gradientType]
+      : s.gradient.anchors;
+    return {
+      gradient: {
+        ...s.gradient,
+        ...next,
+        ...(next.gradientType && next.gradientType !== s.gradient.gradientType ? { anchors } : {}),
+        ...(nextType === 'bezier' && next.gradientType !== s.gradient.gradientType
+          ? { bezierControls: defaultBezierControlsForAnchors(anchors ?? GRADIENT_ANCHOR_DEFAULTS.bezier) }
+          : {}),
+        mesh,
+      },
+    };
+  }),
+  setMeshCorner: (index, position) => set((s) => {
+    if (!Number.isInteger(index) || index < 0 || index > 3) return {};
+    const mesh = normalizeMeshGradientConfig(s.gradient.mesh);
+    const corners = mesh.corners.map((corner, cornerIndex) => cornerIndex === index ? position : corner) as typeof mesh.corners;
+    return { gradient: { ...s.gradient, mesh: normalizeMeshGradientConfig({ ...mesh, corners }) } };
+  }),
+  setMeshHandle: (edge, index, position) => set((s) => {
+    if (!Object.prototype.hasOwnProperty.call(DEFAULT_MESH_GRADIENT.handles, edge)) return {};
+    const mesh = normalizeMeshGradientConfig(s.gradient.mesh);
+    const handles = {
+      ...mesh.handles,
+      [edge]: mesh.handles[edge].map((handle, handleIndex) => handleIndex === index ? position : handle),
+    } as typeof mesh.handles;
+    return { gradient: { ...s.gradient, mesh: normalizeMeshGradientConfig({ ...mesh, handles }) } };
+  }),
+  setMeshColorPosition: (index, value) => set((s) => {
+    if (!Number.isInteger(index) || index < 0 || index > 3) return {};
+    const mesh = normalizeMeshGradientConfig(s.gradient.mesh);
+    const colorPositions = mesh.colorPositions.map((position, colorIndex) => colorIndex === index ? value : position) as typeof mesh.colorPositions;
+    return { gradient: { ...s.gradient, mesh: normalizeMeshGradientConfig({ ...mesh, colorPositions }) } };
+  }),
+  resetMeshGradient: () => set((s) => ({ gradient: { ...s.gradient, gradientType: 'mesh', mesh: normalizeMeshGradientConfig(DEFAULT_MESH_GRADIENT), anchors: GRADIENT_ANCHOR_DEFAULTS.mesh } })),
+  straightenMeshHandles: () => set((s) => {
+    const mesh = normalizeMeshGradientConfig(s.gradient.mesh);
+    const lerp = (a: Vec2Tuple, b: Vec2Tuple, t: number): Vec2Tuple => [
+      a[0] + (b[0] - a[0]) * t,
+      a[1] + (b[1] - a[1]) * t,
+    ];
+    const [bl, br, tl, tr] = mesh.corners;
+    const handles = {
+      bottom: [lerp(bl, br, 1 / 3), lerp(bl, br, 2 / 3)],
+      right: [lerp(br, tr, 1 / 3), lerp(br, tr, 2 / 3)],
+      top: [lerp(tr, tl, 1 / 3), lerp(tr, tl, 2 / 3)],
+      left: [lerp(tl, bl, 1 / 3), lerp(tl, bl, 2 / 3)],
+    } as typeof mesh.handles;
+    return { gradient: { ...s.gradient, mesh: normalizeMeshGradientConfig({ ...mesh, handles }) } };
   }),
   setNoiseDistortion: (v) => set((s) => {
     let nextNoiseDistortion: Partial<NoiseDistortionConfig>;
