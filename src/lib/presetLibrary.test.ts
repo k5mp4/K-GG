@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { IDENTITY_DIFFUSE_BEZIER } from './diffuseCurve';
 import { makePreset } from './presetModel';
 import {
   createEmptyPresetLibrary,
@@ -15,7 +16,10 @@ import {
 import type { StoreSnapshot } from './presetModel';
 
 function preset(name: string, order = 0) {
-  return makePreset(name, {} as StoreSnapshot, { order });
+  const state = {
+    diffuse: { luminanceBezier: [...IDENTITY_DIFFUSE_BEZIER] },
+  } as unknown as StoreSnapshot;
+  return makePreset(name, state, { order });
 }
 
 describe('presetLibrary', () => {

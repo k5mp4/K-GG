@@ -6,6 +6,8 @@ import { Collapsible } from './Collapsible';
 import { Toggle } from './Toggle';
 import { CustomSelect } from './CustomSelect';
 import { Icon } from './Icon';
+import { InputShuffle, fromNumber } from 'tweeq';
+import { useLanguage } from '../i18n/LanguageProvider';
 
 const D = STORE_DEFAULTS.noiseDistortion;
 
@@ -66,6 +68,7 @@ const PHASOR_DIRECTION_MODES = [
 ];
 
 export function NoiseDistortionPanel() {
+  const { t } = useLanguage();
   const { noiseDistortion, setNoiseDistortion } = useGradientStore();
   const canReset = isNoiseDirty(noiseDistortion);
   const isDWAnim = noiseDistortion.type === 'domain_warp_anim';
@@ -90,7 +93,7 @@ export function NoiseDistortionPanel() {
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between pr-1">
-        <h2 className="font-semibold text-sm text-k-text">Noise Distortion</h2>
+        <h2 className="font-semibold text-sm text-k-text">{t('effect.noise')}</h2>
         <div className="flex items-center gap-2">
           <button
             onClick={() => setNoiseDistortion({ ...D, enabled: noiseDistortion.enabled })}
@@ -98,7 +101,7 @@ export function NoiseDistortionPanel() {
             className={`w-6 h-6 inline-flex items-center justify-center bg-transparent hover:bg-k-muted text-tab-inactive hover:text-k-text rounded-none transition-all ${
               canReset ? 'opacity-100 cursor-pointer' : 'opacity-0 pointer-events-none'
             }`}
-            title="Noise Distortion のパラメータをリセット"
+            title={t('common.reset')}
           >
             <Icon name="restart" className="text-[14px]" />
           </button>
@@ -498,13 +501,14 @@ export function NoiseDistortionPanel() {
                   trackId="noiseDistortion.noiseSeed"
                 />
               </div>
-              <button
-                onClick={() => setNoiseDistortion({ noiseSeed: Math.random() * 100 })}
-                className="px-2 py-1 mb-1 text-[10px] bg-k-surface hover:bg-k-muted text-k-text/80 rounded-none border border-cream/40 transition-colors shrink-0"
-                title="乱数シードをランダムに変更"
-              >
-                Dice
-              </button>
+              <InputShuffle
+                value={noiseDistortion.noiseSeed ?? 0}
+                onChange={(noiseSeed) => setNoiseDistortion({ noiseSeed })}
+                generate={fromNumber(0, 100, 0)}
+                className="mb-1 shrink-0"
+                aria-label={t('common.shuffle')}
+                title={t('common.shuffle')}
+              />
             </div>
           )}
 
@@ -569,13 +573,14 @@ export function NoiseDistortionPanel() {
                     trackId="noiseDistortion.curlSeed"
                   />
                 </div>
-                <button
-                  onClick={() => setNoiseDistortion({ curlSeed: Math.random() * 100 })}
-                  className="px-2 py-1 mb-1 text-[10px] bg-k-surface hover:bg-k-muted text-k-text/80 rounded-none border border-cream/40 transition-colors shrink-0"
-                  title="乱数シードをランダムに変更"
-                >
-                  Dice
-                </button>
+                <InputShuffle
+                  value={noiseDistortion.curlSeed ?? 0}
+                  onChange={(curlSeed) => setNoiseDistortion({ curlSeed })}
+                  generate={fromNumber(0, 100, 0)}
+                  className="mb-1 shrink-0"
+                  aria-label={t('common.shuffle')}
+                  title={t('common.shuffle')}
+                />
               </div>
             </>
           )}

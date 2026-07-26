@@ -1,7 +1,10 @@
 import ReactMarkdown from 'react-markdown';
-import helpContent from '../docs/help.md?raw';
+import helpContentJa from '../docs/help.md?raw';
+import helpContentEn from '../docs/help.en.md?raw';
 import type { UpdateStatus } from '../features/updater/types';
 import { Icon } from './Icon';
+import { IconButton } from './IconButton';
+import { useLanguage } from '../i18n/LanguageProvider';
 
 interface HelpPanelProps {
   onClose: () => void;
@@ -19,6 +22,7 @@ export function HelpPanel({
   onCheckForUpdates,
 }: HelpPanelProps) {
   const checking = updateStatus === 'checking';
+  const { language, t } = useLanguage();
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-10">
@@ -38,7 +42,7 @@ export function HelpPanel({
               <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"></path>
               <line x1="12" y1="17" x2="12.01" y2="17"></line>
             </svg>
-            使い方ガイド
+            {t('help.title')}
           </h2>
           <div className="flex items-center gap-4">
             <a
@@ -47,23 +51,20 @@ export function HelpPanel({
               rel="noopener noreferrer"
               className="text-sm text-fire hover:text-cream underline decoration-fire/30 underline-offset-4 transition-colors font-medium flex items-center gap-1"
             >
-              <span>オンラインドキュメント</span>
+              <span>{t('common.onlineDocs')}</span>
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                 <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path>
                 <polyline points="15 3 21 3 21 9"></polyline>
                 <line x1="10" y1="14" x2="21" y2="3"></line>
               </svg>
             </a>
-            <button
+            <IconButton
+              icon="close"
+              label={t('common.close')}
               onClick={onClose}
-              className="text-tab-inactive hover:text-k-text p-1.5 rounded-none hover:bg-k-border transition-colors"
-              aria-label="Close"
-            >
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <line x1="18" y1="6" x2="6" y2="18"></line>
-                <line x1="6" y1="6" x2="18" y2="18"></line>
-              </svg>
-            </button>
+              className="p-1.5"
+              iconClassName="text-[20px]"
+            />
           </div>
         </div>
 
@@ -92,16 +93,16 @@ export function HelpPanel({
               strong: ({ children }) => <strong className="font-bold text-k-text">{children}</strong>,
             }}
           >
-            {helpContent}
+            {language === 'ja' ? helpContentJa : helpContentEn}
           </ReactMarkdown>
         </div>
         <footer className="flex shrink-0 flex-col gap-3 border-t border-cream/30 bg-k-bg/65 px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
           <div>
             <p className="text-[9px] font-display font-semibold uppercase tracking-[0.22em] text-tab-inactive">
-              K-GG Desktop
+              {t('help.desktop')}
             </p>
             <p className="mt-1 font-display text-sm font-bold text-k-text">
-              {appVersion ? `Version ${appVersion}` : 'Web build'}
+              {appVersion ? t('common.version', { version: appVersion }) : t('common.webBuild')}
             </p>
           </div>
           {updateSupported && (
@@ -115,7 +116,7 @@ export function HelpPanel({
                 name={checking ? 'progress' : 'systemUpdate'}
                 className={`text-[15px] ${checking ? 'animate-spin' : ''}`}
               />
-              Check for updates
+              {checking ? t('common.checking') : t('common.checkUpdates')}
             </button>
           )}
         </footer>

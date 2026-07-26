@@ -134,7 +134,10 @@
 .TqViewport .tq-input-angle,
 .TqViewport .tq-input-angle > div {
   width: 100%;
-  min-width: 0;
+  /* Tweeq hides InputNumber when the root is <= inputHeight * 4. Keep the
+   * measured root above that threshold even inside narrow animation rows. */
+  min-width: calc(var(--tq-input-height) * 4 + var(--tq-gap-control));
+  min-height: var(--tq-input-height);
 }
 
 .TqViewport .tq-input-angle > div {
@@ -197,6 +200,17 @@
   font-family: var(--font-display);
   font-size: 12px;
   letter-spacing: 0.015em;
+}
+
+/* Dice buttons are icon controls, not bordered fields. Keep the keyboard
+ * focus affordance while removing the persistent frame around the icon. */
+.TqViewport [data-tq-component='input-shuffle'] {
+  border: 0 !important;
+  box-shadow: none;
+}
+
+.TqViewport [data-tq-component='input-shuffle']:focus-visible {
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--color-fire) 72%, transparent);
 }
 
 .k-color-picker {

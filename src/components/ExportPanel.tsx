@@ -24,6 +24,7 @@ import type { ExportDirectoryHandle, ExportStage, Mp4QualityPreset, NativeFfmpeg
 import type { AeSaveDirStatus, AeStatus } from '../lib/aftereffectsExport';
 import { renderBridge } from '../lib/renderBridge';
 import { exportDisplayProgress, exportProgressPercent, exportStageLabel } from '../lib/exportProgress';
+import { useLanguage } from '../i18n/LanguageProvider';
 
 type ExportJob = 'mov' | 'mp4' | 'zip' | 'slits' | null;
 type VideoExt = 'mov' | 'mp4';
@@ -47,6 +48,7 @@ export function ExportPanel({
   ffmpegChecking,
   onCheckFfmpeg,
 }: Props) {
+  const { t } = useLanguage();
   const { animation, slitScan, presetName } = useGradientStore();
   const { recording } = useRecorder();
 
@@ -395,11 +397,11 @@ export function ExportPanel({
 
   return (
     <div className="space-y-4">
-      <h2 className="font-display font-semibold text-xs uppercase tracking-wider text-k-text">Export</h2>
+      <h2 className="font-display font-semibold text-xs uppercase tracking-wider text-k-text">{t('effect.export')}</h2>
 
       {/* ファイル名 */}
       <div className="space-y-1">
-        <label className="text-xs text-deep">ファイル名</label>
+        <label className="text-xs text-deep">{t('export.fileName')}</label>
         <input
           type="text"
           value={fileName}
@@ -413,7 +415,7 @@ export function ExportPanel({
       {/* 書き出し先フォルダ */}
       {pickerAvailable && (
         <div className="space-y-1">
-          <label className="text-xs text-deep">書き出し先フォルダ</label>
+          <label className="text-xs text-deep">{t('export.destination')}</label>
           {dirName ? (
             <div className="flex items-center gap-2">
               <span className="flex-1 px-2 py-1.5 bg-k-surface border border-panel-border border-panel rounded-none text-xs text-k-text truncate">
@@ -422,7 +424,8 @@ export function ExportPanel({
               <button
                 onClick={handleClearDirectory}
                 className="px-2 py-1.5 bg-k-muted hover:bg-k-muted/70 rounded-none text-xs text-k-text/80"
-                title="フォルダ指定を解除"
+                title={t('export.clearDestination')}
+                aria-label={t('export.clearDestination')}
               >
                 ✕
               </button>
@@ -432,23 +435,23 @@ export function ExportPanel({
               onClick={handlePickDirectory}
               className="w-full px-3 py-1.5 bg-k-surface hover:bg-k-muted border border-panel-border border-panel border-dashed rounded-none text-xs text-deep hover:text-k-text transition-colors"
             >
-              フォルダを選択…
+              {t('export.chooseFolder')}
             </button>
           )}
           {!dirName && (
-            <p className="text-xs text-tab-inactive">未指定の場合はダウンロードフォルダに保存</p>
+            <p className="text-xs text-tab-inactive">{t('export.downloadFallback')}</p>
           )}
         </div>
       )}
 
       {/* 静止画 */}
       <div className="space-y-2">
-        <p className="text-xs text-deep">静止画</p>
+        <p className="text-xs text-deep">{t('export.stillImage')}</p>
         <button
           onClick={() => { const c = canvasRef.current; if (c) downloadPNG(c, stem, dirHandleRef.current).then(() => flashSaved('png')); }}
           className="w-full py-2 bg-fire hover:brightness-110 disabled:opacity-40 disabled:cursor-not-allowed rounded-none text-sm font-display font-semibold text-k-text uppercase tracking-wider"
         >
-          {savedFormats['png'] ? '✓ Saved' : 'Save PNG'}
+          {savedFormats['png'] ? `✓ ${t('export.saved')}` : t('export.savePng')}
         </button>
         <div className="flex gap-2">
           <button
@@ -512,10 +515,10 @@ export function ExportPanel({
 
       {/* 動画 */}
       <div className="border-t border-panel-border border-t-panel pt-4 space-y-3">
-        <p className="text-xs text-deep">動画</p>
+        <p className="text-xs text-deep">{t('export.video')}</p>
 
         {!animation.enabled && (
-          <p className="text-xs text-tab-inactive">Animation を有効にすると動画書き出しが可能です</p>
+          <p className="text-xs text-tab-inactive">{t('export.enableAnimation')}</p>
         )}
 
         {nativeFfmpegAvailable && (
@@ -588,7 +591,7 @@ export function ExportPanel({
 
         {/* オフライン書き出し */}
         <div className="space-y-1.5">
-          <p className="text-xs text-tab-inactive">動画ファイル</p>
+          <p className="text-xs text-tab-inactive">{t('export.videoFile')}</p>
 
           <div className="relative min-h-[40px]">
             {/* MOV Section */}
@@ -601,7 +604,7 @@ export function ExportPanel({
                 disabled={recording || !videoReady || !nativeVideoEncodeReady}
                 className="w-full py-1.5 bg-fire hover:brightness-110 disabled:opacity-40 disabled:cursor-not-allowed rounded-none text-xs font-display font-semibold text-k-text uppercase tracking-wider"
               >
-                {savedFormats['mov'] ? '✓ Saved' : 'Export MOV'}
+                {savedFormats['mov'] ? `✓ ${t('export.saved')}` : t('export.exportMov')}
               </button>
             </div>
           </div>
@@ -616,12 +619,12 @@ export function ExportPanel({
                 disabled={recording || !videoReady || !nativeVideoEncodeReady}
                 className="w-full py-1.5 bg-fire hover:brightness-110 disabled:opacity-40 disabled:cursor-not-allowed rounded-none text-xs font-display font-semibold text-k-text uppercase tracking-wider"
               >
-                {savedFormats['mp4'] ? '✓ Saved' : 'Export MP4 (H.264 RGB)'}
+                {savedFormats['mp4'] ? `✓ ${t('export.saved')}` : t('export.exportMp4')}
               </button>
             </div>
           </div>
 
-          <p className="text-xs text-tab-inactive">連番PNG出力</p>
+          <p className="text-xs text-tab-inactive">{t('export.imageSequence')}</p>
 
           <div className="relative min-h-[40px]">
             {/* ZIP Section */}
@@ -634,7 +637,7 @@ export function ExportPanel({
                 disabled={recording || !videoReady}
                 className="w-full py-1.5 bg-fire/70 hover:bg-fire disabled:opacity-40 disabled:cursor-not-allowed rounded-none text-xs font-display font-semibold text-k-text uppercase tracking-wider"
               >
-                {savedFormats['zip'] ? '✓ Saved' : 'Export ZIP PNG'}
+                {savedFormats['zip'] ? `✓ ${t('export.saved')}` : t('export.exportZip')}
               </button>
             </div>
           </div>
@@ -739,17 +742,15 @@ export function ExportPanel({
           </>
         ) : (
           <div className="rounded-none bg-k-bg border border-panel-border border-panel px-3 py-2 space-y-1">
-            <p className="text-xs text-yellow-400">現在開発中です！</p>
-            <p className="text-xs text-deep">AEに直接画像や動画を送る機能にする予定です</p>
-            <p className="text-xs text-yellow-400">Currently in development!</p>
-            <p className="text-xs text-deep">A feature for sending images and videos directly to AE is planned.</p>
+            <p className="text-xs text-yellow-400">{t('export.aeDevelopment')}</p>
+            <p className="text-xs text-deep">{t('export.aeDevelopmentDescription')}</p>
             <button
               type="button"
               onClick={handleAeRefresh}
               disabled={bridgeChecking}
               className="w-full py-1.5 bg-k-surface hover:bg-k-muted disabled:opacity-40 disabled:cursor-not-allowed rounded-none text-xs text-k-text/80"
             >
-              {bridgeChecking ? 'Checking...' : 'AE Bridge を確認'}
+              {bridgeChecking ? t('common.checking') : t('export.checkBridge')}
             </button>
           </div>
         )}

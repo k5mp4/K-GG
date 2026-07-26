@@ -3,6 +3,7 @@ import { gsap } from 'gsap';
 import { ColorHistogram } from './ColorHistogram';
 import { PostprocessStackPanel } from './PostprocessStackPanel';
 import type { EffectStackKind } from '../types/distortion';
+import { useLanguage } from '../i18n/LanguageProvider';
 
 const WORKSPACE_ORDER_KEY = 'kgg.effect-stack-workspace.order';
 const STACK_SLOT_X = 0;
@@ -27,6 +28,7 @@ type Props = {
 };
 
 export function EffectStackWorkspace({ sourceCanvasRef, hidden = false, onSelectEffectStack }: Props) {
+  const { t } = useLanguage();
   const [order, setOrder] = useState<WorkspaceOrder>(readWorkspaceOrder);
   const stackRef = useRef<HTMLDivElement>(null);
   const histogramRef = useRef<HTMLDivElement>(null);
@@ -66,7 +68,7 @@ export function EffectStackWorkspace({ sourceCanvasRef, hidden = false, onSelect
     <div
       data-effect-stack-workspace
       className={`hidden md:block pointer-events-none absolute inset-x-4 top-4 bottom-4 z-30 transition-opacity duration-200 ${hidden ? 'pointer-events-none opacity-0' : 'opacity-100'}`}
-      aria-label="Effect Stack workspace"
+      aria-label={t('workspace.effectStack')}
     >
       <div className="relative h-full min-w-[480px]">
         <div ref={stackRef} className={`absolute left-0 top-0 ${hidden ? 'pointer-events-none' : 'pointer-events-auto'}`}>

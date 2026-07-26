@@ -24,6 +24,7 @@ import { SliderField } from './SliderField';
 import type { ExportStage } from '../adapters';
 import { exportStageLabel } from '../lib/exportProgress';
 import { renderBridge } from '../lib/renderBridge';
+import { useLanguage } from '../i18n/LanguageProvider';
 
 type Props = {
   animLoopRef: React.MutableRefObject<AnimationLoop | null>;
@@ -49,6 +50,7 @@ function formatSeconds(seconds: number): string {
 }
 
 export function TimelineBar({ animLoopRef, onSeek, exportProgress = null, exportStage = 'preparing', height = 300, showTimeRemap = false, onToggleTimeRemap, selectedEffectPrefix = '' }: Props) {
+  const { t } = useLanguage();
   const isExporting = exportProgress !== null;
   const {
     animation, keyframeTracks, currentTime,
@@ -681,6 +683,19 @@ export function TimelineBar({ animLoopRef, onSeek, exportProgress = null, export
       style={{ height }}
     >
       <div className="flex min-h-10 shrink-0 items-center gap-2 border-b border-panel-border/60 bg-k-surface/80 px-3 py-1.5">
+        <button
+          type="button"
+          onClick={() => setAnimation({ enabled: !animation.enabled })}
+          className={`flex h-6 items-center gap-1.5 border px-2 text-[9px] font-display font-semibold uppercase tracking-wider transition-colors ${
+            animation.enabled
+              ? 'border-emerald-400/60 bg-emerald-400/10 text-emerald-300'
+              : 'border-k-muted/60 bg-k-bg text-tab-inactive'
+          }`}
+          title={t('animation.title')}
+        >
+          <span className={`h-1.5 w-1.5 rounded-full ${animation.enabled ? 'bg-emerald-400' : 'bg-k-muted'}`} />
+          {t('animation.title')}
+        </button>
         <div className="flex items-center border border-k-muted/50 bg-k-bg">
           {(['moving', 'selected', 'all'] as const).map(filter => (
             <button
@@ -691,14 +706,14 @@ export function TimelineBar({ animLoopRef, onSeek, exportProgress = null, export
                 trackFilter === filter ? 'bg-fire text-k-text' : 'text-tab-inactive hover:text-k-text'
               }`}
             >
-              {filter === 'moving' ? 'Moving' : filter === 'selected' ? 'Selected' : 'All'}
+              {filter === 'moving' ? t('animation.moving') : filter === 'selected' ? t('animation.selected') : t('animation.all')}
             </button>
           ))}
         </div>
 
         <div className="ml-auto flex min-w-0 items-center gap-2">
           <SliderField
-            label="Duration"
+            label={t('animation.duration')}
             labelClassName="text-[8px] text-tab-inactive uppercase tracking-wider"
             min={ANIMATION_DURATION_MIN}
             max={ANIMATION_DURATION_MAX}
@@ -725,7 +740,7 @@ export function TimelineBar({ animLoopRef, onSeek, exportProgress = null, export
             </select>
           </div>
           <SliderField
-            label="Speed"
+            label={t('animation.speed')}
             labelClassName="text-[8px] text-tab-inactive uppercase tracking-wider"
             min={ANIMATION_SPEED_MIN}
             max={ANIMATION_SPEED_MAX}
@@ -738,8 +753,12 @@ export function TimelineBar({ animLoopRef, onSeek, exportProgress = null, export
             className="hidden w-[166px] items-center lg:flex"
           />
           <label className="hidden items-center gap-1 text-[8px] uppercase tracking-wider text-tab-inactive xl:flex">
-            Direction
-            <span className="tq-input-angle h-5 w-14" title="Animation Direction">
+            {t('animation.direction')}
+            <span
+              className="tq-input-angle h-6 flex-none"
+              style={{ width: 112, minWidth: 112, flex: '0 0 112px' }}
+              title={t('animation.direction')}
+            >
               <InputAngle
                 value={toTweeqAngle(clampParameter(animation.direction, 0, getParameterLimit('animation.direction')))}
                 snap={15}
@@ -756,9 +775,9 @@ export function TimelineBar({ animLoopRef, onSeek, exportProgress = null, export
                 ? 'border-fire/60 bg-fire/10 text-fire'
                 : 'border-k-muted/60 bg-k-bg text-tab-inactive'
             }`}
-            title="Preview Loop ON/OFF"
+            title={t('animation.previewLoop')}
           >
-            Loop {(animation.previewLoop ?? true) ? 'On' : 'Off'}
+            {t('animation.previewLoop')} {(animation.previewLoop ?? true) ? t('common.on') : t('common.off')}
           </button>
           <button
             type="button"
@@ -768,9 +787,9 @@ export function TimelineBar({ animLoopRef, onSeek, exportProgress = null, export
                 ? 'border-fire/60 bg-fire/10 text-fire'
                 : 'border-k-muted/60 bg-k-bg text-tab-inactive'
             }`}
-            title="Autoモーション専用のLoop Timing"
+            title={t('animation.loopTiming')}
           >
-            Loop Timing
+            {t('animation.loopTiming')}
           </button>
         </div>
       </div>
@@ -779,14 +798,14 @@ export function TimelineBar({ animLoopRef, onSeek, exportProgress = null, export
         {/* 中央: Preview controls */}
         <div className="flex h-[56px] flex-col items-center justify-start gap-1 pt-2">
           <div className="flex items-center gap-1.5 text-[9px] font-display font-semibold uppercase tracking-widest text-k-text/80">
-            <span>Preview</span>
+            <span>{t('common.preview')}</span>
           </div>
           <div className="flex items-center gap-0.5 rounded-sm bg-k-bg px-1.5 py-0.5">
             <button
               onClick={() => seekToNormalized(0)}
               disabled={isExporting}
               className="w-6 h-6 flex items-center justify-center p-0 bg-transparent text-tab-inactive hover:text-k-text disabled:opacity-30 transition-colors"
-              title="先頭へ"
+              title={t('animation.firstFrame')}
             >
               <Icon name="firstPage" className="text-[17px]" />
             </button>
@@ -794,7 +813,7 @@ export function TimelineBar({ animLoopRef, onSeek, exportProgress = null, export
               onClick={() => nudgeFrame(-1)}
               disabled={isExporting}
               className="w-6 h-6 flex items-center justify-center p-0 bg-transparent text-tab-inactive hover:text-k-text disabled:opacity-30 transition-colors"
-              title="1フレーム戻る"
+              title={t('animation.previousFrame')}
             >
               <Icon name="skipPrevious" className="text-[17px]" />
             </button>
@@ -802,7 +821,7 @@ export function TimelineBar({ animLoopRef, onSeek, exportProgress = null, export
               onClick={togglePause}
               disabled={isExporting}
               className="w-9 h-9 flex items-center justify-center shrink-0 rounded-full border border-fire bg-k-surface p-0 text-fire hover:bg-fire hover:text-k-text disabled:opacity-30 transition-colors shadow-[0_0_0_1px_rgba(209,20,2,0.22)]"
-              title={isPaused ? '再生' : '一時停止'}
+              title={isPaused ? t('animation.play') : t('animation.pause')}
             >
               <Icon name={isPaused ? 'play' : 'pause'} className="text-[22px]" />
             </button>
@@ -810,7 +829,7 @@ export function TimelineBar({ animLoopRef, onSeek, exportProgress = null, export
               onClick={() => nudgeFrame(1)}
               disabled={isExporting}
               className="w-6 h-6 flex items-center justify-center p-0 bg-transparent text-tab-inactive hover:text-k-text disabled:opacity-30 transition-colors"
-              title="1フレーム進む"
+              title={t('animation.nextFrame')}
             >
               <Icon name="skipNext" className="text-[17px]" />
             </button>
@@ -818,7 +837,7 @@ export function TimelineBar({ animLoopRef, onSeek, exportProgress = null, export
               onClick={seekToEnd}
               disabled={isExporting}
               className="w-6 h-6 flex items-center justify-center p-0 bg-transparent text-tab-inactive hover:text-k-text disabled:opacity-30 transition-colors"
-              title="末尾へ"
+              title={t('animation.lastFrame')}
             >
               <Icon name="lastPage" className="text-[17px]" />
             </button>
@@ -934,7 +953,7 @@ export function TimelineBar({ animLoopRef, onSeek, exportProgress = null, export
                   ? 'bg-fire text-k-text'
                   : 'bg-k-surface text-tab-inactive hover:bg-k-muted'
               }`}
-              title={viewMode === 'graph' ? 'トラックビューに戻る' : 'グラフエディタを開く (キーフレームを選択してから)'}
+              title={viewMode === 'graph' ? t('animation.trackView') : t('animation.graphEditor')}
             >
               {/* 折れ線グラフアイコン */}
               <svg width="11" height="9" viewBox="0 0 11 9" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">

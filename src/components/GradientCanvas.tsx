@@ -8,6 +8,7 @@ import { hasActiveAnimation } from '../lib/sceneEvaluation';
 import { renderSceneAtTime } from '../lib/renderSceneAtTime';
 import { renderBridge } from '../lib/renderBridge';
 import { LatestFrameScheduler } from '../lib/latestFrameScheduler';
+import { useLanguage } from '../i18n/LanguageProvider';
 
 
 type Props = {
@@ -23,6 +24,7 @@ type Props = {
 };
 
 export function GradientCanvas({ width = 800, height = 800, animLoopRef, seekVersion = 0, canvasRef, sourceImageCanvas = null, imageGradientSource = null, imageMaskSource = null, imageMaskEnabled = false }: Props) {
+  const { t } = useLanguage();
   const fallbackCanvasRef = useRef<HTMLCanvasElement | null>(null);
   const staticRenderSchedulerRef = useRef<LatestFrameScheduler | null>(null);
   const previousPlaybackRef = useRef<{ time: number; playing: boolean } | null>(null);
@@ -206,9 +208,9 @@ export function GradientCanvas({ width = 800, height = 800, animLoopRef, seekVer
             flex: '0 0 auto',
           }}
         />
-        <span>{isWebGLReady ? 'GPU RENDER' : 'PREVIEW'}</span>
+        <span>{isWebGLReady ? t('canvas.gpuRender') : t('common.preview')}</span>
         {!isWebGLReady && (
-          <span style={{ opacity: 0.68, fontWeight: 600 }}>BASE ONLY</span>
+          <span style={{ opacity: 0.68, fontWeight: 600 }}>{t('canvas.baseOnly')}</span>
         )}
       </div>
       <canvas

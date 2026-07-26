@@ -5,6 +5,7 @@ import { SliderField } from './SliderField';
 import { Collapsible } from './Collapsible';
 import { Toggle } from './Toggle';
 import { Icon } from './Icon';
+import { useLanguage } from '../i18n/LanguageProvider';
 
 const D = STORE_DEFAULTS.normalMap;
 const isNormalMapDirty = (value: NormalMapConfig) =>
@@ -15,6 +16,7 @@ const isNormalMapDirty = (value: NormalMapConfig) =>
   });
 
 export function NormalMapPanel() {
+  const { t } = useLanguage();
   const { normalMap, setNormalMap, diffuse, setDiffuse, setGradient } = useGradientStore();
   const canReset = isNormalMapDirty(normalMap);
 
@@ -22,8 +24,8 @@ export function NormalMapPanel() {
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <h2 className="font-semibold text-sm flex items-center gap-1.5">
-          Normal Map
-          <span className="text-[10px] font-medium px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-400 leading-none" title="この機能は試験運用中です">🧪 Beta</span>
+          {t('effect.normal')}
+          <span className="text-[10px] font-medium px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-400 leading-none" title={t('beta.experimental')}>🧪 Beta</span>
         </h2>
         <div className="flex items-center gap-2">
           <button
@@ -32,7 +34,7 @@ export function NormalMapPanel() {
             className={`w-6 h-6 inline-flex items-center justify-center bg-transparent hover:bg-k-muted text-tab-inactive hover:text-k-text rounded-none transition-all ${
               canReset ? 'opacity-100 cursor-pointer' : 'opacity-0 pointer-events-none'
             }`}
-            title="Normal Map のパラメータをリセット"
+            title={t('common.reset')}
           >
             <Icon name="restart" className="text-[14px]" />
           </button>

@@ -1,5 +1,6 @@
 import type { ReactNode } from 'react';
 import { Icon, type IconName } from './Icon';
+import { useLanguage } from '../i18n/LanguageProvider';
 
 export type PanelEdge = 'left' | 'right' | 'bottom';
 
@@ -64,9 +65,10 @@ export function PanelEdgeToggle({
   children,
   className = 'flex',
 }: PanelEdgeToggleProps) {
+  const { t } = useLanguage();
   const styles = EDGE_STYLES[edge];
-  const action = open ? '閉じる' : '開く';
-  const englishAction = open ? 'Close' : 'Open';
+  const action = open ? t('common.close') : t('common.open');
+  const accessibleLabel = t('panel.toggle', { action, panel: panelTitle });
   const stateStyle = open
     ? 'border-transparent bg-transparent opacity-100 shadow-none backdrop-blur-none group-hover/edge-toggle:bg-k-surface/65 group-focus-within/edge-toggle:bg-k-surface/65 hover:border-panel-border focus-visible:border-panel-border'
     : `border-transparent bg-k-surface/95 opacity-100 backdrop-blur-sm hover:border-panel-border focus-visible:border-panel-border ${styles.shadow}`;
@@ -97,8 +99,8 @@ export function PanelEdgeToggle({
           transition-[background-color,border-color,color,opacity,box-shadow] duration-150
           focus:outline-none focus-visible:ring-2 focus-visible:ring-fire
         `}
-        title={`${panelTitle}を${action}`}
-        aria-label={`${englishAction} ${panelTitle}`}
+        title={accessibleLabel}
+        aria-label={accessibleLabel}
         aria-controls={controlsId}
         aria-expanded={open}
       >

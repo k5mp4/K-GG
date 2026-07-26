@@ -2,6 +2,7 @@ import { useState, useRef, useEffect } from 'react';
 import { SliderField } from './SliderField';
 import { CustomSelect } from './CustomSelect';
 import { useGradientStore } from '../store/gradientStore';
+import { useLanguage } from '../i18n/LanguageProvider';
 import {
   extractColorsFromPixels,
   extractPixelsFromImage,
@@ -16,6 +17,7 @@ interface ColorPaletteGeneratorProps {
 }
 
 export function ColorPaletteGenerator({ overlayImageElement, embedded = false }: ColorPaletteGeneratorProps) {
+  const { t } = useLanguage();
   const setGradient = useGradientStore((state) => state.setGradient);
 
   const [colorCount, setColorCount] = useState<number>(5);
@@ -141,9 +143,9 @@ export function ColorPaletteGenerator({ overlayImageElement, embedded = false }:
       type="button"
       onClick={handleLoadFromOverlay}
       className="text-[10px] text-cream hover:text-k-text px-2 py-0.5 rounded-none bg-cream/10 hover:bg-cream/20 transition-all duration-150 cursor-pointer"
-      title="現在設定されているOverlay/Mask画像から色を抽出します"
+      title={t('gradient.importOverlay')}
     >
-      Overlayから取得
+      {t('gradient.importOverlay')}
     </button>
   ) : null;
 
@@ -166,6 +168,15 @@ export function ColorPaletteGenerator({ overlayImageElement, embedded = false }:
         onDragLeave={handleDragLeave}
         onDrop={handleDrop}
         onClick={() => fileInputRef.current?.click()}
+        title={t('gradient.importImage')}
+        role="button"
+        tabIndex={0}
+        onKeyDown={(event) => {
+          if (event.key === 'Enter' || event.key === ' ') {
+            event.preventDefault();
+            fileInputRef.current?.click();
+          }
+        }}
         className={`border border-dashed rounded-none p-4 flex flex-col items-center justify-center cursor-pointer transition-all duration-200 min-h-[90px] bg-k-bg/20 ${
           isDragging
             ? 'border-fire bg-fire/5'
@@ -212,7 +223,7 @@ export function ColorPaletteGenerator({ overlayImageElement, embedded = false }:
               />
             </svg>
             <p className="text-[10px] text-k-muted leading-tight">
-              画像をドロップするか、<br />クリックして選択してください
+              {t('gradient.paletteDropHint')}
             </p>
           </div>
         )}
@@ -303,7 +314,7 @@ export function ColorPaletteGenerator({ overlayImageElement, embedded = false }:
             >
               <polyline points="20 6 9 17 4 12" />
             </svg>
-            グラデーションに適用
+            Apply to Gradient
           </button>
         </div>
       )}

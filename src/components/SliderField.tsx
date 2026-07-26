@@ -11,6 +11,8 @@ import { AnimationPropertyControls } from './AnimationPropertyControls';
 import type { ParameterLimitKey } from '../lib/parameterLimits';
 import { getParameterLimit, wrapAngleDegrees, wrapAngleRadians } from '../lib/parameterLimits';
 import { clampSliderValue, isSliderValueOutOfRange } from '../lib/sliderValue';
+import { useLanguage } from '../i18n/LanguageProvider';
+import { localizeUiLabel } from '../i18n/uiLabels';
 
 type Props = {
   label: string;
@@ -57,6 +59,8 @@ export function SliderField({
   disabled = false,
   className = '',
 }: Props) {
+  const { language, t } = useLanguage();
+  const localizedLabel = localizeUiLabel(label, language);
   const { keyframeTracks, currentTime, animation, addKeyframe, setKeyframe } = useGradientStore();
   const track = trackId ? keyframeTracks[trackId] : null;
   const isKeyframed = getTrackMode(track) === 'keys';
@@ -170,12 +174,12 @@ export function SliderField({
         <div className="flex items-center gap-1.5">
           <label
             className={`select-none cursor-default font-body ${labelClassName}`}
-            title="Tweeqの数値フィールドをドラッグまたはクリックして編集"
+            title={t('input.editNumber')}
           >
-            {label}
+            {localizedLabel}
           </label>
           {trackId && (
-            <AnimationPropertyControls trackId={trackId} label={label} value={value} compact />
+            <AnimationPropertyControls trackId={trackId} label={localizedLabel} value={value} compact />
           )}
         </div>
         {defaultValue !== undefined && (
@@ -186,7 +190,7 @@ export function SliderField({
                 ? toTweeqAngle(angleUnit === 'radians' ? defaultValue * 180 / Math.PI : defaultValue)
                 : toDisplay(defaultValue),
             )}
-            title={`デフォルト値 (${defaultValue}) にリセット`}
+            title={t('input.resetDefault', { value: defaultValue })}
             style={{ width: 40, height: 20, padding: 0, background: 'none' }}
             className={`inline-flex items-center justify-center shrink-0 rounded text-sm transition-opacity ${
               isDirty && !disabled
@@ -223,7 +227,7 @@ export function SliderField({
             clampMin
             clampMax
             default={displayDefault}
-            aria-label={`${label}: ${displayed}`}
+            aria-label={`${localizedLabel}: ${displayed}`}
             title={displayed}
             aria-disabled={disabled}
             onChange={handleValueChange}

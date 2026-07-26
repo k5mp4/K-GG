@@ -5,6 +5,7 @@ import { renderSceneAtTime } from './renderSceneAtTime';
 import { normalizeImageGradientConfig } from '../types/imageGradient';
 import type { LatestState } from '../types/latestState';
 import { initWebGL, type WebGLContext } from './webgl';
+import { resolveDiffuseBezier } from './diffuseCurve';
 
 export const PRESET_THUMBNAIL_WIDTH = 320;
 export const PRESET_THUMBNAIL_HEIGHT = 200;
@@ -41,11 +42,17 @@ export function createPresetThumbnailState(snapshot: StoreSnapshot): LatestState
       ? [...snapshot.manualDistort.smoothMask]
       : createEmptyManualSmoothMask(resolution),
   };
+  const diffuse = {
+    ...STORE_DEFAULTS.diffuse,
+    ...snapshot.diffuse,
+    luminanceBezier: resolveDiffuseBezier(snapshot.diffuse?.luminanceBezier, snapshot.diffuse?.luminanceCurve),
+  };
+  delete diffuse.luminanceCurve;
 
   return {
     gradient: snapshot.gradient,
     noiseDistortion: normalizeNoiseDistortionConfig(snapshot.noiseDistortion),
-    diffuse: { ...STORE_DEFAULTS.diffuse, ...snapshot.diffuse },
+    diffuse,
     imageGradient: normalizeImageGradientConfig(snapshot.imageGradient, snapshot.imageGradient ? 0 : STORE_DEFAULTS.imageGradient.anchorInfluence),
     slitScan: { ...STORE_DEFAULTS.slitScan, ...snapshot.slitScan },
     stretch: { ...STORE_DEFAULTS.stretch, ...snapshot.stretch },

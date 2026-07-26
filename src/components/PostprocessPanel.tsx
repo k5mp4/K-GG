@@ -8,6 +8,7 @@ import { CustomSelect } from './CustomSelect';
 import { SliderField } from './SliderField';
 import { Icon } from './Icon';
 import { Toggle } from './Toggle';
+import { useLanguage } from '../i18n/LanguageProvider';
 
 const D = STORE_DEFAULTS.manualDistort;
 const POSTPROCESS_DIFFUSE_MODES: Array<{ value: string; label: string }> = [
@@ -207,6 +208,7 @@ type ManualDistortControlsProps = {
 };
 
 export function ManualDistortControls({ title, value: manualDistort, defaults = D, onChange: setManualDistort }: ManualDistortControlsProps) {
+  const { t } = useLanguage();
   const canReset = isManualDistortDirty(manualDistort, defaults);
 
   const resetManualDistort = () => {
@@ -230,7 +232,8 @@ export function ManualDistortControls({ title, value: manualDistort, defaults = 
               className={`w-6 h-6 inline-flex items-center justify-center bg-transparent hover:bg-k-muted text-tab-inactive hover:text-k-text rounded-none transition-all ${
                 canReset ? 'opacity-100 cursor-pointer' : 'opacity-0 pointer-events-none'
               }`}
-              title="Manual Distort のパラメータと変位マップをリセット"
+              title={t('common.reset')}
+              aria-label={t('common.reset')}
             >
               <Icon name="restart" className="text-[14px]" />
             </button>
@@ -334,6 +337,7 @@ export function ManualDistortControls({ title, value: manualDistort, defaults = 
 }
 
 export function PostprocessPanel() {
+  const { t } = useLanguage();
   const { gradient, setGradient, postprocess, setPostprocess, effectPipeline } = useGradientStore();
   const isDistort = postprocess.effectMode === 'distort';
   const particleEmitterType = ((postprocess.particleEmitterType as string) === 'nexus'
@@ -361,7 +365,7 @@ export function PostprocessPanel() {
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
-        <h2 className="font-semibold text-sm text-k-text">Postprocess</h2>
+        <h2 className="font-semibold text-sm text-k-text">{t('effect.postprocess')}</h2>
         <Toggle
           variant="switch"
           checked={postprocess.enabled}

@@ -16,6 +16,8 @@ import {
 import { useGradientStore } from '../store/gradientStore';
 import { Toggle } from './Toggle';
 import { Icon } from './Icon';
+import { useLanguage } from '../i18n/LanguageProvider';
+import type { MessageKey } from '../i18n/messages';
 import {
   closeCurrentEffectStackWindow,
   createEffectStackSnapshot,
@@ -48,10 +50,10 @@ const LABELS: Record<EffectStackKind, string> = {
   glassV2: 'Glass V2',
 };
 
-const CATEGORY: Record<EffectStackKind, string> = {
-  diffuse: 'Texture', noise: 'Texture',
-  slit: 'Transform', stretch: 'Transform', distort: 'Transform', mirror: 'Transform', kaleidoscope: 'Transform',
-  voronoi: 'Structure', glass: 'Structure', glassV2: 'Structure',
+const CATEGORY: Record<EffectStackKind, MessageKey> = {
+  diffuse: 'stack.category.texture', noise: 'stack.category.texture',
+  slit: 'stack.category.transform', stretch: 'stack.category.transform', distort: 'stack.category.transform', mirror: 'stack.category.transform', kaleidoscope: 'stack.category.transform',
+  voronoi: 'stack.category.structure', glass: 'stack.category.structure', glassV2: 'stack.category.structure',
 };
 
 type DragState = Omit<EffectStackDragState, 'kind'> & {
@@ -88,6 +90,7 @@ function programKeyForEffect(kind: EffectStackKind): LazyProgramKey {
 }
 
 export function PostprocessStackPanel({ onSwapWorkspace, onSelectEffectStack, detached = false }: Props = {}) {
+  const { t } = useLanguage();
   const { setPostprocess, effectPipeline, normalMap, imageGradient, setEffectPipeline } = useGradientStore();
   const stack = normalizeEffectStack(effectPipeline.effectStack);
   const movableStack = stack;
@@ -506,25 +509,25 @@ export function PostprocessStackPanel({ onSwapWorkspace, onSelectEffectStack, de
 
   const effectStatus = (kind: EffectStackKind, enabled: boolean) => {
     if (imageGradient.enabled && IMAGE_GRADIENT_PROTECTED_EFFECTS.has(kind)) {
-      return { label: 'Protected', className: 'text-amber-300' };
+      return { label: t('stack.status.protected'), className: 'text-amber-300' };
     }
     // Diffuse-only V2 is drawn directly by the Bootstrap generator and never
     // requests stackCore, so it is genuinely applied without a lazy-program
     // ready event.
     if (enabled && kind === 'diffuse' && canRenderV2Direct(effectPipeline, normalMap.enabled)) {
-      return { label: 'Applied', className: 'text-emerald-300' };
+      return { label: t('stack.status.applied'), className: 'text-emerald-300' };
     }
     return programStatusLabel(programKeyForEffect(kind), enabled);
   };
 
   const programStatusLabel = (key: LazyProgramKey, enabled: boolean) => {
-    if (!enabled) return { label: 'Off', className: 'text-cream/40' };
+    if (!enabled) return { label: t('stack.status.off'), className: 'text-cream/40' };
     const status = programStatus[key];
-    if (status === 'loading') return { label: 'Loading…', className: 'text-amber-300' };
-    if (status === 'failed') return { label: 'Unavailable', className: 'text-red-300' };
-    if (status === 'fallback') return { label: 'Applied (Fallback)', className: 'text-cyan-300' };
-    if (status === 'ready') return { label: 'Applied', className: 'text-emerald-300' };
-    return { label: 'Preparing…', className: 'text-amber-300' };
+    if (status === 'loading') return { label: t('stack.status.loading'), className: 'text-amber-300' };
+    if (status === 'failed') return { label: t('stack.status.unavailable'), className: 'text-red-300' };
+    if (status === 'fallback') return { label: t('stack.status.fallback'), className: 'text-cyan-300' };
+    if (status === 'ready') return { label: t('stack.status.applied'), className: 'text-emerald-300' };
+    return { label: t('stack.status.preparing'), className: 'text-amber-300' };
   };
 
   const panel = (
@@ -538,15 +541,15 @@ export function PostprocessStackPanel({ onSwapWorkspace, onSelectEffectStack, de
           onClick={() => setCollapsed(value => !value)}
         >
           <Icon name={collapsed ? 'chevronRight' : 'chevronDown'} className="shrink-0 text-[12px]" />
-          <span className="truncate font-display text-[9px] font-bold uppercase tracking-wider">Effect Stack</span>
+          <span className="truncate font-display text-[9px] font-bold uppercase tracking-wider">{t('effect.stack')}</span>
         </button>
         <div className="flex items-center gap-1.5">
           {(onSwapWorkspace || detached) && (
             <button
               type="button"
               className="rounded px-1 text-[12px] leading-none text-cream/55 transition-colors hover:bg-cream/10 hover:text-fire focus:outline-none focus-visible:ring-2 focus-visible:ring-fire"
-              title="Color Histogramと位置を交換"
-              aria-label="Color Histogramと位置を交換"
+              title={t('stack.swapHistogram')}
+              aria-label={t('stack.swapHistogram')}
               onClick={swapWorkspace}
             >
               ⇄
@@ -555,13 +558,13 @@ export function PostprocessStackPanel({ onSwapWorkspace, onSelectEffectStack, de
           <button
             type="button"
             className="rounded px-1 text-[12px] leading-none text-cream/55 transition-colors hover:bg-cream/10 hover:text-fire focus:outline-none focus-visible:ring-2 focus-visible:ring-fire"
-            title={detached || pipWindow || tauriWindowOpen ? 'Effect Stackを元の位置へ戻す' : 'Effect Stackを別ウィンドウで表示'}
-            aria-label={detached || pipWindow || tauriWindowOpen ? 'Effect Stackを元の位置へ戻す' : 'Effect Stackを別ウィンドウで表示'}
+            title={detached || pipWindow || tauriWindowOpen ? t('stack.restore') : t('stack.detach')}
+            aria-label={detached || pipWindow || tauriWindowOpen ? t('stack.restore') : t('stack.detach')}
             onClick={togglePiP}
           >
             ↗
           </button>
-          <span className="text-[8px] font-bold uppercase text-emerald-300">Stack V2</span>
+          <span className="text-[8px] font-bold uppercase text-emerald-300">{t('stack.version')}</span>
         </div>
       </div>
       <div id="kgg-effect-stack-content" hidden={collapsed}>
@@ -588,8 +591,8 @@ export function PostprocessStackPanel({ onSwapWorkspace, onSelectEffectStack, de
               <button
                 type="button"
                 className="flex h-7 w-6 cursor-grab touch-none items-center justify-center text-cream/50 transition-colors hover:text-fire active:cursor-grabbing"
-                aria-label={`Drag ${LABELS[layer.kind]}`}
-                title={`Drag ${LABELS[layer.kind]}`}
+                aria-label={t('stack.drag', { effect: LABELS[layer.kind] })}
+                title={t('stack.drag', { effect: LABELS[layer.kind] })}
                 onPointerDown={(e) => startDrag(e, layer.kind, index)}
               >
                 <Icon name="gripVertical" className="text-[15px]" />
@@ -597,7 +600,7 @@ export function PostprocessStackPanel({ onSwapWorkspace, onSelectEffectStack, de
               <div className="min-w-0 flex-1">
                 <div className="flex items-center gap-1.5 truncate font-display text-[10px] font-bold uppercase tracking-wider">
                   {LABELS[layer.kind]}
-                  <span className="rounded border border-cream/20 px-1 text-[7px] font-medium tracking-normal text-cream/60">{CATEGORY[layer.kind]}</span>
+                  <span className="rounded border border-cream/20 px-1 text-[7px] font-medium tracking-normal text-cream/60">{t(CATEGORY[layer.kind])}</span>
                 </div>
                 <div className={`text-[8px] font-medium uppercase tracking-wide ${status.className}`}>{status.label}</div>
               </div>
@@ -619,7 +622,7 @@ export function PostprocessStackPanel({ onSwapWorkspace, onSelectEffectStack, de
         })}
       </div>
       <div className="border-t border-cream/15 px-2 py-1.5 text-[8px] uppercase tracking-wider text-cream/55">
-        <div className="mb-1">Fixed: Surface → Prism → Particles</div>
+        <div className="mb-1">{t('stack.fixed')}</div>
         {imageGradient.enabled && (
           <div className="mb-1 text-amber-300/90 normal-case">Image Gradient: geometry-resampling layers are protected</div>
         )}

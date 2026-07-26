@@ -13,6 +13,7 @@ title: 開発者向けドキュメント
 3. [開発・検証ガイド](./development-guide.md)
 4. [DocDD運用ガイド](./docdd.md)
 5. [仕様一覧](../specs/index.md)と[ADR一覧](../adr/index.md)
+6. [UI用語・アイコン表記ガイド](./ui-terminology.md)
 
 ## 一次情報の優先順位
 

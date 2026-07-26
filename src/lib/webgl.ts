@@ -20,7 +20,8 @@ import type { GpuDiagnostics, RenderOptimization } from './gpuDiagnostics';
 import { isGlassOpticallyIdentity, normalizeGlassRenderParameters } from './glass';
 import { getActivePostprocessStackLayers } from './postprocessStack';
 import { canRenderV2Direct, getV2RenderPlan } from './effectPipeline';
-import { buildDiffuseCurveLut, normalizeDiffuseCurve } from './diffuseCurve';
+import { buildDiffuseBezierLut, normalizeDiffuseBezier } from './diffuseCurve';
+import { noiseAngleDegreesForShader, noiseAngleRadiansForShader } from './noiseAngle';
 import { clampParameter, getParameterLimit } from './parameterLimits';
 import { getAnimationDirectionVector } from './animationDirection';
 
@@ -1131,11 +1132,11 @@ function uploadGradientRampTexture(ctx: WebGLContext, gradient: GradientConfig):
   gl.texSubImage2D(gl.TEXTURE_2D, 0, 0, 0, RAMP_TEX_WIDTH, 1, gl.RGBA, gl.UNSIGNED_BYTE, data);
 }
 
-function uploadDiffuseCurveTexture(ctx: WebGLContext, diffuse: Pick<DiffuseConfig, 'luminanceCurve'>): void {
-  const curve = normalizeDiffuseCurve(diffuse.luminanceCurve);
-  const signature = curve.map(point => `${point.x.toFixed(6)}:${point.y.toFixed(6)}`).join('|');
+function uploadDiffuseCurveTexture(ctx: WebGLContext, diffuse: Pick<DiffuseConfig, 'luminanceBezier'>): void {
+  const curve = normalizeDiffuseBezier(diffuse.luminanceBezier);
+  const signature = curve.map(point => point.toFixed(6)).join('|');
   if (ctx.diffuseCurveSignature === signature) return;
-  const lut = buildDiffuseCurveLut(curve);
+  const lut = buildDiffuseBezierLut(curve);
   const rgba = new Uint8Array(lut.length * 4);
   for (let index = 0; index < lut.length; index++) {
     rgba[index * 4] = lut[index];
@@ -1419,12 +1420,15 @@ function drawPostprocessPass(
   gl.uniform2f(ctx.postprocessUniforms.u_animDir, postprocessAnimDirX, postprocessAnimDirY);
   gl.uniform1f(ctx.postprocessUniforms.u_dwInitVal, noiseDistortion.dwInitVal);
   gl.uniform1f(ctx.postprocessUniforms.u_dwInitAmp, noiseDistortion.dwInitAmp);
-  gl.uniform1f(ctx.postprocessUniforms.u_dwRotAngle1, noiseDistortion.dwRotAngle1);
-  gl.uniform1f(ctx.postprocessUniforms.u_dwRotAngle2, noiseDistortion.dwRotAngle2);
+  // Match Noise's screen-space rotation with the canvas InputAngle. The
+  // shader's coordinate rotation uses the opposite sign; persisted values
+  // remain unchanged and are mirrored only at the upload boundary.
+  gl.uniform1f(ctx.postprocessUniforms.u_dwRotAngle1, noiseAngleRadiansForShader(noiseDistortion.dwRotAngle1));
+  gl.uniform1f(ctx.postprocessUniforms.u_dwRotAngle2, noiseAngleRadiansForShader(noiseDistortion.dwRotAngle2));
   gl.uniform1f(ctx.postprocessUniforms.u_dwDist1, noiseDistortion.dwDist1);
   gl.uniform1f(ctx.postprocessUniforms.u_dwDist2, noiseDistortion.dwDist2);
   gl.uniform1f(ctx.postprocessUniforms.u_dwDist3, noiseDistortion.dwDist3);
-  gl.uniform1f(ctx.postprocessUniforms.u_dwDriftAngle, noiseDistortion.dwDriftAngle * Math.PI / 180);
+  gl.uniform1f(ctx.postprocessUniforms.u_dwDriftAngle, noiseAngleDegreesForShader(noiseDistortion.dwDriftAngle));
   const seamlessTypeMap = { simplex: 0, fbm: 1, curl: 2 } as const;
   gl.uniform1i(ctx.postprocessUniforms.u_noiseSeamlessType, seamlessTypeMap[noiseDistortion.seamlessType] ?? 0);
   gl.uniform1i(ctx.postprocessUniforms.u_seamlessAnimation, noiseDistortion.seamlessAnimation === 'radial' ? 1 : 0);
@@ -1444,7 +1448,7 @@ function drawPostprocessPass(
   gl.uniform1i(ctx.postprocessUniforms.u_aeFractalType, noiseDistortion.aeFractalType === 'turbulent' ? 1 : 0);
   gl.uniform1f(ctx.postprocessUniforms.u_aeSubInfluence, noiseDistortion.aeSubInfluence ?? 0.7);
   gl.uniform1f(ctx.postprocessUniforms.u_aeSubScaling, noiseDistortion.aeSubScaling ?? 1.78);
-  gl.uniform1f(ctx.postprocessUniforms.u_aeSubRotation, (noiseDistortion.aeSubRotation ?? 0) * Math.PI / 180);
+  gl.uniform1f(ctx.postprocessUniforms.u_aeSubRotation, noiseAngleDegreesForShader(noiseDistortion.aeSubRotation ?? 0));
   gl.uniform1f(ctx.postprocessUniforms.u_aeContrast, noiseDistortion.aeContrast ?? 1);
   gl.uniform1f(ctx.postprocessUniforms.u_aeBrightness, noiseDistortion.aeBrightness ?? 0);
   gl.uniform1f(ctx.postprocessUniforms.u_causticsDepth, finiteClamp(noiseDistortion.causticsDepth, 0.65, 0.05, 3));
@@ -1964,7 +1968,7 @@ export function render(
     grain: clampParameter(diffuse.grain, 1, getParameterLimit(diffuse.mode === 'dither' ? 'diffuse.ditherGrain' : 'diffuse.grain')),
     seed: clampParameter(diffuse.seed, 0, getParameterLimit('diffuse.seed')),
     ditherThreshold: clampParameter(diffuse.ditherThreshold, 0.5, getParameterLimit('diffuse.ditherThreshold')),
-    luminanceCurve: normalizeDiffuseCurve(diffuse.luminanceCurve),
+    luminanceBezier: normalizeDiffuseBezier(diffuse.luminanceBezier),
   };
   slitScan = {
     ...slitScan,
@@ -2071,7 +2075,7 @@ export function render(
   gl.uniform1i(uniforms.u_aeFractalType, noiseDistortion.aeFractalType === 'turbulent' ? 1 : 0);
   gl.uniform1f(uniforms.u_aeSubInfluence, noiseDistortion.aeSubInfluence ?? 0.7);
   gl.uniform1f(uniforms.u_aeSubScaling, noiseDistortion.aeSubScaling ?? 1.78);
-  gl.uniform1f(uniforms.u_aeSubRotation, ((noiseDistortion.aeSubRotation ?? 0) * Math.PI) / 180);
+  gl.uniform1f(uniforms.u_aeSubRotation, noiseAngleDegreesForShader(noiseDistortion.aeSubRotation ?? 0));
   gl.uniform1f(uniforms.u_aeContrast, noiseDistortion.aeContrast ?? 1.0);
   gl.uniform1f(uniforms.u_aeBrightness, noiseDistortion.aeBrightness ?? 0.0);
   gl.uniform1f(uniforms.u_causticsDepth, finiteClamp(noiseDistortion.causticsDepth, 0.65, 0.05, 3));
@@ -2152,12 +2156,12 @@ export function render(
   gl.uniform1i(uniforms.u_imageMaskEnabled, imageMaskEnabled && imageMaskSource ? 1 : 0);
   gl.uniform1f(uniforms.u_dwInitVal, noiseDistortion.dwInitVal);
   gl.uniform1f(uniforms.u_dwInitAmp, noiseDistortion.dwInitAmp);
-  gl.uniform1f(uniforms.u_dwRotAngle1, noiseDistortion.dwRotAngle1);
-  gl.uniform1f(uniforms.u_dwRotAngle2, noiseDistortion.dwRotAngle2);
+  gl.uniform1f(uniforms.u_dwRotAngle1, noiseAngleRadiansForShader(noiseDistortion.dwRotAngle1));
+  gl.uniform1f(uniforms.u_dwRotAngle2, noiseAngleRadiansForShader(noiseDistortion.dwRotAngle2));
   gl.uniform1f(uniforms.u_dwDist1, noiseDistortion.dwDist1);
   gl.uniform1f(uniforms.u_dwDist2, noiseDistortion.dwDist2);
   gl.uniform1f(uniforms.u_dwDist3, noiseDistortion.dwDist3);
-  gl.uniform1f(uniforms.u_dwDriftAngle, noiseDistortion.dwDriftAngle * Math.PI / 180);
+  gl.uniform1f(uniforms.u_dwDriftAngle, noiseAngleDegreesForShader(noiseDistortion.dwDriftAngle));
   gl.uniform1i(uniforms.u_slitEnabled, generatorColorFieldEnabled && slitScan.enabled ? 1 : 0);
   gl.uniform1i(uniforms.u_slitMode, slitScan.mode === 'circular' ? 1 : slitScan.mode === 'polygon' ? 2 : slitScan.mode === 'wave' ? 3 : 0);
   gl.uniform1f(uniforms.u_slitAngle, (slitScan.angle * Math.PI) / 180);
@@ -2403,7 +2407,7 @@ export function render(
       diffuseSeed: diffuse.seed,
       diffuseDitherThreshold: diffuse.ditherThreshold,
       diffuseAdaptiveEnabled: diffuse.adaptiveEnabled,
-      diffuseLuminanceCurve: diffuse.luminanceCurve,
+      diffuseLuminanceBezier: diffuse.luminanceBezier,
     };
     // In V2, Noise is an explicit stack layer. Other effects may reuse the
     // noise material parameters internally, but must not apply the Noise UV

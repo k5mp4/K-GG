@@ -4,6 +4,7 @@ import { isAutoCapableProperty } from '../lib/animationRegistry';
 import { getTimelineTime, setTimelineTime } from '../lib/timelineClock';
 import { getKeyframeEditTime } from '../lib/loopKeyframes';
 import { renderBridge } from '../lib/renderBridge';
+import { useLanguage } from '../i18n/LanguageProvider';
 
 type Props = {
   trackId: string;
@@ -13,6 +14,7 @@ type Props = {
 };
 
 export function AnimationPropertyControls({ trackId, label, value, compact = false }: Props) {
+  const { t } = useLanguage();
   const { animation, keyframeTracks, setTrackMode, addKeyframe, removeKeyframe } = useGradientStore();
   const track = keyframeTracks[trackId];
   const mode = getTrackMode(track);
@@ -74,24 +76,24 @@ export function AnimationPropertyControls({ trackId, label, value, compact = fal
   return (
     <div
       className={`flex items-center ${compact ? 'gap-0.5' : 'gap-1'}`}
-      title={animation.enabled ? `${label} animation mode` : 'Animation is disabled; the mode is retained'}
+      title={animation.enabled ? t('animation.mode', { label }) : t('animation.disabledRetained')}
     >
       <select
-        aria-label={`${label} animation mode`}
+        aria-label={t('animation.mode', { label })}
         value={mode}
         onChange={event => changeMode(event.target.value as AnimationMode)}
         className={`${compact ? 'h-4 w-[42px] px-0 text-[7px]' : 'h-5 max-w-[54px] px-1 text-[9px]'} border font-display font-semibold uppercase tracking-wide outline-none ${modeColor}`}
       >
-        <option value="static">Static</option>
-        {autoCapable && <option value="auto">Auto</option>}
-        <option value="keys">Keys</option>
+        <option value="static">{t('animation.mode.static')}</option>
+        {autoCapable && <option value="auto">{t('animation.mode.auto')}</option>}
+        <option value="keys">{t('animation.mode.keys')}</option>
       </select>
       <button
         type="button"
         onClick={() => moveToKey(-1)}
         disabled={!track?.keyframes.length}
-        aria-label={`${label} previous keyframe`}
-        title="前のキー"
+        aria-label={t('animation.previousKey', { label })}
+        title={t('animation.previousKey', { label })}
         className={`${compact ? 'h-4 w-3 text-[9px]' : 'h-5 w-4 text-[11px]'} bg-transparent p-0 text-tab-inactive hover:text-k-text disabled:opacity-25`}
       >
         ‹
@@ -99,8 +101,8 @@ export function AnimationPropertyControls({ trackId, label, value, compact = fal
       <button
         type="button"
         onClick={toggleKeyAtTime}
-        aria-label={keyAtTime ? `${label} keyframeを削除` : `${label} keyframeを追加`}
-        title={keyAtTime ? '現在時刻のキーを削除' : '現在時刻にキーを追加'}
+        aria-label={keyAtTime ? t('animation.removeKey', { label }) : t('animation.addKey', { label })}
+        title={keyAtTime ? t('animation.removeKey', { label }) : t('animation.addKey', { label })}
         className={`${compact ? 'h-4 w-4' : 'h-5 w-5'} flex items-center justify-center bg-transparent p-0 transition-colors ${
           mode === 'keys' ? 'text-fire hover:text-cream' : 'text-k-muted hover:text-fire'
         }`}
@@ -113,8 +115,8 @@ export function AnimationPropertyControls({ trackId, label, value, compact = fal
         type="button"
         onClick={() => moveToKey(1)}
         disabled={!track?.keyframes.length}
-        aria-label={`${label} next keyframe`}
-        title="次のキー"
+        aria-label={t('animation.nextKey', { label })}
+        title={t('animation.nextKey', { label })}
         className={`${compact ? 'h-4 w-3 text-[9px]' : 'h-5 w-4 text-[11px]'} bg-transparent p-0 text-tab-inactive hover:text-k-text disabled:opacity-25`}
       >
         ›

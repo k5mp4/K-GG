@@ -1,12 +1,13 @@
 import { useGradientStore, STORE_DEFAULTS } from '../store/gradientStore';
 import { SliderField } from './SliderField';
 import { Collapsible } from './Collapsible';
-import { AnimatedButton } from './AnimatedButton';
 import { Toggle } from './Toggle';
 import type { DiffuseConfig } from '../types/distortion';
 import { Icon } from './Icon';
 import { DiffuseCurveEditor } from './DiffuseCurveEditor';
-import { normalizeDiffuseCurve } from '../lib/diffuseCurve';
+import { IDENTITY_DIFFUSE_BEZIER } from '../lib/diffuseCurve';
+import { useLanguage } from '../i18n/LanguageProvider';
+import { InputRadio } from 'tweeq';
 
 const D = STORE_DEFAULTS.diffuse;
 const isDiffuseDirty = (value: DiffuseConfig) =>
@@ -23,6 +24,7 @@ const DIFFUSE_MODES: Array<{ value: DiffuseConfig['mode']; label: string }> = [
 ];
 
 export function DiffusePanel() {
+  const { t } = useLanguage();
   const { diffuse, setDiffuse } = useGradientStore();
   const canReset = isDiffuseDirty(diffuse);
 
@@ -30,7 +32,7 @@ export function DiffusePanel() {
     <div className="space-y-4">
       <div className="space-y-4">
         <div className="flex items-center justify-between">
-          <h2 className="font-semibold text-sm">Diffuse</h2>
+          <h2 className="font-semibold text-sm">{t('effect.diffuse')}</h2>
           <div className="flex items-center gap-2">
             <button
               onClick={() => setDiffuse({ ...D, enabled: diffuse.enabled })}
@@ -38,7 +40,7 @@ export function DiffusePanel() {
               className={`w-6 h-6 inline-flex items-center justify-center bg-transparent hover:bg-k-muted text-tab-inactive hover:text-k-text rounded-none transition-all ${
                 canReset ? 'opacity-100 cursor-pointer' : 'opacity-0 pointer-events-none'
               }`}
-              title="Diffuse のパラメータをリセット"
+              title={t('common.reset')}
             >
               <Icon name="restart" className="text-[14px]" />
             </button>
@@ -50,18 +52,14 @@ export function DiffusePanel() {
           <div className="space-y-4 pt-2">
             <div>
               <p className="text-xs text-deep mb-1">Mode</p>
-              <div className="grid grid-cols-3 gap-1">
-                {DIFFUSE_MODES.map((m) => (
-                  <AnimatedButton
-                    key={m.value}
-                    onClick={() => setDiffuse({ mode: m.value })}
-                    isActive={diffuse.mode === m.value}
-                    className="py-1"
-                  >
-                    {m.label}
-                  </AnimatedButton>
-                ))}
-              </div>
+              <InputRadio
+                value={diffuse.mode}
+                options={DIFFUSE_MODES.map((mode) => mode.value)}
+                labels={DIFFUSE_MODES.map((mode) => mode.label)}
+                onChange={(mode) => mode !== undefined && setDiffuse({ mode })}
+                aria-label="Diffuse mode"
+                className="w-full"
+              />
             </div>
 
             {diffuse.mode !== 'dither' && (
@@ -100,21 +98,22 @@ export function DiffusePanel() {
 
             <div className="flex items-center justify-between border-t border-k-muted/40 pt-3">
               <div>
-                <p className="text-xs text-deep">Adaptive Luminance</p>
-                <p className="text-[10px] text-tab-inactive">輝度に応じて拡散量を変化</p>
+                <p className="text-xs text-deep">{t('diffuse.adaptiveLuminance')}</p>
+                <p className="text-[10px] text-tab-inactive">{t('diffuse.adaptiveDescription')}</p>
               </div>
               <Toggle checked={diffuse.adaptiveEnabled ?? false} onChange={(v) => setDiffuse({ adaptiveEnabled: v })} />
             </div>
             <DiffuseCurveEditor
-              value={diffuse.luminanceCurve}
-              onChange={(luminanceCurve) => setDiffuse({ luminanceCurve })}
+              value={diffuse.luminanceBezier}
+              onChange={(luminanceBezier) => setDiffuse({ luminanceBezier })}
+              disabled={!diffuse.adaptiveEnabled}
             />
             <button
               type="button"
               className="w-full border border-k-muted/60 bg-k-surface px-2 py-1 text-[10px] text-tab-inactive hover:border-k-text hover:text-k-text"
-              onClick={() => setDiffuse({ luminanceCurve: normalizeDiffuseCurve(undefined) })}
+              onClick={() => setDiffuse({ luminanceBezier: [...IDENTITY_DIFFUSE_BEZIER] as DiffuseConfig['luminanceBezier'] })}
             >
-              Reset Luminance Curve
+              {t('diffuse.resetCurve')}
             </button>
 
             <SliderField

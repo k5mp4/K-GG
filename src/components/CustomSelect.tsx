@@ -1,6 +1,8 @@
 import { useState, useRef, useEffect } from 'react';
 import { gsap } from 'gsap';
 import { useInteractionSettings } from './InteractionSettingsContext';
+import { useLanguage } from '../i18n/LanguageProvider';
+import { localizeUiLabel } from '../i18n/uiLabels';
 
 interface Option {
   value: string;
@@ -16,6 +18,7 @@ interface CustomSelectProps {
 }
 
 export function CustomSelect({ value, options, onChange, label, className = '' }: CustomSelectProps) {
+  const { language } = useLanguage();
   const [isOpen, setIsOpen] = useState(false);
   const { hoverInteractionsEnabled } = useInteractionSettings();
   const dropdownRef = useRef<HTMLDivElement>(null);
@@ -98,7 +101,7 @@ export function CustomSelect({ value, options, onChange, label, className = '' }
         if (hoverInteractionsEnabled) setIsOpen(false);
       }}
     >
-      {label && <label className="block text-xs mb-1 text-deep font-display uppercase tracking-wider">{label}</label>}
+      {label && <label className="block text-xs mb-1 text-deep font-display uppercase tracking-wider">{localizeUiLabel(label, language)}</label>}
       <button
         ref={triggerRef}
         type="button"
@@ -106,7 +109,7 @@ export function CustomSelect({ value, options, onChange, label, className = '' }
         aria-expanded={isOpen}
         className="w-full bg-k-surface border border-panel-border border-panel rounded-none px-2 py-1 text-sm text-k-text text-left flex justify-between items-center hover:border-fire transition-colors focus:outline-none focus:ring-1 focus:ring-fire"
       >
-        <span className="truncate mr-2">{selectedOption.label}</span>
+        <span className="truncate mr-2">{localizeUiLabel(selectedOption.label, language)}</span>
         <svg 
           className={`w-3 h-3 shrink-0 transition-transform duration-200 ${isOpen ? 'rotate-180' : ''}`} 
           fill="none" stroke="var(--color-k-text)" viewBox="0 0 24 24"
@@ -132,7 +135,7 @@ export function CustomSelect({ value, options, onChange, label, className = '' }
                 option.value === value ? 'bg-fire/20 text-cream' : 'text-k-text hover:text-k-text'
               }`}
             >
-              {option.label}
+              {localizeUiLabel(option.label, language)}
             </button>
           ))}
         </div>

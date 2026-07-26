@@ -9,6 +9,8 @@ import { imageFileToCanvas } from '../lib/applySlitToImage';
 import { Icon } from './Icon';
 import { CustomSelect } from './CustomSelect';
 import { AnimationPropertyControls } from './AnimationPropertyControls';
+import { InputShuffle, fromNumber } from 'tweeq';
+import { useLanguage } from '../i18n/LanguageProvider';
 
 const D = STORE_DEFAULTS.slitScan;
 const WAVE_DEFAULT_DIRECTION = 90;
@@ -34,6 +36,7 @@ type Props = {
 };
 
 export function SlitScanPanel({ sourceImageName, hasSourceImage, onSourceImageLoad, onSourceImageClear }: Props) {
+  const { t } = useLanguage();
   const { slitScan, setSlitScan, slitOverlayEnabled, setSlitOverlayEnabled } = useGradientStore();
   const canReset = isSlitDirty(slitScan);
   const [imageError, setImageError] = useState<string | null>(null);
@@ -62,7 +65,7 @@ export function SlitScanPanel({ sourceImageName, hasSourceImage, onSourceImageLo
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
-        <h2 className="font-semibold text-sm">Slit Scan</h2>
+        <h2 className="font-semibold text-sm">{t('effect.slit')}</h2>
         <div className="flex items-center gap-2">
           <button
             onClick={() => setSlitScan({ ...D, enabled: slitScan.enabled })}
@@ -70,7 +73,7 @@ export function SlitScanPanel({ sourceImageName, hasSourceImage, onSourceImageLo
             className={`w-6 h-6 inline-flex items-center justify-center bg-transparent hover:bg-k-muted text-tab-inactive hover:text-k-text rounded-none transition-all ${
               canReset ? 'opacity-100 cursor-pointer' : 'opacity-0 pointer-events-none'
             }`}
-            title="Slit Scan のパラメータをリセット"
+            title={t('common.reset')}
           >
             <Icon name="restart" className="text-[14px]" />
           </button>
@@ -321,13 +324,14 @@ export function SlitScanPanel({ sourceImageName, hasSourceImage, onSourceImageLo
                 trackId="slitScan.seed"
               />
             </div>
-            <button
-              onClick={() => setSlitScan({ seed: Math.floor(Math.random() * 100) })}
-              className="px-2 py-1 mb-1 text-[10px] bg-k-surface hover:bg-k-muted text-k-text/80 rounded-none border border-cream/40 transition-colors shrink-0"
-              title="乱数シードをランダムに変更"
-            >
-              Dice
-            </button>
+            <InputShuffle
+              value={slitScan.seed}
+              onChange={(seed) => setSlitScan({ seed })}
+              generate={fromNumber(0, 100, 1)}
+              className="mb-1 shrink-0"
+              aria-label={t('common.shuffle')}
+              title={t('common.shuffle')}
+            />
           </div>
         </div>
       </Collapsible>

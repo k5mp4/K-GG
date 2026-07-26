@@ -73,6 +73,8 @@ export type DiffuseCurvePoint = {
   y: number;
 };
 
+export type DiffuseBezierValue = [number, number, number, number];
+
 export type DiffuseConfig = {
   enabled: boolean;
   mode: 'block' | 'smooth' | 'dither'; // block=矩形ノイズ, smooth=有機的ドットノイズ, dither=ディザパターン
@@ -83,6 +85,8 @@ export type DiffuseConfig = {
   seedAnimEnabled?: boolean; // true=描画フレームごとに seed を進める
   ditherThreshold: number; // 0–1 ディザのしきい値バイアス（0.5=標準）
   adaptiveEnabled?: boolean;
+  luminanceBezier: DiffuseBezierValue;
+  /** @deprecated Legacy preset input only. New presets must omit this field. */
   luminanceCurve?: DiffuseCurvePoint[];
 };
 
@@ -219,7 +223,7 @@ export type PostprocessConfig = ManualDistortConfig & {
   effectStack: PostprocessStackLayer[];
   /** Diffuse parameters mirrored into the V2 postprocess boundary. */
   diffuseAdaptiveEnabled?: boolean;
-  diffuseLuminanceCurve?: DiffuseCurvePoint[];
+  diffuseLuminanceBezier?: DiffuseBezierValue;
   mirrorMode: PostprocessMirrorMode;
   kaleidoscopeType: PostprocessKaleidoscopeType;
   kaleidoscopeSlices: number;

@@ -1,12 +1,14 @@
 import React, { useRef, useEffect, useState, useMemo, useCallback } from 'react';
 import { useGradientStore } from '../store/gradientStore';
 import { buildRampTextureData } from '../lib/gradientRampUtils';
+import { useLanguage } from '../i18n/LanguageProvider';
 
 interface Props {
   sourceCanvasRef: React.RefObject<HTMLCanvasElement | null>;
 }
 
 export function ColorHistogram({ sourceCanvasRef }: Props) {
+  const { t } = useLanguage();
   const histogramCanvasRef = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const { histogram, setHistogram, gradient } = useGradientStore();
@@ -238,7 +240,7 @@ export function ColorHistogram({ sourceCanvasRef }: Props) {
       <div className="flex justify-between items-center px-0.5">
         <span className="text-[10px] font-bold text-deep uppercase tracking-widest flex items-center gap-2">
           <div className="w-1.5 h-1.5 rounded-full bg-fire animate-pulse" />
-          Realtime Stats
+          {t('histogram.realtime')}
         </span>
         <button
           onClick={() => setHistogram({ enabled: false })}
@@ -278,7 +280,7 @@ export function ColorHistogram({ sourceCanvasRef }: Props) {
            <div className="w-1 h-1 rounded-full bg-blue-500/50" />
         </div>
         <span className="text-[8px] text-tab-inactive font-bold uppercase tracking-tighter">
-          Drag right edge to resize
+          {t('histogram.resize')}
         </span>
       </div>
     </div>

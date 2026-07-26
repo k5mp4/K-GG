@@ -1,6 +1,8 @@
 import { useEffect } from 'react';
 import type { NativeFfmpegStatus } from '../adapters';
 import { Icon } from './Icon';
+import { IconButton } from './IconButton';
+import { useLanguage } from '../i18n/LanguageProvider';
 
 const FFMPEG_BUILDS_URL = 'https://www.gyan.dev/ffmpeg/builds/#release-builds';
 
@@ -23,6 +25,7 @@ export function FfmpegSetupDialog({
   onOpenFolder,
   onOpenBuildsPage,
 }: Props) {
+  const { t } = useLanguage();
   useEffect(() => {
     if (!open) return;
     const onKeyDown = (event: KeyboardEvent) => {
@@ -41,7 +44,7 @@ export function FfmpegSetupDialog({
         className="absolute inset-0 cursor-default bg-black/70 backdrop-blur-sm"
         onClick={onClose}
         disabled={checking}
-        aria-label="FFmpeg案内を閉じる"
+        aria-label={t('common.close')}
       />
       <section
         role="dialog"
@@ -57,41 +60,36 @@ export function FfmpegSetupDialog({
             </span>
             <div>
               <p className="text-[9px] font-display font-semibold uppercase tracking-[0.24em] text-fire">
-                Video export dependency
+                {t('ffmpeg.dependency')}
               </p>
               <h2 id="ffmpeg-dialog-title" className="font-display text-lg font-bold uppercase tracking-wider text-k-text">
-                FFmpeg is required
+                {t('ffmpeg.required')}
               </h2>
             </div>
           </div>
-          <button
-            type="button"
+          <IconButton
+            icon="close"
+            label={t('common.close')}
             onClick={onClose}
             disabled={checking}
             className="flex h-9 w-9 items-center justify-center text-tab-inactive hover:bg-k-border hover:text-k-text disabled:opacity-30"
-            aria-label="閉じる"
-          >
-            <Icon name="close" className="text-[20px]" />
-          </button>
+            iconClassName="text-[20px]"
+          />
         </header>
 
         <div className="space-y-5 overflow-y-auto p-6 scrollbar-thin">
           <p className="text-sm leading-relaxed text-k-text/85">
-            MOV / MP4書き出しには、Windows x64版のFFmpegと
-            <code className="mx-1 text-fire">qtrle</code>・
-            <code className="mx-1 text-fire">libx264rgb</code>
-            エンコーダーが必要です。
+            {t('ffmpeg.description')}
           </p>
 
           <ol className="list-decimal space-y-2 pl-5 text-xs leading-relaxed text-k-text/75">
-            <li>gyan.devから「release essentials」のZIPをダウンロードして展開します。</li>
-            <li>展開したフォルダの<code className="mx-1 text-k-text">bin/ffmpeg.exe</code>をコピーします。</li>
-            <li>下のボタンでK-GG専用フォルダを開き、そこへ配置して再確認します。</li>
+            <li>{t('ffmpeg.stepDownload')}</li>
+            <li>{t('ffmpeg.stepCopy')}</li>
+            <li>{t('ffmpeg.stepPlace')}</li>
           </ol>
 
           <div className="border border-cream/20 bg-k-bg/55 p-4 text-xs leading-relaxed text-tab-inactive">
-            システムPATHから<code className="mx-1 text-k-text">ffmpeg</code>を実行できる場合も利用できます。
-            K-GGはFFmpegのダウンロードやPATH変更を行いません。
+            {t('ffmpeg.pathDescription')}
           </div>
 
           {(status?.error || status?.warning) && (
@@ -103,12 +101,12 @@ export function FfmpegSetupDialog({
 
           {status?.folderPath && (
             <p className="break-all text-[10px] leading-relaxed text-tab-inactive">
-              K-GG専用フォルダ: {status.folderPath}
+              {t('ffmpeg.folder', { path: status.folderPath })}
             </p>
           )}
 
           <p className="text-[10px] leading-relaxed text-tab-inactive">
-            gyan.devの推奨ビルドはGPLv3です。FFmpegのライセンスは導入したビルドに従います。
+            {t('ffmpeg.license')}
           </p>
           <p className="break-all text-[10px] leading-relaxed text-tab-inactive">
             {FFMPEG_BUILDS_URL}
@@ -120,14 +118,14 @@ export function FfmpegSetupDialog({
               onClick={onOpenBuildsPage}
               className="flex items-center justify-center border border-fire bg-fire/15 px-4 py-2.5 text-xs font-display font-bold uppercase tracking-wider text-fire hover:bg-fire hover:text-k-bg"
             >
-              Open gyan.dev
+              {t('ffmpeg.openBuilds')}
             </button>
             <button
               type="button"
               onClick={onOpenFolder}
               className="border border-cream/35 px-4 py-2.5 text-xs font-display font-semibold uppercase tracking-wider text-k-text hover:border-cream"
             >
-              Open FFmpeg Folder
+              {t('ffmpeg.openFolder')}
             </button>
           </div>
 
@@ -138,7 +136,7 @@ export function FfmpegSetupDialog({
               disabled={checking}
               className="border border-cream/30 px-4 py-2 text-xs font-display font-semibold uppercase tracking-wider text-tab-inactive hover:text-k-text disabled:opacity-40"
             >
-              Not now
+              {t('common.notNow')}
             </button>
             <button
               type="button"
@@ -146,7 +144,7 @@ export function FfmpegSetupDialog({
               disabled={checking}
               className="min-w-32 border border-fire bg-fire px-4 py-2 text-xs font-display font-bold uppercase tracking-wider text-k-bg hover:bg-cream disabled:cursor-wait disabled:opacity-50"
             >
-              {checking ? 'Checking…' : 'Check again'}
+              {checking ? t('common.checking') : t('common.checkAgain')}
             </button>
           </div>
         </div>

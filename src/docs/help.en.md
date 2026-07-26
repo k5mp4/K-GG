@@ -1,0 +1,91 @@
+### License / Terms of Use
+
+K-GG source code is distributed under the Apache License 2.0. © 2026 ke-go.
+
+Images, videos, and other materials generated with this application may be used for personal, non-commercial, or commercial purposes. Use, copying, modification, and redistribution of the application itself are governed by the Apache License 2.0. See the repository `LICENSE` for details.
+
+You are responsible for ensuring generated materials do not infringe third-party copyrights, trademarks, event logos, characters, or other rights.
+
+#### Third-party software
+
+For MOV and MP4 export, the K-GG Tauri desktop app launches FFmpeg placed in the K-GG-specific folder or available on PATH. K-GG does not bundle or distribute FFmpeg and does not use ffmpeg.wasm.
+
+FFmpeg is primarily licensed under GNU LGPL 2.1 or later. GPL applies when a build includes GPL components. The recommended build from gyan.dev is GPLv3. FFmpeg licensing is separate from the Apache License 2.0 that covers K-GG.
+
+K-GG uses third-party libraries including React, Tauri, fflate, ogl, Tweeq, Zustand, and react-markdown. See `NOTICE` in the repository for a summary of third-party licenses.
+
+GSAP is used for UI animation under the GSAP Standard License. Review that license or remove the dependency before distributing K-GG in a way that competes with animation-production services or Webflow-style visual animation tools.
+
+The web build loads Noto Sans JP and Open Sans from Google Fonts in `index.html`. Self-host the fonts and bundle their license files for offline or privacy-sensitive distribution.
+
+- FFmpeg: https://ffmpeg.org
+- FFmpeg Windows builds: https://www.gyan.dev/ffmpeg/builds/
+- FFmpeg license information: https://ffmpeg.org/legal.html
+- Apache License 2.0: https://www.apache.org/licenses/LICENSE-2.0
+- LGPL v2.1: https://www.gnu.org/licenses/old-licenses/lgpl-2.1.html
+- GSAP Standard License: https://gsap.com/standard-license/
+
+## K-GG Guide
+
+## Basic settings (right panel)
+
+- **Canvas Size** sets the output resolution. Choose Full HD, HD, 400×400, or 800×800, or enter W and H directly. Mouse wheel changes by 1; Shift+wheel changes by 10. Use the lock icon to preserve the aspect ratio.
+- **Gradient Ramp** is the main editing area below the resolution controls. Adjust color, position, and opacity for each stop. Color Palette Generator extracts colors from an image and applies them as gradient stops.
+- **Image Overlay / Mask** overlays an image or uses it as an alpha mask.
+- **Gradient Type** provides Linear, Radial, 4-color, Diamond, Angle, and Bezier layouts. Each icon previews the default anchor arrangement.
+- **Image Gradient Source** recolors the luminance or RGB channels of an image with the current Gradient Ramp. The image is placed using Cover and the source image itself is not stored in presets.
+  - **S** scales handles or multiple points.
+  - **A** selects all points.
+  - **G** moves points on the canvas; add **X** or **Y** to constrain an axis.
+
+## Effects (left panel)
+
+### Diffuse
+
+Adds deterministic diffusion to the gradient. In V2 it is placed at the final image-processing stage by default. Smooth reduces the visible grid pattern. Adjust Scatter, Grain, and Seed. Adaptive Luminance maps input luminance through one cubic Bezier curve; its histogram is a read-only preview.
+
+### Noise
+
+Distorts the gradient with multiple noise algorithms. Strength controls the amount and Scale controls detail. Curl and Domain Warp are useful for organic textures. Seamless uses polar coordinates to create tileable textures; Radial (Expand) radiates outward from the center.
+
+### Postprocess Effect Stack
+
+Use the Effect Stack panel at the upper-left of the canvas to reorder Noise, Slit, Stretch, Distort, Mirror, Kaleidoscope, Voronoi, Glass, Glass V2, and Diffuse. Drag a row by its grip and toggle it with the switch. The fixed stages are `Surface → Main Stack → Prism → Particles`.
+
+Glass uses an organic ridge height field. Glass V2 approximates screen-space optics with smooth gradient noise and separate RGB refraction. Both share Glass parameters but can be compared or combined as separate layers.
+
+If the screen or GPU rendering becomes corrupted, open Settings in the top bar and use **Refresh app**. Unsaved edits are discarded.
+
+### Slit
+
+Stretches pixels along an axis. Enable Animate for motion. PingPong provides a seamless loop.
+
+### Normal
+
+Builds a normal map from the gradient luminance. Height controls relief strength. A monochrome gradient is applied while enabled; reapply the desired gradient after disabling it.
+
+### Animation
+
+Each property can be Static, Auto, or Keys. Switching from Auto to Keys records the current value; created keys remain when returning to Auto. The Animation Workspace controls playback, frame stepping, Preview Loop, Duration, FPS, and Loop Timing. Filter tracks with Moving, Selected, or All, then edit Keys interpolation in Graph Editor.
+
+### Export
+
+- **Image** exports the current result as PNG, JPG, or WebP.
+- **Slit PNGs** exports one PNG for each slit.
+- **MOV** uses external FFmpeg in the Tauri desktop app to create QuickTime Animation (qtrle) MOV.
+- **MP4 (H.264 RGB)** uses external FFmpeg and offers High (CRF 18), Balanced (CRF 22), and Small (CRF 27). High is the default.
+- **ZIP PNG** exports a numbered PNG sequence in both web and Tauri builds without FFmpeg.
+
+For MOV or MP4, place `ffmpeg.exe` in the K-GG FFmpeg folder or make the `ffmpeg` command available on PATH. Open the preferred folder with **Open K-GG FFmpeg folder** in Export. K-GG does not download FFmpeg.
+
+### Preset
+
+Saves and loads the current settings. In the desktop app, presets are stored in `presets/presets.json` beside the executable. Reset restores the initial settings. Display language is an application preference and is not stored in presets.
+
+## Preview controls
+
+- **Mouse wheel**: Zoom at the pointer.
+- **Middle mouse drag**: Pan.
+- **Space**: Play / pause animation.
+- **Ctrl+Z**: Undo.
+- **Ctrl+Y / Ctrl+Shift+Z**: Redo.

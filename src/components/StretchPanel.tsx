@@ -5,6 +5,8 @@ import { Collapsible } from './Collapsible';
 import { Toggle } from './Toggle';
 import { AnimationPropertyControls } from './AnimationPropertyControls';
 import { Icon } from './Icon';
+import { InputShuffle, fromNumber } from 'tweeq';
+import { useLanguage } from '../i18n/LanguageProvider';
 
 const D = STORE_DEFAULTS.stretch;
 const isStretchDirty = (value: StretchConfig) =>
@@ -15,13 +17,14 @@ const isStretchDirty = (value: StretchConfig) =>
   });
 
 export function StretchPanel() {
+  const { t } = useLanguage();
   const { stretch, setStretch } = useGradientStore();
   const canReset = isStretchDirty(stretch);
 
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
-        <h2 className="font-semibold text-sm">Stretch</h2>
+        <h2 className="font-semibold text-sm">{t('effect.stretch')}</h2>
         <div className="flex items-center gap-2">
           <button
             onClick={() => setStretch({ ...D, enabled: stretch.enabled })}
@@ -29,7 +32,7 @@ export function StretchPanel() {
             className={`w-6 h-6 inline-flex items-center justify-center bg-transparent hover:bg-k-muted text-tab-inactive hover:text-k-text rounded-none transition-all ${
               canReset ? 'opacity-100 cursor-pointer' : 'opacity-0 pointer-events-none'
             }`}
-            title="Stretch のパラメータをリセット"
+            title={t('common.reset')}
           >
             <Icon name="restart" className="text-[14px]" />
           </button>
@@ -84,13 +87,14 @@ export function StretchPanel() {
                 trackId="stretch.seed"
               />
             </div>
-            <button
-              onClick={() => setStretch({ seed: Math.floor(Math.random() * 100) })}
-              className="px-2 py-1 mb-1 text-[10px] bg-k-surface hover:bg-k-muted text-k-text/80 rounded-none border border-cream/40 transition-colors shrink-0"
-              title="乱数シードをランダムに変更"
-            >
-              Dice
-            </button>
+            <InputShuffle
+              value={stretch.seed}
+              onChange={(seed) => setStretch({ seed })}
+              generate={fromNumber(0, 100, 1)}
+            className="mb-1 shrink-0"
+              aria-label={t('common.shuffle')}
+              title={t('common.shuffle')}
+            />
           </div>
           <div className="border-t border-cream/40 pt-3 space-y-4">
             <div className="flex items-center justify-between">

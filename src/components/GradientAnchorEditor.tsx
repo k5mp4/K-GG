@@ -16,6 +16,7 @@ const SNAP_CONFIG = {
 type Props = {
   width: number;
   height: number;
+  visible?: boolean;
 };
 
 /**
@@ -68,7 +69,7 @@ function computeAnchorColors(
   return { fill, innerBorder, outerGlow };
 }
 
-export function GradientAnchorEditor({ width, height }: Props) {
+export function GradientAnchorEditor({ width, height, visible = true }: Props) {
   const { gradient, keyframeTracks, setKeyframeTracks, addKeyframe, setKeyframe, currentTime, animation, selectedGradientAnchors, setSelectedGradientAnchors, setIsGradientAnchorDragging } = useGradientStore();
   const containerRef = useRef<HTMLDivElement>(null);
   const draggingRef = useRef<number | null>(null);
@@ -287,6 +288,8 @@ export function GradientAnchorEditor({ width, height }: Props) {
   }
 
   const showKfButton = animation.enabled;
+
+  if (!visible) return null;
 
   // アニメーション再生中はキーフレームを補間した位置を使用
   const effectiveAnchors: typeof anchors = anchors.map((anchor, idx) => {

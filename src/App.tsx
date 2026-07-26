@@ -35,6 +35,9 @@ import { DockPanel } from './components/DockPanel';
 import { PanelEdgeToggle } from './components/PanelEdgeToggle';
 import { SidebarSection } from './components/SidebarSection';
 import { Icon } from './components/Icon';
+import { IconButton } from './components/IconButton';
+import { useLanguage } from './i18n/LanguageProvider';
+import type { MessageKey } from './i18n/messages';
 import { undo, redo } from './lib/history';
 import type { GpuDiagnostics } from './lib/gpuDiagnostics';
 import type { EffectStackKind } from './types/distortion';
@@ -63,17 +66,17 @@ const CANVAS_SIZE_PRESETS = [
 type LeftTab = 'diffuse' | 'noise' | 'slit' | 'stretch' | 'normal' | 'distort' | 'postprocess' | 'matcap' | 'export' | 'preset';
 type OverlayImageMode = 'overlay' | 'mask' | 'off';
 
-const LEFT_TABS: { value: LeftTab; label: string }[] = [
-  { value: 'diffuse', label: 'Diffuse' },
-  { value: 'noise', label: 'Noise' },
-  { value: 'slit', label: 'Slit' },
-  { value: 'stretch', label: 'Stretch' },
-  { value: 'normal', label: 'Normal' },
-  { value: 'distort', label: 'Distort' },
-  { value: 'postprocess', label: 'Postprocess' },
+const LEFT_TABS: { value: LeftTab; labelKey: MessageKey }[] = [
+  { value: 'diffuse', labelKey: 'effect.diffuse' },
+  { value: 'noise', labelKey: 'effect.noise' },
+  { value: 'slit', labelKey: 'effect.slit' },
+  { value: 'stretch', labelKey: 'effect.stretch' },
+  { value: 'normal', labelKey: 'effect.normal' },
+  { value: 'distort', labelKey: 'effect.distort' },
+  { value: 'postprocess', labelKey: 'effect.postprocess' },
   // Matcap is kept implemented but hidden from the top bar; add it back here to restore the panel.
-  { value: 'export', label: 'Export' },
-  { value: 'preset', label: 'Preset' },
+  { value: 'export', labelKey: 'effect.export' },
+  { value: 'preset', labelKey: 'effect.preset' },
 ];
 
 function formatGpuBytes(bytes: number | null | undefined): string | null {
@@ -127,6 +130,7 @@ const TAB_ANIMATION_PREFIX: Partial<Record<LeftTab, string>> = {
 export default function App() {
   const store = useGradientStore();
   const updater = useAppUpdater();
+  const { t } = useLanguage();
   const {
     matcap,
     animation,
@@ -481,7 +485,7 @@ export default function App() {
         {/* 項目選択用のトップバー */}
         <div className="z-30 flex shrink-0 items-center gap-2 border-b border-panel-border bg-k-bg/95 px-2 py-1.5">
           <div className="inline-flex min-w-0 flex-1 bg-k-surface/80 overflow-x-auto no-scrollbar scroll-smooth">
-            {LEFT_TABS.map(({ value, label }) => {
+            {LEFT_TABS.map(({ value, labelKey }) => {
               const getEnabled = TAB_ENABLED_MAP[value];
               const enabled = getEnabled ? getEnabled(store) : undefined;
               const isPrimary = value === 'diffuse' || value === 'noise' || value === 'slit' || value === 'stretch';
@@ -502,10 +506,10 @@ export default function App() {
                         : 'text-tab-inactive/60 hover:text-tab-inactive hover:bg-k-surface'
                     } ${tabHoverSwitchEnabled && isHoverLocked && leftTab !== value ? 'cursor-default opacity-80' : 'cursor-pointer'}`}
                 >
-                  {label}
+                  {t(labelKey)}
                   {enabled !== undefined && (
                     <span className={`text-[8px] font-bold leading-none ${enabled ? 'text-emerald-400' : 'text-k-muted'}`}>
-                      {enabled ? 'ON' : 'OFF'}
+                      {enabled ? t('common.on') : t('common.off')}
                     </span>
                   )}
                 </button>
@@ -536,12 +540,12 @@ export default function App() {
                 ? 'border-fire/55 bg-fire/10 text-fire hover:bg-fire/20'
                 : 'border-cream/25 bg-k-surface text-tab-inactive hover:border-cream/45 hover:text-k-text'
                 }`}
-              title={`Property module settings · ${tabHoverSwitchEnabled ? 'Hover' : 'Click only'}`}
-              aria-label="Open property module settings"
+              title={`${t('settings.title')} · ${tabHoverSwitchEnabled ? t('settings.hover') : t('settings.clickOnly')}`}
+              aria-label={t('common.settings')}
             >
               <Icon name="settings" className="text-[16px]" />
               <span className="hidden text-[9px] font-display font-semibold uppercase tracking-wider xl:inline">
-                {tabHoverSwitchEnabled ? 'Hover' : 'Click only'}
+                {tabHoverSwitchEnabled ? t('settings.hover') : t('settings.clickOnly')}
               </span>
             </button>
           </div>
@@ -549,6 +553,8 @@ export default function App() {
           {/* モバイル用右サイドバーボタン */}
           <button
             onClick={(e) => { setRightPanelOpen(true); setShowRightSidebar(!showRightSidebar); (e.currentTarget as HTMLButtonElement).blur(); }}
+            title={t('panel.toggle', { action: showRightSidebar ? t('common.close') : t('common.open'), panel: 'K-GG' })}
+            aria-label={t('panel.toggle', { action: showRightSidebar ? t('common.close') : t('common.open'), panel: 'K-GG' })}
             className="md:hidden ml-1 h-10 w-10 bg-k-surface border border-panel-border text-k-text hover:text-cream focus:outline-none focus-visible:ring-2 focus-visible:ring-fire"
           >
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
@@ -573,7 +579,7 @@ export default function App() {
           <DockPanel
             id="property-modules-panel"
             side="left"
-            title="Property Modules"
+            title={t('settings.title')}
             open={leftPanelOpen}
             mobileOpen={showLeftSidebar}
             width={leftPanelW}
@@ -617,7 +623,7 @@ export default function App() {
                     {value === 'normal' && <NormalMapPanel />}
                     {value === 'distort' && (
                       <ManualDistortControls
-                        title="Distort"
+                        title={t('effect.distort')}
                         value={manualDistort}
                         onChange={setManualDistort}
                       />
@@ -673,6 +679,8 @@ export default function App() {
             {/* モバイル用サイドバーボタン (左) */}
             <button
               onClick={() => { setLeftPanelOpen(true); setShowLeftSidebar(true); }}
+              title={t('panel.toggle', { action: t('common.open'), panel: t('settings.title') })}
+              aria-label={t('panel.toggle', { action: t('common.open'), panel: t('settings.title') })}
               className={`md:hidden absolute top-4 left-4 p-3 bg-k-surface/80 border border-panel-border border-panel rounded-sm text-k-text z-10 transition-opacity ${showLeftSidebar || showRightSidebar ? 'opacity-0 pointer-events-none' : 'opacity-100'}`}
             >
               <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
@@ -685,6 +693,8 @@ export default function App() {
             <div className={`md:hidden absolute top-4 right-4 flex gap-2 z-10 transition-opacity ${showLeftSidebar || showRightSidebar ? 'opacity-0 pointer-events-none' : 'opacity-100'}`}>
               <button
                 onClick={undo}
+                title={t('common.undo')}
+                aria-label={t('common.undo')}
                 className="p-3 bg-k-surface/80 border border-panel-border border-panel rounded-sm text-k-text active:bg-fire active:text-k-text"
               >
                 <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
@@ -694,6 +704,8 @@ export default function App() {
               </button>
               <button
                 onClick={redo}
+                title={t('common.redo')}
+                aria-label={t('common.redo')}
                 className="p-3 bg-k-surface/80 border border-panel-border border-panel rounded-sm text-k-text active:bg-fire active:text-k-text"
               >
                 <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
@@ -708,8 +720,8 @@ export default function App() {
                 type="button"
                 onClick={(e) => { setShowFeedback(true); (e.currentTarget as HTMLButtonElement).blur(); }}
                 className="h-10 w-10 shrink-0 flex items-center justify-center border border-cream/30 bg-k-surface/85 p-0 text-fire shadow-[0_10px_24px_rgba(0,0,0,0.28)] backdrop-blur-sm transition-all duration-150 hover:border-fire hover:bg-fire/15 hover:text-k-text focus:outline-none focus-visible:ring-2 focus-visible:ring-fire"
-                title="Feedback"
-                aria-label="Open feedback form"
+                title={t('common.feedback')}
+                aria-label={t('common.feedback')}
               >
                 <svg className="shrink-0" width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round">
                   <path d="M21 15a4 4 0 0 1-4 4H8l-5 3V7a4 4 0 0 1 4-4h10a4 4 0 0 1 4 4z" />
@@ -724,8 +736,8 @@ export default function App() {
                   ? 'border-fire bg-fire/15 text-fire hover:bg-fire/25 hover:border-fire'
                   : 'border-cream/30 bg-k-surface/85 text-cream/70 hover:border-fire hover:bg-fire/15 hover:text-k-text'
                   }`}
-                title={showGradientAnchors ? 'グラデーションアンカーを非表示' : 'グラデーションアンカーを表示'}
-                aria-label={showGradientAnchors ? 'Hide Gradient Anchors' : 'Show Gradient Anchors'}
+                title={showGradientAnchors ? t('canvas.hideAnchors') : t('canvas.showAnchors')}
+                aria-label={showGradientAnchors ? t('canvas.hideAnchors') : t('canvas.showAnchors')}
               >
                 {showGradientAnchors ? (
                   <svg className="shrink-0" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
@@ -750,8 +762,8 @@ export default function App() {
                 type="button"
                 onClick={(e) => { resetViewport(); (e.currentTarget as HTMLButtonElement).blur(); }}
                 className="h-10 w-10 shrink-0 flex items-center justify-center border border-cream/30 bg-k-surface/85 p-0 text-fire shadow-[0_10px_24px_rgba(0,0,0,0.28)] backdrop-blur-sm transition-all duration-150 hover:border-fire hover:bg-fire/15 hover:text-k-text focus:outline-none focus-visible:ring-2 focus-visible:ring-fire"
-                title="キャンバスの移動・ズームをリセット"
-                aria-label="Reset Viewport Zoom and Position"
+                title={t('canvas.resetViewport')}
+                aria-label={t('canvas.resetViewport')}
               >
                 <Icon name="restart" style={{ fontSize: 16 }} />
               </button>
@@ -826,7 +838,7 @@ export default function App() {
                     alt=""
                   />
                 )}
-                <GradientAnchorEditor width={displayW} height={displayH} />
+                <GradientAnchorEditor width={displayW} height={displayH} visible={showGradientAnchors} />
                 <SlitOverlay width={displayW} height={displayH} canvasW={canvasW} canvasH={canvasH} />
               </div>
               <div
@@ -837,7 +849,8 @@ export default function App() {
                   type="button"
                   className="absolute right-1 top-1 z-10 flex h-5 w-5 items-center justify-center bg-transparent text-tab-inactive hover:text-fire transition-colors"
                   onClick={() => setShowTimeRemap(false)}
-                  aria-label="Close Loop Timing"
+                title={t('common.close')}
+                aria-label={t('common.close')}
                 >
                   <Icon name="close" className="text-[12px]" />
                 </button>
@@ -870,32 +883,26 @@ export default function App() {
             <div className="space-y-6 pt-6">
               <div className="flex items-start justify-between gap-4">
                 <div className="min-w-0">
-                  <p className="mb-2 text-[9px] font-display font-semibold uppercase tracking-[0.24em] text-fire">Gradient workspace</p>
+                  <p className="mb-2 text-[9px] font-display font-semibold uppercase tracking-[0.24em] text-fire">{t('workspace.gradient')}</p>
                   <h2 className="text-2xl font-display font-bold uppercase tracking-[0.18em] leading-none text-k-text">K-GG</h2>
                   <p className="mt-3 text-[10px] font-body tracking-normal leading-tight text-tab-inactive">© 2026 ke-go. All rights reserved.</p>
                 </div>
-                <button
-                  type="button"
+                <IconButton
+                  icon="help"
+                  label={t('common.help')}
                   onClick={() => setShowHelp(true)}
                   className="shrink-0 p-2 text-deep hover:bg-k-border hover:text-k-text rounded-none transition-all duration-150 focus:outline-none focus-visible:ring-2 focus-visible:ring-fire"
-                  title="使い方を表示"
-                  aria-label="使い方を表示"
-                >
-                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                    <circle cx="12" cy="12" r="10"></circle>
-                    <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"></path>
-                    <line x1="12" y1="17" x2="12.01" y2="17"></line>
-                  </svg>
-                </button>
+                  iconClassName="text-[20px]"
+                />
               </div>
 
               <div className="space-y-3 border border-fire/25 bg-fire/[0.04] p-3">
                 <div className="flex items-end justify-between gap-3">
                   <div>
-                    <p className="mb-1 text-[9px] font-display font-semibold uppercase tracking-[0.2em] text-fire">01 / Primary</p>
-                    <label htmlFor="canvas-size-preset" className="block text-xs font-display font-semibold uppercase tracking-wider text-k-text">Canvas Size</label>
+                    <p className="mb-1 text-[9px] font-display font-semibold uppercase tracking-[0.2em] text-fire">01 / {t('workspace.primary')}</p>
+                    <label htmlFor="canvas-size-preset" className="block text-xs font-display font-semibold uppercase tracking-wider text-k-text">{t('canvas.size')}</label>
                   </div>
-                  <span className="text-[9px] font-display uppercase tracking-widest text-tab-inactive">Output</span>
+                  <span className="text-[9px] font-display uppercase tracking-widest text-tab-inactive">{t('common.output')}</span>
                 </div>
                 <div className="relative">
                   <select
@@ -909,21 +916,21 @@ export default function App() {
                         {preset.label} · {preset.width}×{preset.height}
                       </option>
                     ))}
-                    <option value="custom">Custom · {canvasW}×{canvasH}</option>
+                    <option value="custom">{t('common.custom')} · {canvasW}×{canvasH}</option>
                   </select>
                   <svg className="pointer-events-none absolute right-3 top-1/2 h-3 w-3 -translate-y-1/2 text-fire" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
                     <path d="m4 6 4 4 4-4" />
                   </svg>
                 </div>
                 <p className="text-[9px] leading-relaxed text-tab-inactive">
-                  {activeCanvasPreset ? `${activeCanvasPreset.label} · ${activeCanvasPreset.width}×${activeCanvasPreset.height}` : `Custom · ${canvasW}×${canvasH}`}
-                  {' '}— custom values remain available below.
+                  {activeCanvasPreset ? `${activeCanvasPreset.label} · ${activeCanvasPreset.width}×${activeCanvasPreset.height}` : `${t('common.custom')} · ${canvasW}×${canvasH}`}
+                  {' '}— {t('canvas.customHint')}
                 </p>
               </div>
 
               <div className="space-y-2">
                 <div className="flex items-center justify-between">
-                  <span className="text-[9px] font-display uppercase tracking-[0.18em] text-tab-inactive">Custom dimensions</span>
+                  <span className="text-[9px] font-display uppercase tracking-[0.18em] text-tab-inactive">{t('canvas.customDimensions')}</span>
                   <span className="text-[9px] font-display uppercase tracking-widest text-tab-inactive">px</span>
                 </div>
               <div className="flex items-center gap-1">
@@ -932,6 +939,7 @@ export default function App() {
                     <p className="text-xs text-deep mb-1">W</p>
                     <input
                       ref={wInputRef}
+                      title={t('canvas.wheelHint')}
                       type="number" min={1} max={15000}
                       value={wDraft}
                       onChange={(e) => setWDraft(e.target.value)}
@@ -947,6 +955,7 @@ export default function App() {
                     <p className="text-xs text-deep mb-1">H</p>
                     <input
                       ref={hInputRef}
+                      title={t('canvas.wheelHint')}
                       type="number" min={1} max={15000}
                       value={hDraft}
                       onChange={(e) => setHDraft(e.target.value)}
@@ -964,8 +973,8 @@ export default function App() {
                     type="button"
                     onClick={swapCanvasSize}
                     className="p-1.5 rounded-none transition-colors duration-150 text-fire hover:text-cream"
-                    title="WidthとHeightを入れ替え"
-                    aria-label="Swap canvas width and height"
+                    title={t('canvas.swap')}
+                    aria-label={t('canvas.swap')}
                   >
                     <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
                       <path d="M5 3h6l-2-2" />
@@ -978,8 +987,8 @@ export default function App() {
                     type="button"
                     onClick={() => { if (!lockAspect) aspectRatioRef.current = canvasW / canvasH; setLockAspect(!lockAspect); }}
                     className={`p-1.5 rounded-none transition-colors duration-150 ${lockAspect ? 'text-fire hover:text-cream' : 'text-k-muted hover:text-k-text'}`}
-                    title={lockAspect ? 'アスペクト比ロック中' : 'アスペクト比ロック解除中'}
-                    aria-label="Toggle aspect ratio lock"
+                    title={t('canvas.lockAspect')}
+                    aria-label={t('canvas.lockAspect')}
                   >
                     {lockAspect ? (
                       <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round">
@@ -998,8 +1007,8 @@ export default function App() {
             </div>
               <SidebarSection
                 id="gradient-ramp"
-                title="Gradient Ramp"
-                description="Primary color control"
+                title={t('gradient.title')}
+                description={t('workspace.primaryColorControl')}
                 open={showGradientRamp}
                 onToggle={() => setShowGradientRamp(value => !value)}
               >
@@ -1008,35 +1017,33 @@ export default function App() {
 
               <SidebarSection
                 id="image-overlay"
-                title="Image Overlay / Mask"
-                description="Overlay and alpha source"
+                title={t('workspace.imageOverlay')}
+                description={t('workspace.imageOverlayDescription')}
                 open={showOverlaySettings}
                 onToggle={() => setShowOverlaySettings(value => !value)}
               >
                 <div className="space-y-3">
                   <div className="flex items-center justify-end gap-2">
                   {overlayImageSrc && (
-                    <button
-                      type="button"
+                    <IconButton
+                      icon="delete"
+                      label={t('common.delete')}
                       onClick={() => { overlayImageLoadIdRef.current += 1; URL.revokeObjectURL(overlayImageSrc); setOverlayImageSrc(null); setOverlayImageName(''); setOverlayImageElement(null); }}
-                      className="text-[10px] text-red-400 hover:text-red-300 px-2 py-0.5 rounded-none bg-red-900/30 hover:bg-red-900/50 transition-colors duration-150"
-                    >
-                      削除
-                    </button>
+                      className="text-red-400 hover:text-red-300 px-2 py-0.5 bg-red-900/30 hover:bg-red-900/50"
+                    />
                   )}
-                  <button
-                    type="button"
+                  <IconButton
+                    icon="upload"
+                    label={t('common.load')}
                     onClick={() => overlayImageInputRef.current?.click()}
-                    className="text-[10px] text-cream hover:text-k-text px-2 py-0.5 rounded-none bg-cream/10 hover:bg-cream/20 transition-all duration-150"
-                  >
-                    読み込み
-                  </button>
+                    className="text-cream hover:text-k-text px-2 py-0.5 bg-cream/10 hover:bg-cream/20"
+                  />
                   <input ref={overlayImageInputRef} type="file" accept="image/*" onChange={handleOverlayImageChange} className="hidden" />
                   </div>
                   {overlayImageSrc ? (
                     <p className="text-[10px] text-deep truncate">{overlayImageName}</p>
                   ) : (
-                    <p className="text-[10px] text-k-muted">画像未選択</p>
+                    <p className="text-[10px] text-k-muted">{t('workspace.noImage')}</p>
                   )}
                   <div className="grid grid-cols-2 gap-1 border border-panel-border/60 bg-k-bg/40 p-1">
                     {(['overlay', 'mask'] as const).map((mode) => (
@@ -1050,13 +1057,13 @@ export default function App() {
                           : 'bg-transparent text-deep hover:text-k-text hover:bg-cream/10'
                           }`}
                       >
-                        {mode}
+                        {t(mode === 'overlay' ? 'workspace.overlay' : 'workspace.mask')}
                       </button>
                     ))}
                   </div>
                   {overlayImageMode === 'overlay' ? (
                     <SliderField
-                      label="Opacity"
+                      label={t('workspace.opacity')}
                       min={0} max={1} step={0.01}
                       value={overlayOpacity}
                       onChange={setOverlayOpacity}
@@ -1065,15 +1072,15 @@ export default function App() {
                     />
                   ) : overlayImageMode === 'mask' ? (
                     <div className="flex items-center justify-between text-[10px] text-deep">
-                      <span>Mask Source</span>
+                      <span>{t('workspace.maskSource')}</span>
                       <span className={overlayImageElement ? 'text-cream' : 'text-k-muted'}>
-                        {overlayImageElement ? 'Alpha Ready' : 'No Image'}
+                        {overlayImageElement ? t('workspace.alphaReady') : t('workspace.noImage')}
                       </span>
                     </div>
                   ) : (
                     <div className="flex items-center justify-between text-[10px] text-deep">
-                      <span>Mode</span>
-                      <span className="text-k-muted">Off</span>
+                      <span>{t('workspace.mode')}</span>
+                      <span className="text-k-muted">{t('common.off')}</span>
                     </div>
                   )}
                 </div>
@@ -1081,8 +1088,8 @@ export default function App() {
 
               <SidebarSection
                 id="image-gradient-source"
-                title="Image Gradient Source"
-                description="Use an image as ramp input"
+                title={t('effect.imageGradient')}
+                description={t('workspace.imageGradientDescription')}
                 open={showImageGradientSource}
                 onToggle={() => setShowImageGradientSource(value => !value)}
               >
@@ -1129,12 +1136,12 @@ export default function App() {
           <PanelEdgeToggle
             edge="bottom"
             open={showTimeline}
-            panelTitle="Animation Timeline"
+            panelTitle={t('animation.title')}
             controlsId="animation-timeline-panel"
             onToggle={() => setShowTimeline(value => !value)}
           >
             <span className="text-[10px] font-display font-semibold uppercase tracking-wider text-k-text">
-              Animation
+              {t('animation.title')}
             </span>
             <span
               className={`h-1.5 w-1.5 rounded-full ${animation.enabled ? 'bg-emerald-400' : 'bg-k-muted'}`}

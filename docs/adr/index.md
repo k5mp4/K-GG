@@ -15,11 +15,13 @@ ADRは、複数の機能や将来の実装を拘束する重要な技術判断�
 | ADR-0003 | [画像グラデーションのアンカー影響を永続設定として分離する](./0003-image-gradient-anchor-influence.md) | accepted |
 | ADR-0004 | [Postprocess Stackをping-pong FBOで描画する](./0004-postprocess-stack-rendering.md) | accepted |
 | ADR-0005 | [Unified Effect Stack V2を段階別ping-pong FBOで描画する](./0005-unified-effect-stack-v2.md) | accepted |
-| ADR-0006 | [Tweeqを共通入力コントロールとして採用する](./0006-tweeq-ui-controls.md) | accepted |
+| ADR-0006 | [Tweeqを共通入力コントロールとして採用する](./0006-tweeq-ui-controls.md) | superseded |
 | ADR-0007 | [プリセットライブラリの仮想フォルダとZIP交換形式](./0007-preset-library-storage-format.md) | accepted |
 | ADR-0008 | [プリセットサムネイルを描画結果から生成する](./0008-preset-rendered-thumbnails.md) | accepted |
 | ADR-0009 | [パラメータ制限を共有レジストリで管理する](./0009-unified-parameter-limits.md) | accepted |
 | ADR-0010 | [Image Gradient Sourceは画像テクスチャと色場を分離して描画する](./0010-image-gradient-color-field-rendering.md) | accepted |
+| ADR-0011 | [Tweeq vendorを固定上流ソースから最小構成で生成する](./0011-tweeq-vendor-source-and-api.md) | accepted |
+| ADR-0012 | [型付き辞書と意味的アイコンをUI表記の基盤とする](./0012-typed-localization-and-icon-semantics.md) | accepted |
 
 ## 作成基準
 

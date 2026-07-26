@@ -1,5 +1,6 @@
 import type { UpdateStatus } from './types';
 import { Icon } from '../../components/Icon';
+import { useLanguage } from '../../i18n/LanguageProvider';
 
 type UpdateButtonProps = {
   status: UpdateStatus;
@@ -7,6 +8,7 @@ type UpdateButtonProps = {
 };
 
 export function UpdateButton({ status, onClick }: UpdateButtonProps) {
+  const { t } = useLanguage();
   const available = status === 'available';
   const busy = status === 'checking' || status === 'downloading' || status === 'installing';
   const failed = status === 'error';
@@ -25,8 +27,8 @@ export function UpdateButton({ status, onClick }: UpdateButtonProps) {
             ? 'border-red-400/50 bg-red-400/10 text-red-300 hover:bg-red-400/20'
             : 'border-cream/25 bg-k-surface text-tab-inactive hover:border-cream/45 hover:text-k-text'
       }`}
-      title={available ? 'アップデートを利用できます' : 'アップデートを確認'}
-      aria-label={available ? 'アップデートを利用できます' : 'アップデートを確認'}
+      title={available ? t('update.available') : t('common.checkUpdates')}
+      aria-label={available ? t('update.available') : t('common.checkUpdates')}
     >
       <Icon
         name={busy ? 'progress' : 'systemUpdate'}

@@ -1,9 +1,15 @@
 import { describe, expect, it } from 'vitest';
 import {
+  buildDiffuseBezierLut,
   buildDiffuseCurveLut,
+  diffuseBezierValue,
   diffuseCurveBezierSegments,
   diffuseCurveValue,
+  IDENTITY_DIFFUSE_BEZIER,
+  migrateLegacyDiffuseCurve,
+  normalizeDiffuseBezier,
   normalizeDiffuseCurve,
+  resolveDiffuseBezier,
 } from './diffuseCurve';
 
 describe('Diffuse luminance curve', () => {
@@ -40,5 +46,58 @@ describe('Diffuse luminance curve', () => {
     expect(segments[0].leftControl).toEqual({ x: 1 / 3, y: 1 / 3 });
     expect(segments[0].rightControl).toEqual({ x: 2 / 3, y: 2 / 3 });
     expect(diffuseCurveValue([{ x: 0, y: 0 }, { x: 0.5, y: 0.8 }, { x: 1, y: 1 }], 0.5)).toBeCloseTo(0.8, 6);
+  });
+
+  it('migrates the legacy identity curve to the identity Bezier deterministically', () => {
+    const legacy = [{ x: 0, y: 0 }, { x: 1, y: 1 }];
+    const first = migrateLegacyDiffuseCurve(legacy);
+    const second = migrateLegacyDiffuseCurve(legacy);
+
+    expect(first).toEqual(second);
+    expect(first).toEqual(expect.arrayContaining([
+      expect.any(Number),
+      expect.any(Number),
+      expect.any(Number),
+      expect.any(Number),
+    ]));
+    first.forEach((value, index) => expect(value).toBeCloseTo(IDENTITY_DIFFUSE_BEZIER[index], 10));
+  });
+
+  it('normalizes malformed legacy input to a finite in-range migration', () => {
+    const legacy = [
+      { x: Number.NEGATIVE_INFINITY, y: 0.4 },
+      { x: -10, y: 4 },
+      { x: 0.2, y: -2 },
+      { x: 0.2, y: 0.9 },
+      { x: 0.7, y: 2 },
+      { x: Number.NaN, y: Number.POSITIVE_INFINITY },
+    ];
+
+    const migrated = migrateLegacyDiffuseCurve(legacy);
+    expect(migrated).toHaveLength(4);
+    expect(migrated.every(value => Number.isFinite(value) && value >= 0 && value <= 1)).toBe(true);
+    expect(resolveDiffuseBezier(undefined, legacy)).toEqual(migrated);
+  });
+
+  it('normalizes invalid Bezier entries without propagating non-finite values', () => {
+    expect(normalizeDiffuseBezier([Number.NaN, -1, Number.POSITIVE_INFINITY, 2])).toEqual([
+      IDENTITY_DIFFUSE_BEZIER[0],
+      0,
+      IDENTITY_DIFFUSE_BEZIER[2],
+      1,
+    ]);
+    expect(normalizeDiffuseBezier(undefined)).toEqual(IDENTITY_DIFFUSE_BEZIER);
+  });
+
+  it('builds every LUT sample from the shared Bezier evaluator', () => {
+    const bezier = [0.16, 0.8, 0.82, 0.23] as const;
+    const size = 65;
+    const lut = buildDiffuseBezierLut(bezier, size);
+
+    expect(lut).toHaveLength(size);
+    for (let index = 0; index < size; index += 1) {
+      const input = index / (size - 1);
+      expect(lut[index]).toBe(Math.round(diffuseBezierValue(bezier, input) * 255));
+    }
   });
 });

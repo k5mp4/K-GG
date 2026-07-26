@@ -63,9 +63,6 @@ export function SidebarSection({
             </span>
           )}
         </span>
-        <span className={`text-[9px] font-display uppercase tracking-widest transition-colors ${open ? 'text-fire' : 'text-tab-inactive'}`}>
-          {open ? 'Open' : 'Select'}
-        </span>
       </button>
       <Collapsible isOpen={open}>
         <div id={contentId} className="pb-4">

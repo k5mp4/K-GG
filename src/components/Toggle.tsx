@@ -1,3 +1,5 @@
+import { useLanguage } from '../i18n/LanguageProvider';
+
 interface ToggleProps {
   checked: boolean;
   onChange: (checked: boolean) => void;
@@ -7,6 +9,7 @@ interface ToggleProps {
 }
 
 export function Toggle({ checked, onChange, size = 'md', variant = 'checkbox', className = '' }: ToggleProps) {
+  const { t } = useLanguage();
   if (variant === 'switch') {
     const trackSize = size === 'xs'
       ? 'h-5 w-10'
@@ -34,6 +37,7 @@ export function Toggle({ checked, onChange, size = 'md', variant = 'checkbox', c
         type="button"
         role="switch"
         aria-checked={checked}
+        aria-label={checked ? t('common.enabled') : t('common.disabled')}
         onClick={() => onChange(!checked)}
         className={`group relative shrink-0 inline-flex items-center rounded-full border px-0 py-0 transition-all duration-200 ease-out focus:outline-none focus-visible:ring-2 focus-visible:ring-fire focus-visible:ring-offset-1 focus-visible:ring-offset-black ${
           trackSize
@@ -46,7 +50,7 @@ export function Toggle({ checked, onChange, size = 'md', variant = 'checkbox', c
         <span
           className={`absolute inset-y-0 flex items-center font-display ${labelClass} font-bold uppercase leading-none transition-colors ${labelPosition}`}
         >
-          {checked ? 'ON' : 'OFF'}
+          {checked ? t('common.on') : t('common.off')}
         </span>
         <span
           className={`absolute left-0.5 top-1/2 -translate-y-1/2 rounded-full bg-cream text-k-bg shadow-[0_1px_5px_rgba(0,0,0,0.45)] transition-transform duration-200 ease-out ${
@@ -71,6 +75,7 @@ export function Toggle({ checked, onChange, size = 'md', variant = 'checkbox', c
       type="button"
       role="checkbox"
       aria-checked={checked}
+      aria-label={checked ? t('common.enabled') : t('common.disabled')}
       onClick={() => onChange(!checked)}
       style={{ width: box, height: box, padding: 0, background: 'none' }}
       className={`shrink-0 inline-flex items-center justify-center cursor-pointer rounded-none border-2 transition-colors duration-150 ease-in-out focus:outline-none focus-visible:ring-2 focus-visible:ring-fire focus-visible:ring-offset-1 focus-visible:ring-offset-black ${

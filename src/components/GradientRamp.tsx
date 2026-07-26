@@ -5,7 +5,7 @@ import { useGradientStore, GRADIENT_ANCHOR_DEFAULTS, defaultBezierControlsForAnc
 import { gradientRampPresets, getColorAtPosition, getOpacityAtPosition, applyMirrorT, normalizeRampSettings } from '../lib/gradientRampUtils';
 import { moveStopsProportionally } from '../lib/proportionalRampEdit';
 import { RAMP_W, RAMP_BAR_H, RAMP_HANDLE_AREA, RAMP_HANDLE_HALF, RAMP_WHEEL_STEP } from '../lib/constants';
-import type { ColorStop, OpacityStop, RampColorMode, RampInterpolation, GradientType } from '../types/gradient';
+import type { ColorStop, OpacityStop, RampColorMode, RampInterpolation } from '../types/gradient';
 import { CustomSelect } from './CustomSelect';
 import { Icon } from './Icon';
 import { undo, redo } from '../lib/history'; // 追加
@@ -21,6 +21,10 @@ import { ColorPicker } from './ColorPicker';
 import { ColorPaletteGenerator } from './ColorPaletteGenerator';
 import { SidebarSection } from './SidebarSection';
 import { SliderField } from './SliderField';
+import { GradientTypeSelector } from './GradientTypeSelector';
+import { IconButton } from './IconButton';
+import { useLanguage } from '../i18n/LanguageProvider';
+import { InputShuffle } from 'tweeq';
 
 const BAR_H = RAMP_BAR_H;
 const HANDLE_AREA = RAMP_HANDLE_AREA;
@@ -347,6 +351,7 @@ type GradientRampProps = {
 };
 
 export function GradientRamp({ overlayImageElement = null, showHeader = true }: GradientRampProps = {}) {
+  const { t } = useLanguage();
   const { gradient, setGradient, isSlitAdjusting, selectedStops, setSelectedStops, keyframeTracks, setKeyframeTracks, addKeyframe, setKeyframe, currentTime } = useGradientStore();
   const selectedIdxs = new Set(selectedStops);
   const [selectedOpacityStops, setSelectedOpacityStops] = useState<number[]>([]);
@@ -359,11 +364,8 @@ export function GradientRamp({ overlayImageElement = null, showHeader = true }: 
   const [paletteName, setPaletteName] = useState('');
   const [userPalettes, setUserPalettes] = useState<UserColorPalette[]>(() => loadUserColorPalettes());
   const [diceSnapshot, setDiceSnapshot] = useState<RampDiceSnapshot | null>(null);
-  const [isDiceButtonHovered, setIsDiceButtonHovered] = useState(false);
-  const [isShiftPressed, setIsShiftPressed] = useState(false);
   const [rampHover, setRampHover] = useState<RampHoverInfo | null>(null);
-  const diceLabelRef = useRef<HTMLSpanElement>(null);
-  const diceButtonLabel = isDiceButtonHovered && isShiftPressed ? 'RANDOM' : 'DICE';
+  const rampShuffleRandomRef = useRef(false);
 
   // 内部的な更新用ヘルパー
   const updateSelectedStops = (newSet: Set<number>) => {
@@ -388,20 +390,6 @@ export function GradientRamp({ overlayImageElement = null, showHeader = true }: 
     });
     setDiceSnapshot(null);
     clearRampSelection();
-  };
-
-  const diceRampPositions = (random = false) => {
-    if (!diceSnapshot) {
-      setDiceSnapshot({
-        stops: cloneColorStops(gradient.stops),
-      });
-    }
-    const maxPosition = gradient.rampMirror ? 0.5 : 1;
-    setGradient({
-      stops: random
-        ? randomizeStopPositions(gradient.stops, maxPosition)
-        : diceStopPositions(gradient.stops, maxPosition),
-    });
   };
 
   const resetDiceRampPositions = () => {
@@ -432,31 +420,6 @@ export function GradientRamp({ overlayImageElement = null, showHeader = true }: 
     return () => window.removeEventListener('kagaribi15_color_palettes_changed', refreshPalettes);
   }, []);
 
-  useEffect(() => {
-    if (!isDiceButtonHovered) return;
-    const updateShiftState = (e: KeyboardEvent) => setIsShiftPressed(e.shiftKey);
-    const clearShiftState = () => setIsShiftPressed(false);
-
-    window.addEventListener('keydown', updateShiftState);
-    window.addEventListener('keyup', updateShiftState);
-    window.addEventListener('blur', clearShiftState);
-
-    return () => {
-      window.removeEventListener('keydown', updateShiftState);
-      window.removeEventListener('keyup', updateShiftState);
-      window.removeEventListener('blur', clearShiftState);
-    };
-  }, [isDiceButtonHovered]);
-
-  useEffect(() => {
-    if (!diceLabelRef.current) return;
-    gsap.fromTo(
-      diceLabelRef.current,
-      { autoAlpha: 0, y: -3 },
-      { autoAlpha: 1, y: 0, duration: 0.16, ease: 'power2.out' }
-    );
-  }, [diceButtonLabel]);
-
   const [floatPos, setFloatPos] = useState(() => ({
     x: Math.max(20, Math.round((window.innerWidth - 700) / 2)),
     y: Math.max(20, Math.round((window.innerHeight - 520) / 2)),
@@ -472,7 +435,7 @@ export function GradientRamp({ overlayImageElement = null, showHeader = true }: 
     }
 
     if (!('documentPictureInPicture' in window)) {
-      alert("お使いのブラウザは Document Picture-in-Picture API をサポートしていません。Chrome / Edge の最新版をお試しください。");
+      alert(t('gradient.pipUnsupported'));
       return;
     }
 
@@ -573,7 +536,6 @@ export function GradientRamp({ overlayImageElement = null, showHeader = true }: 
   const rampVariable = Math.max(-1, Math.min(1, gradient.rampVariable ?? 0));
   const rampVariablePct = `${((rampVariable + 1) / 2) * 100}%`;
   const rampRepeat = Math.max(1, Math.min(20, Math.round(gradient.rampRepeat ?? 1)));
-  const rampRepeatPct = `${((rampRepeat - 1) / 19) * 100}%`;
   const usesHueInterpolation = colorMode === 'hsv' || colorMode === 'hsl' || colorMode === 'lch' || colorMode === 'oklch';
   const interpolationOptions = usesHueInterpolation ? HUE_INTERP_OPTIONS : RGB_INTERP_OPTIONS;
 
@@ -1457,7 +1419,9 @@ export function GradientRamp({ overlayImageElement = null, showHeader = true }: 
 
   const stopOpButtons = (
     <div className="flex gap-1 flex-wrap items-center">
-      <button
+      <IconButton
+        icon="delete"
+        label={t('gradient.deleteStop')}
         onClick={() => {
           if (selectedIdxs.size === 0) return;
           const empty = new Set<number>();
@@ -1473,58 +1437,62 @@ export function GradientRamp({ overlayImageElement = null, showHeader = true }: 
           selectedIdxsRef.current = empty;
         })}
         disabled={selectedIdxs.size === 0}
-        className="text-xs text-k-text bg-k-muted hover:bg-k-muted/70 px-2 py-1 rounded-none disabled:opacity-40"
-        title="選択したストップを削除"
-      >削除</button>
-      <button
+        className="h-7 w-7 bg-k-muted text-k-text hover:bg-k-muted/70"
+      />
+      <IconButton
+        icon="copy"
+        label={t('gradient.duplicateStop')}
         onClick={copySelectedStops}
         onTouchEnd={(e) => runTouchAction(e, copySelectedStops)}
         disabled={selectedIdxs.size === 0}
-        className="text-xs text-k-text bg-k-muted hover:bg-k-muted/70 px-2 py-1 rounded-none disabled:opacity-40"
-        title="選択したストップを複製"
-      >複製</button>
-      <button
+        className="h-7 w-7 bg-k-muted text-k-text hover:bg-k-muted/70"
+      />
+      <IconButton
+        icon="distributeHorizontal"
+        label={t('gradient.distributeStops')}
         onClick={distributeEvenly}
         onTouchEnd={(e) => runTouchAction(e, distributeEvenly)}
-        className="text-xs text-k-text bg-k-muted hover:bg-k-muted/70 px-2 py-1 rounded-none"
-        title="ストップを等間隔に配置"
-      >均等</button>
-      <button
+        className="h-7 w-7 bg-k-muted text-k-text hover:bg-k-muted/70"
+      />
+      <IconButton
+        icon="reverse"
+        label={t('gradient.reverseStops')}
         onClick={reverseGradient}
         onTouchEnd={(e) => runTouchAction(e, reverseGradient)}
-        className="text-xs text-k-text bg-k-muted hover:bg-k-muted/70 px-2 py-1 rounded-none"
-        title="グラデーションを左右反転"
-      >反転</button>
-      <button
-        onClick={(e) => diceRampPositions(e.shiftKey)}
-        onTouchEnd={(e) => runTouchAction(e, () => diceRampPositions(false))}
-        onMouseEnter={(e) => {
-          setIsDiceButtonHovered(true);
-          setIsShiftPressed(e.shiftKey);
+        className="h-7 w-7 bg-k-muted text-k-text hover:bg-k-muted/70"
+      />
+      <InputShuffle
+        value={gradient.stops}
+        generate={(previous) => {
+          const maxPosition = gradient.rampMirror ? 0.5 : 1;
+          return rampShuffleRandomRef.current
+            ? randomizeStopPositions(previous, maxPosition)
+            : diceStopPositions(previous, maxPosition);
         }}
-        onMouseLeave={() => {
-          setIsDiceButtonHovered(false);
-          setIsShiftPressed(false);
+        onChange={(stops) => {
+          if (!diceSnapshot) setDiceSnapshot({ stops: cloneColorStops(gradient.stops) });
+          setGradient({ stops });
+          clearRampSelection();
         }}
-        className="w-16 text-xs text-k-text bg-k-surface hover:bg-k-muted px-2 py-1 rounded-none border border-cream/40 overflow-hidden"
-        title="DICE: 色順を保持して位置をランダム化 / Shift+クリック: Random"
-      >
-        <span ref={diceLabelRef} className="block">{diceButtonLabel}</span>
-      </button>
+        onClick={(event) => { rampShuffleRandomRef.current = event.shiftKey; }}
+        aria-label={t('common.shuffle')}
+        title={t('common.shuffleHint')}
+      />
       {diceSnapshot && (
-        <button
+        <IconButton
+          icon="restart"
+          label={t('common.restoreShuffle')}
           onClick={resetDiceRampPositions}
           onTouchEnd={(e) => runTouchAction(e, resetDiceRampPositions)}
-          className="text-xs text-fire bg-fire/10 hover:bg-fire/20 px-2 py-1 rounded-none border border-fire/50"
-          title="最初にDICEする前のストップ位置へ戻す"
-        >RESET</button>
+          className="h-7 w-7 text-fire bg-fire/10 hover:bg-fire/20 border-fire/50"
+        />
       )}
       <button
         onClick={recordStopKeyframes}
         onTouchEnd={(e) => runTouchAction(e, recordStopKeyframes)}
         disabled={!hasSelectedWithId}
         className="flex items-center gap-1 text-xs text-k-text bg-k-muted hover:bg-k-muted/70 px-2 py-1 rounded-none disabled:opacity-40"
-        title="選択ストップの現在値をキーフレームとして記録 (位置 + RGB)"
+        title={t('gradient.recordColorKeyframe')}
       >
         <Icon name="timer" className="text-[10.5px] text-fire" />
       </button>
@@ -1559,7 +1527,9 @@ export function GradientRamp({ overlayImageElement = null, showHeader = true }: 
   const opacityActionButtons = (
     <div className="flex items-center justify-between gap-2">
       <div className="flex gap-1 flex-wrap">
-        <button
+        <IconButton
+          icon="delete"
+          label={t('gradient.deleteStop')}
           onClick={() => {
             if (selectedOpacityIdxs.size === 0) return;
             const currentStops = gradient.opacityStops ?? DEFAULT_OPACITY_STOPS;
@@ -1584,10 +1554,11 @@ export function GradientRamp({ overlayImageElement = null, showHeader = true }: 
             updateSelectedOpacityStops(nextSel);
             selectedOpacityIdxsRef.current = nextSel;
           })}
-          className="text-xs text-k-text bg-k-muted hover:bg-k-muted/70 px-2 py-1 rounded-none"
-          title="選択した不透明度ストップを削除"
-        >削除</button>
-        <button
+          className="h-7 w-7 bg-k-muted text-k-text hover:bg-k-muted/70"
+        />
+        <IconButton
+          icon="copy"
+          label={t('gradient.duplicateStop')}
           onClick={() => {
             const currentStops = gradient.opacityStops ?? DEFAULT_OPACITY_STOPS;
             const maxPos = gradient.rampMirror ? 0.5 : 1;
@@ -1618,27 +1589,25 @@ export function GradientRamp({ overlayImageElement = null, showHeader = true }: 
             updateSelectedOpacityStops(newSel);
             selectedOpacityIdxsRef.current = newSel;
           })}
-          className="text-xs text-k-text bg-k-muted hover:bg-k-muted/70 px-2 py-1 rounded-none"
-          title="選択した不透明度ストップを複製"
-        >複製</button>
+          className="h-7 w-7 bg-k-muted text-k-text hover:bg-k-muted/70"
+        />
         <button
           onClick={recordOpacityKeyframes}
           onTouchEnd={(e) => runTouchAction(e, recordOpacityKeyframes)}
           disabled={!hasSelectedOpacityWithId}
           className="flex items-center gap-1 text-xs text-k-text bg-k-muted hover:bg-k-muted/70 px-2 py-1 rounded-none disabled:opacity-35"
-          title="選択した不透明度ストップの現在値をキーフレームとして記録"
+          title={t('gradient.recordOpacityKeyframe')}
         >
           <Icon name="timer" className="text-[10.5px] text-fire" />
         </button>
       </div>
-      <button
+      <IconButton
+        icon="close"
+        label={t('common.close')}
         onClick={() => setIsOpacityControlsDismissed(true)}
         onTouchEnd={(e) => runTouchAction(e, () => setIsOpacityControlsDismissed(true))}
         className="w-6 h-6 p-0 flex items-center justify-center text-k-text/55 hover:text-k-text hover:bg-white/10 rounded-none border border-white/10"
-        title="Opacity操作パネルを閉じる"
-      >
-        ×
-      </button>
+      />
     </div>
   );
 
@@ -1670,7 +1639,7 @@ export function GradientRamp({ overlayImageElement = null, showHeader = true }: 
                 onClick={togglePiP}
                 onTouchEnd={(e) => runTouchAction(e, togglePiP)}
                 className="flex items-center justify-center w-7 h-7 p-0 bg-[#2A2A2A] border border-white/10 text-[#F0EAD9] hover:bg-[#3A3A3A] hover:border-white/20 transition-all duration-200"
-                title="別ウィンドウで開く"
+                title={t('common.detach')}
               >
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#F0EAD9" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ pointerEvents: 'none' }}>
                   <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" />
@@ -1678,16 +1647,13 @@ export function GradientRamp({ overlayImageElement = null, showHeader = true }: 
                   <line x1="10" y1="14" x2="21" y2="3" />
                 </svg>
               </button>
-              <button
+              <IconButton
+                icon="expand"
+                label={t('gradient.openEditor')}
                 onClick={() => setIsModalOpen(true)}
                 onTouchEnd={(e) => runTouchAction(e, () => setIsModalOpen(true))}
                 className="flex items-center justify-center w-7 h-7 p-0 bg-[#2A2A2A] border border-white/10 text-[#F0EAD9] hover:bg-[#3A3A3A] hover:border-white/20 transition-all duration-200"
-                title="拡大表示"
-              >
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#F0EAD9" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ pointerEvents: 'none', display: 'block' }}>
-                  <path d="M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7" />
-                </svg>
-              </button>
+              />
           </div>
         </div>
 
@@ -1695,21 +1661,14 @@ export function GradientRamp({ overlayImageElement = null, showHeader = true }: 
           {/* グラデーションタイプ選択 */}
           <div className="flex items-end gap-2">
             <div className="flex-1">
-              <CustomSelect
-                label="Gradient Type"
+              <GradientTypeSelector
                 value={gradient.gradientType ?? 'linear'}
-                options={[
-                  { value: 'linear', label: 'Linear' },
-                  { value: 'radial', label: 'Radial' },
-                  { value: 'fourcolor', label: '4-color' },
-                  { value: 'diamond', label: 'Diamond' },
-                  { value: 'angle', label: 'Angle' },
-                  { value: 'bezier', label: 'Bezier' },
-                ]}
-                onChange={(v) => setGradient({ gradientType: v as GradientType })}
+                onChange={(gradientType) => setGradient({ gradientType })}
               />
             </div>
-            <button
+            <IconButton
+              icon="restart"
+              label={t('common.reset')}
               onClick={() => {
                 const anchors = GRADIENT_ANCHOR_DEFAULTS[gradient.gradientType ?? 'linear'];
                 setGradient({
@@ -1728,26 +1687,9 @@ export function GradientRamp({ overlayImageElement = null, showHeader = true }: 
                     : {}),
                 });
               })}
-              className="shrink-0 mb-0.5 px-2 py-1 text-[10px] bg-k-surface border border-k-muted hover:border-k-text text-deep hover:text-k-text rounded-none transition-all duration-150"
-              title="アンカーをリセット"
-            >↺</button>
-          </div>
-
-          {gradient.gradientType === 'angle' && (
-            <SliderField
-              label="Angle"
-              min={0}
-              max={360}
-              step={1}
-              value={gradient.angle}
-              onChange={(angle) => setGradient({ angle })}
-              format={(value) => `${Math.round(value)}°`}
-              defaultValue={0}
-              trackId="gradient.angle"
-              control="angle"
-              limitKey="gradient.angle"
+              className="mb-0.5 h-8 w-8 shrink-0 bg-k-surface border-k-muted hover:border-k-text hover:text-k-text"
             />
-          )}
+          </div>
 
           {/* カラーモード / 補間モード選択 */}
           <div className="grid grid-cols-2 gap-2">
@@ -1791,26 +1733,20 @@ export function GradientRamp({ overlayImageElement = null, showHeader = true }: 
             </div>
           )}
 
-          <div className="group/row">
-            <div className="mb-1.5 flex items-center justify-between">
-              <label className="select-none cursor-default font-body text-xs text-deep">Repeat</label>
-              <span className="text-[10px] text-k-text tabular-nums">{rampRepeat}x</span>
-            </div>
-            <input
-              type="range"
-              min={1}
-              max={20}
-              step={1}
-              value={rampRepeat}
-              onChange={(e) => setGradient({ rampRepeat: Number(e.target.value) })}
-              className="w-full slider"
-              style={{ '--slider-pct': rampRepeatPct } as CSSProperties}
-            />
-          </div>
+          <SliderField
+            label={t('gradient.repeat')}
+            min={1}
+            max={20}
+            step={1}
+            value={rampRepeat}
+            onChange={(value) => setGradient({ rampRepeat: Math.round(value) })}
+            format={(value) => `${Math.round(value)}x`}
+            defaultValue={1}
+          />
 
           {/* Mirror モード */}
           <div className="flex items-center justify-between">
-            <span className="text-xs text-tab-inactive">Mirror</span>
+            <span className="text-xs text-tab-inactive">{t('gradient.mirror')}</span>
             <button
               onClick={toggleRampMirror}
               onTouchEnd={(e) => runTouchAction(e, toggleRampMirror)}
@@ -1819,14 +1755,14 @@ export function GradientRamp({ overlayImageElement = null, showHeader = true }: 
                   ? 'bg-fire/30 text-fire border border-fire/50'
                   : 'bg-k-muted text-k-text border border-transparent hover:bg-k-muted/70'
               }`}
-              title="Mirrorモード: ストップを0–0.5に制限し、左右対称にレンダリング"
+              title={t('gradient.mirrorDescription')}
             >
-              {gradient.rampMirror ? 'Mirror' : 'Mirror'}
+              {t('gradient.mirror')}
             </button>
           </div>
 
           <p className="text-xs text-tab-inactive">
-            クリックで追加 / Shift+クリックで複数選択 / Shift+ドラッグで近接ストップを比例移動 / ホイールで位置調整
+            {t('gradient.editInstructions')}
           </p>
 
           <div className="relative space-y-1">
@@ -1866,8 +1802,8 @@ export function GradientRamp({ overlayImageElement = null, showHeader = true }: 
 
           <SidebarSection
             id="gradient-palette-generator"
-            title="Color Palette Generator"
-            description="Generate stops from an image"
+            title={t('gradient.paletteGenerator')}
+            description={t('gradient.paletteGeneratorDescription')}
             open={showPaletteGenerator}
             onToggle={() => setShowPaletteGenerator(value => !value)}
             nested
@@ -1883,7 +1819,7 @@ export function GradientRamp({ overlayImageElement = null, showHeader = true }: 
                 value={paletteName}
                 onChange={(e) => setPaletteName(e.target.value)}
                 onKeyDown={(e) => { if (e.key === 'Enter') handleSavePalette(); }}
-                placeholder="Palette name..."
+                placeholder={t('gradient.paletteName')}
                 className="min-w-0 flex-1 bg-k-surface text-k-text text-[10px] rounded-none px-2 py-1 border border-cream/30 focus:border-fire focus:outline-none"
               />
               <button
@@ -1892,12 +1828,12 @@ export function GradientRamp({ overlayImageElement = null, showHeader = true }: 
                 disabled={!paletteName.trim()}
                 className="text-[10px] bg-fire hover:brightness-110 disabled:opacity-40 text-k-text px-2 py-1 rounded-none shrink-0 font-bold"
               >
-                Save
+                {t('common.save')}
               </button>
             </div>
 
             <div className="space-y-1">
-              <p className="text-[9px] font-bold text-tab-inactive uppercase tracking-widest">Built-in Presets</p>
+              <p className="text-[9px] font-bold text-tab-inactive uppercase tracking-widest">{t('gradient.builtInPresets')}</p>
               <div className="flex gap-1 flex-wrap">
                 {Object.entries(gradientRampPresets).map(([name, stops]) => (
                   <button
@@ -1918,7 +1854,7 @@ export function GradientRamp({ overlayImageElement = null, showHeader = true }: 
 
             {userPalettes.length > 0 && (
               <div className="space-y-1">
-                <p className="text-[9px] font-bold text-tab-inactive uppercase tracking-widest">User Palettes</p>
+                <p className="text-[9px] font-bold text-tab-inactive uppercase tracking-widest">{t('gradient.userPalettes')}</p>
                 <div className="flex gap-1 flex-wrap">
                   {userPalettes.map((palette) => (
                     <div key={palette.id} className="inline-flex items-stretch border border-cream/20 bg-k-surface">
@@ -1982,7 +1918,7 @@ export function GradientRamp({ overlayImageElement = null, showHeader = true }: 
                 onClick={(e) => { e.stopPropagation(); undo(); }}
                 onTouchEnd={(e) => runTouchAction(e, undo)}
                 className="w-7 h-7 p-0 flex items-center justify-center bg-white/5 hover:bg-white/10 text-white/70 hover:text-white transition-all border border-white/5"
-                title="元に戻す (Ctrl+Z)"
+                title={`${t('common.undo')} (Ctrl+Z)`}
               >
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ pointerEvents: 'none' }}>
                   <path d="M9 14L4 9L9 4"></path>
@@ -1993,7 +1929,7 @@ export function GradientRamp({ overlayImageElement = null, showHeader = true }: 
                 onClick={(e) => { e.stopPropagation(); redo(); }}
                 onTouchEnd={(e) => runTouchAction(e, redo)}
                 className="w-7 h-7 p-0 flex items-center justify-center bg-white/5 hover:bg-white/10 text-white/70 hover:text-white transition-all border border-white/5"
-                title="やり直し (Ctrl+Y)"
+                title={`${t('common.redo')} (Ctrl+Y)`}
               >
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ pointerEvents: 'none' }}>
                   <path d="M15 14l5-5-5-5"></path>
@@ -2002,7 +1938,9 @@ export function GradientRamp({ overlayImageElement = null, showHeader = true }: 
               </button>
             </div>
 
-            <button
+            <IconButton
+              icon="close"
+              label={t('gradient.closeEditor')}
               onClick={() => {
                 if (pipWindow) pipWindow.close();
                 setIsModalOpen(false);
@@ -2011,20 +1949,14 @@ export function GradientRamp({ overlayImageElement = null, showHeader = true }: 
                 if (pipWindow) pipWindow.close();
                 setIsModalOpen(false);
               })}
-              className="w-8 h-8 p-0 flex items-center justify-center text-k-text/50 hover:text-k-text hover:bg-white/10 transition-all duration-200 rounded-full"
-              title="閉じる"
-            >
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ pointerEvents: 'none' }}>
-                <line x1="18" y1="6" x2="6" y2="18"></line>
-                <line x1="6" y1="6" x2="18" y2="18"></line>
-              </svg>
-            </button>
+              className="w-8 h-8 p-0 text-k-text/50 hover:text-k-text hover:bg-white/10 rounded-full"
+            />
           </div>
 
           {/* コンテンツ */}
           <div className="flex flex-col gap-4 p-5 overflow-y-auto flex-1">
             <p className="text-xs text-tab-inactive">
-              クリックで追加 / Shift+クリックで複数選択 / ホイールで位置調整
+              {t('gradient.editInstructionsCompact')}
             </p>
 
             <div className="relative space-y-1">
@@ -2049,7 +1981,7 @@ export function GradientRamp({ overlayImageElement = null, showHeader = true }: 
 
             {/* Mirror モード */}
             <div className="flex items-center justify-between">
-              <span className="text-xs text-tab-inactive">Mirror</span>
+              <span className="text-xs text-tab-inactive">{t('gradient.mirror')}</span>
               <button
                 onClick={toggleRampMirror}
                 onTouchEnd={(e) => runTouchAction(e, toggleRampMirror)}
@@ -2058,26 +1990,22 @@ export function GradientRamp({ overlayImageElement = null, showHeader = true }: 
                     ? 'bg-fire/30 text-fire border border-fire/50'
                     : 'bg-k-muted text-k-text border border-transparent hover:bg-k-muted/70'
                 }`}
-                title="Mirrorモード: ストップを0–0.5に制限し、左右対称にレンダリング"
+                title={t('gradient.mirrorDescription')}
               >
-                {gradient.rampMirror ? 'Mirror' : 'Mirror'}
+                {t('gradient.mirror')}
               </button>
             </div>
 
-            <div className="group/row max-w-md">
-              <div className="mb-1.5 flex items-center justify-between">
-                <label className="select-none cursor-default font-body text-xs text-deep">Repeat</label>
-                <span className="text-[10px] text-k-text tabular-nums">{rampRepeat}x</span>
-              </div>
-              <input
-                type="range"
+            <div className="max-w-md">
+              <SliderField
+                label={t('gradient.repeat')}
                 min={1}
                 max={20}
                 step={1}
                 value={rampRepeat}
-                onChange={(e) => setGradient({ rampRepeat: Number(e.target.value) })}
-                className="w-full slider"
-                style={{ '--slider-pct': rampRepeatPct } as CSSProperties}
+                onChange={(value) => setGradient({ rampRepeat: Math.round(value) })}
+                format={(value) => `${Math.round(value)}x`}
+                defaultValue={1}
               />
             </div>
 
@@ -2109,7 +2037,7 @@ export function GradientRamp({ overlayImageElement = null, showHeader = true }: 
                   value={paletteName}
                   onChange={(e) => setPaletteName(e.target.value)}
                   onKeyDown={(e) => { if (e.key === 'Enter') handleSavePalette(); }}
-                  placeholder="Palette name..."
+                  placeholder={t('gradient.paletteName')}
                   className="min-w-0 flex-1 bg-k-surface text-k-text text-xs rounded-none px-2 py-1 border border-cream/30 focus:border-fire focus:outline-none"
                 />
                 <button
@@ -2118,12 +2046,12 @@ export function GradientRamp({ overlayImageElement = null, showHeader = true }: 
                   disabled={!paletteName.trim()}
                   className="text-xs bg-fire hover:brightness-110 disabled:opacity-40 text-k-text px-3 py-1 rounded-none shrink-0 font-bold"
                 >
-                  Save
+                  {t('common.save')}
                 </button>
               </div>
 
               <div className="space-y-1">
-                <p className="text-[10px] font-bold text-tab-inactive uppercase tracking-widest">Built-in Presets</p>
+                <p className="text-[10px] font-bold text-tab-inactive uppercase tracking-widest">{t('gradient.builtInPresets')}</p>
                 <div className="flex gap-1 flex-wrap">
                   {Object.entries(gradientRampPresets).map(([name, stops]) => (
                     <button

@@ -1,0 +1,85 @@
+diff --git a/packages/core/src/inputNumber.ts b/packages/core/src/inputNumber.ts
+index 1b51717..7cbda24 100644
+--- a/packages/core/src/inputNumber.ts
++++ b/packages/core/src/inputNumber.ts
+@@ -100,11 +100,8 @@ export type NumberExpression = (value: number, context: {i: number}) => number
+ 
+ export function compileNumberExpression(expression: string): NumberExpression {
+-	return new Function(
+-		'x',
+-		'context',
+-		`const {i} = context;
+-		const result = (${expression});
+-		if (typeof result === 'number') return result;
+-		throw new Error('Value is not a number');`
+-	) as NumberExpression
++	const normalized = expression.trim()
++	if (normalized === '') throw new Error('Value is not a number')
++	const result = Number(normalized)
++	if (!Number.isFinite(result)) throw new Error('Value is not a finite number')
++	return () => result
+ }
+diff --git a/packages/core/src/stringExpression.ts b/packages/core/src/stringExpression.ts
+index 8de9d5d..9eebc3e 100644
+--- a/packages/core/src/stringExpression.ts
++++ b/packages/core/src/stringExpression.ts
+@@ -8,16 +8,14 @@ export type StringExpression = (
+ ) => string
+ 
+-/** Compile InputString's expression mode with its legacy coercion semantics. */
++/** Parse InputString as inert text; K-GG intentionally disables expression execution. */
+ export function compileStringExpression(expression: string): StringExpression {
+-	const evaluate = new Function(
+-		'x',
+-		'context',
+-		`const {i} = context;
+-		const result = (${expression});
+-		if (typeof result === 'string') return result;
+-		if (typeof result === 'number') return result.toString();
+-		throw new Error('Value is not a string or number');`
+-	) as StringExpression
++	let value = expression
++	try {
++		const parsed: unknown = JSON.parse(expression)
++		if (typeof parsed === 'string' || typeof parsed === 'number') value = String(parsed)
++	} catch {
++		// Unquoted text remains literal text.
++	}
+ 
+-	return evaluate
++	return () => value
+ }
+
+diff --git a/packages/core/src/inputTime.ts b/packages/core/src/inputTime.ts
+index 5b5fe66..c9d3b0c 100644
+--- a/packages/core/src/inputTime.ts
++++ b/packages/core/src/inputTime.ts
+@@ -116,23 +116,10 @@ export function compileTimeExpression(
+ 	expression: string,
+ 	frameRate: number
+ ): TimeExpression {
+ 	const code = replaceTimecodeWithFrames(expression, frameRate)
+-	try {
+-		const evaluate = new Function(
+-			'x',
+-			'context',
+-			`const {i, fps} = context;
+-			try {
+-				const value = (${code});
+-				return typeof value === 'number'
+-					? {value, log: []}
+-					: {value: undefined, log: ['Value is not a number']};
+-			} catch (error) {
+-				return {value: undefined, log: [error.message]};
+-			}`
+-		) as TimeExpression
+-		return evaluate
+-	} catch (error) {
+-		return () => ({value: undefined, log: [(error as Error).message]})
+-	}
++	const result = Number(code.trim())
++	if (!Number.isFinite(result)) {
++		return () => ({value: undefined, log: ['Value is not a finite number']})
++	}
++	return () => ({value: result, log: []})
+ }

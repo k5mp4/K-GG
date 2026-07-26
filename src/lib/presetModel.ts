@@ -13,6 +13,7 @@ import type {
   StretchConfig,
 } from '../types/distortion';
 import { createDefaultEffectPipeline, normalizeEffectPipelineConfig } from './effectPipeline';
+import { resolveDiffuseBezier } from './diffuseCurve';
 import type { ImageGradientConfig } from '../types/imageGradient';
 import type { GradientConfig } from '../types/gradient';
 import type { PropertyTrack } from '../types/keyframe';
@@ -59,6 +60,11 @@ export function makePreset(
   state: StoreSnapshot,
   metadata: { folderId?: string | null; order?: number; thumbnail?: string } = {},
 ): Preset {
+  const diffuse = {
+    ...state.diffuse,
+    luminanceBezier: resolveDiffuseBezier(state.diffuse.luminanceBezier, state.diffuse.luminanceCurve),
+  };
+  delete diffuse.luminanceCurve;
   return {
     id: Math.random().toString(36).slice(2),
     name,
@@ -68,6 +74,7 @@ export function makePreset(
     ...(metadata.thumbnail ? { thumbnail: metadata.thumbnail } : {}),
     state: {
       ...state,
+      diffuse,
       effectPipeline: state.effectPipeline
         ? normalizeEffectPipelineConfig(state.effectPipeline)
         : createDefaultEffectPipeline(),

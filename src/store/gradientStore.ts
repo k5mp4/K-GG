@@ -12,7 +12,7 @@ import { clampKeyframeTime } from '../lib/loopKeyframes';
 import { isPostprocessTimeAnimationActive } from '../lib/postprocessAnimation';
 import { createDefaultPostprocessStack, normalizePostprocessEffectStack } from '../lib/postprocessStack';
 import { createDefaultEffectPipeline, normalizeEffectPipelineConfig, updateEffectStackLayer } from '../lib/effectPipeline';
-import { normalizeDiffuseCurve } from '../lib/diffuseCurve';
+import { IDENTITY_DIFFUSE_BEZIER, normalizeDiffuseBezier, resolveDiffuseBezier } from '../lib/diffuseCurve';
 import { clampParameter, getParameterLimit, normalizeTrackValue } from '../lib/parameterLimits';
 
 export type AnimationEasing = {
@@ -244,7 +244,7 @@ export const STORE_DEFAULTS = {
     seedAnimEnabled: false,
     ditherThreshold: 0.5,
     adaptiveEnabled: false,
-    luminanceCurve: normalizeDiffuseCurve(undefined),
+    luminanceBezier: [...IDENTITY_DIFFUSE_BEZIER] as DiffuseConfig['luminanceBezier'],
   },
   imageGradient: IMAGE_GRADIENT_DEFAULTS,
   slitScan: {
@@ -663,7 +663,15 @@ export const useGradientStore = create<GradientStore>((set) => ({
     return { noiseDistortion, keyframeTracks, effectPipeline };
   }),
   setDiffuse: (v) => set((s) => {
-    const diffuse = { ...s.diffuse, ...v };
+    const hasBezier = Object.prototype.hasOwnProperty.call(v, 'luminanceBezier');
+    const hasLegacyCurve = Object.prototype.hasOwnProperty.call(v, 'luminanceCurve');
+    const luminanceBezier = hasBezier
+      ? normalizeDiffuseBezier(v.luminanceBezier)
+      : hasLegacyCurve
+        ? resolveDiffuseBezier(undefined, v.luminanceCurve)
+        : normalizeDiffuseBezier(s.diffuse.luminanceBezier);
+    const diffuse = { ...s.diffuse, ...v, luminanceBezier };
+    delete diffuse.luminanceCurve;
     diffuse.scatter = clampParameter(diffuse.scatter, s.diffuse.scatter, getParameterLimit('diffuse.scatter'));
     diffuse.grain = clampParameter(diffuse.grain, s.diffuse.grain, {
       ...getParameterLimit(diffuse.mode === 'dither' ? 'diffuse.ditherGrain' : 'diffuse.grain'),
@@ -671,7 +679,6 @@ export const useGradientStore = create<GradientStore>((set) => ({
     diffuse.seed = clampParameter(diffuse.seed, s.diffuse.seed, getParameterLimit('diffuse.seed'));
     diffuse.ditherThreshold = clampParameter(diffuse.ditherThreshold, s.diffuse.ditherThreshold, getParameterLimit('diffuse.ditherThreshold'));
     diffuse.adaptiveEnabled = Boolean(diffuse.adaptiveEnabled);
-    diffuse.luminanceCurve = normalizeDiffuseCurve(diffuse.luminanceCurve);
     const keyframeTracks = s.animation.enabled && diffuse.enabled && diffuse.seedAnimEnabled
       ? ensureAutoTrack(s.keyframeTracks, 'diffuse.seed')
       : s.keyframeTracks;

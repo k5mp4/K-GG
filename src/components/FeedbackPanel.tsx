@@ -1,10 +1,13 @@
 const FEEDBACK_FORM_URL = 'https://docs.google.com/forms/d/e/1FAIpQLSePMMNDY7CyVlqA84fr6TEpiSUmbCBPk8gmcooUmD7S8qtMjg/viewform?usp=publish-editor';
+import { IconButton } from './IconButton';
+import { useLanguage } from '../i18n/LanguageProvider';
 
 type FeedbackPanelProps = {
   onClose: () => void;
 };
 
 export function FeedbackPanel({ onClose }: FeedbackPanelProps) {
+  const { t } = useLanguage();
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-10">
       <div
@@ -20,28 +23,20 @@ export function FeedbackPanel({ onClose }: FeedbackPanelProps) {
               <path d="M8 9h8" />
               <path d="M8 13h5" />
             </svg>
-            Feedback
+            {t('common.feedback')}
           </h2>
-          <button
+          <IconButton
+            icon="close"
+            label={t('common.close')}
             onClick={onClose}
             className="text-tab-inactive hover:text-k-text p-1.5 rounded-none hover:bg-k-border transition-colors"
-            aria-label="Close"
-          >
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <line x1="18" y1="6" x2="6" y2="18" />
-              <line x1="6" y1="6" x2="18" y2="18" />
-            </svg>
-          </button>
+            iconClassName="text-[20px]"
+          />
         </div>
 
         <div className="p-8 space-y-6 text-k-text overflow-y-auto scrollbar-thin">
           <div className="space-y-3">
-            <p className="text-sm leading-relaxed text-k-text/85">
-              何かフィードバックがあればこちらにお送りください！
-            </p>
-            <p className="text-sm leading-relaxed text-k-text/70">
-              If you have any feedback, please send it here.
-            </p>
+            <p className="text-sm leading-relaxed text-k-text/85">{t('feedback.description')}</p>
           </div>
 
           <a
@@ -50,7 +45,7 @@ export function FeedbackPanel({ onClose }: FeedbackPanelProps) {
             rel="noopener noreferrer"
             className="flex items-center justify-between gap-3 border border-fire/50 bg-fire/10 px-4 py-3 text-sm text-k-text hover:bg-fire/20 hover:border-fire transition-colors"
           >
-            <span className="min-w-0 truncate">Open Google Form</span>
+            <span className="min-w-0 truncate">{t('feedback.openForm')}</span>
             <svg className="shrink-0 text-fire" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" />
               <polyline points="15 3 21 3 21 9" />

@@ -1,7 +1,7 @@
 ---
 id: ADR-0006
 title: Tweeqを共通入力コントロールとして採用する
-status: accepted
+status: superseded
 date: 2026-07-15
 deciders: [maintainer]
 related_specs: [SPEC-021, SPEC-022]
