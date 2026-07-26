@@ -4,9 +4,23 @@ import {
   getPostprocessFragmentSource,
   getProgramSource,
 } from './webglShaderSources';
-import { NOISE_TYPE_MAP } from './webgl';
+import { GRADIENT_TYPE_MAP, NOISE_TYPE_MAP } from './webgl';
 
 describe('webglShaderSources', () => {
+  it('adds Mesh Gradation at mapping value 6 without shifting existing types', () => {
+    expect(GRADIENT_TYPE_MAP).toEqual({ linear: 0, radial: 1, fourcolor: 2, diamond: 3, angle: 4, bezier: 5, mesh: 6 });
+    const source = getInitialProgramSource().fragment;
+    for (const uniform of [
+      'u_meshCorner0', 'u_meshCorner1', 'u_meshCorner2', 'u_meshCorner3',
+      'u_meshBottomCp0', 'u_meshBottomCp1', 'u_meshRightCp0', 'u_meshRightCp1',
+      'u_meshTopCp0', 'u_meshTopCp1', 'u_meshLeftCp0', 'u_meshLeftCp1',
+      'u_meshColorPositions',
+    ]) expect(source).toContain(`uniform ${uniform.startsWith('u_meshColor') ? 'vec4' : 'vec2'} ${uniform};`);
+    expect(source).toContain('uniform sampler2D u_meshGradient;');
+    expect(source).toContain('return texture2D(u_meshGradient, clamp(sampleUV, 0.0, 1.0));');
+    expect(source).not.toContain('inverseMapMeshUV(');
+    expect(source).toContain('if (u_gradientType == 6) return sampleMeshGradient(sampleUV);');
+  });
   it('keeps the initial program on the base generator source', () => {
     const source = getInitialProgramSource();
     expect(source.vertex).toContain('a_position');

@@ -32,7 +32,7 @@ The web build loads Noto Sans JP and Open Sans from Google Fonts in `index.html`
 - **Canvas Size** sets the output resolution. Choose Full HD, HD, 400×400, or 800×800, or enter W and H directly. Mouse wheel changes by 1; Shift+wheel changes by 10. Use the lock icon to preserve the aspect ratio.
 - **Gradient Ramp** is the main editing area below the resolution controls. Adjust color, position, and opacity for each stop. Color Palette Generator extracts colors from an image and applies them as gradient stops.
 - **Image Overlay / Mask** overlays an image or uses it as an alpha mask.
-- **Gradient Type** provides Linear, Radial, 4-color, Diamond, Angle, and Bezier layouts. Each icon previews the default anchor arrangement.
+- **Gradient Type** provides Linear, Radial, 4-color, Diamond, Angle, Bezier, and **Mesh Gradation** layouts. Mesh Gradation is one 2×2 Coons Patch: drag its four corners and eight cubic-Bezier handles, then choose the four corner positions from the existing Gradient Ramp. The shader uses Newton inversion to map pixels back to patch coordinates and bilinearly interpolates the four Ramp colors. Preview and export use the same WebGL path. Multiple cells are not supported yet, and self-intersecting patches are not guaranteed.
 - **Image Gradient Source** recolors the luminance or RGB channels of an image with the current Gradient Ramp. The image is placed using Cover and the source image itself is not stored in presets.
   - **S** scales handles or multiple points.
   - **A** selects all points.

@@ -3,6 +3,7 @@ import { normalizeEffectPipelineConfig } from './effectPipeline';
 import type { StoreSnapshot } from './presetModel';
 import { renderSceneAtTime } from './renderSceneAtTime';
 import { normalizeImageGradientConfig } from '../types/imageGradient';
+import { normalizeMeshGradientConfig } from '../types/gradient';
 import type { LatestState } from '../types/latestState';
 import { initWebGL, type WebGLContext } from './webgl';
 import { resolveDiffuseBezier } from './diffuseCurve';
@@ -49,8 +50,12 @@ export function createPresetThumbnailState(snapshot: StoreSnapshot): LatestState
   };
   delete diffuse.luminanceCurve;
 
+  const gradient = snapshot.gradient?.gradientType === 'mesh'
+    ? { ...snapshot.gradient, mesh: normalizeMeshGradientConfig(snapshot.gradient.mesh) }
+    : snapshot.gradient;
+
   return {
-    gradient: snapshot.gradient,
+    gradient,
     noiseDistortion: normalizeNoiseDistortionConfig(snapshot.noiseDistortion),
     diffuse,
     imageGradient: normalizeImageGradientConfig(snapshot.imageGradient, snapshot.imageGradient ? 0 : STORE_DEFAULTS.imageGradient.anchorInfluence),

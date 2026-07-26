@@ -39,7 +39,8 @@ Web 版は `index.html` で Google Fonts から Noto Sans JP、Open Sans を読�
   - Ramp内の「Color Palette Generator」から、画像の色をグラデーションストップとして抽出・適用できます。
 - **Image Overlay / Mask**: 折りたたみセクションから画像の重畳またはアルファマスクを設定します。
 - **Gradient type**
-  -Linear/Radial/4-color/Diamond/Angleの5種類のグラデーションタイプを選択可能です。
+  -Linear/Radial/4-color/Diamond/Angle/Bezier/Mesh Gradationのグラデーションタイプを選択可能です。
+  - **Mesh Gradation** は単一の2×2 Coons Patchです。4つのコーナーと8つの三次Bezier制御ハンドルで境界を編集し、各コーナーの色は既存Gradient Ramp上の4位置から取得します。内部色はパッチ座標上で双線形補間され、画面UVからの逆写像にはNewton法を使います。previewとexportは同じWebGL shader経路を使います。複数セルには未対応で、自己交差した形状の結果は保証されません。
   - Kagaribi-15-BGはKV背景に極力寄せたグラデになっています
 - **Image Gradient Source**: 折りたたみセクションから、画像の輝度またはRGBチャンネルを現在のGradient Rampで再配色します。画像はCoverで配置され、画像本体はプリセットへ保存されません。
     - **Sキー**: ハンドル・複数ポイントのスケール

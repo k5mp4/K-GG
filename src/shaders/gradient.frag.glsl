@@ -1,11 +1,24 @@
 
-  uniform int u_gradientType; // 0=linear, 1=radial, 2=fourcolor, 3=diamond, 4=angle, 5=bezier
+  uniform int u_gradientType; // 0=linear, 1=radial, 2=fourcolor, 3=diamond, 4=angle, 5=bezier, 6=mesh
   uniform vec2 u_gradAnchor0;
   uniform vec2 u_gradAnchor1;
   uniform vec2 u_gradAnchor2;
   uniform vec2 u_gradAnchor3;
   uniform vec2 u_gradBezierCp0;
   uniform vec2 u_gradBezierCp1;
+  uniform vec2 u_meshCorner0;
+  uniform vec2 u_meshCorner1;
+  uniform vec2 u_meshCorner2;
+  uniform vec2 u_meshCorner3;
+  uniform vec2 u_meshBottomCp0;
+  uniform vec2 u_meshBottomCp1;
+  uniform vec2 u_meshRightCp0;
+  uniform vec2 u_meshRightCp1;
+  uniform vec2 u_meshTopCp0;
+  uniform vec2 u_meshTopCp1;
+  uniform vec2 u_meshLeftCp0;
+  uniform vec2 u_meshLeftCp1;
+  uniform vec4 u_meshColorPositions;
   uniform vec2 u_gradDir; // 正規化グラデーション方向（ベジェワープ・Radon用）
 
   uniform bool u_noiseEnabled;
@@ -24,6 +37,7 @@
   uniform sampler2D u_diffuseCurve;
 
   uniform sampler2D u_gradientRamp;
+  uniform sampler2D u_meshGradient;
   uniform float u_rampRepeat;
   uniform bool u_sourceImageEnabled;
   uniform sampler2D u_sourceImage;
@@ -230,14 +244,31 @@
       vec2 c = uv - u_gradAnchor0;
       if (dot(c, c) < 0.00001) return 0.0;
       return fract((atan(c.y, c.x) - startAngle) / 6.28318530718 + 0.5);
-    } else {
+    } else if (u_gradientType == 5) {
       // Bezier: A/Bアンカー間の三次ベジェ曲線をグラデーション軸として使う
       return computeBezierGradientBase(uv);
     }
+    return 0.0;
   }
 
   float computeGradientT(vec2 sampleUV) {
     return clamp(computeGradientBase(sampleUV), 0.0, 1.0);
+  }
+
+  vec4 sampleMeshGradient(vec2 sampleUV) {
+    return texture2D(u_meshGradient, clamp(sampleUV, 0.0, 1.0));
+  }
+
+  float applyRampRepeatT(float t);
+
+  vec4 sampleStandardGradient(vec2 sampleUV) {
+    float t = applyRampRepeatT(computeGradientT(sampleUV));
+    return texture2D(u_gradientRamp, vec2(t, 0.5));
+  }
+
+  vec4 sampleGradientColor(vec2 sampleUV) {
+    if (u_gradientType == 6) return sampleMeshGradient(sampleUV);
+    return sampleStandardGradient(sampleUV);
   }
 
 #if !defined(KGG_BOOTSTRAP)
@@ -672,9 +703,13 @@
         vec2 cell = floor(globalCoord / max(u_diffuseGrain, 0.01));
         disp = diffuseHash(cell + seedOff);
       }
+      // Mesh color is sampled once in the final color path below. Keep the
+      // adaptive displacement finite without evaluating the four-corner field twice.
       float adaptiveLuminance = u_imageGradientEnabled
-        ? dot(sampleImageGradient(imageUV).rgb, vec3(0.299, 0.587, 0.114))
-        : dot(texture2D(u_gradientRamp, vec2(clamp(computeGradientT(uv), 0.0, 1.0), 0.5)).rgb, vec3(0.299, 0.587, 0.114));
+        ? dot(texture2D(u_gradientRamp, vec2(clamp(imageGradientT(imageUV), 0.0, 1.0), 0.5)).rgb, vec3(0.299, 0.587, 0.114))
+        : u_gradientType == 6
+          ? 0.5
+          : dot(texture2D(u_gradientRamp, vec2(clamp(computeGradientT(uv), 0.0, 1.0), 0.5)).rgb, vec3(0.299, 0.587, 0.114));
       float adaptiveFactor = u_diffuseAdaptiveEnabled
         ? texture2D(u_diffuseCurve, vec2(clamp(adaptiveLuminance, 0.0, 1.0), 0.5)).r
         : 1.0;
@@ -726,11 +761,12 @@
       return;
     }
 
+    bool meshGradient = u_gradientType == 6;
     float sourceAlpha = u_imageGradientEnabled ? sampleImageGradient(imageUV).a : 1.0;
     float t = u_imageGradientEnabled
       ? mix(imageGradientT(imageUV), computeGradientT(uv), u_imageGradientAnchorInfluence)
       : computeGradientT(uv);
-    if (u_manualDistortEnabled && !u_imageGradientEnabled) {
+    if (u_manualDistortEnabled && !u_imageGradientEnabled && !meshGradient) {
       float smoothPasses = manualSmoothMask * 8.0;
       if (smoothPasses > 0.001) {
         vec2 px = (u_manualDistortSmoothRadius * (1.0 + smoothPasses * 0.08)) / u_resolution;
@@ -750,7 +786,37 @@
       }
     }
     float rampT = applyRampRepeatT(t);
-    vec4 rampColor = texture2D(u_gradientRamp, vec2(rampT, 0.5));
+    vec4 rampColor;
+    if (meshGradient) {
+      vec4 meshColor = sampleMeshGradient(uv);
+      if (u_manualDistortEnabled && !u_imageGradientEnabled) {
+        float smoothPasses = manualSmoothMask * 8.0;
+        if (smoothPasses > 0.001) {
+          vec2 px = (u_manualDistortSmoothRadius * (1.0 + smoothPasses * 0.08)) / u_resolution;
+          vec4 averageColor = vec4(0.0);
+          averageColor += sampleMeshGradient(uv + vec2(-px.x, -px.y));
+          averageColor += sampleMeshGradient(uv + vec2( 0.0,  -px.y));
+          averageColor += sampleMeshGradient(uv + vec2( px.x, -px.y));
+          averageColor += sampleMeshGradient(uv + vec2(-px.x,  0.0));
+          averageColor += meshColor;
+          averageColor += sampleMeshGradient(uv + vec2( px.x,  0.0));
+          averageColor += sampleMeshGradient(uv + vec2(-px.x,  px.y));
+          averageColor += sampleMeshGradient(uv + vec2( 0.0,   px.y));
+          averageColor += sampleMeshGradient(uv + vec2( px.x,  px.y));
+          averageColor /= 9.0;
+          float mixAmount = clamp(1.0 - pow(max(1.0 - u_manualDistortSmoothStrength, 0.001), smoothPasses), 0.0, 1.0);
+          meshColor = mix(meshColor, averageColor, mixAmount);
+        }
+      }
+      if (u_imageGradientEnabled) {
+        vec4 imageGradientColor = texture2D(u_gradientRamp, vec2(applyRampRepeatT(imageGradientT(imageUV)), 0.5));
+        rampColor = mix(imageGradientColor, meshColor, clamp(u_imageGradientAnchorInfluence, 0.0, 1.0));
+      } else {
+        rampColor = meshColor;
+      }
+    } else {
+      rampColor = texture2D(u_gradientRamp, vec2(rampT, 0.5));
+    }
     vec3 color = rampColor.rgb;
     float rampAlpha = rampColor.a;
     if (u_radonEnabled && !u_imageGradientEnabled) {
@@ -768,7 +834,9 @@
         float rs = (float(ri) / (nS - 1.0) - 0.5) * u_radonBlur;
         vec2 sp = foot + rs * lineDir;
         float gt = applyRampRepeatT(dot(sp - 0.5, gradDir) + 0.5);
-        vec4 sc = texture2D(u_gradientRamp, vec2(gt, 0.5));
+        vec4 sc = meshGradient
+          ? sampleMeshGradient(sp)
+          : texture2D(u_gradientRamp, vec2(gt, 0.5));
         lineColor += sc;
       }
       lineColor /= nS;
@@ -776,7 +844,10 @@
       rampAlpha = mix(rampAlpha, lineColor.a, u_radonStrength);
     }
     if (usePatternDither) {
-      color = applyPatternDither(color, globalCoord, rampT);
+      float paletteT = meshGradient
+        ? dot(clamp(color, 0.0, 1.0), vec3(0.299, 0.587, 0.114))
+        : rampT;
+      color = applyPatternDither(color, globalCoord, paletteT);
     }
 
     gl_FragColor = vec4(color, rampAlpha * sourceAlpha);

@@ -10,6 +10,7 @@ const TYPES: Array<{ value: GradientType; label: MessageKey; description: Messag
   { value: 'diamond', label: 'gradient.type.diamond', description: 'gradient.type.diamondDescription' },
   { value: 'angle', label: 'gradient.type.angle', description: 'gradient.type.angleDescription' },
   { value: 'bezier', label: 'gradient.type.bezier', description: 'gradient.type.bezierDescription' },
+  { value: 'mesh', label: 'gradient.type.mesh', description: 'gradient.type.meshDescription' },
 ];
 
 function Anchor({ x, y, control = false }: { x: number; y: number; control?: boolean }) {
@@ -27,6 +28,7 @@ function TypeDiagram({ type }: { type: GradientType }) {
       {type === 'diamond' && <><path d="m28 6 17 13-17 13-17-13Z" {...common} /><path d="M28 19h14" {...common} /><Anchor x={28} y={19} /><Anchor x={42} y={19} /></>}
       {type === 'angle' && <><path d="M28 19h15" {...common} /><path d="M39 15l4 4-4 4" {...common} /><path d="M19 28a13 13 0 0 1 0-18" {...common} strokeOpacity=".55" /><Anchor x={28} y={19} /><Anchor x={43} y={19} /></>}
       {type === 'bezier' && <><path d="M12 30C22 30 34 8 44 8" {...common} /><path d="M12 30 22 30M44 8 34 8" {...common} strokeOpacity=".5" /><Anchor x={12} y={30} /><Anchor x={44} y={8} /><Anchor x={22} y={30} control /><Anchor x={34} y={8} control /></>}
+      {type === 'mesh' && <><path d="M13 9h30v20H13z" {...common} strokeOpacity=".45" /><path d="M13 9c8 5 22 5 30 0M13 29c8-5 22-5 30 0M13 9c5 5 5 15 0 20M43 9c-5 5-5 15 0 20" {...common} /><Anchor x={13} y={9} /><Anchor x={43} y={9} /><Anchor x={13} y={29} /><Anchor x={43} y={29} /></>}
     </svg>
   );
 }

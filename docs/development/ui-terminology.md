@@ -49,6 +49,7 @@ title: UI用語・アイコン表記ガイド
 | Gradient Ramp | `gradient.type.diamond` | Diamond | ひし形 | 中心・ひし形図 |
 | Gradient Ramp | `gradient.type.angle` | Angle | 角度 | 中心・回転方向図 |
 | Gradient Ramp | `gradient.type.bezier` | Bezier | ベジェ | 端点・制御点・曲線図 |
+| Gradient Ramp | `gradient.type.mesh` | Mesh Gradation | Mesh Gradation | 4コーナー・8制御点・Coons Patch図 |
 | Gradient Ramp | `gradient.openEditor` | Open Gradient Ramp editor | Open Gradient Ramp editor | expand icon + tooltip |
 | Gradient Ramp | `gradient.importImage` | Import image | Import image | image drop zone / file picker |
 | Gradient Ramp | `gradient.importOverlay` | Import Overlay | Import Overlay | Overlay/Mask source |

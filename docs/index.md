@@ -69,7 +69,9 @@ built-inプリセットを利用することで素早く違いを把握するこ
 - **Anchor Influence**: 画像チャンネル値とアンカー配色値の混合率を0〜100%で調整します。0%では画像の明暗、100%では歪んだアンカー配色が優先されます。
 - 画像本体はプリセットに保存されないため、再起動または別環境では再読み込みが必要です。
 ### Gradient type
-Linear/Radial/4-color/Diamond/Angleの5種類のグラデーションタイプを選択可能です。
+Linear/Radial/4-color/Diamond/Angle/Bezier/Mesh Gradationのグラデーションタイプを選択可能です。
+
+**Mesh Gradation** は単一の2×2 Coons Patchです。4つのコーナーと8つのBezier制御ハンドルで境界を変形できます。各コーナーの色は既存Gradient Ramp上の4位置から取得し、パッチ座標上で双線形補間します。画面UVからの逆写像にはNewton法を使い、previewとexportは同じWebGL shader経路を使用します。複数セルには未対応で、自己交差した形状の結果は保証されません。
 
 <div class= "image-grid-2">
      <div class="image-item">
