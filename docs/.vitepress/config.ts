@@ -17,6 +17,7 @@ export default defineConfig({
       { text: '使い方', link: '/' },
       { text: '開発者向け', link: '/development/' },
       { text: '仕様', link: '/specs/' },
+      { text: '変更', link: '/changes/' },
       { text: 'ADR', link: '/adr/' },
     ],
 
@@ -35,35 +36,41 @@ export default defineConfig({
       ],
       '/specs/': [
         {
-          text: '機能仕様',
+          text: '現行仕様',
           items: [
-            { text: '仕様一覧', link: '/specs/' },
-            { text: 'SPEC-000 DocDD基盤', link: '/specs/SPEC-000-docdd-foundation' },
+            { text: '仕様の入口', link: '/specs/' },
+            { text: '現行仕様一覧', link: '/specs/current/' },
+            { text: 'Gradient System', link: '/specs/current/gradient-system' },
+            { text: 'Effect Stack', link: '/specs/current/effect-stack' },
+            { text: 'Preset System', link: '/specs/current/preset-system' },
+            { text: 'Legacy SPEC一覧', link: '/specs/#legacy-change-specifications' },
+            { text: 'Legacy SPECテンプレート', link: '/specs/_template' },
+          ],
+        },
+      ],
+      '/changes/': [
+        {
+          text: '変更仕様',
+          items: [
+            { text: '変更の入口', link: '/changes/' },
+            { text: '進行中の変更', link: '/changes/active/' },
+            { text: '完了済み変更', link: '/changes/archive/' },
+            { text: '変更テンプレート', link: '/changes/_template/proposal' },
+          ],
+        },
+      ],
+      '/specs/current/': [
+        {
+          text: '現行仕様',
+          items: [
+            { text: '現行仕様一覧', link: '/specs/current/' },
+            { text: 'Gradient System', link: '/specs/current/gradient-system' },
+            { text: 'Effect Stack', link: '/specs/current/effect-stack' },
+            { text: 'Preset System', link: '/specs/current/preset-system' },
             {
-              text: 'SPEC-001 Postprocessアニメーション判定',
-              link: '/specs/SPEC-001-postprocess-animation-policy',
+              text: 'Legacy SPEC一覧',
+              link: '/specs/#legacy-change-specifications',
             },
-            {
-              text: 'SPEC-002 Tauri WebGL互換性',
-              link: '/specs/SPEC-002-tauri-frame-scheduler-compatibility',
-            },
-            {
-              text: 'SPEC-003 Organic Glass',
-              link: '/specs/SPEC-003-organic-glass-postprocess',
-            },
-            {
-              text: 'SPEC-004 内蔵SVGアイコン',
-              link: '/specs/SPEC-004-bundled-svg-icons',
-            },
-            {
-              text: 'SPEC-005 動画出力名',
-              link: '/specs/SPEC-005-video-export-naming',
-            },
-            {
-              text: 'SPEC-006 統合検証',
-              link: '/specs/SPEC-006-verification-commands',
-            },
-            { text: '仕様テンプレート', link: '/specs/_template' },
           ],
         },
       ],

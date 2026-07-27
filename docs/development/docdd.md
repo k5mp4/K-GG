@@ -4,122 +4,201 @@ title: DocDD運用ガイド
 
 # DocDD運用ガイド
 
-## 原則
+K-GGでは、仕様をコードの後付け説明ではなく、変更意図と利用者向け契約をレビューする一次情報として扱います。目的は文書量を増やすことではなく、現在の動作を短く確認でき、次の変更を安全に提案できることです。
 
-K-GGでは、仕様書を変更意図の一次情報とし、コードとテストをその実現物として扱います。目的は文書量を増やすことではなく、実装前に合意可能な形でWhy、What、Howを固定し、AIと人間の手戻りを減らすことです。
+## 文書の役割
 
-次の原則を守ります。
+| 場所 | 役割 | 何を書くか |
+| --- | --- | --- |
+| `docs/specs/current/` | 現行仕様 | 現在有効な観測可能動作、互換性、境界条件 |
+| `docs/changes/active/` | 変更仕様 | 今回のWhy/What、delta、実装中の検証 |
+| `docs/changes/archive/` | 変更履歴 | 完了した変更、当時の検証、移行経緯 |
+| `docs/changes/active/<CHANGE-ID>/design.md` またはArchive | 設計文書 | How、データモデル、代替案、移行・ロールバック |
+| `docs/adr/` | ADR | 複数機能を長期に拘束する技術判断と理由 |
+| `docs/specs/SPEC-*.md` | Legacy Change Specification | 旧DocDDで蓄積した変更履歴。現在仕様の必須資料ではない |
+| `docs/development/` | 開発ガイド | 構造、ローカル開発、共通の運用ルール |
 
-- Why → What → Howの順に決める。
-- AIは曖昧さの発見、選択肢の提示、実装、検証に使い、製品上の最終判断は人間が行う。
-- 機能ごとの文書は短く保ち、実装に必要な具体性を優先する。
-- 仕様変更が必要になったら、コードより先に仕様を更新する。
-- 文書、コード、テストを同じPull Requestで同期する。
+現行仕様と変更仕様の関係は次のとおりです。
+
+```text
+current spec（現在の真実）
+          ▲ deltaを統合
+active change（今回の差分） ──完了──> archive（過去の履歴）
+          │
+          └── design（How） / tasks（作業） / validation（検証）
+```
+
+現行仕様は履歴を時系列に追記せず、常に現在の状態へ編集します。なぜ変わったかはArchiveとGit履歴で追跡します。
+
+## 参照の優先順位
+
+作業対象を決めるときは、次の順で確認します。
+
+1. `approved` 状態のactive change（今回の変更契約）
+2. 対象領域のcurrent spec（現在有効な契約）
+3. `accepted` 状態のADR（長期的な技術判断）
+4. 実行可能なテスト（保証されている実例）
+5. 実装（現在の事実）
+6. Legacy Change Specification（過去の意図と経緯）
+
+この順序は矛盾を自動解決する規則ではありません。仕様、テスト、実装、Legacyの記述が異なる場合は、対象箇所・利用者影響・選択肢を報告し、人間がcurrentまたはchangeを再レビューします。
 
 ## 変更区分
 
 | 区分 | 例 | 必要な文書 |
 | --- | --- | --- |
-| S: 軽微 | 誤字、コメント、意味を変えない整理 | 新規仕様は不要。関連文書があれば同時更新 |
-| B: 不具合 | 既存の期待動作と異なる挙動 | 既存仕様へ回帰条件を追加。なければ短い仕様 |
-| F: 機能 | 新機能、UI/API/出力の観測可能な変更 | 機能仕様と人間の承認 |
-| A: 設計 | 永続化形式、主要依存、層構造、配布方式 | 機能仕様に加えてADR |
+| S: 軽微 | 誤字、コメント、意味を変えない整理 | 原則として変更仕様不要。関連indexやリンクは同期 |
+| B: 不具合 | 既存の期待動作との差異を修正 | proposal、delta、tasks、validation。期待動作をcurrentへ追記 |
+| F: 機能 | UI、出力、保存、描画など観測可能な変更 | proposal、delta、tasks、validation |
+| A: 設計 | 永続化形式、主要依存、層構造、配布、セキュリティ | proposal、delta、design、ADR、tasks、validation |
+| X: 実験 | Shader実験、技術検証、性能計測 | experimentまたはproposal、validation。製品仕様へ未統合 |
 
-判断に迷う場合は、外部から観測できる動作が変わるならF、将来の複数機能を拘束するならAとして扱います。
+迷ったら、外部から観測できる動作が変わる場合はF、複数機能を長期拘束する場合はAとします。Xの結果は承認されるまでcurrentへ入りません。
+
+### 実装を開始してよい条件
+
+- S区分は、利用者向け契約、保存形式、出力、描画、UI、外部連携の振る舞いを変えない文書整理に限ります。
+- B/F/A区分は、対象current spec、delta、対象外、受け入れ条件がレビュー済みで、変更仕様が `approved` かつ `human_review: completed` になってから実装します。A区分はdesignとADRも確認します。
+- X区分は実験用の領域へ隔離し、結果が有用でも製品コードやcurrent specへ黙って取り込みません。製品化するときはFまたはAのchangeとして再レビューします。
+- 対象current specがまだない領域では、Legacy SPEC・実装・テストから現行動作を調査し、最小のcurrent specとchangeを作成します。未移行であることを理由に、コードだけを先に仕様化しません。
+- `approved`後にWhy/What、スコープ、ACを変更する場合は、`review`へ戻して再承認します。AIや`docs:check`は人間の承認を代替しません。
+
+## Change IDと要件ID
+
+- 既存の `SPEC-000`〜`SPEC-040` は削除・再利用しません。新しい変更は `CHANGE-###-short-name` のディレクトリと `CHANGE-###` のIDを使います。
+- current specは `CURRENT-*` の領域IDを持ち、要件には `GRAD-*`、`EFFECT-*`、`PRESET-*` のような安定IDを付けます。
+- 変更仕様の受け入れ条件は `AC-###` とし、安定したcurrent要件IDとは分けます。
+- 要件の意味を変える場合は既存IDをMODIFIEDとして明示し、新しい無関係の動作を一つの要件へ詰め込みません。
 
 ## 標準ワークフロー
 
 ### 1. 調査
 
-- 関連仕様、ADR、コード、テストを特定する。
-- 現在の挙動と制約を確認する。
-- `depends_on`から影響を受ける仕様を確認する。
+1. `docs/development/index.md` と対象current specを読む。
+2. current specの `related_adrs`、依存するADR、active changeを確認する。
+3. 必要な範囲でLegacy SPEC、コード、テストを調べる。Legacyだけから理想仕様を作らない。
+4. 現在の実装、テストの保証範囲、未検証の手動動作を分けてメモする。
 
-### 2. 仕様の草案
+current specが存在しない場合は、現行動作の調査結果を「確認できた事実」「テストで保証されること」「まだ手動確認が必要なこと」に分けます。未確認の挙動をcurrent specの確定契約として書かないでください。
 
-[仕様テンプレート](../specs/_template.md)から`docs/specs/SPEC-NNN-short-name.md`を作ります。最低限、背景、ゴール、スコープ、方針、エッジケース、受け入れ条件を具体化します。
+### 2. 変更仕様の作成
 
-草案時の`status`は`draft`、人間の判断が必要な間は`human_review: required`です。
+`docs/changes/_template/`から `docs/changes/active/CHANGE-###-short-name/` を作成し、まず次を記入します。
 
-### 3. AIによる設計レビュー
+- `proposal.md`: 背景、理由、ゴール、対象外、影響、リスク、未決定事項
+- `delta.md`: `ADDED`、`MODIFIED`、`REMOVED` の差分だけ。既存要件IDを明示
+- `design.md`: A区分または実装判断が複数にまたがる場合のHow
+- `tasks.md`: 受け入れ条件に対応した小さな作業
+- `validation.md`: ACごとのテスト/手動確認と結果、実行コマンド
 
-AIには実装を依頼する前に、次を指摘させます。
+`proposal.md` と `delta.md` が人間レビューを通るまで、観測可能な本実装を開始しません。調査用プロトタイプはXとして隔離し、本番コードへ残す前に改めて仕様化します。
 
-- 曖昧な語句と未決定事項
-- 要件間または既存仕様との矛盾
-- 代替案とトレードオフ
-- エラー、境界値、互換性、性能上の抜け
-- テストできない受け入れ条件
+### 3. 実装と検証
 
-AIの提案を自動採用せず、人間が判断して仕様へ反映します。
+1. `approved` changeの対象と対象外を確認する。
+2. 変更仕様にない改善を同じPRへ混ぜない。
+3. ACごとに自動テストまたは再現可能な手動確認を追加する。
+4. 仕様とコードに差異が出たら、コードを正として黙って仕様を書き換えない。changeを再レビューする。
+5. `related_code`、`related_tests`、`validation.md`を実態に合わせる。
 
-### 4. 人間による承認
+実装中に仕様外の改善、別領域の整理、未承認の設計変更が見つかった場合は、現在のchangeへ混ぜず、別のchange候補として記録します。
 
-内容が確定したら`status: approved`、`human_review: completed`へ変更します。承認前は、調査用プロトタイプを除いて本実装を開始しません。プロトタイプは本番コードへそのまま残さない前提で扱います。
+### 4. 完了とArchive
 
-### 5. 計画と実装
+1. すべてのACを検証し、結果を記録する。
+2. deltaをcurrent specへ統合する。現在の本文に過去の経緯を追記しない。
+3. current specの要件ID、ADRリンク、関連コード、関連テストを更新する。
+4. `tasks.md`を完了状態にし、`status: implemented`へ更新する。
+5. 同じPRで文書、コード、テスト、利用者向け説明を同期する。
+6. 完了した変更フォルダを `docs/changes/archive/YYYY-MM-DD-short-name/` へ移動し、proposalの状態を `archived` にする。
 
-受け入れ条件ごとに実装とテストを分けます。仕様にない改善は勝手に含めず、別仕様へ分離します。
+Archiveへ移動する前に、`docs/specs/current/index.md`、`docs/specs/index.md`、`docs/changes/*/index.md` のリンクとID・タイトル・statusを確認します。実装していない、またはACが未検証のchangeはArchiveへ移動せず、残る理由を `proposal.md` に記録します。
 
-### 6. 検証と同期
+実装しないことが明確な変更や、currentへのdeltaがない開発基盤変更も、Archiveにvalidationを残すことで後から判断を追えます。
 
-- 各受け入れ条件を自動テストまたは手動確認へ対応付ける。
-- `related_code`と`related_tests`を実態に合わせる。
-- 完了した仕様を`status: implemented`へ変更する。
-- 利用方法が変わる場合は`docs/index.md`も更新する。
-- `npm run docs:check`と必要な品質チェックを実行する。
+## 状態
 
-## 仕様の状態
+### 変更仕様
 
 ```text
-draft -> review -> approved -> implemented -> deprecated
+draft -> review -> approved -> implemented -> archived
+                       └──> cancelled
 ```
 
 | 状態 | 意味 |
 | --- | --- |
 | `draft` | 作成中。未決定事項を含む |
-| `review` | レビュー中。実装開始前 |
-| `approved` | 人間が実装内容として承認済み |
-| `implemented` | コードと検証が仕様に同期済み |
-| `deprecated` | 現在は無効。後継仕様を本文に記載 |
+| `review` | 人間レビュー中。実装開始前 |
+| `approved` | 人間がdeltaとスコープを承認済み |
+| `implemented` | コード、テスト、validation、current統合が完了 |
+| `archived` | 完了記録をArchiveへ移動済み |
+| `cancelled` | 実装しないと判断。理由を残す |
 
-`approved`以降の意味を変える更新は、いったん`review`へ戻して再承認します。
+`approved`以降にWhy/Whatを変える場合は `review`へ戻して再承認します。AIや自動検査は人間の承認状態を代替しません。
 
 ## 仕様と実装が異なる場合
 
-1. 仕様ID、該当箇所、現在の実装、利用者への影響を記録する。
-2. 実装の不具合か、仕様変更が必要かを判断する。
-3. 仕様変更なら`review`へ戻し、人間が承認する。
-4. 承認後にコードとテストを変更する。
-5. 同じPull Requestで再同期する。
+1. 仕様ID、該当箇所、現在の実装、テストが保証する範囲、利用者への影響を記録する。
+2. 期待動作を維持してコードを直すのか、期待動作を変えてchangeを再承認するのかを分ける。
+3. 既存コードを事実上の仕様としてcurrentへ黙って転記しない。望ましい動作と現状を人間が確定する。
+4. 確定後にコード、テスト、current、change/Archiveを同じPRで同期する。
 
-実装を事実上の仕様として黙って文書へ転記すると、設計意図が失われます。既存コードから仕様を起こす場合も、現状と望ましい動作を分けてレビューします。
+### 現行仕様
 
-## フロントマター
+現行仕様は `status: current` とし、現在有効な契約を記載します。要件の廃止は本文から黙って削除せず、後継要件または廃止状態を示し、対応する変更履歴をリンクします。
 
-仕様とADRは機械可読なメタデータを持ちます。
+## 現行仕様の記述ルール
 
-```yaml
----
-id: SPEC-001
-title: 例
-status: draft
-owners: [maintainer]
-created: 2026-07-04
-updated: 2026-07-04
-depends_on: []
-related_adrs: []
-related_code: []
-related_tests: []
-human_review: required
----
+現行仕様は利用者や外部システムから検証できる単位で書きます。目的、現在の要件、境界条件、互換性、他領域との関係、検証上の未確認事項を含めます。
+
+次は契約でない限り本文へ固定しません。
+
+- Reactコンポーネント名、Zustand action名、関数名
+- Shader uniform名、内部の一時的な数値マッピング
+- 実装ファイル一覧（frontmatterの参照情報を除く）
+
+一方、Preset JSONの識別値、Web/Tauri共通の保存契約、export互換性、既存データ移行規則は外部契約として記載します。
+
+## 設計文書とADRの使い分け
+
+- `design.md` は一つの変更を実装するためのHowです。変更完了後も履歴としてArchiveに残ります。
+- ADRは複数の機能や将来の変更を拘束するWhy/Decisionです。主要依存、永続化形式、描画方式、ブラウザ/Tauriの責務、セキュリティ・配布方式などに使います。
+- 局所実装の選択をすべてADRにしません。後から戻すコストが高い判断だけをADRへ昇格します。
+
+## 検証コマンド
+
+文書だけの変更でも、最低限次を実行します。
+
+```sh
+npm run docs:check
+npm run docs:build
 ```
 
-`depends_on`には前提となる仕様IDを記載します。単に似ている文書は本文のリンクに留めます。循環依存は作らず、共通要件を独立した仕様へ分離します。
+コード変更を含む場合は変更範囲に応じて次も実行します。
 
-## 参考にした考え方
+```sh
+npm test
+npm run lint
+npm run build
+```
 
-- [株式会社オブライト: バイブコーディング時代にDocDDが重要な理由](https://www.oflight.co.jp/ja/columns/ai-dd-development-vibe-coding-era-2026)
-- [もっと気軽にDocDD(SpecDD)でAI駆動開発したい](https://zenn.dev/imaimai17468/articles/5df32a0bcfc75a)
+Tauri/Rust、ファイル操作、FFmpeg、更新機構、依存関係、外部入力を変更する場合は次も実行し、セキュリティ観点をレビューします。
 
-K-GGでは、記事の「文書を一次情報にする」「機能単位のplan」「AIによる事前レビュー」「依存関係の明示」を採用しています。一方、特定のAI製品やMCPを必須とせず、変更規模に応じて工程を省略できる構成にしています。
+```sh
+cargo test --manifest-path src-tauri/Cargo.toml
+cargo check --manifest-path src-tauri/Cargo.toml
+```
+
+コマンドは `validation.md` のCommandsへ、ファイルパスはfrontmatterの `related_code` / `related_tests` へ分けて記載します。
+
+## 関連資料
+
+- [現行仕様](../specs/current/)
+- [変更仕様](../changes/)
+- [Legacy Change Specifications](../specs/#legacy-change-specifications)
+- [ADR](../adr/)
+- [GitHub: Pull Request template](https://docs.github.com/en/communities/using-templates-to-encourage-useful-issues-and-pull-requests/creating-a-pull-request-template-for-your-repository)
+- [OpenSpec: Core Concepts](https://openspec.dev/docs/overview)
+- [MADR: Markdown Any Decision Records](https://adr.github.io/madr/)
+
+OpenSpecのcurrent/delta/archiveの分離と、MADRのdecision/statusの考え方を参考にしています。K-GGでは外部ツールを必須化せず、既存のMarkdown、VitePress、Node検査だけで運用します。

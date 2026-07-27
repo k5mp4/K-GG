@@ -1,12 +1,24 @@
 ---
-title: 機能仕様
+title: 仕様一覧
 ---
 
-# 機能仕様
+# 仕様
 
-機能仕様は、K-GGへ加える変更の背景、期待動作、設計方針、受け入れ条件を記録する一次情報です。運用方法は[DocDD運用ガイド](../development/docdd.md)を参照してください。
+仕様の読み方は[現行仕様](./current/)と[変更仕様](../changes/)から始めます。運用方法は[DocDD運用ガイド](../development/docdd.md)を参照してください。
 
-## 仕様一覧
+## 現行仕様
+
+| ID | 領域 | 状態 |
+| --- | --- | --- |
+| CURRENT-GRADIENT | [Gradient System](./current/gradient-system) | current |
+| CURRENT-EFFECT-STACK | [Effect Stack](./current/effect-stack) | current |
+| CURRENT-PRESET | [Preset System](./current/preset-system) | current |
+
+変更の経緯は[完了済み変更](../changes/archive/)と、下記のLegacy Change Specificationsから確認できます。現行仕様を読む際にLegacy SPECを必須資料にしないでください。
+
+## Legacy Change Specifications
+
+### Legacy SPEC一覧
 
 | ID | 仕様 | 状態 |
 | --- | --- | --- |
@@ -18,7 +30,7 @@ title: 機能仕様
 | SPEC-005 | [動画出力表示名とファイル名の整理](./SPEC-005-video-export-naming.md) | implemented |
 | SPEC-006 | [統合検証コマンド](./SPEC-006-verification-commands.md) | implemented |
 | SPEC-007 | [K-GG専用フォルダとPATHからのFFmpeg検出](./SPEC-007-ffmpeg-install-guidance.md) | implemented |
-| SPEC-008 | [画像カラーパレット生成機能](./SPEC-008-color-palette-generator.md) | implemented |
+| SPEC-008 | [画像カラーパレット生成機能](./SPEC-008-color-palette-generator.md) | review |
 | SPEC-009 | [画像グラデーション入力](./SPEC-009-image-gradient-source.md) | implemented |
 | SPEC-010 | [Bezier Axisの廃止](./SPEC-010-remove-bezier-axis.md) | implemented |
 | SPEC-011 | [右サイドバーの情報設計とキャンバス解像度プリセット](./SPEC-011-right-sidebar-organization.md) | implemented |
@@ -52,7 +64,11 @@ title: 機能仕様
 | SPEC-039 | [Tweeq入力UIの安定化とローカル開発サーバー再利用](./SPEC-039-tweeq-input-ui-and-local-dev-recovery.md) | implemented |
 | SPEC-040 | [Mesh Gradation（単一Coons Patch）](./SPEC-040-mesh-gradation.md) | implemented |
 
-## 新しい仕様の作り方
+## Legacy SPECの扱い
+
+既存の `SPEC-000`〜`SPEC-040` は、公開済みリンクと履歴追跡性を維持するため直下に残しています。新しい変更には `CHANGE-###` を使い、既存SPEC IDを再利用しません。現在の動作と過去の意図が異なる場合は、[DocDD運用ガイド](../development/docdd#仕様と実装が異なる場合)に従って差異を報告します。
+
+## 新しいLegacy SPECの作り方（移行期間のみ）
 
 1. 次の未使用番号を採番する。
 2. [_template.md](./_template.md)を`SPEC-NNN-short-name.md`としてコピーする。
