@@ -14,6 +14,8 @@ human_review: required
 
 # SPEC-XXX: 仕様タイトル
 
+> このテンプレートは移行期間中にLegacy Change Specificationを読むために残しています。新しい現在仕様は[現行仕様テンプレート](./current/_template)から、変更は[変更仕様テンプレート](../changes/_template/proposal)から作成してください。
+
 ## 背景・問題
 
 なぜこの変更が必要か、現在誰が何に困っているかを記載する。

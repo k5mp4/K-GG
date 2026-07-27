@@ -1,12 +1,33 @@
+## 変更区分
+
+- [ ] S: 軽微
+- [ ] B: 不具合
+- [ ] F: 機能
+- [ ] A: 設計
+- [ ] X: 実験
+
 ## 変更理由
 
 <!-- 解決する問題と、この変更が必要な理由を記載してください。 -->
 
-## 仕様
+## 対象の現行仕様
 
-- 仕様ID: <!-- SPEC-NNN。軽微な変更で不要な場合は「不要（区分S）」 -->
-- 仕様状態: <!-- approved / implemented / 該当なし -->
+- Current Spec: <!-- CURRENT-*。S区分は「なし」可 -->
+- Requirement IDs: <!-- GRAD-* / EFFECT-* / PRESET-*。なければ「なし」 -->
+
+## 変更仕様
+
+- Change ID: <!-- CHANGE-###。S区分は「なし」可 -->
+- active/archive path: <!-- docs/changes/active/... または docs/changes/archive/...。S区分は「なし」可 -->
+- 状態: <!-- draft / review / approved / implemented / archived / cancelled / 該当なし -->
+- Human review: <!-- required / completed / 該当なし -->
 - 関連ADR: <!-- ADR-NNNN、なければ「なし」 -->
+
+## Delta
+
+- ADDED: <!-- 要件IDと変更内容、なければ「なし」 -->
+- MODIFIED: <!-- 要件IDと変更内容、なければ「なし」 -->
+- REMOVED: <!-- 要件IDと変更内容、なければ「なし」 -->
 
 ## 変更内容
 
@@ -24,10 +45,20 @@
 - [ ] `npm run docs:check`
 - [ ] `npm run docs:build`
 - [ ] 変更範囲に必要なテスト、lint、buildを実行した
+- [ ] 実行していない手動確認、環境依存の失敗、既存警告を「未確認事項」に記載した
+
+## 受け入れ条件と検証
+
+| AC | テスト・確認方法 | 結果 |
+| --- | --- | --- |
+| AC-001 |  |  |
 
 ## 同期確認
 
-- [ ] コード、テスト、仕様の内容が一致している
+- [ ] current specを更新した、または変更不要の理由を記載した
+- [ ] current specの要件ID、タイトル、statusと一覧のリンクが一致している
+- [ ] コード、テスト、current specの内容が一致している
+- [ ] changeをArchiveへ移動した、またはactiveのままにする理由を記載した
 - [ ] 利用者向けの動作変更を`docs/index.md`へ反映した、または変更不要
 - [ ] 仕様外の変更を含めていない
 - [ ] 仕様との差異がある場合、仕様を再レビューした

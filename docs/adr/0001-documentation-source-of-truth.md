@@ -18,7 +18,7 @@ K-GGはReact、WebGL/GLSL、Tauri/Rust、複数の出力経路を持ち、変更
 
 機能の意図と期待動作は、リポジトリ内のバージョン管理された仕様書を一次情報とする。コードとテストは仕様の実現物として同じPull Requestで同期する。
 
-機能仕様は`docs/specs/`、長期的な技術判断は`docs/adr/`、横断的な現状説明は`docs/development/`に分離する。新規機能と観測可能な動作変更は、人間が仕様を承認してから実装する。
+現在有効な機能契約は`docs/specs/current/`、変更理由と差分は`docs/changes/`、長期的な技術判断は`docs/adr/`、横断的な現状説明は`docs/development/`に分離する。旧来の`docs/specs/SPEC-*.md`はLegacy Change Specificationとして履歴参照に残す。新規機能と観測可能な動作変更は、人間が変更仕様を承認してから実装する。
 
 ## 理由
 
