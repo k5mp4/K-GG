@@ -8,7 +8,7 @@ created: 2026-07-28
 updated: 2026-07-28
 requirement_ids: [UI-001, UI-002, UI-003, UI-004, UI-005, UI-006]
 related_adrs: [ADR-0011, ADR-0012]
-related_changes: [CHANGE-002, CHANGE-003, CHANGE-005, CHANGE-006, CHANGE-007]
+related_changes: [CHANGE-010]
 related_code: [src/App.css, src/components/CustomSelect.tsx, src/components/GradientRamp.tsx, src/components/SliderField.tsx, src/components/NoiseDistortionPanel.tsx, src/components/SlitScanPanel.tsx, src/components/StretchPanel.tsx, src/components/TimelineBar.tsx, src/components/IridescencePanel.tsx, src/components/NormalMapPanel.tsx, src/components/RadonPanel.tsx, src/components/PostprocessPanel.tsx, src/i18n/uiLabels.ts, src/i18n/messages.ts]
 related_tests: [src/lib/tweeqAngle.test.ts, src/lib/parameterLimits.test.ts, src/lib/animationDirection.test.ts, 'manual: Tweeq InputAngle and InputShuffle and InputDrum and InputRadio browser checks']
 ---

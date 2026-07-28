@@ -8,7 +8,7 @@ created: 2026-07-27
 updated: 2026-07-28
 requirement_ids: [GRAD-001, GRAD-002, GRAD-003, GRAD-004, GRAD-005, GRAD-006, GRAD-007, GRAD-008, GRAD-009, GRAD-010, GRAD-011, GRAD-012, GRAD-013, GRAD-014]
 related_adrs: [ADR-0001, ADR-0003, ADR-0010, ADR-0013]
-related_changes: [CHANGE-001, CHANGE-004, CHANGE-005, CHANGE-006, CHANGE-007, CHANGE-008]
+related_changes: [CHANGE-001, CHANGE-010]
 related_code: [src/types/gradient.ts, src/types/imageGradient.ts, src/store/gradientStore.ts, src/lib/gradientRampUtils.ts, src/lib/gradientPreview.ts, src/lib/imageGradient.ts, src/lib/meshGradientField.ts, src/lib/sceneEvaluation.ts, src/lib/webgl.ts, src/lib/presetModel.ts, src/components/GradientRamp.tsx, src/components/CustomSelect.tsx, src/components/ColorPaletteGenerator.tsx, src/lib/colorHarmony.ts, src/i18n/uiLabels.ts, src/i18n/messages.ts]
 related_tests: [src/types/gradient.test.ts, src/lib/imageGradient.test.ts, src/lib/imageGradientProtected.test.ts, src/lib/meshGradient.test.ts, src/lib/proportionalRampEdit.test.ts, src/lib/sceneEvaluation.glass.test.ts, src/lib/colorHarmony.test.ts, src/lib/gradientPreview.test.ts]
 ---
