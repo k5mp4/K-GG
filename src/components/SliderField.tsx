@@ -203,7 +203,7 @@ export function SliderField({
         )}
       </div>
       {control === 'angle' ? (
-        <div className={`${compact ? 'w-[104px]' : 'w-full'} tq-input-angle ${disabled ? 'pointer-events-none' : ''}`} title={displayed}>
+        <div className={`${compact ? 'w-[112px]' : 'w-full'} tq-input-angle ${disabled ? 'pointer-events-none' : ''}`} title={displayed}>
           <InputAngle
             value={angleInputValue}
             snap={15}

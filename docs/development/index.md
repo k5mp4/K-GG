@@ -20,11 +20,12 @@ current specは現在の動作、active changeは今回実装する差分、Arch
 1. [プロジェクト概要](./project-overview.md)
 2. [アーキテクチャ](./architecture.md)
 3. [開発・検証ガイド](./development-guide.md)
-4. [DocDD運用ガイド](./docdd.md)
-5. [現行仕様](../specs/current/index.md)
-6. [進行中の変更](../changes/active/index.md)
-7. [ADR一覧](../adr/index.md)
-8. [UI用語・アイコン表記ガイド](./ui-terminology.md)
+4. [変更パッケージ運用](./change-workflow.md)
+5. [DocDD運用ガイド](./docdd.md)
+6. [現行仕様](../specs/current/index.md)
+7. [進行中の変更](../changes/active/index.md)
+8. [ADR一覧](../adr/index.md)
+9. [UI用語・アイコン表記ガイド](./ui-terminology.md)
 
 ## 一次情報の優先順位
 

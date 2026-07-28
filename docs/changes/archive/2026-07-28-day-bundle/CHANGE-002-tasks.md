@@ -1,0 +1,9 @@
+- [x] 対象のcurrent spec、関連ADR、Legacy SPEC、実装を確認する
+- [x] `proposal.md` と `delta.md` を人間レビュー・承認する
+- [x] InputAngleとNoise/Slit/StretchのSeedレイアウトを修正する
+- [x] SlitのModeをInputDrum、Auto ModifierをInputRadioへ置き換える
+- [x] 日本語Animation名称を`ANIMATION`へ変更する
+- [x] 受け入れ条件ごとのブラウザー確認と自動検証を行う
+- [x] `validation.md`へ実結果を記録する
+- [x] current specへdeltaを統合する
+- [x] 変更仕様をArchiveへ移動する

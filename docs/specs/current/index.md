@@ -13,6 +13,7 @@ title: 現行仕様
 | CURRENT-GRADIENT | [Gradient System](./gradient-system) | current |
 | CURRENT-EFFECT-STACK | [Effect Stack](./effect-stack) | current |
 | CURRENT-PRESET | [Preset System](./preset-system) | current |
+| CURRENT-UI-CONTROLS | [UI入力コントロール](./ui-controls) | current |
 
 ## 読み方
 

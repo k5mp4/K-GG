@@ -1,8 +1,9 @@
-import { useCallback, useEffect, useRef, useState, type CSSProperties, type ReactNode } from 'react';
+import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
 import { gsap } from 'gsap';
 import { useGradientStore, GRADIENT_ANCHOR_DEFAULTS, defaultBezierControlsForAnchors } from '../store/gradientStore';
 import { gradientRampPresets, getColorAtPosition, getOpacityAtPosition, applyMirrorT, normalizeRampSettings } from '../lib/gradientRampUtils';
+import { buildGradientPreviewStyle } from '../lib/gradientPreview';
 import { moveStopsProportionally } from '../lib/proportionalRampEdit';
 import { RAMP_W, RAMP_BAR_H, RAMP_HANDLE_AREA, RAMP_HANDLE_HALF, RAMP_WHEEL_STEP } from '../lib/constants';
 import type { ColorStop, OpacityStop, RampColorMode, RampInterpolation } from '../types/gradient';
@@ -24,7 +25,8 @@ import { SliderField } from './SliderField';
 import { GradientTypeSelector } from './GradientTypeSelector';
 import { IconButton } from './IconButton';
 import { useLanguage } from '../i18n/LanguageProvider';
-import { InputShuffle } from 'tweeq';
+import { localizeUiLabel } from '../i18n/uiLabels';
+import { InputNumber, InputShuffle } from 'tweeq';
 
 const BAR_H = RAMP_BAR_H;
 const HANDLE_AREA = RAMP_HANDLE_AREA;
@@ -97,6 +99,34 @@ const HUE_INTERP_OPTIONS: { value: RampInterpolation; label: string }[] = [
   { value: 'clockwise', label: 'Clockwise' },
   { value: 'counterclockwise', label: 'Counter-Clockwise' },
 ];
+
+function defaultInterpolationForColorMode(colorMode: RampColorMode): RampInterpolation {
+  return colorMode === 'hsv' || colorMode === 'hsl' || colorMode === 'lch' || colorMode === 'oklch'
+    ? 'near'
+    : 'ease';
+}
+
+function RampOptionPreview({
+  stops,
+  opacityStops,
+  colorMode,
+  interpolation,
+  variable,
+}: {
+  stops: ColorStop[];
+  opacityStops?: OpacityStop[];
+  colorMode: RampColorMode;
+  interpolation: RampInterpolation;
+  variable: number;
+}) {
+  return (
+    <span
+      aria-hidden="true"
+      className="block h-full w-full"
+      style={buildGradientPreviewStyle(stops, opacityStops, colorMode, interpolation, variable)}
+    />
+  );
+}
 
 // ===== 共通描画関数 =====
 function drawRamp(
@@ -351,7 +381,7 @@ type GradientRampProps = {
 };
 
 export function GradientRamp({ overlayImageElement = null, showHeader = true }: GradientRampProps = {}) {
-  const { t } = useLanguage();
+  const { t, language } = useLanguage();
   const { gradient, setGradient, resetMeshGradient, isSlitAdjusting, selectedStops, setSelectedStops, keyframeTracks, setKeyframeTracks, addKeyframe, setKeyframe, currentTime } = useGradientStore();
   const selectedIdxs = new Set(selectedStops);
   const [selectedOpacityStops, setSelectedOpacityStops] = useState<number[]>([]);
@@ -359,6 +389,7 @@ export function GradientRamp({ overlayImageElement = null, showHeader = true }: 
   const [isOpacityControlsDismissed, setIsOpacityControlsDismissed] = useState(false);
   const [isPickerOpen, setIsPickerOpen] = useState(false);
   const [showPaletteGenerator, setShowPaletteGenerator] = useState(false);
+  const [showRampOptionPreviews, setShowRampOptionPreviews] = useState(false);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [pipWindow, setPipWindow] = useState<Window | null>(null);
   const [paletteName, setPaletteName] = useState('');
@@ -534,10 +565,27 @@ export function GradientRamp({ overlayImageElement = null, showHeader = true }: 
   const colorMode = normalizedRamp.colorMode;
   const interpolation = normalizedRamp.interpolation;
   const rampVariable = Math.max(-1, Math.min(1, gradient.rampVariable ?? 0));
-  const rampVariablePct = `${((rampVariable + 1) / 2) * 100}%`;
   const rampRepeat = Math.max(1, Math.min(20, Math.round(gradient.rampRepeat ?? 1)));
   const usesHueInterpolation = colorMode === 'hsv' || colorMode === 'hsl' || colorMode === 'lch' || colorMode === 'oklch';
   const interpolationOptions = usesHueInterpolation ? HUE_INTERP_OPTIONS : RGB_INTERP_OPTIONS;
+  const renderColorModePreview = (option: { value: string }) => (
+    <RampOptionPreview
+      stops={gradient.stops}
+      opacityStops={gradient.opacityStops}
+      colorMode={option.value as RampColorMode}
+      interpolation={defaultInterpolationForColorMode(option.value as RampColorMode)}
+      variable={rampVariable}
+    />
+  );
+  const renderInterpolationPreview = (option: { value: string }) => (
+    <RampOptionPreview
+      stops={gradient.stops}
+      opacityStops={gradient.opacityStops}
+      colorMode={colorMode}
+      interpolation={option.value as RampInterpolation}
+      variable={rampVariable}
+    />
+  );
 
   // 最新 state を ref で保持（ホイール/ドラッグハンドラ内から参照）
   const selectedIdxsRef = useRef(selectedIdxs);
@@ -546,16 +594,12 @@ export function GradientRamp({ overlayImageElement = null, showHeader = true }: 
   const opacityStopsRef = useRef(gradient.opacityStops ?? DEFAULT_OPACITY_STOPS);
   const setGradientRef = useRef(setGradient);
   const mirrorRef = useRef(gradient.rampMirror ?? false);
-  const rampVariableRef = useRef(rampVariable);
-  const rampVariableInputRef = useRef<HTMLInputElement | null>(null);
-  const rampVariableWheelHandlerRef = useRef<((e: WheelEvent) => void) | null>(null);
   useEffect(() => { selectedIdxsRef.current = selectedIdxs; });
   useEffect(() => { selectedOpacityIdxsRef.current = selectedOpacityIdxs; });
   useEffect(() => { stopsRef.current = gradient.stops; });
   useEffect(() => { opacityStopsRef.current = gradient.opacityStops ?? DEFAULT_OPACITY_STOPS; });
   useEffect(() => { setGradientRef.current = setGradient; });
   useEffect(() => { mirrorRef.current = gradient.rampMirror ?? false; });
-  useEffect(() => { rampVariableRef.current = rampVariable; });
 
   // ドラッグ状態（サイドバー・モーダル共用）
   const draggingRef = useRef<number | null>(null);
@@ -1313,29 +1357,6 @@ export function GradientRamp({ overlayImageElement = null, showHeader = true }: 
     });
   }, []);
 
-  const onRampVariableWheel = useCallback((e: WheelEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
-    const step = e.altKey ? 0.001 : e.shiftKey ? 0.1 : 0.01;
-    const direction = Math.abs(e.deltaX) > Math.abs(e.deltaY)
-      ? (e.deltaX > 0 ? 1 : -1)
-      : (e.deltaY < 0 ? 1 : -1);
-    const next = Math.max(-1, Math.min(1, rampVariableRef.current + direction * step));
-    setGradientRef.current({ rampVariable: Number(next.toFixed(3)) });
-  }, []);
-
-  const rampVariableInputCallbackRef = useCallback((el: HTMLInputElement | null) => {
-    if (rampVariableInputRef.current && rampVariableWheelHandlerRef.current) {
-      rampVariableInputRef.current.removeEventListener('wheel', rampVariableWheelHandlerRef.current);
-      rampVariableWheelHandlerRef.current = null;
-    }
-    rampVariableInputRef.current = el;
-    if (!el) return;
-    const handler = (e: WheelEvent) => onRampVariableWheel(e);
-    rampVariableWheelHandlerRef.current = handler;
-    el.addEventListener('wheel', handler, { passive: false });
-  }, [onRampVariableWheel]);
-
   function recordStopKeyframes() {
     if (selectedIdxs.size === 0) return;
     const nt = currentTime;
@@ -1699,76 +1720,7 @@ export function GradientRamp({ overlayImageElement = null, showHeader = true }: 
             />
           </div>
 
-          {/* カラーモード / 補間モード選択 */}
-          <div className="grid grid-cols-2 gap-2">
-            <CustomSelect
-              label="Color Mode"
-              value={colorMode}
-              options={COLOR_MODE_OPTIONS}
-              onChange={(val) => {
-                const nextMode = val as RampColorMode;
-                setGradient({
-                  rampColorMode: nextMode,
-                  rampInterpolation: nextMode === 'hsv' || nextMode === 'hsl' || nextMode === 'lch' || nextMode === 'oklch' ? 'near' : 'ease',
-                });
-              }}
-            />
-            <CustomSelect
-              label="Interp"
-              value={interpolation}
-              options={interpolationOptions}
-              onChange={(val) => setGradient({ rampInterpolation: val as RampInterpolation })}
-            />
-          </div>
-
-          {interpolation === 'variable' && (
-            <div className="group/row">
-              <div className="mb-1.5 flex items-center justify-between">
-                <label className="select-none cursor-default font-body text-xs text-deep">Variable</label>
-                <span className="text-[10px] text-k-text tabular-nums">{rampVariable.toFixed(3)}</span>
-              </div>
-              <input
-                ref={rampVariableInputCallbackRef}
-                type="range"
-                min={-1}
-                max={1}
-                step={0.001}
-                value={rampVariable}
-                onChange={(e) => setGradient({ rampVariable: Number(e.target.value) })}
-                className="w-full slider"
-                style={{ '--slider-pct': rampVariablePct } as CSSProperties}
-              />
-            </div>
-          )}
-
-          <SliderField
-            label={t('gradient.repeat')}
-            min={1}
-            max={20}
-            step={1}
-            value={rampRepeat}
-            onChange={(value) => setGradient({ rampRepeat: Math.round(value) })}
-            format={(value) => `${Math.round(value)}x`}
-            defaultValue={1}
-          />
-
-          {/* Mirror モード */}
-          <div className="flex items-center justify-between">
-            <span className="text-xs text-tab-inactive">{t('gradient.mirror')}</span>
-            <button
-              onClick={toggleRampMirror}
-              onTouchEnd={(e) => runTouchAction(e, toggleRampMirror)}
-              className={`text-xs px-2 py-1 rounded-none transition-colors ${
-                gradient.rampMirror
-                  ? 'bg-fire/30 text-fire border border-fire/50'
-                  : 'bg-k-muted text-k-text border border-transparent hover:bg-k-muted/70'
-              }`}
-              title={t('gradient.mirrorDescription')}
-            >
-              {t('gradient.mirror')}
-            </button>
-          </div>
-
+          {/* ストップ編集: 頻繁に操作するためグラデーションタイプの直下に固定 */}
           <p className="text-xs text-tab-inactive">
             {t('gradient.editInstructions')}
           </p>
@@ -1808,6 +1760,104 @@ export function GradientRamp({ overlayImageElement = null, showHeader = true }: 
             {stopOpButtons}
           </div>
 
+          {/* カラーモード / 補間モード選択 */}
+          <div className="grid grid-cols-2 gap-2">
+            <CustomSelect
+              label="Color Mode"
+              value={colorMode}
+              options={COLOR_MODE_OPTIONS}
+              optionPreview={renderColorModePreview}
+              alwaysShowPreviews={showRampOptionPreviews}
+              previewOnly={showRampOptionPreviews}
+              localizeOptions={false}
+              onChange={(val) => {
+                const nextMode = val as RampColorMode;
+                setGradient({
+                  rampColorMode: nextMode,
+                  rampInterpolation: defaultInterpolationForColorMode(nextMode),
+                });
+              }}
+            />
+            <CustomSelect
+              label="Interp"
+              value={interpolation}
+              options={interpolationOptions}
+              optionPreview={renderInterpolationPreview}
+              alwaysShowPreviews={showRampOptionPreviews}
+              previewOnly={showRampOptionPreviews}
+              localizeOptions={false}
+              onChange={(val) => setGradient({ rampInterpolation: val as RampInterpolation })}
+            />
+          </div>
+
+          <div className="flex items-center justify-end">
+            <button
+              type="button"
+              aria-pressed={showRampOptionPreviews}
+              onClick={() => setShowRampOptionPreviews((visible) => !visible)}
+              className={`inline-flex items-center gap-1.5 border px-2 py-1 text-[10px] uppercase tracking-wider transition-colors focus:outline-none focus:ring-1 focus:ring-fire ${showRampOptionPreviews ? 'border-fire/70 bg-fire/15 text-cream' : 'border-panel-border text-tab-inactive hover:border-cream/50 hover:text-k-text'}`}
+              title="常時プレビューを切り替え"
+            >
+              <span className="h-2.5 w-5 border border-current/40 bg-[linear-gradient(90deg,#d11402,#e5dabd,#6075a4)]" aria-hidden="true" />
+              {showRampOptionPreviews ? 'Hide previews' : 'Show previews'}
+            </button>
+          </div>
+
+          {interpolation === 'variable' && (
+            <div className="group/row">
+              <div className="mb-1.5 flex items-center justify-between">
+                <label className="select-none cursor-default font-body text-xs text-deep">{localizeUiLabel('Variable', language)}</label>
+              </div>
+              <div className="tq-input-number-shell w-full">
+                <InputNumber
+                className="tq-input-number w-full"
+                value={rampVariable}
+                min={-1}
+                max={1}
+                step={0.001}
+                precision={3}
+                bar={0}
+                clampMin
+                clampMax
+                aria-label={`${localizeUiLabel('Variable', language)}: ${rampVariable.toFixed(3)}`}
+                onChange={(value) => {
+                  if (Number.isFinite(value)) {
+                    setGradient({ rampVariable: Math.max(-1, Math.min(1, value)) });
+                  }
+                }}
+                />
+              </div>
+            </div>
+          )}
+
+          <SliderField
+            label={t('gradient.repeat')}
+            min={1}
+            max={20}
+            step={1}
+            value={rampRepeat}
+            onChange={(value) => setGradient({ rampRepeat: Math.round(value) })}
+            format={(value) => `${Math.round(value)}x`}
+            defaultValue={1}
+          />
+
+          {/* Mirror モード */}
+          <div className="flex items-center justify-between">
+            <span className="text-xs text-tab-inactive">{t('gradient.mirror')}</span>
+            <button
+              onClick={toggleRampMirror}
+              onTouchEnd={(e) => runTouchAction(e, toggleRampMirror)}
+              className={`text-xs px-2 py-1 rounded-none transition-colors ${
+                gradient.rampMirror
+                  ? 'bg-fire/30 text-fire border border-fire/50'
+                  : 'bg-k-muted text-k-text border border-transparent hover:bg-k-muted/70'
+              }`}
+              title={t('gradient.mirrorDescription')}
+            >
+              {t('gradient.mirror')}
+            </button>
+          </div>
+
           <SidebarSection
             id="gradient-palette-generator"
             title={t('gradient.paletteGenerator')}
@@ -1816,7 +1866,10 @@ export function GradientRamp({ overlayImageElement = null, showHeader = true }: 
             onToggle={() => setShowPaletteGenerator(value => !value)}
             nested
           >
-            <ColorPaletteGenerator overlayImageElement={overlayImageElement} embedded />
+          <ColorPaletteGenerator
+              overlayImageElement={overlayImageElement}
+              embedded
+            />
           </SidebarSection>
 
           {/* プリセット */}

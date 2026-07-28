@@ -883,7 +883,6 @@ export default function App() {
             <div className="space-y-6 pt-6">
               <div className="flex items-start justify-between gap-4">
                 <div className="min-w-0">
-                  <p className="mb-2 text-[9px] font-display font-semibold uppercase tracking-[0.24em] text-fire">{t('workspace.gradient')}</p>
                   <h2 className="text-2xl font-display font-bold uppercase tracking-[0.18em] leading-none text-k-text">K-GG</h2>
                   <p className="mt-3 text-[10px] font-body tracking-normal leading-tight text-tab-inactive">© 2026 ke-go. All rights reserved.</p>
                 </div>
@@ -899,7 +898,6 @@ export default function App() {
               <div className="space-y-3 border border-fire/25 bg-fire/[0.04] p-3">
                 <div className="flex items-end justify-between gap-3">
                   <div>
-                    <p className="mb-1 text-[9px] font-display font-semibold uppercase tracking-[0.2em] text-fire">01 / {t('workspace.primary')}</p>
                     <label htmlFor="canvas-size-preset" className="block text-xs font-display font-semibold uppercase tracking-wider text-k-text">{t('canvas.size')}</label>
                   </div>
                   <span className="text-[9px] font-display uppercase tracking-widest text-tab-inactive">{t('common.output')}</span>

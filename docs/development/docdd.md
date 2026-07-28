@@ -17,6 +17,7 @@ K-GGでは、仕様をコードの後付け説明ではなく、変更意図と�
 | `docs/adr/` | ADR | 複数機能を長期に拘束する技術判断と理由 |
 | `docs/specs/SPEC-*.md` | Legacy Change Specification | 旧DocDDで蓄積した変更履歴。現在仕様の必須資料ではない |
 | `docs/development/` | 開発ガイド | 構造、ローカル開発、共通の運用ルール |
+| `docs/development/change-workflow.md` | 変更パッケージ運用 | changeの作成単位、追加指示、状態、コミット準備、Archive |
 
 現行仕様と変更仕様の関係は次のとおりです。
 
@@ -29,6 +30,8 @@ active change（今回の差分） ──完了──> archive（過去の履歴
 ```
 
 現行仕様は履歴を時系列に追記せず、常に現在の状態へ編集します。なぜ変わったかはArchiveとGit履歴で追跡します。
+
+変更パッケージの判定、会話中の追加指示の取り込み、コミットとの関係、Archiveの手順は[変更パッケージ運用](./change-workflow.md)を一次情報とします。本書はDocDDの責務とレビュー原則を定め、同じ手順を重複して管理しません。
 
 ## 参照の優先順位
 
@@ -83,7 +86,7 @@ current specが存在しない場合は、現行動作の調査結果を「確�
 
 ### 2. 変更仕様の作成
 
-`docs/changes/_template/`から `docs/changes/active/CHANGE-###-short-name/` を作成し、まず次を記入します。
+既存のchangeへ収まらない要求だけ、`docs/changes/_template/`から `docs/changes/active/CHANGE-###-short-name/`を1つ作成します。作成単位と追加指示の判定は[変更パッケージ運用](./change-workflow.md)に従い、まず次を記入します。
 
 - `proposal.md`: 背景、理由、ゴール、対象外、影響、リスク、未決定事項
 - `delta.md`: `ADDED`、`MODIFIED`、`REMOVED` の差分だけ。既存要件IDを明示
@@ -91,7 +94,7 @@ current specが存在しない場合は、現行動作の調査結果を「確�
 - `tasks.md`: 受け入れ条件に対応した小さな作業
 - `validation.md`: ACごとのテスト/手動確認と結果、実行コマンド
 
-`proposal.md` と `delta.md` が人間レビューを通るまで、観測可能な本実装を開始しません。調査用プロトタイプはXとして隔離し、本番コードへ残す前に改めて仕様化します。
+`proposal.md` と `delta.md` が人間レビューを通るまで、観測可能な本実装を開始しません。調査用プロトタイプはXとして隔離し、本番コードへ残す前に改めて仕様化します。追加指示でWhy／What、対象外、受け入れ条件を変更する場合は、同じchangeをreviewへ戻して再承認します。
 
 ### 3. 実装と検証
 

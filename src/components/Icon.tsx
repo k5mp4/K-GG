@@ -51,7 +51,7 @@ const PATHS: Record<IconName, string[]> = {
   chevronUp: ['m18 15-6-6-6 6'],
   close: ['M18 6 6 18', 'm6 6 12 12'],
   copy: ['M8 8h11v11H8z', 'M5 16H4V5h11v1'],
-  delete: ['M4 7h16', 'M9 7V4h6v3', 'm7 4-.7 9H8.7L8 11'],
+  delete: ['M4 7h16', 'M9 7V4h6v3', 'M7 7l1 13h8l1-13', 'M10 11v6', 'M14 11v6'],
   distributeHorizontal: ['M4 4v16', 'M20 4v16', 'M8 8v8', 'M16 8v8', 'M12 6v12'],
   download: ['M12 3v12', 'm7 10 5 5 5-5', 'M5 21h14'],
   expand: ['M8 3H3v5', 'M16 3h5v5', 'M8 21H3v-5', 'M16 21h5v-5', 'M3 8l6-6', 'm21 8-6-6', 'M3 16l6 6', 'm21-6-6 6'],
