@@ -5,12 +5,12 @@ title: Gradient System
 status: current
 owners: [maintainer]
 created: 2026-07-27
-updated: 2026-07-27
-requirement_ids: [GRAD-001, GRAD-002, GRAD-003, GRAD-004, GRAD-005, GRAD-006, GRAD-007, GRAD-008]
+updated: 2026-07-28
+requirement_ids: [GRAD-001, GRAD-002, GRAD-003, GRAD-004, GRAD-005, GRAD-006, GRAD-007, GRAD-008, GRAD-009, GRAD-010, GRAD-011, GRAD-012, GRAD-013, GRAD-014]
 related_adrs: [ADR-0001, ADR-0003, ADR-0010, ADR-0013]
-related_changes: [CHANGE-001]
-related_code: [src/types/gradient.ts, src/types/imageGradient.ts, src/store/gradientStore.ts, src/lib/gradientRampUtils.ts, src/lib/imageGradient.ts, src/lib/meshGradientField.ts, src/lib/sceneEvaluation.ts, src/lib/webgl.ts, src/lib/presetModel.ts]
-related_tests: [src/types/gradient.test.ts, src/lib/imageGradient.test.ts, src/lib/imageGradientProtected.test.ts, src/lib/meshGradient.test.ts, src/lib/proportionalRampEdit.test.ts, src/lib/sceneEvaluation.glass.test.ts]
+related_changes: [CHANGE-001, CHANGE-010]
+related_code: [src/types/gradient.ts, src/types/imageGradient.ts, src/store/gradientStore.ts, src/lib/gradientRampUtils.ts, src/lib/gradientPreview.ts, src/lib/imageGradient.ts, src/lib/meshGradientField.ts, src/lib/sceneEvaluation.ts, src/lib/webgl.ts, src/lib/presetModel.ts, src/components/GradientRamp.tsx, src/components/CustomSelect.tsx, src/components/ColorPaletteGenerator.tsx, src/lib/colorHarmony.ts, src/i18n/uiLabels.ts, src/i18n/messages.ts]
+related_tests: [src/types/gradient.test.ts, src/lib/imageGradient.test.ts, src/lib/imageGradientProtected.test.ts, src/lib/meshGradient.test.ts, src/lib/proportionalRampEdit.test.ts, src/lib/sceneEvaluation.glass.test.ts, src/lib/colorHarmony.test.ts, src/lib/gradientPreview.test.ts]
 ---
 
 # Gradient System
@@ -64,6 +64,30 @@ Image Gradient Sourceでは、画像本体の形状・アルファを固定し�
 ### GRAD-008 編集時の境界条件
 
 Rampの位置・透明度・アンカー・Meshの座標は有限値と範囲を確認してから保存・描画します。ストップの編集はRampの範囲外へ移動させず、既存のストップIDを保つことでキーフレームとの対応を維持します。手動入力や破損したPresetが正規化できない場合は、アプリ全体を壊さず対象状態を既定値へ戻します。
+
+### GRAD-009 Ramp候補の結果プレビュー
+
+GradientRampのColor ModeとInterpの選択肢は、現在の色ストップと不透明度を候補へ適用した場合の色のつながりとして表示します。Color Mode候補は色相系ならNear、それ以外ならEaseを既定補間とし、Interp候補は現在のColor Modeを維持します。SHOW PREVIEWSが有効なときは通常のセレクトトリガーとホバー展開を表示せず、候補グリッドのボタンを直接選択面として使います。無効時は従来のホバー／クリック選択UIへ戻ります。プレビューは選択前の比較表示であり、候補を選択するまでRamp状態を変更しません。
+
+### GRAD-010 Rampプレビューの常時表示
+
+Color Mode／Interpの候補プレビューは、ボタンで常時表示へ切り替えられます。常時表示中は候補グリッド上のボタンから直接選択でき、空のセレクトトリガーやホバー展開は表示しません。無効時は従来のホバー／クリックで開く選択UIを維持し、常時表示状態はPresetへ保存しません。
+
+### GRAD-011 配色補助パレット
+
+Color Palette Generatorの配色補助は、TweeqのInputColorで指定した基準色1色と配色ルールだけを入力として、類似色、補色、分割補色、トライアド、スクエア、複合色、シェード、モノクロマティックの実色チップを生成します。基準色は候補に含め、補色は追加1色、トライアドは追加2色を生成します。色チップからHexを確認・コピーでき、候補全体をGradientの色ストップへ適用できます。基準色は上段、配色ルールは下段の1列2段で表示します。SHOW PREVIEWSが有効なときは配色ルールごとの実色パレットを一覧表示し、グリッドボタンからルールを直接選択できます。Harmonyルール名は英語UIでは英語名、日本語UIでは日本語名で表示します。候補の選択や基準色の変更だけではGradient状態を変更しません。
+
+### GRAD-012 プレビューと配色補助の視認性
+
+Color Mode／Interpの候補は、有効な複数背景レイヤーとして色帯と透明度チェッカーを表示し、ブラウザーのCSS解釈で黒一色へフォールバックしません。ホバー選択肢と常時表示候補では、色帯を選択肢ボタンの背面全体へ敷き、ラベルと開閉矢印を前面へ表示します。Color Palette Generatorは「画像からストップを生成」と「配色補助」を内部の別区分として表示し、親説明でも両方の用途を示します。配色補助の見出しとHarmonyプレビュー切替は同じ行に置き、説明文はその下の独立した全幅行へ置きます。`Local`という補助表示は使用しません。配色補助の説明文・補助ラベル・境界・フォーカス表示は、配置される背景に対してWCAG 2.2の通常テキスト4.5:1以上、非テキスト3:1以上を満たす配色を使用します。
+
+### GRAD-013 GradientRampの操作順序
+
+GradientRampは、グラデーション形式／タイプの直後に色・不透明度ストップの編集ランプとストップ操作を表示し、その後にColor Mode／Interpと候補プレビュー、その他の設定、Color Palette Generatorを表示します。候補プレビューの展開・縮小で、頻繁に操作するストップ編集の位置を入れ替えたり、編集を無効化したりしません。表示プレビューの状態は保存形式へ含めません。
+
+### GRAD-014 プレビュー表示stateの独立性
+
+GradientRampのColor Mode／Interp候補プレビューとColor Palette GeneratorのHarmonyルール候補プレビューは、それぞれ独立した表示切替を持ちます。一方を展開・収納しても、もう一方の表示状態は変更しません。どちらの表示stateもGradientやPresetへ保存しません。
 
 ## 他領域との関係
 

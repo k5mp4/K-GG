@@ -3,13 +3,12 @@ import { useGradientStore, STORE_DEFAULTS } from '../store/gradientStore';
 import type { SlitScanConfig } from '../types/distortion';
 import { SliderField } from './SliderField';
 import { Collapsible } from './Collapsible';
-import { AnimatedButton } from './AnimatedButton';
 import { Toggle } from './Toggle';
 import { imageFileToCanvas } from '../lib/applySlitToImage';
 import { Icon } from './Icon';
 import { CustomSelect } from './CustomSelect';
 import { AnimationPropertyControls } from './AnimationPropertyControls';
-import { InputShuffle, fromNumber } from 'tweeq';
+import { InputDrum, InputRadio, InputShuffle, fromNumber } from 'tweeq';
 import { useLanguage } from '../i18n/LanguageProvider';
 
 const D = STORE_DEFAULTS.slitScan;
@@ -20,6 +19,10 @@ const WAVE_TYPE_OPTIONS = [
   { value: 'sawtooth', label: 'Sawtooth' },
   { value: 'semicircle', label: 'Semicircle' },
 ];
+const SLIT_MODES = ['linear', 'circular', 'polygon', 'wave'] as const;
+const SLIT_MODE_LABELS = ['Linear', 'Circular', 'Polygon', 'Wave'] as const;
+const AUTO_MODIFIER_MODES = ['unidirectional', 'pingpong'] as const;
+const AUTO_MODIFIER_LABELS = ['→ Loop', '↔ PingPong'] as const;
 
 const isSlitDirty = (value: SlitScanConfig) =>
   Object.keys(D).some((key) => {
@@ -136,22 +139,18 @@ export function SlitScanPanel({ sourceImageName, hasSourceImage, onSourceImageLo
           {/* Mode toggle */}
           <div>
             <p className="text-xs text-deep mb-1">Mode</p>
-            <div className="grid grid-cols-2 gap-1">
-              {(['linear', 'circular', 'polygon', 'wave'] as const).map((m) => (
-                <AnimatedButton
-                  key={m}
-                  onClick={() => setSlitScan(
-                    m === 'wave'
-                      ? { mode: m, angle: WAVE_DEFAULT_DIRECTION, slitWidth: WAVE_DEFAULT_WIDTH }
-                      : { mode: m }
-                  )}
-                  isActive={slitScan.mode === m}
-                  className="w-full py-1 capitalize"
-                >
-                  {m === 'linear' ? 'Linear' : m === 'circular' ? 'Circular' : m === 'polygon' ? 'Polygon' : 'Wave'}
-                </AnimatedButton>
-              ))}
-            </div>
+            <InputDrum
+              value={slitScan.mode}
+              options={SLIT_MODES}
+              labels={SLIT_MODE_LABELS}
+              onChange={(mode) => setSlitScan(
+                mode === 'wave'
+                  ? { mode, angle: WAVE_DEFAULT_DIRECTION, slitWidth: WAVE_DEFAULT_WIDTH }
+                  : { mode },
+              )}
+              aria-label="Slit mode"
+              className="w-full"
+            />
           </div>
 
           <div className="border border-panel-border border-panel bg-k-bg/40 p-2 space-y-2">
@@ -261,18 +260,14 @@ export function SlitScanPanel({ sourceImageName, hasSourceImage, onSourceImageLo
           {/* Auto modifier settings. Activation is controlled by property mode. */}
           <div className="space-y-3 border-t border-panel-border/30 pt-3">
             <p className="text-[9px] font-display font-semibold uppercase tracking-widest text-tab-inactive">Auto Modifier</p>
-            <div className="flex gap-1">
-              {(['unidirectional', 'pingpong'] as const).map((m) => (
-                <AnimatedButton
-                  key={m}
-                  onClick={() => setSlitScan({ animMode: m })}
-                  isActive={slitScan.animMode === m}
-                  className="flex-1 py-1"
-                >
-                  {m === 'unidirectional' ? '→ Loop' : '↔ PingPong'}
-                </AnimatedButton>
-              ))}
-            </div>
+            <InputRadio
+              value={slitScan.animMode}
+              options={AUTO_MODIFIER_MODES}
+              labels={AUTO_MODIFIER_LABELS}
+              onChange={(animMode) => animMode !== undefined && setSlitScan({ animMode })}
+              aria-label="Slit auto modifier"
+              className="w-full"
+            />
             <SliderField
               label="Offset Speed"
               min={-2} max={2} step={0.01}
@@ -328,7 +323,7 @@ export function SlitScanPanel({ sourceImageName, hasSourceImage, onSourceImageLo
               value={slitScan.seed}
               onChange={(seed) => setSlitScan({ seed })}
               generate={fromNumber(0, 100, 1)}
-              className="mb-1 shrink-0"
+              className="shrink-0"
               aria-label={t('common.shuffle')}
               title={t('common.shuffle')}
             />

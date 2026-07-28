@@ -40,6 +40,8 @@ const uiTerms = [
   ['Prism', 'プリズム'], ['Particles', 'パーティクル'],
   ['Linear', 'リニア'], ['Radial', '放射'], ['4-color', '4色'], ['Diamond', 'ひし形'], ['Angle', '角度'],
   ['Bezier', 'ベジェ'], ['Ease', 'イーズ'], ['Cardinal', 'カーディナル'], ['Constant', '一定'],
+  ['Analogous', '類似色'], ['Complementary', '補色'], ['Split-Complementary', '分割補色'], ['Triad', 'トライアド'],
+  ['Square', 'スクエア'], ['Compound', '複合色'], ['Shades', 'シェード'], ['Monochromatic', 'モノクロマティック'],
   ['Ease In', 'イーズイン'], ['Ease Out', 'イーズアウト'], ['In-Out', 'イン・アウト'],
   ['Variable', '可変'], ['Near', '近い方'], ['Far', '遠い方'], ['Clockwise', '時計回り'],
   ['Counter-Clockwise', '反時計回り'], ['Point', '点'], ['Line', '線'], ['Circle', '円'],

@@ -505,7 +505,7 @@ export function NoiseDistortionPanel() {
                 value={noiseDistortion.noiseSeed ?? 0}
                 onChange={(noiseSeed) => setNoiseDistortion({ noiseSeed })}
                 generate={fromNumber(0, 100, 0)}
-                className="mb-1 shrink-0"
+                className="shrink-0"
                 aria-label={t('common.shuffle')}
                 title={t('common.shuffle')}
               />
@@ -577,7 +577,7 @@ export function NoiseDistortionPanel() {
                   value={noiseDistortion.curlSeed ?? 0}
                   onChange={(curlSeed) => setNoiseDistortion({ curlSeed })}
                   generate={fromNumber(0, 100, 0)}
-                  className="mb-1 shrink-0"
+                  className="shrink-0"
                   aria-label={t('common.shuffle')}
                   title={t('common.shuffle')}
                 />

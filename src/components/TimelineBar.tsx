@@ -755,7 +755,7 @@ export function TimelineBar({ animLoopRef, onSeek, exportProgress = null, export
           <label className="hidden items-center gap-1 text-[8px] uppercase tracking-wider text-tab-inactive xl:flex">
             {t('animation.direction')}
             <span
-              className="tq-input-angle h-6 flex-none"
+              className="tq-input-angle h-[26px] flex-none self-center"
               style={{ width: 112, minWidth: 112, flex: '0 0 112px' }}
               title={t('animation.direction')}
             >

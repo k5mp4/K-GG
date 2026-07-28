@@ -91,7 +91,7 @@ export function StretchPanel() {
               value={stretch.seed}
               onChange={(seed) => setStretch({ seed })}
               generate={fromNumber(0, 100, 1)}
-            className="mb-1 shrink-0"
+              className="shrink-0"
               aria-label={t('common.shuffle')}
               title={t('common.shuffle')}
             />

@@ -4,11 +4,11 @@
 
 ## 作業を始める前に
 
-1. [`docs/development/index.md`](docs/development/index.md) と、必要に応じて [`CONTRIBUTING.md`](CONTRIBUTING.md) を読む。
+1. [`docs/development/index.md`](docs/development/index.md) と [`docs/development/change-workflow.md`](docs/development/change-workflow.md)、必要に応じて [`CONTRIBUTING.md`](CONTRIBUTING.md) を読む。
 2. 変更を `S`（文書整理）、`B`（不具合）、`F`（機能）、`A`（長期的な設計）、`X`（実験）に分類する。利用者、保存形式、出力、描画、UI、外部連携から観測できる動作が変わるなら、原則 `S` にはしない。
-3. 対象領域の `docs/specs/current/` を探して全文を読む。対象のcurrent specがない場合は未移行領域として扱い、関連するLegacy SPEC、ADR、コード、テストから現行動作を調査する。観測可能な変更なら、最小限のcurrent specとactive changeを作成し、人間レビューが完了するまで本実装を始めない。
-4. current specの `related_adrs`、依存するADR、`docs/changes/active/` の変更を確認する。active changeは `current_specs` と要件IDで対象を特定し、重複または対象不明な変更が複数ある場合は実装せず、整理して報告する。
-5. 観測可能な変更では、`proposal.md` の `status: approved` と `human_review: completed`、およびレビュー済みの `delta.md` を確認する。承認状態をAIや自動検査だけで作らない。
+3. 対象領域の `docs/specs/current/`、関連ADR、`docs/changes/active/` を確認する。対象のcurrent specがない場合は、Legacy SPEC、コード、テストから現行動作を調査し、必要なcurrent specとchangeをレビューへ出す。
+4. 今回の要求が既存changeのWhy／What／対象外／受け入れ条件に収まるなら、そのchangeへ追記する。収まらない独立要求だけ新しいactive changeを作成する。会話ターンや小さな修正ごとにディレクトリを増やさない。
+5. 観測可能な変更は、`proposal.md` の `status: approved` と `human_review: completed`、レビュー済みの `delta.md` を確認してから実装する。承認状態をAIや自動検査だけで作らない。
 
 ## 文書の境界
 
@@ -21,6 +21,8 @@
 ## 実装ルール
 
 - `approved` active changeの対象、受け入れ条件、禁止スコープだけを実装する。
+- 1つの変更パッケージに属する関連コード、テスト、文書は、検証結果とともに1コミットへまとめられる粒度で管理する。複数コミットが必要な場合も、合理的な理由をvalidationへ記録し、changeディレクトリは増やさない。
+- 過去の同日履歴を整理する場合は、元のCHANGE IDと検証記録を保持した日付bundleへまとめる。日付bundleを新しい実装changeの単位とは解釈しない。
 - 新機能、UI、描画、保存、出力、外部連携など外部から観測できる変更を、承認済みchangeなしに実装しない。
 - `S`区分で変更仕様を省略できるのは、利用者向け契約や外部から観測できる振る舞いを変えない文書・整理だけである。
 - `B`では期待動作をcurrent specへ追記または明確化し、再現テストを追加する。対応する仕様がなければ短いcurrent specとB changeを先に作る。
@@ -28,6 +30,7 @@
 - `approved`後にWhy/What、スコープ、受け入れ条件を変える場合は、実装を続けず `review`へ戻して再承認する。
 - `status`、`human_review`、validationの結果を、実際のレビューや確認なしに `approved`・`implemented`・`archived`・`pass`へ変更しない。手動確認をしていない場合は未確認として記録する。
 - 受け入れ条件ごとに自動テストまたは再現可能な手動確認を行い、実行コマンドはchangeの `validation.md`、ファイルパスはfrontmatterの `related_code` / `related_tests`に記録する。
+- commit、push、Pull Requestなどの外部Git操作は、ユーザーが明示的に依頼した場合だけ実行する。
 - 完了時はdeltaをcurrent specへ統合し、関連コード・テスト・ADR・利用者向け文書を同期してからchangeをArchiveへ移動する。Archiveだけを更新してcurrentを古いままにしない。
 - 仕様外の改善を同じchangeへ含めない。必要なら別のCHANGEを作る。
 

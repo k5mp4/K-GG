@@ -132,15 +132,16 @@
 }
 
 .TqViewport .tq-input-angle,
-.TqViewport .tq-input-angle > div {
+.TqViewport .tq-input-angle > [data-tq-component='input-angle'] {
+  box-sizing: border-box;
   width: 100%;
-  /* Tweeq hides InputNumber when the root is <= inputHeight * 4. Keep the
-   * measured root above that threshold even inside narrow animation rows. */
-  min-width: calc(var(--tq-input-height) * 4 + var(--tq-gap-control));
+  /* Tweeq hides InputNumber when the root is <= inputHeight * 4. Cross the
+   * threshold by one pixel without adding an extra control gap to the row. */
+  min-width: calc(var(--tq-input-height) * 4 + 1px);
   min-height: var(--tq-input-height);
 }
 
-.TqViewport .tq-input-angle > div {
+.TqViewport .tq-input-angle > [data-tq-component='input-angle'] {
   display: flex;
   flex: 1 1 auto;
   align-items: center;
@@ -150,7 +151,7 @@
   overflow: visible;
 }
 
-.TqViewport .tq-input-angle > div > button[tweak-mode] {
+.TqViewport .tq-input-angle > [data-tq-component='input-angle'] > [data-tq-component='input-rotary'] {
   flex: 0 0 var(--tq-input-height);
   min-width: 0;
   max-width: var(--tq-input-height);
@@ -165,16 +166,16 @@
   transition: background 150ms ease, box-shadow 150ms ease;
 }
 
-.TqViewport .tq-input-angle > div > button[tweak-mode]:hover,
-.TqViewport .tq-input-angle > div > button[tweak-mode]:focus-visible {
+.TqViewport .tq-input-angle > [data-tq-component='input-angle'] > [data-tq-component='input-rotary']:hover,
+.TqViewport .tq-input-angle > [data-tq-component='input-angle'] > [data-tq-component='input-rotary']:focus-visible {
   box-shadow: 0 0 0 2px color-mix(in srgb, var(--color-fire) 22%, transparent);
 }
 
-.TqViewport .tq-input-angle > div > button[tweak-mode]::before {
+.TqViewport .tq-input-angle > [data-tq-component='input-angle'] > [data-tq-component='input-rotary']::before {
   display: none;
 }
 
-.TqViewport .tq-input-angle > div > [font='numeric'] {
+.TqViewport .tq-input-angle > [data-tq-component='input-angle'] > [font='numeric'] {
   flex: 1 1 auto;
   width: auto;
   min-width: 0;
@@ -184,11 +185,11 @@
   transition: border-color 150ms ease, box-shadow 150ms ease, background 150ms ease;
 }
 
-.TqViewport .tq-input-angle > div > [font='numeric']:hover {
+.TqViewport .tq-input-angle > [data-tq-component='input-angle'] > [font='numeric']:hover {
   border-color: color-mix(in srgb, var(--color-cream) 26%, transparent);
 }
 
-.TqViewport .tq-input-angle > div > [font='numeric']:focus-within {
+.TqViewport .tq-input-angle > [data-tq-component='input-angle'] > [font='numeric']:focus-within {
   border-color: color-mix(in srgb, var(--color-fire) 78%, var(--color-cream));
   box-shadow: 0 0 0 1px color-mix(in srgb, var(--color-fire) 42%, transparent),
     inset 0 1px 0 rgba(255, 247, 236, 0.06);
