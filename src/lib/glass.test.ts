@@ -3,9 +3,11 @@ import type { PostprocessConfig } from '../types/distortion';
 import {
   GLASS_DEFAULTS,
   GLASS_LIMITS,
+  GLASS_V2_COLOR_DEFAULTS,
   getPostprocessStackSamplePadding,
   isGlassOpticallyIdentity,
   normalizeGlassRenderParameters,
+  normalizeGlassV2ColorParameters,
   smoothGlassNoiseBlend,
 } from './glass';
 import { createDefaultEffectPipeline, updateEffectStackLayer } from './effectPipeline';
@@ -50,47 +52,30 @@ describe('getPostprocessStackSamplePadding', () => {
     expect(getPostprocessStackSamplePadding(glassConfig({ glassMix: 0 }))).toBe(0);
   });
 
-  it.each(['glass', 'glassV2'] as const)(
-    'uses the V2 %s layer as the authoritative padding source',
-    (kind) => {
-      const pipeline = createDefaultEffectPipeline();
-      const glassPipeline = {
-        ...pipeline,
-        effectStack: updateEffectStackLayer(pipeline.effectStack, kind, { enabled: true }),
-      };
-      expect(getPostprocessStackSamplePadding(
-        glassConfig({ enabled: false }),
-        glassPipeline,
-      )).toBe(40);
-    },
-  );
-
-  it('adds the dependency radius when Glass and Glass V2 are both active', () => {
+  it('uses the V2-backed Glass layer as the authoritative padding source', () => {
     const pipeline = createDefaultEffectPipeline();
-    const bothGlassPipeline = {
+    const glassPipeline = {
       ...pipeline,
-      effectStack: updateEffectStackLayer(
-        updateEffectStackLayer(pipeline.effectStack, 'glass', { enabled: true }),
-        'glassV2',
-        { enabled: true },
-      ),
+      effectStack: updateEffectStackLayer(pipeline.effectStack, 'glass', { enabled: true }),
     };
 
     expect(getPostprocessStackSamplePadding(
       glassConfig({ enabled: false }),
-      bothGlassPipeline,
-    )).toBe(80);
+      glassPipeline,
+    )).toBe(40);
   });
 
-  it('adds the two independent Glass layer sample radii when both are enabled', () => {
+  it('does not reserve duplicate padding for a legacy Glass V2 alias', () => {
     const pipeline = createDefaultEffectPipeline();
-    const bothGlassLayers = {
+    const migratedGlassPipeline = {
       ...pipeline,
-      effectStack: pipeline.effectStack.map(layer => (
-        layer.kind === 'glass' || layer.kind === 'glassV2' ? { ...layer, enabled: true } : layer
-      )),
+      effectStack: [
+        { kind: 'glass', enabled: true },
+        { kind: 'glassV2', enabled: true },
+        ...pipeline.effectStack.filter(layer => layer.kind !== 'glass'),
+      ] as unknown as typeof pipeline.effectStack,
     };
-    expect(getPostprocessStackSamplePadding(glassConfig({ enabled: false }), bothGlassLayers)).toBe(80);
+    expect(getPostprocessStackSamplePadding(glassConfig({ enabled: false }), migratedGlassPipeline)).toBe(40);
   });
 
   it('clamps imported or directly entered values to renderer limits', () => {
@@ -128,6 +113,11 @@ describe('smoothGlassNoiseBlend', () => {
 });
 
 describe('normalizeGlassRenderParameters', () => {
+  it('exposes the expanded chromatic aberration ceiling to the renderer contract', () => {
+    expect(GLASS_LIMITS.chromaticAberration).toBe(80);
+    expect(normalizeGlassRenderParameters({ glassChromaticAberration: 80 }).chromaticAberration).toBe(80);
+  });
+
   it('uses finite renderer-safe values for every Glass uniform', () => {
     const params = normalizeGlassRenderParameters({
       glassScale: Number.NaN,
@@ -164,6 +154,48 @@ describe('normalizeGlassRenderParameters', () => {
     });
     expect(Math.ceil(params.refraction + params.chromaticAberration + params.roughness) + 2)
       .toBe(GLASS_LIMITS.refraction + GLASS_LIMITS.chromaticAberration + GLASS_LIMITS.roughness + 2);
+  });
+});
+
+describe('normalizeGlassV2ColorParameters', () => {
+  it('uses identity-preserving defaults for legacy presets', () => {
+    expect(normalizeGlassV2ColorParameters()).toEqual({
+      chromaticHueDegrees: GLASS_V2_COLOR_DEFAULTS.chromaticHue,
+      chromaticHueRadians: 0,
+      chromaticSaturation: GLASS_V2_COLOR_DEFAULTS.chromaticSaturation,
+      transmissionTint: GLASS_V2_COLOR_DEFAULTS.transmissionTint,
+      highlightTint: GLASS_V2_COLOR_DEFAULTS.highlightTint,
+    });
+  });
+
+  it('clamps finite values and normalizes valid tint colors', () => {
+    const params = normalizeGlassV2ColorParameters({
+      glassV2ChromaticHue: 999,
+      glassV2ChromaticSaturation: -1,
+      glassV2TransmissionTint: '#a1b2c3',
+      glassV2HighlightTint: '#00ff88',
+    });
+
+    expect(params.chromaticHueDegrees).toBe(180);
+    expect(params.chromaticHueRadians).toBe(Math.PI);
+    expect(params.chromaticSaturation).toBe(0);
+    expect(params.transmissionTint).toBe('#A1B2C3');
+    expect(params.highlightTint).toBe('#00FF88');
+  });
+
+  it('rejects non-finite values and malformed tint colors', () => {
+    expect(normalizeGlassV2ColorParameters({
+      glassV2ChromaticHue: Number.NaN,
+      glassV2ChromaticSaturation: Number.POSITIVE_INFINITY,
+      glassV2TransmissionTint: '#FFF',
+      glassV2HighlightTint: 'white',
+    })).toEqual({
+      chromaticHueDegrees: GLASS_V2_COLOR_DEFAULTS.chromaticHue,
+      chromaticHueRadians: 0,
+      chromaticSaturation: GLASS_V2_COLOR_DEFAULTS.chromaticSaturation,
+      transmissionTint: GLASS_V2_COLOR_DEFAULTS.transmissionTint,
+      highlightTint: GLASS_V2_COLOR_DEFAULTS.highlightTint,
+    });
   });
 });
 

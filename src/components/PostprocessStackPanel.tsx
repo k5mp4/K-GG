@@ -1,11 +1,17 @@
 import { useEffect, useRef, useState } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import type { WebviewWindow } from '@tauri-apps/api/webviewWindow';
+import { Viewport } from 'tweeq';
 import type { EffectStackKind, PostprocessStackKind } from '../types/distortion';
 import {
   canRenderV2Direct,
+  captureEffectStackEnabledState,
+  isEffectStackLayerTemporarilyHidden,
   moveEffectStackLayer,
   normalizeEffectStack,
+  randomizeEffectStackOrder,
+  restoreEffectStackEnabledState,
+  soloEffectStackLayer,
   updateEffectStackLayer,
 } from '../lib/effectPipeline';
 import {
@@ -16,8 +22,15 @@ import {
 import { useGradientStore } from '../store/gradientStore';
 import { Toggle } from './Toggle';
 import { Icon } from './Icon';
-import { useLanguage } from '../i18n/LanguageProvider';
+import { LanguageProvider, useLanguage } from '../i18n/LanguageProvider';
 import type { MessageKey } from '../i18n/messages';
+import { renderBridge } from '../lib/renderBridge';
+import {
+  EFFECT_STACK_TRANSITION_DURATION_MS,
+  beginEffectStackTransition,
+  finishEffectStackTransition,
+  isEffectStackTransitionActive,
+} from '../lib/effectStackTransition';
 import {
   closeCurrentEffectStackWindow,
   createEffectStackSnapshot,
@@ -47,13 +60,12 @@ const LABELS: Record<EffectStackKind, string> = {
   kaleidoscope: 'Kaleidoscope',
   voronoi: 'Voronoi',
   glass: 'Glass',
-  glassV2: 'Glass V2',
 };
 
 const CATEGORY: Record<EffectStackKind, MessageKey> = {
   diffuse: 'stack.category.texture', noise: 'stack.category.texture',
   slit: 'stack.category.transform', stretch: 'stack.category.transform', distort: 'stack.category.transform', mirror: 'stack.category.transform', kaleidoscope: 'stack.category.transform',
-  voronoi: 'stack.category.structure', glass: 'stack.category.structure', glassV2: 'stack.category.structure',
+  voronoi: 'stack.category.structure', glass: 'stack.category.structure',
 };
 
 type DragState = Omit<EffectStackDragState, 'kind'> & {
@@ -61,14 +73,20 @@ type DragState = Omit<EffectStackDragState, 'kind'> & {
   pointerId: number;
 };
 
-type LazyProgramKey = 'stackCore' | 'noiseStack' | 'glass' | 'glassV2' | 'stretch' | 'prism' | 'prismComposite' | 'normalMap' | 'blur' | 'particles';
+type RowTransitionPhase = 'idle' | 'from' | 'animate';
+type SoloSnapshot = {
+  targetKind: EffectStackKind;
+  enabledState: ReturnType<typeof captureEffectStackEnabledState>;
+};
+
+type LazyProgramKey = 'stackCore' | 'noiseStack' | 'glassV2' | 'stretch' | 'prism' | 'prismComposite' | 'normalMap' | 'blur' | 'particles';
 type LazyProgramStatus = 'loading' | 'ready' | 'failed' | 'fallback';
 
 const CORE_EFFECTS = new Set<EffectStackKind>([
   'diffuse', 'noise', 'slit', 'distort', 'mirror', 'kaleidoscope', 'voronoi',
 ]);
 const IMAGE_GRADIENT_PROTECTED_EFFECTS = new Set<EffectStackKind>([
-  'stretch', 'distort', 'mirror', 'kaleidoscope', 'voronoi', 'glass', 'glassV2',
+  'stretch', 'distort', 'mirror', 'kaleidoscope', 'voronoi', 'glass',
 ]);
 
 type DocumentPictureInPictureApi = {
@@ -84,8 +102,7 @@ type Props = {
 function programKeyForEffect(kind: EffectStackKind): LazyProgramKey {
   if (kind === 'noise') return 'noiseStack';
   if (CORE_EFFECTS.has(kind)) return 'stackCore';
-  if (kind === 'glass') return 'glass';
-  if (kind === 'glassV2') return 'glassV2';
+  if (kind === 'glass') return 'glassV2';
   return 'stretch';
 }
 
@@ -111,6 +128,8 @@ export function PostprocessStackPanel({ onSwapWorkspace, onSelectEffectStack, de
   const [pipWindow, setPipWindow] = useState<Window | null>(null);
   const [pipMount, setPipMount] = useState<HTMLElement | null>(null);
   const [tauriWindowOpen, setTauriWindowOpen] = useState(false);
+  const [randomizingOrder, setRandomizingOrder] = useState(false);
+  const [rowTransitionPhase, setRowTransitionPhase] = useState<RowTransitionPhase>('idle');
   const pipRootRef = useRef<Root | null>(null);
   const pipWindowRef = useRef<Window | null>(null);
   const tauriWindowRef = useRef<WebviewWindow | null>(null);
@@ -118,6 +137,8 @@ export function PostprocessStackPanel({ onSwapWorkspace, onSelectEffectStack, de
   const swapWorkspaceRef = useRef(onSwapWorkspace);
   const selectEffectStackRef = useRef(onSelectEffectStack);
   const externalWindowCleanupRef = useRef<(() => void) | null>(null);
+  const previousStackOrderRef = useRef<EffectStackKind[]>(stack.map(layer => layer.kind));
+  const soloSnapshotRef = useRef<SoloSnapshot | null>(null);
   stackRef.current = stack;
   pipWindowRef.current = pipWindow;
   swapWorkspaceRef.current = onSwapWorkspace;
@@ -174,7 +195,7 @@ export function PostprocessStackPanel({ onSwapWorkspace, onSelectEffectStack, de
         cleanups.push(readyCleanup, updateCleanup, closeCleanup, swapCleanup);
       }
     };
-    void setupHost();
+    void setupHost().catch(error => console.error('Failed to initialize Effect Stack host window:', error));
 
     let hostSnapshotSignature = '';
     const unsubscribe = useGradientStore.subscribe(state => {
@@ -233,7 +254,7 @@ export function PostprocessStackPanel({ onSwapWorkspace, onSelectEffectStack, de
       cleanups.push(stateCleanup, unsubscribe);
       if (!disposed) await emitTo('main', EFFECT_STACK_READY_EVENT);
     };
-    void setupDetached();
+    void setupDetached().catch(error => console.error('Failed to initialize detached Effect Stack window:', error));
     return () => {
       disposed = true;
       cleanups.forEach(cleanup => cleanup());
@@ -250,6 +271,35 @@ export function PostprocessStackPanel({ onSwapWorkspace, onSelectEffectStack, de
     pipWindowRef.current?.close();
     void tauriWindowRef.current?.close();
   }, []);
+
+  useEffect(() => {
+    if (!randomizingOrder) return;
+    let frameId = 0;
+    const tick = () => {
+      renderBridge.renderAtTime(
+        renderBridge.getCurrentTime(),
+        renderBridge.getCurrentNormalizedTime(),
+      );
+      if (!isEffectStackTransitionActive()) {
+        finishEffectStackTransition();
+        setRandomizingOrder(false);
+        return;
+      }
+      frameId = window.requestAnimationFrame(tick);
+    };
+    frameId = window.requestAnimationFrame(tick);
+    return () => window.cancelAnimationFrame(frameId);
+  }, [randomizingOrder]);
+
+  useEffect(() => {
+    if (!randomizingOrder) {
+      setRowTransitionPhase('idle');
+      previousStackOrderRef.current = stackRef.current.map(layer => layer.kind);
+      return;
+    }
+    const frameId = window.requestAnimationFrame(() => setRowTransitionPhase('animate'));
+    return () => window.cancelAnimationFrame(frameId);
+  }, [randomizingOrder]);
 
   useEffect(() => {
     try {
@@ -289,9 +339,14 @@ export function PostprocessStackPanel({ onSwapWorkspace, onSelectEffectStack, de
           tauriWindowRef.current = null;
           setTauriWindowOpen(false);
         });
+        const { emitTo } = await import('@tauri-apps/api/event');
+        await emitTo(
+          EFFECT_STACK_WINDOW_LABEL,
+          EFFECT_STACK_STATE_EVENT,
+          createEffectStackSnapshot(useGradientStore.getState()),
+        );
       } catch (error) {
         console.error('Failed to open Effect Stack Tauri window:', error);
-        window.alert('Effect Stackの別ウィンドウを開始できませんでした。インライン表示を維持します。');
       }
       return;
     }
@@ -380,11 +435,46 @@ export function PostprocessStackPanel({ onSwapWorkspace, onSelectEffectStack, de
     }
   };
 
-  const selectLayer = (kind: EffectStackKind) => {
+  const randomizeOrder = () => {
+    if (randomizingOrder || isEffectStackTransitionActive()) return;
+    const current = useGradientStore.getState().effectPipeline;
+    const nextStack = randomizeEffectStackOrder(current.effectStack);
+    previousStackOrderRef.current = normalizeEffectStack(current.effectStack).map(layer => layer.kind);
+    setRowTransitionPhase('from');
+    beginEffectStackTransition(current.effectStack, nextStack);
+    setEffectPipeline({ effectStack: nextStack });
+    setRandomizingOrder(true);
+  };
+
+  const selectLayer = (kind: EffectStackKind, solo = false) => {
     onSelectEffectStack?.(kind);
-    setEffectPipeline({ selectedKind: kind });
-    if (kind === 'distort' || kind === 'mirror' || kind === 'kaleidoscope' || kind === 'voronoi' || kind === 'glass' || kind === 'glassV2') {
-      setPostprocess({ enabled: true, effectMode: kind as PostprocessStackKind });
+    const currentStack = normalizeEffectStack(useGradientStore.getState().effectPipeline.effectStack);
+    let effectStack: typeof currentStack | undefined;
+    if (solo) {
+      const snapshot = soloSnapshotRef.current;
+      if (snapshot?.targetKind === kind) {
+        effectStack = restoreEffectStackEnabledState(currentStack, snapshot.enabledState);
+        soloSnapshotRef.current = null;
+      } else {
+        if (!snapshot) {
+          soloSnapshotRef.current = {
+            targetKind: kind,
+            enabledState: captureEffectStackEnabledState(currentStack),
+          };
+        } else {
+          soloSnapshotRef.current = { ...snapshot, targetKind: kind };
+        }
+        effectStack = soloEffectStackLayer(currentStack, kind);
+      }
+    } else {
+      soloSnapshotRef.current = null;
+    }
+    setEffectPipeline({
+      selectedKind: kind,
+      ...(effectStack ? { effectStack } : {}),
+    });
+    if (kind === 'distort' || kind === 'mirror' || kind === 'kaleidoscope' || kind === 'voronoi' || kind === 'glass') {
+      setPostprocess({ enabled: true, effectMode: kind === 'glass' ? 'glassV2' : kind as PostprocessStackKind });
     }
   };
 
@@ -496,15 +586,27 @@ export function PostprocessStackPanel({ onSwapWorkspace, onSelectEffectStack, de
   };
 
   const rowTransform = (kind: EffectStackKind, index: number) => {
-    if (!dragging) return 'translateY(0px)';
-    if (kind === dragging.kind) return `translate3d(0, ${dragging.deltaY}px, 0)`;
-    if (dragging.targetIndex > dragging.fromIndex && index > dragging.fromIndex && index <= dragging.targetIndex) {
+    if (kind === dragging?.kind) return `translate3d(0, ${dragging.deltaY}px, 0)`;
+    if (dragging && dragging.targetIndex > dragging.fromIndex && index > dragging.fromIndex && index <= dragging.targetIndex) {
       return `translate3d(0, -${ROW_HEIGHT}px, 0)`;
     }
-    if (dragging.targetIndex < dragging.fromIndex && index < dragging.fromIndex && index >= dragging.targetIndex) {
+    if (dragging && dragging.targetIndex < dragging.fromIndex && index < dragging.fromIndex && index >= dragging.targetIndex) {
       return `translate3d(0, ${ROW_HEIGHT}px, 0)`;
     }
+    if (!dragging && rowTransitionPhase === 'from') {
+      const previousIndex = previousStackOrderRef.current.indexOf(kind);
+      if (previousIndex >= 0) return `translate3d(0, ${(previousIndex - index) * ROW_HEIGHT}px, 0)`;
+    }
     return 'translate3d(0, 0, 0)';
+  };
+
+  const orderTransitioning = randomizingOrder || isEffectStackTransitionActive();
+
+  const handleLayerToggleClickCapture = (event: React.MouseEvent<HTMLDivElement>, kind: EffectStackKind) => {
+    if (!event.altKey) return;
+    event.preventDefault();
+    event.stopPropagation();
+    selectLayer(kind, true);
   };
 
   const effectStatus = (kind: EffectStackKind, enabled: boolean) => {
@@ -518,6 +620,19 @@ export function PostprocessStackPanel({ onSwapWorkspace, onSelectEffectStack, de
       return { label: t('stack.status.applied'), className: 'text-emerald-300' };
     }
     return programStatusLabel(programKeyForEffect(kind), enabled);
+  };
+
+  const isSoloHidden = (kind: EffectStackKind, enabled: boolean) => {
+    const snapshot = soloSnapshotRef.current;
+    return Boolean(
+      snapshot
+      && isEffectStackLayerTemporarilyHidden(
+        kind,
+        enabled,
+        snapshot.targetKind,
+        snapshot.enabledState,
+      ),
+    );
   };
 
   const programStatusLabel = (key: LazyProgramKey, enabled: boolean) => {
@@ -544,6 +659,16 @@ export function PostprocessStackPanel({ onSwapWorkspace, onSelectEffectStack, de
           <span className="truncate font-display text-[9px] font-bold uppercase tracking-wider">{t('effect.stack')}</span>
         </button>
         <div className="flex items-center gap-1.5">
+          <button
+            type="button"
+            className="rounded px-1 text-[12px] leading-none text-cream/55 transition-colors hover:bg-cream/10 hover:text-fire focus:outline-none focus-visible:ring-2 focus-visible:ring-fire disabled:cursor-wait disabled:opacity-35"
+            title={t('stack.shuffleOrderHint')}
+            aria-label={t('stack.shuffleOrder')}
+            disabled={randomizingOrder}
+            onClick={randomizeOrder}
+          >
+            <Icon name="shuffle" className="text-[12px]" />
+          </button>
           {(onSwapWorkspace || detached) && (
             <button
               type="button"
@@ -572,21 +697,28 @@ export function PostprocessStackPanel({ onSwapWorkspace, onSelectEffectStack, de
         {movableStack.map((layer, index) => {
           const selected = effectPipeline.selectedKind === layer.kind;
           const isDragging = dragging?.kind === layer.kind;
-          const status = effectStatus(layer.kind, layer.enabled);
+          const status = isSoloHidden(layer.kind, layer.enabled)
+            ? { label: t('stack.status.stay'), className: 'text-amber-300' }
+            : effectStatus(layer.kind, layer.enabled);
           return (
             <div
               key={layer.kind}
-              className={`absolute left-0 right-0 flex h-[38px] items-center gap-2 border-b border-cream/10 px-2 transition-[transform,background-color,border-color,opacity] duration-150 ${
+              className={`absolute left-0 right-0 flex h-[38px] items-center gap-2 border-b border-cream/10 px-2 transition-[top,transform,background-color,border-color,opacity] ease-in-out duration-150 ${
                 selected ? 'bg-fire/15 text-k-text' : 'bg-transparent text-cream/80 hover:bg-cream/10'
               } ${layer.enabled ? 'opacity-100' : 'opacity-56'} ${isDragging ? 'z-10 shadow-[0_12px_28px_rgba(0,0,0,0.42)]' : 'z-0'}`}
               style={{
                 top: index * ROW_HEIGHT,
                 transform: rowTransform(layer.kind, index),
-                transitionDuration: dragging
+                transitionDuration: rowTransitionPhase === 'from'
+                  ? '0ms'
+                  : orderTransitioning
+                  ? `${EFFECT_STACK_TRANSITION_DURATION_MS}ms`
+                  : dragging
                   ? (dragging.phase === 'dragging' && isDragging ? '0ms' : `${DRAG_SETTLE_MS}ms`)
                   : '0ms',
               }}
-              onClick={() => selectLayer(layer.kind)}
+              title={t('stack.soloHint')}
+              onClick={(event) => selectLayer(layer.kind, event.altKey)}
             >
               <button
                 type="button"
@@ -604,7 +736,11 @@ export function PostprocessStackPanel({ onSwapWorkspace, onSelectEffectStack, de
                 </div>
                 <div className={`text-[8px] font-medium uppercase tracking-wide ${status.className}`}>{status.label}</div>
               </div>
-              <div onClick={(e) => e.stopPropagation()} onPointerDown={(e) => e.stopPropagation()}>
+              <div
+                onClick={(event) => event.stopPropagation()}
+                onClickCapture={(event) => handleLayerToggleClickCapture(event, layer.kind)}
+                onPointerDown={(event) => event.stopPropagation()}
+              >
                 <Toggle
                   variant="switch"
                   size="xs"
@@ -644,7 +780,13 @@ export function PostprocessStackPanel({ onSwapWorkspace, onSelectEffectStack, de
   // which made toggles and pointer gestures inert in the detached window.
   useEffect(() => {
     if (pipWindow && pipMount && pipRootRef.current) {
-      pipRootRef.current.render(panel);
+      pipRootRef.current.render(
+        <LanguageProvider>
+          <Viewport appId="k-gg-effect-stack">
+            {panel}
+          </Viewport>
+        </LanguageProvider>,
+      );
     }
   }, [panel, pipMount, pipWindow]);
 

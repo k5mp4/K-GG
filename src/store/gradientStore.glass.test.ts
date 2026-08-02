@@ -17,6 +17,10 @@ describe('Glass postprocess preset compatibility', () => {
     expect(loaded.glassNoiseInfluence).toBe(
       STORE_DEFAULTS.postprocess.glassNoiseInfluence,
     );
+    expect(loaded.glassV2ChromaticHue).toBe(0);
+    expect(loaded.glassV2ChromaticSaturation).toBe(1);
+    expect(loaded.glassV2TransmissionTint).toBe('#FFFFFF');
+    expect(loaded.glassV2HighlightTint).toBe('#FFFFFF');
     expect(loaded.effectMode).toBe('mirror');
     expect(loaded.effectStack.find(layer => layer.kind === 'glassV2')).toEqual({
       kind: 'glassV2',
@@ -24,7 +28,7 @@ describe('Glass postprocess preset compatibility', () => {
     });
   });
 
-  it('adds disabled Glass V2 to an old stack without changing Glass padding', () => {
+  it('normalizes an old Glass stack to one Glass V2 layer without changing padding', () => {
     const loaded = normalizePostprocessConfig({
       enabled: true,
       effectMode: 'glass',
@@ -38,7 +42,10 @@ describe('Glass postprocess preset compatibility', () => {
       ],
     });
 
-    expect(loaded.effectStack.at(-1)).toEqual({ kind: 'glassV2', enabled: false });
+    expect(loaded.effectMode).toBe('glassV2');
+    expect(loaded.effectStack.filter(layer => layer.kind === 'glass' || layer.kind === 'glassV2')).toEqual([
+      { kind: 'glassV2', enabled: true },
+    ]);
     expect(getPostprocessStackSamplePadding(loaded)).toBe(40);
   });
 
@@ -54,7 +61,7 @@ describe('Glass postprocess preset compatibility', () => {
     }));
     const loaded = normalizePostprocessConfig(saved);
 
-    expect(loaded.effectMode).toBe('glass');
+    expect(loaded.effectMode).toBe('glassV2');
     expect(loaded.glassSeed).toBe(37);
     expect(loaded.glassNoiseInfluence).toBe(0.72);
     expect(loaded.glassRefraction).toBe(64);
@@ -76,16 +83,40 @@ describe('Glass postprocess preset compatibility', () => {
       glassRefraction: 48,
       glassChromaticAberration: 9,
       glassRoughness: 3,
+      glassV2ChromaticHue: -42,
+      glassV2ChromaticSaturation: 1.35,
+      glassV2TransmissionTint: '#A0D8FF',
+      glassV2HighlightTint: '#FFD6A0',
     }));
 
     const loaded = normalizePostprocessConfig(saved);
     expect(loaded.effectMode).toBe('glassV2');
     expect(loaded.effectStack.slice(0, 2)).toEqual([
       { kind: 'glassV2', enabled: true },
-      { kind: 'glass', enabled: false },
+      { kind: 'distort', enabled: true },
     ]);
     expect(loaded.glassRefraction).toBe(48);
     expect(loaded.glassChromaticAberration).toBe(9);
     expect(loaded.glassRoughness).toBe(3);
+    expect(loaded.glassV2ChromaticHue).toBe(-42);
+    expect(loaded.glassV2ChromaticSaturation).toBe(1.35);
+    expect(loaded.glassV2TransmissionTint).toBe('#A0D8FF');
+    expect(loaded.glassV2HighlightTint).toBe('#FFD6A0');
+  });
+
+  it('normalizes malformed Glass V2 color values without affecting shared optics', () => {
+    const loaded = normalizePostprocessConfig({
+      glassRefraction: 48,
+      glassV2ChromaticHue: Number.POSITIVE_INFINITY,
+      glassV2ChromaticSaturation: 99,
+      glassV2TransmissionTint: '#12',
+      glassV2HighlightTint: 'transparent',
+    });
+
+    expect(loaded.glassRefraction).toBe(48);
+    expect(loaded.glassV2ChromaticHue).toBe(0);
+    expect(loaded.glassV2ChromaticSaturation).toBe(2);
+    expect(loaded.glassV2TransmissionTint).toBe('#FFFFFF');
+    expect(loaded.glassV2HighlightTint).toBe('#FFFFFF');
   });
 });

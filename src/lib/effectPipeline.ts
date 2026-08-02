@@ -15,7 +15,6 @@ export const EFFECT_STACK_KINDS = [
   'kaleidoscope',
   'voronoi',
   'glass',
-  'glassV2',
   'diffuse',
 ] as const satisfies readonly EffectStackKind[];
 
@@ -63,14 +62,17 @@ export function normalizeEffectStack(stack: unknown): EffectStackLayer[] {
   const seen = new Set<EffectStackKind>();
   const normalized: EffectStackLayer[] = [];
   for (const rawLayer of stack) {
-    if (seen.size === EFFECT_STACK_KINDS.length) break;
     if (typeof rawLayer !== 'object' || rawLayer === null) continue;
-    const kind = (rawLayer as { kind?: unknown }).kind;
-    if (!isEffectStackKind(kind) || seen.has(kind)) continue;
-    normalized.push({
-      kind,
-      enabled: Boolean((rawLayer as { enabled?: unknown }).enabled),
-    });
+    const rawKind = (rawLayer as { kind?: unknown }).kind;
+    const kind = rawKind === 'glassV2' ? 'glass' : rawKind;
+    if (!isEffectStackKind(kind)) continue;
+    const enabled = Boolean((rawLayer as { enabled?: unknown }).enabled);
+    const existing = normalized.find(layer => layer.kind === kind);
+    if (existing) {
+      existing.enabled = existing.enabled || enabled;
+      continue;
+    }
+    normalized.push({ kind, enabled });
     seen.add(kind);
   }
 
@@ -91,8 +93,11 @@ export function normalizeEffectPipelineConfig(value: unknown): EffectPipelineCon
 
   const raw = value as Partial<EffectPipelineConfig>;
   const effectStack = normalizeEffectStack(raw.effectStack);
-  const selectedKind = isEffectStackKind(raw.selectedKind)
-    ? raw.selectedKind
+  const rawSelectedKind = (value as { selectedKind?: unknown }).selectedKind;
+  const selectedKind = rawSelectedKind === 'glassV2'
+    ? 'glass'
+    : isEffectStackKind(rawSelectedKind)
+      ? rawSelectedKind
     : 'diffuse';
 
   return {
@@ -116,6 +121,68 @@ export function moveEffectStackLayer(
   const clampedIndex = Math.max(0, Math.min(next.length, Math.round(targetIndex)));
   next.splice(clampedIndex, 0, normalized[fromIndex]);
   return next;
+}
+
+/**
+ * 主スタックの全レイヤーを一度ずつ含むランダムな順列を作る。
+ * レイヤーの有効状態や設定は順序変更から独立して保持する。
+ */
+export function randomizeEffectStackOrder(
+  stack: EffectStackLayer[],
+  random: () => number = Math.random,
+): EffectStackLayer[] {
+  const next = normalizeEffectStack(stack).map(layer => ({ ...layer }));
+  for (let index = next.length - 1; index > 0; index -= 1) {
+    const sample = random();
+    const bounded = Number.isFinite(sample)
+      ? Math.max(0, Math.min(0.9999999999999999, sample))
+      : 0;
+    const swapIndex = Math.floor(bounded * (index + 1));
+    [next[index], next[swapIndex]] = [next[swapIndex], next[index]];
+  }
+  return next;
+}
+
+/**
+ * 指定した主スタックレイヤーだけを有効にする。固定段はこの配列に
+ * 含まれないため、Prism／Particlesの状態へ影響しない。
+ */
+export function soloEffectStackLayer(
+  stack: EffectStackLayer[],
+  kind: EffectStackKind,
+): EffectStackLayer[] {
+  return normalizeEffectStack(stack).map(layer => ({
+    ...layer,
+    enabled: layer.kind === kind,
+  }));
+}
+
+export type EffectStackEnabledState = Record<EffectStackKind, boolean>;
+
+export function captureEffectStackEnabledState(stack: EffectStackLayer[]): EffectStackEnabledState {
+  const state = {} as EffectStackEnabledState;
+  for (const layer of normalizeEffectStack(stack)) state[layer.kind] = layer.enabled;
+  return state;
+}
+
+export function restoreEffectStackEnabledState(
+  stack: EffectStackLayer[],
+  enabledState: EffectStackEnabledState,
+): EffectStackLayer[] {
+  return normalizeEffectStack(stack).map(layer => ({
+    ...layer,
+    enabled: enabledState[layer.kind],
+  }));
+}
+
+/** Returns true when solo mode temporarily hid a layer that was enabled before soloing. */
+export function isEffectStackLayerTemporarilyHidden(
+  kind: EffectStackKind,
+  enabled: boolean,
+  soloTargetKind: EffectStackKind,
+  previousEnabledState: EffectStackEnabledState,
+): boolean {
+  return kind !== soloTargetKind && previousEnabledState[kind] && !enabled;
 }
 
 export function updateEffectStackLayer(
@@ -188,7 +255,6 @@ export type V2RenderPlan = {
   programs: {
     stackCore: boolean;
     noiseStack: boolean;
-    glass: boolean;
     glassV2: boolean;
     normalMap: boolean;
     blur: boolean;
@@ -219,8 +285,7 @@ export function getV2RenderPlan(
   const prismNeedsBlur = prismRequested && Number.isFinite(options.prismGlowRadius)
     && options.prismGlowRadius > 0.01;
   const particlesRequested = pipeline.particlesEnabled;
-  const glassRequested = enabledLayers.some(layer => layer.kind === 'glass');
-  const glassV2Requested = enabledLayers.some(layer => layer.kind === 'glassV2');
+  const glassV2Requested = enabledLayers.some(layer => layer.kind === 'glass');
   const noiseRequested = enabledLayers.some(layer => layer.kind === 'noise');
   const stretchRequested = enabledLayers.some(layer => layer.kind === 'stretch');
 
@@ -237,7 +302,6 @@ export function getV2RenderPlan(
     programs: {
       stackCore: requiresV2StackCore(pipeline, normalRequested),
       noiseStack: noiseRequested,
-      glass: glassRequested,
       glassV2: glassV2Requested,
       normalMap: normalRequested,
       blur: normalNeedsBlur || prismNeedsBlur,
@@ -254,7 +318,5 @@ export function requiresHeavyV2Postprocess(
   prismEnabled: boolean,
 ): boolean {
   if (prismEnabled) return true;
-  return effectStack.some(layer => layer.enabled && (
-    layer.kind === 'glass' || layer.kind === 'glassV2'
-  ));
+  return effectStack.some(layer => layer.enabled && layer.kind === 'glass');
 }

@@ -5,12 +5,12 @@ title: Preset System
 status: current
 owners: [maintainer]
 created: 2026-07-27
-updated: 2026-07-27
-requirement_ids: [PRESET-001, PRESET-002, PRESET-003, PRESET-004, PRESET-005, PRESET-006, PRESET-007, PRESET-008]
+updated: 2026-08-02
+requirement_ids: [PRESET-001, PRESET-002, PRESET-003, PRESET-004, PRESET-005, PRESET-006, PRESET-007, PRESET-008, PRESET-009, PRESET-011]
 related_adrs: [ADR-0007, ADR-0008]
-related_changes: [CHANGE-001]
-related_code: [src/lib/presetModel.ts, src/lib/presetLibrary.ts, src/lib/presets.ts, src/lib/presetPreview.ts, src/lib/presetThumbnail.ts, src/components/PresetPanel.tsx, src/components/PresetPreview.tsx, src/adapters/types.ts, src/adapters/browser/presetRepository.ts, src/adapters/tauri/presetRepository.ts, src-tauri/src/lib.rs]
-related_tests: [src/lib/presetLibrary.test.ts, src/lib/presetModel.diffuse.test.ts, src/lib/presetPreview.test.ts, src/lib/presetThumbnail.test.ts]
+related_changes: [CHANGE-001, CHANGE-012, CHANGE-013]
+related_code: [src/lib/presetModel.ts, src/lib/presetLibrary.ts, src/lib/presets.ts, src/lib/presetPreview.ts, src/lib/presetThumbnail.ts, src/lib/glass.ts, src/lib/postprocessStack.ts, src/store/gradientStore.ts, src/components/PresetPanel.tsx, src/components/PresetPreview.tsx, src/adapters/types.ts, src/adapters/browser/presetRepository.ts, src/adapters/tauri/presetRepository.ts, src-tauri/src/lib.rs]
+related_tests: [src/lib/presetLibrary.test.ts, src/lib/presetModel.diffuse.test.ts, src/lib/presetPreview.test.ts, src/lib/presetThumbnail.test.ts, src/lib/glass.test.ts, src/lib/postprocessStack.test.ts, src/store/gradientStore.glass.test.ts, src/store/gradientStore.postprocessStack.test.ts]
 ---
 
 # Preset System
@@ -65,6 +65,14 @@ Web版はブラウザの `localStorage` を保存先とし、単一PresetはJSON
 
 Presetやライブラリは読込時に構造、ID、親子関係、循環、名前、サイズ上限を検証します。破損データを現在のライブラリへ部分適用せず、エラーとして扱います。Web版で読込に失敗した場合は空ライブラリへフォールバックし、Tauri版でも保存済みデータを壊さずにエラーを通知します。
 
+### PRESET-009 GLASS V2色設定の互換保存
+
+PresetはGLASS V2のChromatic Hue、Chromatic Saturation、Transmission Tint、Highlight TintをPostprocess設定として保存・復元します。これらを持たない旧Presetは、変更前外観と同一になる`0°`、`100%`、`#FFFFFF`、`#FFFFFF`を補完します。無効なHEX、非有限値、範囲外の数値は、描画前に安全な既定値または上限へ正規化します。
+
+### PRESET-011 Postprocess Glassの互換正規化
+
+旧PresetのPostprocess設定にある`effectMode: glass`およびstackの`kind: glass`は、読込時に`glassV2`へ写像します。`glass`と`glassV2`が重複する場合は最初の位置を維持し、有効状態を論理和で統合します。正規化後のPostprocess設定と新規保存値には旧`glass`を残しません。
+
 ## 他領域との関係
 
 - Gradient Systemは `state.gradient`、Image Gradient設定、Meshの正規化を定義します。
@@ -77,6 +85,7 @@ Presetやライブラリは読込時に構造、ID、親子関係、循環、名
 - [SPEC-026 操作性と描画Thumbnail](../SPEC-026-preset-library-ux-and-rendered-thumbnails)
 - [SPEC-031〜033 アニメーションと出力時刻](../index#legacy-change-specifications)
 - [SPEC-040 Mesh Gradation](../SPEC-040-mesh-gradation)
+- [CHANGE-012 GLASS V2色調整コントロール](../../changes/archive/CHANGE-012-glass-v2-color-controls/proposal)
 
 Legacy SPECは保存形式が変化した経緯を追うために残します。現行の保存契約・環境差・未実装の更新操作はこの文書を確認してください。
 

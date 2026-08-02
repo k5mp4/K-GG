@@ -50,9 +50,11 @@ Distorts the gradient with multiple noise algorithms. Strength controls the amou
 
 ### Postprocess Effect Stack
 
-Use the Effect Stack panel at the upper-left of the canvas to reorder Noise, Slit, Stretch, Distort, Mirror, Kaleidoscope, Voronoi, Glass, Glass V2, and Diffuse. Drag a row by its grip and toggle it with the switch. The fixed stages are `Surface → Main Stack → Prism → Particles`.
+Use the Effect Stack panel at the upper-left of the canvas to reorder Noise, Slit, Stretch, Distort, Mirror, Kaleidoscope, Voronoi, Glass, and Diffuse. Drag a row by its grip and toggle it with the switch. The fixed stages are `Surface → Main Stack → Prism → Particles`.
 
-Glass uses an organic ridge height field. Glass V2 approximates screen-space optics with smooth gradient noise and separate RGB refraction. Both share Glass parameters but can be compared or combined as separate layers.
+Glass uses the GLASS V2 screen-space optical approximation with smooth gradient noise and separate RGB refraction. The Postprocess properties show one Glass entry; Chromatic Aberration reaches 80px, and Transmission Tint / Highlight Tint use color inputs.
+
+Use the shuffle button in the Effect Stack header to randomize the main-stack order. The preview transitions smoothly from the current result to the new order, and rows move from their current positions. Alt-click a layer row or its on/off toggle to solo that layer; layers temporarily hidden by solo are marked with a yellow `STAY` status. Alt-click the same target again to restore the previous enabled state. The Effect Stack can also be opened in another window; closing it restores the inline panel.
 
 If the screen or GPU rendering becomes corrupted, open Settings in the top bar and use **Refresh app**. Unsaved edits are discarded.
 

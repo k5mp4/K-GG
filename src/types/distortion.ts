@@ -196,8 +196,7 @@ export type EffectStackKind =
   | 'mirror'
   | 'kaleidoscope'
   | 'voronoi'
-  | 'glass'
-  | 'glassV2';
+  | 'glass';
 
 export type EffectStackLayer = {
   kind: EffectStackKind;
@@ -261,6 +260,10 @@ export type PostprocessConfig = ManualDistortConfig & {
   glassMix: number;
   glassEvolution: number;
   glassMotion: number;
+  glassV2ChromaticHue: number;
+  glassV2ChromaticSaturation: number;
+  glassV2TransmissionTint: string;
+  glassV2HighlightTint: string;
   particleCount: number;
   particleEmitterType: PostprocessParticleEmitterType;
   particleEmitterPoint: [number, number];

@@ -1,5 +1,10 @@
 import { useEffect, useRef, useState } from 'react';
-import { initWebGL, SHADER_VERSION } from '../lib/webgl';
+import {
+  getRequiredExportProgramKeys,
+  initWebGL,
+  prepareExportPrograms,
+  SHADER_VERSION,
+} from '../lib/webgl';
 import { buildRampTextureData } from '../lib/gradientRampUtils';
 import { renderBridge } from '../lib/renderBridge';
 import { AnimationLoop } from '../lib/animation';
@@ -10,6 +15,7 @@ import { useGradientStore } from '../store/gradientStore';
 import type { WebGLContext } from '../lib/webgl';
 import type { GradientConfig } from '../types/gradient';
 import type { LatestState } from '../types/latestState';
+import { createExportStateSnapshot } from '../lib/exportRenderState';
 
 type WebGLInitRequest = {
   canvas: HTMLCanvasElement;
@@ -120,6 +126,50 @@ export function useWebGL(
         latestRef.current?.effectPipeline,
       ),
     );
+    renderBridge.registerExportRenderer(async (signal?: AbortSignal) => {
+      const ctx = webglRef.current;
+      const latest = latestRef.current;
+      if (!ctx || !latest) throw new Error('WebGL export renderer is not ready');
+
+      const snapshot = createExportStateSnapshot(latest);
+      const tilePadding = getPostprocessStackSamplePadding(
+        snapshot.postprocess,
+        snapshot.effectPipeline,
+      );
+      await prepareExportPrograms(ctx, snapshot, signal);
+      const requiredPrograms = getRequiredExportProgramKeys(snapshot);
+
+      return {
+        renderAtTime: (_time, normalizedTime = 0, tile) => {
+          renderSceneAtTime(ctx, snapshot, normalizedTime, {
+            tile,
+            allowEffectStackTransition: false,
+          });
+        },
+        finishGpu: () => ctx.gl.finish(),
+        tilePadding,
+        diagnostics: {
+          effectStack: snapshot.effectPipeline.effectStack
+            .filter(layer => layer.enabled)
+            .map(layer => layer.kind),
+          requiredPrograms,
+          readyPrograms: requiredPrograms,
+          glassFallback: !ctx.glassProgram && ctx.glassFallbackActive,
+          glassV2Fallback: !ctx.glassV2Program && ctx.glassV2FallbackActive,
+          canvasSize: [snapshot.width, snapshot.height],
+          tilePadding,
+        },
+        restorePreview: () => {
+          const currentContext = webglRef.current;
+          const currentState = latestRef.current;
+          if (!currentContext || !currentState) return;
+          const normalizedTime = currentState.animation.enabled
+            ? (animLoopRef.current?.currentNormalizedTime ?? useGradientStore.getState().currentTime)
+            : 0;
+          renderSceneAtTime(currentContext, currentState, normalizedTime, {});
+        },
+      };
+    });
     renderBridge.registerPause(
       () => {
         const loop = animLoopRef.current;

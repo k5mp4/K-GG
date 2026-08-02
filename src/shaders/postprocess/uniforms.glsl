@@ -52,6 +52,12 @@ uniform float u_glassHighlight;
 uniform float u_glassMix;
 uniform float u_glassEvolution;
 uniform float u_glassMotion;
+#if !defined(KGG_LEGACY_GLASS_ONLY)
+uniform float u_glassV2ChromaticHue;
+uniform float u_glassV2ChromaticSaturation;
+uniform vec3 u_glassV2TransmissionTint;
+uniform vec3 u_glassV2HighlightTint;
+#endif
 uniform bool u_diffuseEnabled;
 uniform int u_diffuseMode;
 uniform float u_diffuseScatter;

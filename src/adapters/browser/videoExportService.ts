@@ -1,70 +1,8 @@
 import { Zip, ZipPassThrough } from 'fflate';
-import { renderBridge } from '../../lib/renderBridge';
-import { applyTimeRemap } from '../../lib/timeRemap';
-import { needsTiledRender, renderTiledToCanvas2D, canvas2dToPngBlob } from '../../lib/tileRender';
+import { needsTiledRender } from '../../lib/tileRender';
+import { renderAndCaptureExportFrame, withExportSession } from '../../lib/videoExportFrames';
 import type { AnimationEasing } from '../../store/gradientStore';
 import type { VideoExportConfig, VideoExportService } from '../types';
-
-// ---------- 共通ユーティリティ ----------
-
-function calcExportNormalizedTime(frameIndex: number, totalFrames: number): number {
-  if (totalFrames <= 1) return 0;
-  // Sample the composition frame interval [0, 1). Preview looping is a transport
-  // choice and must not replace a keyed animation's final frame with frame zero.
-  return Math.max(0, Math.min(1, frameIndex / totalFrames));
-}
-
-/** easing に応じた normalizedTime → u_time を計算 */
-function calcTimeFromNormalized(
-  normalizedTime: number,
-  speed: number,
-  duration: number,
-  easing?: AnimationEasing,
-): number {
-  const nt = applyTimeRemap(normalizedTime, duration, easing);
-  return nt * speed * duration;
-}
-
-/** canvas → PNG Blob。タイルが必要な場合はタイル描画を行う。 */
-async function captureBlob(
-  canvas: HTMLCanvasElement,
-  fullW: number,
-  fullH: number,
-  t: number,
-  nt: number,
-  signal?: AbortSignal,
-  onTileProgress?: (p: number) => void,
-): Promise<Blob> {
-  if (needsTiledRender(canvas, fullW, fullH)) {
-    const out2d = await renderTiledToCanvas2D({
-      canvas,
-      fullWidth: fullW,
-      fullHeight: fullH,
-      time: t,
-      normalizedTime: nt,
-      signal,
-      onProgress: onTileProgress,
-    });
-    return await canvas2dToPngBlob(out2d);
-  }
-
-  // 通常パス: 描画して capture
-  renderBridge.renderAtTime(t, nt);
-  
-  // WebGL レンダリング完了を待機 (preserveDrawingBuffer 用)
-  await new Promise<void>((resolve) => {
-    requestAnimationFrame(() => {
-      requestAnimationFrame(() => resolve());
-    });
-  });
-
-  return new Promise<Blob>((resolve, reject) => {
-    canvas.toBlob(
-      (blob) => (blob ? resolve(blob) : reject(new Error('toBlob returned null'))),
-      'image/png',
-    );
-  });
-}
 
 /** PNG ZIP 用: フレームを描画・キャプチャしながら ZIP チャンクへ流す。 */
 async function captureFrameZipChunks(
@@ -83,7 +21,7 @@ async function captureFrameZipChunks(
 
   if (useTiled) console.log(`[exportVideo] Using tiled render path for ${fullW}×${fullH} (ZIP)`);
 
-  const zipBlobPromise = new Promise<Blob>((resolve, reject) => {
+  return await withExportSession(signal, async session => await new Promise<Blob>((resolve, reject) => {
     const zip = new Zip((err, data, final) => {
       if (err) {
         reject(err);
@@ -102,19 +40,23 @@ async function captureFrameZipChunks(
         // WebGL canvas は単一の描画先なので、通常パスもタイルパスも逐次処理する。
         for (let i = 0; i < totalFrames; i++) {
           if (signal?.aborted) throw new DOMException('Export cancelled', 'AbortError');
-          const nt = calcExportNormalizedTime(i, totalFrames);
-          const t = calcTimeFromNormalized(nt, speed, duration, easing);
           const frameBaseProgress = i / totalFrames;
 
-          const blob = await captureBlob(
+          const { blob } = await renderAndCaptureExportFrame({
+            session,
             canvas,
-            fullW,
-            fullH,
-            t,
-            nt,
+            fullWidth: fullW,
+            fullHeight: fullH,
+            frameIndex: i,
+            totalFrames,
+            speed,
+            duration,
+            easing,
             signal,
-            useTiled ? (tileProgress) => onProgress(frameBaseProgress + tileProgress / totalFrames) : undefined,
-          );
+            onTileProgress: useTiled
+              ? tileProgress => onProgress(frameBaseProgress + tileProgress / totalFrames)
+              : undefined,
+          });
           const frame = new Uint8Array(await blob.arrayBuffer());
           const file = new ZipPassThrough(`frame_${String(i).padStart(4, '0')}.png`);
           zip.add(file);
@@ -130,9 +72,7 @@ async function captureFrameZipChunks(
         reject(e);
       }
     })();
-  });
-
-  return zipBlobPromise;
+  }));
 }
 
 // ---------- 公開型 ----------

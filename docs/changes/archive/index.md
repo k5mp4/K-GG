@@ -8,6 +8,7 @@ title: 完了済み変更
 
 | ID | 変更 | 状態 |
 | --- | --- | --- |
+| CHANGE-012 | [GLASS V2色調整コントロール](./CHANGE-012-glass-v2-color-controls/proposal) | archived |
 | CHANGE-010 | [2026-07-28変更履歴の統合](./2026-07-28-day-bundle/proposal) | archived |
 | CHANGE-001 | [DocDDを現行仕様＋変更仕様へ移行](./2026-07-27-docdd-current-and-change-specs/proposal) | archived |
 

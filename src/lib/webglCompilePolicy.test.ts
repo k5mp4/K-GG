@@ -49,13 +49,31 @@ describe('WebGL lazy compile policy', () => {
     expect(fallbackRequest).toBeGreaterThan(timeoutGuard);
   });
 
-  it('queues both Glass modes sequentially without gating other ready stages', () => {
+  it('queues the V2-backed Glass program without gating other ready stages', () => {
     const source = functionSource('render');
 
-    expect(source).toContain("stackCoreReady && noiseStackReady && requestGlassProgram(ctx, 'glass')");
-    expect(source).toContain("stackCoreReady && noiseStackReady && glassCompileSettled && requestGlassProgram(ctx, 'glassV2')");
+    expect(source).toContain("stackCoreReady && noiseStackReady && requestGlassProgram(ctx, 'glassV2')");
+    expect(source).not.toContain("requestGlassProgram(ctx, 'glass')");
     const readinessGate = source.match(/if \(!stackCoreReady \|\|[^\n]+\) \{/)?.[0] ?? '';
     expect(readinessGate).not.toContain('glassReady');
     expect(readinessGate).not.toContain('glassV2Ready');
+  });
+
+  it('prepares required Glass programs before export starts', () => {
+    const prepareSource = functionSource('prepareExportPrograms');
+    const planSource = functionSource('getRequiredExportProgramKeys');
+
+    expect(planSource).toContain("add('glassV2',");
+    expect(prepareSource).toContain('for (const key of required) await waitForLazyProgram');
+  });
+
+  it('keeps ping-pong sources separate and rejects destination feedback', () => {
+    const passSource = functionSource('drawPostprocessPass');
+
+    expect(webglSource).toContain('sourceTexture === ctx.postprocessTextureA');
+    expect(webglSource).toContain('fbo: ctx.postprocessFboB');
+    expect(passSource).toContain('Postprocess pass cannot sample from its destination texture');
+    expect(passSource).toContain('gl.disable(gl.BLEND)');
+    expect(passSource).toContain('gl.disable(gl.SCISSOR_TEST)');
   });
 });

@@ -62,9 +62,11 @@ Web 版は `index.html` で Google Fonts から Noto Sans JP、Open Sans を読�
   - Radial(Expand)は中央から外側に広がる形でオススメ
 
 ### Postprocess Effect Stack
-- キャンバス左上の `Effect Stack` パネルで、Noise / Slit / Stretch / Distort / Mirror / Kaleidoscope / Voronoi / Glass / Glass V2 / Diffuse の順序を変更できます。Diffuseは初期状態では最後尾です。
-- Glassは有機的なリッジ高さ場、Glass V2は滑らかな勾配ノイズとRGB別屈折率を使う画面空間の光学近似です。両方とも同じGlassパラメータを使い、独立したレイヤーとして比較・併用できます。
+- キャンバス左上の `Effect Stack` パネルで、Noise / Slit / Stretch / Distort / Mirror / Kaleidoscope / Voronoi / Glass / Diffuse の順序を変更できます。Diffuseは初期状態では最後尾です。
+- GlassはGLASS V2による滑らかな勾配ノイズとRGB別屈折率を使う画面空間の光学近似です。PostprocessのプロパティにはGlassを一つだけ表示し、色収差は最大80px、Transmission TintとHighlight Tintはカラー入力から調整できます。
 - 行のグリップをドラッグすると、行が目的位置へ収束してから描画順序が確定します。各行のスイッチでレイヤーをON/OFFできます。
+- Effect Stackヘッダーのシャッフル操作で主スタックの順序をランダム化できます。現在の見た目から新しい順序へ滑らかに遷移します。行またはオンオフToggleをAltクリックすると、そのレイヤーだけを有効にするソロ操作になり、ソロ化で一時的に非表示になったレイヤーは黄色の`STAY`で示されます。同じ対象をもう一度Altクリックすると元の有効状態へ戻ります。
+- Effect Stackは別ウィンドウへ切り離せます。別ウィンドウを閉じるとインライン表示へ戻ります。
 - 固定順は `Surface → Main Stack → Prism → Particles` です。DiffuseはMain Stack内の位置で一度だけ適用されます。
 - 画面やGPU描画が壊れた場合は、トップバーの設定モーダル（Hover / Click only）にある `Refresh app` でアプリを再読み込みできます。未保存の編集状態は破棄されます。
 

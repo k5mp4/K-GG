@@ -9,8 +9,10 @@ import { SliderField } from './SliderField';
 import { Icon } from './Icon';
 import { Toggle } from './Toggle';
 import { useLanguage } from '../i18n/LanguageProvider';
+import { InputColor } from 'tweeq';
 
 const D = STORE_DEFAULTS.manualDistort;
+const GLASS_COLOR_INPUT_CLASS = 'tq-color-input w-[132px] min-w-0 flex-none border border-panel-border bg-k-bg/50';
 const POSTPROCESS_DIFFUSE_MODES: Array<{ value: string; label: string }> = [
   { value: 'block', label: 'Block' },
   { value: 'smooth', label: 'Smooth' },
@@ -384,8 +386,7 @@ export function PostprocessPanel() {
               { value: 'kaleidoscope', label: 'Kaleidoscope' },
               { value: 'prism', label: 'Prism' },
               { value: 'voronoi', label: 'Voronoi' },
-              { value: 'glass', label: 'Glass' },
-              { value: 'glassV2', label: 'Glass V2' },
+              { value: 'glassV2', label: 'Glass' },
               { value: 'particles', label: 'Particles' },
             ]}
             onChange={(value) => setEffectMode(value as typeof postprocess.effectMode)}
@@ -662,13 +663,11 @@ export function PostprocessPanel() {
                 defaultValue={STORE_DEFAULTS.postprocess.voronoiSeed}
               />
             </div>
-          ) : postprocess.effectMode === 'glass' || postprocess.effectMode === 'glassV2' ? (
+          ) : postprocess.effectMode === 'glassV2' ? (
             <div className="space-y-4">
-              {postprocess.effectMode === 'glassV2' && (
-                <p className="text-[10px] leading-relaxed text-tab-inactive">
-                  Smooth gradient noise, wavelength-dependent refraction, rough transmission, and Fresnel highlights are combined as a single-layer screen-space approximation.
-                </p>
-              )}
+              <p className="text-[10px] leading-relaxed text-tab-inactive">
+                Smooth gradient noise, wavelength-dependent refraction, rough transmission, and Fresnel highlights are combined as a single-layer screen-space approximation.
+              </p>
               <PostprocessControlGroup title="Surface">
                 <SliderField
                   label="Scale"
@@ -766,7 +765,7 @@ export function PostprocessPanel() {
                 <SliderField
                   label="Chromatic Aberration"
                   min={0}
-                  max={40}
+                  max={80}
                   step={0.1}
                   value={postprocess.glassChromaticAberration}
                   onChange={(v) => setPostprocess({ glassChromaticAberration: v })}
@@ -807,6 +806,59 @@ export function PostprocessPanel() {
                   defaultValue={STORE_DEFAULTS.postprocess.glassMix}
                   trackId="postprocess.glassMix"
                 />
+              </PostprocessControlGroup>
+
+              <PostprocessControlGroup title="Color">
+                <SliderField
+                  label="Chromatic Hue"
+                  min={-180}
+                  max={180}
+                  step={1}
+                  value={postprocess.glassV2ChromaticHue}
+                  onChange={(v) => setPostprocess({ glassV2ChromaticHue: v })}
+                  format={(v) => `${Math.round(v)}°`}
+                  defaultValue={STORE_DEFAULTS.postprocess.glassV2ChromaticHue}
+                />
+                <SliderField
+                  label="Chromatic Saturation"
+                  min={0}
+                  max={2}
+                  step={0.01}
+                  value={postprocess.glassV2ChromaticSaturation}
+                  onChange={(v) => setPostprocess({ glassV2ChromaticSaturation: v })}
+                  format={(v) => `${Math.round(v * 100)}%`}
+                  defaultValue={STORE_DEFAULTS.postprocess.glassV2ChromaticSaturation}
+                />
+                <div className="flex items-center justify-between gap-3">
+                  <span className="text-xs text-deep font-display uppercase tracking-wider">
+                    Transmission Tint
+                  </span>
+                  <div className={GLASS_COLOR_INPUT_CLASS}>
+                    <InputColor
+                      value={postprocess.glassV2TransmissionTint}
+                      onChange={(value) => setPostprocess({
+                        glassV2TransmissionTint: value.toUpperCase(),
+                      })}
+                      alpha={false}
+                      aria-label="Glass Transmission Tint"
+                    />
+                  </div>
+                </div>
+                <div className="flex items-center justify-between gap-3">
+                  <span className="text-xs text-deep font-display uppercase tracking-wider">
+                    Highlight Tint
+                  </span>
+                  <div className={GLASS_COLOR_INPUT_CLASS}>
+                    <InputColor
+                      value={postprocess.glassV2HighlightTint}
+                      onChange={(value) => setPostprocess({
+                        glassV2HighlightTint: value.toUpperCase(),
+                      })}
+                      alpha={false}
+                      aria-label="Glass Highlight Tint"
+                    />
+                  </div>
+                </div>
               </PostprocessControlGroup>
 
               <PostprocessControlGroup title="Motion" defaultOpen={false}>

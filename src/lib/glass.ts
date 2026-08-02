@@ -4,7 +4,7 @@ import { isEffectStackLayerEnabled } from './effectPipeline';
 
 export const GLASS_LIMITS = {
   refraction: 120,
-  chromaticAberration: 40,
+  chromaticAberration: 80,
   roughness: 12,
 } as const;
 
@@ -25,6 +25,13 @@ export const GLASS_DEFAULTS = {
   motion: 0.35,
 } as const;
 
+export const GLASS_V2_COLOR_DEFAULTS = {
+  chromaticHue: 0,
+  chromaticSaturation: 1,
+  transmissionTint: '#FFFFFF',
+  highlightTint: '#FFFFFF',
+} as const;
+
 export type GlassRenderParameters = {
   scale: number;
   stretch: number;
@@ -42,6 +49,14 @@ export type GlassRenderParameters = {
   motion: number;
 };
 
+export type GlassV2ColorParameters = {
+  chromaticHueDegrees: number;
+  chromaticHueRadians: number;
+  chromaticSaturation: number;
+  transmissionTint: string;
+  highlightTint: string;
+};
+
 function clamp(value: number, min: number, max: number): number {
   if (!Number.isFinite(value)) return min;
   return Math.max(min, Math.min(max, value));
@@ -49,6 +64,12 @@ function clamp(value: number, min: number, max: number): number {
 
 function finiteClamped(value: number | undefined, fallback: number, min: number, max: number): number {
   return clamp(Number.isFinite(value) ? value as number : fallback, min, max);
+}
+
+function normalizedHexColor(value: unknown, fallback: string): string {
+  return typeof value === 'string' && /^#[0-9a-f]{6}$/i.test(value)
+    ? value.toUpperCase()
+    : fallback;
 }
 
 export function normalizeGlassRenderParameters(
@@ -88,6 +109,41 @@ export function normalizeGlassRenderParameters(
   };
 }
 
+export function normalizeGlassV2ColorParameters(
+  config: Partial<Pick<
+    PostprocessConfig,
+    | 'glassV2ChromaticHue'
+    | 'glassV2ChromaticSaturation'
+    | 'glassV2TransmissionTint'
+    | 'glassV2HighlightTint'
+  >> = {},
+): GlassV2ColorParameters {
+  const chromaticHueDegrees = finiteClamped(
+    config.glassV2ChromaticHue,
+    GLASS_V2_COLOR_DEFAULTS.chromaticHue,
+    -180,
+    180,
+  );
+  return {
+    chromaticHueDegrees,
+    chromaticHueRadians: chromaticHueDegrees * Math.PI / 180,
+    chromaticSaturation: finiteClamped(
+      config.glassV2ChromaticSaturation,
+      GLASS_V2_COLOR_DEFAULTS.chromaticSaturation,
+      0,
+      2,
+    ),
+    transmissionTint: normalizedHexColor(
+      config.glassV2TransmissionTint,
+      GLASS_V2_COLOR_DEFAULTS.transmissionTint,
+    ),
+    highlightTint: normalizedHexColor(
+      config.glassV2HighlightTint,
+      GLASS_V2_COLOR_DEFAULTS.highlightTint,
+    ),
+  };
+}
+
 /**
  * Glass固有形状とNoise Distortionの補間率。
  * 端点で一次・二次導関数が0になるため、99%→100%のような操作でも
@@ -118,10 +174,8 @@ export function getPostprocessStackSamplePadding(
 ): number {
   const activeGlassLayerCount = effectPipeline?.version === 'stack-v2'
     ? Number(isEffectStackLayerEnabled(effectPipeline, 'glass'))
-      + Number(isEffectStackLayerEnabled(effectPipeline, 'glassV2'))
     : postprocess?.enabled && postprocess
-      ? Number(isPostprocessLayerEnabled(postprocess, 'glass'))
-        + Number(isPostprocessLayerEnabled(postprocess, 'glassV2'))
+      ? Number(isPostprocessLayerEnabled(postprocess, 'glassV2'))
       : 0;
   if (activeGlassLayerCount === 0 || !postprocess || isGlassOpticallyIdentity(postprocess)) {
     return 0;
@@ -132,8 +186,8 @@ export function getPostprocessStackSamplePadding(
     params.refraction + params.chromaticAberration + params.roughness,
   ) + 2;
   // Consecutive sampling layers expand the source dependency radius. Reserve
-  // the sum so Glass -> Glass V2 (or the reverse) cannot clamp the first
-  // layer's result at an export tile boundary.
+  // The normalized Effect Stack contains one V2-backed Glass layer, so its
+  // dependency radius is reserved exactly once.
   return perLayerPadding * activeGlassLayerCount;
 }
 

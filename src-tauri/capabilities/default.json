@@ -6,11 +6,13 @@
   "permissions": [
     "core:default",
     "core:window:allow-create",
+    "core:webview:allow-create-webview-window",
     "core:window:allow-show",
     "core:window:allow-set-focus",
     "core:window:allow-close",
     "dialog:allow-open",
     "dialog:allow-save",
+    "dialog:allow-message",
     "updater:default",
     "process:allow-restart",
     "fs:allow-mkdir",
