@@ -7,56 +7,54 @@ import {
 } from './postprocessStack';
 
 describe('postprocessStack', () => {
-  it('creates a default stack with the selected legacy mode enabled', () => {
+  it('maps the legacy Glass mode to the single Glass V2 layer', () => {
     expect(createDefaultPostprocessStack('glass')).toEqual([
       { kind: 'distort', enabled: false },
       { kind: 'mirror', enabled: false },
       { kind: 'kaleidoscope', enabled: false },
       { kind: 'prism', enabled: false },
       { kind: 'voronoi', enabled: false },
-      { kind: 'glass', enabled: true },
-      { kind: 'glassV2', enabled: false },
+      { kind: 'glassV2', enabled: true },
     ]);
   });
 
-  it('creates Glass V2 as an independent selected legacy layer', () => {
+  it('creates Glass V2 as the only Glass layer', () => {
     const stack = createDefaultPostprocessStack('glassV2');
 
-    expect(stack.find(layer => layer.kind === 'glass')).toEqual({ kind: 'glass', enabled: false });
     expect(stack.find(layer => layer.kind === 'glassV2')).toEqual({ kind: 'glassV2', enabled: true });
+    expect(stack.filter(layer => layer.kind === 'glass' || layer.kind === 'glassV2')).toHaveLength(1);
   });
 
-  it('normalizes invalid, duplicate, and missing layers', () => {
+  it('normalizes invalid, duplicate, and legacy Glass layers', () => {
     expect(normalizePostprocessEffectStack([
       { kind: 'glass', enabled: true },
       { kind: 'future', enabled: true },
       { kind: 'mirror', enabled: 1 },
+      { kind: 'glassV2', enabled: false },
       { kind: 'glass', enabled: false },
     ])).toEqual([
-      { kind: 'glass', enabled: true },
+      { kind: 'glassV2', enabled: true },
       { kind: 'mirror', enabled: true },
       { kind: 'distort', enabled: false },
       { kind: 'kaleidoscope', enabled: false },
       { kind: 'prism', enabled: false },
       { kind: 'voronoi', enabled: false },
-      { kind: 'glassV2', enabled: false },
     ]);
   });
 
-  it('moves a layer to the requested index', () => {
+  it('moves a legacy Glass alias to the requested index', () => {
     const stack = createDefaultPostprocessStack('distort');
     expect(movePostprocessStackLayer(stack, 'glass', 1).map(layer => layer.kind)).toEqual([
       'distort',
-      'glass',
+      'glassV2',
       'mirror',
       'kaleidoscope',
       'prism',
       'voronoi',
-      'glassV2',
     ]);
   });
 
-  it('updates one layer without changing order', () => {
+  it('updates the single Glass layer without changing order', () => {
     const stack = createDefaultPostprocessStack('distort');
     expect(updatePostprocessStackLayer(stack, 'glass', { enabled: true })).toEqual([
       { kind: 'distort', enabled: true },
@@ -64,8 +62,7 @@ describe('postprocessStack', () => {
       { kind: 'kaleidoscope', enabled: false },
       { kind: 'prism', enabled: false },
       { kind: 'voronoi', enabled: false },
-      { kind: 'glass', enabled: true },
-      { kind: 'glassV2', enabled: false },
+      { kind: 'glassV2', enabled: true },
     ]);
   });
 });

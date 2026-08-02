@@ -5,6 +5,8 @@
   "windows": ["effect-stack"],
   "permissions": [
     "core:default",
-    "core:window:allow-close"
+    "core:window:allow-close",
+    "core:window:allow-show",
+    "core:window:allow-set-focus"
   ]
 }

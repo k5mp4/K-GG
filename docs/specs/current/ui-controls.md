@@ -5,12 +5,12 @@ title: UI入力コントロール
 status: current
 owners: [maintainer]
 created: 2026-07-28
-updated: 2026-07-28
-requirement_ids: [UI-001, UI-002, UI-003, UI-004, UI-005, UI-006]
+updated: 2026-08-02
+requirement_ids: [UI-001, UI-002, UI-003, UI-004, UI-005, UI-006, UI-007, UI-008, UI-009]
 related_adrs: [ADR-0011, ADR-0012]
-related_changes: [CHANGE-010]
-related_code: [src/App.css, src/components/CustomSelect.tsx, src/components/GradientRamp.tsx, src/components/SliderField.tsx, src/components/NoiseDistortionPanel.tsx, src/components/SlitScanPanel.tsx, src/components/StretchPanel.tsx, src/components/TimelineBar.tsx, src/components/IridescencePanel.tsx, src/components/NormalMapPanel.tsx, src/components/RadonPanel.tsx, src/components/PostprocessPanel.tsx, src/i18n/uiLabels.ts, src/i18n/messages.ts]
-related_tests: [src/lib/tweeqAngle.test.ts, src/lib/parameterLimits.test.ts, src/lib/animationDirection.test.ts, 'manual: Tweeq InputAngle and InputShuffle and InputDrum and InputRadio browser checks']
+related_changes: [CHANGE-010, CHANGE-012, CHANGE-013, CHANGE-014, CHANGE-015]
+related_code: [src/App.css, src/components/CustomSelect.tsx, src/components/GradientRamp.tsx, src/components/SliderField.tsx, src/components/NoiseDistortionPanel.tsx, src/components/SlitScanPanel.tsx, src/components/StretchPanel.tsx, src/components/TimelineBar.tsx, src/components/IridescencePanel.tsx, src/components/NormalMapPanel.tsx, src/components/RadonPanel.tsx, src/components/PostprocessPanel.tsx, src/components/PostprocessStackPanel.tsx, src/lib/effectStackWindow.ts, src/lib/effectPipeline.ts, src/i18n/uiLabels.ts, src/i18n/messages.ts]
+related_tests: [src/lib/tweeqAngle.test.ts, src/lib/effectPipeline.test.ts, src/lib/effectStackWindow.test.ts, src/lib/parameterLimits.test.ts, src/lib/animationDirection.test.ts, 'manual: Tweeq InputAngle and InputShuffle and InputDrum and InputRadio browser checks', 'manual: Glass color controls browser check', 'manual: Effect Stack randomize; Alt-solo; detached-window checks']
 ---
 
 # UI入力コントロール
@@ -44,6 +44,18 @@ SlitのModeはLinear、Circular、Polygon、WaveをInputDrumで選択できま�
 ### UI-006 VariableのTweeq入力
 
 GradientRampでInterpがVariableの場合、VariableはTweeqのInputNumberで表示します。入力値は-1〜1、stepは0.001とし、既存のrampVariableへ有限値を反映します。native range inputは使用しません。
+
+### UI-007 Glassの色コントロール
+
+PostprocessのプロパティモジュールにはGlassを一つだけ表示し、その実体はGLASS V2です。ColorグループへChromatic Hue、Chromatic Saturation、Transmission Tint、Highlight Tintを表示します。HueとSaturationは数値編集、TintはTweeqのInputColorで即時に描画へ反映します。Transmission TintとHighlight TintのInputColorは同じ固定横幅で表示します。旧Glassの選択肢と`Glass V2`の別表示はありません。この変更では4項目にキーフレーム／自動アニメーション操作を表示しません。
+
+### UI-008 Effect Stack探索操作
+
+Effect Stackには主スタック9種類の順序をランダム化する操作を表示します。操作は既存の有効状態・選択状態を維持し、現在の描画結果から新しい順序へ滑らかに遷移します。主スタックの行位置もキャンバス遷移と同じ400msの`easeInOut`で、現在位置から移動します。主スタックの行またはそのオンオフToggleをAltクリックすると、その行だけを有効にするソロ操作になります。ソロ化によって新たに無効化された行は黄色の`STAY`で表示します。同じ対象を再度Altクリックするとソロ化前の有効状態へ戻ります。Altキーなしのクリック、トグル、ドラッグ並べ替えは既存の操作を維持します。
+
+### UI-009 Effect Stack別ウィンドウ
+
+Effect Stackはインライン表示と別ウィンドウ表示を切り替えられます。別ウィンドウでは通常表示と同じLanguageProviderおよびTweeq Viewportの下で表示し、選択と有効状態変更を既存storeへ反映します。Tauriの別ウィンドウは非表示で生成し、ネイティブ生成成功後に表示・フォーカスします。子側React rootの準備完了通知は表示後の状態同期に使い、通知遅延によって表示自体を失敗扱いにしません。別ウィンドウのclose、作成失敗、ポップアップ制限、Tauri作成タイムアウトではインライン表示へ復旧し、再試行可能な状態を残します。
 
 ## 互換性
 

@@ -39,7 +39,9 @@ float glassCauchyIor(float wavelengthMicrometers, float chromaticAberration) {
   const float lambdaD = 0.5876;
   const float lambdaF = 0.4861;
   const float lambdaC = 0.6563;
-  float amount = clamp(chromaticAberration / 40.0, 0.0, 1.0);
+  // Preserve the established 0..40px response while allowing the new
+  // 40..80px range to extend dispersion up to twice that response.
+  float amount = clamp(chromaticAberration / 40.0, 0.0, 2.0);
   float deltaFC = (nD - 1.0) * amount / 8.0;
   float inverseF = 1.0 / (lambdaF * lambdaF);
   float inverseC = 1.0 / (lambdaC * lambdaC);
@@ -120,7 +122,7 @@ vec3 glassSpectralColor(
 
 vec4 organicGlass(vec2 globalUv, vec2 globalCoord) {
   float glassRefraction = glassFloat(u_glassRefraction, 32.0, 0.0, 120.0);
-  float glassChromaticAberration = glassFloat(u_glassChromaticAberration, 4.0, 0.0, 40.0);
+  float glassChromaticAberration = glassFloat(u_glassChromaticAberration, 4.0, 0.0, 80.0);
   float glassRoughness = glassFloat(u_glassRoughness, 1.5, 0.0, 12.0);
   float glassHighlight = glassFloat(u_glassHighlight, 0.45, 0.0, 2.0);
   float glassMix = glassFloat(u_glassMix, 1.0, 0.0, 1.0);
@@ -181,6 +183,29 @@ vec2 glassV2RefractDirection(vec3 incident, vec3 normal, float ior) {
   return direction / max(1.0, directionLength);
 }
 
+vec3 glassV2AdjustChromaticResidual(
+  vec3 spectralColor,
+  vec3 baseTransmission,
+  float hueRadians,
+  float saturation
+) {
+  if (abs(hueRadians) <= 0.000001 && abs(saturation - 1.0) <= 0.000001) {
+    return spectralColor;
+  }
+
+  vec3 residual = spectralColor - baseTransmission;
+  float neutral = dot(residual, vec3(0.2126, 0.7152, 0.0722));
+  residual = mix(vec3(neutral), residual, saturation);
+
+  vec3 hueAxis = vec3(0.57735026919);
+  float hueCos = cos(hueRadians);
+  float hueSin = sin(hueRadians);
+  vec3 rotated = residual * hueCos
+    + cross(hueAxis, residual) * hueSin
+    + hueAxis * dot(hueAxis, residual) * (1.0 - hueCos);
+  return clamp(baseTransmission + rotated, 0.0, 1.0);
+}
+
 vec3 glassV2Transmission(
   vec2 baseUv,
   vec2 redOffset,
@@ -189,7 +214,9 @@ vec3 glassV2Transmission(
   vec2 cyanOffset,
   vec2 blueOffset,
   vec2 roughnessOffset,
-  float roughness
+  float roughness,
+  float chromaticHue,
+  float chromaticSaturation
 ) {
   vec3 redCenter = sampleGlassSource(baseUv + redOffset).rgb;
   vec3 yellowCenter = sampleGlassSource(baseUv + yellowOffset).rgb;
@@ -200,6 +227,12 @@ vec3 glassV2Transmission(
     redCenter.r * 0.72 + yellowCenter.r * 0.28,
     yellowCenter.g * 0.22 + greenCenter.g * 0.56 + cyanCenter.g * 0.22,
     cyanCenter.b * 0.28 + blueCenter.b * 0.72
+  );
+  color = glassV2AdjustChromaticResidual(
+    color,
+    greenCenter,
+    chromaticHue,
+    chromaticSaturation
   );
   if (roughness <= 0.0001) return color;
 
@@ -216,10 +249,22 @@ vec3 glassV2Transmission(
 
 vec4 opticalGlassV2(vec2 globalUv, vec2 globalCoord) {
   float refractionPx = glassFloat(u_glassRefraction, 32.0, 0.0, 120.0);
-  float chromaticPx = glassFloat(u_glassChromaticAberration, 4.0, 0.0, 40.0);
+  float chromaticPx = glassFloat(u_glassChromaticAberration, 4.0, 0.0, 80.0);
   float roughnessPx = glassFloat(u_glassRoughness, 1.5, 0.0, 12.0);
   float highlightAmount = glassFloat(u_glassHighlight, 0.45, 0.0, 2.0);
   float mixAmount = glassFloat(u_glassMix, 1.0, 0.0, 1.0);
+  float chromaticHue = glassFloat(u_glassV2ChromaticHue, 0.0, -PI, PI);
+  float chromaticSaturation = glassFloat(u_glassV2ChromaticSaturation, 1.0, 0.0, 2.0);
+  vec3 transmissionTint = clamp(vec3(
+    finiteFloat(u_glassV2TransmissionTint.r, 1.0),
+    finiteFloat(u_glassV2TransmissionTint.g, 1.0),
+    finiteFloat(u_glassV2TransmissionTint.b, 1.0)
+  ), 0.0, 1.0);
+  vec3 highlightTint = clamp(vec3(
+    finiteFloat(u_glassV2HighlightTint.r, 1.0),
+    finiteFloat(u_glassV2HighlightTint.g, 1.0),
+    finiteFloat(u_glassV2HighlightTint.b, 1.0)
+  ), 0.0, 1.0);
   vec2 resolution = glassResolution();
   vec2 gradient = glassV2SurfaceGradient(globalUv, resolution, 2.0);
   vec2 boundedGradient = glassBoundedGradient(gradient);
@@ -248,8 +293,18 @@ vec4 opticalGlassV2(vec2 globalUv, vec2 globalCoord) {
   vec2 roughnessOffset = tangent * roughnessPx / resolution;
   vec2 baseUv = diffuseGlassGlobalUv(globalUv, globalCoord);
   vec3 transmission = glassV2Transmission(
-    baseUv, redOffset, yellowOffset, greenOffset, cyanOffset, blueOffset, roughnessOffset, roughnessPx
+    baseUv,
+    redOffset,
+    yellowOffset,
+    greenOffset,
+    cyanOffset,
+    blueOffset,
+    roughnessOffset,
+    roughnessPx,
+    chromaticHue,
+    chromaticSaturation
   );
+  transmission *= transmissionTint;
 
   float f0 = pow((greenIor - 1.0) / (greenIor + 1.0), 2.0);
   float cosTheta = clamp(dot(-incident, normal), 0.0, 1.0);
@@ -259,6 +314,10 @@ vec4 opticalGlassV2(vec2 globalUv, vec2 globalCoord) {
   float broadSpecular = pow(max(dot(normal, halfVector), 0.0), 8.0);
   float highlight = clamp((fresnel * 0.72 + broadSpecular * 0.58) * highlightAmount, 0.0, 1.0);
   vec3 highlighted = vec3(1.0) - (vec3(1.0) - transmission) * (vec3(1.0) - highlight);
+  if (any(lessThan(highlightTint, vec3(0.999999)))) {
+    highlighted = vec3(1.0) - (vec3(1.0) - transmission)
+      * (vec3(1.0) - highlight * highlightTint);
+  }
   vec4 original = sampleGlassSource(baseUv);
   vec4 result = vec4(mix(original.rgb, highlighted, mixAmount), original.a);
   return applyDiffuseDither(result, globalCoord);

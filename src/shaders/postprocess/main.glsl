@@ -83,7 +83,7 @@ void main() {
     // normal calculations at zero strength.
     if (glassFloat(u_glassMix, 1.0, 0.0, 1.0) <= 0.0001 || (
       glassFloat(u_glassRefraction, 32.0, 0.0, 120.0) <= 0.0001 &&
-      glassFloat(u_glassChromaticAberration, 4.0, 0.0, 40.0) <= 0.0001 &&
+      glassFloat(u_glassChromaticAberration, 4.0, 0.0, 80.0) <= 0.0001 &&
       glassFloat(u_glassRoughness, 1.5, 0.0, 12.0) <= 0.0001 &&
       glassFloat(u_glassHighlight, 0.45, 0.0, 2.0) <= 0.0001
     )) {

@@ -109,22 +109,19 @@ describe('isPostprocessTimeAnimationActive', () => {
     }))).toBe(false);
   });
 
-  it.each(['glass', 'glassV2'] as const)(
-    'uses the V2 %s layer when deciding whether shared time is active',
-    (kind) => {
-      const pipeline = createDefaultEffectPipeline();
-      const glassPipeline = {
-        ...pipeline,
-        effectStack: updateEffectStackLayer(pipeline.effectStack, kind, { enabled: true }),
-      };
-      expect(isPostprocessTimeAnimationActive(
-        createPostprocess('distort', { glassMotion: 0.2 }),
-        glassPipeline,
-      )).toBe(true);
-      expect(isPostprocessTimeAnimationActive(
-        createPostprocess('distort', { glassMotion: 0 }),
-        glassPipeline,
-      )).toBe(false);
-    },
-  );
+  it('uses the V2-backed Glass layer when deciding whether shared time is active', () => {
+    const pipeline = createDefaultEffectPipeline();
+    const glassPipeline = {
+      ...pipeline,
+      effectStack: updateEffectStackLayer(pipeline.effectStack, 'glass', { enabled: true }),
+    };
+    expect(isPostprocessTimeAnimationActive(
+      createPostprocess('distort', { glassMotion: 0.2 }),
+      glassPipeline,
+    )).toBe(true);
+    expect(isPostprocessTimeAnimationActive(
+      createPostprocess('distort', { glassMotion: 0 }),
+      glassPipeline,
+    )).toBe(false);
+  });
 });

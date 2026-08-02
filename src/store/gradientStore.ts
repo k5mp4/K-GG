@@ -10,10 +10,11 @@ import { computeAutoHandles } from '../lib/autoBezier';
 import { createAnimationTrack, getAnimationDefinition } from '../lib/animationRegistry';
 import { clampKeyframeTime } from '../lib/loopKeyframes';
 import { isPostprocessTimeAnimationActive } from '../lib/postprocessAnimation';
-import { createDefaultPostprocessStack, normalizePostprocessEffectStack } from '../lib/postprocessStack';
+import { createDefaultPostprocessStack, normalizePostprocessEffectMode, normalizePostprocessEffectStack } from '../lib/postprocessStack';
 import { createDefaultEffectPipeline, normalizeEffectPipelineConfig, updateEffectStackLayer } from '../lib/effectPipeline';
 import { IDENTITY_DIFFUSE_BEZIER, normalizeDiffuseBezier, resolveDiffuseBezier } from '../lib/diffuseCurve';
 import { clampParameter, getParameterLimit, normalizeTrackValue } from '../lib/parameterLimits';
+import { GLASS_V2_COLOR_DEFAULTS, normalizeGlassV2ColorParameters } from '../lib/glass';
 
 export type AnimationEasing = {
   enabled: boolean;
@@ -398,6 +399,10 @@ export const STORE_DEFAULTS = {
     glassMix: 1,
     glassEvolution: 0,
     glassMotion: 0.35,
+    glassV2ChromaticHue: GLASS_V2_COLOR_DEFAULTS.chromaticHue,
+    glassV2ChromaticSaturation: GLASS_V2_COLOR_DEFAULTS.chromaticSaturation,
+    glassV2TransmissionTint: GLASS_V2_COLOR_DEFAULTS.transmissionTint,
+    glassV2HighlightTint: GLASS_V2_COLOR_DEFAULTS.highlightTint,
     particleCount: 180000,
     particleEmitterType: 'field' as const,
     particleEmitterPoint: [0.5, 0.5] as [number, number],
@@ -518,7 +523,10 @@ export function normalizePostprocessConfig(
     && value.length === expectedLength
     && value.every(item => typeof item === 'number' && Number.isFinite(item))
   );
-  const effectMode = saved?.effectMode ?? STORE_DEFAULTS.postprocess.effectMode;
+  const effectMode = normalizePostprocessEffectMode(
+    saved?.effectMode,
+    STORE_DEFAULTS.postprocess.effectMode,
+  );
   const normalized: PostprocessConfig = {
     ...STORE_DEFAULTS.postprocess,
     ...saved,
@@ -535,6 +543,11 @@ export function normalizePostprocessConfig(
   normalized.kaleidoscopeRotation = clampParameter(normalized.kaleidoscopeRotation, STORE_DEFAULTS.postprocess.kaleidoscopeRotation, getParameterLimit('postprocess.kaleidoscopeRotation'));
   normalized.voronoiAngle = clampParameter(normalized.voronoiAngle, STORE_DEFAULTS.postprocess.voronoiAngle, getParameterLimit('postprocess.voronoiAngle'));
   normalized.glassRotation = clampParameter(normalized.glassRotation, STORE_DEFAULTS.postprocess.glassRotation, getParameterLimit('postprocess.glassRotation'));
+  const glassV2Color = normalizeGlassV2ColorParameters(normalized);
+  normalized.glassV2ChromaticHue = glassV2Color.chromaticHueDegrees;
+  normalized.glassV2ChromaticSaturation = glassV2Color.chromaticSaturation;
+  normalized.glassV2TransmissionTint = glassV2Color.transmissionTint;
+  normalized.glassV2HighlightTint = glassV2Color.highlightTint;
   normalized.particleDirection = clampParameter(normalized.particleDirection, STORE_DEFAULTS.postprocess.particleDirection, getParameterLimit('postprocess.particleDirection'));
   return normalized;
 }
@@ -839,7 +852,10 @@ export const useGradientStore = create<GradientStore>((set) => ({
       : v.mapResolution && v.mapResolution !== s.postprocess.mapResolution
         ? createEmptyManualSmoothMask(resolution)
         : s.postprocess.smoothMask ?? createEmptyManualSmoothMask(resolution);
-    const effectMode = v.effectMode ?? s.postprocess.effectMode;
+    const effectMode = normalizePostprocessEffectMode(
+      v.effectMode ?? s.postprocess.effectMode,
+      s.postprocess.effectMode,
+    );
     const effectStack = normalizePostprocessEffectStack(v.effectStack ?? s.postprocess.effectStack, effectMode);
     const next = { ...s.postprocess, ...v, effectMode, effectStack, displacement, smoothMask };
     next.kaleidoscopeRotation = clampParameter(next.kaleidoscopeRotation, s.postprocess.kaleidoscopeRotation, getParameterLimit('postprocess.kaleidoscopeRotation'));

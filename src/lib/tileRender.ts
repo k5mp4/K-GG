@@ -8,7 +8,7 @@
  * 結果を別の 2D canvas に貼り合わせて最終高解像度画像を得る。
  */
 
-import { renderBridge } from './renderBridge';
+import { renderBridge, type ExportSessionToken } from './renderBridge';
 
 const DEFAULT_TILE_SIZE = 4096;
 const TILE_SIZE_FLOOR = 1024;
@@ -61,6 +61,8 @@ export type TiledRenderOptions = {
   syncFrames?: number;
   /** キャンセル用シグナル */
   signal?: AbortSignal;
+  /** 動画export中は専用sessionで各tileを描画する */
+  exportSession?: ExportSessionToken;
 };
 
 export type PaddedTileRegion = {
@@ -114,9 +116,12 @@ export function getPaddedTileRegion(
 export async function renderTiledToCanvas2D(
   opts: TiledRenderOptions,
 ): Promise<HTMLCanvasElement> {
-  const { canvas, fullWidth, fullHeight, time = 0, normalizedTime, onProgress, signal } = opts;
+  const { canvas, fullWidth, fullHeight, time = 0, normalizedTime, onProgress, signal, exportSession } = opts;
   const tileSize = opts.tileSize ?? pickTileSize(canvas);
-  const padding = Math.min(renderBridge.getTilePadding(), Math.max(0, Math.floor((tileSize - 1) / 2)));
+  const requestedPadding = exportSession
+    ? renderBridge.getExportTilePadding(exportSession)
+    : renderBridge.getTilePadding();
+  const padding = Math.min(requestedPadding, Math.max(0, Math.floor((tileSize - 1) / 2)));
   const coreTileSize = Math.max(1, tileSize - padding * 2);
   const syncFrames = opts.syncFrames ?? 1;
 
@@ -134,7 +139,7 @@ export async function renderTiledToCanvas2D(
   const origH = canvas.height;
 
   // アニメーションを停止して描画タイミングを制御
-  renderBridge.stopAnimation();
+  if (!exportSession) renderBridge.stopAnimation();
 
   console.log(
     `[tileRender] start ${fullWidth}×${fullHeight} → ${cols}×${rows} tiles (${coreTileSize}px core, ${padding}px padding)`,
@@ -165,10 +170,15 @@ export async function renderTiledToCanvas2D(
         const offsetX = region.renderX;
         const offsetY = fullHeight - region.renderY - region.renderHeight;
 
-        renderBridge.renderAtTime(time, normalizedTime, {
-          viewport: [region.renderWidth, region.renderHeight],
-          offset: [offsetX, offsetY],
-        });
+        const tileOptions = {
+          viewport: [region.renderWidth, region.renderHeight] as [number, number],
+          offset: [offsetX, offsetY] as [number, number],
+        };
+        const renderSequence = exportSession
+          ? renderBridge.renderExportFrame(exportSession, time, normalizedTime, tileOptions)
+          : 0;
+        if (exportSession) renderBridge.finishExportFrame(exportSession, renderSequence);
+        else renderBridge.renderAtTime(time, normalizedTime, tileOptions);
 
         // GPU→CPU 同期。drawImage は内部的に同期するが、念のため rAF で待機。
         for (let i = 0; i < syncFrames; i++) {
@@ -187,6 +197,7 @@ export async function renderTiledToCanvas2D(
           region.coreWidth,
           region.coreHeight,
         );
+        if (exportSession) renderBridge.assertExportFrameCurrent(exportSession, renderSequence);
 
         tileIndex++;
         onProgress?.(tileIndex / totalTiles);
@@ -197,12 +208,14 @@ export async function renderTiledToCanvas2D(
     // drawingBuffer がクリアされるので、プレビューを 1 回再描画して表示を戻す。
     canvas.width = origW;
     canvas.height = origH;
-    try {
-      renderBridge.renderAtTime(time, normalizedTime);
-    } catch (e) {
-      console.warn('[tileRender] preview re-render failed:', e);
+    if (!exportSession) {
+      try {
+        renderBridge.renderAtTime(time, normalizedTime);
+      } catch (e) {
+        console.warn('[tileRender] preview re-render failed:', e);
+      }
+      renderBridge.startAnimation();
     }
-    renderBridge.startAnimation();
   }
 
   console.log(`[tileRender] done`);

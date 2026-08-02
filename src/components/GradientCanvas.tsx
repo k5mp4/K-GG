@@ -83,7 +83,9 @@ export function GradientCanvas({ width = 800, height = 800, animLoopRef, seekVer
       const normalizedTime = frameState.animation.enabled
         ? (animLoopRef.current?.currentNormalizedTime ?? useGradientStore.getState().currentTime)
         : 0;
-      renderSceneAtTime(ctx, frameState, normalizedTime, {});
+      renderBridge.renderPreview(() => {
+        renderSceneAtTime(ctx, frameState, normalizedTime, {});
+      });
     });
   }, [gradient, noiseDistortion, diffuse, imageGradient, slitScan, stretch, normalMap, radon, iridescence, manualDistort, postprocess, effectPipeline, width, height, animation.enabled, animation.speed, animation.direction, animation.easing, animation.affectNoise, animation.affectSlit, animation.affectRamp, animation.affectStretch, keyframeTracks, currentTime, lazyProgramReadyCount, seekVersion, isWebGLReady, sourceImageCanvas, imageGradientSource, imageMaskSource, imageMaskEnabled]); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -114,7 +116,9 @@ export function GradientCanvas({ width = 800, height = 800, animLoopRef, seekVer
           const ctx = webglRef.current;
           const frameState = latestRef.current;
           if (!ctx || !frameState) return;
-          renderSceneAtTime(ctx, frameState, normalizedTime, {});
+          renderBridge.renderPreview(() => {
+            renderSceneAtTime(ctx, frameState, normalizedTime, {});
+          });
         },
         {
           loop: animation.previewLoop ?? true,
@@ -139,9 +143,10 @@ export function GradientCanvas({ width = 800, height = 800, animLoopRef, seekVer
         const ctx = webglRef.current;
         const frameState = latestRef.current;
         if (!ctx || !frameState || hasActiveAnimation(frameState)) return;
-        renderSceneAtTime(ctx, frameState, frameState.animation.enabled
-          ? useGradientStore.getState().currentTime
-          : 0, {
+        renderBridge.renderPreview(() => {
+          renderSceneAtTime(ctx, frameState, frameState.animation.enabled
+            ? useGradientStore.getState().currentTime
+            : 0, {});
         });
       });
     }

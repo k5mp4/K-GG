@@ -2,64 +2,10 @@ import { invoke } from '@tauri-apps/api/core';
 import { join, tempDir } from '@tauri-apps/api/path';
 import { mkdir, readFile, remove, writeFile } from '@tauri-apps/plugin-fs';
 import { browserVideoExportService } from '../browser/videoExportService';
-import { renderBridge } from '../../lib/renderBridge';
-import { applyTimeRemap } from '../../lib/timeRemap';
-import { canvas2dToPngBlob, needsTiledRender, renderTiledToCanvas2D } from '../../lib/tileRender';
-import type { AnimationEasing } from '../../store/gradientStore';
+import { needsTiledRender } from '../../lib/tileRender';
+import { renderAndCaptureExportFrame, withExportSession } from '../../lib/videoExportFrames';
 import type { NativeFfmpegStatus, VideoExportConfig, VideoExportService } from '../types';
 import { isTauriRuntime } from './exportService';
-
-function calcExportNormalizedTime(frameIndex: number, totalFrames: number): number {
-  if (totalFrames <= 1) return 0;
-  return Math.max(0, Math.min(1, frameIndex / totalFrames));
-}
-
-function calcTimeFromNormalized(
-  normalizedTime: number,
-  speed: number,
-  duration: number,
-  easing?: AnimationEasing,
-): number {
-  const nt = applyTimeRemap(normalizedTime, duration, easing);
-  return nt * speed * duration;
-}
-
-async function captureBlob(
-  canvas: HTMLCanvasElement,
-  fullW: number,
-  fullH: number,
-  t: number,
-  nt: number,
-  signal?: AbortSignal,
-  onTileProgress?: (p: number) => void,
-): Promise<Blob> {
-  if (needsTiledRender(canvas, fullW, fullH)) {
-    const out2d = await renderTiledToCanvas2D({
-      canvas,
-      fullWidth: fullW,
-      fullHeight: fullH,
-      time: t,
-      normalizedTime: nt,
-      signal,
-      onProgress: onTileProgress,
-    });
-    return await canvas2dToPngBlob(out2d);
-  }
-
-  renderBridge.renderAtTime(t, nt);
-  await new Promise<void>((resolve) => {
-    requestAnimationFrame(() => {
-      requestAnimationFrame(() => resolve());
-    });
-  });
-
-  return new Promise<Blob>((resolve, reject) => {
-    canvas.toBlob(
-      (blob) => (blob ? resolve(blob) : reject(new Error('toBlob returned null'))),
-      'image/png',
-    );
-  });
-}
 
 async function writePngSequenceToTempDir(
   config: VideoExportConfig,
@@ -72,25 +18,31 @@ async function writePngSequenceToTempDir(
   const useTiled = needsTiledRender(canvas, fullW, fullH);
 
   onStage?.('rendering');
-  for (let i = 0; i < totalFrames; i++) {
-    if (signal?.aborted) throw new DOMException('Export cancelled', 'AbortError');
-    const nt = calcExportNormalizedTime(i, totalFrames);
-    const t = calcTimeFromNormalized(nt, speed, duration, easing);
-    const frameBaseProgress = i / totalFrames;
-    const blob = await captureBlob(
-      canvas,
-      fullW,
-      fullH,
-      t,
-      nt,
-      signal,
-      useTiled ? (tileProgress) => onProgress((frameBaseProgress + tileProgress / totalFrames) * 0.7) : undefined,
-    );
-    const filename = `frame_${String(i).padStart(4, '0')}.png`;
-    await writeFile(await join(tempPath, filename), new Uint8Array(await blob.arrayBuffer()));
-    onProgress(((i + 1) / totalFrames) * 0.7);
-    if (i % 5 === 0) await new Promise(resolve => setTimeout(resolve, 0));
-  }
+  await withExportSession(signal, async session => {
+    for (let i = 0; i < totalFrames; i++) {
+      if (signal?.aborted) throw new DOMException('Export cancelled', 'AbortError');
+      const frameBaseProgress = i / totalFrames;
+      const { blob } = await renderAndCaptureExportFrame({
+        session,
+        canvas,
+        fullWidth: fullW,
+        fullHeight: fullH,
+        frameIndex: i,
+        totalFrames,
+        speed,
+        duration,
+        easing,
+        signal,
+        onTileProgress: useTiled
+          ? tileProgress => onProgress((frameBaseProgress + tileProgress / totalFrames) * 0.7)
+          : undefined,
+      });
+      const filename = `frame_${String(i).padStart(4, '0')}.png`;
+      await writeFile(await join(tempPath, filename), new Uint8Array(await blob.arrayBuffer()));
+      onProgress(((i + 1) / totalFrames) * 0.7);
+      if (i % 5 === 0) await new Promise(resolve => setTimeout(resolve, 0));
+    }
+  });
 }
 
 export const tauriVideoExportService: VideoExportService = {

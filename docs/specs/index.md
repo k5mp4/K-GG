@@ -12,6 +12,7 @@ title: 仕様一覧
 | --- | --- | --- |
 | CURRENT-GRADIENT | [Gradient System](./current/gradient-system) | current |
 | CURRENT-EFFECT-STACK | [Effect Stack](./current/effect-stack) | current |
+| CURRENT-VIDEO-EXPORT | [動画・連番フレーム出力](./current/video-export) | current |
 | CURRENT-PRESET | [Preset System](./current/preset-system) | current |
 | CURRENT-UI-CONTROLS | [UI入力コントロール](./current/ui-controls) | current |
 

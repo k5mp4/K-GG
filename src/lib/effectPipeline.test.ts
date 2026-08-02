@@ -1,16 +1,21 @@
 import { describe, expect, it } from 'vitest';
 import {
   canRenderV2Direct,
+  captureEffectStackEnabledState,
   createDefaultEffectPipeline,
   createDefaultEffectStack,
   getV2FramebufferAllocationMode,
   getV2RenderPlan,
+  isEffectStackLayerTemporarilyHidden,
   isEffectStackLayerEnabled,
   moveEffectStackLayer,
   normalizeEffectPipelineConfig,
   normalizeEffectStack,
   requiresV2StackCore,
   requiresHeavyV2Postprocess,
+  randomizeEffectStackOrder,
+  soloEffectStackLayer,
+  restoreEffectStackEnabledState,
   updateEffectStackLayer,
 } from './effectPipeline';
 
@@ -78,7 +83,7 @@ describe('effectPipeline', () => {
 
     it('requires the heavy program for heavy layers or Prism', () => {
       const stack = createDefaultEffectStack();
-      for (const kind of ['glass', 'glassV2'] as const) {
+      for (const kind of ['glass'] as const) {
         expect(requiresHeavyV2Postprocess(
           updateEffectStackLayer(stack, kind, { enabled: true }),
           false,
@@ -132,11 +137,7 @@ describe('effectPipeline', () => {
       const glassPipeline = {
         ...pipeline,
         effectStack: updateEffectStackLayer(
-          updateEffectStackLayer(
-            updateEffectStackLayer(pipeline.effectStack, 'glass', { enabled: true }),
-            'glassV2',
-            { enabled: true },
-          ),
+          updateEffectStackLayer(pipeline.effectStack, 'glass', { enabled: true }),
           'diffuse', { enabled: false },
         ),
         prismEnabled: true,
@@ -149,13 +150,12 @@ describe('effectPipeline', () => {
         prismGlowRadius: 4,
       });
 
-      expect(plan.enabledLayers.map(layer => layer.kind)).toEqual(['glass', 'glassV2']);
+      expect(plan.enabledLayers.map(layer => layer.kind)).toEqual(['glass']);
       expect(plan.diffuseEnabled).toBe(false);
       expect(plan.framebufferAllocationMode).toBe('full');
       expect(plan.programs).toEqual({
         stackCore: true,
         noiseStack: false,
-        glass: true,
         glassV2: true,
         normalMap: true,
         blur: true,
@@ -178,9 +178,8 @@ describe('effectPipeline', () => {
         { kind: 'mirror', enabled: false },
         { kind: 'kaleidoscope', enabled: false },
         { kind: 'voronoi', enabled: false },
-      { kind: 'glass', enabled: false },
-      { kind: 'glassV2', enabled: false },
-      { kind: 'diffuse', enabled: true },
+        { kind: 'glass', enabled: false },
+        { kind: 'diffuse', enabled: true },
       ],
       selectedKind: 'diffuse',
       prismEnabled: false,
@@ -203,9 +202,35 @@ describe('effectPipeline', () => {
       { kind: 'distort', enabled: false },
       { kind: 'kaleidoscope', enabled: false },
       { kind: 'voronoi', enabled: false },
-      { kind: 'glassV2', enabled: false },
       { kind: 'diffuse', enabled: false },
     ]);
+  });
+
+  it('migrates Glass V2 aliases into one V2-backed Glass layer', () => {
+    const normalized = normalizeEffectStack([
+      { kind: 'glass', enabled: false },
+      { kind: 'glassV2', enabled: true },
+      { kind: 'mirror', enabled: true },
+    ]);
+
+    expect(normalized.slice(0, 3)).toEqual([
+      { kind: 'glass', enabled: true },
+      { kind: 'mirror', enabled: true },
+      { kind: 'noise', enabled: false },
+    ]);
+    expect(JSON.stringify(normalized)).not.toContain('glassV2');
+  });
+
+  it('merges a trailing Glass V2 alias even after all canonical layers are present', () => {
+    const normalized = normalizeEffectStack([
+      ...createDefaultEffectStack().map(layer => (
+        layer.kind === 'glass' ? { ...layer, enabled: false } : layer
+      )),
+      { kind: 'glassV2', enabled: true },
+    ]);
+
+    expect(normalized.find(layer => layer.kind === 'glass')).toEqual({ kind: 'glass', enabled: true });
+    expect(JSON.stringify(normalized)).not.toContain('glassV2');
   });
 
   it('preserves the requested Diffuse position while filling missing layers', () => {
@@ -231,7 +256,6 @@ describe('effectPipeline', () => {
       'mirror',
       'kaleidoscope',
       'voronoi',
-      'glassV2',
     ]);
     expect(Object.fromEntries(normalized.map(layer => [layer.kind, layer.enabled]))).toEqual({
       diffuse: false,
@@ -243,7 +267,6 @@ describe('effectPipeline', () => {
       mirror: true,
       kaleidoscope: false,
       voronoi: true,
-      glassV2: false,
     });
   });
 
@@ -270,7 +293,6 @@ describe('effectPipeline', () => {
       'mirror',
       'kaleidoscope',
       'voronoi',
-      'glassV2',
       'diffuse',
     ]);
 
@@ -305,11 +327,59 @@ describe('effectPipeline', () => {
       'kaleidoscope',
       'voronoi',
       'glass',
-      'glassV2',
       'diffuse',
       'noise',
     ]);
     expect(movedPastDiffuse.at(-2)).toEqual({ kind: 'diffuse', enabled: true });
     expect(movedPastDiffuse.at(-1)).toEqual({ kind: 'noise', enabled: true });
+  });
+
+  it('randomizes the complete stack without changing layer enabled state', () => {
+    const stack = updateEffectStackLayer(
+      updateEffectStackLayer(createDefaultEffectStack(), 'noise', { enabled: true }),
+      'glass',
+      { enabled: true },
+    );
+    const enabledByKind = Object.fromEntries(stack.map(layer => [layer.kind, layer.enabled]));
+    let seed = 0;
+    const randomized = randomizeEffectStackOrder(stack, () => (seed += 0.17) % 1);
+
+    expect(randomized).toHaveLength(9);
+    expect(new Set(randomized.map(layer => layer.kind))).toEqual(new Set(stack.map(layer => layer.kind)));
+    expect(Object.fromEntries(randomized.map(layer => [layer.kind, layer.enabled]))).toEqual(enabledByKind);
+    expect(randomized).not.toBe(stack);
+  });
+
+  it('solos one main-stack layer without changing layer identities', () => {
+    const stack = updateEffectStackLayer(createDefaultEffectStack(), 'glass', { enabled: true });
+    const solo = soloEffectStackLayer(stack, 'mirror');
+
+    expect(solo.filter(layer => layer.enabled).map(layer => layer.kind)).toEqual(['mirror']);
+    expect(solo.map(layer => layer.kind)).toEqual(stack.map(layer => layer.kind));
+  });
+
+  it('restores the enabled state captured before solo mode', () => {
+    const stack = updateEffectStackLayer(
+      updateEffectStackLayer(createDefaultEffectStack(), 'noise', { enabled: true }),
+      'glass',
+      { enabled: true },
+    );
+    const captured = captureEffectStackEnabledState(stack);
+    const solo = soloEffectStackLayer(stack, 'glass');
+    expect(restoreEffectStackEnabledState(solo, captured)).toEqual(stack);
+  });
+
+  it('marks only layers newly hidden by solo mode as temporary', () => {
+    const stack = updateEffectStackLayer(
+      updateEffectStackLayer(createDefaultEffectStack(), 'noise', { enabled: true }),
+      'glass',
+      { enabled: true },
+    );
+    const previousEnabledState = captureEffectStackEnabledState(stack);
+    const solo = soloEffectStackLayer(stack, 'glass');
+
+    expect(isEffectStackLayerTemporarilyHidden('noise', solo.find(layer => layer.kind === 'noise')!.enabled, 'glass', previousEnabledState)).toBe(true);
+    expect(isEffectStackLayerTemporarilyHidden('slit', solo.find(layer => layer.kind === 'slit')!.enabled, 'glass', previousEnabledState)).toBe(false);
+    expect(isEffectStackLayerTemporarilyHidden('glass', true, 'glass', previousEnabledState)).toBe(false);
   });
 });

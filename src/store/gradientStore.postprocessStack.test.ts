@@ -2,20 +2,20 @@ import { describe, expect, it } from 'vitest';
 import { normalizePostprocessConfig, STORE_DEFAULTS } from './gradientStore';
 
 describe('Postprocess stack preset compatibility', () => {
-  it('converts a legacy single-mode preset into one enabled stack layer', () => {
+  it('converts a legacy single-mode Glass preset to Glass V2', () => {
     const loaded = normalizePostprocessConfig({
       enabled: true,
       effectMode: 'glass',
       glassMotion: 0.5,
     });
 
-    expect(loaded.effectMode).toBe('glass');
+    expect(loaded.effectMode).toBe('glassV2');
     expect(loaded.effectStack.filter(layer => layer.enabled)).toEqual([
-      { kind: 'glass', enabled: true },
+      { kind: 'glassV2', enabled: true },
     ]);
   });
 
-  it('preserves stack order and selected mode through JSON round trip', () => {
+  it('preserves stack order while collapsing legacy Glass aliases', () => {
     const saved = JSON.parse(JSON.stringify({
       ...STORE_DEFAULTS.postprocess,
       enabled: true,
@@ -27,22 +27,22 @@ describe('Postprocess stack preset compatibility', () => {
         { kind: 'kaleidoscope', enabled: false },
         { kind: 'prism', enabled: false },
         { kind: 'voronoi', enabled: false },
+        { kind: 'glassV2', enabled: false },
       ],
     }));
 
     const loaded = normalizePostprocessConfig(saved);
     expect(loaded.effectMode).toBe('mirror');
     expect(loaded.effectStack.map(layer => layer.kind)).toEqual([
-      'glass',
+      'glassV2',
       'mirror',
       'distort',
       'kaleidoscope',
       'prism',
       'voronoi',
-      'glassV2',
     ]);
     expect(loaded.effectStack.filter(layer => layer.enabled).map(layer => layer.kind)).toEqual([
-      'glass',
+      'glassV2',
       'mirror',
     ]);
   });
@@ -63,7 +63,6 @@ describe('Postprocess stack preset compatibility', () => {
       { kind: 'kaleidoscope', enabled: false },
       { kind: 'prism', enabled: false },
       { kind: 'voronoi', enabled: false },
-      { kind: 'glass', enabled: false },
       { kind: 'glassV2', enabled: false },
     ]);
   });

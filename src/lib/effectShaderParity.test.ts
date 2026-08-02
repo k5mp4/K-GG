@@ -4,7 +4,7 @@ import noiseShader from '../shaders/noise.glsl?raw';
 import webglSource from './webgl.ts?raw';
 import { getPostprocessFragmentSource, getProgramSource } from './webglShaderSources';
 
-const postprocessShader = getPostprocessFragmentSource();
+const postprocessShader = getPostprocessFragmentSource().replace(/\r\n?/g, '\n');
 
 function extractFunction(source: string, name: string): string {
   const signature = new RegExp(`\\b(?:float|vec2|vec3|vec4)\\s+${name}\\s*\\(`).exec(source);
@@ -179,6 +179,39 @@ describe('V2 effect shader parity', () => {
     ));
   });
 
+  it('adjusts only the Glass V2 chromatic residual and preserves identity defaults', () => {
+    const adjustment = compact(extractFunction(
+      postprocessShader,
+      'glassV2AdjustChromaticResidual',
+    ));
+    const transmission = compact(extractFunction(postprocessShader, 'glassV2Transmission'));
+    const optical = compact(extractFunction(postprocessShader, 'opticalGlassV2'));
+
+    expect(adjustment).toContain(compact(
+      'if (abs(hueRadians) <= 0.000001 && abs(saturation - 1.0) <= 0.000001) { return spectralColor; }',
+    ));
+    expect(adjustment).toContain(compact(
+      'vec3 residual = spectralColor - baseTransmission;',
+    ));
+    expect(adjustment).toContain(compact(
+      'return clamp(baseTransmission + rotated, 0.0, 1.0);',
+    ));
+    expect(transmission).toContain(compact(
+      'color = glassV2AdjustChromaticResidual(color, greenCenter, chromaticHue, chromaticSaturation);',
+    ));
+    expect(optical).toContain(compact('transmission *= transmissionTint;'));
+    expect(optical).toContain(compact(
+      'if (any(lessThan(highlightTint, vec3(0.999999))))',
+    ));
+  });
+
+  it('declares Glass V2 color uniforms outside the legacy Glass specialization', () => {
+    expect(postprocessShader).toContain('#if !defined(KGG_LEGACY_GLASS_ONLY)\nuniform float u_glassV2ChromaticHue;');
+    expect(postprocessShader).toContain('uniform float u_glassV2ChromaticSaturation;');
+    expect(postprocessShader).toContain('uniform vec3 u_glassV2TransmissionTint;');
+    expect(postprocessShader).toContain('uniform vec3 u_glassV2HighlightTint;');
+  });
+
   it('routes effect mode 9 to Glass V2 while retaining mode 5 for legacy Glass', () => {
     const main = compact(postprocessShader.slice(postprocessShader.indexOf('void main()')));
     expect(compact(webglSource)).toContain(compact('glass: 5'));
@@ -213,6 +246,12 @@ describe('V2 effect shader parity', () => {
     const main = postprocessShader.slice(postprocessShader.indexOf('void main()'));
     expect(main).toContain('glassFloat(u_glassMix, 1.0, 0.0, 1.0) <= 0.0001');
     expect(main).toContain('glassFloat(u_glassRefraction, 32.0, 0.0, 120.0) <= 0.0001');
+  });
+
+  it('keeps the expanded chromatic aberration ceiling in the Glass shader', () => {
+    expect(postprocessShader).toContain('u_glassChromaticAberration, 4.0, 0.0, 80.0');
+    expect(postprocessShader).toContain('chromaticAberration / 40.0');
+    expect(postprocessShader).toContain('float amount = clamp(chromaticAberration / 40.0, 0.0, 2.0);');
   });
 
   it('restores Glass V2 as an independent optical program and stack mode', () => {
