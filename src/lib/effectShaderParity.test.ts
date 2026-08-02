@@ -4,7 +4,7 @@ import noiseShader from '../shaders/noise.glsl?raw';
 import webglSource from './webgl.ts?raw';
 import { getPostprocessFragmentSource, getProgramSource } from './webglShaderSources';
 
-const postprocessShader = getPostprocessFragmentSource();
+const postprocessShader = getPostprocessFragmentSource().replace(/\r\n?/g, '\n');
 
 function extractFunction(source: string, name: string): string {
   const signature = new RegExp(`\\b(?:float|vec2|vec3|vec4)\\s+${name}\\s*\\(`).exec(source);

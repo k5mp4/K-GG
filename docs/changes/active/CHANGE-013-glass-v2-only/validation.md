@@ -30,13 +30,15 @@
 実行環境のPATHにnpmがないため、上記package script相当をNode.js 24.4.1の絶対パスから実行した。
 
 ```text
-Vitest: 50 files / 254 tests passed
+Vitest: 52 files / 264 tests passed
 TypeScript: tsc -b passed
 ESLint: 0 errors / 24 existing warnings
 Vite build: passed; existing chunk-size warning only
 DocDD check: passed
 VitePress docs build: passed
 ```
+
+CI再現確認: `src/lib/effectShaderParity.test.ts`のGlass V2 uniformブロック比較がWindowsのCRLF／LF差分に依存していたため、比較前に改行をLFへ正規化した。対象テスト23件、全Vitest 264件で再確認済み。
 
 ## 未確認事項
 
