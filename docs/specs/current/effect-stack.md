@@ -5,12 +5,12 @@ title: Effect Stack
 status: current
 owners: [maintainer]
 created: 2026-07-27
-updated: 2026-08-02
-requirement_ids: [EFFECT-001, EFFECT-002, EFFECT-003, EFFECT-004, EFFECT-005, EFFECT-006, EFFECT-007, EFFECT-008, EFFECT-009, EFFECT-010, EFFECT-011]
+updated: 2026-08-03
+requirement_ids: [EFFECT-001, EFFECT-002, EFFECT-003, EFFECT-004, EFFECT-005, EFFECT-006, EFFECT-007, EFFECT-008, EFFECT-009, EFFECT-010, EFFECT-011, EFFECT-012, EFFECT-013, EFFECT-014]
 related_adrs: [ADR-0004, ADR-0005, ADR-0010]
-related_changes: [CHANGE-001, CHANGE-011, CHANGE-012, CHANGE-013, CHANGE-014, CHANGE-015]
-related_code: [src/types/distortion.ts, src/lib/effectPipeline.ts, src/lib/effectStackTransition.ts, src/lib/postprocessStack.ts, src/lib/effectStackWindow.ts, src/lib/postprocessAnimation.ts, src/lib/sceneEvaluation.ts, src/lib/glass.ts, src/lib/webgl.ts, src/components/PostprocessStackPanel.tsx, src/components/EffectStackWorkspace.tsx, src/components/PostprocessPanel.tsx, src/shaders/postprocess/glass-optics.glsl]
-related_tests: [src/lib/effectPipeline.test.ts, src/lib/effectStackTransition.test.ts, src/lib/effectStackWindow.test.ts, src/lib/postprocessStack.test.ts, src/lib/postprocessAnimation.test.ts, src/lib/effectStackDrag.test.ts, src/lib/effectShaderParity.test.ts, src/lib/glass.test.ts, src/store/gradientStore.effectPipeline.test.ts, src/store/gradientStore.glass.test.ts, src/lib/sceneEvaluation.glass.test.ts]
+related_changes: [CHANGE-001, CHANGE-011, CHANGE-012, CHANGE-013, CHANGE-014, CHANGE-015, CHANGE-018]
+related_code: [src/types/distortion.ts, src/lib/effectPipeline.ts, src/lib/normalMap.ts, src/lib/effectStackTransition.ts, src/lib/postprocessStack.ts, src/lib/effectStackWindow.ts, src/lib/postprocessAnimation.ts, src/lib/sceneEvaluation.ts, src/lib/glass.ts, src/lib/webgl.ts, src/lib/presetModel.ts, src/components/PostprocessStackPanel.tsx, src/components/EffectStackWorkspace.tsx, src/components/PostprocessPanel.tsx, src/components/DistortOverlay.tsx, src/components/SandboxPanel.tsx, src/shaders/normalmap.frag.glsl, src/shaders/postprocess/glass-optics.glsl]
+related_tests: [src/lib/effectPipeline.test.ts, src/lib/webglNormalMapParity.test.ts, src/lib/effectStackTransition.test.ts, src/lib/effectStackWindow.test.ts, src/lib/postprocessStack.test.ts, src/lib/postprocessAnimation.test.ts, src/lib/effectStackDrag.test.ts, src/lib/effectShaderParity.test.ts, src/lib/glass.test.ts, src/store/gradientStore.effectPipeline.test.ts, src/store/gradientStore.postprocessStack.test.ts, src/store/gradientStore.glass.test.ts, src/lib/sceneEvaluation.glass.test.ts]
 ---
 
 # Effect Stack
@@ -33,19 +33,23 @@ Unified Effect Stack V2の主スタックは、`Noise`、`Slit`、`Stretch`、`D
 
 新規V2状態の既定順は `Noise → Slit → Stretch → Distort → Mirror → Kaleidoscope → Voronoi → Glass → Diffuse` で、Diffuseが既定で有効です。ユーザーが保存した順序と有効状態はPresetへ保存されます。ランダム化操作では9種類を一度ずつ含む順列を作り、有効状態・選択状態・固定段を維持します。現在の描画結果から目標順序の結果へ400msの`easeInOut`表示ブレンドを行い、完了後に目標順序を確定します。
 
+### EFFECT-014 Postprocessの全体有効状態
+
+`Stretch`、`Distort`、`Mirror`、`Kaleidoscope`、`Voronoi`、`Glass`のいずれか一つ以上が有効な場合、Postprocess全体を有効状態として表示します。Postprocessのプロパティモジュールには各レイヤーの個別ON／OFFを表示せず、レイヤーの有効状態はEffect Stackで管理します。プロパティモジュールではPostprocess全体のON／OFFと、選択レイヤーの詳細プロパティを表示します。Postprocessの全レイヤーが無効な場合は全体も無効状態になります。
+
 ### EFFECT-003 固定段と描画順
 
-V2の全体順序は `Base → Surface → Main Stack → Prism → Particles` です。Normal/MatcapはSurface、PrismはGlowを含む専用段、Particlesは最終オーバーレイとして扱い、主スタックの並べ替え対象には含めません。
+V2の全体順序は `Base → Surface → Main Stack → Prism → Particles` です。Normal/MatcapはSurface、PrismはGlowを含む専用段、Particlesは最終オーバーレイとして扱い、主スタックの並べ替え対象には含めません。これらの固定段の有効状態とパラメータはSANDBOXで編集し、Effect Stackには表示しません。
 
 有効な主スタックレイヤーは前段の結果を次段の入力として処理します。レイヤーが0件の場合の直接描画、軽量な主スタック、追加の中間バッファが必要な構成は描画計画として一貫して決定されます。
 
 ### EFFECT-004 DiffuseとImage Gradient Source
 
-Diffuseは主スタック内の一つのレイヤーです。旧来の固定最終段として別に二重適用しません。Image Gradient Sourceが有効なとき、画像本体の形状・アルファを変える `Stretch`、`Distort`、`Mirror`、`Kaleidoscope`、`Voronoi`、`Glass` は保護経路の対象外となり、色場の契約を壊さないよう扱われます。
+Diffuseは主スタック内の一つのレイヤーです。旧来の固定最終段として別に二重適用しません。Image Gradient Sourceが有効なとき、画像本体の形状・アルファを変える `Stretch`、`Distort`、`Mirror`、`Kaleidoscope`、`Voronoi`、`Glass` は保護経路の対象外となり、色場の契約を壊さないよう扱われます。手描き`Distort`の編集・描画入力はPostprocessの設定を正規値とし、旧`manualDistort`はPreset移行用の互換値としてのみ扱います。
 
 ### EFFECT-005 旧Presetとの互換性
 
-`effectPipeline`を持たない旧PresetはLegacy V1として読み込みます。旧来のPostprocess設定に残る`effectMode: glass`およびstackの`kind: glass`は、読み込み時に`glassV2`へ正規化し、正規化後のPostprocess状態には旧Glassを残しません。V2の状態を持つPresetでは `effectPipeline` が有効状態と順序の一次情報です。
+`effectPipeline`を持たない旧PresetはLegacy V1として読み込みます。旧来のPostprocess設定に残る`effectMode: glass`およびstackの`kind: glass`は、読み込み時に`glassV2`へ正規化し、正規化後のPostprocess状態には旧Glassを残しません。旧Presetの`manualDistort`だけに保存されたDistort値はPostprocessへ移行し、Legacy generatorへ二重適用しません。V2の状態を持つPresetでは `effectPipeline` が有効状態と順序の一次情報です。
 
 ### EFFECT-006 描画失敗からの復旧
 
@@ -77,6 +81,14 @@ Hueの既定値は`0°`、Saturationの既定値は`100%`、両Tintの既定値�
 
 主スタックのレイヤー行またはオンオフToggleをAltクリックすると、クリックしたレイヤーだけを有効にし、その他の主スタックレイヤーを無効にします。最初のソロ化時に現在の主スタックの有効状態を一時保持し、同じ対象をもう一度Altクリックするとソロ化前へ復元します。ソロ中に別レイヤーをAltクリックした場合は対象だけを切り替えます。ソロ化によって新たに無効化されたレイヤーの状態欄には黄色の`STAY`を表示します。固定段とレイヤー設定値は変更せず、ソロ状態は既存の`enabled`値としてPresetへ保存します。専用の`solo`保存キーは持ちません。
 
+### EFFECT-012 SANDBOX固定段
+
+TOPバーのSANDBOXから、Postprocessの`Edit Layer`と同じ選択要素でNormal、Prism、Particlesのいずれか一つを選択して編集できます。SANDBOXのモジュール選択は描画順を変更せず、NormalはSurface、Prismは主スタック後、Particlesは最終オーバーレイとして既存のEffect Pipelineへ反映します。SANDBOXの選択状態は保存せず、各モジュールの既存設定だけをPreset、Preview、Thumbnail、Exportへ引き継ぎます。
+
+### EFFECT-013 Normal Mapの描画互換
+
+Legacy V1とEffect Stack V2のNormal Mapは、同じNormal Mapシェーダー、輝度サンプリング、中心差分、角度回転、反転、`R=右・G=上・B=手前`のRGBAエンコードを使用します。両経路はDiffuseが有効なフレームではNormalを描画せず、Diffuseを法線計算用入力の代替として扱いません。V2の`manualDistort`状態がPostprocessのNormal入力やDistort値を上書きすることはありません。
+
 ## 他領域との関係
 
 - Gradient SystemはEffect Stackの入力画像・色場と、Image Gradient Sourceの保護条件を定義します。
@@ -96,6 +108,7 @@ Hueの既定値は`0°`、Saturationの既定値は`100%`、両Tintの既定値�
 - [CHANGE-013 Effect Stack GlassをGLASS V2へ統合](../../changes/active/CHANGE-013-glass-v2-only/proposal)
 - [CHANGE-014 Effect Stackのランダム順序とソロレイヤー](../../changes/active/CHANGE-014-effect-stack-controls/proposal)
 - [CHANGE-015 Effect Stack別ウィンドウの復旧](../../changes/active/CHANGE-015-effect-stack-window-repair/proposal)
+- [CHANGE-018 SANDBOX描画モジュールの新設](../../changes/active/CHANGE-018-sandbox-graphics/proposal)
 
 Legacy SPECは履歴参照用です。現行の主スタック、固定段、互換性はこの文書と関連ADRを先に確認します。
 

@@ -10,14 +10,12 @@ import { NoiseDistortionPanel } from './components/NoiseDistortionPanel';
 import { DiffusePanel } from './components/BlockNoisePanel';
 import { ExportPanel } from './components/ExportPanel';
 import { SlitScanPanel } from './components/SlitScanPanel';
-import { StretchPanel } from './components/StretchPanel';
 import { PresetPanel } from './components/PresetPanel';
-import { NormalMapPanel } from './components/NormalMapPanel';
-import { ManualDistortControls, PostprocessPanel } from './components/PostprocessPanel';
+import { SandboxPanel } from './components/SandboxPanel';
+import { PostprocessPanel } from './components/PostprocessPanel';
 import { EffectStackWorkspace } from './components/EffectStackWorkspace';
 import { DistortOverlay } from './components/DistortOverlay';
 import { PostprocessOverlay } from './components/PostprocessOverlay';
-import { MatcapPanel } from './components/MatcapPanel';
 import { GradientRamp } from './components/GradientRamp';
 import { ImageGradientSourcePanel } from './components/ImageGradientSourcePanel';
 import { SliderField } from './components/SliderField';
@@ -46,6 +44,7 @@ import { UpdateButton } from './features/updater/UpdateButton';
 import { UpdateDialog } from './features/updater/UpdateDialog';
 import { FfmpegSetupDialog } from './components/FfmpegSetupDialog';
 import { isPostprocessLayerEnabled } from './lib/postprocessStack';
+import { hasEnabledPostprocessEffectStack, isEffectStackLayerEnabled } from './lib/effectPipeline';
 import {
   getNativeFfmpegStatus,
   nativeFfmpegSupported,
@@ -63,18 +62,15 @@ const CANVAS_SIZE_PRESETS = [
   { value: 'square-800', label: '800×800', width: 800, height: 800 },
 ] as const;
 
-type LeftTab = 'diffuse' | 'noise' | 'slit' | 'stretch' | 'normal' | 'distort' | 'postprocess' | 'matcap' | 'export' | 'preset';
+type LeftTab = 'diffuse' | 'noise' | 'slit' | 'postprocess' | 'sandbox' | 'export' | 'preset';
 type OverlayImageMode = 'overlay' | 'mask' | 'off';
 
 const LEFT_TABS: { value: LeftTab; labelKey: MessageKey }[] = [
   { value: 'diffuse', labelKey: 'effect.diffuse' },
   { value: 'noise', labelKey: 'effect.noise' },
   { value: 'slit', labelKey: 'effect.slit' },
-  { value: 'stretch', labelKey: 'effect.stretch' },
-  { value: 'normal', labelKey: 'effect.normal' },
-  { value: 'distort', labelKey: 'effect.distort' },
   { value: 'postprocess', labelKey: 'effect.postprocess' },
-  // Matcap is kept implemented but hidden from the top bar; add it back here to restore the panel.
+  { value: 'sandbox', labelKey: 'effect.sandbox' },
   { value: 'export', labelKey: 'effect.export' },
   { value: 'preset', labelKey: 'effect.preset' },
 ];
@@ -112,18 +108,14 @@ const TAB_ENABLED_MAP: Partial<Record<LeftTab, (s: StoreSnapshot) => boolean>> =
   diffuse: (s) => s.diffuse.enabled,
   noise: (s) => s.noiseDistortion.enabled,
   slit: (s) => s.slitScan.enabled,
-  stretch: (s) => s.stretch.enabled,
-  normal: (s) => s.normalMap.enabled,
-  distort: (s) => s.manualDistort.enabled,
-  postprocess: (s) => s.postprocess.enabled,
-  matcap: (s) => s.matcap.enabled,
+  sandbox: (s) => s.normalMap.enabled || s.effectPipeline.prismEnabled || s.effectPipeline.particlesEnabled,
+  postprocess: (s) => s.postprocess.enabled || hasEnabledPostprocessEffectStack(s.effectPipeline),
 };
 
 const TAB_ANIMATION_PREFIX: Partial<Record<LeftTab, string>> = {
   diffuse: 'diffuse.',
   noise: 'noiseDistortion.',
   slit: 'slitScan.',
-  stretch: 'stretch.',
   postprocess: 'postprocess.',
 };
 
@@ -135,8 +127,6 @@ export default function App() {
     matcap,
     animation,
     noiseDistortion,
-    manualDistort,
-    setManualDistort,
     postprocess,
     setPostprocess,
     effectPipeline,
@@ -277,13 +267,12 @@ export default function App() {
       ? 'diffuse'
       : kind === 'noise'
         ? 'noise'
-        : kind === 'slit'
-          ? 'slit'
-          : kind === 'stretch'
-            ? 'stretch'
-            : kind === 'distort'
-              ? 'distort'
-              : 'postprocess';
+          : kind === 'slit'
+            ? 'slit'
+            : 'postprocess';
+    if (kind === 'distort') {
+      setPostprocess({ effectMode: 'distort' });
+    }
     activeLeftTabRef.current = nextTab;
     setLeftTab(nextTab);
     setLeftPanelOpen(true);
@@ -488,7 +477,7 @@ export default function App() {
             {LEFT_TABS.map(({ value, labelKey }) => {
               const getEnabled = TAB_ENABLED_MAP[value];
               const enabled = getEnabled ? getEnabled(store) : undefined;
-              const isPrimary = value === 'diffuse' || value === 'noise' || value === 'slit' || value === 'stretch';
+              const isPrimary = value === 'diffuse' || value === 'noise' || value === 'slit';
               const isUtility = value === 'export' || value === 'preset';
               return (
                 <button
@@ -619,17 +608,8 @@ export default function App() {
                         }}
                       />
                     )}
-                    {value === 'stretch' && <StretchPanel />}
-                    {value === 'normal' && <NormalMapPanel />}
-                    {value === 'distort' && (
-                      <ManualDistortControls
-                        title={t('effect.distort')}
-                        value={manualDistort}
-                        onChange={setManualDistort}
-                      />
-                    )}
+                    {value === 'sandbox' && <SandboxPanel />}
                     {value === 'postprocess' && <PostprocessPanel />}
-                    {value === 'matcap' && <MatcapPanel />}
                     {value === 'export' && (
                       <ExportPanel
                         onExportProgress={setExportProgress}
@@ -795,16 +775,11 @@ export default function App() {
                   imageMaskEnabled={overlayImageMode === 'mask'}
                 />
                 <DistortOverlay
-                  active={leftTab === 'distort'}
-                  width={displayW}
-                  height={displayH}
-                  canvasW={canvasW}
-                  canvasH={canvasH}
-                  manualDistort={manualDistort}
-                  setManualDistort={setManualDistort}
-                />
-                <DistortOverlay
-                  active={effectPipeline.version === 'legacy-v1' && leftTab === 'postprocess' && isPostprocessLayerEnabled(postprocess, 'distort') && postprocess.effectMode === 'distort'}
+                  active={leftTab === 'postprocess' && postprocess.effectMode === 'distort' && (
+                    effectPipeline.version === 'stack-v2'
+                      ? isEffectStackLayerEnabled(effectPipeline, 'distort')
+                      : isPostprocessLayerEnabled(postprocess, 'distort')
+                  )}
                   width={displayW}
                   height={displayH}
                   canvasW={canvasW}

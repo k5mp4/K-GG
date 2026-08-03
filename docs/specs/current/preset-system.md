@@ -5,10 +5,10 @@ title: Preset System
 status: current
 owners: [maintainer]
 created: 2026-07-27
-updated: 2026-08-02
+updated: 2026-08-03
 requirement_ids: [PRESET-001, PRESET-002, PRESET-003, PRESET-004, PRESET-005, PRESET-006, PRESET-007, PRESET-008, PRESET-009, PRESET-011]
 related_adrs: [ADR-0007, ADR-0008]
-related_changes: [CHANGE-001, CHANGE-012, CHANGE-013]
+related_changes: [CHANGE-001, CHANGE-012, CHANGE-013, CHANGE-018]
 related_code: [src/lib/presetModel.ts, src/lib/presetLibrary.ts, src/lib/presets.ts, src/lib/presetPreview.ts, src/lib/presetThumbnail.ts, src/lib/glass.ts, src/lib/postprocessStack.ts, src/store/gradientStore.ts, src/components/PresetPanel.tsx, src/components/PresetPreview.tsx, src/adapters/types.ts, src/adapters/browser/presetRepository.ts, src/adapters/tauri/presetRepository.ts, src-tauri/src/lib.rs]
 related_tests: [src/lib/presetLibrary.test.ts, src/lib/presetModel.diffuse.test.ts, src/lib/presetPreview.test.ts, src/lib/presetThumbnail.test.ts, src/lib/glass.test.ts, src/lib/postprocessStack.test.ts, src/store/gradientStore.glass.test.ts, src/store/gradientStore.postprocessStack.test.ts]
 ---
@@ -25,7 +25,7 @@ Preset Systemは、Gradient、Effect Stack、アニメーションなどの編�
 
 Presetの `state` には、Gradient、Noise Distortion、Diffuse、Image Gradientの設定、Slit Scan、Stretch、Animation、Normal Map、Radon、Iridescence、手描きDistort、Postprocess、Effect Pipeline、Matcap、キーフレームトラック、ユーザーカラーパレット、解像度などの編集状態を含められます。
 
-選択中のUI状態や互換用の任意フィールドが含まれることはありますが、Presetの読込時は描画に必要な状態を正規化してからストアへ適用します。
+選択中のUI状態や互換用の任意フィールドが含まれることはありますが、Presetの読込時は描画に必要な状態を正規化してからストアへ適用します。手描きDistortはPostprocess設定を正規値とし、旧Presetの`manualDistort`だけに残る値は読込時にPostprocessへ移行します。新規保存では旧`manualDistort.enabled`をLegacy generatorの独立入力として有効化しません。
 
 ### PRESET-002 保存しない外部入力
 

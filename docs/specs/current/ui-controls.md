@@ -5,11 +5,11 @@ title: UI入力コントロール
 status: current
 owners: [maintainer]
 created: 2026-07-28
-updated: 2026-08-02
-requirement_ids: [UI-001, UI-002, UI-003, UI-004, UI-005, UI-006, UI-007, UI-008, UI-009]
+updated: 2026-08-03
+requirement_ids: [UI-001, UI-002, UI-003, UI-004, UI-005, UI-006, UI-007, UI-008, UI-009, UI-010]
 related_adrs: [ADR-0011, ADR-0012]
-related_changes: [CHANGE-010, CHANGE-012, CHANGE-013, CHANGE-014, CHANGE-015]
-related_code: [src/App.css, src/components/CustomSelect.tsx, src/components/GradientRamp.tsx, src/components/SliderField.tsx, src/components/NoiseDistortionPanel.tsx, src/components/SlitScanPanel.tsx, src/components/StretchPanel.tsx, src/components/TimelineBar.tsx, src/components/IridescencePanel.tsx, src/components/NormalMapPanel.tsx, src/components/RadonPanel.tsx, src/components/PostprocessPanel.tsx, src/components/PostprocessStackPanel.tsx, src/lib/effectStackWindow.ts, src/lib/effectPipeline.ts, src/i18n/uiLabels.ts, src/i18n/messages.ts]
+related_changes: [CHANGE-010, CHANGE-012, CHANGE-013, CHANGE-014, CHANGE-015, CHANGE-018]
+related_code: [src/App.tsx, src/App.css, src/components/CustomSelect.tsx, src/components/GradientRamp.tsx, src/components/SliderField.tsx, src/components/NoiseDistortionPanel.tsx, src/components/SlitScanPanel.tsx, src/components/StretchPanel.tsx, src/components/TimelineBar.tsx, src/components/IridescencePanel.tsx, src/components/NormalMapPanel.tsx, src/components/SandboxPanel.tsx, src/components/RadonPanel.tsx, src/components/PostprocessPanel.tsx, src/components/PostprocessStackPanel.tsx, src/components/Toggle.tsx, src/lib/effectStackWindow.ts, src/lib/effectPipeline.ts, src/i18n/uiLabels.ts, src/i18n/messages.ts]
 related_tests: [src/lib/tweeqAngle.test.ts, src/lib/effectPipeline.test.ts, src/lib/effectStackWindow.test.ts, src/lib/parameterLimits.test.ts, src/lib/animationDirection.test.ts, 'manual: Tweeq InputAngle and InputShuffle and InputDrum and InputRadio browser checks', 'manual: Glass color controls browser check', 'manual: Effect Stack randomize; Alt-solo; detached-window checks']
 ---
 
@@ -56,6 +56,10 @@ Effect Stackには主スタック9種類の順序をランダム化する操作�
 ### UI-009 Effect Stack別ウィンドウ
 
 Effect Stackはインライン表示と別ウィンドウ表示を切り替えられます。別ウィンドウでは通常表示と同じLanguageProviderおよびTweeq Viewportの下で表示し、選択と有効状態変更を既存storeへ反映します。Tauriの別ウィンドウは非表示で生成し、ネイティブ生成成功後に表示・フォーカスします。子側React rootの準備完了通知は表示後の状態同期に使い、通知遅延によって表示自体を失敗扱いにしません。別ウィンドウのclose、作成失敗、ポップアップ制限、Tauri作成タイムアウトではインライン表示へ復旧し、再試行可能な状態を残します。
+
+### UI-010 トップバーとSANDBOXのモジュール入口
+
+TOPバーは左から`Diffuse`、`Noise`、`Slit`、`Postprocess`、`SANDBOX`、`Export`、`Preset`の順に表示します。`Stretch`は独立項目として表示せず、Postprocessのプロパティモジュールにも表示しません。PostprocessのプロパティモジュールはON／OFFと`Edit Layer`を表示し、選択したEdit Layerの詳細プロパティをその下で操作できます。Stretch、Distort、Mirror、Kaleidoscopeなどの個別ON／OFFはプロパティモジュールに表示せず、いずれか一つ以上がEffect Stackで有効な場合にPostprocess全体をONとして表示します。SANDBOXの文字色はPostprocessと同じ通常色を使います。`Normal`と`Distort`も独立項目として表示しません。SANDBOXの左パネルにはPostprocessの`Edit Layer`と同じ選択要素を表示し、Normal、Prism、Particlesから一つを選択して既存の有効状態とパラメータを編集できます。モジュールのON／OFFと描画準備状態を確認でき、SANDBOXの選択状態はPresetへ保存しません。DistortはPostprocessの`Edit Layer`で選択し、Effect StackとPostprocessの主スタック編集UIにPrism／Particlesの重複入口を表示しません。
 
 ## 互換性
 

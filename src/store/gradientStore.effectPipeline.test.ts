@@ -3,7 +3,7 @@ import { createDefaultEffectStack, updateEffectStackLayer } from '../lib/effectP
 import { optimizeNoiseDistortion, type RenderOptimization } from '../lib/gpuDiagnostics';
 import { normalizeNoiseDistortionConfig, STORE_DEFAULTS, useGradientStore } from './gradientStore';
 
-function layerEnabled(kind: 'diffuse' | 'noise' | 'slit'): boolean {
+function layerEnabled(kind: 'diffuse' | 'noise' | 'slit' | 'distort'): boolean {
   return useGradientStore.getState().effectPipeline.effectStack
     .find(layer => layer.kind === kind)?.enabled ?? false;
 }
@@ -84,6 +84,58 @@ describe('Gradient store Effect Pipeline V2 synchronization', () => {
       diffuseSeed: 2,
       diffuseDitherThreshold: 0.1,
     });
+  });
+
+  it('keeps Postprocess global state independent from the canonical Distort layer', () => {
+    const store = useGradientStore.getState();
+    store.setPostprocess({
+      effectMode: 'distort',
+      enabled: true,
+      mode: 'spiky',
+      brushSize: 64,
+      strength: 1.25,
+    });
+
+    expect(useGradientStore.getState().postprocess).toMatchObject({
+      effectMode: 'distort',
+      enabled: true,
+      mode: 'spiky',
+      brushSize: 64,
+      strength: 1.25,
+    });
+    expect(layerEnabled('distort')).toBe(false);
+    expect(useGradientStore.getState().manualDistort.enabled).toBe(false);
+
+    let effectStack = createDefaultEffectStack();
+    effectStack = updateEffectStackLayer(effectStack, 'distort', { enabled: true });
+    store.setEffectPipeline({ effectStack });
+    expect(useGradientStore.getState().postprocess.enabled).toBe(true);
+    expect(layerEnabled('distort')).toBe(true);
+
+    store.setPostprocess({ enabled: false });
+    expect(useGradientStore.getState().postprocess.enabled).toBe(false);
+    expect(layerEnabled('distort')).toBe(true);
+
+    effectStack = updateEffectStackLayer(effectStack, 'distort', { enabled: false });
+    store.setEffectPipeline({ effectStack });
+    expect(useGradientStore.getState().postprocess.enabled).toBe(false);
+  });
+
+  it('derives the Postprocess global state from any enabled postprocess layer', () => {
+    const store = useGradientStore.getState();
+    let effectStack = createDefaultEffectStack();
+    effectStack = updateEffectStackLayer(effectStack, 'stretch', { enabled: true });
+    store.setEffectPipeline({ effectStack });
+    expect(useGradientStore.getState().postprocess.enabled).toBe(true);
+
+    effectStack = updateEffectStackLayer(effectStack, 'stretch', { enabled: false });
+    effectStack = updateEffectStackLayer(effectStack, 'mirror', { enabled: true });
+    store.setEffectPipeline({ effectStack });
+    expect(useGradientStore.getState().postprocess.enabled).toBe(true);
+
+    effectStack = updateEffectStackLayer(effectStack, 'mirror', { enabled: false });
+    store.setEffectPipeline({ effectStack });
+    expect(useGradientStore.getState().postprocess.enabled).toBe(false);
   });
 
   it('keeps Legacy config toggles independent from the stored V2 layer flags', () => {

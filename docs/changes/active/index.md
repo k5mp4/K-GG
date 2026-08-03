@@ -14,3 +14,4 @@ title: 進行中の変更
 | CHANGE-013 | [Effect Stack GlassをGLASS V2へ統合](./CHANGE-013-glass-v2-only/proposal) | approved |
 | CHANGE-014 | [Effect Stackのランダム順序とソロレイヤー](./CHANGE-014-effect-stack-controls/proposal) | approved |
 | CHANGE-015 | [Effect Stack別ウィンドウの復旧](./CHANGE-015-effect-stack-window-repair/proposal) | approved |
+| CHANGE-018 | [SANDBOX描画モジュールの新設](./CHANGE-018-sandbox-graphics/proposal) | approved |

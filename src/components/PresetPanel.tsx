@@ -310,17 +310,23 @@ export function PresetPanel({ canvasW, canvasH, setCanvasW, setCanvasH, aspectRa
     if (s.normalMap) store.setNormalMap(s.normalMap);
     store.setRadon({ ...STORE_DEFAULTS.radon, ...s.radon, enabled: false });
     store.setIridescence({ ...STORE_DEFAULTS.iridescence, ...s.iridescence, enabled: false });
-    const resolution = normalizeManualDistortResolution(s.manualDistort?.mapResolution);
+    const loadedPostprocess = normalizePostprocessConfig(
+      s.postprocess ?? s.postprocessDistort,
+      s.manualDistort,
+    );
+    const legacyDistort = s.manualDistort ?? loadedPostprocess;
+    const resolution = normalizeManualDistortResolution(legacyDistort.mapResolution);
     const displacementLength = resolution * resolution * 2;
     const smoothMaskLength = resolution * resolution;
     store.setManualDistort({
       ...STORE_DEFAULTS.manualDistort,
-      ...s.manualDistort,
+      ...legacyDistort,
+      enabled: false,
       mapResolution: resolution,
-      displacement: validFiniteArray(s.manualDistort?.displacement, displacementLength) ? s.manualDistort.displacement : createEmptyManualDistortMap(resolution),
-      smoothMask: validFiniteArray(s.manualDistort?.smoothMask, smoothMaskLength) ? s.manualDistort.smoothMask : createEmptyManualSmoothMask(resolution),
+      displacement: validFiniteArray(legacyDistort.displacement, displacementLength) ? legacyDistort.displacement : createEmptyManualDistortMap(resolution),
+      smoothMask: validFiniteArray(legacyDistort.smoothMask, smoothMaskLength) ? legacyDistort.smoothMask : createEmptyManualSmoothMask(resolution),
     });
-    store.setPostprocess(normalizePostprocessConfig(s.postprocess ?? s.postprocessDistort));
+    store.setPostprocess(loadedPostprocess);
     store.setEffectPipeline(normalizeEffectPipelineConfig(s.effectPipeline));
     if (s.matcap) store.setMatcap(s.matcap);
     store.setKeyframeTracks(s.keyframeTracks ?? {});
@@ -345,7 +351,7 @@ export function PresetPanel({ canvasW, canvasH, setCanvasW, setCanvasH, aspectRa
     const state = {
       gradient, noiseDistortion, diffuse, imageGradient,
       slitScan: { ...slitScan, selectedSlitIdx: -1 }, stretch,
-      animation, normalMap, radon, iridescence, manualDistort, postprocess, effectPipeline, matcap,
+      animation, normalMap, radon, iridescence, manualDistort: { ...manualDistort, enabled: false }, postprocess, effectPipeline, matcap,
       keyframeTracks, colorPalettes: loadUserColorPalettes(), resolution: { width: canvasW, height: canvasH },
     };
     setSaving(true);

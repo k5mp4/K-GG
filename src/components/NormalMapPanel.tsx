@@ -15,39 +15,57 @@ const isNormalMapDirty = (value: NormalMapConfig) =>
     return JSON.stringify(value[typedKey as keyof NormalMapConfig]) !== JSON.stringify(D[typedKey]);
   });
 
-export function NormalMapPanel() {
+type NormalMapPanelProps = {
+  embedded?: boolean;
+};
+
+export function NormalMapPanel({ embedded = false }: NormalMapPanelProps = {}) {
   const { t } = useLanguage();
   const { normalMap, setNormalMap, diffuse, setDiffuse, setGradient } = useGradientStore();
   const canReset = isNormalMapDirty(normalMap);
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between">
-        <h2 className="font-semibold text-sm flex items-center gap-1.5">
-          {t('effect.normal')}
-          <span className="text-[10px] font-medium px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-400 leading-none" title={t('beta.experimental')}>🧪 Beta</span>
-        </h2>
-        <div className="flex items-center gap-2">
+      {!embedded && (
+        <div className="flex items-center justify-between">
+          <h2 className="font-semibold text-sm flex items-center gap-1.5">
+            {t('effect.normal')}
+            <span className="text-[10px] font-medium px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-400 leading-none" title={t('beta.experimental')}>🧪 Beta</span>
+          </h2>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => setNormalMap({ ...D, enabled: normalMap.enabled })}
+              disabled={!canReset}
+              className={`w-6 h-6 inline-flex items-center justify-center bg-transparent hover:bg-k-muted text-tab-inactive hover:text-k-text rounded-none transition-all ${
+                canReset ? 'opacity-100 cursor-pointer' : 'opacity-0 pointer-events-none'
+              }`}
+              title={t('common.reset')}
+            >
+              <Icon name="restart" className="text-[14px]" />
+            </button>
+            <Toggle
+              variant="switch"
+              checked={normalMap.enabled}
+              onChange={(v) => {
+                setNormalMap({ enabled: v });
+                if (v) setGradient({ stops: [...gradientRampPresets.mono] });
+              }}
+            />
+          </div>
+        </div>
+      )}
+      {embedded && canReset && (
+        <div className="flex justify-end">
           <button
             onClick={() => setNormalMap({ ...D, enabled: normalMap.enabled })}
-            disabled={!canReset}
-            className={`w-6 h-6 inline-flex items-center justify-center bg-transparent hover:bg-k-muted text-tab-inactive hover:text-k-text rounded-none transition-all ${
-              canReset ? 'opacity-100 cursor-pointer' : 'opacity-0 pointer-events-none'
-            }`}
+            className="inline-flex h-6 items-center gap-1.5 px-1.5 text-[9px] font-display uppercase tracking-wider text-tab-inactive transition-colors hover:bg-k-muted hover:text-k-text"
             title={t('common.reset')}
           >
-            <Icon name="restart" className="text-[14px]" />
+            <Icon name="restart" className="text-[12px]" />
+            {t('common.reset')}
           </button>
-          <Toggle
-            variant="switch"
-            checked={normalMap.enabled}
-            onChange={(v) => {
-              setNormalMap({ enabled: v });
-              if (v) setGradient({ stops: [...gradientRampPresets.mono] });
-            }}
-          />
         </div>
-      </div>
+      )}
 
       <Collapsible isOpen={normalMap.enabled && diffuse.enabled}>
         <div className="pt-2">

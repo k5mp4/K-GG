@@ -6,9 +6,10 @@ interface ToggleProps {
   size?: 'xs' | 'sm' | 'md';
   variant?: 'checkbox' | 'switch';
   className?: string;
+  ariaLabel?: string;
 }
 
-export function Toggle({ checked, onChange, size = 'md', variant = 'checkbox', className = '' }: ToggleProps) {
+export function Toggle({ checked, onChange, size = 'md', variant = 'checkbox', className = '', ariaLabel }: ToggleProps) {
   const { t } = useLanguage();
   if (variant === 'switch') {
     const trackSize = size === 'xs'
@@ -37,7 +38,7 @@ export function Toggle({ checked, onChange, size = 'md', variant = 'checkbox', c
         type="button"
         role="switch"
         aria-checked={checked}
-        aria-label={checked ? t('common.enabled') : t('common.disabled')}
+        aria-label={ariaLabel ?? (checked ? t('common.enabled') : t('common.disabled'))}
         onClick={() => onChange(!checked)}
         className={`group relative shrink-0 inline-flex items-center rounded-full border px-0 py-0 transition-all duration-200 ease-out focus:outline-none focus-visible:ring-2 focus-visible:ring-fire focus-visible:ring-offset-1 focus-visible:ring-offset-black ${
           trackSize
@@ -75,7 +76,7 @@ export function Toggle({ checked, onChange, size = 'md', variant = 'checkbox', c
       type="button"
       role="checkbox"
       aria-checked={checked}
-      aria-label={checked ? t('common.enabled') : t('common.disabled')}
+      aria-label={ariaLabel ?? (checked ? t('common.enabled') : t('common.disabled'))}
       onClick={() => onChange(!checked)}
       style={{ width: box, height: box, padding: 0, background: 'none' }}
       className={`shrink-0 inline-flex items-center justify-center cursor-pointer rounded-none border-2 transition-colors duration-150 ease-in-out focus:outline-none focus-visible:ring-2 focus-visible:ring-fire focus-visible:ring-offset-1 focus-visible:ring-offset-black ${
