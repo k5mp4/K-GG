@@ -29,12 +29,17 @@ function validFiniteArray(value: unknown, expectedLength: number): value is numb
  * purpose because they are not part of the portable preset format.
  */
 export function createPresetThumbnailState(snapshot: StoreSnapshot): LatestState {
-  const resolution = normalizeMapResolution(snapshot.manualDistort?.mapResolution);
+  const postprocess = normalizePostprocessConfig(
+    snapshot.postprocess ?? snapshot.postprocessDistort,
+    snapshot.manualDistort,
+  );
+  const resolution = normalizeMapResolution(postprocess.mapResolution);
   const displacementLength = resolution * resolution * 2;
   const smoothMaskLength = resolution * resolution;
   const manualDistort = {
     ...STORE_DEFAULTS.manualDistort,
     ...snapshot.manualDistort,
+    enabled: false,
     mapResolution: resolution,
     displacement: validFiniteArray(snapshot.manualDistort?.displacement, displacementLength)
       ? [...snapshot.manualDistort.displacement]
@@ -65,7 +70,7 @@ export function createPresetThumbnailState(snapshot: StoreSnapshot): LatestState
     radon: { ...STORE_DEFAULTS.radon, ...snapshot.radon, enabled: false },
     iridescence: { ...STORE_DEFAULTS.iridescence, ...snapshot.iridescence, enabled: false },
     manualDistort,
-    postprocess: normalizePostprocessConfig(snapshot.postprocess ?? snapshot.postprocessDistort),
+    postprocess,
     effectPipeline: normalizeEffectPipelineConfig(snapshot.effectPipeline),
     matcap: { ...STORE_DEFAULTS.matcap, ...snapshot.matcap },
     animation: { ...STORE_DEFAULTS.animation, ...snapshot.animation, previewLoop: snapshot.animation.previewLoop ?? true },

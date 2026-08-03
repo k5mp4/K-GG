@@ -2,6 +2,36 @@ import { describe, expect, it } from 'vitest';
 import { normalizePostprocessConfig, STORE_DEFAULTS } from './gradientStore';
 
 describe('Postprocess stack preset compatibility', () => {
+  it('migrates legacy manual Distort values into the canonical Postprocess config', () => {
+    const loaded = normalizePostprocessConfig(undefined, {
+      enabled: true,
+      mode: 'swirl',
+      brushSize: 88,
+      strength: 1.4,
+      falloff: 2.1,
+      showOverlay: true,
+      mapResolution: STORE_DEFAULTS.manualDistort.mapResolution,
+      displacement: [...STORE_DEFAULTS.manualDistort.displacement],
+      smoothMask: [...STORE_DEFAULTS.manualDistort.smoothMask],
+      smoothStrength: 0.8,
+      smoothRadius: 12,
+      maxDisplacement: 0.75,
+    });
+
+    expect(loaded).toMatchObject({
+      enabled: true,
+      effectMode: 'distort',
+      mode: 'swirl',
+      brushSize: 88,
+      strength: 1.4,
+      falloff: 2.1,
+      smoothStrength: 0.8,
+      smoothRadius: 12,
+      maxDisplacement: 0.75,
+    });
+    expect(loaded.effectStack.find(layer => layer.kind === 'distort')?.enabled).toBe(true);
+  });
+
   it('converts a legacy single-mode Glass preset to Glass V2', () => {
     const loaded = normalizePostprocessConfig({
       enabled: true,

@@ -4,6 +4,7 @@ import type {
   EffectStackKind,
   EffectStackLayer,
 } from '../types/distortion';
+import { shouldRenderNormalMap } from './normalMap';
 
 /** V2 で新規作成する主スタックの初期順序。 */
 export const EFFECT_STACK_KINDS = [
@@ -18,7 +19,18 @@ export const EFFECT_STACK_KINDS = [
   'diffuse',
 ] as const satisfies readonly EffectStackKind[];
 
+/** Postprocessの全体ON/OFFへ反映する、主スタック内のレイヤー。 */
+export const POSTPROCESS_EFFECT_STACK_KINDS = [
+  'stretch',
+  'distort',
+  'mirror',
+  'kaleidoscope',
+  'voronoi',
+  'glass',
+] as const satisfies readonly EffectStackKind[];
+
 const EFFECT_STACK_KIND_SET = new Set<string>(EFFECT_STACK_KINDS);
+const POSTPROCESS_EFFECT_STACK_KIND_SET = new Set<string>(POSTPROCESS_EFFECT_STACK_KINDS);
 
 export function isEffectStackKind(value: unknown): value is EffectStackKind {
   return typeof value === 'string' && EFFECT_STACK_KIND_SET.has(value);
@@ -82,6 +94,21 @@ export function normalizeEffectStack(stack: unknown): EffectStackLayer[] {
     if (!seen.has(kind)) normalized.push({ kind, enabled: false });
   }
   return normalized;
+}
+
+export function getPostprocessEffectStackEnabledSignature(effectPipeline: EffectPipelineConfig): string {
+  if (effectPipeline.version !== 'stack-v2') return '';
+  return normalizeEffectStack(effectPipeline.effectStack)
+    .filter(layer => POSTPROCESS_EFFECT_STACK_KIND_SET.has(layer.kind))
+    .map(layer => `${layer.kind}:${layer.enabled ? '1' : '0'}`)
+    .sort()
+    .join('|');
+}
+
+export function hasEnabledPostprocessEffectStack(effectPipeline: EffectPipelineConfig): boolean {
+  return getPostprocessEffectStackEnabledSignature(effectPipeline)
+    .split('|')
+    .some(layer => layer.endsWith(':1'));
 }
 
 /**
@@ -279,7 +306,7 @@ export function getV2RenderPlan(
   const normalizedStack = normalizeEffectStack(pipeline.effectStack);
   const enabledLayers = normalizedStack.filter(layer => layer.enabled);
   const diffuseEnabled = enabledLayers.some(layer => layer.kind === 'diffuse');
-  const normalRequested = options.normalMapEnabled;
+  const normalRequested = shouldRenderNormalMap(options.normalMapEnabled, diffuseEnabled);
   const normalNeedsBlur = normalRequested && options.normalMapBlur >= 0.5;
   const prismRequested = pipeline.prismEnabled;
   const prismNeedsBlur = prismRequested && Number.isFinite(options.prismGlowRadius)

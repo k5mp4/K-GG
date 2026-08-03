@@ -474,7 +474,7 @@ export function PostprocessStackPanel({ onSwapWorkspace, onSelectEffectStack, de
       ...(effectStack ? { effectStack } : {}),
     });
     if (kind === 'distort' || kind === 'mirror' || kind === 'kaleidoscope' || kind === 'voronoi' || kind === 'glass') {
-      setPostprocess({ enabled: true, effectMode: kind === 'glass' ? 'glassV2' : kind as PostprocessStackKind });
+      setPostprocess({ effectMode: kind === 'glass' ? 'glassV2' : kind as PostprocessStackKind });
     }
   };
 
@@ -757,20 +757,11 @@ export function PostprocessStackPanel({ onSwapWorkspace, onSelectEffectStack, de
           );
         })}
       </div>
-      <div className="border-t border-cream/15 px-2 py-1.5 text-[8px] uppercase tracking-wider text-cream/55">
-        <div className="mb-1">{t('stack.fixed')}</div>
-        {imageGradient.enabled && (
-          <div className="mb-1 text-amber-300/90 normal-case">Image Gradient: geometry-resampling layers are protected</div>
-        )}
-        <div className="flex items-center justify-between py-0.5 text-cream/75">
-          <span className="flex items-center gap-2">Prism <span className={`text-[8px] ${programStatusLabel('prism', effectPipeline.prismEnabled).className}`}>{programStatusLabel('prism', effectPipeline.prismEnabled).label}</span></span>
-          <Toggle variant="switch" size="xs" checked={effectPipeline.prismEnabled} onChange={(prismEnabled) => setEffectPipeline({ prismEnabled })} />
+      {imageGradient.enabled && (
+        <div className="border-t border-cream/15 px-2 py-1.5 text-[8px] uppercase tracking-wider text-amber-300/90">
+          Image Gradient: geometry-resampling layers are protected
         </div>
-        <div className="flex items-center justify-between py-0.5 text-cream/75">
-          <span className="flex items-center gap-2">Particles <span className={`text-[8px] ${programStatusLabel('particles', effectPipeline.particlesEnabled).className}`}>{programStatusLabel('particles', effectPipeline.particlesEnabled).label}</span></span>
-          <Toggle variant="switch" size="xs" checked={effectPipeline.particlesEnabled} onChange={(particlesEnabled) => setEffectPipeline({ particlesEnabled })} />
-        </div>
-      </div>
+      )}
       </div>
     </div>
   );

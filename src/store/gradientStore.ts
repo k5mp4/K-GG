@@ -11,7 +11,13 @@ import { createAnimationTrack, getAnimationDefinition } from '../lib/animationRe
 import { clampKeyframeTime } from '../lib/loopKeyframes';
 import { isPostprocessTimeAnimationActive } from '../lib/postprocessAnimation';
 import { createDefaultPostprocessStack, normalizePostprocessEffectMode, normalizePostprocessEffectStack } from '../lib/postprocessStack';
-import { createDefaultEffectPipeline, normalizeEffectPipelineConfig, updateEffectStackLayer } from '../lib/effectPipeline';
+import {
+  createDefaultEffectPipeline,
+  getPostprocessEffectStackEnabledSignature,
+  hasEnabledPostprocessEffectStack,
+  normalizeEffectPipelineConfig,
+  updateEffectStackLayer,
+} from '../lib/effectPipeline';
 import { IDENTITY_DIFFUSE_BEZIER, normalizeDiffuseBezier, resolveDiffuseBezier } from '../lib/diffuseCurve';
 import { clampParameter, getParameterLimit, normalizeTrackValue } from '../lib/parameterLimits';
 import { GLASS_V2_COLOR_DEFAULTS, normalizeGlassV2ColorParameters } from '../lib/glass';
@@ -509,29 +515,34 @@ export function normalizeNoiseDistortionConfig(
 
 export function normalizePostprocessConfig(
   saved?: Partial<PostprocessConfig>,
+  legacyDistort?: Partial<ManualDistortConfig>,
 ): PostprocessConfig {
-  const rawResolution = saved?.mapResolution;
+  // Postprocess Distort is the canonical editor state. `manualDistort` is
+  // accepted only as a read-time fallback for presets created before Distort
+  // moved under Postprocess.
+  const source: Partial<PostprocessConfig> = saved ?? legacyDistort ?? {};
+  const rawResolution = source?.mapResolution;
   const resolution = typeof rawResolution === 'number' && Number.isFinite(rawResolution)
     ? Math.max(1, Math.min(512, Math.round(rawResolution)))
     : STORE_DEFAULTS.postprocess.mapResolution;
   const displacementLength = resolution * resolution * 2;
   const smoothMaskLength = resolution * resolution;
-  const savedDisplacement = saved?.displacement;
-  const savedSmoothMask = saved?.smoothMask;
+  const savedDisplacement = source?.displacement;
+  const savedSmoothMask = source?.smoothMask;
   const validFiniteArray = (value: unknown, expectedLength: number): value is number[] => (
     Array.isArray(value)
     && value.length === expectedLength
     && value.every(item => typeof item === 'number' && Number.isFinite(item))
   );
   const effectMode = normalizePostprocessEffectMode(
-    saved?.effectMode,
+    source?.effectMode,
     STORE_DEFAULTS.postprocess.effectMode,
   );
   const normalized: PostprocessConfig = {
     ...STORE_DEFAULTS.postprocess,
-    ...saved,
+    ...source,
     effectMode,
-    effectStack: normalizePostprocessEffectStack(saved?.effectStack, effectMode),
+    effectStack: normalizePostprocessEffectStack(source?.effectStack, effectMode),
     mapResolution: resolution,
     displacement: validFiniteArray(savedDisplacement, displacementLength)
       ? [...savedDisplacement]
@@ -784,7 +795,16 @@ export const useGradientStore = create<GradientStore>((set) => ({
     const effectPipeline = v.enabled !== undefined && s.effectPipeline.version === 'stack-v2'
       ? { ...s.effectPipeline, effectStack: updateEffectStackLayer(s.effectPipeline.effectStack, 'stretch', { enabled: v.enabled }) }
       : s.effectPipeline;
-    return { stretch, keyframeTracks, effectPipeline };
+    const postprocessEnabledSignatureChanged = v.enabled !== undefined
+      && getPostprocessEffectStackEnabledSignature(s.effectPipeline) !== getPostprocessEffectStackEnabledSignature(effectPipeline);
+    return {
+      stretch,
+      keyframeTracks,
+      effectPipeline,
+      ...(postprocessEnabledSignatureChanged
+        ? { postprocess: { ...s.postprocess, enabled: hasEnabledPostprocessEffectStack(effectPipeline) } }
+        : {}),
+    };
   }),
   setAnimation: (v) => set((s) => {
     const nextAnimation = { ...s.animation, ...v };
@@ -835,10 +855,7 @@ export const useGradientStore = create<GradientStore>((set) => ({
       : v.mapResolution && v.mapResolution !== s.manualDistort.mapResolution
         ? createEmptyManualSmoothMask(resolution)
         : s.manualDistort.smoothMask ?? createEmptyManualSmoothMask(resolution);
-    const effectPipeline = v.enabled !== undefined && s.effectPipeline.version === 'stack-v2'
-      ? { ...s.effectPipeline, effectStack: updateEffectStackLayer(s.effectPipeline.effectStack, 'distort', { enabled: v.enabled }) }
-      : s.effectPipeline;
-    return { manualDistort: { ...s.manualDistort, ...v, displacement, smoothMask }, effectPipeline };
+    return { manualDistort: { ...s.manualDistort, ...v, displacement, smoothMask } };
   }),
   setPostprocess: (v) => set((s) => {
     const resolution = v.mapResolution ?? s.postprocess.mapResolution;
@@ -858,6 +875,9 @@ export const useGradientStore = create<GradientStore>((set) => ({
     );
     const effectStack = normalizePostprocessEffectStack(v.effectStack ?? s.postprocess.effectStack, effectMode);
     const next = { ...s.postprocess, ...v, effectMode, effectStack, displacement, smoothMask };
+    if (v.effectStack !== undefined && v.enabled === undefined) {
+      next.enabled = effectStack.some(layer => layer.enabled);
+    }
     next.kaleidoscopeRotation = clampParameter(next.kaleidoscopeRotation, s.postprocess.kaleidoscopeRotation, getParameterLimit('postprocess.kaleidoscopeRotation'));
     next.voronoiAngle = clampParameter(next.voronoiAngle, s.postprocess.voronoiAngle, getParameterLimit('postprocess.voronoiAngle'));
     next.glassRotation = clampParameter(next.glassRotation, s.postprocess.glassRotation, getParameterLimit('postprocess.glassRotation'));
@@ -882,13 +902,17 @@ export const useGradientStore = create<GradientStore>((set) => ({
     const keyframeTracks = s.animation.enabled && isPostprocessTimeAnimationActive(s.postprocess, effectPipeline)
       ? ensureAutoTrack(s.keyframeTracks, 'postprocess.__time')
       : s.keyframeTracks;
+    const postprocessEnabledSignatureChanged = v.effectStack !== undefined
+      && getPostprocessEffectStackEnabledSignature(s.effectPipeline) !== getPostprocessEffectStackEnabledSignature(effectPipeline);
     return {
       effectPipeline,
       noiseDistortion: { ...s.noiseDistortion, enabled: enabled('noise') },
       diffuse: { ...s.diffuse, enabled: enabled('diffuse') },
       slitScan: { ...s.slitScan, enabled: enabled('slit') },
       stretch: { ...s.stretch, enabled: enabled('stretch') },
-      manualDistort: { ...s.manualDistort, enabled: enabled('distort') },
+      ...(postprocessEnabledSignatureChanged
+        ? { postprocess: { ...s.postprocess, enabled: hasEnabledPostprocessEffectStack(effectPipeline) } }
+        : {}),
       keyframeTracks,
     };
   }),

@@ -18,6 +18,7 @@ import {
   restoreEffectStackEnabledState,
   updateEffectStackLayer,
 } from './effectPipeline';
+import { shouldRenderNormalMap } from './normalMap';
 
 describe('effectPipeline', () => {
   describe('canRenderV2Direct', () => {
@@ -117,6 +118,27 @@ describe('effectPipeline', () => {
   });
 
   describe('getV2RenderPlan', () => {
+    it('keeps Normal Map parity with Legacy by suppressing it while Diffuse is enabled', () => {
+      const pipeline = createDefaultEffectPipeline();
+      const withDiffuseOff = {
+        ...pipeline,
+        effectStack: updateEffectStackLayer(pipeline.effectStack, 'diffuse', { enabled: false }),
+      };
+
+      expect(shouldRenderNormalMap(true, false)).toBe(true);
+      expect(shouldRenderNormalMap(true, true)).toBe(false);
+      expect(getV2RenderPlan(pipeline, {
+        normalMapEnabled: true,
+        normalMapBlur: 1,
+        prismGlowRadius: 0,
+      }).normalRequested).toBe(false);
+      expect(getV2RenderPlan(withDiffuseOff, {
+        normalMapEnabled: true,
+        normalMapBlur: 1,
+        prismGlowRadius: 0,
+      }).normalRequested).toBe(true);
+    });
+
     it('requests the dedicated Noise program only when the Noise layer is enabled', () => {
       const pipeline = createDefaultEffectPipeline();
       const plan = getV2RenderPlan({

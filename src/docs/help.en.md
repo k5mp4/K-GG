@@ -50,7 +50,7 @@ Distorts the gradient with multiple noise algorithms. Strength controls the amou
 
 ### Postprocess Effect Stack
 
-Use the Effect Stack panel at the upper-left of the canvas to reorder Noise, Slit, Stretch, Distort, Mirror, Kaleidoscope, Voronoi, Glass, and Diffuse. Drag a row by its grip and toggle it with the switch. The fixed stages are `Surface → Main Stack → Prism → Particles`.
+Use the Effect Stack panel at the upper-left of the canvas to reorder Noise, Slit, Stretch, Distort, Mirror, Kaleidoscope, Voronoi, Glass, and Diffuse. Drag a row by its grip and toggle it with the switch. Postprocess is shown as enabled whenever one of Stretch, Distort, Mirror, Kaleidoscope, Voronoi, or Glass is enabled in the Effect Stack. Edit hand-drawn `Distort` from Postprocess's `Edit Layer`; old `manualDistort` preset data is migrated there on load. The fixed stages are `Surface → Main Stack → Prism → Particles`; edit Normal, Prism, and Particles from the `SANDBOX` tab in the top bar.
 
 Glass uses the GLASS V2 screen-space optical approximation with smooth gradient noise and separate RGB refraction. The Postprocess properties show one Glass entry; Chromatic Aberration reaches 80px, and Transmission Tint / Highlight Tint use color inputs.
 
@@ -62,9 +62,15 @@ If the screen or GPU rendering becomes corrupted, open Settings in the top bar a
 
 Stretches pixels along an axis. Enable Animate for motion. PingPong provides a seamless loop.
 
+### SANDBOX
+
+The top bar is ordered `Diffuse → Noise → Slit → Postprocess → SANDBOX → Export → Preset`; Stretch has no standalone tab and is not shown in the Postprocess property module. Select an Edit Layer in Postprocess to operate that layer's detailed properties. SANDBOX uses the same text color as Postprocess. The `SANDBOX` top-bar tab groups drawing modules that sit outside the reorderable gradient stack. Use its `Edit Layer` selector to edit one of Normal, Prism, and Particles at a time; changing the selection does not change the render order.
+
+Normal builds a normal map from the gradient luminance. Strength, Blur, Angle, and Bevel Size control the surface relief. Prism controls the post-stack light rays and glow; Particles controls the final particle overlay.
+
 ### Normal
 
-Builds a normal map from the gradient luminance. Height controls relief strength. A monochrome gradient is applied while enabled; reapply the desired gradient after disabling it.
+Builds a normal map from the gradient luminance. Height controls relief strength. A monochrome gradient is applied while enabled; reapply the desired gradient after disabling it. Normal Map stays off while Diffuse is enabled, matching the legacy rendering rule.
 
 ### Animation
 

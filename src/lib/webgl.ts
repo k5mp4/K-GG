@@ -30,6 +30,7 @@ import { buildMeshGradientField, MESH_FIELD_SIZE, MESH_FIELD_SUBDIVISIONS } from
 import { noiseAngleDegreesForShader, noiseAngleRadiansForShader } from './noiseAngle';
 import { clampParameter, getParameterLimit } from './parameterLimits';
 import { getAnimationDirectionVector } from './animationDirection';
+import { shouldRenderNormalMap } from './normalMap';
 import type { LatestState } from '../types/latestState';
 import {
   exportDiagnosticsEnabled,
@@ -2763,7 +2764,6 @@ export function render(
 
     const v2Postprocess: PostprocessConfig = {
       ...postprocess,
-      ...manualDistort,
       diffuseEnabled: diffuseLayerEnabled,
       diffuseMode: diffuse.mode,
       diffuseScatter: diffuse.scatter,
@@ -2830,7 +2830,7 @@ export function render(
     return;
   }
 
-  const normalMapRequested = normalMap.enabled && !diffuse.enabled;
+  const normalMapRequested = shouldRenderNormalMap(normalMap.enabled, diffuse.enabled);
   const normalMapNeedsBlur = normalMapRequested && normalMap.blur >= 0.5;
   const normalMapReady = !normalMapRequested || (
     requestLazyProgram(ctx, 'normalMap') &&

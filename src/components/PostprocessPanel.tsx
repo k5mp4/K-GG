@@ -10,6 +10,7 @@ import { Icon } from './Icon';
 import { Toggle } from './Toggle';
 import { useLanguage } from '../i18n/LanguageProvider';
 import { InputColor } from 'tweeq';
+import { hasEnabledPostprocessEffectStack } from '../lib/effectPipeline';
 
 const D = STORE_DEFAULTS.manualDistort;
 const GLASS_COLOR_INPUT_CLASS = 'tq-color-input w-[132px] min-w-0 flex-none border border-panel-border bg-k-bg/50';
@@ -207,9 +208,10 @@ type ManualDistortControlsProps = {
   value: ManualDistortConfig;
   defaults?: ManualDistortConfig;
   onChange: (v: Partial<ManualDistortConfig>) => void;
+  showEnabledToggle?: boolean;
 };
 
-export function ManualDistortControls({ title, value: manualDistort, defaults = D, onChange: setManualDistort }: ManualDistortControlsProps) {
+export function ManualDistortControls({ title, value: manualDistort, defaults = D, onChange: setManualDistort, showEnabledToggle = true }: ManualDistortControlsProps) {
   const { t } = useLanguage();
   const canReset = isManualDistortDirty(manualDistort, defaults);
 
@@ -239,15 +241,17 @@ export function ManualDistortControls({ title, value: manualDistort, defaults = 
             >
               <Icon name="restart" className="text-[14px]" />
             </button>
-            <Toggle
-              variant="switch"
-              checked={manualDistort.enabled}
-              onChange={(v) => setManualDistort({ enabled: v })}
-            />
+            {showEnabledToggle && (
+              <Toggle
+                variant="switch"
+                checked={manualDistort.enabled}
+                onChange={(v) => setManualDistort({ enabled: v })}
+              />
+            )}
           </div>
         </div>
 
-        <Collapsible isOpen={manualDistort.enabled}>
+        <Collapsible isOpen={!showEnabledToggle || manualDistort.enabled}>
           <div className="space-y-4 pt-2">
             <div>
               <label className="block text-xs mb-1 text-deep">Brush Mode</label>
@@ -338,16 +342,28 @@ export function ManualDistortControls({ title, value: manualDistort, defaults = 
   );
 }
 
-export function PostprocessPanel() {
+type PostprocessPanelProps = {
+  /** Render a fixed-stage module inside SANDBOX without the legacy header. */
+  sandboxMode?: 'prism' | 'particles';
+  embedded?: boolean;
+};
+
+export function PostprocessPanel({ sandboxMode, embedded = false }: PostprocessPanelProps = {}) {
   const { t } = useLanguage();
   const { gradient, setGradient, postprocess, setPostprocess, effectPipeline } = useGradientStore();
-  const isDistort = postprocess.effectMode === 'distort';
+  const activeEffectMode = sandboxMode ?? (
+    postprocess.effectMode === 'prism' || postprocess.effectMode === 'particles'
+      ? 'distort'
+      : postprocess.effectMode
+  );
+  const isDistort = activeEffectMode === 'distort';
   const particleEmitterType = ((postprocess.particleEmitterType as string) === 'nexus'
     ? 'point'
     : postprocess.particleEmitterType) as PostprocessParticleEmitterType;
   const particleEmitterPoint = postprocess.particleEmitterPoint ?? STORE_DEFAULTS.postprocess.particleEmitterPoint;
   const particleRampStops = gradient.stops ?? STORE_DEFAULTS.gradient.stops;
   const particleRampInterpolation = gradient.rampInterpolation ?? STORE_DEFAULTS.gradient.rampInterpolation;
+  const postprocessEnabled = postprocess.enabled || hasEnabledPostprocessEffectStack(effectPipeline);
 
   const setEffectMode = (value: typeof postprocess.effectMode) => {
     setPostprocess({ effectMode: value });
@@ -366,40 +382,43 @@ export function PostprocessPanel() {
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between">
-        <h2 className="font-semibold text-sm text-k-text">{t('effect.postprocess')}</h2>
-        <Toggle
-          variant="switch"
-          checked={postprocess.enabled}
-          onChange={(v) => setPostprocess({ enabled: v })}
-        />
-      </div>
-
-      <Collapsible isOpen={postprocess.enabled}>
-        <div className="space-y-4 pt-2">
-          <CustomSelect
-            label="Edit Layer"
-            value={postprocess.effectMode}
-            options={[
-              { value: 'distort', label: 'Distort' },
-              { value: 'mirror', label: 'Mirror' },
-              { value: 'kaleidoscope', label: 'Kaleidoscope' },
-              { value: 'prism', label: 'Prism' },
-              { value: 'voronoi', label: 'Voronoi' },
-              { value: 'glassV2', label: 'Glass' },
-              { value: 'particles', label: 'Particles' },
-            ]}
-            onChange={(value) => setEffectMode(value as typeof postprocess.effectMode)}
+      {!embedded && (
+        <div className="flex items-center justify-between">
+          <h2 className="font-semibold text-sm text-k-text">{t('effect.postprocess')}</h2>
+          <Toggle
+            variant="switch"
+            checked={postprocessEnabled}
+            onChange={(v) => setPostprocess({ enabled: v })}
           />
+        </div>
+      )}
 
+      {!sandboxMode && (
+        <CustomSelect
+          label="Edit Layer"
+          value={activeEffectMode}
+          options={[
+            { value: 'distort', label: 'Distort' },
+            { value: 'mirror', label: 'Mirror' },
+            { value: 'kaleidoscope', label: 'Kaleidoscope' },
+            { value: 'voronoi', label: 'Voronoi' },
+            { value: 'glassV2', label: 'Glass' },
+          ]}
+          onChange={(value) => setEffectMode(value as typeof postprocess.effectMode)}
+        />
+      )}
+
+      <Collapsible isOpen>
+        <div className="space-y-4 pt-2">
           {isDistort ? (
             <ManualDistortControls
               title="Distort"
               value={postprocess}
               defaults={STORE_DEFAULTS.postprocess}
               onChange={setPostprocess}
+              showEnabledToggle={false}
             />
-          ) : postprocess.effectMode === 'mirror' ? (
+          ) : activeEffectMode === 'mirror' ? (
             <div className="space-y-4">
               <CustomSelect
                 label="Mirror Axis"
@@ -417,7 +436,7 @@ export function PostprocessPanel() {
                 />
               </div>
             </div>
-          ) : postprocess.effectMode === 'kaleidoscope' ? (
+          ) : activeEffectMode === 'kaleidoscope' ? (
             <div className="space-y-4">
               <CustomSelect
                 label="Mirroring Type"
@@ -467,7 +486,7 @@ export function PostprocessPanel() {
                 />
               </div>
             </div>
-          ) : postprocess.effectMode === 'prism' ? (
+          ) : activeEffectMode === 'prism' ? (
             <div className="space-y-4">
               <SliderField
                 label="Ray Count"
@@ -599,7 +618,7 @@ export function PostprocessPanel() {
                 defaultValue={STORE_DEFAULTS.postprocess.prismSeed}
               />
             </div>
-          ) : postprocess.effectMode === 'voronoi' ? (
+          ) : activeEffectMode === 'voronoi' ? (
             <div className="space-y-4">
               <SliderField
                 label="Cell Scale"
@@ -663,7 +682,7 @@ export function PostprocessPanel() {
                 defaultValue={STORE_DEFAULTS.postprocess.voronoiSeed}
               />
             </div>
-          ) : postprocess.effectMode === 'glassV2' ? (
+          ) : activeEffectMode === 'glassV2' ? (
             <div className="space-y-4">
               <p className="text-[10px] leading-relaxed text-tab-inactive">
                 Smooth gradient noise, wavelength-dependent refraction, rough transmission, and Fresnel highlights are combined as a single-layer screen-space approximation.
@@ -1224,7 +1243,7 @@ export function PostprocessPanel() {
             </div>
           )}
 
-          {effectPipeline.version === 'legacy-v1' && postprocess.effectMode !== 'particles' && (
+          {!sandboxMode && effectPipeline.version === 'legacy-v1' && postprocess.effectMode !== 'particles' && (
           <div className="border-t border-cream/40 pt-4 space-y-4">
             <div className="flex items-center justify-between">
               <span className="text-xs text-deep font-display uppercase tracking-wider">Post Diffuse</span>

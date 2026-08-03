@@ -145,7 +145,7 @@ Diceボタンを押すことでランダムなノイズを生成することが�
 - Glassは有機的なリッジ高さ場、Glass V2は滑らかな勾配ノイズとRGB別屈折率を使う画面空間の光学近似です。両方とも同じGlassパラメータを使い、独立したレイヤーとして比較・併用できます。
 - 行のグリップをドラッグすると、行が目的位置へ収束してから描画順序が確定します。
 - 各行のスイッチで、その主スタックレイヤーのON/OFFを切り替えられます。Texture / Transform / Structure のカテゴリ表示は順序を制限しません。
-- Normal/Matcapは主スタック前のSurface、Prismは主スタック後、Particlesは最終オーバーレイとして `Surface → Main Stack → Prism → Particles` の固定順で描画されます。DiffuseはMain Stack内の位置で一度だけ適用されます。
+- Normal/Matcapは主スタック前のSurface、Prismは主スタック後、Particlesは最終オーバーレイとして `Surface → Main Stack → Prism → Particles` の固定順で描画されます。これらの固定段はTOPバーの `SANDBOX` から編集します。DiffuseはMain Stack内の位置で一度だけ適用されます。
 - 画面やGPU描画が壊れた場合は、トップバーの設定（Hover / Click only）モーダルにある `Refresh app` でアプリを再読み込みできます。未保存の編集状態は破棄されます。
 
 ## Slit (スリットスキャン)
@@ -153,7 +153,14 @@ Diceボタンを押すことでランダムなノイズを生成することが�
 - Animateを有効にすることでアニメーション可能です
 - PingPongは仕組み上動きの破綻がないです
 
-## Normal (ノーマルマップ)
+## SANDBOX
+- TOPバーは `Diffuse → Noise → Slit → Postprocess → SANDBOX → Export → Preset` の順です。Stretchは独立項目およびPostprocessのプロパティモジュールに表示せず、SANDBOXの文字色はPostprocessと同じです。
+- TOPバーの `SANDBOX` から、グラデーションの主スタックとは別の描画モジュールをまとめて編集できます。
+- `Normal` はグラデーションの輝度勾配から法線マップを生成し、表面の凹凸を調整します。有効時は既存どおりモノクロのグラデーションを適用します。
+- `Prism` は主スタック後段の光線・グロー、`Particles` は最終オーバーレイのパーティクルを調整します。
+- モジュールの表示順は `Surface → Main Stack → Prism → Particles` で固定され、SANDBOX内の選択変更は描画順を変更しません。SANDBOXの`Edit Layer`からNormal／Prism／Particlesを一つずつ選択します。
+
+### Normal (ノーマルマップ)
 - グラデーションの輝度勾配から法線マップを生成します。
 - `Height` で凹凸の強調具合を調整できます。
 - 有効時にモノクロのグラデーションを適用しています。
