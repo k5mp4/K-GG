@@ -9,7 +9,7 @@ import { SliderField } from './SliderField';
 import { Icon } from './Icon';
 import { Toggle } from './Toggle';
 import { useLanguage } from '../i18n/LanguageProvider';
-import { InputColor } from 'tweeq';
+import { InputColor, InputDrum, InputRadio, InputString } from 'tweeq';
 import { hasEnabledPostprocessEffectStack } from '../lib/effectPipeline';
 
 const D = STORE_DEFAULTS.manualDistort;
@@ -18,7 +18,12 @@ const POSTPROCESS_DIFFUSE_MODES: Array<{ value: string; label: string }> = [
   { value: 'block', label: 'Block' },
   { value: 'smooth', label: 'Smooth' },
   { value: 'dither', label: 'Dither' },
+  { value: 'halftone', label: 'Halftone' },
+  { value: 'ascii', label: 'ASCII' },
 ];
+const POSTPROCESS_DIFFUSE_MODE_VALUES = POSTPROCESS_DIFFUSE_MODES.map((mode) => mode.value);
+const POSTPROCESS_HALFTONE_SHAPES = ['circle', 'square'] as const;
+const POSTPROCESS_HALFTONE_SHAPE_LABELS = ['Circle', 'Square'] as const;
 const MIRROR_AXIS_OPTIONS = [
   { value: 'horizontal', label: 'Left / Right' },
   { value: 'vertical', label: 'Top / Bottom' },
@@ -255,26 +260,14 @@ export function ManualDistortControls({ title, value: manualDistort, defaults = 
           <div className="space-y-4 pt-2">
             <div>
               <label className="block text-xs mb-1 text-deep">Brush Mode</label>
-              <div className="grid grid-cols-3 gap-1">
-                {([
-                  ['warp', 'Warp'],
-                  ['swirl', 'Swirl'],
-                  ['spiky', 'Spiky'],
-                ] as const).map(([value, label]) => (
-                  <button
-                    key={value}
-                    type="button"
-                    onClick={() => setManualDistort({ mode: value })}
-                    className={`text-xs py-1.5 rounded-none transition-colors ${
-                      manualDistort.mode === value
-                        ? 'bg-fire text-k-text'
-                        : 'bg-k-muted hover:bg-k-muted/70 text-k-text'
-                    }`}
-                  >
-                    {label}
-                  </button>
-                ))}
-              </div>
+              <InputRadio
+                value={manualDistort.mode}
+                options={['warp', 'swirl', 'spiky'] as const}
+                labels={['Warp', 'Swirl', 'Spiky'] as const}
+                onChange={(mode) => mode !== undefined && setManualDistort({ mode })}
+                aria-label="Brush Mode"
+                className="w-full"
+              />
             </div>
             <SliderField
               label="Brush Size"
@@ -1256,13 +1249,18 @@ export function PostprocessPanel({ sandboxMode, embedded = false }: PostprocessP
             </div>
             <Collapsible isOpen={postprocess.diffuseEnabled}>
               <div className="space-y-4 pt-2">
-                <CustomSelect
-                  label="Diffuse Mode"
-                  value={postprocess.diffuseMode}
-                  options={POSTPROCESS_DIFFUSE_MODES}
-                  onChange={(value) => setPostprocess({ diffuseMode: value as typeof postprocess.diffuseMode })}
-                />
-                {postprocess.diffuseMode !== 'dither' && (
+                <div>
+                  <p className="mb-1 text-xs text-deep">Diffuse Mode</p>
+                  <InputDrum
+                    value={postprocess.diffuseMode}
+                    options={POSTPROCESS_DIFFUSE_MODE_VALUES}
+                    labels={POSTPROCESS_DIFFUSE_MODES.map((mode) => mode.label)}
+                    onChange={(mode) => mode !== undefined && setPostprocess({ diffuseMode: mode as typeof postprocess.diffuseMode })}
+                    aria-label="Post Diffuse mode"
+                    className="w-full"
+                  />
+                </div>
+                {(postprocess.diffuseMode === 'block' || postprocess.diffuseMode === 'smooth') && (
                   <SliderField
                     label="Scatter"
                     min={0}
@@ -1275,15 +1273,65 @@ export function PostprocessPanel({ sandboxMode, embedded = false }: PostprocessP
                   />
                 )}
                 <SliderField
-                  label={postprocess.diffuseMode === 'dither' ? 'Dot Size' : 'Grain'}
-                  min={0.01}
-                  max={postprocess.diffuseMode === 'dither' ? 12 : 5}
-                  step={0.01}
+                  label={postprocess.diffuseMode === 'dither' ? 'Dot Size' : postprocess.diffuseMode === 'halftone' || postprocess.diffuseMode === 'ascii' ? 'Cell Size' : 'Grain'}
+                  min={postprocess.diffuseMode === 'halftone' ? 2 : postprocess.diffuseMode === 'ascii' ? 4 : 0.01}
+                  max={postprocess.diffuseMode === 'dither' ? 12 : postprocess.diffuseMode === 'halftone' || postprocess.diffuseMode === 'ascii' ? 64 : 5}
+                  step={postprocess.diffuseMode === 'halftone' || postprocess.diffuseMode === 'ascii' ? 1 : 0.01}
                   value={postprocess.diffuseGrain}
                   onChange={(v) => setPostprocess({ diffuseGrain: v })}
-                  format={(v) => `${v.toFixed(2)}px`}
+                  format={(v) => postprocess.diffuseMode === 'halftone' || postprocess.diffuseMode === 'ascii' ? `${Math.round(v)}px` : `${v.toFixed(2)}px`}
                   defaultValue={STORE_DEFAULTS.postprocess.diffuseGrain}
                 />
+                {postprocess.diffuseMode === 'halftone' && (
+                  <>
+                    <div>
+                      <p className="mb-1 text-xs text-deep">Shape</p>
+                      <InputRadio
+                        value={postprocess.diffuseHalftoneShape ?? 'circle'}
+                        options={POSTPROCESS_HALFTONE_SHAPES}
+                        labels={POSTPROCESS_HALFTONE_SHAPE_LABELS}
+                        onChange={(diffuseHalftoneShape) => diffuseHalftoneShape !== undefined && setPostprocess({ diffuseHalftoneShape })}
+                        aria-label="Post Diffuse halftone shape"
+                        className="w-full"
+                      />
+                    </div>
+                    <SliderField
+                      label="Shape Size"
+                      min={0.05}
+                      max={1}
+                      step={0.01}
+                      value={postprocess.diffuseHalftoneSize ?? STORE_DEFAULTS.postprocess.diffuseHalftoneSize}
+                      onChange={(v) => setPostprocess({ diffuseHalftoneSize: v })}
+                      format={(v) => `${Math.round(v * 100)}%`}
+                      defaultValue={STORE_DEFAULTS.postprocess.diffuseHalftoneSize}
+                    />
+                  </>
+                )}
+                {postprocess.diffuseMode === 'ascii' && (
+                  <div className="space-y-1">
+                    <p className="text-xs text-deep">ASCII Characters</p>
+                    <InputString
+                      value={postprocess.diffuseAsciiCharset ?? STORE_DEFAULTS.postprocess.diffuseAsciiCharset}
+                      onChange={(diffuseAsciiCharset) => setPostprocess({ diffuseAsciiCharset })}
+                      aria-label="Post Diffuse ASCII character set"
+                      className="w-full"
+                    />
+                    <p className="text-[9px] text-tab-inactive">Dark to light, left to right</p>
+                  </div>
+                )}
+                {(postprocess.diffuseMode === 'halftone' || postprocess.diffuseMode === 'ascii') && (
+                  <div className="flex items-center justify-between gap-3">
+                    <span className="text-xs text-deep">Background Color</span>
+                    <div className="tq-color-input w-[180px]">
+                      <InputColor
+                        value={postprocess.diffuseBackgroundColor ?? STORE_DEFAULTS.postprocess.diffuseBackgroundColor}
+                        onChange={(diffuseBackgroundColor) => setPostprocess({ diffuseBackgroundColor })}
+                        alpha={false}
+                        aria-label="Post Diffuse background color"
+                      />
+                    </div>
+                  </div>
+                )}
                 {postprocess.diffuseMode === 'dither' && (
                   <SliderField
                     label="Threshold"

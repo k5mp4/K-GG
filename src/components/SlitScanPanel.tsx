@@ -7,7 +7,6 @@ import { Toggle } from './Toggle';
 import { imageFileToCanvas } from '../lib/applySlitToImage';
 import { Icon } from './Icon';
 import { CustomSelect } from './CustomSelect';
-import { AnimationPropertyControls } from './AnimationPropertyControls';
 import { InputDrum, InputRadio, InputShuffle, fromNumber } from 'tweeq';
 import { useLanguage } from '../i18n/LanguageProvider';
 
@@ -21,8 +20,8 @@ const WAVE_TYPE_OPTIONS = [
 ];
 const SLIT_MODES = ['linear', 'circular', 'polygon', 'wave'] as const;
 const SLIT_MODE_LABELS = ['Linear', 'Circular', 'Polygon', 'Wave'] as const;
-const AUTO_MODIFIER_MODES = ['unidirectional', 'pingpong'] as const;
-const AUTO_MODIFIER_LABELS = ['→ Loop', '↔ PingPong'] as const;
+const SLIT_MOTION_MODES = ['unidirectional', 'pingpong'] as const;
+const SLIT_MOTION_LABELS = ['→ Loop', '↔ PingPong'] as const;
 
 const isSlitDirty = (value: SlitScanConfig) =>
   Object.keys(D).some((key) => {
@@ -257,15 +256,15 @@ export function SlitScanPanel({ sourceImageName, hasSourceImage, onSourceImageLo
             trackId="slitScan.slitWidth"
           />
 
-          {/* Auto modifier settings. Activation is controlled by property mode. */}
+          {/* Slit motion settings. The speed values are also used by export. */}
           <div className="space-y-3 border-t border-panel-border/30 pt-3">
-            <p className="text-[9px] font-display font-semibold uppercase tracking-widest text-tab-inactive">Auto Modifier</p>
+            <p className="text-[9px] font-display font-semibold uppercase tracking-widest text-tab-inactive">Motion</p>
             <InputRadio
               value={slitScan.animMode}
-              options={AUTO_MODIFIER_MODES}
-              labels={AUTO_MODIFIER_LABELS}
+              options={SLIT_MOTION_MODES}
+              labels={SLIT_MOTION_LABELS}
               onChange={(animMode) => animMode !== undefined && setSlitScan({ animMode })}
-              aria-label="Slit auto modifier"
+              aria-label="Slit motion mode"
               className="w-full"
             />
             <SliderField
@@ -277,14 +276,6 @@ export function SlitScanPanel({ sourceImageName, hasSourceImage, onSourceImageLo
               defaultValue={D.offsetSpeed}
               trackId="slitScan.offsetSpeed"
             />
-            <div className="flex items-center justify-between">
-              <p className="text-xs text-deep">Phase Motion</p>
-              <AnimationPropertyControls
-                trackId="slitScan.slitPhase"
-                label="Phase Motion"
-                value={slitScan.slitPhase}
-              />
-            </div>
             <SliderField
               label="Phase Speed"
               min={-4} max={4} step={0.01}

@@ -6,7 +6,7 @@ title: 進行中の変更
 
 新しい変更は、会話ターンや日付ごとではなく、[変更パッケージ運用](../../development/change-workflow)で定義する1つのまとまった依頼ごとに管理します。既存パッケージへ収まる追加指示ではディレクトリを増やさず、同じパッケージへ追記します。収まらない独立要求だけ、[変更仕様テンプレート](../_template/proposal)から `CHANGE-###-short-name` のディレクトリを作り、まず `proposal.md` と `delta.md` をレビューへ出します。
 
-## 一覧
+## 変更パッケージ
 
 | ID | 変更 | 状態 |
 | --- | --- | --- |
@@ -15,3 +15,4 @@ title: 進行中の変更
 | CHANGE-014 | [Effect Stackのランダム順序とソロレイヤー](./CHANGE-014-effect-stack-controls/proposal) | approved |
 | CHANGE-015 | [Effect Stack別ウィンドウの復旧](./CHANGE-015-effect-stack-window-repair/proposal) | approved |
 | CHANGE-018 | [SANDBOX描画モジュールの新設](./CHANGE-018-sandbox-graphics/proposal) | approved |
+| CHANGE-019 | [Diffuse描画モードとEffect Stack UIの拡張](./CHANGE-019-diffuse-halftone-ascii-adaptive-ui/proposal) | approved |

@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import { DEFAULT_MESH_GRADIENT, normalizeMeshGradientConfig, type GradientConfig, type MeshEdge, type Vec2Tuple } from '../types/gradient';
-import type { NoiseDistortionConfig, DiffuseConfig, SlitScanConfig, StretchConfig, NormalMapConfig, RadonConfig, IridescenceConfig, ManualDistortConfig, PostprocessConfig, MatcapConfig, HistogramConfig, EffectPipelineConfig } from '../types/distortion';
+import type { NoiseDistortionConfig, DiffuseConfig, SlitScanConfig, StretchConfig, NormalMapConfig, RadonConfig, IridescenceConfig, ManualDistortConfig, PostprocessConfig, MatcapConfig, HistogramConfig, EffectPipelineConfig, DiffuseAdaptiveChannel, DiffuseHalftoneShape } from '../types/distortion';
+import { DEFAULT_DIFFUSE_ASCII_CHARSET, DEFAULT_DIFFUSE_BACKGROUND_COLOR } from '../types/distortion';
 import type { ImageGradientConfig } from '../types/imageGradient';
 import { IMAGE_GRADIENT_DEFAULTS, normalizeImageGradientConfig } from '../types/imageGradient';
 import { gradientRampPresets } from '../lib/gradientRampUtils';
@@ -262,8 +263,16 @@ export const STORE_DEFAULTS = {
     seed: 0,
     seedAnimEnabled: false,
     ditherThreshold: 0.5,
+    halftoneShape: 'circle' as const,
+    halftoneSize: 0.82,
+    asciiCharset: DEFAULT_DIFFUSE_ASCII_CHARSET,
+    backgroundColor: DEFAULT_DIFFUSE_BACKGROUND_COLOR,
     adaptiveEnabled: false,
+    adaptiveChannel: 'luminance' as DiffuseAdaptiveChannel,
     luminanceBezier: [...IDENTITY_DIFFUSE_BEZIER] as DiffuseConfig['luminanceBezier'],
+    grainAdaptiveEnabled: false,
+    grainAdaptiveAmount: 1,
+    grainBezier: [...IDENTITY_DIFFUSE_BEZIER] as DiffuseConfig['grainBezier'],
   },
   imageGradient: IMAGE_GRADIENT_DEFAULTS,
   slitScan: {
@@ -278,7 +287,7 @@ export const STORE_DEFAULTS = {
     offsetSpeed: 0.3,
     animEnabled: false,
     animMode: 'unidirectional' as const,
-    phaseAnimEnabled: false,
+    phaseAnimEnabled: true,
     phaseSpeed: 1.0,
     variance: 0.5,
     seed: 0,
@@ -444,6 +453,14 @@ export const STORE_DEFAULTS = {
     diffuseGrain: 2,
     diffuseSeed: 0,
     diffuseDitherThreshold: 0.5,
+    diffuseHalftoneShape: 'circle' as DiffuseHalftoneShape,
+    diffuseHalftoneSize: 0.82,
+    diffuseAsciiCharset: DEFAULT_DIFFUSE_ASCII_CHARSET,
+    diffuseBackgroundColor: DEFAULT_DIFFUSE_BACKGROUND_COLOR,
+    diffuseAdaptiveChannel: 'luminance' as DiffuseAdaptiveChannel,
+    diffuseGrainAdaptiveEnabled: false,
+    diffuseGrainAdaptiveAmount: 1,
+    diffuseGrainBezier: [...IDENTITY_DIFFUSE_BEZIER] as DiffuseConfig['grainBezier'],
     mode: 'warp' as const,
     brushSize: 120,
     strength: 1.0,
@@ -513,6 +530,12 @@ export function normalizeNoiseDistortionConfig(
   return normalized;
 }
 
+function normalizeDiffuseBackgroundColor(value: unknown, fallback: string): string {
+  return typeof value === 'string' && /^#[0-9a-f]{6}$/i.test(value)
+    ? value.toUpperCase()
+    : fallback;
+}
+
 export function normalizePostprocessConfig(
   saved?: Partial<PostprocessConfig>,
   legacyDistort?: Partial<ManualDistortConfig>,
@@ -559,13 +582,17 @@ export function normalizePostprocessConfig(
   normalized.glassV2ChromaticSaturation = glassV2Color.chromaticSaturation;
   normalized.glassV2TransmissionTint = glassV2Color.transmissionTint;
   normalized.glassV2HighlightTint = glassV2Color.highlightTint;
+  normalized.diffuseBackgroundColor = normalizeDiffuseBackgroundColor(
+    normalized.diffuseBackgroundColor,
+    STORE_DEFAULTS.postprocess.diffuseBackgroundColor,
+  );
   normalized.particleDirection = clampParameter(normalized.particleDirection, STORE_DEFAULTS.postprocess.particleDirection, getParameterLimit('postprocess.particleDirection'));
   return normalized;
 }
 
 type AutoTrackState = Pick<
   GradientStore,
-  'noiseDistortion' | 'diffuse' | 'slitScan' | 'stretch' | 'radon' | 'iridescence' | 'postprocess' | 'effectPipeline'
+  'noiseDistortion' | 'diffuse' | 'slitScan' | 'stretch' | 'radon' | 'iridescence' | 'postprocess' | 'effectPipeline' | 'animation'
 >;
 
 function ensureAutoTrack(
@@ -591,7 +618,7 @@ function ensureDefaultAutoTracks(
   if (state.noiseDistortion.enabled) tracks = ensureAutoTrack(tracks, 'noiseDistortion.evolution');
   if (state.radon.enabled) tracks = ensureAutoTrack(tracks, 'radon.evolution');
   if (state.iridescence.enabled) tracks = ensureAutoTrack(tracks, 'iridescence.__time');
-  if (state.slitScan.enabled) {
+  if (state.slitScan.enabled && state.animation.affectSlit) {
     tracks = ensureAutoTrack(tracks, 'slitScan.offset');
     if (state.slitScan.phaseAnimEnabled) tracks = ensureAutoTrack(tracks, 'slitScan.slitPhase');
   }
@@ -755,15 +782,40 @@ export const useGradientStore = create<GradientStore>((set) => ({
       : hasLegacyCurve
         ? resolveDiffuseBezier(undefined, v.luminanceCurve)
         : normalizeDiffuseBezier(s.diffuse.luminanceBezier);
-    const diffuse = { ...s.diffuse, ...v, luminanceBezier };
+    const grainBezier = Object.prototype.hasOwnProperty.call(v, 'grainBezier')
+      ? normalizeDiffuseBezier(v.grainBezier)
+      : normalizeDiffuseBezier(s.diffuse.grainBezier);
+    const diffuse = { ...s.diffuse, ...v, luminanceBezier, grainBezier };
     delete diffuse.luminanceCurve;
     diffuse.scatter = clampParameter(diffuse.scatter, s.diffuse.scatter, getParameterLimit('diffuse.scatter'));
     diffuse.grain = clampParameter(diffuse.grain, s.diffuse.grain, {
-      ...getParameterLimit(diffuse.mode === 'dither' ? 'diffuse.ditherGrain' : 'diffuse.grain'),
+      ...getParameterLimit(
+        diffuse.mode === 'dither'
+          ? 'diffuse.ditherGrain'
+          : diffuse.mode === 'halftone'
+            ? 'diffuse.halftoneGrain'
+            : diffuse.mode === 'ascii'
+              ? 'diffuse.asciiGrain'
+              : 'diffuse.grain',
+      ),
     });
     diffuse.seed = clampParameter(diffuse.seed, s.diffuse.seed, getParameterLimit('diffuse.seed'));
     diffuse.ditherThreshold = clampParameter(diffuse.ditherThreshold, s.diffuse.ditherThreshold, getParameterLimit('diffuse.ditherThreshold'));
+    diffuse.halftoneSize = clampParameter(diffuse.halftoneSize, s.diffuse.halftoneSize, getParameterLimit('diffuse.halftoneSize'));
+    diffuse.grainAdaptiveAmount = clampParameter(diffuse.grainAdaptiveAmount, s.diffuse.grainAdaptiveAmount, getParameterLimit('diffuse.grainAdaptiveAmount'));
+    diffuse.adaptiveChannel = diffuse.adaptiveChannel === 'hue' || diffuse.adaptiveChannel === 'saturation'
+      ? diffuse.adaptiveChannel
+      : 'luminance';
+    diffuse.halftoneShape = diffuse.halftoneShape === 'square' ? 'square' : 'circle';
+    diffuse.asciiCharset = typeof diffuse.asciiCharset === 'string' && diffuse.asciiCharset.length > 0
+      ? diffuse.asciiCharset.slice(0, 64)
+      : DEFAULT_DIFFUSE_ASCII_CHARSET;
     diffuse.adaptiveEnabled = Boolean(diffuse.adaptiveEnabled);
+    diffuse.grainAdaptiveEnabled = Boolean(diffuse.grainAdaptiveEnabled);
+    diffuse.backgroundColor = normalizeDiffuseBackgroundColor(
+      diffuse.backgroundColor,
+      s.diffuse.backgroundColor ?? DEFAULT_DIFFUSE_BACKGROUND_COLOR,
+    );
     const keyframeTracks = s.animation.enabled && diffuse.enabled && diffuse.seedAnimEnabled
       ? ensureAutoTrack(s.keyframeTracks, 'diffuse.seed')
       : s.keyframeTracks;
@@ -778,7 +830,7 @@ export const useGradientStore = create<GradientStore>((set) => ({
     slitScan.angle = clampParameter(slitScan.angle, s.slitScan.angle, getParameterLimit('slit.angle'));
     slitScan.offsetAngle = clampParameter(slitScan.offsetAngle, s.slitScan.offsetAngle ?? 0, getParameterLimit('slit.offsetAngle'));
     let keyframeTracks = s.keyframeTracks;
-    if (s.animation.enabled && slitScan.enabled) {
+    if (s.animation.enabled && slitScan.enabled && s.animation.affectSlit) {
       keyframeTracks = ensureAutoTrack(keyframeTracks, 'slitScan.offset');
       if (slitScan.phaseAnimEnabled) keyframeTracks = ensureAutoTrack(keyframeTracks, 'slitScan.slitPhase');
     }
@@ -875,6 +927,10 @@ export const useGradientStore = create<GradientStore>((set) => ({
     );
     const effectStack = normalizePostprocessEffectStack(v.effectStack ?? s.postprocess.effectStack, effectMode);
     const next = { ...s.postprocess, ...v, effectMode, effectStack, displacement, smoothMask };
+    next.diffuseBackgroundColor = normalizeDiffuseBackgroundColor(
+      next.diffuseBackgroundColor,
+      s.postprocess.diffuseBackgroundColor ?? DEFAULT_DIFFUSE_BACKGROUND_COLOR,
+    );
     if (v.effectStack !== undefined && v.enabled === undefined) {
       next.enabled = effectStack.some(layer => layer.enabled);
     }

@@ -5,6 +5,7 @@ import { createAnimationTrack } from './animationRegistry';
 import { evaluateSceneAtTime, hasActiveAnimation } from './sceneEvaluation';
 import { createDefaultPostprocessStack } from './postprocessStack';
 import { updateEffectStackLayer } from './effectPipeline';
+import { calcExportRenderTime } from './videoExportFrames';
 
 function createGlassState(glassMotion: number): LatestState {
   return {
@@ -54,6 +55,62 @@ describe('Glass scene animation', () => {
       'auto',
     );
     expect(hasActiveAnimation(stateWithRetainedAutoTrack)).toBe(false);
+  });
+
+  it('uses the same speed-adjusted Slit clock for preview and export', () => {
+    const state = createGlassState(0);
+    state.slitScan = {
+      ...STORE_DEFAULTS.slitScan,
+      enabled: true,
+      animMode: 'pingpong',
+      offsetSpeed: 0.5,
+    };
+    state.animation = {
+      ...state.animation,
+      duration: 7,
+      speed: 2,
+      affectSlit: false,
+    };
+
+    expect(hasActiveAnimation(state)).toBe(true);
+    const start = evaluateSceneAtTime(state, 0);
+    const end = evaluateSceneAtTime(state, 1);
+    expect(start.slitAnimationTime).toBe(0);
+    expect(end.slitAnimationTime).toBe(14);
+    const midpoint = evaluateSceneAtTime(state, 0.5);
+    expect(midpoint.slitAnimationTime).toBe(7);
+    expect(midpoint.slitAnimationTime).toBe(
+      calcExportRenderTime(0.5, state.animation.speed, state.animation.duration, state.animation.easing),
+    );
+    expect(start.slitScan.animEnabled).toBe(true);
+    expect(start.slitScan.offsetSpeed).toBe(0.5);
+    expect(start.slitScan.phaseSpeed).toBe(1);
+  });
+
+  it('keeps Slit own animation running without a timeline loop switch', () => {
+    const state = createGlassState(0);
+    state.slitScan = { ...STORE_DEFAULTS.slitScan, enabled: true, offsetSpeed: 0.3 };
+    state.animation = { ...state.animation, affectSlit: false };
+
+    expect(hasActiveAnimation(state)).toBe(true);
+    expect(evaluateSceneAtTime(state, 0.5).slitAnimationTime).toBeCloseTo(2.5);
+    expect(evaluateSceneAtTime(state, 0.5).slitScan.animEnabled).toBe(true);
+  });
+
+  it('keeps Slit static when its own animation settings are disabled', () => {
+    const state = createGlassState(0);
+    state.slitScan = {
+      ...STORE_DEFAULTS.slitScan,
+      enabled: true,
+      animMode: 'off',
+      offsetSpeed: 0,
+      phaseAnimEnabled: false,
+      phaseSpeed: 0,
+    };
+    state.animation = { ...state.animation, affectSlit: false };
+
+    expect(hasActiveAnimation(state)).toBe(false);
+    expect(evaluateSceneAtTime(state, 0.5).slitScan.animEnabled).toBe(false);
   });
 
   it('maps the loop endpoints to the same shader phase', () => {

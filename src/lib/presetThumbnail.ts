@@ -64,7 +64,11 @@ export function createPresetThumbnailState(snapshot: StoreSnapshot): LatestState
     noiseDistortion: normalizeNoiseDistortionConfig(snapshot.noiseDistortion),
     diffuse,
     imageGradient: normalizeImageGradientConfig(snapshot.imageGradient, snapshot.imageGradient ? 0 : STORE_DEFAULTS.imageGradient.anchorInfluence),
-    slitScan: { ...STORE_DEFAULTS.slitScan, ...snapshot.slitScan },
+    slitScan: (() => {
+      const loadedSlit = { ...STORE_DEFAULTS.slitScan, ...snapshot.slitScan };
+      delete (loadedSlit as Record<string, unknown>).autoLoop;
+      return loadedSlit;
+    })(),
     stretch: { ...STORE_DEFAULTS.stretch, ...snapshot.stretch },
     normalMap: { ...STORE_DEFAULTS.normalMap, ...snapshot.normalMap },
     radon: { ...STORE_DEFAULTS.radon, ...snapshot.radon, enabled: false },

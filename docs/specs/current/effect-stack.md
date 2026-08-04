@@ -6,11 +6,11 @@ status: current
 owners: [maintainer]
 created: 2026-07-27
 updated: 2026-08-03
-requirement_ids: [EFFECT-001, EFFECT-002, EFFECT-003, EFFECT-004, EFFECT-005, EFFECT-006, EFFECT-007, EFFECT-008, EFFECT-009, EFFECT-010, EFFECT-011, EFFECT-012, EFFECT-013, EFFECT-014]
+requirement_ids: [EFFECT-001, EFFECT-002, EFFECT-003, EFFECT-004, EFFECT-005, EFFECT-006, EFFECT-007, EFFECT-008, EFFECT-009, EFFECT-010, EFFECT-011, EFFECT-012, EFFECT-013, EFFECT-014, EFFECT-015, EFFECT-016, EFFECT-017]
 related_adrs: [ADR-0004, ADR-0005, ADR-0010]
-related_changes: [CHANGE-001, CHANGE-011, CHANGE-012, CHANGE-013, CHANGE-014, CHANGE-015, CHANGE-018]
-related_code: [src/types/distortion.ts, src/lib/effectPipeline.ts, src/lib/normalMap.ts, src/lib/effectStackTransition.ts, src/lib/postprocessStack.ts, src/lib/effectStackWindow.ts, src/lib/postprocessAnimation.ts, src/lib/sceneEvaluation.ts, src/lib/glass.ts, src/lib/webgl.ts, src/lib/presetModel.ts, src/components/PostprocessStackPanel.tsx, src/components/EffectStackWorkspace.tsx, src/components/PostprocessPanel.tsx, src/components/DistortOverlay.tsx, src/components/SandboxPanel.tsx, src/shaders/normalmap.frag.glsl, src/shaders/postprocess/glass-optics.glsl]
-related_tests: [src/lib/effectPipeline.test.ts, src/lib/webglNormalMapParity.test.ts, src/lib/effectStackTransition.test.ts, src/lib/effectStackWindow.test.ts, src/lib/postprocessStack.test.ts, src/lib/postprocessAnimation.test.ts, src/lib/effectStackDrag.test.ts, src/lib/effectShaderParity.test.ts, src/lib/glass.test.ts, src/store/gradientStore.effectPipeline.test.ts, src/store/gradientStore.postprocessStack.test.ts, src/store/gradientStore.glass.test.ts, src/lib/sceneEvaluation.glass.test.ts]
+related_changes: [CHANGE-001, CHANGE-011, CHANGE-012, CHANGE-013, CHANGE-014, CHANGE-015, CHANGE-018, CHANGE-019]
+related_code: [src/types/distortion.ts, src/lib/effectPipeline.ts, src/lib/normalMap.ts, src/lib/effectStackTransition.ts, src/lib/postprocessStack.ts, src/lib/effectStackWindow.ts, src/lib/postprocessAnimation.ts, src/lib/sceneEvaluation.ts, src/lib/glass.ts, src/lib/webgl.ts, src/lib/presetModel.ts, src/lib/presetThumbnail.ts, src/store/gradientStore.ts, src/components/PostprocessStackPanel.tsx, src/components/EffectStackWorkspace.tsx, src/components/PostprocessPanel.tsx, src/components/DistortOverlay.tsx, src/components/SandboxPanel.tsx, src/components/BlockNoisePanel.tsx, src/components/DiffuseCurveEditor.tsx, src/components/SlitScanPanel.tsx, src/components/StretchPanel.tsx, src/components/PresetPanel.tsx, src/shaders/normalmap.frag.glsl, src/shaders/postprocess/glass-optics.glsl]
+related_tests: [src/lib/effectPipeline.test.ts, src/lib/webglNormalMapParity.test.ts, src/lib/effectStackTransition.test.ts, src/lib/effectStackWindow.test.ts, src/lib/postprocessStack.test.ts, src/lib/postprocessAnimation.test.ts, src/lib/effectStackDrag.test.ts, src/lib/effectShaderParity.test.ts, src/lib/glass.test.ts, src/store/gradientStore.effectPipeline.test.ts, src/store/gradientStore.postprocessStack.test.ts, src/store/gradientStore.glass.test.ts, src/lib/sceneEvaluation.glass.test.ts, src/lib/presetThumbnail.test.ts]
 ---
 
 # Effect Stack
@@ -51,6 +51,8 @@ Diffuseは主スタック内の一つのレイヤーです。旧来の固定最�
 
 `effectPipeline`を持たない旧PresetはLegacy V1として読み込みます。旧来のPostprocess設定に残る`effectMode: glass`およびstackの`kind: glass`は、読み込み時に`glassV2`へ正規化し、正規化後のPostprocess状態には旧Glassを残しません。旧Presetの`manualDistort`だけに保存されたDistort値はPostprocessへ移行し、Legacy generatorへ二重適用しません。V2の状態を持つPresetでは `effectPipeline` が有効状態と順序の一次情報です。
 
+Diffuseへ追加されたHalftone、ASCII、適応ソース、粒度カーブの値がない旧Presetは既定値で補完します。Slitの旧Presetに残る`autoLoop`は読み込み時に破棄し、保存済みの`animMode`、`offsetSpeed`、`phaseSpeed`を使います。
+
 ### EFFECT-006 描画失敗からの復旧
 
 描画に必要なプログラムとバッファは、現在の描画計画に必要なものだけを準備します。準備中・失敗・フォールバックの状態はEffect Stack UIへ反映され、失敗した効果があっても保存済みPresetのデータ自体は失われません。再試行や別構成への変更で描画計画を再評価できます。
@@ -88,6 +90,17 @@ TOPバーのSANDBOXから、Postprocessの`Edit Layer`と同じ選択要素でNo
 ### EFFECT-013 Normal Mapの描画互換
 
 Legacy V1とEffect Stack V2のNormal Mapは、同じNormal Mapシェーダー、輝度サンプリング、中心差分、角度回転、反転、`R=右・G=上・B=手前`のRGBAエンコードを使用します。両経路はDiffuseが有効なフレームではNormalを描画せず、Diffuseを法線計算用入力の代替として扱いません。V2の`manualDistort`状態がPostprocessのNormal入力やDistort値を上書きすることはありません。
+### EFFECT-015 DiffuseのHalftoneとASCII
+
+DiffuseはBlock、Smooth、Dither、Halftone、ASCIIの5モードを持ちます。Halftoneは円形または四角形の形状、セルサイズ、形状サイズ、背景色を持ち、入力色の濃度に応じて形状の占有率を変えます。ASCIIは保存された文字セットと背景色を濃度順に割り当て、セルごとに対応文字を描画します。背景色の既定値は`#000000`です。Halftone／ASCIIはフラグメント解像度の色と座標を使い、Ditherだけがセル中心サンプリングを使います。粒度適応時もベースセル単位で代表色とセル内座標を決めるため、円形・四角形の形状を崩しません。Halftone／ASCIIのセルは指定した背景色と不透明アルファを持ち、キャンバスの裏面が透けないようにします。ASCIIは固定アトラスグリッドを参照します。通常描画とEffect Stack描画は同じ保存設定を使います。
+
+### EFFECT-016 Diffuseの適応ソースと粒度
+
+Diffuseの適応ソースは輝度、色相、彩度から選択できます。選択した値を拡散量Bezierの入力として評価し、粒度適応を有効にした場合は独立した粒度Bezierをベース粒度へ反映します。粒度適応を無効にした場合は固定粒度を使います。
+
+### EFFECT-017 Slitのduration基準ループ
+
+AnimationとSlitが有効な場合、Slitは`animMode`（Loop／PingPong）、`offsetSpeed`、`phaseSpeed`で連続アニメーションします。キャンバス再生と書き出しは、Easing・Animation Speed・Durationを反映した同じ秒ベースのアニメーション時計を使います。速度が0またはModeが`off`のときは該当する動きを停止します。旧Presetに残る`autoLoop`やTimeline Loopの状態は描画へ影響させません。
 
 ## 他領域との関係
 
@@ -109,6 +122,7 @@ Legacy V1とEffect Stack V2のNormal Mapは、同じNormal Mapシェーダー、
 - [CHANGE-014 Effect Stackのランダム順序とソロレイヤー](../../changes/active/CHANGE-014-effect-stack-controls/proposal)
 - [CHANGE-015 Effect Stack別ウィンドウの復旧](../../changes/active/CHANGE-015-effect-stack-window-repair/proposal)
 - [CHANGE-018 SANDBOX描画モジュールの新設](../../changes/active/CHANGE-018-sandbox-graphics/proposal)
+- [CHANGE-019 Diffuse描画モードとEffect Stack UIの拡張](../../changes/active/CHANGE-019-diffuse-halftone-ascii-adaptive-ui/proposal)
 
 Legacy SPECは履歴参照用です。現行の主スタック、固定段、互換性はこの文書と関連ADRを先に確認します。
 

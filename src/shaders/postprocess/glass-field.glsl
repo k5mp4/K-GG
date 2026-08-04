@@ -377,7 +377,7 @@ float glassV2SurfaceHeight(vec2 uv) {
 
 vec2 diffuseGlassGlobalUv(vec2 uv, vec2 globalCoord) {
   uv = glassFiniteUv(uv);
-  if (!u_diffuseEnabled || u_diffuseMode == 2) return mirrorRepeatUv(uv);
+  if (!u_diffuseEnabled || u_diffuseMode >= 2) return mirrorRepeatUv(uv);
   return mirrorRepeatUv(
     uv + diffusePanelDisplacement(globalCoord) * u_diffuseScatter
       / glassResolution()

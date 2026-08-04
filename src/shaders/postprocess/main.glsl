@@ -11,8 +11,9 @@ void main() {
   vec2 globalUv = globalCoord / safeFullResolution;
 #if !defined(KGG_GLASS_ONLY) && !defined(KGG_PRISM_ONLY)
   if (u_effectEnabled && u_effectMode == 6) {
-    // Diffuse panel parity: pattern dither quantizes the sampled image into
-    // grain-sized cells before applying its palette threshold pattern.
+    // Only ordered Dither needs a cell-center source sample. Halftone and
+    // ASCII must retain the fragment color so their shape/glyph mask remains
+    // visible instead of degenerating into solid blocks.
     vec2 diffuseSampleCoord = u_diffuseMode == 2
       ? ditherCellCenter(globalCoord)
       : globalCoord;
