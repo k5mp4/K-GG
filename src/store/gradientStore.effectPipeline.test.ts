@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 import { createDefaultEffectStack, updateEffectStackLayer } from '../lib/effectPipeline';
 import { optimizeNoiseDistortion, type RenderOptimization } from '../lib/gpuDiagnostics';
-import { normalizeNoiseDistortionConfig, STORE_DEFAULTS, useGradientStore } from './gradientStore';
+import { normalizeNoiseDistortionConfig, normalizePostprocessConfig, STORE_DEFAULTS, useGradientStore } from './gradientStore';
 
 function layerEnabled(kind: 'diffuse' | 'noise' | 'slit' | 'distort'): boolean {
   return useGradientStore.getState().effectPipeline.effectStack
@@ -37,6 +37,22 @@ describe('Gradient store Effect Pipeline V2 synchronization', () => {
     expect(layerEnabled('diffuse')).toBe(false);
     expect(layerEnabled('noise')).toBe(true);
     expect(layerEnabled('slit')).toBe(true);
+  });
+
+  it('normalizes Diffuse Halftone and ASCII background colors for both config boundaries', () => {
+    const store = useGradientStore.getState();
+    store.setDiffuse({ backgroundColor: '#12abef' });
+    expect(useGradientStore.getState().diffuse.backgroundColor).toBe('#12ABEF');
+
+    store.setDiffuse({ backgroundColor: 'not-a-color' });
+    expect(useGradientStore.getState().diffuse.backgroundColor).toBe('#12ABEF');
+
+    expect(normalizePostprocessConfig({ diffuseBackgroundColor: '#345678' }).diffuseBackgroundColor).toBe('#345678');
+    expect(normalizePostprocessConfig({ diffuseBackgroundColor: 'invalid' }).diffuseBackgroundColor)
+      .toBe(STORE_DEFAULTS.postprocess.diffuseBackgroundColor);
+
+    store.setPostprocess({ diffuseBackgroundColor: '#abcdef' });
+    expect(useGradientStore.getState().postprocess.diffuseBackgroundColor).toBe('#ABCDEF');
   });
 
   it('keeps Diffuse panel parameters as the V2 source instead of legacy postprocess values', () => {

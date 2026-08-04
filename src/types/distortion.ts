@@ -67,6 +67,11 @@ export type NoiseDistortionConfig = {
 };
 
 export type DiffuseDitherMode = 'pattern_dither';
+export type DiffuseMode = 'block' | 'smooth' | 'dither' | 'halftone' | 'ascii';
+export type DiffuseHalftoneShape = 'circle' | 'square';
+export type DiffuseAdaptiveChannel = 'luminance' | 'hue' | 'saturation';
+export const DEFAULT_DIFFUSE_ASCII_CHARSET = ' .:-=+*#%@';
+export const DEFAULT_DIFFUSE_BACKGROUND_COLOR = '#000000';
 
 export type DiffuseCurvePoint = {
   x: number;
@@ -77,15 +82,23 @@ export type DiffuseBezierValue = [number, number, number, number];
 
 export type DiffuseConfig = {
   enabled: boolean;
-  mode: 'block' | 'smooth' | 'dither'; // block=矩形ノイズ, smooth=有機的ドットノイズ, dither=ディザパターン
+  mode: DiffuseMode; // block=矩形ノイズ, smooth=有機的ドットノイズ, dither=ディザパターン, halftone=網点, ascii=文字組版
   ditherMode: DiffuseDitherMode;
   scatter: number;  // 0–300  ピクセル単位の最大変位量
   grain: number;    // 0.01–5 グレインサイズ（px単位）
   seed: number;     // 0–99   ハッシュシード
   seedAnimEnabled?: boolean; // true=描画フレームごとに seed を進める
   ditherThreshold: number; // 0–1 ディザのしきい値バイアス（0.5=標準）
+  halftoneShape: DiffuseHalftoneShape;
+  halftoneSize: number; // 0.05–1.0 セル内の形状占有率
+  asciiCharset: string; // 濃度の低い順に割り当てる文字セット
+  backgroundColor: string; // Halftone / ASCII の空白部分の背景色
   adaptiveEnabled?: boolean;
+  adaptiveChannel: DiffuseAdaptiveChannel;
   luminanceBezier: DiffuseBezierValue;
+  grainAdaptiveEnabled?: boolean;
+  grainAdaptiveAmount: number; // 0–1 粒度Bezierの影響量
+  grainBezier: DiffuseBezierValue;
   /** @deprecated Legacy preset input only. New presets must omit this field. */
   luminanceCurve?: DiffuseCurvePoint[];
 };
@@ -223,6 +236,14 @@ export type PostprocessConfig = ManualDistortConfig & {
   /** Diffuse parameters mirrored into the V2 postprocess boundary. */
   diffuseAdaptiveEnabled?: boolean;
   diffuseLuminanceBezier?: DiffuseBezierValue;
+  diffuseAdaptiveChannel?: DiffuseAdaptiveChannel;
+  diffuseGrainAdaptiveEnabled?: boolean;
+  diffuseGrainAdaptiveAmount?: number;
+  diffuseGrainBezier?: DiffuseBezierValue;
+  diffuseHalftoneShape?: DiffuseHalftoneShape;
+  diffuseHalftoneSize?: number;
+  diffuseAsciiCharset?: string;
+  diffuseBackgroundColor?: string;
   mirrorMode: PostprocessMirrorMode;
   kaleidoscopeType: PostprocessKaleidoscopeType;
   kaleidoscopeSlices: number;

@@ -34,6 +34,16 @@
   uniform float u_diffuseSeed;
   uniform float u_diffuseDitherThreshold;
   uniform bool u_diffuseAdaptiveEnabled;
+  uniform int u_diffuseAdaptiveChannel; // 0=luminance, 1=hue, 2=saturation
+  uniform bool u_diffuseGrainAdaptiveEnabled;
+  uniform float u_diffuseGrainAdaptiveAmount;
+  uniform int u_diffuseHalftoneShape; // 0=circle, 1=square
+  uniform float u_diffuseHalftoneSize;
+  uniform vec3 u_diffuseBackgroundColor;
+  uniform sampler2D u_diffuseAsciiAtlas;
+  uniform float u_diffuseAsciiCount;
+  uniform float u_diffuseAsciiColumns;
+  uniform float u_diffuseAsciiRows;
   uniform sampler2D u_diffuseCurve;
 
   uniform sampler2D u_gradientRamp;
@@ -408,6 +418,99 @@
     return diffuseHash(p).x * 0.5 + 0.5;
   }
 
+  vec3 diffuseRgbToHsv(vec3 c) {
+    vec4 k = vec4(0.0, -1.0 / 3.0, 2.0 / 3.0, -1.0);
+    vec4 p = mix(vec4(c.bg, k.wz), vec4(c.gb, k.xy), step(c.b, c.g));
+    vec4 q = mix(vec4(p.xyw, c.r), vec4(c.r, p.yzx), step(p.x, c.r));
+    float d = q.x - min(q.w, q.y);
+    float e = 1.0e-10;
+    return vec3(d < 0.00001 ? 0.0 : abs(q.z + (q.w - q.y) / (6.0 * d + e)), d / (q.x + e), q.x);
+  }
+
+  float diffuseAdaptiveInput(vec3 rgb) {
+    vec3 hsv = diffuseRgbToHsv(clamp(rgb, 0.0, 1.0));
+    if (u_diffuseAdaptiveChannel == 1) return hsv.x;
+    if (u_diffuseAdaptiveChannel == 2) return hsv.y;
+    return dot(clamp(rgb, 0.0, 1.0), vec3(0.299, 0.587, 0.114));
+  }
+
+  float diffuseCurveValue(float inputValue, bool grainCurve) {
+    vec4 curve = texture2D(u_diffuseCurve, vec2(clamp(inputValue, 0.0, 1.0), 0.5));
+    return grainCurve ? curve.g : curve.r;
+  }
+
+  float diffuseCellSize(float inputValue) {
+    float baseSize = max(u_diffuseGrain, 0.01);
+    if (!u_diffuseGrainAdaptiveEnabled) return baseSize;
+    float response = diffuseCurveValue(inputValue, true);
+    float scale = mix(1.0, mix(0.55, 1.55, response), clamp(u_diffuseGrainAdaptiveAmount, 0.0, 1.0));
+    return max(baseSize * scale, 0.01);
+  }
+
+  vec2 diffuseCellFraction(vec2 coord, float cellSize) {
+    float baseSize = max(u_diffuseGrain, 0.01);
+    vec2 baseCellCenter = (floor(coord / baseSize) + 0.5) * baseSize;
+    return clamp((coord - baseCellCenter) / max(cellSize, 0.01) + 0.5, 0.0, 1.0);
+  }
+
+  float diffuseCellSizeAtCoord(vec2 coord, vec3 fallbackColor) {
+    float baseSize = max(u_diffuseGrain, 0.01);
+    if (!u_diffuseGrainAdaptiveEnabled) return baseSize;
+    vec2 baseCellCenter = (floor(coord / baseSize) + 0.5) * baseSize;
+    vec2 centerUv = clamp(baseCellCenter / max(u_resolution, vec2(1.0)), 0.0, 1.0);
+    vec3 representativeColor = fallbackColor;
+    if (u_imageGradientEnabled) {
+      representativeColor = sampleImageGradient(centerUv).rgb;
+    } else if (u_sourceImageEnabled) {
+      representativeColor = sampleSourceImageRaw(centerUv).rgb;
+    } else {
+      representativeColor = sampleGradientColor(centerUv).rgb;
+    }
+    return diffuseCellSize(diffuseAdaptiveInput(representativeColor));
+  }
+
+  vec3 diffusePatternBackground(vec3 cellColor) {
+    return u_diffuseBackgroundColor;
+  }
+
+  float diffuseShapeMask(vec2 cellFraction, float radius) {
+    vec2 centered = cellFraction - 0.5;
+    float edge = 0.035;
+    if (u_diffuseHalftoneShape == 1) {
+      float distanceToEdge = max(abs(centered.x), abs(centered.y));
+      return 1.0 - smoothstep(radius, radius + edge, distanceToEdge);
+    }
+    return 1.0 - smoothstep(radius, radius + edge, length(centered));
+  }
+
+  vec3 applyDiffuseHalftone(vec3 cellColor, vec2 coord, float cellSize) {
+    float luminance = dot(clamp(cellColor, 0.0, 1.0), vec3(0.299, 0.587, 0.114));
+    float radius = 0.5 * clamp(u_diffuseHalftoneSize, 0.05, 1.0) * sqrt(clamp(luminance, 0.0, 1.0));
+    float mask = diffuseShapeMask(diffuseCellFraction(coord, cellSize), radius);
+    vec3 patternColor = mix(diffusePatternBackground(cellColor), cellColor, mask);
+    float amount = u_diffuseAdaptiveEnabled
+      ? diffuseCurveValue(diffuseAdaptiveInput(cellColor), false)
+      : 1.0;
+    return mix(cellColor, patternColor, amount);
+  }
+
+  vec3 applyDiffuseAscii(vec3 cellColor, vec2 coord, float cellSize) {
+    float luminance = dot(clamp(cellColor, 0.0, 1.0), vec3(0.299, 0.587, 0.114));
+    float glyphIndex = floor(clamp(luminance, 0.0, 1.0) * max(u_diffuseAsciiCount - 1.0, 0.0) + 0.5);
+    float column = mod(glyphIndex, max(u_diffuseAsciiColumns, 1.0));
+    float row = floor(glyphIndex / max(u_diffuseAsciiColumns, 1.0));
+    vec2 local = diffuseCellFraction(coord, cellSize);
+    vec2 atlasUv = vec2((column + local.x) / max(u_diffuseAsciiColumns, 1.0), (row + local.y) / max(u_diffuseAsciiRows, 1.0));
+    // Canvas text is white in RGB; sampling red keeps the mask visible even
+    // on browsers that premultiply the transparent atlas alpha during upload.
+    float glyph = texture2D(u_diffuseAsciiAtlas, vec2(atlasUv.x, 1.0 - atlasUv.y)).r;
+    vec3 patternColor = mix(diffusePatternBackground(cellColor), cellColor, glyph);
+    float amount = u_diffuseAdaptiveEnabled
+      ? diffuseCurveValue(diffuseAdaptiveInput(cellColor), false)
+      : 1.0;
+    return mix(cellColor, patternColor, amount);
+  }
+
   float patternDither8x8(vec2 p) {
     vec2 m = mod(p, 8.0);
     float x = m.x;
@@ -514,7 +617,7 @@
     float ditherT = (lower + upperMix) / (paletteSteps - 1.0);
     vec3 paletteColor = texture2D(u_gradientRamp, vec2(clamp(ditherT, 0.0, 1.0), 0.5)).rgb;
     float adaptiveFactor = u_diffuseAdaptiveEnabled
-      ? texture2D(u_diffuseCurve, vec2(clamp(paletteT, 0.0, 1.0), 0.5)).r
+      ? diffuseCurveValue(diffuseAdaptiveInput(color), false)
       : 1.0;
     float amount = clamp(u_diffuseScatter / 100.0, 0.0, 1.0) * adaptiveFactor;
     return mix(color, paletteColor, amount);
@@ -610,7 +713,10 @@
     // タイル描画時はオフセットを足して、u_resolution（最終出力）空間の座標として扱う
     vec2 globalCoord = gl_FragCoord.xy + u_tileOffset;
     bool usePatternDither = u_diffuseEnabled && u_diffuseMode == 2;
+    bool useCellPattern = u_diffuseEnabled && (u_diffuseMode == 3 || u_diffuseMode == 4);
     vec2 ditherCoord = ditherCellCenter(globalCoord);
+    // Halftone/ASCII are spatial masks, so sampling at the fixed Dither cell
+    // center hides their dots/glyphs. Only ordered Dither uses that snap.
     vec2 sampleCoord = usePatternDither ? ditherCoord : globalCoord;
     // imageUVは画像そのものを固定する。以降に変形されるuvはアンカー配色だけに使う。
     vec2 imageUV = globalCoord / u_resolution;
@@ -687,7 +793,7 @@
     if (!rawSourceActive) {
       uv = applyNoiseUV(uv);
     }
-    if (u_diffuseEnabled && u_diffuseMode != 2) {
+    if (u_diffuseEnabled && u_diffuseMode <= 1) {
       vec2 seedOff = vec2(u_diffuseSeed * 31.41, u_diffuseSeed * 59.26);
       vec2 disp;
       if (u_diffuseMode == 1) {
@@ -705,13 +811,11 @@
       }
       // Mesh color is sampled once in the final color path below. Keep the
       // adaptive displacement finite without evaluating the four-corner field twice.
-      float adaptiveLuminance = u_imageGradientEnabled
-        ? dot(texture2D(u_gradientRamp, vec2(clamp(imageGradientT(imageUV), 0.0, 1.0), 0.5)).rgb, vec3(0.299, 0.587, 0.114))
-        : u_gradientType == 6
-          ? 0.5
-          : dot(texture2D(u_gradientRamp, vec2(clamp(computeGradientT(uv), 0.0, 1.0), 0.5)).rgb, vec3(0.299, 0.587, 0.114));
+      vec3 adaptiveColor = u_imageGradientEnabled
+        ? texture2D(u_gradientRamp, vec2(clamp(imageGradientT(imageUV), 0.0, 1.0), 0.5)).rgb
+        : sampleGradientColor(uv).rgb;
       float adaptiveFactor = u_diffuseAdaptiveEnabled
-        ? texture2D(u_diffuseCurve, vec2(clamp(adaptiveLuminance, 0.0, 1.0), 0.5)).r
+        ? diffuseCurveValue(diffuseAdaptiveInput(adaptiveColor), false)
         : 1.0;
       uv += disp * clamp(u_diffuseScatter, 0.0, 300.0) * adaptiveFactor / u_resolution;
     }
@@ -756,6 +860,12 @@
       if (usePatternDither) {
         float sourcePaletteT = dot(clamp(sourceColor.rgb, 0.0, 1.0), vec3(0.299, 0.587, 0.114));
         sourceColor.rgb = applyPatternDither(sourceColor.rgb, globalCoord, sourcePaletteT);
+      } else if (useCellPattern) {
+        float cellSize = diffuseCellSizeAtCoord(globalCoord, sourceColor.rgb);
+        sourceColor.rgb = u_diffuseMode == 3
+          ? applyDiffuseHalftone(sourceColor.rgb, globalCoord, cellSize)
+          : applyDiffuseAscii(sourceColor.rgb, globalCoord, cellSize);
+        sourceColor.a = 1.0;
       }
       gl_FragColor = applyImageMask(sourceColor, globalCoord);
       return;
@@ -848,9 +958,14 @@
         ? dot(clamp(color, 0.0, 1.0), vec3(0.299, 0.587, 0.114))
         : rampT;
       color = applyPatternDither(color, globalCoord, paletteT);
+    } else if (useCellPattern) {
+      float cellSize = diffuseCellSizeAtCoord(globalCoord, color);
+      color = u_diffuseMode == 3
+        ? applyDiffuseHalftone(color, globalCoord, cellSize)
+        : applyDiffuseAscii(color, globalCoord, cellSize);
     }
 
-    gl_FragColor = vec4(color, rampAlpha * sourceAlpha);
+    gl_FragColor = vec4(color, useCellPattern ? 1.0 : rampAlpha * sourceAlpha);
 
     // Matcap: 円形アルファマスク
     if (u_matcapEnabled) {

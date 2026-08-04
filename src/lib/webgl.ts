@@ -1,5 +1,6 @@
 import type { GradientConfig } from '../types/gradient';
 import type { NoiseDistortionConfig, DiffuseConfig, SlitScanConfig, StretchConfig, NormalMapConfig, RadonConfig, IridescenceConfig, ManualDistortConfig, PostprocessConfig, MatcapConfig, PostprocessStackKind, EffectPipelineConfig } from '../types/distortion';
+import { DEFAULT_DIFFUSE_ASCII_CHARSET, DEFAULT_DIFFUSE_BACKGROUND_COLOR } from '../types/distortion';
 import { IMAGE_GRADIENT_DEFAULTS, type ImageGradientConfig } from '../types/imageGradient';
 import { GRADIENT_ANCHOR_DEFAULTS, defaultBezierControlsForAnchors } from '../store/gradientStore';
 import { normalizeMeshGradientConfig, type MeshGradientConfig } from '../types/gradient';
@@ -78,6 +79,10 @@ export type WebGLContext = {
   meshGradientTextureSignature: string;
   diffuseCurveTexture: WebGLTexture; // TEXTURE8: Diffuse輝度カーブLUT
   diffuseCurveSignature: string;
+  diffuseAsciiTexture: WebGLTexture; // TEXTURE9: Diffuse ASCIIグリフアトラス
+  diffuseAsciiSignature: string;
+  diffuseAsciiCount: number;
+  diffuseAsciiRows: number;
   diffuseHistogramAt: number;
   manualDistortTexture: WebGLTexture; // TEXTURE5: 手作業UV変位マップ
   manualDistortDisplacement: number[] | null;
@@ -354,6 +359,16 @@ export async function initWebGL(canvas: HTMLCanvasElement): Promise<WebGLContext
     u_diffuseSeed: gl.getUniformLocation(program, 'u_diffuseSeed'),
     u_diffuseDitherThreshold: gl.getUniformLocation(program, 'u_diffuseDitherThreshold'),
     u_diffuseAdaptiveEnabled: gl.getUniformLocation(program, 'u_diffuseAdaptiveEnabled'),
+    u_diffuseAdaptiveChannel: gl.getUniformLocation(program, 'u_diffuseAdaptiveChannel'),
+    u_diffuseGrainAdaptiveEnabled: gl.getUniformLocation(program, 'u_diffuseGrainAdaptiveEnabled'),
+    u_diffuseGrainAdaptiveAmount: gl.getUniformLocation(program, 'u_diffuseGrainAdaptiveAmount'),
+    u_diffuseHalftoneShape: gl.getUniformLocation(program, 'u_diffuseHalftoneShape'),
+    u_diffuseHalftoneSize: gl.getUniformLocation(program, 'u_diffuseHalftoneSize'),
+    u_diffuseBackgroundColor: gl.getUniformLocation(program, 'u_diffuseBackgroundColor'),
+    u_diffuseAsciiAtlas: gl.getUniformLocation(program, 'u_diffuseAsciiAtlas'),
+    u_diffuseAsciiCount: gl.getUniformLocation(program, 'u_diffuseAsciiCount'),
+    u_diffuseAsciiColumns: gl.getUniformLocation(program, 'u_diffuseAsciiColumns'),
+    u_diffuseAsciiRows: gl.getUniformLocation(program, 'u_diffuseAsciiRows'),
     u_diffuseCurve: gl.getUniformLocation(program, 'u_diffuseCurve'),
     u_gradientRamp: gl.getUniformLocation(program, 'u_gradientRamp'),
     u_meshGradient: gl.getUniformLocation(program, 'u_meshGradient'),
@@ -486,6 +501,13 @@ export async function initWebGL(canvas: HTMLCanvasElement): Promise<WebGLContext
   gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
   gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
   gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+  const diffuseAsciiTexture = gl.createTexture()!;
+  gl.bindTexture(gl.TEXTURE_2D, diffuseAsciiTexture);
+  gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, ASCII_ATLAS_WIDTH, ASCII_ATLAS_HEIGHT, 0, gl.RGBA, gl.UNSIGNED_BYTE, null);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
   const manualDistortTexture = gl.createTexture()!;
   gl.bindTexture(gl.TEXTURE_2D, manualDistortTexture);
   gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, 1, 1, 0, gl.RGBA, gl.UNSIGNED_BYTE, new Uint8Array([128, 128, 0, 255]));
@@ -518,7 +540,7 @@ export async function initWebGL(canvas: HTMLCanvasElement): Promise<WebGLContext
   const { fbo: prismGlowFbo, tex: prismGlowTexture } = createFboWithTexture(gl);
   const transitionTextureFrom = createTexture(gl);
   const transitionTextureTo = createTexture(gl);
-  const ctx: WebGLContext = { gl, gpuDiagnostics, renderOptimization, program, uniforms, generatorProgram: null, generatorUniforms: {}, gradientRampTexture, meshGradientTexture, meshGradientTextureSignature: '', diffuseCurveTexture, diffuseCurveSignature: '', diffuseHistogramAt: 0, manualDistortTexture, manualDistortDisplacement: null, manualDistortSmoothMask: null, manualDistortMapResolution: 0, sourceImageTexture, sourceImageCanvas: null, imageGradientTexture, imageGradientSource: null, imageMaskTexture, imageMaskSource: null, normalMapProgram: null, normalMapUniforms: {}, gradFbo, gradTexture, blurProgram: null, blurUniforms: {}, stretchProgram: null, stretchUniforms: {}, stackCoreProgram: null, stackCoreUniforms: {}, noiseStackProgram: null, noiseStackUniforms: {}, glassProgram: null, glassUniforms: {}, glassFallbackActive: false, glassV2Program: null, glassV2Uniforms: {}, glassV2FallbackActive: false, prismProgram: null, prismUniforms: {}, postprocessProgram: null, postprocessUniforms: {}, prismCompositeProgram: null, prismCompositeUniforms: {}, particleProgram: null, particleUniforms: {}, particleVao: null, particleQuadBuffer: null, particleInstanceBuffer: null, particleInstanceCount: 0, particleInstanceSeed: Number.NaN, normalFbo, normalTexture, hBlurFbo, hBlurTexture, postprocessFboA, postprocessTextureA, postprocessFboB, postprocessTextureB, prismScratchFbo, prismScratchTexture, prismBlurFbo, prismBlurTexture, prismGlowFbo, prismGlowTexture, fboSize: [0, 0], v2CoreFboSize: [0, 0], shaderCompileExt: ext, lazyProgramState: createLazyProgramState(), hasPresentedFrame: false };
+  const ctx: WebGLContext = { gl, gpuDiagnostics, renderOptimization, program, uniforms, generatorProgram: null, generatorUniforms: {}, gradientRampTexture, meshGradientTexture, meshGradientTextureSignature: '', diffuseCurveTexture, diffuseCurveSignature: '', diffuseAsciiTexture, diffuseAsciiSignature: '', diffuseAsciiCount: 1, diffuseAsciiRows: ASCII_ATLAS_MAX_ROWS, diffuseHistogramAt: 0, manualDistortTexture, manualDistortDisplacement: null, manualDistortSmoothMask: null, manualDistortMapResolution: 0, sourceImageTexture, sourceImageCanvas: null, imageGradientTexture, imageGradientSource: null, imageMaskTexture, imageMaskSource: null, normalMapProgram: null, normalMapUniforms: {}, gradFbo, gradTexture, blurProgram: null, blurUniforms: {}, stretchProgram: null, stretchUniforms: {}, stackCoreProgram: null, stackCoreUniforms: {}, noiseStackProgram: null, noiseStackUniforms: {}, glassProgram: null, glassUniforms: {}, glassFallbackActive: false, glassV2Program: null, glassV2Uniforms: {}, glassV2FallbackActive: false, prismProgram: null, prismUniforms: {}, postprocessProgram: null, postprocessUniforms: {}, prismCompositeProgram: null, prismCompositeUniforms: {}, particleProgram: null, particleUniforms: {}, particleVao: null, particleQuadBuffer: null, particleInstanceBuffer: null, particleInstanceCount: 0, particleInstanceSeed: Number.NaN, normalFbo, normalTexture, hBlurFbo, hBlurTexture, postprocessFboA, postprocessTextureA, postprocessFboB, postprocessTextureB, prismScratchFbo, prismScratchTexture, prismBlurFbo, prismBlurTexture, prismGlowFbo, prismGlowTexture, fboSize: [0, 0], v2CoreFboSize: [0, 0], shaderCompileExt: ext, lazyProgramState: createLazyProgramState(), hasPresentedFrame: false };
   effectStackTransitionResources.set(ctx, {
     program: transitionProgram,
     from: gl.getUniformLocation(transitionProgram, 'u_transitionFrom'),
@@ -782,6 +804,16 @@ function getPostprocessUniforms(gl: WebGL2RenderingContext, program: WebGLProgra
     u_diffuseSeed: gl.getUniformLocation(program, 'u_diffuseSeed'),
     u_diffuseDitherThreshold: gl.getUniformLocation(program, 'u_diffuseDitherThreshold'),
     u_diffuseAdaptiveEnabled: gl.getUniformLocation(program, 'u_diffuseAdaptiveEnabled'),
+    u_diffuseAdaptiveChannel: gl.getUniformLocation(program, 'u_diffuseAdaptiveChannel'),
+    u_diffuseGrainAdaptiveEnabled: gl.getUniformLocation(program, 'u_diffuseGrainAdaptiveEnabled'),
+    u_diffuseGrainAdaptiveAmount: gl.getUniformLocation(program, 'u_diffuseGrainAdaptiveAmount'),
+    u_diffuseHalftoneShape: gl.getUniformLocation(program, 'u_diffuseHalftoneShape'),
+    u_diffuseHalftoneSize: gl.getUniformLocation(program, 'u_diffuseHalftoneSize'),
+    u_diffuseBackgroundColor: gl.getUniformLocation(program, 'u_diffuseBackgroundColor'),
+    u_diffuseAsciiAtlas: gl.getUniformLocation(program, 'u_diffuseAsciiAtlas'),
+    u_diffuseAsciiCount: gl.getUniformLocation(program, 'u_diffuseAsciiCount'),
+    u_diffuseAsciiColumns: gl.getUniformLocation(program, 'u_diffuseAsciiColumns'),
+    u_diffuseAsciiRows: gl.getUniformLocation(program, 'u_diffuseAsciiRows'),
     u_diffuseCurve: gl.getUniformLocation(program, 'u_diffuseCurve'),
     u_stackSlitMode: gl.getUniformLocation(program, 'u_stackSlitMode'),
     u_stackSlitAngle: gl.getUniformLocation(program, 'u_stackSlitAngle'),
@@ -1363,8 +1395,14 @@ export function hexToRgb(hex: string): [number, number, number] {
 
 export const NOISE_TYPE_MAP = { simplex: 0, fbm: 1, voronoi: 2, curl: 3, domain_warp_anim: 4, seamless: 5, ridged_fbm: 6, ae_fractal: 7, fast_curl: 8, caustics: 9, phasor: 10 } as const;
 export const GRADIENT_TYPE_MAP = { linear: 0, radial: 1, fourcolor: 2, diamond: 3, angle: 4, bezier: 5, mesh: 6 } as const;
-const DIFFUSE_MODE_MAP = { block: 0, smooth: 1, dither: 2 } as const;
+const DIFFUSE_MODE_MAP = { block: 0, smooth: 1, dither: 2, halftone: 3, ascii: 4 } as const;
 const PARTICLE_EMITTER_TYPE_MAP = { field: 0, line: 1, burst: 2, point: 3 } as const;
+const ASCII_ATLAS_COLUMNS = 16;
+const ASCII_GLYPH_WIDTH = 32;
+const ASCII_GLYPH_HEIGHT = 32;
+const ASCII_ATLAS_WIDTH = ASCII_ATLAS_COLUMNS * ASCII_GLYPH_WIDTH;
+const ASCII_ATLAS_MAX_ROWS = 4;
+const ASCII_ATLAS_HEIGHT = ASCII_ATLAS_MAX_ROWS * ASCII_GLYPH_HEIGHT;
 
 function finiteClamp(value: number | undefined, fallback: number, min: number, max: number): number {
   if (typeof value !== 'number' || !Number.isFinite(value)) return fallback;
@@ -1443,16 +1481,18 @@ function uploadMeshGradientTexture(ctx: WebGLContext, gradient: GradientConfig, 
   ctx.meshGradientTextureSignature = signature;
 }
 
-function uploadDiffuseCurveTexture(ctx: WebGLContext, diffuse: Pick<DiffuseConfig, 'luminanceBezier'>): void {
+function uploadDiffuseCurveTexture(ctx: WebGLContext, diffuse: Pick<DiffuseConfig, 'luminanceBezier' | 'grainBezier'>): void {
   const curve = normalizeDiffuseBezier(diffuse.luminanceBezier);
-  const signature = curve.map(point => point.toFixed(6)).join('|');
+  const grainCurve = normalizeDiffuseBezier(diffuse.grainBezier);
+  const signature = `${curve.map(point => point.toFixed(6)).join('|')}::${grainCurve.map(point => point.toFixed(6)).join('|')}`;
   if (ctx.diffuseCurveSignature === signature) return;
   const lut = buildDiffuseBezierLut(curve);
+  const grainLut = buildDiffuseBezierLut(grainCurve, lut.length);
   const rgba = new Uint8Array(lut.length * 4);
   for (let index = 0; index < lut.length; index++) {
     rgba[index * 4] = lut[index];
-    rgba[index * 4 + 1] = lut[index];
-    rgba[index * 4 + 2] = lut[index];
+    rgba[index * 4 + 1] = grainLut[index];
+    rgba[index * 4 + 2] = grainLut[index];
     rgba[index * 4 + 3] = 255;
   }
   const { gl } = ctx;
@@ -1460,6 +1500,45 @@ function uploadDiffuseCurveTexture(ctx: WebGLContext, diffuse: Pick<DiffuseConfi
   gl.bindTexture(gl.TEXTURE_2D, ctx.diffuseCurveTexture);
   gl.texSubImage2D(gl.TEXTURE_2D, 0, 0, 0, lut.length, 1, gl.RGBA, gl.UNSIGNED_BYTE, rgba);
   ctx.diffuseCurveSignature = signature;
+}
+
+function normalizeAsciiCharset(value: string | undefined): string[] {
+  const chars = Array.from(typeof value === 'string' && value.length > 0 ? value : DEFAULT_DIFFUSE_ASCII_CHARSET).slice(0, 64);
+  return chars.length > 0 ? chars : Array.from(DEFAULT_DIFFUSE_ASCII_CHARSET);
+}
+
+function uploadDiffuseAsciiTexture(ctx: WebGLContext, value: string | undefined): void {
+  const chars = normalizeAsciiCharset(value);
+  const signature = chars.join('');
+  if (ctx.diffuseAsciiSignature === signature) return;
+  const { gl } = ctx;
+  const canvas = typeof document !== 'undefined' ? document.createElement('canvas') : null;
+  if (canvas) {
+    canvas.width = ASCII_ATLAS_WIDTH;
+    canvas.height = ASCII_ATLAS_HEIGHT;
+    const context = canvas.getContext('2d');
+    if (context) {
+      context.clearRect(0, 0, canvas.width, canvas.height);
+      context.fillStyle = '#ffffff';
+      context.textAlign = 'center';
+      context.textBaseline = 'middle';
+      context.font = 'bold 29px monospace';
+      chars.forEach((char, index) => {
+        const column = index % ASCII_ATLAS_COLUMNS;
+        const row = Math.floor(index / ASCII_ATLAS_COLUMNS);
+        context.fillText(char, column * ASCII_GLYPH_WIDTH + ASCII_GLYPH_WIDTH / 2, row * ASCII_GLYPH_HEIGHT + ASCII_GLYPH_HEIGHT / 2 + 1);
+      });
+      gl.activeTexture(gl.TEXTURE9);
+      gl.bindTexture(gl.TEXTURE_2D, ctx.diffuseAsciiTexture);
+      gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, 0);
+      gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, canvas);
+    }
+  }
+  ctx.diffuseAsciiSignature = signature;
+  ctx.diffuseAsciiCount = chars.length;
+  // The texture always has the fixed four-row atlas height. The shader must
+  // address that physical grid, rather than the number of populated rows.
+  ctx.diffuseAsciiRows = ASCII_ATLAS_MAX_ROWS;
 }
 
 function publishDiffuseInputHistogram(ctx: WebGLContext, gradient: GradientConfig, sourceCanvas: HTMLCanvasElement | null | undefined): void {
@@ -1712,8 +1791,16 @@ function drawPostprocessPass(
   gl.bindTexture(gl.TEXTURE_2D, ctx.gradientRampTexture);
   gl.uniform1i(ctx.postprocessUniforms.u_gradientRamp, 1);
   gl.activeTexture(gl.TEXTURE8);
+  uploadDiffuseCurveTexture(ctx, {
+    luminanceBezier: postprocess.diffuseLuminanceBezier ?? normalizeDiffuseBezier(undefined),
+    grainBezier: postprocess.diffuseGrainBezier ?? normalizeDiffuseBezier(undefined),
+  });
   gl.bindTexture(gl.TEXTURE_2D, ctx.diffuseCurveTexture);
   gl.uniform1i(ctx.postprocessUniforms.u_diffuseCurve, 8);
+  uploadDiffuseAsciiTexture(ctx, postprocess.diffuseAsciiCharset);
+  gl.activeTexture(gl.TEXTURE9);
+  gl.bindTexture(gl.TEXTURE_2D, ctx.diffuseAsciiTexture);
+  gl.uniform1i(ctx.postprocessUniforms.u_diffuseAsciiAtlas, 9);
   gl.activeTexture(gl.TEXTURE5);
   gl.bindTexture(gl.TEXTURE_2D, ctx.manualDistortTexture);
   gl.uniform1i(ctx.postprocessUniforms.u_distortMap, 5);
@@ -1864,6 +1951,19 @@ function drawPostprocessPass(
   gl.uniform1f(ctx.postprocessUniforms.u_diffuseSeed, postprocess.diffuseSeed);
   gl.uniform1f(ctx.postprocessUniforms.u_diffuseDitherThreshold, postprocess.diffuseDitherThreshold ?? 0.5);
   gl.uniform1i(ctx.postprocessUniforms.u_diffuseAdaptiveEnabled, postprocess.diffuseAdaptiveEnabled ? 1 : 0);
+  const postDiffuseChannelMap = { luminance: 0, hue: 1, saturation: 2 } as const;
+  gl.uniform1i(ctx.postprocessUniforms.u_diffuseAdaptiveChannel, postDiffuseChannelMap[postprocess.diffuseAdaptiveChannel ?? 'luminance']);
+  gl.uniform1i(ctx.postprocessUniforms.u_diffuseGrainAdaptiveEnabled, postprocess.diffuseGrainAdaptiveEnabled ? 1 : 0);
+  gl.uniform1f(ctx.postprocessUniforms.u_diffuseGrainAdaptiveAmount, postprocess.diffuseGrainAdaptiveAmount ?? 1);
+  gl.uniform1i(ctx.postprocessUniforms.u_diffuseHalftoneShape, postprocess.diffuseHalftoneShape === 'square' ? 1 : 0);
+  gl.uniform1f(ctx.postprocessUniforms.u_diffuseHalftoneSize, postprocess.diffuseHalftoneSize ?? 0.82);
+  const [postDiffuseBackgroundR, postDiffuseBackgroundG, postDiffuseBackgroundB] = hexToRgb(
+    postprocess.diffuseBackgroundColor ?? DEFAULT_DIFFUSE_BACKGROUND_COLOR,
+  );
+  gl.uniform3f(ctx.postprocessUniforms.u_diffuseBackgroundColor, postDiffuseBackgroundR, postDiffuseBackgroundG, postDiffuseBackgroundB);
+  gl.uniform1f(ctx.postprocessUniforms.u_diffuseAsciiCount, ctx.diffuseAsciiCount);
+  gl.uniform1f(ctx.postprocessUniforms.u_diffuseAsciiColumns, ASCII_ATLAS_COLUMNS);
+  gl.uniform1f(ctx.postprocessUniforms.u_diffuseAsciiRows, ctx.diffuseAsciiRows);
   const stackSlitModeMap = { linear: 0, circular: 1, polygon: 2, wave: 3 } as const;
   const stackSlit: SlitScanConfig = slitScan ?? {
     enabled: false,
@@ -1909,10 +2009,13 @@ function drawPostprocessPass(
   const stackSlitAnimationTime = stackSlitOffsetAnimationActive
     ? ((stackSlitAnimationBaseTime * stackSlit.offsetSpeed) % 1 + 1) % 1
     : 0;
+  const stackSlitPhaseProgress = ((
+    stackSlitAnimationBaseTime * (stackSlit.phaseSpeed ?? 1)
+  ) % 1 + 1) % 1;
   const stackSlitPhaseOffset = stackSlit.animEnabled
     && (stackSlit.phaseAnimEnabled ?? false)
     && (stackSlit.phaseSpeed ?? 0) !== 0
-    ? -stackSlitAnimationBaseTime * stackSlitWidth * (stackSlit.phaseSpeed ?? 1)
+    ? -stackSlitPhaseProgress * stackSlitWidth
     : 0;
   gl.uniform2f(
     ctx.postprocessUniforms.u_stackSlitParams,
@@ -2330,10 +2433,25 @@ export function render(
   diffuse = {
     ...diffuse,
     scatter: clampParameter(diffuse.scatter, 0, getParameterLimit('diffuse.scatter')),
-    grain: clampParameter(diffuse.grain, 1, getParameterLimit(diffuse.mode === 'dither' ? 'diffuse.ditherGrain' : 'diffuse.grain')),
+    grain: clampParameter(
+      diffuse.grain,
+      1,
+      getParameterLimit(
+        diffuse.mode === 'dither'
+          ? 'diffuse.ditherGrain'
+          : diffuse.mode === 'halftone'
+            ? 'diffuse.halftoneGrain'
+            : diffuse.mode === 'ascii'
+              ? 'diffuse.asciiGrain'
+              : 'diffuse.grain',
+      ),
+    ),
     seed: clampParameter(diffuse.seed, 0, getParameterLimit('diffuse.seed')),
     ditherThreshold: clampParameter(diffuse.ditherThreshold, 0.5, getParameterLimit('diffuse.ditherThreshold')),
     luminanceBezier: normalizeDiffuseBezier(diffuse.luminanceBezier),
+    grainBezier: normalizeDiffuseBezier(diffuse.grainBezier),
+    grainAdaptiveAmount: clampParameter(diffuse.grainAdaptiveAmount, 1, getParameterLimit('diffuse.grainAdaptiveAmount')),
+    halftoneSize: clampParameter(diffuse.halftoneSize, 0.82, getParameterLimit('diffuse.halftoneSize')),
   };
   slitScan = {
     ...slitScan,
@@ -2476,6 +2594,23 @@ export function render(
   gl.bindTexture(gl.TEXTURE_2D, ctx.diffuseCurveTexture);
   gl.uniform1i(uniforms.u_diffuseCurve, 8);
   gl.uniform1i(uniforms.u_diffuseAdaptiveEnabled, diffuse.adaptiveEnabled ? 1 : 0);
+  const diffuseChannelMap = { luminance: 0, hue: 1, saturation: 2 } as const;
+  gl.uniform1i(uniforms.u_diffuseAdaptiveChannel, diffuseChannelMap[diffuse.adaptiveChannel ?? 'luminance']);
+  gl.uniform1i(uniforms.u_diffuseGrainAdaptiveEnabled, diffuse.grainAdaptiveEnabled ? 1 : 0);
+  gl.uniform1f(uniforms.u_diffuseGrainAdaptiveAmount, diffuse.grainAdaptiveAmount ?? 1);
+  gl.uniform1i(uniforms.u_diffuseHalftoneShape, diffuse.halftoneShape === 'square' ? 1 : 0);
+  gl.uniform1f(uniforms.u_diffuseHalftoneSize, diffuse.halftoneSize ?? 0.82);
+  const [diffuseBackgroundR, diffuseBackgroundG, diffuseBackgroundB] = hexToRgb(
+    diffuse.backgroundColor ?? DEFAULT_DIFFUSE_BACKGROUND_COLOR,
+  );
+  gl.uniform3f(uniforms.u_diffuseBackgroundColor, diffuseBackgroundR, diffuseBackgroundG, diffuseBackgroundB);
+  uploadDiffuseAsciiTexture(ctx, diffuse.asciiCharset);
+  gl.activeTexture(gl.TEXTURE9);
+  gl.bindTexture(gl.TEXTURE_2D, ctx.diffuseAsciiTexture);
+  gl.uniform1i(uniforms.u_diffuseAsciiAtlas, 9);
+  gl.uniform1f(uniforms.u_diffuseAsciiCount, ctx.diffuseAsciiCount);
+  gl.uniform1f(uniforms.u_diffuseAsciiColumns, ASCII_ATLAS_COLUMNS);
+  gl.uniform1f(uniforms.u_diffuseAsciiRows, ctx.diffuseAsciiRows);
   const rampData = buildGradientRampData(gradient);
   uploadGradientRampTexture(ctx, rampData);
   if ((gradient.gradientType ?? 'linear') === 'mesh') uploadMeshGradientTexture(ctx, gradient, rampData);
@@ -2554,8 +2689,9 @@ export function render(
   const slitTime = slitOffsetAnimActive
     ? ((slitAnimBaseTime * slitScan.offsetSpeed) % 1.0 + 1.0) % 1.0
     : 0.0;
+  const slitPhaseProgress = ((slitAnimBaseTime * (slitScan.phaseSpeed ?? 1)) % 1 + 1) % 1;
   const phaseOffset = slitScan.animEnabled && (slitScan.phaseAnimEnabled ?? false) && (slitScan.phaseSpeed ?? 0) !== 0
-    ? -slitAnimBaseTime * Math.max(_ppR(slitScan.slitWidth), 1) * (slitScan.phaseSpeed ?? 1)
+    ? -slitPhaseProgress * Math.max(_ppR(slitScan.slitWidth), 1)
     : 0;
   gl.uniform2f(uniforms.u_slitParams, _ppR((slitScan.slitPhase ?? 0) + phaseOffset), slitScan.seed);
   {
@@ -2772,6 +2908,14 @@ export function render(
       diffuseDitherThreshold: diffuse.ditherThreshold,
       diffuseAdaptiveEnabled: diffuse.adaptiveEnabled,
       diffuseLuminanceBezier: diffuse.luminanceBezier,
+      diffuseAdaptiveChannel: diffuse.adaptiveChannel,
+      diffuseGrainAdaptiveEnabled: diffuse.grainAdaptiveEnabled,
+      diffuseGrainAdaptiveAmount: diffuse.grainAdaptiveAmount,
+      diffuseGrainBezier: diffuse.grainBezier,
+      diffuseHalftoneShape: diffuse.halftoneShape,
+      diffuseHalftoneSize: diffuse.halftoneSize,
+      diffuseAsciiCharset: diffuse.asciiCharset,
+      diffuseBackgroundColor: diffuse.backgroundColor,
     };
     // In V2, Noise is an explicit stack layer. Other effects may reuse the
     // noise material parameters internally, but must not apply the Noise UV

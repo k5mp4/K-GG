@@ -7,7 +7,7 @@ import { Icon } from './Icon';
 import { DiffuseCurveEditor } from './DiffuseCurveEditor';
 import { IDENTITY_DIFFUSE_BEZIER } from '../lib/diffuseCurve';
 import { useLanguage } from '../i18n/LanguageProvider';
-import { InputRadio } from 'tweeq';
+import { InputColor, InputDrum, InputRadio, InputString } from 'tweeq';
 
 const D = STORE_DEFAULTS.diffuse;
 const isDiffuseDirty = (value: DiffuseConfig) =>
@@ -21,7 +21,14 @@ const DIFFUSE_MODES: Array<{ value: DiffuseConfig['mode']; label: string }> = [
   { value: 'block', label: 'Block' },
   { value: 'smooth', label: 'Smooth' },
   { value: 'dither', label: 'Dither' },
+  { value: 'halftone', label: 'Halftone' },
+  { value: 'ascii', label: 'ASCII' },
 ];
+const DIFFUSE_MODE_VALUES = DIFFUSE_MODES.map(mode => mode.value);
+const ADAPTIVE_CHANNELS = ['luminance', 'hue', 'saturation'] as const;
+const ADAPTIVE_CHANNEL_LABELS = ['Luminance', 'Hue', 'Saturation'] as const;
+const HALFTONE_SHAPES = ['circle', 'square'] as const;
+const HALFTONE_SHAPE_LABELS = ['Circle', 'Square'] as const;
 
 export function DiffusePanel() {
   const { t } = useLanguage();
@@ -52,9 +59,9 @@ export function DiffusePanel() {
           <div className="space-y-4 pt-2">
             <div>
               <p className="text-xs text-deep mb-1">Mode</p>
-              <InputRadio
+              <InputDrum
                 value={diffuse.mode}
-                options={DIFFUSE_MODES.map((mode) => mode.value)}
+                options={DIFFUSE_MODE_VALUES}
                 labels={DIFFUSE_MODES.map((mode) => mode.label)}
                 onChange={(mode) => mode !== undefined && setDiffuse({ mode })}
                 aria-label="Diffuse mode"
@@ -62,7 +69,7 @@ export function DiffusePanel() {
               />
             </div>
 
-            {diffuse.mode !== 'dither' && (
+            {diffuse.mode !== 'dither' && diffuse.mode !== 'halftone' && diffuse.mode !== 'ascii' && (
               <SliderField
                 label="Scatter"
                 min={0} max={300} step={1}
@@ -75,14 +82,71 @@ export function DiffusePanel() {
             )}
 
             <SliderField
-              label={diffuse.mode === 'dither' ? 'Dot Size' : 'Grain'}
-              min={0.01} max={diffuse.mode === 'dither' ? 12 : 5} step={0.01}
+              label={diffuse.mode === 'dither' ? 'Dot Size' : diffuse.mode === 'halftone' || diffuse.mode === 'ascii' ? 'Cell Size' : 'Grain'}
+              min={diffuse.mode === 'halftone' ? 2 : diffuse.mode === 'ascii' ? 4 : 0.01}
+              max={diffuse.mode === 'dither' ? 12 : diffuse.mode === 'halftone' || diffuse.mode === 'ascii' ? 64 : 5}
+              step={diffuse.mode === 'halftone' || diffuse.mode === 'ascii' ? 1 : 0.01}
               value={diffuse.grain}
               onChange={(v) => setDiffuse({ grain: v })}
-              format={(v) => v.toFixed(2) + 'px'}
+              format={(v) => (diffuse.mode === 'halftone' || diffuse.mode === 'ascii' ? `${Math.round(v)}px` : v.toFixed(2) + 'px')}
               defaultValue={D.grain}
-              limitKey={diffuse.mode === 'dither' ? 'diffuse.ditherGrain' : 'diffuse.grain'}
+              limitKey={diffuse.mode === 'dither' ? 'diffuse.ditherGrain' : diffuse.mode === 'halftone' ? 'diffuse.halftoneGrain' : diffuse.mode === 'ascii' ? 'diffuse.asciiGrain' : 'diffuse.grain'}
             />
+
+            {diffuse.mode === 'halftone' && (
+              <>
+                <div>
+                  <p className="mb-1 text-xs text-deep">Shape</p>
+                  <InputRadio
+                    value={diffuse.halftoneShape}
+                    options={HALFTONE_SHAPES}
+                    labels={HALFTONE_SHAPE_LABELS}
+                    onChange={(halftoneShape) => halftoneShape !== undefined && setDiffuse({ halftoneShape })}
+                    aria-label="Halftone shape"
+                    className="w-full"
+                  />
+                </div>
+                <SliderField
+                  label="Shape Size"
+                  min={0.05}
+                  max={1}
+                  step={0.01}
+                  value={diffuse.halftoneSize}
+                  onChange={(v) => setDiffuse({ halftoneSize: v })}
+                  format={(v) => `${Math.round(v * 100)}%`}
+                  defaultValue={D.halftoneSize}
+                  limitKey="diffuse.halftoneSize"
+                />
+              </>
+            )}
+
+            {diffuse.mode === 'ascii' && (
+              <div className="space-y-1">
+                <p className="text-xs text-deep">ASCII Characters</p>
+                <InputString
+                  value={diffuse.asciiCharset}
+                  onChange={(asciiCharset) => setDiffuse({ asciiCharset })}
+                  aria-label="ASCII character set"
+                  title="ASCII character set"
+                  className="w-full"
+                />
+                <p className="text-[9px] text-tab-inactive">Dark to light, left to right</p>
+              </div>
+            )}
+
+            {(diffuse.mode === 'halftone' || diffuse.mode === 'ascii') && (
+              <div className="flex items-center justify-between gap-3">
+                <span className="text-xs text-deep">Background Color</span>
+                <div className="tq-color-input w-[180px]">
+                  <InputColor
+                    value={diffuse.backgroundColor}
+                    onChange={(backgroundColor) => setDiffuse({ backgroundColor })}
+                    alpha={false}
+                    aria-label="Diffuse background color"
+                  />
+                </div>
+              </div>
+            )}
 
             {diffuse.mode === 'dither' && (
               <SliderField
@@ -98,23 +162,65 @@ export function DiffusePanel() {
 
             <div className="flex items-center justify-between border-t border-k-muted/40 pt-3">
               <div>
-                <p className="text-xs text-deep">{t('diffuse.adaptiveLuminance')}</p>
-                <p className="text-[10px] text-tab-inactive">{t('diffuse.adaptiveDescription')}</p>
+                <p className="text-xs text-deep">Adaptive Diffuse</p>
+                <p className="text-[10px] text-tab-inactive">Amount responds to color properties</p>
               </div>
               <Toggle checked={diffuse.adaptiveEnabled ?? false} onChange={(v) => setDiffuse({ adaptiveEnabled: v })} />
+            </div>
+            <div>
+              <p className="mb-1 text-xs text-deep">Adaptive Source</p>
+              <InputDrum
+                value={diffuse.adaptiveChannel}
+                options={ADAPTIVE_CHANNELS}
+                labels={ADAPTIVE_CHANNEL_LABELS}
+                onChange={(adaptiveChannel) => adaptiveChannel !== undefined && setDiffuse({ adaptiveChannel })}
+                aria-label="Diffuse adaptive source"
+                className="w-full"
+              />
             </div>
             <DiffuseCurveEditor
               value={diffuse.luminanceBezier}
               onChange={(luminanceBezier) => setDiffuse({ luminanceBezier })}
               disabled={!diffuse.adaptiveEnabled}
+              label="Amount Curve"
+              description="Maps the selected source to scatter"
             />
             <button
               type="button"
               className="w-full border border-k-muted/60 bg-k-surface px-2 py-1 text-[10px] text-tab-inactive hover:border-k-text hover:text-k-text"
-              onClick={() => setDiffuse({ luminanceBezier: [...IDENTITY_DIFFUSE_BEZIER] as DiffuseConfig['luminanceBezier'] })}
+              onClick={() => setDiffuse({
+                luminanceBezier: [...IDENTITY_DIFFUSE_BEZIER] as DiffuseConfig['luminanceBezier'],
+                grainBezier: [...IDENTITY_DIFFUSE_BEZIER] as DiffuseConfig['grainBezier'],
+              })}
             >
               {t('diffuse.resetCurve')}
             </button>
+
+            <div className="flex items-center justify-between border-t border-k-muted/40 pt-3">
+              <div>
+                <p className="text-xs text-deep">Adaptive Grain</p>
+                <p className="text-[10px] text-tab-inactive">Change cell size with the same source</p>
+              </div>
+              <Toggle checked={diffuse.grainAdaptiveEnabled ?? false} onChange={(v) => setDiffuse({ grainAdaptiveEnabled: v })} />
+            </div>
+            <SliderField
+              label="Grain Curve Amount"
+              min={0}
+              max={1}
+              step={0.01}
+              value={diffuse.grainAdaptiveAmount}
+              onChange={(v) => setDiffuse({ grainAdaptiveAmount: v })}
+              format={(v) => `${Math.round(v * 100)}%`}
+              defaultValue={D.grainAdaptiveAmount}
+              limitKey="diffuse.grainAdaptiveAmount"
+            />
+            <DiffuseCurveEditor
+              value={diffuse.grainBezier}
+              onChange={(grainBezier) => setDiffuse({ grainBezier })}
+              disabled={!diffuse.grainAdaptiveEnabled}
+              label="Grain Curve"
+              description="Maps the selected source to cell size"
+            />
 
             <SliderField
               label="Seed"

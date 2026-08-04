@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import gradientShader from '../shaders/gradient.frag.glsl?raw';
 import noiseShader from '../shaders/noise.glsl?raw';
+import postprocessDiffuseShader from '../shaders/postprocess/diffuse.glsl?raw';
 import webglSource from './webgl.ts?raw';
 import { getPostprocessFragmentSource, getProgramSource } from './webglShaderSources';
 
@@ -277,6 +278,57 @@ describe('V2 effect shader parity', () => {
       .toBe(compact(panelPattern));
   });
 
+  it('keeps the five Diffuse mode mapping and adaptive pattern inputs available in both render paths', () => {
+    expect(compact(webglSource)).toContain('block:0,smooth:1,dither:2,halftone:3,ascii:4');
+    for (const source of [gradientShader, postprocessShader]) {
+      expect(source).toContain('u_diffuseAdaptiveChannel');
+      expect(source).toContain('u_diffuseGrainAdaptiveEnabled');
+      expect(source).toContain('u_diffuseHalftoneShape');
+      expect(source).toContain('u_diffuseBackgroundColor');
+      expect(source).toContain('u_diffuseAsciiAtlas');
+      expect(source).toContain('applyDiffuseHalftone');
+      expect(source).toContain('applyDiffuseAscii');
+    }
+  });
+
+  it('keeps Halftone and ASCII at full fragment resolution while reserving cell snapping for Dither', () => {
+    const postprocessMain = compact(postprocessShader.slice(postprocessShader.indexOf('void main()')));
+    expect(postprocessMain).toContain(compact('vec2 diffuseSampleCoord = u_diffuseMode == 2 ? ditherCellCenter(globalCoord) : globalCoord;'));
+    expect(postprocessMain).not.toContain(compact('u_diffuseMode >= 2 ? ditherCellCenter(globalCoord)'));
+
+    const gradientMain = compact(gradientShader.slice(gradientShader.lastIndexOf('void main()')));
+    expect(gradientMain).toContain(compact('vec2 sampleCoord = usePatternDither ? ditherCoord : globalCoord;'));
+    expect(gradientMain).not.toContain(compact('usePatternDither || useCellPattern ? ditherCoord'));
+  });
+
+  it('keeps Halftone and ASCII cells visible and addresses the fixed ASCII atlas grid', () => {
+    for (const source of [gradientShader, postprocessDiffuseShader]) {
+      expect(source).toContain('vec3 diffusePatternBackground');
+      expect(source).toContain('return u_diffuseBackgroundColor;');
+      expect(source).toContain('vec2 diffuseCellFraction');
+      expect(source).toContain('float diffuseCellSizeAtCoord');
+      expect(source).toContain('texture2D(u_diffuseAsciiAtlas, vec2(atlasUv.x, 1.0 - atlasUv.y)).r');
+    }
+    expect(postprocessDiffuseShader).toContain(
+      'float cellSize = diffuseCellSizeAtCoord(globalCoord, color.rgb);',
+    );
+    expect(postprocessDiffuseShader).toContain(
+      'return vec4(applyDiffuseAscii(color.rgb, globalCoord, cellSize), 1.0);',
+    );
+    expect(gradientShader).toContain('sourceColor.a = 1.0;');
+    expect(gradientShader).toContain('useCellPattern ? 1.0 : rampAlpha * sourceAlpha');
+    expect(compact(webglSource)).toContain('diffuseAsciiRows:ASCII_ATLAS_MAX_ROWS');
+    expect(compact(webglSource)).toContain("context.font='bold29pxmonospace'");
+  });
+
+  it('keeps shared Diffuse helpers outside the Glass-only stub guard', () => {
+    const glassGuard = postprocessDiffuseShader.indexOf('#if defined(KGG_GLASS_ONLY)');
+    expect(glassGuard).toBeGreaterThanOrEqual(0);
+    expect(postprocessDiffuseShader.indexOf('float diffuseAdaptiveInput')).toBeLessThan(glassGuard);
+    expect(postprocessDiffuseShader.indexOf('vec3 applyDiffuseHalftone')).toBeLessThan(glassGuard);
+    expect(postprocessDiffuseShader.indexOf('vec3 applyDiffuseAscii')).toBeLessThan(glassGuard);
+  });
+
   it('keeps the V2 Noise transform equivalent to the Legacy generator transform', () => {
     expect(canonicalNoise(extractFunction(postprocessShader, 'applyStackCurlNoiseUv')))
       .toBe(canonicalNoise(extractFunction(gradientShader, 'applyCurlNoiseUV')));
@@ -372,5 +424,10 @@ describe('V2 effect shader parity', () => {
     const slitIndex = compact(extractFunction(postprocessShader, 'computeStackSlitIndex'));
     expect(slitIndex).toContain(compact('stackSlitDeltaAt(index)'));
     expect(slitIndex).toContain(compact('cumulativeDelta += entry.y'));
+  });
+
+  it('bounds Slit phase motion to one normalized cycle for stable playback', () => {
+    expect(compact(webglSource)).toContain(compact('const stackSlitPhaseProgress = ((stackSlitAnimationBaseTime * (stackSlit.phaseSpeed ?? 1)) % 1 + 1) % 1;'));
+    expect(compact(webglSource)).toContain(compact('const slitPhaseProgress = ((slitAnimBaseTime * (slitScan.phaseSpeed ?? 1)) % 1 + 1) % 1;'));
   });
 });

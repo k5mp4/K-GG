@@ -5,7 +5,7 @@ import { Collapsible } from './Collapsible';
 import { Toggle } from './Toggle';
 import { AnimationPropertyControls } from './AnimationPropertyControls';
 import { Icon } from './Icon';
-import { InputShuffle, fromNumber } from 'tweeq';
+import { InputColor, InputShuffle, fromNumber } from 'tweeq';
 import { useLanguage } from '../i18n/LanguageProvider';
 
 const D = STORE_DEFAULTS.stretch;
@@ -103,19 +103,14 @@ export function StretchPanel() {
             </div>
             <div className="flex items-center justify-between gap-3">
               <span className="text-xs text-deep font-display uppercase tracking-wider">Glow Tint</span>
-              <label className="flex items-center gap-2">
-                <span
-                  className="block h-6 w-8 border border-cream/40"
-                  style={{ backgroundColor: stretch.glowTint ?? D.glowTint }}
-                />
-                <input
-                  type="color"
+              <div className="tq-color-input w-[180px]">
+                <InputColor
                   value={stretch.glowTint ?? D.glowTint}
-                  onChange={(e) => setStretch({ glowTint: e.target.value })}
-                  className="h-7 w-10 cursor-pointer rounded-none border border-cream/40 bg-k-surface p-0"
-                  title="Glow tint"
+                  onChange={(glowTint) => setStretch({ glowTint })}
+                  alpha={false}
+                  aria-label="Glow tint"
                 />
-              </label>
+              </div>
             </div>
             <SliderField
               label="Glow Intensity"

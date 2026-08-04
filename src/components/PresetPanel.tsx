@@ -305,7 +305,14 @@ export function PresetPanel({ canvasW, canvasH, setCanvasW, setCanvasH, aspectRa
     delete loadedDiffuse.luminanceCurve;
     store.setDiffuse(loadedDiffuse);
     store.setImageGradient(normalizeImageGradientConfig(s.imageGradient, s.imageGradient ? 0 : STORE_DEFAULTS.imageGradient.anchorInfluence));
-    if (s.slitScan) store.setSlitScan({ ...STORE_DEFAULTS.slitScan, ...s.slitScan });
+    if (s.slitScan) {
+      const loadedSlit = {
+        ...STORE_DEFAULTS.slitScan,
+        ...s.slitScan,
+      };
+      delete (loadedSlit as Record<string, unknown>).autoLoop;
+      store.setSlitScan(loadedSlit);
+    }
     if (s.stretch) store.setStretch(s.stretch);
     if (s.normalMap) store.setNormalMap(s.normalMap);
     store.setRadon({ ...STORE_DEFAULTS.radon, ...s.radon, enabled: false });

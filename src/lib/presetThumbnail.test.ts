@@ -40,4 +40,28 @@ describe('presetThumbnail', () => {
     expect(preview.manualDistort.displacement).not.toBe(displacement);
     expect(source.manualDistort?.displacement).toBe(displacement);
   });
+
+  it('fills new Diffuse and Slit fields when loading a legacy snapshot', () => {
+    const legacy = snapshot();
+    const legacyDiffuse = { ...legacy.diffuse };
+    delete (legacyDiffuse as Partial<typeof legacyDiffuse>).halftoneShape;
+    delete (legacyDiffuse as Partial<typeof legacyDiffuse>).halftoneSize;
+    delete (legacyDiffuse as Partial<typeof legacyDiffuse>).asciiCharset;
+    delete (legacyDiffuse as Partial<typeof legacyDiffuse>).backgroundColor;
+    delete (legacyDiffuse as Partial<typeof legacyDiffuse>).adaptiveChannel;
+    delete (legacyDiffuse as Partial<typeof legacyDiffuse>).grainAdaptiveEnabled;
+    delete (legacyDiffuse as Partial<typeof legacyDiffuse>).grainAdaptiveAmount;
+    delete (legacyDiffuse as Partial<typeof legacyDiffuse>).grainBezier;
+
+    const preview = createPresetThumbnailState({
+      ...legacy,
+      diffuse: legacyDiffuse,
+    });
+
+    expect(preview.diffuse.halftoneShape).toBe(STORE_DEFAULTS.diffuse.halftoneShape);
+    expect(preview.diffuse.asciiCharset).toBe(STORE_DEFAULTS.diffuse.asciiCharset);
+    expect(preview.diffuse.backgroundColor).toBe(STORE_DEFAULTS.diffuse.backgroundColor);
+    expect(preview.diffuse.grainBezier).toEqual(STORE_DEFAULTS.diffuse.grainBezier);
+    expect('autoLoop' in preview.slitScan).toBe(false);
+  });
 });

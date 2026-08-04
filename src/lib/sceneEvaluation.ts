@@ -207,13 +207,22 @@ function keyedTrackValue(state: LatestState, propertyId: string, time: number): 
   return interpolateKeyframesWithLoop(time, track.keyframes, state.animation.previewLoop ?? true);
 }
 
+function hasSlitOwnAnimation(slit: SlitScanConfig): boolean {
+  if (!slit.enabled) return false;
+  const offsetAnimationActive = slit.animMode !== 'off' && Math.abs(slit.offsetSpeed) > 1e-6;
+  const phaseAnimationActive = slit.phaseAnimEnabled && Math.abs(slit.phaseSpeed) > 1e-6;
+  return offsetAnimationActive || phaseAnimationActive;
+}
+
 export function hasActiveAnimation(state: LatestState): boolean {
   if (!state.animation.enabled) return false;
   if (Object.values(state.keyframeTracks).some(track => (
-    propertyOwnerEnabled(state, track.propertyId) && getTrackMode(track) !== 'static'
+    propertyOwnerEnabled(state, track.propertyId)
+      && getTrackMode(track) !== 'static'
   ))) return true;
   return (
     (state.animation.affectNoise && (state.noiseDistortion.enabled || state.radon.enabled || state.iridescence.enabled)) ||
+    (state.slitScan.enabled && hasSlitOwnAnimation(state.slitScan)) ||
     (state.animation.affectSlit && state.slitScan.enabled) ||
     (state.animation.affectStretch && state.stretch.enabled) ||
     state.animation.affectRamp ||
@@ -231,8 +240,11 @@ export function evaluateSceneAtTime(state: LatestState, normalizedTime: number):
   const noiseMode = trackMode(state, 'noiseDistortion.evolution', animation.affectNoise && state.noiseDistortion.enabled);
   const radonMode = trackMode(state, 'radon.evolution', animation.affectNoise && state.radon.enabled);
   const iridescenceMode = trackMode(state, 'iridescence.__time', animation.affectNoise && state.iridescence.enabled);
-  const slitOffsetMode = trackMode(state, 'slitScan.offset', animation.affectSlit && state.slitScan.enabled);
-  const slitPhaseMode = trackMode(state, 'slitScan.slitPhase', animation.affectSlit && state.slitScan.enabled && state.slitScan.phaseAnimEnabled);
+  const rawSlitOffsetMode = trackMode(state, 'slitScan.offset', animation.affectSlit && state.slitScan.enabled);
+  const rawSlitPhaseMode = trackMode(state, 'slitScan.slitPhase', animation.affectSlit && state.slitScan.enabled && state.slitScan.phaseAnimEnabled);
+  const slitTrackAnimationActive = rawSlitOffsetMode === 'auto' || rawSlitPhaseMode === 'auto';
+  const slitOwnAnimationActive = animation.enabled && hasSlitOwnAnimation(state.slitScan);
+  const slitAnimationActive = animation.enabled && (slitTrackAnimationActive || slitOwnAnimationActive);
   const stretchMode = trackMode(state, 'stretch.__scan', animation.affectStretch && state.stretch.enabled);
   const diffuseMode = trackMode(state, 'diffuse.seed', state.diffuse.enabled && Boolean(state.diffuse.seedAnimEnabled));
   const postprocessMode = trackMode(
@@ -311,8 +323,8 @@ export function evaluateSceneAtTime(state: LatestState, normalizedTime: number):
   );
   slitScan = {
     ...slitScan,
-    animEnabled: slitOffsetMode === 'auto' || slitPhaseMode === 'auto',
-    phaseAnimEnabled: slitPhaseMode === 'auto',
+    animEnabled: slitAnimationActive,
+    phaseAnimEnabled: rawSlitPhaseMode === 'auto' || slitScan.phaseAnimEnabled,
   };
   const stretch = applyObjectTracks(
     'stretch',
@@ -347,8 +359,10 @@ export function evaluateSceneAtTime(state: LatestState, normalizedTime: number):
     iridescence,
     postprocess,
     renderTime,
-    slitAnimationTime: animation.enabled && (slitOffsetMode === 'auto' || slitPhaseMode === 'auto')
-      ? autoTime * animation.duration
+    slitAnimationTime: slitAnimationActive
+      // Slit shaders consume seconds. Use the same remapped, speed-adjusted
+      // clock for preview and export so both paths advance identically.
+      ? autoTime * animation.speed * animation.duration
       : null,
     stretchTime: animation.enabled
       ? stretchMode === 'auto'
