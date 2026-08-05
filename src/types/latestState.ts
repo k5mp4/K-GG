@@ -12,9 +12,10 @@ import type {
   SlitScanConfig,
   StretchConfig,
 } from './distortion';
-import type { ImageGradientConfig } from './imageGradient';
 import type { GradientConfig } from './gradient';
+import type { ImageGradientConfig } from './imageGradient';
 import type { PropertyTrack } from './keyframe';
+import type { ClothGradientConfig } from './clothGradient';
 
 export type LatestState = {
   gradient: GradientConfig;
@@ -24,6 +25,7 @@ export type LatestState = {
   slitScan: SlitScanConfig;
   stretch: StretchConfig;
   normalMap: NormalMapConfig;
+  clothGradient?: ClothGradientConfig;
   radon: RadonConfig;
   iridescence: IridescenceConfig;
   manualDistort: ManualDistortConfig;

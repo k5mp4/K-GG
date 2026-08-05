@@ -19,6 +19,9 @@ import { normalizeMeshGradientConfig, type GradientConfig } from '../types/gradi
 import type { PropertyTrack } from '../types/keyframe';
 import type { UserColorPalette } from './colorPalettes';
 
+import type { ClothGradientConfig } from '../types/clothGradient';
+import { normalizeClothGradientConfig } from '../types/clothGradient';
+
 export type StoreSnapshot = {
   gradient: GradientConfig;
   noiseDistortion: NoiseDistortionConfig;
@@ -28,6 +31,7 @@ export type StoreSnapshot = {
   stretch?: StretchConfig;
   animation: AnimationConfig;
   normalMap: NormalMapConfig;
+  clothGradient?: ClothGradientConfig;
   radon: RadonConfig;
   iridescence?: IridescenceConfig;
   manualDistort?: ManualDistortConfig;
@@ -79,6 +83,7 @@ export function makePreset(
       ...state,
       gradient,
       diffuse,
+      clothGradient: normalizeClothGradientConfig(state.clothGradient),
       effectPipeline: state.effectPipeline
         ? normalizeEffectPipelineConfig(state.effectPipeline)
         : createDefaultEffectPipeline(),
