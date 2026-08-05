@@ -183,14 +183,7 @@ uniform float uFresnelPower;
 uniform vec3 uFresnelColor;
 uniform float uFresnelColorStrength;
 
-uniform float uLightWeight;
-uniform float uHeightWeight;
-uniform float uFresnelWeight;
-uniform float uFlowWeight;
 uniform float uRampOffset;
-uniform float uRampLow;
-uniform float uRampHigh;
-uniform float uShadingMix;
 
 varying vec3 vNormal;
 varying vec3 vWorldPosition;
@@ -204,7 +197,7 @@ void main() {
   vec3 V = normalize(cameraPosition - vWorldPosition);
   vec3 H = normalize(L + V);
 
-  // Lighting calculations
+  // 白黒シェーディング: ライティング + スペキュラー + フレネルを輝度として計算する。
   float NdotL = max(dot(N, L), 0.0);
 
   // Hemisphere Ambient
@@ -219,31 +212,18 @@ void main() {
   float NdotV = max(dot(N, V), 0.0);
   float fresnel = pow(1.0 - NdotV, uFresnelPower);
 
-  // Normalized Height 0..1 (assuming height approx -2..2)
-  float height01 = clamp(vHeight * 0.25 + 0.5, 0.0, 1.0);
-  float flow01 = vFlowNoise * 0.5 + 0.5;
+  // ライティングの輝度 (Rec.709)
+  vec3 lighting = ambient + vec3(NdotL * uLightIntensity);
+  float shade = dot(lighting, vec3(0.299, 0.587, 0.114))
+              + spec * dot(uSpecularColor, vec3(0.299, 0.587, 0.114))
+              + fresnel * uFresnelColorStrength * dot(uFresnelColor, vec3(0.299, 0.587, 0.114))
+              + uRampOffset;
 
-  // Ramp Signal construction
-  float rampSignal = NdotL * uLightWeight
-                   + height01 * uHeightWeight
-                   + fresnel * uFresnelWeight
-                   + flow01 * uFlowWeight
-                   + uRampOffset;
-
-  float rampRange = max(uRampHigh - uRampLow, 0.001);
-  float rampT = clamp((rampSignal - uRampLow) / rampRange, 0.0, 1.0);
-
+  // 白黒シェーディングの輝度をランプのインデックスとしてグラデーションを適用する。
+  float rampT = clamp(shade, 0.0, 1.0);
   vec4 rampColor = texture2D(uGradientRamp, vec2(rampT, 0.5));
 
-  // Shading mix
-  vec3 lighting = ambient + vec3(NdotL * uLightIntensity);
-  vec3 shadedColor = rampColor.rgb * lighting;
-  vec3 finalBase = mix(rampColor.rgb, shadedColor, uShadingMix);
-
-  // Add specular and fresnel color highlights
-  vec3 finalColor = finalBase + (spec * uSpecularColor) + (fresnel * uFresnelColorStrength * uFresnelColor);
-
-  gl_FragColor = vec4(finalColor, 1.0);
+  gl_FragColor = vec4(rampColor.rgb, 1.0);
 }
 `;
 
@@ -342,14 +322,7 @@ export class ClothGradientRenderer {
         uFresnelColor: { value: new THREE.Vector3(1, 1, 1) },
         uFresnelColorStrength: { value: 0.4 },
 
-        uLightWeight: { value: 0.45 },
-        uHeightWeight: { value: 0.35 },
-        uFresnelWeight: { value: 0.15 },
-        uFlowWeight: { value: 0.1 },
         uRampOffset: { value: 0.0 },
-        uRampLow: { value: 0.0 },
-        uRampHigh: { value: 1.0 },
-        uShadingMix: { value: 0.85 },
       },
     });
 
@@ -442,14 +415,7 @@ export class ClothGradientRenderer {
     u.uFresnelColor.value.copy(hexToRgbVec3(config.fresnelColor));
     u.uFresnelColorStrength.value = config.fresnelColorStrength;
 
-    u.uLightWeight.value = config.lightWeight;
-    u.uHeightWeight.value = config.heightWeight;
-    u.uFresnelWeight.value = config.fresnelWeight;
-    u.uFlowWeight.value = config.flowWeight;
     u.uRampOffset.value = config.rampOffset;
-    u.uRampLow.value = config.rampLow;
-    u.uRampHigh.value = config.rampHigh;
-    u.uShadingMix.value = config.shadingMix;
 
     // Tile Export handling
     if (tileOptions && targetWidth > 0 && targetHeight > 0) {

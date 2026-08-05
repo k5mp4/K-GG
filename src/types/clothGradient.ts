@@ -35,14 +35,7 @@ export type ClothGradientConfig = {
   fresnelColor: string;
   fresnelColorStrength: number;
 
-  lightWeight: number;
-  heightWeight: number;
-  fresnelWeight: number;
-  flowWeight: number;
   rampOffset: number;
-  rampLow: number;
-  rampHigh: number;
-  shadingMix: number;
 
   quality: ClothGradientQuality;
 };
@@ -81,14 +74,7 @@ export const DEFAULT_CLOTH_GRADIENT: ClothGradientConfig = {
   fresnelColor: '#ffffff',
   fresnelColorStrength: 0.4,
 
-  lightWeight: 0.45,
-  heightWeight: 0.35,
-  fresnelWeight: 0.15,
-  flowWeight: 0.1,
   rampOffset: 0.0,
-  rampLow: 0.0,
-  rampHigh: 1.0,
-  shadingMix: 0.85,
 
   quality: 'medium',
 };
@@ -166,14 +152,7 @@ export function normalizeClothGradientConfig(value: unknown): ClothGradientConfi
     fresnelColor: sanitizeHexColor(raw.fresnelColor, DEFAULT_CLOTH_GRADIENT.fresnelColor),
     fresnelColorStrength: sanitizeNumber(raw.fresnelColorStrength, DEFAULT_CLOTH_GRADIENT.fresnelColorStrength, 0, 5),
 
-    lightWeight: sanitizeNumber(raw.lightWeight, DEFAULT_CLOTH_GRADIENT.lightWeight, -5, 5),
-    heightWeight: sanitizeNumber(raw.heightWeight, DEFAULT_CLOTH_GRADIENT.heightWeight, -5, 5),
-    fresnelWeight: sanitizeNumber(raw.fresnelWeight, DEFAULT_CLOTH_GRADIENT.fresnelWeight, -5, 5),
-    flowWeight: sanitizeNumber(raw.flowWeight, DEFAULT_CLOTH_GRADIENT.flowWeight, -5, 5),
     rampOffset: sanitizeNumber(raw.rampOffset, DEFAULT_CLOTH_GRADIENT.rampOffset, -2, 2),
-    rampLow: sanitizeNumber(raw.rampLow, DEFAULT_CLOTH_GRADIENT.rampLow, -2, 2),
-    rampHigh: sanitizeNumber(raw.rampHigh, DEFAULT_CLOTH_GRADIENT.rampHigh, -2, 2),
-    shadingMix: sanitizeNumber(raw.shadingMix, DEFAULT_CLOTH_GRADIENT.shadingMix, 0, 1),
 
     quality,
   };
