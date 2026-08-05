@@ -7,6 +7,7 @@ import type {
   SlitScanConfig,
   StretchConfig,
   NoiseDistortionConfig,
+  NormalMapConfig,
 } from '../types/distortion';
 import { normalizeMeshGradientConfig, type GradientConfig } from '../types/gradient';
 import type { PropertyTrack } from '../types/keyframe';
@@ -17,16 +18,23 @@ import { hexToRgb255, rgb255ToHex } from './gradientRampUtils';
 import { withAnimatedDiffuseSeed } from './diffuseSeed';
 import { isPostprocessTimeAnimationActive } from './postprocessAnimation';
 
+import type { ClothGradientConfig } from '../types/clothGradient';
+import { normalizeClothGradientConfig } from '../types/clothGradient';
+
 export type EvaluatedScene = {
   gradient: GradientConfig;
   noiseDistortion: NoiseDistortionConfig;
   diffuse: DiffuseConfig;
   slitScan: SlitScanConfig;
   stretch: StretchConfig;
+  normalMap: NormalMapConfig;
+  clothGradient: ClothGradientConfig;
   radon: RadonConfig;
   iridescence: IridescenceConfig;
   postprocess: PostprocessConfig;
   renderTime: number;
+  /** Cloth Gradient 専用の時間。アニメーション有効時のみ進む秒単位の値。 */
+  clothTime: number;
   slitAnimationTime: number | null;
   stretchTime: number | null;
   noiseLoopPeriod: number;
@@ -349,16 +357,31 @@ export function evaluateSceneAtTime(state: LatestState, normalizedTime: number):
     seedFrame,
   );
 
+  const clothGradient = normalizeClothGradientConfig(
+    applyObjectTracks(
+      'clothGradient',
+      { ...state.clothGradient },
+      tracks,
+      time,
+      animation.previewLoop ?? true,
+    ),
+  );
+
   return {
     gradient: applyGradientTracks(state.gradient, tracks, time, animation.previewLoop ?? true),
     noiseDistortion,
     diffuse,
     slitScan,
     stretch,
+    normalMap: state.normalMap,
+    clothGradient,
     radon,
     iridescence,
     postprocess,
     renderTime,
+    clothTime: animation.enabled
+      ? autoTime * animation.speed * animation.duration
+      : 0,
     slitAnimationTime: slitAnimationActive
       // Slit shaders consume seconds. Use the same remapped, speed-adjusted
       // clock for preview and export so both paths advance identically.

@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState, type ChangeEvent, type DragEvent, type MutableRefObject } from 'react';
 import { createEmptyManualDistortMap, createEmptyManualSmoothMask, normalizeNoiseDistortionConfig, normalizePostprocessConfig, STORE_DEFAULTS, useGradientStore } from '../store/gradientStore';
-import { normalizeEffectPipelineConfig } from '../lib/effectPipeline';
+import { createDefaultEffectPipeline, normalizeEffectPipelineConfig } from '../lib/effectPipeline';
+import { normalizeClothGradientConfig } from '../types/clothGradient';
 import { normalizeImageGradientConfig } from '../types/imageGradient';
 import { resolveDiffuseBezier } from '../lib/diffuseCurve';
 import {
@@ -334,7 +335,15 @@ export function PresetPanel({ canvasW, canvasH, setCanvasW, setCanvasH, aspectRa
       smoothMask: validFiniteArray(legacyDistort.smoothMask, smoothMaskLength) ? legacyDistort.smoothMask : createEmptyManualSmoothMask(resolution),
     });
     store.setPostprocess(loadedPostprocess);
-    store.setEffectPipeline(normalizeEffectPipelineConfig(s.effectPipeline));
+    // clothGradient が無い旧プリセットでも安全にデフォルトで初期化し、
+    // SANDBOX の Cloth Gradient 設定を反映する。
+    store.setClothGradient(normalizeClothGradientConfig(s.clothGradient));
+    // effectPipeline を持たない旧プリセット/内蔵プリセットは Legacy v1 に
+    // ならないよう、既定の V2 パイプラインへ昇格する。V2 でなければ
+    // SANDBOX Cloth は描画パイプラインへ一切統合されないため。
+    store.setEffectPipeline(s.effectPipeline
+      ? normalizeEffectPipelineConfig(s.effectPipeline)
+      : createDefaultEffectPipeline());
     if (s.matcap) store.setMatcap(s.matcap);
     store.setKeyframeTracks(s.keyframeTracks ?? {});
     if (s.animation) store.setAnimation({ ...s.animation, previewLoop: s.animation.previewLoop ?? true });

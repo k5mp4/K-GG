@@ -1,3 +1,5 @@
+import type { ClothGradientConfig } from '../types/clothGradient';
+import { ClothGradientRenderer } from './clothGradientRenderer';
 import type { GradientConfig } from '../types/gradient';
 import type { NoiseDistortionConfig, DiffuseConfig, SlitScanConfig, StretchConfig, NormalMapConfig, RadonConfig, IridescenceConfig, ManualDistortConfig, PostprocessConfig, MatcapConfig, PostprocessStackKind, EffectPipelineConfig } from '../types/distortion';
 import { DEFAULT_DIFFUSE_ASCII_CHARSET, DEFAULT_DIFFUSE_BACKGROUND_COLOR } from '../types/distortion';
@@ -145,6 +147,8 @@ export type WebGLContext = {
   v2CoreFboSize: [number, number];
   shaderCompileExt: ShaderCompileExt;
   lazyProgramState: Record<LazyProgramKey, LazyProgramState>;
+  clothRenderer?: ClothGradientRenderer | null;
+  clothStatus?: 'loading' | 'ready' | 'failed' | 'fallback';
   hasPresentedFrame: boolean;
 };
 
@@ -282,6 +286,10 @@ export async function initWebGL(canvas: HTMLCanvasElement): Promise<WebGLContext
       `[WebGL diag] Canvas size (${canvasWidth}×${canvasHeight}) exceeds MAX_VIEWPORT_DIMS (${maxViewportDims[0]}×${maxViewportDims[1]}).`
     );
   }
+
+  // 浮動小数点テクスチャのリニアフィルタリングとFBOアタッチメント用拡張
+  gl.getExtension('OES_texture_float_linear');
+  gl.getExtension('EXT_color_buffer_float');
 
   // KHR_parallel_shader_compile: シェーダーコンパイルを非同期化してメインスレッドをブロックしない
   const ext = gl.getExtension('KHR_parallel_shader_compile') as ShaderCompileExt;
@@ -2379,6 +2387,92 @@ function drawParticleOverlay(
   gl.bindVertexArray(null);
 }
 
+/**
+ * SANDBOX Cloth Gradient: 3D布メッシュをオフスクリーン描画し、その結果を
+ * V2 パイプラインの Base テクスチャ `ctx.gradTexture` へ転送する。
+ * 失敗時は `false` を返し、呼び出し側は既存の Base Gradient へフォールバックする。
+ */
+function renderClothIntoGradTexture(
+  ctx: WebGLContext,
+  gradient: GradientConfig,
+  clothGradient: ClothGradientConfig,
+  clothTime: number,
+  vpW: number,
+  vpH: number,
+  tile: TileRenderOptions | undefined,
+  loopPeriod = 1,
+): boolean {
+  const { gl } = ctx;
+  try {
+    if (!ctx.clothRenderer) {
+      ctx.clothRenderer = new ClothGradientRenderer();
+    }
+    const rampData = buildRampTextureData(
+      gradient.stops,
+      gradient.rampInterpolation,
+      gradient.rampMirror ?? false,
+      gradient.opacityStops,
+      gradient.rampColorMode,
+      gradient.rampVariable,
+      gradient.rampRepeat,
+    );
+    ctx.clothRenderer.updateRampData(rampData);
+    // Cloth はアニメーションON時のみ動く専用の時間 clothTime を使う。
+    // 共有の renderTime (time) は noise 等の Auto 有効時以外は進まず、
+    // Cloth 単体の波が動かない原因になるため分離している。
+    const clothCanvas = ctx.clothRenderer.render(clothGradient, clothTime, vpW, vpH, tile, loopPeriod);
+
+    gl.activeTexture(gl.TEXTURE2);
+    gl.bindTexture(gl.TEXTURE_2D, ctx.gradTexture);
+    gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, true);
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, clothCanvas);
+    gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, false);
+    ctx.clothStatus = 'ready';
+    window.dispatchEvent(new CustomEvent('kgg:webgl-lazy-program-state', { detail: { key: 'cloth', state: 'ready' } }));
+    return true;
+  } catch (err) {
+    console.error('[ClothGradientRenderer] Error rendering cloth frame:', err);
+    ctx.clothStatus = 'fallback';
+    window.dispatchEvent(new CustomEvent('kgg:webgl-lazy-program-state', { detail: { key: 'cloth', state: 'fallback' } }));
+    return false;
+  }
+}
+
+/**
+ * gradTexture に転送済みの cloth フレームを画面へコピーする。
+ * stack プログラムが未コンパイルでも、Base Generator としての cloth 結果を
+ * 提示するために使う。
+ */
+function presentClothGradTextureToScreen(
+  ctx: WebGLContext,
+  gradient: GradientConfig,
+  width: number,
+  height: number,
+  vpW: number,
+  vpH: number,
+  tileOx: number,
+  tileOy: number,
+): void {
+  const { gl } = ctx;
+  gl.useProgram(ctx.postprocessProgram ?? ctx.program);
+  gl.viewport(0, 0, vpW, vpH);
+  gl.activeTexture(gl.TEXTURE2);
+  gl.bindTexture(gl.TEXTURE_2D, ctx.gradTexture);
+  if (ctx.postprocessProgram) {
+    gl.uniform1i(ctx.postprocessUniforms.u_sourceTex, 2);
+    gl.uniform2f(ctx.postprocessUniforms.u_resolution, vpW, vpH);
+    gl.uniform2f(ctx.postprocessUniforms.u_fullResolution, vpW, vpH);
+    gl.uniform2f(ctx.postprocessUniforms.u_tileOffset, tileOx, tileOy);
+  } else {
+    gl.uniform1i(ctx.uniforms.u_gradientRamp, 2);
+    gl.uniform2f(ctx.uniforms.u_resolution, width, height);
+    gl.uniform1i(ctx.uniforms.u_gradientType, GRADIENT_TYPE_MAP[gradient.gradientType ?? 'linear']);
+  }
+  gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+  gl.drawArrays(gl.TRIANGLES, 0, 6);
+  ctx.hasPresentedFrame = true;
+}
+
 export function render(
   ctx: WebGLContext,
   gradient: GradientConfig,
@@ -2407,6 +2501,9 @@ export function render(
   imageMaskSource?: TexImageSource | null,
   imageMaskEnabled = false,
   effectPipeline?: EffectPipelineConfig,
+  clothGradient?: ClothGradientConfig,
+  clothTime = 0,
+  clothLoopPeriod = 1,
 ): void {
   const isV2Pipeline = effectPipeline?.version === 'stack-v2';
   const imageGradientProtected = imageGradient.enabled && !!imageGradientSource;
@@ -2554,7 +2651,7 @@ export function render(
   gl.uniform1f(uniforms.u_voronoiMinkowskiExp, noiseDistortion.voronoiMinkowskiExp ?? 2.0);
   gl.uniform1f(uniforms.u_ridgeSharpness, noiseDistortion.ridgeSharpness ?? 2.0);
   gl.uniform1f(uniforms.u_ridgeGain, noiseDistortion.ridgeGain ?? 0.0);
-  gl.uniform1f(uniforms.u_ridgeLacunarity, noiseDistortion.ridgeLacunarity ?? 2.0);
+  gl.uniform1f(uniforms.ridgeLacunarity, noiseDistortion.ridgeLacunarity ?? 2.0);
   gl.uniform1f(uniforms.u_ridgePersistence, noiseDistortion.ridgePersistence ?? 0.6);
   gl.uniform1f(uniforms.u_ridgeOffset, noiseDistortion.ridgeOffset ?? 1.0);
   gl.uniform1f(uniforms.u_ridgeWarp, noiseDistortion.ridgeWarp ?? 1.0);
@@ -2774,6 +2871,7 @@ export function render(
       normalMapEnabled: normalMap.enabled,
       normalMapBlur: normalMap.blur,
       prismGlowRadius: postprocess.prismGlowRadius ?? 0,
+      clothGradientEnabled: clothGradient?.enabled ?? false,
     });
     const diffuseLayerEnabled = renderPlan.diffuseEnabled;
     const protectedLayerEnabled = (kind: EffectPipelineConfig['effectStack'][number]['kind']) =>
@@ -2791,7 +2889,7 @@ export function render(
     // no intervening stages. Avoid compiling the large texture-stack shader
     // and allocating full-size ping-pong FBOs for this common path.
     const protectedDirect = imageGradientProtected && !normalRequested && !renderPlan.prismRequested && !renderPlan.particlesRequested;
-    if (canRenderV2Direct(effectPipeline, normalRequested) || protectedDirect) {
+    if (canRenderV2Direct(effectPipeline, normalRequested, clothGradient?.enabled ?? false) || protectedDirect) {
       if (imageGradientProtected) {
         gl.uniform1i(uniforms.u_noiseEnabled, protectedLayerEnabled('noise') && noiseDistortion.enabled ? 1 : 0);
         gl.uniform1i(uniforms.u_slitEnabled, protectedLayerEnabled('slit') && slitScan.enabled ? 1 : 0);
@@ -2830,6 +2928,15 @@ export function render(
     // Lazy programs compile asynchronously. Keep a usable base frame until every
     // requested V2 stage is available instead of presenting a partial stack.
     if (!stackCoreReady || !normalReady || !stretchReady || !prismReady || !particlesReady) {
+      // Cloth is a Base generator and does not depend on the stack programs:
+      // present the cloth frame even while they compile.
+      const clothReady = clothGradient?.enabled
+        ? renderClothIntoGradTexture(ctx, gradient, clothGradient, clothTime, vpW, vpH, tile, clothLoopPeriod)
+        : false;
+      if (clothReady) {
+        presentClothGradTextureToScreen(ctx, gradient, width, height, vpW, vpH, tileOx, tileOy);
+        return;
+      }
       // Keep rendering the current base state while programs compile so
       // anchor and parameter edits remain visible instead of freezing the
       // first frame that happened to be presented.
@@ -2845,6 +2952,13 @@ export function render(
     // allocations; high-resolution export continues through the tile path.
     if (vpW * vpH > 16_777_216) {
       console.error('[WebGL render] V2 viewport exceeds the 16M-pixel FBO safety budget. Use tiled export or reduce preview resolution.');
+      const clothReady = clothGradient?.enabled
+        ? renderClothIntoGradTexture(ctx, gradient, clothGradient, clothTime, vpW, vpH, tile, clothLoopPeriod)
+        : false;
+      if (clothReady) {
+        presentClothGradTextureToScreen(ctx, gradient, width, height, vpW, vpH, tileOx, tileOy);
+        return;
+      }
       gl.uniform1i(uniforms.u_matcapEnabled, matcap.enabled ? 1 : 0);
       gl.bindFramebuffer(gl.FRAMEBUFFER, null);
       gl.drawArrays(gl.TRIANGLES, 0, 6);
@@ -2859,9 +2973,16 @@ export function render(
 
     // Base -> Surface. Base-only uniforms above deliberately disabled the
     // stackable generator effects, so every V2 layer receives a color texture.
-    gl.uniform1i(uniforms.u_matcapEnabled, normalRequested ? 0 : (matcap.enabled ? 1 : 0));
-    gl.bindFramebuffer(gl.FRAMEBUFFER, ctx.gradFbo);
-    gl.drawArrays(gl.TRIANGLES, 0, 6);
+    let clothRenderSuccess = false;
+    if (clothGradient?.enabled) {
+      clothRenderSuccess = renderClothIntoGradTexture(ctx, gradient, clothGradient, clothTime, vpW, vpH, tile, clothLoopPeriod);
+    }
+
+    if (!clothRenderSuccess) {
+      gl.uniform1i(uniforms.u_matcapEnabled, normalRequested ? 0 : (matcap.enabled ? 1 : 0));
+      gl.bindFramebuffer(gl.FRAMEBUFFER, ctx.gradFbo);
+      gl.drawArrays(gl.TRIANGLES, 0, 6);
+    }
     let currentTexture: WebGLTexture = ctx.gradTexture;
 
     if (normalRequested && ctx.normalMapProgram) {

@@ -2,15 +2,16 @@ import { useEffect, useState, type ReactNode } from 'react';
 import { gradientRampPresets } from '../lib/gradientRampUtils';
 import { useGradientStore } from '../store/gradientStore';
 import { useLanguage } from '../i18n/LanguageProvider';
+import { ClothGradientPanel } from './ClothGradientPanel';
 import { CustomSelect } from './CustomSelect';
 import { Icon } from './Icon';
 import { NormalMapPanel } from './NormalMapPanel';
 import { PostprocessPanel } from './PostprocessPanel';
 import { Toggle } from './Toggle';
 
-type SandboxProgramKey = 'normalMap' | 'prism' | 'particles';
+type SandboxProgramKey = 'normalMap' | 'prism' | 'particles' | 'cloth';
 type SandboxProgramStatus = 'loading' | 'ready' | 'failed' | 'fallback';
-type SandboxModuleKey = 'normal' | 'prism' | 'particles';
+type SandboxModuleKey = 'cloth' | 'normal' | 'prism' | 'particles';
 
 type SandboxModuleProps = {
   id: SandboxModuleKey;
@@ -84,7 +85,7 @@ function moduleStatus(
   if (status === 'loading') return { label: t('stack.status.loading'), className: 'text-amber-300' };
   if (status === 'failed') return { label: t('stack.status.unavailable'), className: 'text-red-300' };
   if (status === 'fallback') return { label: t('stack.status.fallback'), className: 'text-cyan-300' };
-  if (status === 'ready') return { label: t('stack.status.applied'), className: 'text-emerald-300' };
+  if (status === 'ready' || (key === 'cloth' && status === undefined)) return { label: t('stack.status.applied'), className: 'text-emerald-300' };
   return { label: t('stack.status.preparing'), className: 'text-amber-300' };
 }
 
@@ -93,11 +94,13 @@ export function SandboxPanel() {
   const {
     normalMap,
     setNormalMap,
+    clothGradient,
+    setClothGradient,
     setGradient,
     effectPipeline,
     setEffectPipeline,
   } = useGradientStore();
-  const [selectedModule, setSelectedModule] = useState<SandboxModuleKey>('normal');
+  const [selectedModule, setSelectedModule] = useState<SandboxModuleKey>('cloth');
   const [programStatus, setProgramStatus] = useState<Partial<Record<SandboxProgramKey, SandboxProgramStatus>>>({});
 
   useEffect(() => {
@@ -110,10 +113,11 @@ export function SandboxPanel() {
     return () => window.removeEventListener('kgg:webgl-lazy-program-state', handleProgramState);
   }, []);
 
+  const clothStatus = moduleStatus('cloth', clothGradient.enabled, programStatus, t);
   const normalStatus = moduleStatus('normalMap', normalMap.enabled, programStatus, t);
   const prismStatus = moduleStatus('prism', effectPipeline.prismEnabled, programStatus, t);
   const particlesStatus = moduleStatus('particles', effectPipeline.particlesEnabled, programStatus, t);
-  const activeCount = [normalMap.enabled, effectPipeline.prismEnabled, effectPipeline.particlesEnabled]
+  const activeCount = [clothGradient.enabled, normalMap.enabled, effectPipeline.prismEnabled, effectPipeline.particlesEnabled]
     .filter(Boolean).length;
 
   const setNormalEnabled = (enabled: boolean) => {
@@ -121,9 +125,11 @@ export function SandboxPanel() {
     if (enabled) setGradient({ stops: [...gradientRampPresets.mono] });
   };
 
-  const selectedLabel = selectedModule === 'normal'
-    ? t('effect.normal')
-    : selectedModule === 'prism' ? 'Prism' : 'Particles';
+  const selectedLabel = selectedModule === 'cloth'
+    ? 'Cloth Gradient'
+    : selectedModule === 'normal'
+      ? t('effect.normal')
+      : selectedModule === 'prism' ? 'Prism' : 'Particles';
 
   return (
     <div className="space-y-4" data-sandbox-panel>
@@ -142,7 +148,7 @@ export function SandboxPanel() {
           </div>
           <div className="shrink-0 border border-cyan-200/25 bg-k-bg/35 px-2 py-1 text-right">
             <span className="block text-[8px] font-display uppercase tracking-[0.16em] text-cyan-100/60">{t('sandbox.active')}</span>
-            <span className="mt-0.5 block font-display text-sm font-bold text-cyan-100">{activeCount}<span className="text-cyan-100/40">/3</span></span>
+            <span className="mt-0.5 block font-display text-sm font-bold text-cyan-100">{activeCount}<span className="text-cyan-100/40">/4</span></span>
           </div>
         </div>
       </div>
@@ -153,12 +159,27 @@ export function SandboxPanel() {
           value={selectedModule}
           localizeOptions={false}
           options={[
+            { value: 'cloth', label: 'Cloth Gradient' },
             { value: 'normal', label: t('effect.normal') },
             { value: 'prism', label: 'Prism' },
             { value: 'particles', label: 'Particles' },
           ]}
           onChange={(value) => setSelectedModule(value as SandboxModuleKey)}
         />
+
+        {selectedModule === 'cloth' && (
+          <SandboxModule
+            id="cloth"
+            label={selectedLabel}
+            description="3D wave cloth mesh mapped to Gradient Ramp lighting."
+            enabled={clothGradient.enabled}
+            status={clothStatus}
+            onToggleEnabled={(enabled) => setClothGradient({ enabled })}
+            badge={<span className="rounded bg-amber-500/20 px-1.5 py-0.5 text-[8px] font-medium tracking-normal text-amber-300" title={t('beta.experimental')}>🧪 Beta</span>}
+          >
+            <ClothGradientPanel />
+          </SandboxModule>
+        )}
 
         {selectedModule === 'normal' && (
           <SandboxModule
