@@ -54,6 +54,9 @@ function renderSceneFrame(
     state.imageMaskSource ?? null,
     state.imageMaskEnabled ?? false,
     effectStack,
+    scene.clothGradient,
+    scene.clothTime,
+    scene.noiseLoopPeriod,
   );
 }
 

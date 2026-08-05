@@ -233,7 +233,9 @@ export function isEffectStackLayerEnabled(
 export function canRenderV2Direct(
   pipeline: EffectPipelineConfig,
   normalMapEnabled: boolean,
+  clothGradientEnabled = false,
 ): boolean {
+  if (clothGradientEnabled) return false;
   const stack = normalizeEffectStack(pipeline.effectStack);
   return pipeline.version === 'stack-v2'
     && !normalMapEnabled
@@ -245,8 +247,9 @@ export function canRenderV2Direct(
 export function getV2FramebufferAllocationMode(
   pipeline: EffectPipelineConfig,
   normalMapEnabled: boolean,
+  clothGradientEnabled = false,
 ): 'direct' | 'core' | 'full' {
-  if (canRenderV2Direct(pipeline, normalMapEnabled)) return 'direct';
+  if (canRenderV2Direct(pipeline, normalMapEnabled, clothGradientEnabled)) return 'direct';
   if (normalMapEnabled || pipeline.prismEnabled) return 'full';
   return 'core';
 }
@@ -259,14 +262,16 @@ export function getV2FramebufferAllocationMode(
 export function requiresV2StackCore(
   pipeline: EffectPipelineConfig,
   normalMapEnabled = false,
+  clothGradientEnabled = false,
 ): boolean {
-  return pipeline.version === 'stack-v2' && !canRenderV2Direct(pipeline, normalMapEnabled);
+  return pipeline.version === 'stack-v2' && !canRenderV2Direct(pipeline, normalMapEnabled, clothGradientEnabled);
 }
 
 export type V2RenderPlanOptions = {
   normalMapEnabled: boolean;
   normalMapBlur: number;
   prismGlowRadius: number;
+  clothGradientEnabled?: boolean;
 };
 
 export type V2RenderPlan = {
@@ -325,9 +330,9 @@ export function getV2RenderPlan(
     prismRequested,
     prismNeedsBlur,
     particlesRequested,
-    framebufferAllocationMode: getV2FramebufferAllocationMode(pipeline, normalRequested),
+    framebufferAllocationMode: getV2FramebufferAllocationMode(pipeline, normalRequested, options.clothGradientEnabled),
     programs: {
-      stackCore: requiresV2StackCore(pipeline, normalRequested),
+      stackCore: requiresV2StackCore(pipeline, normalRequested, options.clothGradientEnabled),
       noiseStack: noiseRequested,
       glassV2: glassV2Requested,
       normalMap: normalRequested,
