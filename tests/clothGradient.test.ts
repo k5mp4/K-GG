@@ -49,6 +49,42 @@ describe('Cloth Gradient Config Normalization', () => {
     expect(normalized.skyLightColor).toBe(DEFAULT_CLOTH_GRADIENT.skyLightColor);
     expect(normalized.direction1).toEqual(DEFAULT_CLOTH_GRADIENT.direction1);
   });
+
+  it('keeps rampOffset and ignores removed ramp-mapping keys', () => {
+    const raw = {
+      lightWeight: 0.9,
+      heightWeight: 0.1,
+      fresnelWeight: 0.5,
+      flowWeight: 0.2,
+      rampLow: -0.5,
+      rampHigh: 1.5,
+      shadingMix: 0.3,
+      rampOffset: 0.25,
+    };
+    const normalized = normalizeClothGradientConfig(raw);
+
+    // Removed keys are not carried into the normalized config.
+    expect('lightWeight' in normalized).toBe(false);
+    expect('heightWeight' in normalized).toBe(false);
+    expect('fresnelWeight' in normalized).toBe(false);
+    expect('flowWeight' in normalized).toBe(false);
+    expect('rampLow' in normalized).toBe(false);
+    expect('rampHigh' in normalized).toBe(false);
+    expect('shadingMix' in normalized).toBe(false);
+    // rampOffset is still honored.
+    expect(normalized.rampOffset).toBe(0.25);
+  });
+
+  it('does not define removed ramp-mapping keys in the default config', () => {
+    expect('lightWeight' in DEFAULT_CLOTH_GRADIENT).toBe(false);
+    expect('heightWeight' in DEFAULT_CLOTH_GRADIENT).toBe(false);
+    expect('fresnelWeight' in DEFAULT_CLOTH_GRADIENT).toBe(false);
+    expect('flowWeight' in DEFAULT_CLOTH_GRADIENT).toBe(false);
+    expect('rampLow' in DEFAULT_CLOTH_GRADIENT).toBe(false);
+    expect('rampHigh' in DEFAULT_CLOTH_GRADIENT).toBe(false);
+    expect('shadingMix' in DEFAULT_CLOTH_GRADIENT).toBe(false);
+    expect(DEFAULT_CLOTH_GRADIENT.rampOffset).toBe(0);
+  });
 });
 
 describe('Effect Stack Isolation', () => {

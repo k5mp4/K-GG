@@ -291,41 +291,9 @@ export function ClothGradientPanel() {
         </div>
       </ClothControlGroup>
 
-      {/* Ramp Mapping */}
-      <ClothControlGroup title="Ramp Mapping" defaultOpen={false}>
+      {/* Ramp */}
+      <ClothControlGroup title="Ramp" defaultOpen={false}>
         <div className="space-y-3">
-          <SliderField
-            label="Light Weight"
-            value={clothGradient.lightWeight}
-            min={-2}
-            max={2}
-            step={0.05}
-            onChange={(v) => setClothGradient({ lightWeight: v })}
-          />
-          <SliderField
-            label="Height Weight"
-            value={clothGradient.heightWeight}
-            min={-2}
-            max={2}
-            step={0.05}
-            onChange={(v) => setClothGradient({ heightWeight: v })}
-          />
-          <SliderField
-            label="Fresnel Weight"
-            value={clothGradient.fresnelWeight}
-            min={-2}
-            max={2}
-            step={0.05}
-            onChange={(v) => setClothGradient({ fresnelWeight: v })}
-          />
-          <SliderField
-            label="Flow Weight"
-            value={clothGradient.flowWeight}
-            min={-2}
-            max={2}
-            step={0.05}
-            onChange={(v) => setClothGradient({ flowWeight: v })}
-          />
           <SliderField
             label="Ramp Offset"
             value={clothGradient.rampOffset}
@@ -333,30 +301,6 @@ export function ClothGradientPanel() {
             max={1}
             step={0.01}
             onChange={(v) => setClothGradient({ rampOffset: v })}
-          />
-          <SliderField
-            label="Ramp Low"
-            value={clothGradient.rampLow}
-            min={-1}
-            max={1}
-            step={0.01}
-            onChange={(v) => setClothGradient({ rampLow: v })}
-          />
-          <SliderField
-            label="Ramp High"
-            value={clothGradient.rampHigh}
-            min={0}
-            max={2}
-            step={0.01}
-            onChange={(v) => setClothGradient({ rampHigh: v })}
-          />
-          <SliderField
-            label="Shading Mix"
-            value={clothGradient.shadingMix}
-            min={0}
-            max={1}
-            step={0.01}
-            onChange={(v) => setClothGradient({ shadingMix: v })}
           />
         </div>
       </ClothControlGroup>

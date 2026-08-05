@@ -18,3 +18,4 @@ title: 進行中の変更
 | CHANGE-019 | [Diffuse描画モードとEffect Stack UIの拡張](./CHANGE-019-diffuse-halftone-ascii-adaptive-ui/proposal) | approved |
 | CHANGE-020 | [歪みマップテクスチャの Float32 化による量子化段差の修正](./CHANGE-020-distort-float32-precision/proposal) | approved |
 | CHANGE-021 | [SANDBOX Cloth Gradient Base Generator](./CHANGE-021-cloth-gradient/proposal) | approved |
+| CHANGE-022 | [Cloth Gradientのランプ適用順序の反転（白黒シェーディング→グラデーション）](./CHANGE-022-cloth-ramp-last-shading/proposal) | approved |
