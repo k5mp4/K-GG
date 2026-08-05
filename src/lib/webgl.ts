@@ -285,6 +285,8 @@ export async function initWebGL(canvas: HTMLCanvasElement): Promise<WebGLContext
 
   // KHR_parallel_shader_compile: シェーダーコンパイルを非同期化してメインスレッドをブロックしない
   const ext = gl.getExtension('KHR_parallel_shader_compile') as ShaderCompileExt;
+  // 浮動小数点テクスチャのリニアフィルタリング用拡張 (RGBA32F distortion map)
+  gl.getExtension('OES_texture_float_linear');
   // 初期表示はメインのグラデーションプログラムだけを待つ。
   // 補助プログラムは init 完了後に順次コンパイルし、最初のグラデーション表示を早める。
   const initialSource = getInitialProgramSource();
@@ -510,7 +512,7 @@ export async function initWebGL(canvas: HTMLCanvasElement): Promise<WebGLContext
   gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
   const manualDistortTexture = gl.createTexture()!;
   gl.bindTexture(gl.TEXTURE_2D, manualDistortTexture);
-  gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, 1, 1, 0, gl.RGBA, gl.UNSIGNED_BYTE, new Uint8Array([128, 128, 0, 255]));
+  gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA32F, 1, 1, 0, gl.RGBA, gl.FLOAT, new Float32Array([0.5, 0.5, 0.0, 1.0]));
   gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
   gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
   gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
@@ -1621,7 +1623,7 @@ function uploadManualDistortMap(ctx: WebGLContext, manualDistort: ManualDistortC
   }
 
   const textureResolution = distortTextureResolution(resolution);
-  const data = new Uint8Array(textureResolution * textureResolution * 4);
+  const data = new Float32Array(textureResolution * textureResolution * 4);
   const sourceScale = resolution / textureResolution;
 
   for (let y = 0; y < textureResolution; y++) {
@@ -1644,16 +1646,16 @@ function uploadManualDistortMap(ctx: WebGLContext, manualDistort: ManualDistortC
         0,
         8,
       );
-      data[dst] = Math.round((dx * 0.5 + 0.5) * 255);
-      data[dst + 1] = Math.round((dy * 0.5 + 0.5) * 255);
-      data[dst + 2] = Math.round((smooth / 8) * 255);
-      data[dst + 3] = 255;
+      data[dst] = dx * 0.5 + 0.5;
+      data[dst + 1] = dy * 0.5 + 0.5;
+      data[dst + 2] = smooth / 8;
+      data[dst + 3] = 1.0;
     }
   }
 
   gl.activeTexture(gl.TEXTURE5);
   gl.bindTexture(gl.TEXTURE_2D, ctx.manualDistortTexture);
-  gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, textureResolution, textureResolution, 0, gl.RGBA, gl.UNSIGNED_BYTE, data);
+  gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA32F, textureResolution, textureResolution, 0, gl.RGBA, gl.FLOAT, data);
   ctx.manualDistortDisplacement = manualDistort.displacement;
   ctx.manualDistortSmoothMask = manualDistort.smoothMask;
   ctx.manualDistortMapResolution = resolution;

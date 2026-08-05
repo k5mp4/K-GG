@@ -16,3 +16,4 @@ title: 進行中の変更
 | CHANGE-015 | [Effect Stack別ウィンドウの復旧](./CHANGE-015-effect-stack-window-repair/proposal) | approved |
 | CHANGE-018 | [SANDBOX描画モジュールの新設](./CHANGE-018-sandbox-graphics/proposal) | approved |
 | CHANGE-019 | [Diffuse描画モードとEffect Stack UIの拡張](./CHANGE-019-diffuse-halftone-ascii-adaptive-ui/proposal) | approved |
+| CHANGE-020 | [歪みマップテクスチャの Float32 化による量子化段差の修正](./CHANGE-020-distort-float32-precision/proposal) | approved |
