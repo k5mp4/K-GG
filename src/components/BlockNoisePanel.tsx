@@ -1,3 +1,4 @@
+import { useEffect, useState } from 'react';
 import { useGradientStore, STORE_DEFAULTS } from '../store/gradientStore';
 import { SliderField } from './SliderField';
 import { Collapsible } from './Collapsible';
@@ -6,8 +7,9 @@ import type { DiffuseConfig } from '../types/distortion';
 import { Icon } from './Icon';
 import { DiffuseCurveEditor } from './DiffuseCurveEditor';
 import { IDENTITY_DIFFUSE_BEZIER } from '../lib/diffuseCurve';
+import { fromTweeqAngle, toTweeqAngle } from '../lib/tweeqAngle';
 import { useLanguage } from '../i18n/LanguageProvider';
-import { InputColor, InputDrum, InputRadio, InputString } from 'tweeq';
+import { InputAngle, InputColor, InputDropdown, InputDrum, InputRadio, InputString } from 'tweeq';
 
 const D = STORE_DEFAULTS.diffuse;
 const isDiffuseDirty = (value: DiffuseConfig) =>
@@ -29,11 +31,38 @@ const ADAPTIVE_CHANNELS = ['luminance', 'hue', 'saturation'] as const;
 const ADAPTIVE_CHANNEL_LABELS = ['Luminance', 'Hue', 'Saturation'] as const;
 const HALFTONE_SHAPES = ['circle', 'square'] as const;
 const HALFTONE_SHAPE_LABELS = ['Circle', 'Square'] as const;
+const GENERIC_FONT_OPTIONS = ['monospace', 'serif', 'sans-serif', 'cursive', 'fantasy'];
+
+async function loadSystemFonts(): Promise<string[]> {
+  try {
+    const { invoke } = await import('@tauri-apps/api/core');
+    const fonts = await invoke<string[]>('list_system_fonts');
+    if (Array.isArray(fonts) && fonts.length > 0) {
+      return [...GENERIC_FONT_OPTIONS, ...fonts];
+    }
+  } catch (error) {
+    console.debug('System font enumeration unavailable:', error);
+  }
+  return GENERIC_FONT_OPTIONS;
+}
 
 export function DiffusePanel() {
   const { t } = useLanguage();
   const { diffuse, setDiffuse } = useGradientStore();
   const canReset = isDiffuseDirty(diffuse);
+  const [systemFonts, setSystemFonts] = useState<string[] | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    void loadSystemFonts().then((fonts) => {
+      if (!cancelled) setSystemFonts(fonts);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const asciiFontOptions = systemFonts ?? GENERIC_FONT_OPTIONS;
 
   return (
     <div className="space-y-4">
@@ -131,6 +160,41 @@ export function DiffusePanel() {
                   className="w-full"
                 />
                 <p className="text-[9px] text-tab-inactive">Dark to light, left to right</p>
+                <div>
+                  <p className="mb-1 text-xs text-deep">Font</p>
+                  <InputDropdown
+                    value={diffuse.asciiFont}
+                    options={asciiFontOptions}
+                    labels={asciiFontOptions}
+                    onChange={(asciiFont) => asciiFont !== undefined && setDiffuse({ asciiFont })}
+                    aria-label="ASCII font"
+                    className="w-full"
+                  />
+                </div>
+                <SliderField
+                  label="Font Size"
+                  min={8}
+                  max={128}
+                  step={1}
+                  value={diffuse.asciiFontSize}
+                  onChange={(v) => setDiffuse({ asciiFontSize: v })}
+                  format={(v) => `${Math.round(v)}px`}
+                  defaultValue={D.asciiFontSize}
+                  limitKey="diffuse.asciiFontSize"
+                />
+                <div className="flex items-center justify-between gap-3">
+                  <span className="text-xs text-deep">Rotation</span>
+                  <div className="tq-input-angle w-[112px]">
+                    <InputAngle
+                      value={toTweeqAngle(diffuse.asciiRotation)}
+                      snap={45}
+                      angleOffset={-90}
+                      onChange={(v) => v !== undefined && setDiffuse({ asciiRotation: fromTweeqAngle(v) })}
+                      aria-label="ASCII rotation"
+                      title="ASCII rotation"
+                    />
+                  </div>
+                </div>
               </div>
             )}
 

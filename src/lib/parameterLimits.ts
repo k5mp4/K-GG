@@ -19,6 +19,8 @@ export const PARAMETER_LIMITS = {
   'diffuse.ditherThreshold': { min: 0, max: 1, step: 0.01 },
   'diffuse.halftoneSize': { min: 0.05, max: 1, step: 0.01 },
   'diffuse.grainAdaptiveAmount': { min: 0, max: 1, step: 0.01 },
+  'diffuse.asciiFontSize': { min: 8, max: 128, step: 1, integer: true },
+  'diffuse.asciiRotation': { min: 0, max: 360, step: 1, angleUnit: 'degrees', wrapAngle: true },
   'noise.dwRotAngle1': { min: 0, max: Math.PI * 2, step: Math.PI / 180, angleUnit: 'radians', wrapAngle: true },
   'noise.dwRotAngle2': { min: 0, max: Math.PI * 2, step: Math.PI / 180, angleUnit: 'radians', wrapAngle: true },
   'noise.dwDriftAngle': { min: 0, max: 360, step: 1, angleUnit: 'degrees', wrapAngle: true },

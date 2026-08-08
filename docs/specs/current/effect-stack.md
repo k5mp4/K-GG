@@ -6,11 +6,11 @@ status: current
 owners: [maintainer]
 created: 2026-07-27
 updated: 2026-08-03
-requirement_ids: [EFFECT-001, EFFECT-002, EFFECT-003, EFFECT-004, EFFECT-005, EFFECT-006, EFFECT-007, EFFECT-008, EFFECT-009, EFFECT-010, EFFECT-011, EFFECT-012, EFFECT-013, EFFECT-014, EFFECT-015, EFFECT-016, EFFECT-017, CLOTH-001, CLOTH-002, CLOTH-003, SANDBOX-001]
+requirement_ids: [EFFECT-001, EFFECT-002, EFFECT-003, EFFECT-004, EFFECT-005, EFFECT-006, EFFECT-007, EFFECT-008, EFFECT-009, EFFECT-010, EFFECT-011, EFFECT-012, EFFECT-013, EFFECT-014, EFFECT-015, EFFECT-016, EFFECT-017, EFFECT-018, EFFECT-019, CLOTH-001, CLOTH-002, CLOTH-003, SANDBOX-001]
 related_adrs: [ADR-0004, ADR-0005, ADR-0010]
-related_changes: [CHANGE-001, CHANGE-011, CHANGE-012, CHANGE-013, CHANGE-014, CHANGE-015, CHANGE-018, CHANGE-019, CHANGE-021, CHANGE-022]
-related_code: [src/types/distortion.ts, src/lib/effectPipeline.ts, src/lib/normalMap.ts, src/lib/effectStackTransition.ts, src/lib/postprocessStack.ts, src/lib/effectStackWindow.ts, src/lib/postprocessAnimation.ts, src/lib/sceneEvaluation.ts, src/lib/glass.ts, src/lib/webgl.ts, src/lib/presetModel.ts, src/lib/presetThumbnail.ts, src/store/gradientStore.ts, src/components/PostprocessStackPanel.tsx, src/components/EffectStackWorkspace.tsx, src/components/PostprocessPanel.tsx, src/components/DistortOverlay.tsx, src/components/SandboxPanel.tsx, src/components/BlockNoisePanel.tsx, src/components/DiffuseCurveEditor.tsx, src/components/SlitScanPanel.tsx, src/components/StretchPanel.tsx, src/components/PresetPanel.tsx, src/components/ClothGradientPanel.tsx, src/lib/clothGradientRenderer.ts, src/types/clothGradient.ts, src/shaders/normalmap.frag.glsl, src/shaders/postprocess/glass-optics.glsl]
-related_tests: [src/lib/effectPipeline.test.ts, src/lib/webglNormalMapParity.test.ts, src/lib/effectStackTransition.test.ts, src/lib/effectStackWindow.test.ts, src/lib/postprocessStack.test.ts, src/lib/postprocessAnimation.test.ts, src/lib/effectStackDrag.test.ts, src/lib/effectShaderParity.test.ts, src/lib/glass.test.ts, src/store/gradientStore.effectPipeline.test.ts, src/store/gradientStore.postprocessStack.test.ts, src/store/gradientStore.glass.test.ts, src/lib/sceneEvaluation.glass.test.ts, src/lib/presetThumbnail.test.ts, tests/clothGradient.test.ts]
+related_changes: [CHANGE-001, CHANGE-011, CHANGE-012, CHANGE-013, CHANGE-014, CHANGE-015, CHANGE-018, CHANGE-019, CHANGE-021, CHANGE-022, CHANGE-023]
+related_code: [src/types/distortion.ts, src/lib/effectPipeline.ts, src/lib/normalMap.ts, src/lib/effectStackTransition.ts, src/lib/postprocessStack.ts, src/lib/postprocessAnimation.ts, src/lib/sceneEvaluation.ts, src/lib/glass.ts, src/lib/webgl.ts, src/lib/presetModel.ts, src/lib/presetThumbnail.ts, src/store/gradientStore.ts, src/components/PostprocessStackPanel.tsx, src/components/EffectStackWorkspace.tsx, src/components/PostprocessPanel.tsx, src/components/DistortOverlay.tsx, src/components/SandboxPanel.tsx, src/components/BlockNoisePanel.tsx, src/components/DiffuseCurveEditor.tsx, src/components/SlitScanPanel.tsx, src/components/StretchPanel.tsx, src/components/PresetPanel.tsx, src/components/ClothGradientPanel.tsx, src/lib/clothGradientRenderer.ts, src/types/clothGradient.ts, src/shaders/normalmap.frag.glsl, src/shaders/postprocess/glass-optics.glsl]
+related_tests: [src/lib/effectPipeline.test.ts, src/lib/webglNormalMapParity.test.ts, src/lib/effectStackTransition.test.ts, src/lib/postprocessStack.test.ts, src/lib/postprocessAnimation.test.ts, src/lib/effectStackDrag.test.ts, src/lib/effectShaderParity.test.ts, src/lib/glass.test.ts, src/store/gradientStore.effectPipeline.test.ts, src/store/gradientStore.postprocessStack.test.ts, src/store/gradientStore.glass.test.ts, src/lib/sceneEvaluation.glass.test.ts, src/lib/presetThumbnail.test.ts, tests/clothGradient.test.ts]
 ---
 
 # Effect Stack
@@ -92,11 +92,19 @@ TOPバーのSANDBOXから、Postprocessの`Edit Layer`と同じ選択要素でNo
 Legacy V1とEffect Stack V2のNormal Mapは、同じNormal Mapシェーダー、輝度サンプリング、中心差分、角度回転、反転、`R=右・G=上・B=手前`のRGBAエンコードを使用します。両経路はDiffuseが有効なフレームではNormalを描画せず、Diffuseを法線計算用入力の代替として扱いません。V2の`manualDistort`状態がPostprocessのNormal入力やDistort値を上書きすることはありません。
 ### EFFECT-015 DiffuseのHalftoneとASCII
 
-DiffuseはBlock、Smooth、Dither、Halftone、ASCIIの5モードを持ちます。Halftoneは円形または四角形の形状、セルサイズ、形状サイズ、背景色を持ち、入力色の濃度に応じて形状の占有率を変えます。ASCIIは保存された文字セットと背景色を濃度順に割り当て、セルごとに対応文字を描画します。背景色の既定値は`#000000`です。Halftone／ASCIIはフラグメント解像度の色と座標を使い、Ditherだけがセル中心サンプリングを使います。粒度適応時もベースセル単位で代表色とセル内座標を決めるため、円形・四角形の形状を崩しません。Halftone／ASCIIのセルは指定した背景色と不透明アルファを持ち、キャンバスの裏面が透けないようにします。ASCIIは固定アトラスグリッドを参照します。通常描画とEffect Stack描画は同じ保存設定を使います。
+DiffuseはBlock、Smooth、Dither、Halftone、ASCIIの5モードを持ちます。Halftoneは円形または四角形の形状、セルサイズ、形状サイズ、背景色を持ち、入力色の濃度に応じて形状の占有率を変えます。ASCIIは保存された文字セットと背景色を濃度順に割り当て、セルごとに対応文字を描画します。背景色の既定値は`#000000`です。Halftone／ASCIIはフラグメント解像度の色と座標を使い、Ditherだけがセル中心サンプリングを使います。粒度適応時もベースセル単位で代表色とセル内座標を決めるため、円形・四角形の形状を崩しません。Halftone／ASCIIのセルは指定した背景色と不透明アルファを持ち、キャンバスの裏面が透けないようにします。ASCIIアトラスはCanvasの行順を維持してアップロードし、シェーダーはアトラス座標をそのままサンプリングするため、アトラスのrow 0（先頭の文字）がキャンバス上で正しく表示されます。ASCIIは保存されたフォント指定と文字サイズ（px）を持ち、グリフアトラスの生成とグリフセルサイズへ反映されます。通常描画とEffect Stack描画は同じ保存設定を使います。
+
+### EFFECT-018 ASCIIのフォントと文字サイズ
+
+ASCII描画モードは、保存されたフォント指定（CSS font-family）、文字サイズ（px、既定29）、回転角（度、既定0）を持ちます。グリフアトラスはフォントと文字サイズで生成され、グリフセルはフォントサイズに応じて拡大します。フォント名はCSSクォートで囲み、`document.fonts.load`でロードしてからアトラスを描画するため、スペースを含むフォント名や未ロードのフォントも実際のグリフへ適用されます。シェーダーはセルフラクションをそのまま使ってアトラスをサンプリングするため、フォントサイズが大きくてもグリフは自分のセルに収まり、隣のセルの文字と混ざりません。回転角はInputAngleで調整し、シェーダーがセル内座標を回転してグリフを回転させます。フォントはInputDropdownで選択し、選択肢にはシステムにインストールされたフォント（Tauriコマンド`list_system_fonts`で列挙）が含まれます。フォント・文字サイズ・回転角はPresetへ保存され、通常描画とEffect Stack描画、Preview、Thumbnail、書き出しで同じ見た目になります。旧Presetにこれらの値がない場合は既定値（`monospace`、29px、0°）で補完されます。
+
+### EFFECT-019 システムフォント列挙
+
+Tauriコマンド`list_system_fonts`は、OSの標準フォントディレクトリ（Windowsは`SystemRoot\Fonts`、`%LOCALAPPDATA%\Microsoft\Windows\Fonts`、`ProgramFiles\Common Files\Adobe\Fonts`、`ProgramFiles\Morisawa`等）からフォントファイル（TTF/OTF/TTC）を再帰スキャンし、Windowsではレジストリ（`HKLM\SOFTWARE\Microsoft\Windows NT\CurrentVersion\Fonts`）から正確なフォントファミリー名も取得します。これによりAdobeフォントや森澤フォントなど、ユーザーが個別にインストールしたフォントがフォント選択肢へ含まれます。列挙に失敗した場合は汎用フォント（monospace/serif/sans-serif等）のみを表示します。
 
 ### EFFECT-016 Diffuseの適応ソースと粒度
 
-Diffuseの適応ソースは輝度、色相、彩度から選択できます。選択した値を拡散量Bezierの入力として評価し、粒度適応を有効にした場合は独立した粒度Bezierをベース粒度へ反映します。粒度適応を無効にした場合は固定粒度を使います。
+Diffuseの適応ソースは輝度、色相、彩度から選択できます。選択した値を拡散量Bezierの入力として評価し、粒度適応を有効にした場合は独立した粒度Bezierをベースセル単位の代表色へ評価します。セル内座標はベースセル基準で固定され、Halftoneの円形・四角形とASCII文字は自分のセル内に収まるため、フラグメント境界で崩れません。粒度適応はBlock/Smoothの拡散セルサイズ（`diffusePanelDisplacement`とLegacyの拡散グリッド）にも反映され、グレインカーブとアマウントが拡散セルの大きさを変化させます。ドメインワープは等方的に保たれ、セルはアスペクト比を維持したまま拡大します。粒度適応を無効にした場合は固定粒度を使います。
 
 ### EFFECT-017 Slitのduration基準ループ
 
@@ -138,11 +146,12 @@ SANDBOX パネルのモジュール選択肢に `Cloth Gradient` を追加し、
 - [CHANGE-012 GLASS V2色調整コントロール](../../changes/archive/CHANGE-012-glass-v2-color-controls/proposal)
 - [CHANGE-013 Effect Stack GlassをGLASS V2へ統合](../../changes/active/CHANGE-013-glass-v2-only/proposal)
 - [CHANGE-014 Effect Stackのランダム順序とソロレイヤー](../../changes/active/CHANGE-014-effect-stack-controls/proposal)
-- [CHANGE-015 Effect Stack別ウィンドウの復旧](../../changes/active/CHANGE-015-effect-stack-window-repair/proposal)
+- [CHANGE-015 Effect Stack別ウィンドウの廃止](../../changes/active/CHANGE-015-effect-stack-window-repair/proposal)
 - [CHANGE-018 SANDBOX描画モジュールの新設](../../changes/active/CHANGE-018-sandbox-graphics/proposal)
 - [CHANGE-019 Diffuse描画モードとEffect Stack UIの拡張](../../changes/active/CHANGE-019-diffuse-halftone-ascii-adaptive-ui/proposal)
 - [CHANGE-021 SANDBOX Cloth Gradient Base Generator](../../changes/active/CHANGE-021-cloth-gradient/proposal)
 - [CHANGE-022 Cloth Gradientのランプ適用順序の反転](../../changes/active/CHANGE-022-cloth-ramp-last-shading/proposal)
+- [CHANGE-023 ASCIIのフォント選択と文字サイズ](../../changes/active/CHANGE-023-ascii-font-controls/proposal)
 
 Legacy SPECは履歴参照用です。現行の主スタック、固定段、互換性はこの文書と関連ADRを先に確認します。
 

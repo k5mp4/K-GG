@@ -5,7 +5,11 @@ import postprocessDiffuseShader from '../shaders/postprocess/diffuse.glsl?raw';
 import webglSource from './webgl.ts?raw';
 import { getPostprocessFragmentSource, getProgramSource } from './webglShaderSources';
 
+// Normalize line endings so indexOf-based guards (e.g. '#else\n#if ...') stay
+// reliable when the repository is checked out with CRLF on Windows runners.
 const postprocessShader = getPostprocessFragmentSource().replace(/\r\n?/g, '\n');
+const normalizedDiffuseShader = postprocessDiffuseShader.replace(/\r\n?/g, '\n');
+const normalizedGradientShader = gradientShader.replace(/\r\n?/g, '\n');
 
 function extractFunction(source: string, name: string): string {
   const signature = new RegExp(`\\b(?:float|vec2|vec3|vec4)\\s+${name}\\s*\\(`).exec(source);
@@ -269,10 +273,10 @@ describe('V2 effect shader parity', () => {
   it('keeps Dither cell-center and Bayer threshold behavior identical to the Diffuse panel', () => {
     for (const name of ['ditherCellSize', 'ditherCellIndex', 'ditherCellCenter']) {
       expect(compact(extractFunction(postprocessShader, name)))
-        .toBe(compact(extractFunction(gradientShader, name)));
+        .toBe(compact(extractFunction(normalizedGradientShader, name)));
     }
 
-    const panelPattern = extractFunction(gradientShader, 'patternDither8x8')
+    const panelPattern = extractFunction(normalizedGradientShader, 'patternDither8x8')
       .replace(/\bp\b/g, 'cell');
     expect(compact(extractFunction(postprocessShader, 'patternDither8x8')))
       .toBe(compact(panelPattern));
@@ -280,7 +284,7 @@ describe('V2 effect shader parity', () => {
 
   it('keeps the five Diffuse mode mapping and adaptive pattern inputs available in both render paths', () => {
     expect(compact(webglSource)).toContain('block:0,smooth:1,dither:2,halftone:3,ascii:4');
-    for (const source of [gradientShader, postprocessShader]) {
+    for (const source of [normalizedGradientShader, postprocessShader]) {
       expect(source).toContain('u_diffuseAdaptiveChannel');
       expect(source).toContain('u_diffuseGrainAdaptiveEnabled');
       expect(source).toContain('u_diffuseHalftoneShape');
@@ -296,48 +300,118 @@ describe('V2 effect shader parity', () => {
     expect(postprocessMain).toContain(compact('vec2 diffuseSampleCoord = u_diffuseMode == 2 ? ditherCellCenter(globalCoord) : globalCoord;'));
     expect(postprocessMain).not.toContain(compact('u_diffuseMode >= 2 ? ditherCellCenter(globalCoord)'));
 
-    const gradientMain = compact(gradientShader.slice(gradientShader.lastIndexOf('void main()')));
+    const gradientMain = compact(normalizedGradientShader.slice(normalizedGradientShader.lastIndexOf('void main()')));
     expect(gradientMain).toContain(compact('vec2 sampleCoord = usePatternDither ? ditherCoord : globalCoord;'));
     expect(gradientMain).not.toContain(compact('usePatternDither || useCellPattern ? ditherCoord'));
   });
 
   it('keeps Halftone and ASCII cells visible and addresses the fixed ASCII atlas grid', () => {
-    for (const source of [gradientShader, postprocessDiffuseShader]) {
+    for (const source of [normalizedGradientShader, normalizedDiffuseShader]) {
       expect(source).toContain('vec3 diffusePatternBackground');
       expect(source).toContain('return u_diffuseBackgroundColor;');
       expect(source).toContain('vec2 diffuseCellFraction');
       expect(source).toContain('float diffuseCellSizeAtCoord');
-      expect(source).toContain('texture2D(u_diffuseAsciiAtlas, vec2(atlasUv.x, 1.0 - atlasUv.y)).r');
+      expect(source).toContain('texture2D(u_diffuseAsciiAtlas, atlasUv).r');
+      expect(source).not.toContain('1.0 - atlasUv.y');
     }
-    expect(postprocessDiffuseShader).toContain(
+    expect(normalizedDiffuseShader).toContain(
       'float cellSize = diffuseCellSizeAtCoord(globalCoord, color.rgb);',
     );
-    expect(postprocessDiffuseShader).toContain(
+    expect(normalizedDiffuseShader).toContain(
       'return vec4(applyDiffuseAscii(color.rgb, globalCoord, cellSize), 1.0);',
     );
-    expect(gradientShader).toContain('sourceColor.a = 1.0;');
-    expect(gradientShader).toContain('useCellPattern ? 1.0 : rampAlpha * sourceAlpha');
+    expect(normalizedGradientShader).toContain('sourceColor.a = 1.0;');
+    expect(normalizedGradientShader).toContain('useCellPattern ? 1.0 : rampAlpha * sourceAlpha');
     expect(compact(webglSource)).toContain('diffuseAsciiRows:ASCII_ATLAS_MAX_ROWS');
-    expect(compact(webglSource)).toContain("context.font='bold29pxmonospace'");
+    expect(compact(webglSource)).toContain('ASCII_GENERIC_FONTS.has(font)?font:`"${font}"`');
+  });
+
+  it('keeps adaptive grain on the base cell grid and the shape inside its own cell', () => {
+    for (const source of [normalizedGradientShader, normalizedDiffuseShader]) {
+      expect(extractFunction(source, 'diffuseCellFraction')).toContain(
+        '/ max(baseSize, 0.01) + 0.5',
+      );
+      // The shape/glyph must stay inside the clamped cell fraction so an
+      // adaptive cell or a large font never bleeds into the neighbor.
+      const ascii = extractFunction(source, 'applyDiffuseAscii');
+      expect(ascii).toContain('vec2 local = diffuseCellFraction(coord, cellSize) - 0.5;');
+      expect(ascii).not.toContain('cellScale');
+      expect(ascii).not.toContain('u_diffuseAsciiFontScale');
+      const halftone = extractFunction(source, 'applyDiffuseHalftone');
+      expect(halftone).not.toContain('cellScale');
+    }
+  });
+
+  it('feeds the adaptive grain cell size into the Block/Smooth displacement grid', () => {
+    const stackElse = normalizedDiffuseShader.indexOf('#else\n#if defined(KGG_PRISM_ONLY)');
+    const stackDisplacement = extractFunction(
+      normalizedDiffuseShader.slice(stackElse),
+      'diffusePanelDisplacement',
+    );
+    expect(stackDisplacement).toContain('diffuseCellSizeAtCoord(globalCoord, vec3(0.0))');
+    expect(stackDisplacement).toContain('/ max(cellSize, 0.01)');
+    const gradientMain = normalizedGradientShader.slice(normalizedGradientShader.indexOf('void main()'));
+    expect(gradientMain).toContain(
+      'float cellSize = diffuseCellSizeAtCoord(globalCoord, vec3(0.0));',
+    );
+    expect(gradientMain).toContain('floor(globalCoord / max(cellSize, 0.01))');
+    expect(gradientMain).not.toMatch(/floor\(globalCoord \/ max\(u_diffuseGrain, 0\.01\)\)/);
+  });
+
+  it('scales ASCII glyphs with the configured font size in both render paths', () => {
+    expect(normalizedGradientShader).not.toContain('u_diffuseAsciiFontScale');
+    expect(postprocessShader).not.toContain('u_diffuseAsciiFontScale');
+    for (const source of [normalizedGradientShader, normalizedDiffuseShader]) {
+      expect(extractFunction(source, 'applyDiffuseAscii')).toContain(
+        'vec2 local = diffuseCellFraction(coord, cellSize) - 0.5;',
+      );
+    }
+    // The atlas glyph cell grows with the font size so a large font stays
+    // inside its own cell and never samples the neighboring atlas glyph.
+    expect(compact(webglSource)).toContain(
+      'constglyphSize=Math.max(Math.ceil(resolvedSize*1.15),ASCII_GLYPH_WIDTH)',
+    );
+    // The font family is quoted so a family with spaces (e.g. "Noto Sans JP")
+    // is applied instead of silently falling back.
+    expect(compact(webglSource)).toContain('return`bold${size}px${family}`');
+    expect(compact(webglSource)).toContain('ASCII_GENERIC_FONTS.has(font)?font:`"${font}"`');
+    expect(compact(webglSource)).toContain('fonts.load(fontShorthand)');
+  });
+
+  it('rotates ASCII glyphs around the cell center in both render paths', () => {
+    for (const source of [normalizedGradientShader, normalizedDiffuseShader]) {
+      const ascii = extractFunction(source, 'applyDiffuseAscii');
+      expect(ascii).toContain('abs(u_diffuseAsciiRotation) > 0.0001');
+      expect(ascii).toContain('local.x * cosR + local.y * sinR');
+      expect(ascii).toContain('-local.x * sinR + local.y * cosR');
+    }
+    expect(normalizedGradientShader).toContain('uniform float u_diffuseAsciiRotation;');
+    expect(postprocessShader).toContain('uniform float u_diffuseAsciiRotation;');
+    expect(compact(webglSource)).toContain(
+      'u_diffuseAsciiRotation:gl.getUniformLocation(program,\'u_diffuseAsciiRotation\')',
+    );
+    expect(compact(webglSource)).toContain(
+      '(diffuse.asciiRotation??0)*Math.PI)/180',
+    );
   });
 
   it('keeps shared Diffuse helpers outside the Glass-only stub guard', () => {
-    const glassGuard = postprocessDiffuseShader.indexOf('#if defined(KGG_GLASS_ONLY)');
+    const glassGuard = normalizedDiffuseShader.indexOf('#if defined(KGG_GLASS_ONLY)');
     expect(glassGuard).toBeGreaterThanOrEqual(0);
-    expect(postprocessDiffuseShader.indexOf('float diffuseAdaptiveInput')).toBeLessThan(glassGuard);
-    expect(postprocessDiffuseShader.indexOf('vec3 applyDiffuseHalftone')).toBeLessThan(glassGuard);
-    expect(postprocessDiffuseShader.indexOf('vec3 applyDiffuseAscii')).toBeLessThan(glassGuard);
+    expect(normalizedDiffuseShader.indexOf('float diffuseAdaptiveInput')).toBeLessThan(glassGuard);
+    expect(normalizedDiffuseShader.indexOf('vec3 applyDiffuseHalftone')).toBeLessThan(glassGuard);
+    expect(normalizedDiffuseShader.indexOf('vec3 applyDiffuseAscii')).toBeLessThan(glassGuard);
   });
 
   it('keeps the V2 Noise transform equivalent to the Legacy generator transform', () => {
     expect(canonicalNoise(extractFunction(postprocessShader, 'applyStackCurlNoiseUv')))
-      .toBe(canonicalNoise(extractFunction(gradientShader, 'applyCurlNoiseUV')));
+      .toBe(canonicalNoise(extractFunction(normalizedGradientShader, 'applyCurlNoiseUV')));
     expect(canonicalNoise(extractFunction(postprocessShader, 'stackNoiseUv')))
-      .toBe(canonicalNoise(extractFunction(gradientShader, 'applyNoiseUV')));
+      .toBe(canonicalNoise(extractFunction(normalizedGradientShader, 'applyNoiseUV')));
   });
 
   it('uses analytic derivatives for Fast Curl and keeps its Legacy/V2 wrappers equivalent', () => {
-    const legacy = extractFunction(gradientShader, 'applyFastCurlNoiseUV');
+    const legacy = extractFunction(normalizedGradientShader, 'applyFastCurlNoiseUV');
     const stack = extractFunction(postprocessShader, 'applyStackFastCurlNoiseUv');
     expect(canonicalFastCurl(stack)).toBe(canonicalFastCurl(legacy));
 
@@ -351,7 +425,7 @@ describe('V2 effect shader parity', () => {
     expect(field).not.toContain('wrapped');
     expect(extractFunction(noiseShader, 'psrdnoise2D')).toContain('vec3(value, derivative)');
 
-    const legacyCurl = extractFunction(gradientShader, 'applyCurlNoiseUV');
+    const legacyCurl = extractFunction(normalizedGradientShader, 'applyCurlNoiseUV');
     expect(legacyCurl).toContain('fbm3D(');
     expect(legacyCurl).toContain('u_curlEps');
   });
@@ -363,7 +437,7 @@ describe('V2 effect shader parity', () => {
     expect(noiseShader).toContain('vec2 tangentDirection = vec2(-normalDirection.y, normalDirection.x);');
     expect(noiseShader).toContain('u_phasorDirectionMode == 1 || u_phasorDirectionMode == 2');
     expect(noiseShader).toContain('if (noiseType == PHASOR_NOISE_TYPE)');
-    expect(gradientShader).toContain('u_noiseType == PHASOR_NOISE_TYPE');
+    expect(normalizedGradientShader).toContain('u_noiseType == PHASOR_NOISE_TYPE');
     expect(postprocessShader).toContain('u_noiseType == PHASOR_NOISE_TYPE');
   });
 
@@ -385,14 +459,14 @@ describe('V2 effect shader parity', () => {
   });
 
   it('keeps Slit hashing and pixel-perfect snapping equivalent to Legacy', () => {
-    const legacyHash = extractFunction(gradientShader, 'slitHash')
+    const legacyHash = extractFunction(normalizedGradientShader, 'slitHash')
       .replaceAll('slitHash', 'canonicalSlitHash')
       .replace(/\bn\b/g, 'value');
     const stackHash = extractFunction(postprocessShader, 'stackSlitHash')
       .replaceAll('stackSlitHash', 'canonicalSlitHash');
     expect(compact(stackHash)).toBe(compact(legacyHash));
 
-    const legacySnapUv = extractFunction(gradientShader, 'snapSlitUVToCanvasPixel')
+    const legacySnapUv = extractFunction(normalizedGradientShader, 'snapSlitUVToCanvasPixel')
       .replaceAll('snapSlitUVToCanvasPixel', 'canonicalSnapUv')
       .replaceAll('u_slitPixelPerfect', 'u_pixelPerfect')
       .replaceAll('u_resolution', 'u_fullResolution')
@@ -402,7 +476,7 @@ describe('V2 effect shader parity', () => {
       .replaceAll('u_stackSlitPixelPerfect', 'u_pixelPerfect');
     expect(compact(stackSnapUv)).toBe(compact(legacySnapUv));
 
-    const legacySnapOffset = extractFunction(gradientShader, 'snapSlitOffsetToCanvasPixel')
+    const legacySnapOffset = extractFunction(normalizedGradientShader, 'snapSlitOffsetToCanvasPixel')
       .replaceAll('snapSlitOffsetToCanvasPixel', 'canonicalSnapOffset')
       .replaceAll('u_slitPixelPerfect', 'u_pixelPerfect')
       .replaceAll('u_resolution', 'u_fullResolution')

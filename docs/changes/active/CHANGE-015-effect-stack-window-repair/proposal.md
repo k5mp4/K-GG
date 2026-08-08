@@ -1,47 +1,45 @@
 ---
 type: change
 id: CHANGE-015
-title: Effect Stack別ウィンドウの復旧
+title: Effect Stack別ウィンドウの廃止
 status: approved
 change_kind: B
 owners: [maintainer]
 created: 2026-08-02
-updated: 2026-08-02
+updated: 2026-08-08
 current_specs: [CURRENT-EFFECT-STACK, CURRENT-UI-CONTROLS]
 related_adrs: []
-related_code: [src/components/PostprocessStackPanel.tsx, src/components/DetachedEffectStackApp.tsx, src/lib/effectStackWindow.ts, src/main.tsx, src-tauri/capabilities/default.json, src-tauri/capabilities/effect-stack.json, src-tauri/tauri.conf.json]
-related_tests: [src/lib/effectStackWindow.test.ts, src/components/PostprocessStackPanel.test.tsx]
+related_code: [src/components/PostprocessStackPanel.tsx, src/components/GradientRamp.tsx, src/main.tsx, src/i18n/messages.ts, src-tauri/capabilities/default.json]
+related_tests: ['manual: inline Effect Stack checks', 'manual: Tauri inline-only check']
 human_review: completed
 ---
 
-# CHANGE-015 Effect Stack別ウィンドウの復旧
+# CHANGE-015 Effect Stack別ウィンドウの廃止
 
-実装と自動検証は完了している。現在の検証環境では別ウィンドウが制御対象として公開されないため、ポップアップ／Tauri実機の受け入れ確認完了までactiveに保持する。
+実機検証により、TauriのWebView2環境ではネイティブ`WebviewWindow`が16×16の極小ウィンドウになりWebviewがページをロードしないこと、Document Picture-in-Pictureおよび`window.open`ポップアップもユーザー操作で失敗することを確認した。ブラウザーでも別ウィンドウ化は利便性に対して維持コストが高いため、別ウィンドウ化そのものを廃止し、Effect Stackは常にワークスペース内のインライン表示のみで提供する方針へ変更する。実装と自動検証は完了し、実機受け入れ確認までactiveに保持する。
 
 ## 背景・問題
 
 Effect Stackを別ウィンドウへ切り離す操作が、ブラウザーの別ドキュメントで正しく表示・操作できないことがあります。現在のブラウザー用ポップアップは独立したReact rootへパネルだけを描画しており、パネルが利用するLanguageProviderやTweeqのViewportを共有していません。そのため、別ウィンドウで`useLanguage`を呼ぶコンポーネントが実行時エラーになり、空白または操作不能になる可能性があります。
 
-Tauriの別ウィンドウ作成も、作成・失敗イベントが届かない場合に一定時間後の処理を成功として扱うため、実際には作成できていないのに開いた状態としてUIが残る可能性があります。
+Tauriの別ウィンドウ作成も、作成・失敗イベントが届かない場合に一定時間後の処理を成功として扱うため、実際には作成できていないのに開いた状態としてUIが残る可能性があります。実機確認では、TauriのWebView2環境で別ウィンドウ（`WebviewWindow`）が16×16ピクセルの極小サイズで作成され、Webviewがページをロードしない問題が再現した。`documentPictureInPicture.requestWindow()`もユーザー操作で`NotAllowedError`またはIPC失敗になり、`window.open`フォールバックも`null`を返した。
 
 ## 変更理由
 
-別ウィンドウを通常表示と同じコンテキストで描画し、作成失敗を失敗として扱うことで、ブラウザーとTauriの両方で切り離し操作を再現可能かつ復旧可能にします。既存のインライン表示、別ウィンドウからの選択・有効状態変更、閉じた後の再オープンを壊さないことを目的とします。
+Tauriではネイティブ別ウィンドウ・Document Picture-in-Picture・ポップアップのいずれも安定動作しないため、別ウィンドウ化を廃止し、Effect Stackを常にインライン表示で提供する。ブラウザーとTauriのどちらでも同じインラインUIを使うことで、開閉状態の不整合やプラットフォーム差分を残さないことを目的とする。
 
 ## ゴール・成功条件
 
-- ブラウザーのDocument Picture-in-Pictureまたは通常ポップアップでEffect Stackが空白にならず、表示言語・Tweeqコントロール・選択・トグルが動作する。
-- ブラウザーの別ドキュメント用React rootが、通常のアプリと同じLanguageProviderおよびTweeq Viewportの下でパネルを描画する。
-- Tauriの別ウィンドウ作成イベントまたはエラーを正しく待機し、作成失敗・タイムアウト時はインライン表示へ戻る。
-- 別ウィンドウを閉じるとホスト側の開閉状態が解除され、再度開く操作ができる。
-- 別ウィンドウでのレイヤー選択・有効状態変更がホスト側へ反映され、ホスト側の変更も別ウィンドウへ反映される。
-- 通常のインラインEffect Stack、別ウィンドウ以外のTauri起動、描画・保存形式は変更しない。
+- Effect Stackはワークスペース内のインライン表示のみで提供する。
+- 別ウィンドウ操作（Document Picture-in-Picture、ポップアップ、TauriネイティブWebviewWindow）のボタンやUIを表示しない。
+- 通常のインラインEffect Stack、ランダム順序・ソロレイヤー・ドラッグ並べ替え、選択・有効状態変更は既存動作を維持する。
+- 描画・保存形式、Preset互換性は変更しない。
 
 ## 対象
 
-- ブラウザーの外部Document/Picture-in-PiP rootのProvider構成。
-- Tauri WebviewWindowの作成・失敗・タイムアウト・close/reopenライフサイクル。
-- 別ウィンドウとホスト間の既存store購読・再描画の検証。
+- ブラウザーのDocument/Picture-in-PiP、通常ポップアップの別ウィンドウrootを削除する。
+- TauriネイティブWebviewWindowの別ウィンドウ経路（`DetachedEffectStackApp.tsx`、`effectStackWindow.ts`、`effect-stack.json`capability、`main.tsx`分岐）を削除する。
+- 別ウィンドウ操作ボタンと関連i18nメッセージ、UI用語辞書の記述を削除する。
 - 原因を再現できる単体テストと、ブラウザー・Tauriの手動確認項目。
 
 ## 対象外
@@ -49,6 +47,7 @@ Tauriの別ウィンドウ作成も、作成・失敗イベントが届かない
 - Effect Stackのランダム順序、Altクリックのソロレイヤー（CHANGE-014）。
 - Effect Stackのデータモデル、描画パイプライン、Preset保存形式の変更。
 - 複数の同時別ウィンドウ、別プロセス間の新しい同期プロトコル。
+- 別ウィンドウ化の再導入。ブラウザー・Tauriのどちらでも別ウィンドウ表示は提供しない。
 - Tauriの権限を必要以上に拡張すること、Window以外の権限変更。
 
 ## 影響を受ける現行仕様
@@ -59,15 +58,15 @@ Tauriの別ウィンドウ作成も、作成・失敗イベントが届かない
 
 ## 関連ADR
 
-- ADR-0005の主スタック／固定段の境界を維持し、別ウィンドウ固有のProviderとライフサイクルだけを修正する。既存ADRと実装が矛盾する場合は実装前に報告する。
+- ADR-0005の主スタック／固定段の境界を維持する。別ウィンドウ固有のProviderとライフサイクルは削除するため、ADR-0005との矛盾はない。既存ADRと実装が矛盾する場合は実装前に報告する。
 
 ## 主なリスク
 
-- ブラウザーがポップアップをブロックした場合、別ウィンドウは開けないためインライン表示を維持し、ユーザーが再試行できる状態にする。
-- Tauriのイベント名や権限設定を誤ると起動環境だけで失敗するため、作成・失敗・closeをテスト可能な境界へ分離する。
-- Providerを二重化することでテーマや言語状態が初期化される可能性があるため、別ドキュメントではホストと同じ初期言語を使い、Effect Stackのstore状態を一次情報として扱う。
+- 別ウィンドウ化の削除により、複数モニターでEffect Stackを開いていた利用者の作業形態が変わる。インライン表示のみになるため、既存のワークスペース配置で代替できることを利用者向け文書に示す。
+- 削除漏れのコードやメッセージキーが残ると、未使用コードや型の不整合が生じるため、型チェック・lint・docs checkで検証する。
 
 ## 実装決定・未確認事項
 
-- Tauri作成イベントの待機タイムアウトは3秒とし、イベント未着時は失敗としてインライン表示へ戻す。
-- Document Picture-in-Pictureのcloseイベント購読は既存の`pagehide`／`unload`経路を維持する。実機でのポップアップclose/reopen確認は未実施としてvalidationに記録する。
+- TauriのWebView2環境では、`WebviewWindow`（16×16極小・Webview未ロード）、`documentPictureInPicture`（`NotAllowedError`／IPC失敗）、`window.open`（null）のいずれも動作しないことを実機で確認した。別ウィンドウ化そのものを廃止する。
+- 別ウィンドウ操作ボタン、関連i18nメッセージ（`common.detach`、`stack.detach`、`stack.restore`、`gradient.pipUnsupported`）、UI用語辞書の記述を削除する。
+- 実機でのインライン表示・ランダム順序・ソロレイヤー・ドラッグ並べ替えの受け入れ確認は、validationに未確認事項として記録する。

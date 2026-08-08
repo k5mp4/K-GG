@@ -52,6 +52,9 @@ describe('presetThumbnail', () => {
     delete (legacyDiffuse as Partial<typeof legacyDiffuse>).grainAdaptiveEnabled;
     delete (legacyDiffuse as Partial<typeof legacyDiffuse>).grainAdaptiveAmount;
     delete (legacyDiffuse as Partial<typeof legacyDiffuse>).grainBezier;
+    delete (legacyDiffuse as Partial<typeof legacyDiffuse>).asciiFont;
+    delete (legacyDiffuse as Partial<typeof legacyDiffuse>).asciiFontSize;
+    delete (legacyDiffuse as Partial<typeof legacyDiffuse>).asciiRotation;
 
     const preview = createPresetThumbnailState({
       ...legacy,
@@ -62,6 +65,9 @@ describe('presetThumbnail', () => {
     expect(preview.diffuse.asciiCharset).toBe(STORE_DEFAULTS.diffuse.asciiCharset);
     expect(preview.diffuse.backgroundColor).toBe(STORE_DEFAULTS.diffuse.backgroundColor);
     expect(preview.diffuse.grainBezier).toEqual(STORE_DEFAULTS.diffuse.grainBezier);
+    expect(preview.diffuse.asciiFont).toBe(STORE_DEFAULTS.diffuse.asciiFont);
+    expect(preview.diffuse.asciiFontSize).toBe(STORE_DEFAULTS.diffuse.asciiFontSize);
+    expect(preview.diffuse.asciiRotation).toBe(STORE_DEFAULTS.diffuse.asciiRotation);
     expect('autoLoop' in preview.slitScan).toBe(false);
   });
 });

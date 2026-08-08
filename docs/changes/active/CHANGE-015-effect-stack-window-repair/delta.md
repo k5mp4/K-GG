@@ -4,18 +4,24 @@
 
 ### EFFECT-002 Effect Stackの配置と操作
 
-既存の別ウィンドウ操作は、ブラウザーでは独立ドキュメントへ必要なProviderを含むReactツリーを描画し、TauriではWebviewWindowの作成成功を確認してから別ウィンドウ状態へ遷移する。作成失敗またはタイムアウト時はインライン表示へ復旧し、再試行可能な状態を維持する。別ウィンドウとホストは既存のEffect Pipeline状態を共有する。
+Effect Stackは常にワークスペース内のインライン表示のみで提供する。別ウィンドウ化（Document Picture-in-Picture、ポップアップ、TauriネイティブWebviewWindow）は行わない。既存のEffect Pipeline状態はインライン表示のまま共有し、レイヤー選択と有効状態変更を反映する。
 
-### UI-009 Effect Stack別ウィンドウ
+### UI-009 Effect Stackの表示形態
 
-Effect Stackはインライン表示と別ウィンドウ表示を切り替えられる。別ウィンドウでは通常表示と同じ言語・Tweeqコントロールを使用し、レイヤー選択と有効状態変更を相互に反映する。別ウィンドウを閉じた場合はインライン表示へ戻り、開閉状態の不整合を残さない。ブラウザーのポップアップ制限やTauri作成失敗はエラーとして扱い、空白ウィンドウや開いたままの偽状態を残さない。
+Effect Stackは常にインライン表示のみで提供する。別ウィンドウ操作（Document Picture-in-Picture、ポップアップ、TauriネイティブWebviewWindow）のボタンやUIを表示しない。TauriのWebView2環境で別ウィンドウ化が安定動作しないため、ブラウザー・Tauriのどちらでもインライン表示に統一する。
 
 ## ADDED Requirements
 
-### WINDOW-001 別ウィンドウ作成の失敗復旧
+### WINDOW-001 別ウィンドウ化の廃止
 
-別ウィンドウ作成処理は、成功イベント、エラーイベント、タイムアウトを区別して結果を返す。成功イベントを受け取らない場合は成功扱いにせず、作成済みハンドルがあれば安全に閉じ、Effect Stackをインライン状態へ戻す。Tauriの作成元には`core:webview:allow-create-webview-window`を付与し、失敗イベントの構造化payloadをエラーへ保持する。TauriのWebviewWindowは非表示で生成し、ネイティブ生成成功後に表示・フォーカスする。子側React rootの準備完了通知は表示後の状態同期に使用し、ウィンドウ表示の成否へ依存させない。表示成功後はホストからも現在のスナップショットを一度送信する。失敗時はダイアログAPIを呼ばず、インライン表示を維持して権限エラーを未処理Promiseとして残さない。
+ブラウザー・Tauriの両方で、Effect Stackの別ウィンドウ化（Document Picture-in-Picture、ポップアップ、Tauriネイティブ`WebviewWindow`）を廃止する。別ウィンドウ操作ボタン、関連i18nメッセージ（`common.detach`、`stack.detach`、`stack.restore`、`gradient.pipUnsupported`）、UI用語辞書の記述を削除する。`DetachedEffectStackApp.tsx`、`src/lib/effectStackWindow.ts`、`effect-stack.json`capability、`main.tsx`の別ウィンドウ分岐を削除し、`PostprocessStackPanel`と`GradientRamp`からPiP／ポップアップ処理を除去する。
 
 ## REMOVED Requirements
 
-なし。
+### TauriネイティブWebviewWindowの別ウィンドウ生成
+
+Tauriの`WebviewWindow`による別ウィンドウ生成・表示・状態同期の経路を削除した。実機検証で、`WebviewWindow`が16×16ピクセルの極小ウィンドウになりWebviewがページをロードしない問題が再現したため、この経路を廃止する。関連する`DetachedEffectStackApp.tsx`、`src/lib/effectStackWindow.ts`、`effect-stack.json`capabilityを削除し、`main.tsx`の別ウィンドウ分岐を撤去する。
+
+### ブラウザーの別ウィンドウroot（PiP・ポップアップ）
+
+ブラウザーのDocument Picture-in-Pictureおよび通常ポップアップによる別ウィンドウrootを削除した。`PostprocessStackPanel`と`GradientRamp`からPiP・ポップアップ処理（`documentPictureInPicture.requestWindow`、`window.open`、別ドキュメントへのReactポータル）を除去し、インライン表示のみに統一する。
