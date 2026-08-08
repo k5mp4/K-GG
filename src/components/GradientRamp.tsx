@@ -10,7 +10,6 @@ import type { ColorStop, OpacityStop, RampColorMode, RampInterpolation } from '.
 import { CustomSelect } from './CustomSelect';
 import { Icon } from './Icon';
 import { undo, redo } from '../lib/history'; // 追加
-import { renderBridge } from '../lib/renderBridge'; // 追加
 import {
   deleteUserColorPalette,
   loadUserColorPalettes,
@@ -391,7 +390,6 @@ export function GradientRamp({ overlayImageElement = null, showHeader = true }: 
   const [showPaletteGenerator, setShowPaletteGenerator] = useState(false);
   const [showRampOptionPreviews, setShowRampOptionPreviews] = useState(false);
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [pipWindow, setPipWindow] = useState<Window | null>(null);
   const [paletteName, setPaletteName] = useState('');
   const [userPalettes, setUserPalettes] = useState<UserColorPalette[]>(() => loadUserColorPalettes());
   const [diceSnapshot, setDiceSnapshot] = useState<RampDiceSnapshot | null>(null);
@@ -457,75 +455,6 @@ export function GradientRamp({ overlayImageElement = null, showHeader = true }: 
   }));
   const [floatSize, setFloatSize] = useState({ w: 700, h: 520 });
   const pickerWrapperRef = useRef<HTMLDivElement>(null);
-
-  // ウィンドウ飛び出し (Picture-in-Picture)
-  const togglePiP = async () => {
-    if (pipWindow) {
-      pipWindow.close();
-      return;
-    }
-
-    if (!('documentPictureInPicture' in window)) {
-      alert(t('gradient.pipUnsupported'));
-      return;
-    }
-
-    try {
-      const pip = await (window as any).documentPictureInPicture.requestWindow({
-        width: floatSize.w,
-        height: floatSize.h,
-      });
-
-      // スタイルをメインウィンドウからコピー
-      [...document.styleSheets].forEach((styleSheet) => {
-        try {
-          const cssRules = [...styleSheet.cssRules].map((rule) => rule.cssText).join('');
-          const style = document.createElement('style');
-          style.textContent = cssRules;
-          pip.document.head.appendChild(style);
-        } catch (e) {
-          if (styleSheet.href) {
-            const link = document.createElement('link');
-            link.rel = 'stylesheet';
-            link.href = styleSheet.href;
-            pip.document.head.appendChild(link);
-          }
-        }
-      });
-
-      pip.document.body.style.backgroundColor = '#141414';
-      pip.document.body.style.margin = '0';
-      pip.document.body.style.overflow = 'hidden';
-
-      // PiPウィンドウ内でのショートカットキー対応
-      const onPipKeyDown = (e: KeyboardEvent) => {
-        const target = e.target as HTMLElement;
-        const isInput = target?.tagName === 'INPUT' || target?.tagName === 'TEXTAREA';
-        if (isInput) return;
-
-        const ctrl = e.ctrlKey || e.metaKey;
-        const key = e.key.toLowerCase();
-
-        if (ctrl && key === 'z' && !e.shiftKey) { e.preventDefault(); undo(); }
-        if (ctrl && (key === 'y' || (key === 'z' && e.shiftKey))) { e.preventDefault(); redo(); }
-        if (e.code === 'Space') { 
-          e.preventDefault(); 
-          renderBridge.togglePause(); 
-        }
-      };
-      pip.addEventListener('keydown', onPipKeyDown);
-
-      pip.addEventListener('pagehide', () => {
-        setPipWindow(null);
-        setIsModalOpen(false);
-      });
-
-      setPipWindow(pip);
-      setIsModalOpen(true);
-    } catch (err) {
-      console.error('Failed to open PiP window:', err);
-    }
-  };
 
   // フローティングウィンドウ ドラッグ用
   const titleDragRef = useRef<{ sx: number; sy: number; ox: number; oy: number } | null>(null);
@@ -1656,18 +1585,6 @@ export function GradientRamp({ overlayImageElement = null, showHeader = true }: 
         <div className={`flex items-center mb-1 ${showHeader ? 'justify-between' : 'justify-end'}`}>
           {showHeader && <h2 className="font-semibold text-sm text-k-text tracking-wide">Gradient Ramp</h2>}
           <div className="flex items-center gap-1">
-              <button
-                onClick={togglePiP}
-                onTouchEnd={(e) => runTouchAction(e, togglePiP)}
-                className="flex items-center justify-center w-7 h-7 p-0 bg-[#2A2A2A] border border-white/10 text-[#F0EAD9] hover:bg-[#3A3A3A] hover:border-white/20 transition-all duration-200"
-                title={t('common.detach')}
-              >
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#F0EAD9" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ pointerEvents: 'none' }}>
-                  <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" />
-                  <polyline points="15 3 21 3 21 9" />
-                  <line x1="10" y1="14" x2="21" y2="3" />
-                </svg>
-              </button>
               <IconButton
                 icon="expand"
                 label={t('gradient.openEditor')}
@@ -1947,15 +1864,15 @@ export function GradientRamp({ overlayImageElement = null, showHeader = true }: 
         </div>
       </div>
 
-      {/* ===== フローティングウィンドウ (portal で body または PiPウィンドウに描画) ===== */}
+      {/* ===== フローティングウィンドウ (portal で body に描画) ===== */}
       {isModalOpen && createPortal(
         <div
-          className={`bg-k-surface flex flex-col k-touch-controls ${pipWindow ? 'w-full h-full' : 'fixed z-50 border border-cream/25 shadow-2xl'}`}
+          className="bg-k-surface flex flex-col k-touch-controls fixed z-50 border border-cream/25 shadow-2xl"
           onPointerDown={stopTouchPropagation}
           onPointerMove={stopTouchPropagation}
           onPointerUp={stopTouchPropagation}
           onPointerCancel={stopTouchPropagation}
-          style={pipWindow ? {} : {
+          style={{
             left: floatPos.x,
             top: floatPos.y,
             width: floatSize.w,
@@ -1967,12 +1884,12 @@ export function GradientRamp({ overlayImageElement = null, showHeader = true }: 
           {/* タイトルバー（ドラッグハンドル）※PiP時はOSの枠があるため非表示にしても良いが、一応残す */}
           <div
             className="flex items-center justify-between px-3 py-2 border-b border-cream/15 cursor-move select-none shrink-0 bg-k-surface/80"
-            onPointerDown={pipWindow ? undefined : onTitlePointerDown}
-            onPointerMove={pipWindow ? undefined : onTitlePointerMove}
-            onPointerUp={pipWindow ? undefined : onTitlePointerUp}
-            onPointerLeave={pipWindow ? undefined : onTitlePointerUp}
+            onPointerDown={onTitlePointerDown}
+            onPointerMove={onTitlePointerMove}
+            onPointerUp={onTitlePointerUp}
+            onPointerLeave={onTitlePointerUp}
           >
-            <span className="font-semibold text-sm tracking-wide">Gradient Ramp {pipWindow && '(External)'}</span>
+            <span className="font-semibold text-sm tracking-wide">Gradient Ramp</span>
             
             <div className="flex items-center gap-1.5 ml-auto mr-4">
               <button 
@@ -2003,11 +1920,9 @@ export function GradientRamp({ overlayImageElement = null, showHeader = true }: 
               icon="close"
               label={t('gradient.closeEditor')}
               onClick={() => {
-                if (pipWindow) pipWindow.close();
                 setIsModalOpen(false);
               }}
               onTouchEnd={(e) => runTouchAction(e, () => {
-                if (pipWindow) pipWindow.close();
                 setIsModalOpen(false);
               })}
               className="w-8 h-8 p-0 text-k-text/50 hover:text-k-text hover:bg-white/10 rounded-full"
@@ -2164,21 +2079,19 @@ export function GradientRamp({ overlayImageElement = null, showHeader = true }: 
             </div>
           </div>
 
-          {/* リサイズハンドル（右下角）※PiP時は不要 */}
-          {!pipWindow && (
-            <div
-              className="absolute bottom-0 right-0 w-5 h-5 cursor-se-resize"
-              style={{
-                background: 'linear-gradient(135deg, transparent 50%, rgba(255,255,255,0.18) 50%)',
-              }}
-              onPointerDown={onResizePointerDown}
-              onPointerMove={onResizePointerMove}
-              onPointerUp={onResizePointerUp}
-              onPointerLeave={onResizePointerUp}
-            />
-          )}
+          {/* リサイズハンドル（右下角） */}
+          <div
+            className="absolute bottom-0 right-0 w-5 h-5 cursor-se-resize"
+            style={{
+              background: 'linear-gradient(135deg, transparent 50%, rgba(255,255,255,0.18) 50%)',
+            }}
+            onPointerDown={onResizePointerDown}
+            onPointerMove={onResizePointerMove}
+            onPointerUp={onResizePointerUp}
+            onPointerLeave={onResizePointerUp}
+          />
         </div>,
-        pipWindow ? pipWindow.document.body : document.body
+        document.body
       )}
     </>
   );

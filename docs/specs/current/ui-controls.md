@@ -9,8 +9,8 @@ updated: 2026-08-03
 requirement_ids: [UI-001, UI-002, UI-003, UI-004, UI-005, UI-006, UI-007, UI-008, UI-009, UI-010, UI-011, UI-012, UI-013]
 related_adrs: [ADR-0011, ADR-0012]
 related_changes: [CHANGE-010, CHANGE-012, CHANGE-013, CHANGE-014, CHANGE-015, CHANGE-018, CHANGE-019]
-related_code: [src/App.tsx, src/App.css, src/components/CustomSelect.tsx, src/components/GradientRamp.tsx, src/components/SliderField.tsx, src/components/NoiseDistortionPanel.tsx, src/components/BlockNoisePanel.tsx, src/components/DiffuseCurveEditor.tsx, src/components/SlitScanPanel.tsx, src/components/StretchPanel.tsx, src/components/TimelineBar.tsx, src/components/IridescencePanel.tsx, src/components/NormalMapPanel.tsx, src/components/SandboxPanel.tsx, src/components/RadonPanel.tsx, src/components/PostprocessPanel.tsx, src/components/PostprocessStackPanel.tsx, src/components/PresetPanel.tsx, src/components/Toggle.tsx, src/lib/effectStackWindow.ts, src/lib/effectPipeline.ts, src/i18n/uiLabels.ts, src/i18n/messages.ts]
-related_tests: [src/lib/tweeqAngle.test.ts, src/lib/effectPipeline.test.ts, src/lib/effectStackWindow.test.ts, src/lib/parameterLimits.test.ts, src/lib/animationDirection.test.ts, src/lib/effectShaderParity.test.ts, src/lib/presetThumbnail.test.ts, 'manual: Tweeq InputAngle and InputShuffle and InputDrum and InputRadio browser checks', 'manual: Glass color controls browser check', 'manual: Effect Stack randomize; Alt-solo; detached-window checks']
+related_code: [src/App.tsx, src/App.css, src/components/CustomSelect.tsx, src/components/GradientRamp.tsx, src/components/SliderField.tsx, src/components/NoiseDistortionPanel.tsx, src/components/BlockNoisePanel.tsx, src/components/DiffuseCurveEditor.tsx, src/components/SlitScanPanel.tsx, src/components/StretchPanel.tsx, src/components/TimelineBar.tsx, src/components/IridescencePanel.tsx, src/components/NormalMapPanel.tsx, src/components/SandboxPanel.tsx, src/components/RadonPanel.tsx, src/components/PostprocessPanel.tsx, src/components/PostprocessStackPanel.tsx, src/components/PresetPanel.tsx, src/components/Toggle.tsx, src/lib/effectPipeline.ts, src/i18n/uiLabels.ts, src/i18n/messages.ts]
+related_tests: [src/lib/tweeqAngle.test.ts, src/lib/effectPipeline.test.ts, src/lib/parameterLimits.test.ts, src/lib/animationDirection.test.ts, src/lib/effectShaderParity.test.ts, src/lib/presetThumbnail.test.ts, 'manual: Tweeq InputAngle and InputShuffle and InputDrum and InputRadio browser checks', 'manual: Glass color controls browser check', 'manual: Effect Stack randomize; Alt-solo; detached-window checks']
 ---
 
 # UI入力コントロール
@@ -53,9 +53,9 @@ PostprocessのプロパティモジュールにはGlassを一つだけ表示し�
 
 Effect Stackには主スタック9種類の順序をランダム化する操作を表示します。操作は既存の有効状態・選択状態を維持し、現在の描画結果から新しい順序へ滑らかに遷移します。主スタックの行位置もキャンバス遷移と同じ400msの`easeInOut`で、現在位置から移動します。主スタックの行またはそのオンオフToggleをAltクリックすると、その行だけを有効にするソロ操作になります。ソロ化によって新たに無効化された行は黄色の`STAY`で表示します。同じ対象を再度Altクリックするとソロ化前の有効状態へ戻ります。Altキーなしのクリック、トグル、ドラッグ並べ替えは既存の操作を維持します。
 
-### UI-009 Effect Stack別ウィンドウ
+### UI-009 Effect Stackの表示形態
 
-Effect Stackはインライン表示と別ウィンドウ表示を切り替えられます。別ウィンドウでは通常表示と同じLanguageProviderおよびTweeq Viewportの下で表示し、選択と有効状態変更を既存storeへ反映します。Tauriの別ウィンドウは非表示で生成し、ネイティブ生成成功後に表示・フォーカスします。子側React rootの準備完了通知は表示後の状態同期に使い、通知遅延によって表示自体を失敗扱いにしません。別ウィンドウのclose、作成失敗、ポップアップ制限、Tauri作成タイムアウトではインライン表示へ復旧し、再試行可能な状態を残します。
+Effect Stackは常にワークスペース内のインライン表示のみで提供します。別ウィンドウ化（Document Picture-in-Picture、ポップアップ、TauriネイティブWebviewWindow）は行いません。TauriのWebView2環境では別ウィンドウ化が安定動作しないため、操作ボタン自体を表示しません。ブラウザーでも同様に別ウィンドウ操作は提供せず、インライン表示に統一します。
 
 ### UI-010 トップバーとSANDBOXのモジュール入口
 

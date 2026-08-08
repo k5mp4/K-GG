@@ -270,6 +270,9 @@ export const STORE_DEFAULTS = {
     halftoneShape: 'circle' as const,
     halftoneSize: 0.82,
     asciiCharset: DEFAULT_DIFFUSE_ASCII_CHARSET,
+    asciiFont: 'monospace',
+    asciiFontSize: 29,
+    asciiRotation: 0,
     backgroundColor: DEFAULT_DIFFUSE_BACKGROUND_COLOR,
     adaptiveEnabled: false,
     adaptiveChannel: 'luminance' as DiffuseAdaptiveChannel,
@@ -816,6 +819,11 @@ export const useGradientStore = create<GradientStore>((set) => ({
     diffuse.asciiCharset = typeof diffuse.asciiCharset === 'string' && diffuse.asciiCharset.length > 0
       ? diffuse.asciiCharset.slice(0, 64)
       : DEFAULT_DIFFUSE_ASCII_CHARSET;
+    diffuse.asciiFont = typeof diffuse.asciiFont === 'string' && diffuse.asciiFont.length > 0
+      ? diffuse.asciiFont
+      : 'monospace';
+    diffuse.asciiFontSize = clampParameter(diffuse.asciiFontSize, s.diffuse.asciiFontSize, getParameterLimit('diffuse.asciiFontSize'));
+    diffuse.asciiRotation = clampParameter(diffuse.asciiRotation, s.diffuse.asciiRotation, getParameterLimit('diffuse.asciiRotation'));
     diffuse.adaptiveEnabled = Boolean(diffuse.adaptiveEnabled);
     diffuse.grainAdaptiveEnabled = Boolean(diffuse.grainAdaptiveEnabled);
     diffuse.backgroundColor = normalizeDiffuseBackgroundColor(

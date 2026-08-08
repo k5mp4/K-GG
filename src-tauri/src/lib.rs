@@ -39,7 +39,8 @@ pub fn run() {
             open_native_ffmpeg_folder,
             open_ffmpeg_builds_page,
             load_presets_file,
-            save_presets_file
+            save_presets_file,
+            list_system_fonts
         ])
         .run(tauri::generate_context!())
         .expect("error while running KAGARIBI Grad");
@@ -520,6 +521,175 @@ fn get_native_ffmpeg_status(app: tauri::AppHandle) -> NativeFfmpegStatus {
 }
 
 #[tauri::command]
+fn list_system_fonts() -> Vec<String> {
+    let mut fonts: Vec<String> = Vec::new();
+    let mut seen = std::collections::HashSet::new();
+
+    for directory in font_directories() {
+        scan_font_directory(&directory, &mut fonts, &mut seen);
+    }
+    for family in registry_font_families() {
+        if seen.insert(family.clone()) {
+            fonts.push(family);
+        }
+    }
+
+    fonts.sort();
+    fonts
+}
+
+fn font_directories() -> Vec<PathBuf> {
+    let mut dirs = Vec::new();
+    #[cfg(windows)]
+    {
+        if let Some(root) = std::env::var_os("SystemRoot") {
+            dirs.push(PathBuf::from(root).join("Fonts"));
+        }
+        // User-installed fonts (including per-user installs, Adobe, Morisawa, etc.).
+        if let Some(local) = std::env::var_os("LOCALAPPDATA") {
+            dirs.push(PathBuf::from(local).join("Microsoft").join("Windows").join("Fonts"));
+        }
+        if let Some(program_files) = std::env::var_os("ProgramFiles") {
+            dirs.push(PathBuf::from(&program_files).join("Fonts"));
+            dirs.push(
+                PathBuf::from(&program_files)
+                    .join("Common Files")
+                    .join("Adobe")
+                    .join("Fonts"),
+            );
+            dirs.push(PathBuf::from(&program_files).join("Morisawa"));
+        }
+        if let Some(program_files_x86) = std::env::var_os("ProgramFiles(x86)") {
+            dirs.push(
+                PathBuf::from(program_files_x86)
+                    .join("Common Files")
+                    .join("Adobe")
+                    .join("Fonts"),
+            );
+        }
+    }
+    #[cfg(target_os = "macos")]
+    {
+        dirs.push(PathBuf::from("/System/Library/Fonts"));
+        dirs.push(PathBuf::from("/Library/Fonts"));
+        dirs.push(PathBuf::from("/Library/Application Support/Adobe/Fonts"));
+        if let Some(home) = std::env::var_os("HOME") {
+            dirs.push(PathBuf::from(home).join("Library").join("Fonts"));
+        }
+    }
+    #[cfg(all(unix, not(target_os = "macos")))]
+    {
+        dirs.push(PathBuf::from("/usr/share/fonts"));
+        dirs.push(PathBuf::from("/usr/local/share/fonts"));
+        if let Some(home) = std::env::var_os("HOME") {
+            dirs.push(PathBuf::from(home).join(".fonts"));
+            dirs.push(PathBuf::from(home).join(".local").join("share").join("fonts"));
+        }
+    }
+    dirs
+}
+
+#[cfg(windows)]
+fn parse_registry_font_output(output: &str) -> Vec<String> {
+    output
+        .lines()
+        .filter_map(|line| {
+            // Registry value lines look like:
+            //   "    Arial (TrueType)    REG_SZ    arial.ttf"
+            // The family name is the value name before "REG_SZ", with the
+            // "(TrueType)" / "(OpenType)" suffix stripped.
+            let type_start = line.find("REG_SZ")?;
+            let raw = line[..type_start].trim();
+            let family = raw
+                .split(" (")
+                .next()
+                .unwrap_or(raw)
+                .trim()
+                .to_string();
+            (!family.is_empty()).then_some(family)
+        })
+        .collect()
+}
+
+#[cfg(windows)]
+fn registry_font_families() -> Vec<String> {
+    let Some(reg) = windows_system_executable("reg.exe") else {
+        return Vec::new();
+    };
+    let mut command = Command::new(&reg);
+    command
+        .args([
+            "query",
+            r"HKLM\SOFTWARE\Microsoft\Windows NT\CurrentVersion\Fonts",
+            "/s",
+        ])
+        .stdin(Stdio::null());
+    configure_hidden_command(&mut command);
+    let Ok(output) = command.output() else {
+        return Vec::new();
+    };
+    if !output.status.success() {
+        return Vec::new();
+    }
+    let text = String::from_utf8_lossy(&output.stdout);
+    parse_registry_font_output(&text)
+}
+
+#[cfg(not(windows))]
+fn registry_font_families() -> Vec<String> {
+    Vec::new()
+}
+
+fn scan_font_directory(
+    directory: &Path,
+    fonts: &mut Vec<String>,
+    seen: &mut std::collections::HashSet<String>,
+) {
+    let Ok(entries) = std::fs::read_dir(directory) else {
+        return;
+    };
+    for entry in entries.flatten() {
+        let path = entry.path();
+        if path.is_dir() {
+            scan_font_directory(&path, fonts, seen);
+            continue;
+        }
+        let Some(extension) = path.extension().and_then(OsStr::to_str) else {
+            continue;
+        };
+        let extension = extension.to_ascii_lowercase();
+        if !matches!(extension.as_str(), "ttf" | "otf" | "ttc") {
+            continue;
+        }
+        let Some(file_name) = path.file_stem().and_then(OsStr::to_str) else {
+            continue;
+        };
+        let name = font_name_from_file_name(file_name);
+        if name.is_empty() || !seen.insert(name.clone()) {
+            continue;
+        }
+        fonts.push(name);
+    }
+}
+
+/// Derive a CSS font-family candidate from a font file name. The browser then
+/// falls back to the closest installed family if the exact name differs.
+fn font_name_from_file_name(file_name: &str) -> String {
+    file_name
+        .split(|ch: char| !(ch.is_alphanumeric() || ch == ' '))
+        .filter(|part| !part.is_empty() && part.len() > 1)
+        .map(|part| {
+            let mut chars = part.chars();
+            match chars.next() {
+                Some(first) => first.to_uppercase().collect::<String>() + chars.as_str(),
+                None => String::new(),
+            }
+        })
+        .collect::<Vec<_>>()
+        .join(" ")
+}
+
+#[tauri::command]
 fn open_native_ffmpeg_folder(app: tauri::AppHandle) -> Result<(), String> {
     let directory = ensure_ffmpeg_dir(&app)?;
     #[cfg(windows)]
@@ -975,6 +1145,32 @@ HKEY_CURRENT_USER\Environment
 
     #[cfg(windows)]
     #[test]
+    fn parses_registry_font_families_from_reg_query_output() {
+        use super::parse_registry_font_output;
+
+        let output = r#"
+HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Windows NT\CurrentVersion\Fonts
+    Arial (TrueType)    REG_SZ    arial.ttf
+    Arial Black (TrueType)    REG_SZ    ariblk.ttf
+    森澤UDゴシック (OpenType)    REG_SZ    morisawa.ttf
+    Adobe 明朝 Std (OpenType)    REG_SZ    adobe.ttf
+    Segoe UI Emoji (TrueType)    REG_SZ    seguiemj.ttf
+"#;
+
+        assert_eq!(
+            parse_registry_font_output(output),
+            vec![
+                "Arial".to_string(),
+                "Arial Black".to_string(),
+                "森澤UDゴシック".to_string(),
+                "Adobe 明朝 Std".to_string(),
+                "Segoe UI Emoji".to_string(),
+            ]
+        );
+    }
+
+    #[cfg(windows)]
+    #[test]
     fn expands_windows_environment_variables_in_path_values() {
         use super::expand_windows_env_vars;
 
@@ -1023,6 +1219,11 @@ HKEY_CURRENT_USER\Environment
 
     #[test]
     fn rejects_video_export_paths_outside_the_kgg_temp_root() {
+        use super::canonical_video_export_root;
+
+        // validate_video_export_path canonicalizes the K-GG temp root first.
+        std::fs::create_dir_all(canonical_video_export_root().expect("create temp root"))
+            .expect("create K-GG temp root");
         let outside = test_dir("video-export-outside");
         std::fs::create_dir_all(&outside).expect("create outside dir");
         let output = outside.join("output.mov");
@@ -1079,6 +1280,43 @@ HKEY_CURRENT_USER\Environment
             legacy.exists(),
             "legacy preset must remain available for rollback"
         );
+        let _ = std::fs::remove_dir_all(root);
+    }
+
+    #[test]
+    fn derives_font_family_candidates_from_file_names() {
+        use super::font_name_from_file_name;
+
+        assert_eq!(font_name_from_file_name("arial"), "Arial");
+        assert_eq!(font_name_from_file_name("times_new_roman"), "Times New Roman");
+        assert_eq!(font_name_from_file_name("courier-new-bold"), "Courier New Bold");
+        assert_eq!(font_name_from_file_name("NotoSansJP"), "NotoSansJP");
+        assert_eq!(font_name_from_file_name("a"), "");
+    }
+
+    #[test]
+    fn scans_font_directories_and_deduplicates_families() {
+        use super::{font_name_from_file_name, scan_font_directory};
+
+        let root = test_dir("font-scan");
+        let fonts_dir = root.join("fonts");
+        std::fs::create_dir_all(fonts_dir.join("sub")).expect("create fonts dirs");
+        std::fs::write(fonts_dir.join("arial.ttf"), b"fixture").expect("write arial");
+        std::fs::write(fonts_dir.join("ARIAL.ttf"), b"fixture").expect("write arial dup");
+        std::fs::write(fonts_dir.join("sub").join("georgia.otf"), b"fixture").expect("write georgia");
+        std::fs::write(fonts_dir.join("readme.txt"), b"not a font").expect("write txt");
+
+        let mut fonts = Vec::new();
+        let mut seen = std::collections::HashSet::new();
+        scan_font_directory(&root, &mut fonts, &mut seen);
+
+        let derived: Vec<String> = fonts
+            .iter()
+            .map(|name| font_name_from_file_name(name))
+            .collect();
+        assert!(derived.contains(&"Arial".to_string()));
+        assert!(derived.contains(&"Georgia".to_string()));
+        assert!(!derived.contains(&"".to_string()));
         let _ = std::fs::remove_dir_all(root);
     }
 

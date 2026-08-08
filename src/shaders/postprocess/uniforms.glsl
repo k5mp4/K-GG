@@ -75,6 +75,7 @@ uniform sampler2D u_diffuseAsciiAtlas;
 uniform float u_diffuseAsciiCount;
 uniform float u_diffuseAsciiColumns;
 uniform float u_diffuseAsciiRows;
+uniform float u_diffuseAsciiRotation;
 uniform sampler2D u_diffuseCurve;
 uniform int u_stackSlitMode;
 uniform float u_stackSlitAngle;

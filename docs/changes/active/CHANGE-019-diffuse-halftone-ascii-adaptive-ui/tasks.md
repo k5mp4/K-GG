@@ -15,5 +15,7 @@
 - [x] Halftone／ASCIIの暗部背景とASCIIアトラスの縦方向サンプリングを修正する
 - [x] Halftone／ASCIIの背景色をInputColorから保存・uniformへ渡し、ASCIIマスクを安定して描画する
 - [x] 粒度適応の代表色をベースセル単位で評価し、Halftoneの円形・四角形を安定させる
+- [x] ASCIIアトラスのY反転を除去し、row 0の文字を正しくサンプリングする
+- [x] 粒度適応時にセル内座標をベースセル基準へ固定し、形状サイズをセルサイズ比でスケールする
 - [x] deltaをcurrent specへ統合する
 - [ ] 変更仕様をArchiveへ移動する

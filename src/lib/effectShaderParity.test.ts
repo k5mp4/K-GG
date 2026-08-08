@@ -307,7 +307,8 @@ describe('V2 effect shader parity', () => {
       expect(source).toContain('return u_diffuseBackgroundColor;');
       expect(source).toContain('vec2 diffuseCellFraction');
       expect(source).toContain('float diffuseCellSizeAtCoord');
-      expect(source).toContain('texture2D(u_diffuseAsciiAtlas, vec2(atlasUv.x, 1.0 - atlasUv.y)).r');
+      expect(source).toContain('texture2D(u_diffuseAsciiAtlas, atlasUv).r');
+      expect(source).not.toContain('1.0 - atlasUv.y');
     }
     expect(postprocessDiffuseShader).toContain(
       'float cellSize = diffuseCellSizeAtCoord(globalCoord, color.rgb);',
@@ -318,7 +319,76 @@ describe('V2 effect shader parity', () => {
     expect(gradientShader).toContain('sourceColor.a = 1.0;');
     expect(gradientShader).toContain('useCellPattern ? 1.0 : rampAlpha * sourceAlpha');
     expect(compact(webglSource)).toContain('diffuseAsciiRows:ASCII_ATLAS_MAX_ROWS');
-    expect(compact(webglSource)).toContain("context.font='bold29pxmonospace'");
+    expect(compact(webglSource)).toContain('ASCII_GENERIC_FONTS.has(font)?font:`"${font}"`');
+  });
+
+  it('keeps adaptive grain on the base cell grid and the shape inside its own cell', () => {
+    for (const source of [gradientShader, postprocessDiffuseShader]) {
+      expect(extractFunction(source, 'diffuseCellFraction')).toContain(
+        '/ max(baseSize, 0.01) + 0.5',
+      );
+      // The shape/glyph must stay inside the clamped cell fraction so an
+      // adaptive cell or a large font never bleeds into the neighbor.
+      const ascii = extractFunction(source, 'applyDiffuseAscii');
+      expect(ascii).toContain('vec2 local = diffuseCellFraction(coord, cellSize) - 0.5;');
+      expect(ascii).not.toContain('cellScale');
+      expect(ascii).not.toContain('u_diffuseAsciiFontScale');
+      const halftone = extractFunction(source, 'applyDiffuseHalftone');
+      expect(halftone).not.toContain('cellScale');
+    }
+  });
+
+  it('feeds the adaptive grain cell size into the Block/Smooth displacement grid', () => {
+    const stackElse = postprocessDiffuseShader.indexOf('#else\n#if defined(KGG_PRISM_ONLY)');
+    const stackDisplacement = extractFunction(
+      postprocessDiffuseShader.slice(stackElse),
+      'diffusePanelDisplacement',
+    );
+    expect(stackDisplacement).toContain('diffuseCellSizeAtCoord(globalCoord, vec3(0.0))');
+    expect(stackDisplacement).toContain('/ max(cellSize, 0.01)');
+    const gradientMain = gradientShader.slice(gradientShader.indexOf('void main()'));
+    expect(gradientMain).toContain(
+      'float cellSize = diffuseCellSizeAtCoord(globalCoord, vec3(0.0));',
+    );
+    expect(gradientMain).toContain('floor(globalCoord / max(cellSize, 0.01))');
+    expect(gradientMain).not.toMatch(/floor\(globalCoord \/ max\(u_diffuseGrain, 0\.01\)\)/);
+  });
+
+  it('scales ASCII glyphs with the configured font size in both render paths', () => {
+    expect(gradientShader).not.toContain('u_diffuseAsciiFontScale');
+    expect(postprocessShader).not.toContain('u_diffuseAsciiFontScale');
+    for (const source of [gradientShader, postprocessDiffuseShader]) {
+      expect(extractFunction(source, 'applyDiffuseAscii')).toContain(
+        'vec2 local = diffuseCellFraction(coord, cellSize) - 0.5;',
+      );
+    }
+    // The atlas glyph cell grows with the font size so a large font stays
+    // inside its own cell and never samples the neighboring atlas glyph.
+    expect(compact(webglSource)).toContain(
+      'constglyphSize=Math.max(Math.ceil(resolvedSize*1.15),ASCII_GLYPH_WIDTH)',
+    );
+    // The font family is quoted so a family with spaces (e.g. "Noto Sans JP")
+    // is applied instead of silently falling back.
+    expect(compact(webglSource)).toContain('return`bold${size}px${family}`');
+    expect(compact(webglSource)).toContain('ASCII_GENERIC_FONTS.has(font)?font:`"${font}"`');
+    expect(compact(webglSource)).toContain('fonts.load(fontShorthand)');
+  });
+
+  it('rotates ASCII glyphs around the cell center in both render paths', () => {
+    for (const source of [gradientShader, postprocessDiffuseShader]) {
+      const ascii = extractFunction(source, 'applyDiffuseAscii');
+      expect(ascii).toContain('abs(u_diffuseAsciiRotation) > 0.0001');
+      expect(ascii).toContain('local.x * cosR + local.y * sinR');
+      expect(ascii).toContain('-local.x * sinR + local.y * cosR');
+    }
+    expect(gradientShader).toContain('uniform float u_diffuseAsciiRotation;');
+    expect(postprocessShader).toContain('uniform float u_diffuseAsciiRotation;');
+    expect(compact(webglSource)).toContain(
+      'u_diffuseAsciiRotation:gl.getUniformLocation(program,\'u_diffuseAsciiRotation\')',
+    );
+    expect(compact(webglSource)).toContain(
+      '(diffuse.asciiRotation??0)*Math.PI)/180',
+    );
   });
 
   it('keeps shared Diffuse helpers outside the Glass-only stub guard', () => {

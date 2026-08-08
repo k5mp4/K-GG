@@ -30,7 +30,7 @@ float diffuseCellSize(float inputValue) {
 vec2 diffuseCellFraction(vec2 coord, float cellSize) {
   float baseSize = max(u_diffuseGrain, 0.01);
   vec2 baseCellCenter = (floor(coord / baseSize) + 0.5) * baseSize;
-  return clamp((coord - baseCellCenter) / max(cellSize, 0.01) + 0.5, 0.0, 1.0);
+  return clamp((coord - baseCellCenter) / max(baseSize, 0.01) + 0.5, 0.0, 1.0);
 }
 
 float diffuseCellSizeAtCoord(vec2 coord, vec3 fallbackColor) {
@@ -76,11 +76,23 @@ vec3 applyDiffuseAscii(vec3 cellColor, vec2 coord, float cellSize) {
   float glyphIndex = floor(clamp(luminance, 0.0, 1.0) * max(u_diffuseAsciiCount - 1.0, 0.0) + 0.5);
   float column = mod(glyphIndex, max(u_diffuseAsciiColumns, 1.0));
   float row = floor(glyphIndex / max(u_diffuseAsciiColumns, 1.0));
-  vec2 local = diffuseCellFraction(coord, cellSize);
+  // The cell fraction is already clamped to [0, 1]. Keeping it unscaled means
+  // the glyph fills its own cell even when the adaptive grain or font size
+  // changes, so it never bleeds into the neighboring atlas glyph. A nonzero
+  // rotation spins the glyph around the cell center before sampling. UV space
+  // has a downward Y axis, so the sign of sin is flipped to keep the visual
+  // rotation counter-clockwise (readable text at 0°).
+  vec2 local = diffuseCellFraction(coord, cellSize) - 0.5;
+  if (abs(u_diffuseAsciiRotation) > 0.0001) {
+    float cosR = cos(u_diffuseAsciiRotation);
+    float sinR = sin(u_diffuseAsciiRotation);
+    local = vec2(local.x * cosR + local.y * sinR, -local.x * sinR + local.y * cosR);
+  }
+  local += 0.5;
   vec2 atlasUv = vec2((column + local.x) / max(u_diffuseAsciiColumns, 1.0), (row + local.y) / max(u_diffuseAsciiRows, 1.0));
   // Canvas text is white in RGB; sampling red keeps the mask visible even on
   // browsers that premultiply the transparent atlas alpha during upload.
-  float glyph = texture2D(u_diffuseAsciiAtlas, vec2(atlasUv.x, 1.0 - atlasUv.y)).r;
+  float glyph = texture2D(u_diffuseAsciiAtlas, atlasUv).r;
   vec3 patternColor = mix(diffusePatternBackground(cellColor), cellColor, glyph);
   float amount = u_diffuseAdaptiveEnabled
     ? diffuseCurveValue(diffuseAdaptiveInput(cellColor), false)
@@ -108,23 +120,27 @@ vec2 diffuseHash(vec2 p) {
 }
 #endif
 
-vec2 diffuseDomainWarp(vec2 globalCoord) {
+vec2 diffuseDomainWarp(vec2 globalCoord, float cellSize) {
+  // The warp must stay isotropic so an adaptive cell keeps its aspect ratio.
+  // A shear (x/y mixed sinusoids) would squash the cell diagonally whenever
+  // the grain curve changes the cell size.
   vec2 normalized = globalCoord / max(u_fullResolution, vec2(1.0));
   float seedPhase = u_diffuseSeed * 0.61803398875;
   vec2 warp = vec2(
-    sin((normalized.y * 2.0 + normalized.x) * 2.0 * PI + seedPhase * 7.13),
-    sin((normalized.x * 3.0 - normalized.y) * 2.0 * PI - seedPhase * 5.71)
+    sin(normalized.y * 4.0 * PI + seedPhase * 7.13),
+    sin(normalized.x * 4.0 * PI - seedPhase * 5.71)
   );
   warp += 0.5 * vec2(
-    sin((normalized.x * 2.0 - normalized.y * 3.0) * 2.0 * PI + seedPhase * 11.31),
-    sin((normalized.y * 3.0 + normalized.x * 2.0) * 2.0 * PI - seedPhase * 13.17)
+    sin(normalized.x * 4.0 * PI + seedPhase * 11.31),
+    sin(normalized.y * 4.0 * PI - seedPhase * 13.17)
   );
-  return globalCoord + warp * max(u_diffuseGrain * 1.75, 1.0);
+  return globalCoord + warp * max(cellSize * 1.75, 1.0);
 }
 
 vec2 diffusePanelDisplacement(vec2 globalCoord) {
+  float cellSize = diffuseCellSizeAtCoord(globalCoord, vec3(0.0));
   vec2 seedOffset = vec2(u_diffuseSeed * 31.41, u_diffuseSeed * 59.26);
-  vec2 grainCoord = diffuseDomainWarp(globalCoord) / max(u_diffuseGrain, 0.01);
+  vec2 grainCoord = diffuseDomainWarp(globalCoord, cellSize) / max(cellSize, 0.01);
   if (u_diffuseMode == 1) {
     vec2 cell = floor(grainCoord);
     vec2 fraction = fract(grainCoord);

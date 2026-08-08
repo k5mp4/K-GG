@@ -379,6 +379,7 @@ export async function initWebGL(canvas: HTMLCanvasElement): Promise<WebGLContext
     u_diffuseAsciiCount: gl.getUniformLocation(program, 'u_diffuseAsciiCount'),
     u_diffuseAsciiColumns: gl.getUniformLocation(program, 'u_diffuseAsciiColumns'),
     u_diffuseAsciiRows: gl.getUniformLocation(program, 'u_diffuseAsciiRows'),
+    u_diffuseAsciiRotation: gl.getUniformLocation(program, 'u_diffuseAsciiRotation'),
     u_diffuseCurve: gl.getUniformLocation(program, 'u_diffuseCurve'),
     u_gradientRamp: gl.getUniformLocation(program, 'u_gradientRamp'),
     u_meshGradient: gl.getUniformLocation(program, 'u_meshGradient'),
@@ -824,6 +825,7 @@ function getPostprocessUniforms(gl: WebGL2RenderingContext, program: WebGLProgra
     u_diffuseAsciiCount: gl.getUniformLocation(program, 'u_diffuseAsciiCount'),
     u_diffuseAsciiColumns: gl.getUniformLocation(program, 'u_diffuseAsciiColumns'),
     u_diffuseAsciiRows: gl.getUniformLocation(program, 'u_diffuseAsciiRows'),
+    u_diffuseAsciiRotation: gl.getUniformLocation(program, 'u_diffuseAsciiRotation'),
     u_diffuseCurve: gl.getUniformLocation(program, 'u_diffuseCurve'),
     u_stackSlitMode: gl.getUniformLocation(program, 'u_stackSlitMode'),
     u_stackSlitAngle: gl.getUniformLocation(program, 'u_stackSlitAngle'),
@@ -1517,38 +1519,70 @@ function normalizeAsciiCharset(value: string | undefined): string[] {
   return chars.length > 0 ? chars : Array.from(DEFAULT_DIFFUSE_ASCII_CHARSET);
 }
 
-function uploadDiffuseAsciiTexture(ctx: WebGLContext, value: string | undefined): void {
+const ASCII_GENERIC_FONTS = new Set(['monospace', 'serif', 'sans-serif', 'cursive', 'fantasy']);
+
+function cssFontShorthand(size: number, font: string): string {
+  const family = ASCII_GENERIC_FONTS.has(font) ? font : `"${font}"`;
+  return `bold ${size}px ${family}`;
+}
+
+function uploadDiffuseAsciiTexture(
+  ctx: WebGLContext,
+  value: string | undefined,
+  font?: string,
+  fontSize?: number,
+): void {
   const chars = normalizeAsciiCharset(value);
-  const signature = chars.join('');
+  const resolvedFont = typeof font === 'string' && font.length > 0 ? font : 'monospace';
+  const resolvedSize = Number.isFinite(fontSize) && fontSize! > 0 ? fontSize! : 29;
+  // Grow the atlas glyph cell with the font size so a large font never bleeds
+  // into the neighboring atlas glyph. The cell fraction in the shader stays in
+  // [0, 1], so the glyph fills its own cell at any font size.
+  const glyphSize = Math.max(Math.ceil(resolvedSize * 1.15), ASCII_GLYPH_WIDTH);
+  const atlasWidth = ASCII_ATLAS_COLUMNS * glyphSize;
+  const atlasHeight = ASCII_ATLAS_MAX_ROWS * glyphSize;
+  const signature = `${chars.join('')}::${resolvedFont}::${resolvedSize}`;
   if (ctx.diffuseAsciiSignature === signature) return;
   const { gl } = ctx;
   const canvas = typeof document !== 'undefined' ? document.createElement('canvas') : null;
-  if (canvas) {
-    canvas.width = ASCII_ATLAS_WIDTH;
-    canvas.height = ASCII_ATLAS_HEIGHT;
-    const context = canvas.getContext('2d');
-    if (context) {
-      context.clearRect(0, 0, canvas.width, canvas.height);
-      context.fillStyle = '#ffffff';
-      context.textAlign = 'center';
-      context.textBaseline = 'middle';
-      context.font = 'bold 29px monospace';
-      chars.forEach((char, index) => {
-        const column = index % ASCII_ATLAS_COLUMNS;
-        const row = Math.floor(index / ASCII_ATLAS_COLUMNS);
-        context.fillText(char, column * ASCII_GLYPH_WIDTH + ASCII_GLYPH_WIDTH / 2, row * ASCII_GLYPH_HEIGHT + ASCII_GLYPH_HEIGHT / 2 + 1);
-      });
-      gl.activeTexture(gl.TEXTURE9);
-      gl.bindTexture(gl.TEXTURE_2D, ctx.diffuseAsciiTexture);
-      gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, 0);
-      gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, canvas);
-    }
+  if (!canvas) return;
+  canvas.width = atlasWidth;
+  canvas.height = atlasHeight;
+  const context = canvas.getContext('2d');
+  if (!context) return;
+  const fontShorthand = cssFontShorthand(resolvedSize, resolvedFont);
+  const draw = (): void => {
+    context.clearRect(0, 0, canvas.width, canvas.height);
+    context.fillStyle = '#ffffff';
+    context.textAlign = 'center';
+    context.textBaseline = 'middle';
+    context.font = fontShorthand;
+    chars.forEach((char, index) => {
+      const column = index % ASCII_ATLAS_COLUMNS;
+      const row = Math.floor(index / ASCII_ATLAS_COLUMNS);
+      context.fillText(char, column * glyphSize + glyphSize / 2, row * glyphSize + glyphSize / 2 + 1);
+    });
+    gl.activeTexture(gl.TEXTURE9);
+    gl.bindTexture(gl.TEXTURE_2D, ctx.diffuseAsciiTexture);
+    gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, 0);
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, canvas);
+    ctx.diffuseAsciiSignature = signature;
+    ctx.diffuseAsciiCount = chars.length;
+    ctx.diffuseAsciiRows = ASCII_ATLAS_MAX_ROWS;
+  };
+  // Draw synchronously with the currently available font first, so a font
+  // change is visible immediately. `document.fonts.load` resolves for system
+  // fonts too; when it settles, invalidate the signature so the next frame
+  // re-draws with the fully loaded family instead of a fallback.
+  draw();
+  const fonts = typeof document !== 'undefined' ? document.fonts : null;
+  if (fonts && !fonts.check(fontShorthand)) {
+    void fonts.load(fontShorthand).then(() => {
+      ctx.diffuseAsciiSignature = '';
+    }).catch(() => {
+      // Font unavailable on this system; keep the fallback-drawn atlas.
+    });
   }
-  ctx.diffuseAsciiSignature = signature;
-  ctx.diffuseAsciiCount = chars.length;
-  // The texture always has the fixed four-row atlas height. The shader must
-  // address that physical grid, rather than the number of populated rows.
-  ctx.diffuseAsciiRows = ASCII_ATLAS_MAX_ROWS;
 }
 
 function publishDiffuseInputHistogram(ctx: WebGLContext, gradient: GradientConfig, sourceCanvas: HTMLCanvasElement | null | undefined): void {
@@ -1807,7 +1841,7 @@ function drawPostprocessPass(
   });
   gl.bindTexture(gl.TEXTURE_2D, ctx.diffuseCurveTexture);
   gl.uniform1i(ctx.postprocessUniforms.u_diffuseCurve, 8);
-  uploadDiffuseAsciiTexture(ctx, postprocess.diffuseAsciiCharset);
+  uploadDiffuseAsciiTexture(ctx, postprocess.diffuseAsciiCharset, postprocess.diffuseAsciiFont, postprocess.diffuseAsciiFontSize);
   gl.activeTexture(gl.TEXTURE9);
   gl.bindTexture(gl.TEXTURE_2D, ctx.diffuseAsciiTexture);
   gl.uniform1i(ctx.postprocessUniforms.u_diffuseAsciiAtlas, 9);
@@ -1974,6 +2008,7 @@ function drawPostprocessPass(
   gl.uniform1f(ctx.postprocessUniforms.u_diffuseAsciiCount, ctx.diffuseAsciiCount);
   gl.uniform1f(ctx.postprocessUniforms.u_diffuseAsciiColumns, ASCII_ATLAS_COLUMNS);
   gl.uniform1f(ctx.postprocessUniforms.u_diffuseAsciiRows, ctx.diffuseAsciiRows);
+  gl.uniform1f(ctx.postprocessUniforms.u_diffuseAsciiRotation, ((postprocess.diffuseAsciiRotation ?? 0) * Math.PI) / 180);
   const stackSlitModeMap = { linear: 0, circular: 1, polygon: 2, wave: 3 } as const;
   const stackSlit: SlitScanConfig = slitScan ?? {
     enabled: false,
@@ -2703,13 +2738,14 @@ export function render(
     diffuse.backgroundColor ?? DEFAULT_DIFFUSE_BACKGROUND_COLOR,
   );
   gl.uniform3f(uniforms.u_diffuseBackgroundColor, diffuseBackgroundR, diffuseBackgroundG, diffuseBackgroundB);
-  uploadDiffuseAsciiTexture(ctx, diffuse.asciiCharset);
+  uploadDiffuseAsciiTexture(ctx, diffuse.asciiCharset, diffuse.asciiFont, diffuse.asciiFontSize);
   gl.activeTexture(gl.TEXTURE9);
   gl.bindTexture(gl.TEXTURE_2D, ctx.diffuseAsciiTexture);
   gl.uniform1i(uniforms.u_diffuseAsciiAtlas, 9);
   gl.uniform1f(uniforms.u_diffuseAsciiCount, ctx.diffuseAsciiCount);
   gl.uniform1f(uniforms.u_diffuseAsciiColumns, ASCII_ATLAS_COLUMNS);
   gl.uniform1f(uniforms.u_diffuseAsciiRows, ctx.diffuseAsciiRows);
+  gl.uniform1f(uniforms.u_diffuseAsciiRotation, ((diffuse.asciiRotation ?? 0) * Math.PI) / 180);
   const rampData = buildGradientRampData(gradient);
   uploadGradientRampTexture(ctx, rampData);
   if ((gradient.gradientType ?? 'linear') === 'mesh') uploadMeshGradientTexture(ctx, gradient, rampData);
@@ -3038,6 +3074,9 @@ export function render(
       diffuseHalftoneShape: diffuse.halftoneShape,
       diffuseHalftoneSize: diffuse.halftoneSize,
       diffuseAsciiCharset: diffuse.asciiCharset,
+      diffuseAsciiFont: diffuse.asciiFont,
+      diffuseAsciiFontSize: diffuse.asciiFontSize,
+      diffuseAsciiRotation: diffuse.asciiRotation,
       diffuseBackgroundColor: diffuse.backgroundColor,
     };
     // In V2, Noise is an explicit stack layer. Other effects may reuse the

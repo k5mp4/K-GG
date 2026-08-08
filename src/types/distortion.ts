@@ -92,6 +92,9 @@ export type DiffuseConfig = {
   halftoneShape: DiffuseHalftoneShape;
   halftoneSize: number; // 0.05–1.0 セル内の形状占有率
   asciiCharset: string; // 濃度の低い順に割り当てる文字セット
+  asciiFont: string; // ASCIIグリフアトラスのフォント指定（CSS font-family）
+  asciiFontSize: number; // ASCIIグリフアトラスのフォントサイズ（px）
+  asciiRotation: number; // ASCIIグリフの回転角（度、0–360）
   backgroundColor: string; // Halftone / ASCII の空白部分の背景色
   adaptiveEnabled?: boolean;
   adaptiveChannel: DiffuseAdaptiveChannel;
@@ -243,6 +246,9 @@ export type PostprocessConfig = ManualDistortConfig & {
   diffuseHalftoneShape?: DiffuseHalftoneShape;
   diffuseHalftoneSize?: number;
   diffuseAsciiCharset?: string;
+  diffuseAsciiFont?: string;
+  diffuseAsciiFontSize?: number;
+  diffuseAsciiRotation?: number;
   diffuseBackgroundColor?: string;
   mirrorMode: PostprocessMirrorMode;
   kaleidoscopeType: PostprocessKaleidoscopeType;

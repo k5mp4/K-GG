@@ -44,6 +44,7 @@
   uniform float u_diffuseAsciiCount;
   uniform float u_diffuseAsciiColumns;
   uniform float u_diffuseAsciiRows;
+  uniform float u_diffuseAsciiRotation;
   uniform sampler2D u_diffuseCurve;
 
   uniform sampler2D u_gradientRamp;
@@ -450,7 +451,7 @@
   vec2 diffuseCellFraction(vec2 coord, float cellSize) {
     float baseSize = max(u_diffuseGrain, 0.01);
     vec2 baseCellCenter = (floor(coord / baseSize) + 0.5) * baseSize;
-    return clamp((coord - baseCellCenter) / max(cellSize, 0.01) + 0.5, 0.0, 1.0);
+    return clamp((coord - baseCellCenter) / max(baseSize, 0.01) + 0.5, 0.0, 1.0);
   }
 
   float diffuseCellSizeAtCoord(vec2 coord, vec3 fallbackColor) {
@@ -499,11 +500,23 @@
     float glyphIndex = floor(clamp(luminance, 0.0, 1.0) * max(u_diffuseAsciiCount - 1.0, 0.0) + 0.5);
     float column = mod(glyphIndex, max(u_diffuseAsciiColumns, 1.0));
     float row = floor(glyphIndex / max(u_diffuseAsciiColumns, 1.0));
-    vec2 local = diffuseCellFraction(coord, cellSize);
+    // The cell fraction is already clamped to [0, 1]. Keeping it unscaled means
+    // the glyph fills its own cell even when the adaptive grain or font size
+    // changes, so it never bleeds into the neighboring atlas glyph. A nonzero
+    // rotation spins the glyph around the cell center before sampling. UV space
+    // has a downward Y axis, so the sign of sin is flipped to keep the visual
+    // rotation counter-clockwise (readable text at 0°).
+    vec2 local = diffuseCellFraction(coord, cellSize) - 0.5;
+    if (abs(u_diffuseAsciiRotation) > 0.0001) {
+      float cosR = cos(u_diffuseAsciiRotation);
+      float sinR = sin(u_diffuseAsciiRotation);
+      local = vec2(local.x * cosR + local.y * sinR, -local.x * sinR + local.y * cosR);
+    }
+    local += 0.5;
     vec2 atlasUv = vec2((column + local.x) / max(u_diffuseAsciiColumns, 1.0), (row + local.y) / max(u_diffuseAsciiRows, 1.0));
     // Canvas text is white in RGB; sampling red keeps the mask visible even
     // on browsers that premultiply the transparent atlas alpha during upload.
-    float glyph = texture2D(u_diffuseAsciiAtlas, vec2(atlasUv.x, 1.0 - atlasUv.y)).r;
+    float glyph = texture2D(u_diffuseAsciiAtlas, atlasUv).r;
     vec3 patternColor = mix(diffusePatternBackground(cellColor), cellColor, glyph);
     float amount = u_diffuseAdaptiveEnabled
       ? diffuseCurveValue(diffuseAdaptiveInput(cellColor), false)
@@ -795,10 +808,11 @@
     }
     if (u_diffuseEnabled && u_diffuseMode <= 1) {
       vec2 seedOff = vec2(u_diffuseSeed * 31.41, u_diffuseSeed * 59.26);
+      float cellSize = diffuseCellSizeAtCoord(globalCoord, vec3(0.0));
       vec2 disp;
       if (u_diffuseMode == 1) {
-        vec2 ci = floor(globalCoord / max(u_diffuseGrain, 0.01));
-        vec2 cf = fract(globalCoord / max(u_diffuseGrain, 0.01));
+        vec2 ci = floor(globalCoord / max(cellSize, 0.01));
+        vec2 cf = fract(globalCoord / max(cellSize, 0.01));
         vec2 cf_s = cf * cf * (3.0 - 2.0 * cf);
         vec2 h00 = diffuseHash(ci + seedOff);
         vec2 h10 = diffuseHash(ci + vec2(1.0, 0.0) + seedOff);
@@ -806,7 +820,7 @@
         vec2 h11 = diffuseHash(ci + vec2(1.0, 1.0) + seedOff);
         disp = mix(mix(h00, h10, cf_s.x), mix(h01, h11, cf_s.x), cf_s.y);
       } else {
-        vec2 cell = floor(globalCoord / max(u_diffuseGrain, 0.01));
+        vec2 cell = floor(globalCoord / max(cellSize, 0.01));
         disp = diffuseHash(cell + seedOff);
       }
       // Mesh color is sampled once in the final color path below. Keep the
