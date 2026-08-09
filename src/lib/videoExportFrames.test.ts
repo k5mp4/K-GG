@@ -87,6 +87,37 @@ describe('video export frame generation', () => {
     expect(restoreCalls).toBe(1);
   });
 
+  it('captures a composed output when a display renderer is provided', async () => {
+    const canvas = createCanvas(() => {
+      expect(gpuFinished).toBe(true);
+      expect(renderBridge.renderAtTime(99, 0.99)).toBe(false);
+    }, () => canvasFrameId);
+
+    const result = await withExportSession(undefined, async session => (
+      renderAndCaptureExportFrame({
+        session,
+        canvas,
+        fullWidth: 400,
+        fullHeight: 400,
+        frameIndex: 12,
+        totalFrames: 60,
+        speed: 1,
+        duration: 3,
+        renderFrame: ({ session: exportSession, time, normalizedTime }) => {
+          const sequence = renderBridge.renderExportFrame(exportSession, time, normalizedTime);
+          renderBridge.finishExportFrame(exportSession, sequence);
+          canvasFrameId = `cloth:${normalizedTime}`;
+          return sequence;
+        },
+      })
+    ));
+
+    expect(await result.blob.text()).toBe(`cloth:${result.normalizedTime}`);
+    expect(renderedTimes).toEqual([[result.renderTime, result.normalizedTime]]);
+    expect(previewRenderCalls).toBe(0);
+    expect(restoreCalls).toBe(1);
+  });
+
   it('keeps 100 repeated captures stable across event-loop yields', async () => {
     const hashes = await withExportSession(undefined, async session => {
       const values: string[] = [];

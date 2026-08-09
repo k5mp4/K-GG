@@ -2,6 +2,7 @@ import { useState, useRef, useEffect, useLayoutEffect } from 'react';
 import './App.css';
 import { gsap } from 'gsap';
 import { GradientCanvas } from './components/GradientCanvas';
+import { ClothCanvas } from './components/ClothCanvas';
 import { GradientAnchorEditor } from './components/GradientAnchorEditor';
 import { TimelineBar } from './components/TimelineBar';
 import { BezierEasingEditor } from './components/BezierEasingEditor';
@@ -20,6 +21,7 @@ import { GradientRamp } from './components/GradientRamp';
 import { ImageGradientSourcePanel } from './components/ImageGradientSourcePanel';
 import { SliderField } from './components/SliderField';
 import { useGradientStore } from './store/gradientStore';
+import type { RenderViewMode } from './types/renderView';
 import { useViewportControl } from './hooks/useViewportControl';
 import { useCanvasSize } from './hooks/useCanvasSize';
 import { useKeyboardShortcuts } from './hooks/useKeyboardShortcuts';
@@ -51,7 +53,7 @@ import {
   openFfmpegBuildsPage,
   openNativeFfmpegFolder,
 } from './lib/exportVideo';
-import type { ExportStage, NativeFfmpegStatus } from './adapters';
+import type { ExportStage, NativeFfmpegStatus, VideoExportFrameRenderer } from './adapters';
 
 const MAX_DISPLAY_W = 1000;
 
@@ -126,6 +128,7 @@ export default function App() {
   const {
     matcap,
     animation,
+    clothGradient,
     noiseDistortion,
     postprocess,
     setPostprocess,
@@ -137,11 +140,16 @@ export default function App() {
   const [showFeedback, setShowFeedback] = useState(false);
   const [showPropertyModulesSettings, setShowPropertyModulesSettings] = useState(false);
   const [showGradientAnchors, setShowGradientAnchors] = useState(true);
+  const [renderViewMode, setRenderViewMode] = useState<RenderViewMode>('canvas');
+  const [clothReady, setClothReady] = useState(false);
+  const [clothUnavailable, setClothUnavailable] = useState(false);
   const [gpuDiagnostics, setGpuDiagnostics] = useState<GpuDiagnostics | null>(() => (
     typeof window === 'undefined' ? null : window.__KAGARIBI_GPU_DIAGNOSTICS__ ?? null
   ));
   const animLoopRef = useRef<AnimationLoop | null>(null);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
+  const clothCanvasRef = useRef<HTMLCanvasElement | null>(null);
+  const clothExportFrameRendererRef = useRef<VideoExportFrameRenderer | null>(null);
   const [seekVersion, setSeekVersion] = useState(0);
   const [exportProgress, setExportProgress] = useState<number | null>(null);
   const [exportStage, setExportStage] = useState<ExportStage>('preparing');
@@ -608,7 +616,16 @@ export default function App() {
                         }}
                       />
                     )}
-                    {value === 'sandbox' && <SandboxPanel />}
+                    {value === 'sandbox' && (
+                      <SandboxPanel
+                        renderViewMode={renderViewMode}
+                        onRenderViewModeChange={(mode) => {
+                          setClothUnavailable(false);
+                          setClothReady(false);
+                          setRenderViewMode(mode);
+                        }}
+                      />
+                    )}
                     {value === 'postprocess' && <PostprocessPanel />}
                     {value === 'export' && (
                       <ExportPanel
@@ -620,6 +637,12 @@ export default function App() {
                           aspectRatioRef.current = w / h;
                         }}
                         canvasRef={canvasRef}
+                        previewCanvasRef={renderViewMode === 'cloth' && clothReady ? clothCanvasRef : canvasRef}
+                        exportFrameRendererRef={
+                          renderViewMode === 'cloth' && clothReady
+                            ? clothExportFrameRendererRef
+                            : undefined
+                        }
                         ffmpegStatus={ffmpegStatus}
                         ffmpegChecking={ffmpegChecking}
                         onCheckFfmpeg={refreshFfmpegStatus}
@@ -763,19 +786,46 @@ export default function App() {
                 transform: `translate(${pan.x}px, ${pan.y}px) scale(${zoom})`,
                 transformOrigin: 'center center',
               }}>
-                <GradientCanvas
-                  width={canvasW}
-                  height={canvasH}
-                  animLoopRef={animLoopRef}
-                  seekVersion={seekVersion}
-                  canvasRef={canvasRef}
-                  sourceImageCanvas={slitSourceImageCanvas}
-                  imageGradientSource={imageGradientSource}
-                  imageMaskSource={overlayImageElement}
-                  imageMaskEnabled={overlayImageMode === 'mask'}
-                />
+                <div
+                  style={{
+                    position: 'absolute',
+                    inset: 0,
+                    opacity: renderViewMode === 'canvas' || !clothReady ? 1 : 0,
+                    pointerEvents: renderViewMode === 'canvas' ? 'auto' : 'none',
+                    transition: 'opacity 180ms ease-out',
+                  }}
+                >
+                  <GradientCanvas
+                    width={canvasW}
+                    height={canvasH}
+                    animLoopRef={animLoopRef}
+                    seekVersion={seekVersion}
+                    canvasRef={canvasRef}
+                    sourceImageCanvas={slitSourceImageCanvas}
+                    imageGradientSource={imageGradientSource}
+                    imageMaskSource={overlayImageElement}
+                    imageMaskEnabled={overlayImageMode === 'mask'}
+                    disableClothBase={renderViewMode === 'cloth'}
+                  />
+                </div>
+                {renderViewMode === 'cloth' && (
+                  <ClothCanvas
+                    sourceCanvasRef={canvasRef}
+                    clothGradient={clothGradient}
+                    width={canvasW}
+                    height={canvasH}
+                    onReady={() => setClothReady(true)}
+                    outputCanvasRef={clothCanvasRef}
+                    exportFrameRendererRef={clothExportFrameRendererRef}
+                    onUnavailable={() => {
+                      setClothReady(false);
+                      setClothUnavailable(true);
+                      setRenderViewMode('canvas');
+                    }}
+                  />
+                )}
                 <DistortOverlay
-                  active={leftTab === 'postprocess' && postprocess.effectMode === 'distort' && (
+                  active={renderViewMode === 'canvas' && leftTab === 'postprocess' && postprocess.effectMode === 'distort' && (
                     effectPipeline.version === 'stack-v2'
                       ? isEffectStackLayerEnabled(effectPipeline, 'distort')
                       : isPostprocessLayerEnabled(postprocess, 'distort')
@@ -788,7 +838,7 @@ export default function App() {
                   setManualDistort={setPostprocess}
                 />
                 <PostprocessOverlay
-                  active={
+                  active={renderViewMode === 'canvas' &&
                     leftTab === 'postprocess' &&
                     (
                       (postprocess.effectMode === 'mirror' && isPostprocessLayerEnabled(postprocess, 'mirror')) ||
@@ -799,7 +849,7 @@ export default function App() {
                   height={displayH}
                   postprocess={postprocess}
                 />
-                {overlayImageSrc && overlayImageMode === 'overlay' && (
+                {renderViewMode === 'canvas' && overlayImageSrc && overlayImageMode === 'overlay' && (
                   <img
                     src={overlayImageSrc}
                     style={{
@@ -813,9 +863,17 @@ export default function App() {
                     alt=""
                   />
                 )}
-                <GradientAnchorEditor width={displayW} height={displayH} visible={showGradientAnchors} />
-                <SlitOverlay width={displayW} height={displayH} canvasW={canvasW} canvasH={canvasH} />
+                <GradientAnchorEditor width={displayW} height={displayH} visible={showGradientAnchors && renderViewMode === 'canvas'} />
+                {renderViewMode === 'canvas' && <SlitOverlay width={displayW} height={displayH} canvasW={canvasW} canvasH={canvasH} />}
               </div>
+              {clothUnavailable && (
+                <div
+                  role="status"
+                  className="absolute right-4 top-20 z-30 max-w-[280px] border border-amber-300/30 bg-[#1b1715]/92 px-3 py-2 text-[10px] leading-relaxed text-amber-100 shadow-[0_14px_30px_rgba(0,0,0,0.32)]"
+                >
+                  {t('canvas.clothUnavailable')}
+                </div>
+              )}
               <div
                 className="absolute right-4 bottom-4 w-[220px] max-h-[calc(100%-32px)] bg-k-bg/98 border border-panel-border/70 z-30 overflow-y-auto p-3 scrollbar-thin shadow-[0_18px_48px_rgba(0,0,0,0.35)]"
                 style={{ display: (showTimeRemap && exportProgress === null) ? 'block' : 'none' }}

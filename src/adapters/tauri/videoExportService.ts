@@ -12,10 +12,10 @@ async function writePngSequenceToTempDir(
   tempPath: string,
   totalFrames: number,
 ): Promise<void> {
-  const { canvas, speed, duration, easing, signal, onProgress = () => {}, onStage } = config;
+  const { canvas, speed, duration, easing, signal, onProgress = () => {}, onStage, renderFrame } = config;
   const fullW = canvas.width;
   const fullH = canvas.height;
-  const useTiled = needsTiledRender(canvas, fullW, fullH);
+  const useTiled = !renderFrame && needsTiledRender(canvas, fullW, fullH);
 
   onStage?.('rendering');
   await withExportSession(signal, async session => {
@@ -33,6 +33,7 @@ async function writePngSequenceToTempDir(
         duration,
         easing,
         signal,
+        renderFrame,
         onTileProgress: useTiled
           ? tileProgress => onProgress((frameBaseProgress + tileProgress / totalFrames) * 0.7)
           : undefined,

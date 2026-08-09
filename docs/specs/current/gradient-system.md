@@ -5,12 +5,12 @@ title: Gradient System
 status: current
 owners: [maintainer]
 created: 2026-07-27
-updated: 2026-07-28
-requirement_ids: [GRAD-001, GRAD-002, GRAD-003, GRAD-004, GRAD-005, GRAD-006, GRAD-007, GRAD-008, GRAD-009, GRAD-010, GRAD-011, GRAD-012, GRAD-013, GRAD-014]
+updated: 2026-08-09
+requirement_ids: [GRAD-001, GRAD-002, GRAD-003, GRAD-004, GRAD-005, GRAD-006, GRAD-007, GRAD-008, GRAD-009, GRAD-010, GRAD-011, GRAD-012, GRAD-013, GRAD-014, GRAD-015, GRAD-016, GRAD-017, GRAD-018]
 related_adrs: [ADR-0001, ADR-0003, ADR-0010, ADR-0013]
-related_changes: [CHANGE-001, CHANGE-010]
-related_code: [src/types/gradient.ts, src/types/imageGradient.ts, src/store/gradientStore.ts, src/lib/gradientRampUtils.ts, src/lib/gradientPreview.ts, src/lib/imageGradient.ts, src/lib/meshGradientField.ts, src/lib/sceneEvaluation.ts, src/lib/webgl.ts, src/lib/presetModel.ts, src/components/GradientRamp.tsx, src/components/CustomSelect.tsx, src/components/ColorPaletteGenerator.tsx, src/lib/colorHarmony.ts, src/i18n/uiLabels.ts, src/i18n/messages.ts]
-related_tests: [src/types/gradient.test.ts, src/lib/imageGradient.test.ts, src/lib/imageGradientProtected.test.ts, src/lib/meshGradient.test.ts, src/lib/proportionalRampEdit.test.ts, src/lib/sceneEvaluation.glass.test.ts, src/lib/colorHarmony.test.ts, src/lib/gradientPreview.test.ts]
+related_changes: [CHANGE-001, CHANGE-010, CHANGE-024]
+related_code: [src/types/gradient.ts, src/types/imageGradient.ts, src/types/renderView.ts, src/store/gradientStore.ts, src/lib/gradientRampUtils.ts, src/lib/gradientPreview.ts, src/lib/imageGradient.ts, src/lib/meshGradientField.ts, src/lib/sceneEvaluation.ts, src/lib/webgl.ts, src/lib/clothGradientRenderer.ts, src/lib/presetModel.ts, src/components/GradientRamp.tsx, src/components/CustomSelect.tsx, src/components/ColorPaletteGenerator.tsx, src/components/GradientCanvas.tsx, src/components/SandboxPanel.tsx, src/components/ClothGradientPanel.tsx, src/components/ClothCanvas.tsx, src/components/ExportPanel.tsx, src/lib/videoExportFrames.ts, src/adapters/types.ts, src/lib/clothView.ts, src/lib/colorHarmony.ts, src/i18n/uiLabels.ts, src/i18n/messages.ts]
+related_tests: [src/types/gradient.test.ts, src/lib/imageGradient.test.ts, src/lib/imageGradientProtected.test.ts, src/lib/meshGradient.test.ts, src/lib/proportionalRampEdit.test.ts, src/lib/sceneEvaluation.glass.test.ts, src/lib/colorHarmony.test.ts, src/lib/gradientPreview.test.ts, src/lib/videoExportFrames.test.ts, src/lib/clothView.test.ts]
 ---
 
 # Gradient System
@@ -88,6 +88,22 @@ GradientRampは、グラデーション形式／タイプの直後に色・不�
 ### GRAD-014 プレビュー表示stateの独立性
 
 GradientRampのColor Mode／Interp候補プレビューとColor Palette GeneratorのHarmonyルール候補プレビューは、それぞれ独立した表示切替を持ちます。一方を展開・収納しても、もう一方の表示状態は変更しません。どちらの表示stateもGradientやPresetへ保存しません。
+
+### GRAD-015 Preview表示モード
+
+Previewは既定の2D Canvasと、処理済みCanvasを表示する3D Clothを切り替えられます。切り替えUIはSANDBOXの`Cloth Gradient`プロパティモジュールにあり、Clothの詳細パラメータと同じ編集領域から操作します。モードは一時的な表示状態であり、GradientやCanvasサイズとは独立しPresetへ保存しません。
+
+### GRAD-016 処理済みCanvasのClothマッピング
+
+3D Clothは既存のGradient／Effect Stackで処理したCanvasをCanvasTextureとして読み込み、Three.jsクロスメッシュのUVへ直接マッピングします。3D表示時は2D入力キャンバスからCloth Baseを外し、クロス変形と表面ライティングを一度だけ適用します。Curl／Noise／Distortなどの2D結果はテクスチャとして布の波打ちに追従します。
+
+### GRAD-017 2D互換とフォールバック
+
+CanvasはCloth初期化中も描画を継続します。Cloth Rendererが利用できない場合は2D Canvasへ戻り、既存のアンカー、オーバーレイ、編集UIを利用できます。
+
+### GRAD-018 Preview表示面の書き出し
+
+Exportは現在Previewで選択されている表示面を使用します。2DモードではGradientCanvas、3Dモードでは処理済みCanvasをCanvasTextureとしてマッピングしたClothのWebGL CanvasをPNG／JPG／WebP、連番PNG ZIP、MOV／MP4へ渡します。
 
 ## 他領域との関係
 

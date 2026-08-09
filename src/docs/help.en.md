@@ -67,6 +67,7 @@ Stretches pixels along an axis. Enable Animate for motion. PingPong provides a s
 The top bar is ordered `Diffuse → Noise → Slit → Postprocess → SANDBOX → Export → Preset`; Stretch has no standalone tab and is not shown in the Postprocess property module. Select an Edit Layer in Postprocess to operate that layer's detailed properties. SANDBOX uses the same text color as Postprocess. The `SANDBOX` top-bar tab groups drawing modules that sit outside the reorderable gradient stack. Use its `Edit Layer` selector to edit one of Normal, Prism, and Particles at a time; changing the selection does not change the render order.
 
 Normal builds a normal map from the gradient luminance. Strength, Blur, Angle, and Bevel Size control the surface relief. Prism controls the post-stack light rays and glow; Particles controls the final particle overlay.
+Use the view mode switch in the `Cloth Gradient` property module to choose the existing 2D Canvas or a 3D Cloth that maps the processed 2D Canvas to the cloth UVs. Curl, Noise, and Distort results follow the cloth deformation. Canvas remains visible while Cloth prepares and is restored if Cloth is unavailable; the view mode is not saved in presets.
 
 ### Normal
 

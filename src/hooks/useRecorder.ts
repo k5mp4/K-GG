@@ -1,7 +1,7 @@
-import { useState, useRef } from 'react';
+import { useState, useRef, type RefObject } from 'react';
 import { useGradientStore } from '../store/gradientStore';
 
-export function useRecorder() {
+export function useRecorder(outputCanvasRef?: RefObject<HTMLCanvasElement | null>) {
   const [recording, setRecording] = useState(false);
   const [progress, setProgress] = useState(0);
   const recorderRef = useRef<MediaRecorder | null>(null);
@@ -9,8 +9,9 @@ export function useRecorder() {
   const { animation } = useGradientStore();
 
   const startRecording = () => {
-    // GradientCanvas が最初の canvas 要素
-    const canvas = document.querySelector('canvas') as HTMLCanvasElement;
+    // Previewで選択されている表示面を優先し、旧呼び出し元にはDOM検索を残す。
+    const canvas = outputCanvasRef?.current
+      ?? (document.querySelector('canvas') as HTMLCanvasElement | null);
     if (!canvas) return;
 
     const stream = canvas.captureStream(animation.fps);

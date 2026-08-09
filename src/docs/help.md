@@ -84,6 +84,7 @@ Web 版は `index.html` で Google Fonts から Noto Sans JP、Open Sans を読�
 - `Normal` はグラデーションの輝度勾配から法線マップを生成します。`Strength`、`Blur`、`Angle`、`Bevel Size`で表面の凹凸を調整します。
 - `Prism` は主スタック後段の光線・グロー、`Particles` は最終オーバーレイのパーティクルを調整します。
 - `Edit Layer`の選択要素からNormal／Prism／Particlesを一つずつ表示して編集します。選択を変更しても描画順は変わりません。
+- `Cloth Gradient`プロパティモジュールの表示モードから、従来の2D Canvasと、2Dエフェクト済みCanvasを布のUVへマッピングした3D Clothを切り替えられます。Curl／Noise／Distortの結果は布の波打ちに追従します。準備中や利用できない場合はCanvasへ戻り、表示モードはPresetへ保存されません。
 
 ### Normal (ノーマルマップ)
 - グラデーションの輝度勾配から法線マップを生成します。

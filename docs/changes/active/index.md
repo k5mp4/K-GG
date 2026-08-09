@@ -20,3 +20,4 @@ title: 進行中の変更
 | CHANGE-021 | [SANDBOX Cloth Gradient Base Generator](./CHANGE-021-cloth-gradient/proposal) | approved |
 | CHANGE-022 | [Cloth Gradientのランプ適用順序の反転（白黒シェーディング→グラデーション）](./CHANGE-022-cloth-ramp-last-shading/proposal) | approved |
 | CHANGE-023 | [ASCIIのフォント選択と文字サイズ](./CHANGE-023-ascii-font-controls/proposal) | draft |
+| CHANGE-024 | [SANDBOXの2D Canvas／3D Cloth表示モード](./CHANGE-024-cloth-preview-view-mode/proposal) | approved |

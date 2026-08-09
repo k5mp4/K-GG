@@ -6,6 +6,7 @@ import {
   renderTiledToCanvas2D,
 } from './tileRender';
 import type { AnimationEasing } from '../store/gradientStore';
+import type { VideoExportFrameRenderer } from '../adapters/types';
 import {
   beginExportFrameDiagnostics,
   recordExportCaptureDiagnostics,
@@ -29,6 +30,7 @@ export type RenderAndCaptureExportFrameOptions = {
   easing?: AnimationEasing;
   signal?: AbortSignal;
   onTileProgress?: (progress: number) => void;
+  renderFrame?: VideoExportFrameRenderer;
 };
 
 function throwIfAborted(signal?: AbortSignal): void {
@@ -92,6 +94,7 @@ export async function renderAndCaptureExportFrame(
     easing,
     signal,
     onTileProgress,
+    renderFrame,
   } = options;
   throwIfAborted(signal);
 
@@ -100,7 +103,22 @@ export async function renderAndCaptureExportFrame(
   beginExportFrameDiagnostics(frameIndex, normalizedTime, renderTime);
   let blob: Blob;
 
-  if (needsTiledRender(canvas, fullWidth, fullHeight)) {
+  if (renderFrame) {
+    // The custom renderer owns the composition step. It first renders the
+    // processed 2D frame and then maps that frame to the visible output
+    // surface (the 3D cloth canvas), so capture never falls back to the
+    // source Canvas.
+    const sequence = renderFrame({
+      session,
+      time: renderTime,
+      normalizedTime,
+    });
+    throwIfAborted(signal);
+    recordExportCaptureDiagnostics('begin');
+    blob = await canvasToPngBlob(canvas);
+    renderBridge.assertExportFrameCurrent(session, sequence);
+    recordExportCaptureDiagnostics('end');
+  } else if (needsTiledRender(canvas, fullWidth, fullHeight)) {
     const outputCanvas = await renderTiledToCanvas2D({
       canvas,
       fullWidth,

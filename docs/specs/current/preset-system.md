@@ -5,12 +5,12 @@ title: Preset System
 status: current
 owners: [maintainer]
 created: 2026-07-27
-updated: 2026-08-03
-requirement_ids: [PRESET-001, PRESET-002, PRESET-003, PRESET-004, PRESET-005, PRESET-006, PRESET-007, PRESET-008, PRESET-009, PRESET-011]
+updated: 2026-08-09
+requirement_ids: [PRESET-001, PRESET-002, PRESET-003, PRESET-004, PRESET-005, PRESET-006, PRESET-007, PRESET-008, PRESET-009, PRESET-011, PRESET-012]
 related_adrs: [ADR-0007, ADR-0008]
-related_changes: [CHANGE-001, CHANGE-012, CHANGE-013, CHANGE-018]
-related_code: [src/lib/presetModel.ts, src/lib/presetLibrary.ts, src/lib/presets.ts, src/lib/presetPreview.ts, src/lib/presetThumbnail.ts, src/lib/glass.ts, src/lib/postprocessStack.ts, src/store/gradientStore.ts, src/components/PresetPanel.tsx, src/components/PresetPreview.tsx, src/adapters/types.ts, src/adapters/browser/presetRepository.ts, src/adapters/tauri/presetRepository.ts, src-tauri/src/lib.rs]
-related_tests: [src/lib/presetLibrary.test.ts, src/lib/presetModel.diffuse.test.ts, src/lib/presetPreview.test.ts, src/lib/presetThumbnail.test.ts, src/lib/glass.test.ts, src/lib/postprocessStack.test.ts, src/store/gradientStore.glass.test.ts, src/store/gradientStore.postprocessStack.test.ts]
+related_changes: [CHANGE-001, CHANGE-012, CHANGE-013, CHANGE-018, CHANGE-024]
+related_code: [src/lib/presetModel.ts, src/lib/presetLibrary.ts, src/lib/presets.ts, src/lib/presetPreview.ts, src/lib/presetThumbnail.ts, src/lib/glass.ts, src/lib/postprocessStack.ts, src/store/gradientStore.ts, src/components/PresetPanel.tsx, src/components/PresetPreview.tsx, src/components/ClothCanvas.tsx, src/types/renderView.ts, src/adapters/types.ts, src/adapters/browser/presetRepository.ts, src/adapters/tauri/presetRepository.ts, src-tauri/src/lib.rs]
+related_tests: [src/lib/presetLibrary.test.ts, src/lib/presetModel.diffuse.test.ts, src/lib/presetPreview.test.ts, src/lib/presetThumbnail.test.ts, src/lib/glass.test.ts, src/lib/postprocessStack.test.ts, src/store/gradientStore.glass.test.ts, src/store/gradientStore.postprocessStack.test.ts, src/lib/clothView.test.ts]
 ---
 
 # Preset System
@@ -72,6 +72,10 @@ PresetはGLASS V2のChromatic Hue、Chromatic Saturation、Transmission Tint、H
 ### PRESET-011 Postprocess Glassの互換正規化
 
 旧PresetのPostprocess設定にある`effectMode: glass`およびstackの`kind: glass`は、読込時に`glassV2`へ写像します。`glass`と`glassV2`が重複する場合は最初の位置を維持し、有効状態を論理和で統合します。正規化後のPostprocess設定と新規保存値には旧`glass`を残しません。
+
+### PRESET-012 Preview表示モードの非永続性
+
+Canvas／Clothの選択状態、Three.js Renderer、メッシュ、カメラはPresetの保存対象に含めません。Presetの保存・読込・Thumbnailは既存契約を維持します。ExportはPresetへ保存されたモードではなく、現在Previewで選択されている表示面を使用します。
 
 ## 他領域との関係
 

@@ -2,7 +2,7 @@ import { Zip, ZipPassThrough } from 'fflate';
 import { needsTiledRender } from '../../lib/tileRender';
 import { renderAndCaptureExportFrame, withExportSession } from '../../lib/videoExportFrames';
 import type { AnimationEasing } from '../../store/gradientStore';
-import type { VideoExportConfig, VideoExportService } from '../types';
+import type { VideoExportConfig, VideoExportFrameRenderer, VideoExportService } from '../types';
 
 /** PNG ZIP 用: フレームを描画・キャプチャしながら ZIP チャンクへ流す。 */
 async function captureFrameZipChunks(
@@ -13,11 +13,12 @@ async function captureFrameZipChunks(
   onProgress: (p: number) => void,
   easing?: AnimationEasing,
   signal?: AbortSignal,
+  renderFrame?: VideoExportFrameRenderer,
 ): Promise<Blob> {
   const zipChunks: BlobPart[] = [];
   const fullW = canvas.width;
   const fullH = canvas.height;
-  const useTiled = needsTiledRender(canvas, fullW, fullH);
+  const useTiled = !renderFrame && needsTiledRender(canvas, fullW, fullH);
 
   if (useTiled) console.log(`[exportVideo] Using tiled render path for ${fullW}×${fullH} (ZIP)`);
 
@@ -53,6 +54,7 @@ async function captureFrameZipChunks(
             duration,
             easing,
             signal,
+            renderFrame,
             onTileProgress: useTiled
               ? tileProgress => onProgress(frameBaseProgress + tileProgress / totalFrames)
               : undefined,
@@ -95,7 +97,7 @@ export async function exportHighQualityMP4(_config: ExportConfig): Promise<Blob>
 
 /** 連番 PNG ZIP を生成して Blob を返す（保存は呼び出し側が行う） */
 export async function exportFrameZip(config: ExportConfig): Promise<Blob> {
-  const { canvas, fps, duration, speed, easing, signal, onProgress = () => {} } = config;
+  const { canvas, fps, duration, speed, easing, signal, onProgress = () => {}, renderFrame } = config;
   const totalFrames = Math.ceil(fps * duration);
 
   // フレームをZIPへ逐次追加（95%）。巨大な連続 ArrayBuffer を作らず、中尺動画でのメモリ不足を避ける。
@@ -104,6 +106,7 @@ export async function exportFrameZip(config: ExportConfig): Promise<Blob> {
     (p) => onProgress(p * 0.95),
     easing,
     signal,
+    renderFrame,
   );
 
   return blob;

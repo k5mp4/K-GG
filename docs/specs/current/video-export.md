@@ -5,12 +5,12 @@ title: 動画・連番フレーム出力
 status: current
 owners: [maintainer]
 created: 2026-07-31
-updated: 2026-07-31
-requirement_ids: [EXPORT-001, EXPORT-002, EXPORT-003, EXPORT-004, EXPORT-005, EXPORT-006]
+updated: 2026-08-09
+requirement_ids: [EXPORT-001, EXPORT-002, EXPORT-003, EXPORT-004, EXPORT-005, EXPORT-006, EXPORT-007]
 related_adrs: [ADR-0004, ADR-0005]
-related_changes: [CHANGE-011]
-related_code: [src/adapters/browser/videoExportService.ts, src/adapters/tauri/videoExportService.ts, src/adapters/types.ts, src/lib/renderBridge.ts, src/lib/tileRender.ts, src/lib/webgl.ts, src/components/GradientCanvas.tsx]
-related_tests: [src/lib/renderBridge.test.ts, src/lib/effectPipeline.test.ts, src/lib/glass.test.ts]
+related_changes: [CHANGE-011, CHANGE-024]
+related_code: [src/adapters/browser/videoExportService.ts, src/adapters/tauri/videoExportService.ts, src/adapters/types.ts, src/lib/renderBridge.ts, src/lib/videoExportFrames.ts, src/lib/tileRender.ts, src/lib/webgl.ts, src/components/GradientCanvas.tsx, src/components/ClothCanvas.tsx, src/components/ExportPanel.tsx]
+related_tests: [src/lib/renderBridge.test.ts, src/lib/effectPipeline.test.ts, src/lib/glass.test.ts, src/lib/videoExportFrames.test.ts]
 ---
 
 # 動画・連番フレーム出力
@@ -44,6 +44,10 @@ Glass（GLASS V2）を含む出力では、sourceとdestinationのFBO／texture�
 ### EXPORT-006 cancellationと失敗
 
 AbortSignalによるcancellation、shader program準備失敗、CanvasまたはGPU同期失敗では、途中のフレーム列を成功出力として扱わない。失敗またはcancel後はexport sessionを解除し、Preview状態と通常描画を復元する。
+
+### EXPORT-007 Preview表示面のフレームキャプチャ
+
+2Dモードの動画・連番フレーム出力は従来のGradientCanvasを使用します。3Dモードでは、export sessionで生成した処理済み2DフレームをClothのCanvasTextureへ反映し、マッピング後の3D Preview Canvasをキャプチャします。Preview RAFによる上書きや、元の2D Canvasだけの出力を許可しません。
 
 ## 他領域との関係
 

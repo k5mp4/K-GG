@@ -5,11 +5,11 @@ title: UI入力コントロール
 status: current
 owners: [maintainer]
 created: 2026-07-28
-updated: 2026-08-03
-requirement_ids: [UI-001, UI-002, UI-003, UI-004, UI-005, UI-006, UI-007, UI-008, UI-009, UI-010, UI-011, UI-012, UI-013]
+updated: 2026-08-09
+requirement_ids: [UI-001, UI-002, UI-003, UI-004, UI-005, UI-006, UI-007, UI-008, UI-009, UI-010, UI-011, UI-012, UI-013, UI-014]
 related_adrs: [ADR-0011, ADR-0012]
-related_changes: [CHANGE-010, CHANGE-012, CHANGE-013, CHANGE-014, CHANGE-015, CHANGE-018, CHANGE-019]
-related_code: [src/App.tsx, src/App.css, src/components/CustomSelect.tsx, src/components/GradientRamp.tsx, src/components/SliderField.tsx, src/components/NoiseDistortionPanel.tsx, src/components/BlockNoisePanel.tsx, src/components/DiffuseCurveEditor.tsx, src/components/SlitScanPanel.tsx, src/components/StretchPanel.tsx, src/components/TimelineBar.tsx, src/components/IridescencePanel.tsx, src/components/NormalMapPanel.tsx, src/components/SandboxPanel.tsx, src/components/RadonPanel.tsx, src/components/PostprocessPanel.tsx, src/components/PostprocessStackPanel.tsx, src/components/PresetPanel.tsx, src/components/Toggle.tsx, src/lib/effectPipeline.ts, src/i18n/uiLabels.ts, src/i18n/messages.ts]
+related_changes: [CHANGE-010, CHANGE-012, CHANGE-013, CHANGE-014, CHANGE-015, CHANGE-018, CHANGE-019, CHANGE-024]
+related_code: [src/App.tsx, src/App.css, src/types/renderView.ts, src/components/CustomSelect.tsx, src/components/GradientRamp.tsx, src/components/SliderField.tsx, src/components/NoiseDistortionPanel.tsx, src/components/BlockNoisePanel.tsx, src/components/DiffuseCurveEditor.tsx, src/components/SlitScanPanel.tsx, src/components/StretchPanel.tsx, src/components/TimelineBar.tsx, src/components/IridescencePanel.tsx, src/components/NormalMapPanel.tsx, src/components/SandboxPanel.tsx, src/components/ClothGradientPanel.tsx, src/components/ClothCanvas.tsx, src/components/RadonPanel.tsx, src/components/PostprocessPanel.tsx, src/components/PostprocessStackPanel.tsx, src/components/PresetPanel.tsx, src/components/Toggle.tsx, src/lib/effectPipeline.ts, src/i18n/uiLabels.ts, src/i18n/messages.ts]
 related_tests: [src/lib/tweeqAngle.test.ts, src/lib/effectPipeline.test.ts, src/lib/parameterLimits.test.ts, src/lib/animationDirection.test.ts, src/lib/effectShaderParity.test.ts, src/lib/presetThumbnail.test.ts, 'manual: Tweeq InputAngle and InputShuffle and InputDrum and InputRadio browser checks', 'manual: Glass color controls browser check', 'manual: Effect Stack randomize; Alt-solo; detached-window checks']
 ---
 
@@ -71,6 +71,10 @@ SlitのMotionにはLoop／PingPongのInputRadio、Offset Speed、Phase Speedだ�
 ### UI-013 共通Tweeq入力への統一
 
 StretchのGlow TintはTweeq InputColor、Postprocess DistortのBrush ModeはTweeq InputRadioで編集します。保存値と描画上の意味は変更しません。
+
+### UI-014 SANDBOX Cloth Gradientの表示面切り替え
+
+SANDBOXで`Cloth Gradient`を選択した場合、プロパティモジュールの先頭に2D Canvas／3D Clothの表示面切り替えを表示します。Quality、Surface Wave、Organic Motion、Lighting、Specular、Fresnel、Rampの詳細パラメータは同じプロパティモジュール内で編集できます。Preview右側には表示面切り替えの重複UIを表示しません。表示面の選択は一時状態で、Presetには保存しません。
 
 ## 互換性
 

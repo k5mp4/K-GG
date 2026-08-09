@@ -3,6 +3,7 @@ import type { ColorStop } from '../types/gradient';
 import type { Preset, StoreSnapshot } from '../lib/presetModel';
 import type { PresetExportScope, PresetFolder, PresetLibrary } from '../lib/presetLibrary';
 import type { UserColorPalette } from '../lib/colorPalettes';
+import type { ExportSessionToken } from '../lib/renderBridge';
 
 export type MaybePromise<T> = T | Promise<T>;
 export type ExportDirectoryHandle = FileSystemDirectoryHandle | string;
@@ -13,6 +14,18 @@ export const MP4_QUALITY_PRESETS = [
 ] as const;
 export type Mp4QualityPreset = (typeof MP4_QUALITY_PRESETS)[number]['value'];
 export type ExportStage = 'preparing' | 'rendering' | 'encoding' | 'saving';
+
+/**
+ * 2Dの書き出しフレームを別の表示面へ合成するためのコールバック。
+ * 3D Clothモードでは、renderBridgeが2Dフレームを生成した後に
+ * ClothCanvasがCanvasTextureとしてマッピングし、返されたsequenceを
+ * キャプチャ直前の整合性検証に使用する。
+ */
+export type VideoExportFrameRenderer = (options: {
+  session: ExportSessionToken;
+  time: number;
+  normalizedTime: number;
+}) => number;
 
 export interface PresetRepository {
   loadPresetLibrary(): MaybePromise<PresetLibrary>;
@@ -69,6 +82,7 @@ export interface ExportService {
 
 export type VideoExportConfig = {
   canvas: HTMLCanvasElement;
+  renderFrame?: VideoExportFrameRenderer;
   fps: 24 | 30 | 60;
   duration: number;
   speed: number;
