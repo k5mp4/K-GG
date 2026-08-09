@@ -168,6 +168,8 @@ void main() {
 
 const FRAGMENT_SHADER = `
 uniform sampler2D uGradientRamp;
+uniform sampler2D uSourceTexture;
+uniform int uUseSourceTexture;
 
 uniform vec3 uLightDirection;
 uniform vec3 uSkyLightColor;
@@ -223,7 +225,20 @@ void main() {
   float rampT = clamp(shade, 0.0, 1.0);
   vec4 rampColor = texture2D(uGradientRamp, vec2(rampT, 0.5));
 
-  gl_FragColor = vec4(rampColor.rgb, 1.0);
+  if (uUseSourceTexture != 0) {
+    // The processed 2D Canvas is the color source. The texture stays
+    // attached to vUv while the vertex shader deforms the cloth, so
+    // curl/noise/distortion follows the surface instead of being rendered
+    // as a second, unrelated cloth pass.
+    vec4 sourceColor = texture2D(uSourceTexture, clamp(vUv, vec2(0.0), vec2(1.0)));
+    vec3 surfaceLight = max(ambient + vec3(NdotL * uLightIntensity), vec3(0.08));
+    vec3 litSource = sourceColor.rgb * surfaceLight;
+    litSource += sourceColor.rgb * spec * uSpecularColor * 0.35;
+    litSource += fresnel * uFresnelColor * uFresnelColorStrength * 0.25;
+    gl_FragColor = vec4(litSource, sourceColor.a);
+  } else {
+    gl_FragColor = vec4(rampColor.rgb, 1.0);
+  }
 }
 `;
 
@@ -244,7 +259,11 @@ export class ClothGradientRenderer {
   private mesh: THREE.Mesh;
   private material: THREE.ShaderMaterial;
   private rampTexture: THREE.DataTexture;
+  private sourceTexture: THREE.CanvasTexture | null = null;
   private currentQuality: string = 'medium';
+  private geometryMode: 'base' | 'texture' = 'base';
+  private geometryWidth = 8;
+  private geometryHeight = 8;
 
   constructor() {
     this.canvas = document.createElement('canvas');
@@ -308,6 +327,8 @@ export class ClothGradientRenderer {
         uTileScale: { value: new THREE.Vector2(1, 1) },
 
         uGradientRamp: { value: this.rampTexture },
+        uSourceTexture: { value: this.rampTexture },
+        uUseSourceTexture: { value: 0 },
         uLightDirection: { value: new THREE.Vector3(0.5, 1.0, 0.8).normalize() },
         uSkyLightColor: { value: new THREE.Vector3(0.9, 0.9, 1.0) },
         uGroundLightColor: { value: new THREE.Vector3(0.1, 0.1, 0.3) },
@@ -338,6 +359,40 @@ export class ClothGradientRenderer {
     return 72; // medium
   }
 
+  private replaceGeometry(width: number, height: number, segments: number): void {
+    this.mesh.geometry.dispose();
+    this.mesh.geometry = new THREE.PlaneGeometry(width, height, segments, segments);
+    this.geometryWidth = width;
+    this.geometryHeight = height;
+  }
+
+  private configureGeometry(mappedTexture: boolean, targetWidth: number, targetHeight: number): void {
+    const segments = this.getSegmentsForQuality(this.currentQuality);
+    if (mappedTexture) {
+      const planeHeight = 2.35;
+      const planeWidth = planeHeight * Math.max(1, targetWidth) / Math.max(1, targetHeight);
+      if (
+        this.geometryMode !== 'texture' ||
+        Math.abs(this.geometryWidth - planeWidth) > 0.001 ||
+        Math.abs(this.geometryHeight - planeHeight) > 0.001
+      ) {
+        this.replaceGeometry(planeWidth, planeHeight, segments);
+        this.geometryMode = 'texture';
+      }
+      const fovRadians = (this.camera.fov * Math.PI) / 180;
+      const verticalDistance = (planeHeight * 0.5) / Math.tan(fovRadians * 0.5);
+      const horizontalDistance = (planeWidth * 0.5) / (Math.tan(fovRadians * 0.5) * this.camera.aspect);
+      this.camera.position.z = Math.max(verticalDistance, horizontalDistance) * 1.24 + 0.35;
+    } else {
+      if (this.geometryMode !== 'base') {
+        this.replaceGeometry(8, 8, segments);
+        this.geometryMode = 'base';
+      }
+      this.camera.position.z = 4.5;
+    }
+    this.camera.lookAt(0, 0, 0);
+  }
+
   public updateRampData(rampData: Uint8Array): void {
     if (!rampData || rampData.length < 4 || rampData.length % 4 !== 0) return;
     const width = rampData.length / 4;
@@ -350,6 +405,38 @@ export class ClothGradientRenderer {
     this.material.uniforms.uGradientRamp.value = this.rampTexture;
   }
 
+  public getCanvas(): HTMLCanvasElement {
+    return this.canvas;
+  }
+
+  private updateSourceTexture(sourceCanvas: HTMLCanvasElement): void {
+    if (!this.sourceTexture || this.sourceTexture.image !== sourceCanvas) {
+      this.sourceTexture?.dispose();
+      this.sourceTexture = new THREE.CanvasTexture(sourceCanvas);
+      this.sourceTexture.colorSpace = THREE.SRGBColorSpace;
+      this.sourceTexture.minFilter = THREE.LinearFilter;
+      this.sourceTexture.magFilter = THREE.LinearFilter;
+      this.sourceTexture.wrapS = THREE.ClampToEdgeWrapping;
+      this.sourceTexture.wrapT = THREE.ClampToEdgeWrapping;
+      this.sourceTexture.generateMipmaps = false;
+      this.material.uniforms.uSourceTexture.value = this.sourceTexture;
+    }
+    this.sourceTexture.needsUpdate = true;
+  }
+
+  public renderMappedTexture(
+    sourceCanvas: HTMLCanvasElement,
+    config: ClothGradientConfig,
+    time: number,
+    targetWidth: number,
+    targetHeight: number,
+    loopPeriod = 1,
+  ): HTMLCanvasElement {
+    this.updateSourceTexture(sourceCanvas);
+    this.material.uniforms.uUseSourceTexture.value = 1;
+    return this.renderInternal(config, time, targetWidth, targetHeight, undefined, loopPeriod, true);
+  }
+
   public render(
     config: ClothGradientConfig,
     time: number,
@@ -358,12 +445,24 @@ export class ClothGradientRenderer {
     tileOptions?: TileRenderOptions,
     loopPeriod = 1,
   ): HTMLCanvasElement {
+    this.material.uniforms.uUseSourceTexture.value = 0;
+    return this.renderInternal(config, time, targetWidth, targetHeight, tileOptions, loopPeriod);
+  }
+
+  private renderInternal(
+    config: ClothGradientConfig,
+    time: number,
+    targetWidth: number,
+    targetHeight: number,
+    tileOptions?: TileRenderOptions,
+    loopPeriod = 1,
+    mappedTexture = false,
+  ): HTMLCanvasElement {
     // Quality update
     if (config.quality !== this.currentQuality) {
       this.currentQuality = config.quality;
       const seg = this.getSegmentsForQuality(this.currentQuality);
-      this.mesh.geometry.dispose();
-      this.mesh.geometry = new THREE.PlaneGeometry(8.0, 8.0, seg, seg);
+      this.replaceGeometry(8, 8, seg);
     }
 
     // Resize canvas if needed
@@ -374,6 +473,7 @@ export class ClothGradientRenderer {
       this.camera.aspect = targetWidth / targetHeight;
       this.camera.updateProjectionMatrix();
     }
+    this.configureGeometry(mappedTexture, targetWidth, targetHeight);
 
     // Uniform updates
     const u = this.material.uniforms;
@@ -439,6 +539,7 @@ export class ClothGradientRenderer {
     this.mesh.geometry.dispose();
     this.material.dispose();
     this.rampTexture.dispose();
+    this.sourceTexture?.dispose();
     this.renderer.dispose();
   }
 }

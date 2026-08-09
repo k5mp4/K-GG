@@ -33,6 +33,7 @@ export type {
   NativeFfmpegStatus,
   PresetRepository,
   VideoExportConfig,
+  VideoExportFrameRenderer,
   VideoExportService,
 } from './types';
 export { MP4_QUALITY_PRESETS } from './types';

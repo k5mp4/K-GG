@@ -8,6 +8,7 @@ import { Icon } from './Icon';
 import { NormalMapPanel } from './NormalMapPanel';
 import { PostprocessPanel } from './PostprocessPanel';
 import { Toggle } from './Toggle';
+import type { RenderViewMode } from '../types/renderView';
 
 type SandboxProgramKey = 'normalMap' | 'prism' | 'particles' | 'cloth';
 type SandboxProgramStatus = 'loading' | 'ready' | 'failed' | 'fallback';
@@ -89,7 +90,12 @@ function moduleStatus(
   return { label: t('stack.status.preparing'), className: 'text-amber-300' };
 }
 
-export function SandboxPanel() {
+type SandboxPanelProps = {
+  renderViewMode: RenderViewMode;
+  onRenderViewModeChange: (mode: RenderViewMode) => void;
+};
+
+export function SandboxPanel({ renderViewMode, onRenderViewModeChange }: SandboxPanelProps) {
   const { t } = useLanguage();
   const {
     normalMap,
@@ -177,7 +183,10 @@ export function SandboxPanel() {
             onToggleEnabled={(enabled) => setClothGradient({ enabled })}
             badge={<span className="rounded bg-amber-500/20 px-1.5 py-0.5 text-[8px] font-medium tracking-normal text-amber-300" title={t('beta.experimental')}>🧪 Beta</span>}
           >
-            <ClothGradientPanel />
+            <ClothGradientPanel
+              renderViewMode={renderViewMode}
+              onRenderViewModeChange={onRenderViewModeChange}
+            />
           </SandboxModule>
         )}
 

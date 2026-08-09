@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, type MutableRefObject, type RefObject } from 'react';
 import { Toggle } from './Toggle';
 import { useGradientStore } from '../store/gradientStore';
 import { useRecorder } from '../hooks/useRecorder';
@@ -20,7 +20,13 @@ import {
   aeGetSaveDir, aeChooseSaveDir, aeClearSaveDir,
 } from '../lib/aftereffectsExport';
 import { MP4_QUALITY_PRESETS } from '../adapters';
-import type { ExportDirectoryHandle, ExportStage, Mp4QualityPreset, NativeFfmpegStatus } from '../adapters';
+import type {
+  ExportDirectoryHandle,
+  ExportStage,
+  Mp4QualityPreset,
+  NativeFfmpegStatus,
+  VideoExportFrameRenderer,
+} from '../adapters';
 import type { AeSaveDirStatus, AeStatus } from '../lib/aftereffectsExport';
 import { renderBridge } from '../lib/renderBridge';
 import { exportDisplayProgress, exportProgressPercent, exportStageLabel } from '../lib/exportProgress';
@@ -33,7 +39,9 @@ type Props = {
   onExportProgress?: (progress: number | null) => void;
   onExportStage?: (stage: ExportStage) => void;
   onResizeCanvas?: (w: number, h: number) => void;
-  canvasRef: React.RefObject<HTMLCanvasElement | null>;
+  canvasRef: RefObject<HTMLCanvasElement | null>;
+  previewCanvasRef?: RefObject<HTMLCanvasElement | null>;
+  exportFrameRendererRef?: MutableRefObject<VideoExportFrameRenderer | null>;
   ffmpegStatus: NativeFfmpegStatus | null;
   ffmpegChecking: boolean;
   onCheckFfmpeg: (showDialog: boolean) => Promise<NativeFfmpegStatus | null>;
@@ -44,13 +52,24 @@ export function ExportPanel({
   onExportStage,
   onResizeCanvas,
   canvasRef,
+  previewCanvasRef,
+  exportFrameRendererRef,
   ffmpegStatus,
   ffmpegChecking,
   onCheckFfmpeg,
 }: Props) {
   const { t } = useLanguage();
   const { animation, slitScan, presetName } = useGradientStore();
-  const { recording } = useRecorder();
+  const outputCanvasRef = previewCanvasRef ?? canvasRef;
+  const { recording } = useRecorder(outputCanvasRef);
+
+  function getOutputCanvas(): HTMLCanvasElement | null {
+    return outputCanvasRef.current;
+  }
+
+  function getOutputFrameRenderer(): VideoExportFrameRenderer | undefined {
+    return exportFrameRendererRef?.current ?? undefined;
+  }
 
   const [fileName, setFileName] = useState(sanitizeStem(presetName || 'gradient'));
   const [exportJob, setExportJob] = useState<ExportJob>(null);
@@ -164,7 +183,7 @@ export function ExportPanel({
   }
 
   async function handleAeSendImage() {
-    const canvas = canvasRef.current;
+    const canvas = getOutputCanvas();
     if (!canvas) return;
     setAeStatus('sending');
     const blob = await canvasToPngBlob(canvas);
@@ -230,7 +249,8 @@ export function ExportPanel({
 
   async function handleExportMov() {
     console.log('[Export] handleExportMov START');
-    const canvas = canvasRef.current;
+    const canvas = getOutputCanvas();
+    const renderFrame = getOutputFrameRenderer();
     if (!canvas || exportJob) return;
     if (!await ensureNativeVideoEncodeReady()) return;
 
@@ -245,6 +265,7 @@ export function ExportPanel({
     try {
       const blob = await exportLosslessMOV({
         canvas,
+        renderFrame,
         fps: animation.fps,
         duration: animation.duration,
         speed: animation.speed,
@@ -275,7 +296,8 @@ export function ExportPanel({
   }
 
   async function handleExportMP4() {
-    const canvas = canvasRef.current;
+    const canvas = getOutputCanvas();
+    const renderFrame = getOutputFrameRenderer();
     if (!canvas || exportJob) return;
     if (!await ensureNativeVideoEncodeReady()) return;
 
@@ -289,6 +311,7 @@ export function ExportPanel({
     try {
       const blob = await exportHighQualityMP4({
         canvas,
+        renderFrame,
         fps: animation.fps,
         duration: animation.duration,
         speed: animation.speed,
@@ -318,7 +341,8 @@ export function ExportPanel({
   }
 
   async function handleExportZip() {
-    const canvas = canvasRef.current;
+    const canvas = getOutputCanvas();
+    const renderFrame = getOutputFrameRenderer();
     if (!canvas || exportJob) return;
 
     const controller = beginExport('zip');
@@ -333,6 +357,7 @@ export function ExportPanel({
       reportStage('rendering');
       const blob = await exportFrameZip({
         canvas,
+        renderFrame,
         fps: animation.fps,
         duration: animation.duration,
         speed: animation.speed,
@@ -358,7 +383,7 @@ export function ExportPanel({
 
   async function handleExportSlits() {
     console.log('[Export] handleExportSlits START');
-    const canvas = canvasRef.current;
+    const canvas = getOutputCanvas();
     if (!canvas || exportJob) return;
 
     const controller = beginExport('slits');
@@ -448,20 +473,20 @@ export function ExportPanel({
       <div className="space-y-2">
         <p className="text-xs text-deep">{t('export.stillImage')}</p>
         <button
-          onClick={() => { const c = canvasRef.current; if (c) downloadPNG(c, stem, dirHandleRef.current).then(() => flashSaved('png')); }}
+          onClick={() => { const c = getOutputCanvas(); if (c) downloadPNG(c, stem, dirHandleRef.current).then(() => flashSaved('png')); }}
           className="w-full py-2 bg-fire hover:brightness-110 disabled:opacity-40 disabled:cursor-not-allowed rounded-none text-sm font-display font-semibold text-k-text uppercase tracking-wider"
         >
           {savedFormats['png'] ? `✓ ${t('export.saved')}` : t('export.savePng')}
         </button>
         <div className="flex gap-2">
           <button
-            onClick={() => { const c = canvasRef.current; if (c) downloadJPG(c, 0.92, stem, dirHandleRef.current).then(() => flashSaved('jpg')); }}
+            onClick={() => { const c = getOutputCanvas(); if (c) downloadJPG(c, 0.92, stem, dirHandleRef.current).then(() => flashSaved('jpg')); }}
             className="flex-1 py-1.5 bg-k-muted hover:bg-k-muted/70 disabled:opacity-40 disabled:cursor-not-allowed rounded-none text-xs text-k-text"
           >
             {savedFormats['jpg'] ? '✓' : 'JPG'}
           </button>
           <button
-            onClick={() => { const c = canvasRef.current; if (c) downloadWebP(c, 0.92, stem, dirHandleRef.current).then(() => flashSaved('webp')); }}
+            onClick={() => { const c = getOutputCanvas(); if (c) downloadWebP(c, 0.92, stem, dirHandleRef.current).then(() => flashSaved('webp')); }}
             className="flex-1 py-1.5 bg-k-muted hover:bg-k-muted/70 disabled:opacity-40 disabled:cursor-not-allowed rounded-none text-xs text-k-text"
           >
             {savedFormats['webp'] ? '✓' : 'WebP'}

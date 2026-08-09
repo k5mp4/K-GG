@@ -1,11 +1,18 @@
 import { useState, type ReactNode } from 'react';
 import { InputColor } from 'tweeq';
+import { useLanguage } from '../i18n/LanguageProvider';
 import { useGradientStore } from '../store/gradientStore';
 import { Collapsible } from './Collapsible';
 import { CustomSelect } from './CustomSelect';
 import { SliderField } from './SliderField';
 import { Toggle } from './Toggle';
 import type { ClothGradientQuality } from '../types/clothGradient';
+import type { RenderViewMode } from '../types/renderView';
+
+type ClothGradientPanelProps = {
+  renderViewMode: RenderViewMode;
+  onRenderViewModeChange: (mode: RenderViewMode) => void;
+};
 
 type ControlGroupProps = {
   title: string;
@@ -34,11 +41,55 @@ function ClothControlGroup({ title, defaultOpen = true, children }: ControlGroup
   );
 }
 
-export function ClothGradientPanel() {
+export function ClothGradientPanel({ renderViewMode, onRenderViewModeChange }: ClothGradientPanelProps) {
+  const { t } = useLanguage();
   const { clothGradient, setClothGradient } = useGradientStore();
 
   return (
     <div className="space-y-3 text-[11px]" data-cloth-gradient-panel>
+      <section className="space-y-2 border border-cyan-200/25 bg-cyan-300/[0.04] p-3" data-cloth-view-mode>
+        <div className="flex items-start justify-between gap-3">
+          <div className="min-w-0">
+            <h3 className="font-display text-[10px] font-semibold uppercase tracking-[0.16em] text-cyan-100">
+              {t('canvas.viewMode')}
+            </h3>
+            <p className="mt-1 text-[10px] leading-relaxed text-cream/60">
+              {renderViewMode === 'cloth' ? t('canvas.switchToCloth') : t('canvas.switchToCanvas')}
+            </p>
+          </div>
+          <span className="shrink-0 border border-cyan-200/30 bg-k-bg/40 px-2 py-1 font-display text-[9px] font-bold uppercase tracking-[0.14em] text-cyan-100/80">
+            {renderViewMode === 'cloth' ? '3D' : '2D'}
+          </span>
+        </div>
+        <div
+          role="group"
+          aria-label={t('canvas.viewMode')}
+          className="grid grid-cols-2 gap-1 border border-cream/15 bg-k-bg/30 p-1"
+        >
+          {(['canvas', 'cloth'] as const).map((mode) => {
+            const active = renderViewMode === mode;
+            const label = t(mode === 'canvas' ? 'canvas.viewMode.canvas' : 'canvas.viewMode.cloth');
+            return (
+              <button
+                key={mode}
+                type="button"
+                aria-pressed={active}
+                title={t(mode === 'canvas' ? 'canvas.switchToCanvas' : 'canvas.switchToCloth')}
+                onClick={() => onRenderViewModeChange(mode)}
+                className={`min-h-8 px-2 py-1.5 font-display text-[9px] font-bold uppercase tracking-[0.1em] transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-fire ${active
+                  ? mode === 'cloth'
+                    ? 'border border-cyan-200/45 bg-cyan-300/15 text-cyan-100'
+                    : 'border border-fire/60 bg-fire/15 text-fire'
+                  : 'border border-transparent text-cream/55 hover:bg-cream/10 hover:text-cream'
+                  }`}
+              >
+                {mode === 'canvas' ? '2D ' : '3D '}{label}
+              </button>
+            );
+          })}
+        </div>
+      </section>
+
       {/* Quality */}
       <div className="space-y-2 border-b border-cream/10 pb-3">
         <CustomSelect
