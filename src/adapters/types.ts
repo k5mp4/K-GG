@@ -17,8 +17,8 @@ export type ExportStage = 'preparing' | 'rendering' | 'encoding' | 'saving';
 
 /**
  * 2Dの書き出しフレームを別の表示面へ合成するためのコールバック。
- * 3D Clothモードでは、renderBridgeが2Dフレームを生成した後に
- * ClothCanvasがCanvasTextureとしてマッピングし、返されたsequenceを
+ * 3D表示モードでは、renderBridgeが2Dフレームを生成した後に
+ * 選択中の表示アダプターがCanvasTextureとしてマッピングし、返されたsequenceを
  * キャプチャ直前の整合性検証に使用する。
  */
 export type VideoExportFrameRenderer = (options: {

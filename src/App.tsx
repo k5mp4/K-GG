@@ -3,6 +3,8 @@ import './App.css';
 import { gsap } from 'gsap';
 import { GradientCanvas } from './components/GradientCanvas';
 import { ClothCanvas } from './components/ClothCanvas';
+import { ConeCanvas } from './components/ConeCanvas';
+import { ConeApexEditor } from './components/ConeApexEditor';
 import { GradientAnchorEditor } from './components/GradientAnchorEditor';
 import { TimelineBar } from './components/TimelineBar';
 import { BezierEasingEditor } from './components/BezierEasingEditor';
@@ -129,6 +131,7 @@ export default function App() {
     matcap,
     animation,
     clothGradient,
+    coneView,
     noiseDistortion,
     postprocess,
     setPostprocess,
@@ -143,6 +146,8 @@ export default function App() {
   const [renderViewMode, setRenderViewMode] = useState<RenderViewMode>('canvas');
   const [clothReady, setClothReady] = useState(false);
   const [clothUnavailable, setClothUnavailable] = useState(false);
+  const [coneReady, setConeReady] = useState(false);
+  const [coneUnavailable, setConeUnavailable] = useState(false);
   const [gpuDiagnostics, setGpuDiagnostics] = useState<GpuDiagnostics | null>(() => (
     typeof window === 'undefined' ? null : window.__KAGARIBI_GPU_DIAGNOSTICS__ ?? null
   ));
@@ -150,6 +155,8 @@ export default function App() {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const clothCanvasRef = useRef<HTMLCanvasElement | null>(null);
   const clothExportFrameRendererRef = useRef<VideoExportFrameRenderer | null>(null);
+  const coneCanvasRef = useRef<HTMLCanvasElement | null>(null);
+  const coneExportFrameRendererRef = useRef<VideoExportFrameRenderer | null>(null);
   const [seekVersion, setSeekVersion] = useState(0);
   const [exportProgress, setExportProgress] = useState<number | null>(null);
   const [exportStage, setExportStage] = useState<ExportStage>('preparing');
@@ -622,6 +629,8 @@ export default function App() {
                         onRenderViewModeChange={(mode) => {
                           setClothUnavailable(false);
                           setClothReady(false);
+                          setConeUnavailable(false);
+                          setConeReady(false);
                           setRenderViewMode(mode);
                         }}
                       />
@@ -637,18 +646,41 @@ export default function App() {
                           aspectRatioRef.current = w / h;
                         }}
                         canvasRef={canvasRef}
-                        previewCanvasRef={renderViewMode === 'cloth' && clothReady ? clothCanvasRef : canvasRef}
+                        previewCanvasRef={
+                          renderViewMode === 'cloth' && clothReady
+                            ? clothCanvasRef
+                            : renderViewMode === 'cone' && coneReady
+                              ? coneCanvasRef
+                              : canvasRef
+                        }
                         exportFrameRendererRef={
                           renderViewMode === 'cloth' && clothReady
                             ? clothExportFrameRendererRef
-                            : undefined
+                            : renderViewMode === 'cone' && coneReady
+                              ? coneExportFrameRendererRef
+                              : undefined
                         }
                         ffmpegStatus={ffmpegStatus}
                         ffmpegChecking={ffmpegChecking}
                         onCheckFfmpeg={refreshFfmpegStatus}
                       />
                     )}
-                    {value === 'preset' && <PresetPanel canvasW={canvasW} canvasH={canvasH} setCanvasW={setCanvasW} setCanvasH={setCanvasH} aspectRatioRef={aspectRatioRef} />}
+                    {value === 'preset' && (
+                      <PresetPanel
+                        canvasW={canvasW}
+                        canvasH={canvasH}
+                        setCanvasW={setCanvasW}
+                        setCanvasH={setCanvasH}
+                        aspectRatioRef={aspectRatioRef}
+                        onPresetLoad={() => {
+                          setClothReady(false);
+                          setConeReady(false);
+                          setClothUnavailable(false);
+                          setConeUnavailable(false);
+                          setRenderViewMode('canvas');
+                        }}
+                      />
+                    )}
                   </div>
                 ))}
               </div>
@@ -772,7 +804,7 @@ export default function App() {
               </button>
             </div>
 
-            <div className="relative flex-1 flex items-center justify-center p-2 md:p-6 overflow-hidden">
+            <div className="relative flex-1 flex items-center justify-center p-2 md:p-6 overflow-visible">
               <EffectStackWorkspace
                 sourceCanvasRef={canvasRef}
                 hidden={showLeftSidebar || showRightSidebar}
@@ -790,7 +822,7 @@ export default function App() {
                   style={{
                     position: 'absolute',
                     inset: 0,
-                    opacity: renderViewMode === 'canvas' || !clothReady ? 1 : 0,
+                    opacity: renderViewMode === 'canvas' || (renderViewMode === 'cloth' ? !clothReady : !coneReady) ? 1 : 0,
                     pointerEvents: renderViewMode === 'canvas' ? 'auto' : 'none',
                     transition: 'opacity 180ms ease-out',
                   }}
@@ -823,6 +855,25 @@ export default function App() {
                       setRenderViewMode('canvas');
                     }}
                   />
+                )}
+                {renderViewMode === 'cone' && (
+                  <ConeCanvas
+                    sourceCanvasRef={canvasRef}
+                    coneView={coneView}
+                    width={canvasW}
+                    height={canvasH}
+                    onReady={() => setConeReady(true)}
+                    outputCanvasRef={coneCanvasRef}
+                    exportFrameRendererRef={coneExportFrameRendererRef}
+                    onUnavailable={() => {
+                      setConeReady(false);
+                      setConeUnavailable(true);
+                      setRenderViewMode('canvas');
+                    }}
+                  />
+                )}
+                {renderViewMode === 'cone' && (
+                  <ConeApexEditor width={displayW} height={displayH} visible={showGradientAnchors} />
                 )}
                 <DistortOverlay
                   active={renderViewMode === 'canvas' && leftTab === 'postprocess' && postprocess.effectMode === 'distort' && (
@@ -863,7 +914,7 @@ export default function App() {
                     alt=""
                   />
                 )}
-                <GradientAnchorEditor width={displayW} height={displayH} visible={showGradientAnchors && renderViewMode === 'canvas'} />
+                <GradientAnchorEditor width={displayW} height={displayH} visible={showGradientAnchors} />
                 {renderViewMode === 'canvas' && <SlitOverlay width={displayW} height={displayH} canvasW={canvasW} canvasH={canvasH} />}
               </div>
               {clothUnavailable && (
@@ -872,6 +923,14 @@ export default function App() {
                   className="absolute right-4 top-20 z-30 max-w-[280px] border border-amber-300/30 bg-[#1b1715]/92 px-3 py-2 text-[10px] leading-relaxed text-amber-100 shadow-[0_14px_30px_rgba(0,0,0,0.32)]"
                 >
                   {t('canvas.clothUnavailable')}
+                </div>
+              )}
+              {coneUnavailable && (
+                <div
+                  role="status"
+                  className="absolute right-4 top-20 z-30 max-w-[280px] border border-amber-300/30 bg-[#1b1715]/92 px-3 py-2 text-[10px] leading-relaxed text-amber-100 shadow-[0_14px_30px_rgba(0,0,0,0.32)]"
+                >
+                  {t('canvas.coneUnavailable')}
                 </div>
               )}
               <div

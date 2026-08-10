@@ -106,7 +106,7 @@ export async function renderAndCaptureExportFrame(
   if (renderFrame) {
     // The custom renderer owns the composition step. It first renders the
     // processed 2D frame and then maps that frame to the visible output
-    // surface (the 3D cloth canvas), so capture never falls back to the
+    // surface (for example the 3D cloth or cone canvas), so capture never falls back to the
     // source Canvas.
     const sequence = renderFrame({
       session,

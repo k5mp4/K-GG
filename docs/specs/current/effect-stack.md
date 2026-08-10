@@ -5,12 +5,12 @@ title: Effect Stack
 status: current
 owners: [maintainer]
 created: 2026-07-27
-updated: 2026-08-09
-requirement_ids: [EFFECT-001, EFFECT-002, EFFECT-003, EFFECT-004, EFFECT-005, EFFECT-006, EFFECT-007, EFFECT-008, EFFECT-009, EFFECT-010, EFFECT-011, EFFECT-012, EFFECT-013, EFFECT-014, EFFECT-015, EFFECT-016, EFFECT-017, EFFECT-018, EFFECT-019, EFFECT-020, CLOTH-001, CLOTH-002, CLOTH-003, SANDBOX-001]
+updated: 2026-08-10
+requirement_ids: [EFFECT-001, EFFECT-002, EFFECT-003, EFFECT-004, EFFECT-005, EFFECT-006, EFFECT-007, EFFECT-008, EFFECT-009, EFFECT-010, EFFECT-011, EFFECT-012, EFFECT-013, EFFECT-014, EFFECT-015, EFFECT-016, EFFECT-017, EFFECT-018, EFFECT-019, EFFECT-020, EFFECT-021, CLOTH-001, CLOTH-002, CLOTH-003, SANDBOX-001]
 related_adrs: [ADR-0004, ADR-0005, ADR-0010]
-related_changes: [CHANGE-001, CHANGE-011, CHANGE-012, CHANGE-013, CHANGE-014, CHANGE-015, CHANGE-018, CHANGE-019, CHANGE-021, CHANGE-022, CHANGE-023, CHANGE-024]
-related_code: [src/types/distortion.ts, src/types/renderView.ts, src/lib/effectPipeline.ts, src/lib/normalMap.ts, src/lib/effectStackTransition.ts, src/lib/postprocessStack.ts, src/lib/postprocessAnimation.ts, src/lib/sceneEvaluation.ts, src/lib/glass.ts, src/lib/webgl.ts, src/lib/presetModel.ts, src/lib/presetThumbnail.ts, src/store/gradientStore.ts, src/components/PostprocessStackPanel.tsx, src/components/EffectStackWorkspace.tsx, src/components/PostprocessPanel.tsx, src/components/DistortOverlay.tsx, src/components/SandboxPanel.tsx, src/components/BlockNoisePanel.tsx, src/components/DiffuseCurveEditor.tsx, src/components/SlitScanPanel.tsx, src/components/StretchPanel.tsx, src/components/PresetPanel.tsx, src/components/ClothGradientPanel.tsx, src/components/ClothCanvas.tsx, src/lib/clothGradientRenderer.ts, src/lib/clothView.ts, src/types/clothGradient.ts, src/shaders/normalmap.frag.glsl, src/shaders/postprocess/glass-optics.glsl]
-related_tests: [src/lib/effectPipeline.test.ts, src/lib/webglNormalMapParity.test.ts, src/lib/effectStackTransition.test.ts, src/lib/postprocessStack.test.ts, src/lib/postprocessAnimation.test.ts, src/lib/effectStackDrag.test.ts, src/lib/effectShaderParity.test.ts, src/lib/glass.test.ts, src/store/gradientStore.effectPipeline.test.ts, src/store/gradientStore.postprocessStack.test.ts, src/store/gradientStore.glass.test.ts, src/lib/sceneEvaluation.glass.test.ts, src/lib/presetThumbnail.test.ts, src/lib/clothView.test.ts, tests/clothGradient.test.ts]
+related_changes: [CHANGE-001, CHANGE-011, CHANGE-012, CHANGE-013, CHANGE-014, CHANGE-015, CHANGE-018, CHANGE-019, CHANGE-021, CHANGE-022, CHANGE-023, CHANGE-024, CHANGE-025]
+related_code: [src/types/distortion.ts, src/types/renderView.ts, src/types/coneView.ts, src/lib/effectPipeline.ts, src/lib/normalMap.ts, src/lib/effectStackTransition.ts, src/lib/postprocessStack.ts, src/lib/postprocessAnimation.ts, src/lib/sceneEvaluation.ts, src/lib/glass.ts, src/lib/webgl.ts, src/lib/presetModel.ts, src/lib/presetThumbnail.ts, src/lib/coneView.ts, src/lib/coneViewRenderer.ts, src/lib/processedCanvasClock.ts, src/store/gradientStore.ts, src/components/PostprocessStackPanel.tsx, src/components/EffectStackWorkspace.tsx, src/components/PostprocessPanel.tsx, src/components/DistortOverlay.tsx, src/components/SandboxPanel.tsx, src/components/BlockNoisePanel.tsx, src/components/DiffuseCurveEditor.tsx, src/components/SlitScanPanel.tsx, src/components/StretchPanel.tsx, src/components/PresetPanel.tsx, src/components/ClothGradientPanel.tsx, src/components/ClothCanvas.tsx, src/components/ConeCanvas.tsx, src/components/ConeViewPanel.tsx, src/lib/clothGradientRenderer.ts, src/lib/clothView.ts, src/types/clothGradient.ts, src/shaders/normalmap.frag.glsl, src/shaders/postprocess/glass-optics.glsl]
+related_tests: [src/lib/effectPipeline.test.ts, src/lib/webglNormalMapParity.test.ts, src/lib/effectStackTransition.test.ts, src/lib/postprocessStack.test.ts, src/lib/postprocessAnimation.test.ts, src/lib/effectStackDrag.test.ts, src/lib/effectShaderParity.test.ts, src/lib/glass.test.ts, src/store/gradientStore.effectPipeline.test.ts, src/store/gradientStore.postprocessStack.test.ts, src/store/gradientStore.glass.test.ts, src/lib/sceneEvaluation.glass.test.ts, src/lib/presetThumbnail.test.ts, src/lib/clothView.test.ts, src/lib/coneView.test.ts, src/lib/processedCanvasClock.test.ts, src/types/coneView.test.ts, tests/clothGradient.test.ts]
 ---
 
 # Effect Stack
@@ -122,17 +122,21 @@ Three.js の描画は非表示 Offscreen Canvas で行い、そのレンダリ�
 
 ### CLOTH-003 Preset 永続化とエラーフォールバック
 
-Cloth Gradient の全パラメータ (Surface Wave, Organic Motion, Lighting, Specular, Fresnel, Ramp, Quality) は Preset およびストアに永続化され、旧 Preset 読み込み時も安全に初期化される。レンダラーの初期化や描画に失敗した場合は黒画面を起こさず既存 Base Gradient に自動フォールバックする。旧 Preset に残る廃止キー（`lightWeight`, `heightWeight`, `fresnelWeight`, `flowWeight`, `rampLow`, `rampHigh`, `shadingMix`）は無視され、残りのパラメータは正規化される。
+Cloth の全パラメータ (Surface Wave, Organic Motion, Lighting, Specular, Fresnel, Ramp, Quality) は Preset およびストアに永続化され、旧 Preset 読み込み時も安全に初期化される。レンダラーの初期化や描画に失敗した場合は黒画面を起こさず既存 Base Gradient に自動フォールバックする。旧 Preset に残る廃止キー（`lightWeight`, `heightWeight`, `fresnelWeight`, `flowWeight`, `rampLow`, `rampHigh`, `shadingMix`）は無視され、残りのパラメータは正規化される。
 
 ### SANDBOX-001 SANDBOX パネルモジュールの拡張
 
-SANDBOX パネルのモジュール選択肢に `Cloth Gradient` を追加し、アクティブカウント表示を `4/4` に更新する。モジュールの ON/OFF 状態およびプログラミングステータス（applied / fallback / preparing）を UI 上に可視化する。
+SANDBOX パネルのモジュール選択肢に `Cloth` を追加し、アクティブカウント表示を `4/4` に更新する。モジュールの ON/OFF 状態およびプログラミングステータス（applied / fallback / preparing）を UI 上に可視化する。
 
 ### EFFECT-020 Cloth表示アダプター
 
 Cloth表示はEffect Stackの新しい段階ではなく、処理済みCanvasを受け取る後段の表示アダプターです。Effect Stackの有効状態、順序、処理結果はCanvas表示とCloth表示で共通です。3D表示の入力ではCloth Baseを二重適用せず、CanvasTextureをクロスのUVへ割り当てた後に表面変形・ライティングを一度だけ行います。
 
-表示面の切り替えはSANDBOXの`Cloth Gradient`プロパティモジュールで行います。Effect Stackの操作領域やPreview右側に、別の表示面設定を追加しません。
+表示面の切り替えはSANDBOXのCloth／ConeモジュールのON/OFFで行います。Effect Stackの操作領域やPreview右側に、別のPreview Surface設定を追加しません。
+
+### EFFECT-021 Cone表示アダプター
+
+Cone表示はEffect Stackの新しい段階ではなく、処理済みCanvasを受け取る後段の表示アダプターです。Cloth Baseを含む現在のGradient／Effect Stack／SANDBOX結果をCanvasTextureとして読み込み、描画完了フレームの通知に同期して、照明計算を持たない円錐内面へ表示します。ConeはMapping、キャンバス上の頂点ハンドル、Seam Blendを表示アダプター内で処理し、Mapping設定が変わった場合も最後に完了した処理済みCanvasへ同じ時刻で即時再マッピングします。Gradient Rampは右サイドバーで編集し、同じ処理済みCanvasへ反映します。Coneの選択や設定はEffect Stackの有効状態、順序、処理結果を変更しません。
 
 ## 他領域との関係
 

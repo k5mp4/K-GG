@@ -106,13 +106,13 @@ describe('video export frame generation', () => {
         renderFrame: ({ session: exportSession, time, normalizedTime }) => {
           const sequence = renderBridge.renderExportFrame(exportSession, time, normalizedTime);
           renderBridge.finishExportFrame(exportSession, sequence);
-          canvasFrameId = `cloth:${normalizedTime}`;
+          canvasFrameId = `cone:${normalizedTime}`;
           return sequence;
         },
       })
     ));
 
-    expect(await result.blob.text()).toBe(`cloth:${result.normalizedTime}`);
+    expect(await result.blob.text()).toBe(`cone:${result.normalizedTime}`);
     expect(renderedTimes).toEqual([[result.renderTime, result.normalizedTime]]);
     expect(previewRenderCalls).toBe(0);
     expect(restoreCalls).toBe(1);

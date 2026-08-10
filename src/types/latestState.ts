@@ -16,6 +16,7 @@ import type { GradientConfig } from './gradient';
 import type { ImageGradientConfig } from './imageGradient';
 import type { PropertyTrack } from './keyframe';
 import type { ClothGradientConfig } from './clothGradient';
+import type { ConeViewConfig } from './coneView';
 
 export type LatestState = {
   gradient: GradientConfig;
@@ -26,6 +27,7 @@ export type LatestState = {
   stretch: StretchConfig;
   normalMap: NormalMapConfig;
   clothGradient?: ClothGradientConfig;
+  coneView?: ConeViewConfig;
   radon: RadonConfig;
   iridescence: IridescenceConfig;
   manualDistort: ManualDistortConfig;

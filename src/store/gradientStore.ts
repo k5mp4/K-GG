@@ -3,6 +3,8 @@ import { DEFAULT_MESH_GRADIENT, normalizeMeshGradientConfig, type GradientConfig
 import type { NoiseDistortionConfig, DiffuseConfig, SlitScanConfig, StretchConfig, NormalMapConfig, RadonConfig, IridescenceConfig, ManualDistortConfig, PostprocessConfig, MatcapConfig, HistogramConfig, EffectPipelineConfig, DiffuseAdaptiveChannel, DiffuseHalftoneShape } from '../types/distortion';
 import type { ClothGradientConfig } from '../types/clothGradient';
 import { DEFAULT_CLOTH_GRADIENT, normalizeClothGradientConfig } from '../types/clothGradient';
+import type { ConeViewConfig } from '../types/coneView';
+import { DEFAULT_CONE_VIEW, normalizeConeViewConfig } from '../types/coneView';
 import { DEFAULT_DIFFUSE_ASCII_CHARSET, DEFAULT_DIFFUSE_BACKGROUND_COLOR } from '../types/distortion';
 import type { ImageGradientConfig } from '../types/imageGradient';
 import { IMAGE_GRADIENT_DEFAULTS, normalizeImageGradientConfig } from '../types/imageGradient';
@@ -74,6 +76,7 @@ type GradientStore = {
   animation: AnimationConfig;
   normalMap: NormalMapConfig;
   clothGradient: ClothGradientConfig;
+  coneView: ConeViewConfig;
   radon: RadonConfig;
   iridescence: IridescenceConfig;
   manualDistort: ManualDistortConfig;
@@ -107,6 +110,7 @@ type GradientStore = {
   setAnimation: (v: Partial<AnimationConfig>) => void;
   setNormalMap: (v: Partial<NormalMapConfig>) => void;
   setClothGradient: (v: Partial<ClothGradientConfig>) => void;
+  setConeView: (v: Partial<ConeViewConfig>) => void;
   setRadon: (v: Partial<RadonConfig>) => void;
   setIridescence: (v: Partial<IridescenceConfig>) => void;
   setManualDistort: (v: Partial<ManualDistortConfig>) => void;
@@ -350,6 +354,7 @@ export const STORE_DEFAULTS = {
     invert: false,
   },
   clothGradient: { ...DEFAULT_CLOTH_GRADIENT },
+  coneView: { ...DEFAULT_CONE_VIEW },
   radon: {
     enabled: false,
     strength: 1.0,
@@ -666,6 +671,7 @@ export const useGradientStore = create<GradientStore>((set) => ({
   animation: { ...STORE_DEFAULTS.animation },
   normalMap: { ...STORE_DEFAULTS.normalMap },
   clothGradient: { ...STORE_DEFAULTS.clothGradient },
+  coneView: { ...STORE_DEFAULTS.coneView },
   radon: { ...STORE_DEFAULTS.radon },
   iridescence: { ...STORE_DEFAULTS.iridescence },
   manualDistort: {
@@ -894,6 +900,7 @@ export const useGradientStore = create<GradientStore>((set) => ({
   }),
   setNormalMap: (v) => set((s) => ({ normalMap: { ...s.normalMap, ...v, angle: clampParameter(v.angle ?? s.normalMap.angle, s.normalMap.angle, getParameterLimit('normalMap.angle')) } })),
   setClothGradient: (v) => set((s) => ({ clothGradient: normalizeClothGradientConfig({ ...s.clothGradient, ...v }) })),
+  setConeView: (v) => set((s) => ({ coneView: normalizeConeViewConfig({ ...s.coneView, ...v }) })),
   setRadon: (v) => set((s) => {
     const radon = { ...s.radon, ...v };
     radon.angle = clampParameter(radon.angle, s.radon.angle, getParameterLimit('radon.angle'));

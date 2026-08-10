@@ -8,6 +8,7 @@ import { hasActiveAnimation } from '../lib/sceneEvaluation';
 import { renderSceneAtTime } from '../lib/renderSceneAtTime';
 import { renderBridge } from '../lib/renderBridge';
 import { LatestFrameScheduler } from '../lib/latestFrameScheduler';
+import { publishProcessedCanvasFrame } from '../lib/processedCanvasClock';
 import { useLanguage } from '../i18n/LanguageProvider';
 
 
@@ -90,6 +91,7 @@ export function GradientCanvas({ width = 800, height = 800, animLoopRef, seekVer
         : 0;
       renderBridge.renderPreview(() => {
         renderSceneAtTime(ctx, frameState, normalizedTime, {});
+        publishProcessedCanvasFrame(normalizedTime);
       });
     });
   }, [gradient, noiseDistortion, diffuse, imageGradient, slitScan, stretch, normalMap, radon, iridescence, manualDistort, postprocess, effectPipeline, clothGradient, disableClothBase, width, height, animation.enabled, animation.speed, animation.direction, animation.easing, animation.affectNoise, animation.affectSlit, animation.affectRamp, animation.affectStretch, keyframeTracks, currentTime, lazyProgramReadyCount, seekVersion, isWebGLReady, sourceImageCanvas, imageGradientSource, imageMaskSource, imageMaskEnabled]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -123,6 +125,7 @@ export function GradientCanvas({ width = 800, height = 800, animLoopRef, seekVer
           if (!ctx || !frameState) return;
           renderBridge.renderPreview(() => {
             renderSceneAtTime(ctx, frameState, normalizedTime, {});
+            publishProcessedCanvasFrame(normalizedTime);
           });
         },
         {
@@ -152,6 +155,9 @@ export function GradientCanvas({ width = 800, height = 800, animLoopRef, seekVer
           renderSceneAtTime(ctx, frameState, frameState.animation.enabled
             ? useGradientStore.getState().currentTime
             : 0, {});
+          publishProcessedCanvasFrame(frameState.animation.enabled
+            ? useGradientStore.getState().currentTime
+            : 0);
         });
       });
     }
