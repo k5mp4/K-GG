@@ -1,0 +1,24 @@
+# Tasks
+
+- [x] 現行仕様、CHANGE-018／021／024、既存Cloth表示・出力経路を確認する
+- [x] `proposal.md`、`delta.md`、`design.md`を利用者承認済み計画へ固定する
+- [x] Cone設定型、正規化、Store、Preset永続化を実装する
+- [x] ConeGeometry描画、全画面被覆、Texture Flowの純粋ロジックを実装する
+- [x] Coneの頂点位置を開口部から独立して移動し、Canvas外を含む正規化範囲-2..2を実装する
+- [x] Texture Repeat／Flow Cyclesの円周・高さ方向の継ぎ目ブレンドを実装する
+- [x] Cone Preview／Exportアダプターとフォールバックを実装する
+- [x] SANDBOX Edit LayerとCone設定UI、Mapping切替、右サイドバーGradient Ramp、アンカー表示、日英表示を実装する
+- [x] Preview Surface表示モードを削除し、Cloth／ConeモジュールのON/OFFで3D表示を切り替える
+- [x] Cloth Gradientの表示名をClothへ変更し、Apex補助ラベルとグラデーションアンカー連動を整理する
+- [x] Cone設定変更をアニメーション中・停止中とも直近の処理済みCanvasへ即時再マッピングする
+- [x] Apexをキャンバス上のドラッグ可能な頂点ハンドルへ移し、中央へ戻すリセットUIを実装する
+- [x] PerspectiveとWrapped Smoothを削除し、Depthを30、Flow Cyclesを±30まで拡張する
+- [x] 処理済みCanvasの描画完了後にConeを同期するフレーム通知を実装する
+- [x] 単体・回帰テストを追加する
+- [ ] ブラウザでPreview、背景漏れ、色、Flow、切替、失敗時挙動を確認する（Preview、1:1／16:9／9:16の背景漏れ、色、Canvas／Cone切替は確認済み。Renderer失敗時フォールバックは未確認）
+- [ ] PNG／JPG／WebP、連番PNG、MOV／MP4を手動確認する
+- [x] current spec、日英ヘルプ、validationを同期する
+- [x] 継ぎ目方式2モードの正規化、Preset後方互換、表示ラベルを追加する
+- [x] Mirror Repeat／Edge Weldを独立したシェーダー方式として実装し、同一の最終色サンプルへ統合する
+- [ ] 2モード切替、アニメーション中の固定継ぎ目、0%／50%幅、Mapping変更の即時反映を単体・ブラウザで検証する（単体テストとコード確認は実施。実ブラウザの連続操作は未確認）
+- [ ] 全AC検証後にArchiveへ移動する

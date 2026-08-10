@@ -5,12 +5,12 @@ title: Gradient System
 status: current
 owners: [maintainer]
 created: 2026-07-27
-updated: 2026-08-09
-requirement_ids: [GRAD-001, GRAD-002, GRAD-003, GRAD-004, GRAD-005, GRAD-006, GRAD-007, GRAD-008, GRAD-009, GRAD-010, GRAD-011, GRAD-012, GRAD-013, GRAD-014, GRAD-015, GRAD-016, GRAD-017, GRAD-018]
+updated: 2026-08-10
+requirement_ids: [GRAD-001, GRAD-002, GRAD-003, GRAD-004, GRAD-005, GRAD-006, GRAD-007, GRAD-008, GRAD-009, GRAD-010, GRAD-011, GRAD-012, GRAD-013, GRAD-014, GRAD-015, GRAD-016, GRAD-017, GRAD-018, GRAD-019, GRAD-020]
 related_adrs: [ADR-0001, ADR-0003, ADR-0010, ADR-0013]
-related_changes: [CHANGE-001, CHANGE-010, CHANGE-024]
-related_code: [src/types/gradient.ts, src/types/imageGradient.ts, src/types/renderView.ts, src/store/gradientStore.ts, src/lib/gradientRampUtils.ts, src/lib/gradientPreview.ts, src/lib/imageGradient.ts, src/lib/meshGradientField.ts, src/lib/sceneEvaluation.ts, src/lib/webgl.ts, src/lib/clothGradientRenderer.ts, src/lib/presetModel.ts, src/components/GradientRamp.tsx, src/components/CustomSelect.tsx, src/components/ColorPaletteGenerator.tsx, src/components/GradientCanvas.tsx, src/components/SandboxPanel.tsx, src/components/ClothGradientPanel.tsx, src/components/ClothCanvas.tsx, src/components/ExportPanel.tsx, src/lib/videoExportFrames.ts, src/adapters/types.ts, src/lib/clothView.ts, src/lib/colorHarmony.ts, src/i18n/uiLabels.ts, src/i18n/messages.ts]
-related_tests: [src/types/gradient.test.ts, src/lib/imageGradient.test.ts, src/lib/imageGradientProtected.test.ts, src/lib/meshGradient.test.ts, src/lib/proportionalRampEdit.test.ts, src/lib/sceneEvaluation.glass.test.ts, src/lib/colorHarmony.test.ts, src/lib/gradientPreview.test.ts, src/lib/videoExportFrames.test.ts, src/lib/clothView.test.ts]
+related_changes: [CHANGE-001, CHANGE-010, CHANGE-024, CHANGE-025]
+related_code: [src/types/gradient.ts, src/types/imageGradient.ts, src/types/renderView.ts, src/types/coneView.ts, src/store/gradientStore.ts, src/lib/gradientRampUtils.ts, src/lib/gradientPreview.ts, src/lib/imageGradient.ts, src/lib/meshGradientField.ts, src/lib/sceneEvaluation.ts, src/lib/webgl.ts, src/lib/clothGradientRenderer.ts, src/lib/coneView.ts, src/lib/coneViewRenderer.ts, src/lib/processedCanvasClock.ts, src/lib/presetModel.ts, src/components/GradientRamp.tsx, src/components/CustomSelect.tsx, src/components/ColorPaletteGenerator.tsx, src/components/GradientCanvas.tsx, src/components/SandboxPanel.tsx, src/components/ClothGradientPanel.tsx, src/components/ClothCanvas.tsx, src/components/ConeCanvas.tsx, src/components/ConeViewPanel.tsx, src/components/ExportPanel.tsx, src/lib/videoExportFrames.ts, src/adapters/types.ts, src/lib/clothView.ts, src/lib/colorHarmony.ts, src/i18n/uiLabels.ts, src/i18n/messages.ts]
+related_tests: [src/types/gradient.test.ts, src/types/coneView.test.ts, src/lib/imageGradient.test.ts, src/lib/imageGradientProtected.test.ts, src/lib/meshGradient.test.ts, src/lib/proportionalRampEdit.test.ts, src/lib/sceneEvaluation.glass.test.ts, src/lib/colorHarmony.test.ts, src/lib/gradientPreview.test.ts, src/lib/videoExportFrames.test.ts, src/lib/clothView.test.ts, src/lib/coneView.test.ts, src/lib/processedCanvasClock.test.ts]
 ---
 
 # Gradient System
@@ -89,9 +89,9 @@ GradientRampは、グラデーション形式／タイプの直後に色・不�
 
 GradientRampのColor Mode／Interp候補プレビューとColor Palette GeneratorのHarmonyルール候補プレビューは、それぞれ独立した表示切替を持ちます。一方を展開・収納しても、もう一方の表示状態は変更しません。どちらの表示stateもGradientやPresetへ保存しません。
 
-### GRAD-015 Preview表示モード
+### GRAD-015 Preview表示アダプター
 
-Previewは既定の2D Canvasと、処理済みCanvasを表示する3D Clothを切り替えられます。切り替えUIはSANDBOXの`Cloth Gradient`プロパティモジュールにあり、Clothの詳細パラメータと同じ編集領域から操作します。モードは一時的な表示状態であり、GradientやCanvasサイズとは独立しPresetへ保存しません。
+Previewは2D Canvasを既定とし、SANDBOXのEdit LayerでClothまたはConeモジュールをONにすると該当する3D表示アダプターへ切り替わります。専用のPreview Surface／プレビュー表示モードUIは表示しません。ClothまたはConeをOFFにすると2D Canvasへ戻り、表示状態は一時的でPresetへ保存しません。
 
 ### GRAD-016 処理済みCanvasのClothマッピング
 
@@ -103,7 +103,15 @@ CanvasはCloth初期化中も描画を継続します。Cloth Rendererが利用�
 
 ### GRAD-018 Preview表示面の書き出し
 
-Exportは現在Previewで選択されている表示面を使用します。2DモードではGradientCanvas、3Dモードでは処理済みCanvasをCanvasTextureとしてマッピングしたClothのWebGL CanvasをPNG／JPG／WebP、連番PNG ZIP、MOV／MP4へ渡します。
+Exportは現在Previewで選択されている表示面を使用します。2DモードではGradientCanvas、3Dモードでは処理済みCanvasをCanvasTextureとしてマッピングしたClothまたはConeのWebGL CanvasをPNG／JPG／WebP、連番PNG ZIP、MOV／MP4へ渡します。
+
+### GRAD-019 3D Cone表示面
+
+3D Coneは処理済みCanvasの横方向を円周、縦方向を頂点から開口部へ対応させ、開口したThree.js円錐内面へCanvasTextureとしてマッピングします。Mappingは、normalizedTimeでV offsetを進めるFlowと、V offsetを固定して処理済み2Dフレームをそのまま投影するDirect Projectionから選択できます。頂点はプレビュー面上の専用ハンドルをドラッグしてCanvasの外側まで移動でき、Apex X／Apex Yは正規化値-2..2（Canvasの幅・高さに対して最大50%外側）へ制限します。開口部は四隅を覆う半径を維持するため、1:1、横長、縦長のCanvasに背景を露出しません。Coneはunlitかつ不透明で、環境光、ライト、スペキュラー、フレネルを追加しません。Gradient Rampは右サイドバーで操作し、3D表示中も処理済みCanvasへ反映します。頂点ハンドルとグラデーションアンカーはプレビュー面へ重ねて維持し、頂点はUIのリセット操作で中央へ戻せます。
+
+### GRAD-020 Cone Texture Flow
+
+ConeのTexture Flowは共通のnormalizedTimeと整数Flow Cycles（-30..30）から位相を決めます。正数は頂点から開口部、負数は逆方向、0は停止として扱い、Previewの再生・停止・シークと連番・動画出力で同じ位相を使用します。ループ境界では整数テクスチャオフセットへ戻ります。Texture RepeatとFlow Cyclesの円周方向・高さ方向の境界は、0..0.5のSeam Blend幅とSeam Modeで連続化します。Mirror Repeatは反復座標を鏡面化し、Edge Weldは継ぎ目両側の端色を一つの不透明な最終色へ溶接します。方式はこの2つから切り替えられ、既定値はEdge Weldです。各方式はアニメーション中も反復境界の位置を固定し、硬い直線や円形の切れ目、半透明レイヤーの重なりを表示しません。Depthは2..30で編集できます。
 
 ## 他領域との関係
 

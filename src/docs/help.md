@@ -80,11 +80,12 @@ Web 版は `index.html` で Google Fonts から Noto Sans JP、Open Sans を読�
 
 ### SANDBOX
 - トップバーは `Diffuse → Noise → Slit → Postprocess → SANDBOX → Export → Preset` の順で、Stretchは独立項目およびPostprocessのプロパティモジュールに表示しません。PostprocessではEdit Layerを選択し、その詳細プロパティを操作できます。SANDBOXの文字色はPostprocessと同じです。
-- グラデーションの主スタックとは別に、Normal、Prism、Particlesの描画モジュールを一つのパネルから編集できます。
+- グラデーションの主スタックとは別に、Cloth、Cone、Normal、Prism、Particlesの描画モジュールを一つのパネルから編集できます。
 - `Normal` はグラデーションの輝度勾配から法線マップを生成します。`Strength`、`Blur`、`Angle`、`Bevel Size`で表面の凹凸を調整します。
 - `Prism` は主スタック後段の光線・グロー、`Particles` は最終オーバーレイのパーティクルを調整します。
-- `Edit Layer`の選択要素からNormal／Prism／Particlesを一つずつ表示して編集します。選択を変更しても描画順は変わりません。
-- `Cloth Gradient`プロパティモジュールの表示モードから、従来の2D Canvasと、2Dエフェクト済みCanvasを布のUVへマッピングした3D Clothを切り替えられます。Curl／Noise／Distortの結果は布の波打ちに追従します。準備中や利用できない場合はCanvasへ戻り、表示モードはPresetへ保存されません。
+- `Edit Layer`の選択要素から各モジュールを一つずつ表示して編集します。選択を変更しても描画順は変わりません。
+- SANDBOXのCloth／ConeモジュールをONにすると、処理済みCanvasをそれぞれの3D表示へ切り替えられます。専用のPreview Surface表示モードはありません。Coneの頂点ハンドルをキャンバス外までドラッグして移動でき、正規化位置は-2..2に制限されます。リセットボタンで中央へ戻せます。グラデーションアンカー非表示ボタンはConeの頂点ハンドルにも適用されます。Seam Mode（Mirror Repeat／Edge Weld）とSeam Blendでテクスチャ反復とFlowの継ぎ目を連続化できます。準備中や利用できない場合はCanvasへ戻り、表示状態はPresetへ保存されません。
+- ConeはMapping（Flow／Direct Projection）、Depth（最大30）、Rotation、Texture Repeat、Seam Mode、Seam Blend、Flow Cycles（±30）を調整できます。Perspectiveは表示しません。既定のSeam ModeはEdge Weldです。Direct ProjectionではFlowを止め、処理済み2Dフレームを円錐内面へ固定投影します。Gradient Rampは右サイドバーで編集し、3D表示中も処理済みCanvasへ反映できます。アンカー表示はプレビュー面に重ねて維持され、環境光や立体ライティングは加えません。Texture FlowはAnimationタイムラインと書き出しへ同期し、Mapping設定の変更は直近の処理済みCanvasへ即時反映されます。Cone設定はPresetへ保存されます。
 
 ### Normal (ノーマルマップ)
 - グラデーションの輝度勾配から法線マップを生成します。

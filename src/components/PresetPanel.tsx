@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState, type ChangeEvent, type DragEvent,
 import { createEmptyManualDistortMap, createEmptyManualSmoothMask, normalizeNoiseDistortionConfig, normalizePostprocessConfig, STORE_DEFAULTS, useGradientStore } from '../store/gradientStore';
 import { createDefaultEffectPipeline, normalizeEffectPipelineConfig } from '../lib/effectPipeline';
 import { normalizeClothGradientConfig } from '../types/clothGradient';
+import { normalizeConeViewConfig } from '../types/coneView';
 import { normalizeImageGradientConfig } from '../types/imageGradient';
 import { resolveDiffuseBezier } from '../lib/diffuseCurve';
 import {
@@ -33,6 +34,7 @@ type PresetPanelProps = {
   setCanvasW: (w: number) => void;
   setCanvasH: (h: number) => void;
   aspectRatioRef: MutableRefObject<number>;
+  onPresetLoad: () => void;
 };
 
 type ViewMode = 'grid' | 'list';
@@ -255,7 +257,7 @@ function FolderCard({ folder, library, onOpen, onDropPreset }: { folder: PresetF
   );
 }
 
-export function PresetPanel({ canvasW, canvasH, setCanvasW, setCanvasH, aspectRatioRef }: PresetPanelProps) {
+export function PresetPanel({ canvasW, canvasH, setCanvasW, setCanvasH, aspectRatioRef, onPresetLoad }: PresetPanelProps) {
   const { t } = useLanguage();
   const store = useGradientStore();
   const [library, setLibrary] = useState<PresetLibrary>({ format: 'kgg-preset-library', version: 2, folders: [], presets: [] });
@@ -336,8 +338,9 @@ export function PresetPanel({ canvasW, canvasH, setCanvasW, setCanvasH, aspectRa
     });
     store.setPostprocess(loadedPostprocess);
     // clothGradient が無い旧プリセットでも安全にデフォルトで初期化し、
-    // SANDBOX の Cloth Gradient 設定を反映する。
+    // SANDBOX の Cloth 設定を反映する。
     store.setClothGradient(normalizeClothGradientConfig(s.clothGradient));
+    store.setConeView(normalizeConeViewConfig(s.coneView));
     // effectPipeline を持たない旧プリセット/内蔵プリセットは Legacy v1 に
     // ならないよう、既定の V2 パイプラインへ昇格する。V2 でなければ
     // SANDBOX Cloth は描画パイプラインへ一切統合されないため。
@@ -358,16 +361,17 @@ export function PresetPanel({ canvasW, canvasH, setCanvasW, setCanvasH, aspectRa
     }
     store.setPresetName(preset.name);
     setSelectedPresetId(preset.id);
+    onPresetLoad();
   }
 
   async function handleSave() {
     const trimmed = name.trim();
     if (!trimmed) return;
-    const { gradient, noiseDistortion, diffuse, imageGradient, slitScan, stretch, animation, normalMap, radon, iridescence, manualDistort, postprocess, effectPipeline, matcap, keyframeTracks } = store;
+    const { gradient, noiseDistortion, diffuse, imageGradient, slitScan, stretch, animation, normalMap, coneView, radon, iridescence, manualDistort, postprocess, effectPipeline, matcap, keyframeTracks } = store;
     const state = {
       gradient, noiseDistortion, diffuse, imageGradient,
       slitScan: { ...slitScan, selectedSlitIdx: -1 }, stretch,
-      animation, normalMap, radon, iridescence, manualDistort: { ...manualDistort, enabled: false }, postprocess, effectPipeline, matcap,
+      animation, normalMap, coneView, radon, iridescence, manualDistort: { ...manualDistort, enabled: false }, postprocess, effectPipeline, matcap,
       keyframeTracks, colorPalettes: loadUserColorPalettes(), resolution: { width: canvasW, height: canvasH },
     };
     setSaving(true);

@@ -1,1 +1,1 @@
-export type RenderViewMode = 'canvas' | 'cloth';
+export type RenderViewMode = 'canvas' | 'cloth' | 'cone';

@@ -21,6 +21,8 @@ import type { UserColorPalette } from './colorPalettes';
 
 import type { ClothGradientConfig } from '../types/clothGradient';
 import { normalizeClothGradientConfig } from '../types/clothGradient';
+import type { ConeViewConfig } from '../types/coneView';
+import { normalizeConeViewConfig } from '../types/coneView';
 
 export type StoreSnapshot = {
   gradient: GradientConfig;
@@ -32,6 +34,7 @@ export type StoreSnapshot = {
   animation: AnimationConfig;
   normalMap: NormalMapConfig;
   clothGradient?: ClothGradientConfig;
+  coneView?: ConeViewConfig;
   radon: RadonConfig;
   iridescence?: IridescenceConfig;
   manualDistort?: ManualDistortConfig;
@@ -84,6 +87,7 @@ export function makePreset(
       gradient,
       diffuse,
       clothGradient: normalizeClothGradientConfig(state.clothGradient),
+      coneView: normalizeConeViewConfig(state.coneView),
       effectPipeline: state.effectPipeline
         ? normalizeEffectPipelineConfig(state.effectPipeline)
         : createDefaultEffectPipeline(),

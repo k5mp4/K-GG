@@ -158,8 +158,9 @@ Diceボタンを押すことでランダムなノイズを生成することが�
 - TOPバーの `SANDBOX` から、グラデーションの主スタックとは別の描画モジュールをまとめて編集できます。
 - `Normal` はグラデーションの輝度勾配から法線マップを生成し、表面の凹凸を調整します。有効時は既存どおりモノクロのグラデーションを適用します。
 - `Prism` は主スタック後段の光線・グロー、`Particles` は最終オーバーレイのパーティクルを調整します。
-- モジュールの表示順は `Surface → Main Stack → Prism → Particles` で固定され、SANDBOX内の選択変更は描画順を変更しません。SANDBOXの`Edit Layer`からNormal／Prism／Particlesを一つずつ選択します。
-- `Cloth Gradient`プロパティモジュールの表示モードから、従来の **2D Canvas** と、2Dエフェクト済みCanvasを布のUVへマッピングした **3D Cloth** を切り替えられます。Curl／Noise／Distortの結果は布の波打ちに追従します。Clothの準備中や利用できない環境ではCanvas表示を維持し、表示モードはPresetへ保存されません。
+- モジュールの表示順は `Surface → Main Stack → Prism → Particles` で固定され、SANDBOX内の選択変更は描画順を変更しません。SANDBOXの`Edit Layer`からCloth／Cone／Normal／Prism／Particlesを一つずつ選択します。
+- SANDBOXのCloth／ConeモジュールをONにすると、処理済みCanvasをそれぞれの3D表示へ切り替えられます。専用のPreview Surface表示モードはなく、OFFにすると2D Canvasへ戻ります。準備中や利用できない環境ではCanvas表示を維持し、表示状態はPresetへ保存されません。
+- ConeはDepth、Perspective、Rotation、Texture Repeat、Flow Cyclesを調整できます。照明を加えずCanvasの描画色を使い、Texture FlowはAnimationのタイムラインと静止画・動画書き出しへ同期します。Cone設定はPresetへ保存されます。
 
 ### Normal (ノーマルマップ)
 - グラデーションの輝度勾配から法線マップを生成します。

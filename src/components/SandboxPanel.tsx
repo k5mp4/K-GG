@@ -3,6 +3,7 @@ import { gradientRampPresets } from '../lib/gradientRampUtils';
 import { useGradientStore } from '../store/gradientStore';
 import { useLanguage } from '../i18n/LanguageProvider';
 import { ClothGradientPanel } from './ClothGradientPanel';
+import { ConeViewPanel } from './ConeViewPanel';
 import { CustomSelect } from './CustomSelect';
 import { Icon } from './Icon';
 import { NormalMapPanel } from './NormalMapPanel';
@@ -10,9 +11,9 @@ import { PostprocessPanel } from './PostprocessPanel';
 import { Toggle } from './Toggle';
 import type { RenderViewMode } from '../types/renderView';
 
-type SandboxProgramKey = 'normalMap' | 'prism' | 'particles' | 'cloth';
+type SandboxProgramKey = 'normalMap' | 'prism' | 'particles' | 'cloth' | 'cone';
 type SandboxProgramStatus = 'loading' | 'ready' | 'failed' | 'fallback';
-type SandboxModuleKey = 'cloth' | 'normal' | 'prism' | 'particles';
+type SandboxModuleKey = 'cloth' | 'cone' | 'normal' | 'prism' | 'particles';
 
 type SandboxModuleProps = {
   id: SandboxModuleKey;
@@ -86,7 +87,7 @@ function moduleStatus(
   if (status === 'loading') return { label: t('stack.status.loading'), className: 'text-amber-300' };
   if (status === 'failed') return { label: t('stack.status.unavailable'), className: 'text-red-300' };
   if (status === 'fallback') return { label: t('stack.status.fallback'), className: 'text-cyan-300' };
-  if (status === 'ready' || (key === 'cloth' && status === undefined)) return { label: t('stack.status.applied'), className: 'text-emerald-300' };
+  if (status === 'ready' || ((key === 'cloth' || key === 'cone') && status === undefined)) return { label: t('stack.status.applied'), className: 'text-emerald-300' };
   return { label: t('stack.status.preparing'), className: 'text-amber-300' };
 }
 
@@ -120,10 +121,11 @@ export function SandboxPanel({ renderViewMode, onRenderViewModeChange }: Sandbox
   }, []);
 
   const clothStatus = moduleStatus('cloth', clothGradient.enabled, programStatus, t);
+  const coneStatus = moduleStatus('cone', renderViewMode === 'cone', programStatus, t);
   const normalStatus = moduleStatus('normalMap', normalMap.enabled, programStatus, t);
   const prismStatus = moduleStatus('prism', effectPipeline.prismEnabled, programStatus, t);
   const particlesStatus = moduleStatus('particles', effectPipeline.particlesEnabled, programStatus, t);
-  const activeCount = [clothGradient.enabled, normalMap.enabled, effectPipeline.prismEnabled, effectPipeline.particlesEnabled]
+  const activeCount = [clothGradient.enabled, renderViewMode === 'cone', normalMap.enabled, effectPipeline.prismEnabled, effectPipeline.particlesEnabled]
     .filter(Boolean).length;
 
   const setNormalEnabled = (enabled: boolean) => {
@@ -132,10 +134,12 @@ export function SandboxPanel({ renderViewMode, onRenderViewModeChange }: Sandbox
   };
 
   const selectedLabel = selectedModule === 'cloth'
-    ? 'Cloth Gradient'
-    : selectedModule === 'normal'
-      ? t('effect.normal')
-      : selectedModule === 'prism' ? 'Prism' : 'Particles';
+    ? 'Cloth'
+    : selectedModule === 'cone'
+      ? 'Cone'
+      : selectedModule === 'normal'
+        ? t('effect.normal')
+        : selectedModule === 'prism' ? 'Prism' : 'Particles';
 
   return (
     <div className="space-y-4" data-sandbox-panel>
@@ -154,7 +158,7 @@ export function SandboxPanel({ renderViewMode, onRenderViewModeChange }: Sandbox
           </div>
           <div className="shrink-0 border border-cyan-200/25 bg-k-bg/35 px-2 py-1 text-right">
             <span className="block text-[8px] font-display uppercase tracking-[0.16em] text-cyan-100/60">{t('sandbox.active')}</span>
-            <span className="mt-0.5 block font-display text-sm font-bold text-cyan-100">{activeCount}<span className="text-cyan-100/40">/4</span></span>
+            <span className="mt-0.5 block font-display text-sm font-bold text-cyan-100">{activeCount}<span className="text-cyan-100/40">/5</span></span>
           </div>
         </div>
       </div>
@@ -165,7 +169,8 @@ export function SandboxPanel({ renderViewMode, onRenderViewModeChange }: Sandbox
           value={selectedModule}
           localizeOptions={false}
           options={[
-            { value: 'cloth', label: 'Cloth Gradient' },
+            { value: 'cloth', label: 'Cloth' },
+            { value: 'cone', label: 'Cone' },
             { value: 'normal', label: t('effect.normal') },
             { value: 'prism', label: 'Prism' },
             { value: 'particles', label: 'Particles' },
@@ -180,13 +185,27 @@ export function SandboxPanel({ renderViewMode, onRenderViewModeChange }: Sandbox
             description="3D wave cloth mesh mapped to Gradient Ramp lighting."
             enabled={clothGradient.enabled}
             status={clothStatus}
-            onToggleEnabled={(enabled) => setClothGradient({ enabled })}
+            onToggleEnabled={(enabled) => {
+              setClothGradient({ enabled });
+              onRenderViewModeChange(enabled ? 'cloth' : 'canvas');
+            }}
             badge={<span className="rounded bg-amber-500/20 px-1.5 py-0.5 text-[8px] font-medium tracking-normal text-amber-300" title={t('beta.experimental')}>🧪 Beta</span>}
           >
-            <ClothGradientPanel
-              renderViewMode={renderViewMode}
-              onRenderViewModeChange={onRenderViewModeChange}
-            />
+            <ClothGradientPanel />
+          </SandboxModule>
+        )}
+
+        {selectedModule === 'cone' && (
+          <SandboxModule
+            id="cone"
+            label={selectedLabel}
+            description={t('sandbox.coneDescription')}
+            enabled={renderViewMode === 'cone'}
+            status={coneStatus}
+            onToggleEnabled={(enabled) => onRenderViewModeChange(enabled ? 'cone' : 'canvas')}
+            badge={<span className="border border-cyan-200/25 bg-cyan-300/10 px-1.5 py-0.5 text-[8px] font-medium tracking-normal text-cyan-100">3D VIEW</span>}
+          >
+            <ConeViewPanel />
           </SandboxModule>
         )}
 
