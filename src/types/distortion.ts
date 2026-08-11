@@ -67,7 +67,7 @@ export type NoiseDistortionConfig = {
 };
 
 export type DiffuseDitherMode = 'pattern_dither';
-export type DiffuseMode = 'block' | 'smooth' | 'dither' | 'halftone' | 'ascii';
+export type DiffuseMode = 'block' | 'smooth' | 'dither' | 'halftone' | 'ascii' | 'legacy';
 export type DiffuseHalftoneShape = 'circle' | 'square';
 export type DiffuseAdaptiveChannel = 'luminance' | 'hue' | 'saturation';
 export const DEFAULT_DIFFUSE_ASCII_CHARSET = ' .:-=+*#%@';
@@ -82,7 +82,7 @@ export type DiffuseBezierValue = [number, number, number, number];
 
 export type DiffuseConfig = {
   enabled: boolean;
-  mode: DiffuseMode; // block=矩形ノイズ, smooth=有機的ドットノイズ, dither=ディザパターン, halftone=網点, ascii=文字組版
+  mode: DiffuseMode; // block=矩形ノイズ, smooth=有機的ドットノイズ, dither=ディザパターン, halftone=網点, ascii=文字組版, legacy=旧Stipple
   ditherMode: DiffuseDitherMode;
   scatter: number;  // 0–300  ピクセル単位の最大変位量
   grain: number;    // 0.01–5 グレインサイズ（px単位）

@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { useGradientStore, STORE_DEFAULTS } from '../store/gradientStore';
 import { SliderField } from './SliderField';
 import { Collapsible } from './Collapsible';
+import { AnimatedButton } from './AnimatedButton';
 import { Toggle } from './Toggle';
 import type { DiffuseConfig } from '../types/distortion';
 import { Icon } from './Icon';
@@ -25,6 +26,7 @@ const DIFFUSE_MODES: Array<{ value: DiffuseConfig['mode']; label: string }> = [
   { value: 'dither', label: 'Dither' },
   { value: 'halftone', label: 'Halftone' },
   { value: 'ascii', label: 'ASCII' },
+  { value: 'legacy', label: 'Stipple' },
 ];
 const DIFFUSE_MODE_VALUES = DIFFUSE_MODES.map(mode => mode.value);
 const ADAPTIVE_CHANNELS = ['luminance', 'hue', 'saturation'] as const;
@@ -224,67 +226,71 @@ export function DiffusePanel() {
               />
             )}
 
-            <div className="flex items-center justify-between border-t border-k-muted/40 pt-3">
-              <div>
-                <p className="text-xs text-deep">Adaptive Diffuse</p>
-                <p className="text-[10px] text-tab-inactive">Amount responds to color properties</p>
-              </div>
-              <Toggle checked={diffuse.adaptiveEnabled ?? false} onChange={(v) => setDiffuse({ adaptiveEnabled: v })} />
-            </div>
-            <div>
-              <p className="mb-1 text-xs text-deep">Adaptive Source</p>
-              <InputDrum
-                value={diffuse.adaptiveChannel}
-                options={ADAPTIVE_CHANNELS}
-                labels={ADAPTIVE_CHANNEL_LABELS}
-                onChange={(adaptiveChannel) => adaptiveChannel !== undefined && setDiffuse({ adaptiveChannel })}
-                aria-label="Diffuse adaptive source"
-                className="w-full"
-              />
-            </div>
-            <DiffuseCurveEditor
-              value={diffuse.luminanceBezier}
-              onChange={(luminanceBezier) => setDiffuse({ luminanceBezier })}
-              disabled={!diffuse.adaptiveEnabled}
-              label="Amount Curve"
-              description="Maps the selected source to scatter"
-            />
-            <button
-              type="button"
-              className="w-full border border-k-muted/60 bg-k-surface px-2 py-1 text-[10px] text-tab-inactive hover:border-k-text hover:text-k-text"
-              onClick={() => setDiffuse({
-                luminanceBezier: [...IDENTITY_DIFFUSE_BEZIER] as DiffuseConfig['luminanceBezier'],
-                grainBezier: [...IDENTITY_DIFFUSE_BEZIER] as DiffuseConfig['grainBezier'],
-              })}
-            >
-              {t('diffuse.resetCurve')}
-            </button>
+            {diffuse.mode !== 'legacy' && (
+              <>
+                <div className="flex items-center justify-between border-t border-k-muted/40 pt-3">
+                  <div>
+                    <p className="text-xs text-deep">Adaptive Diffuse</p>
+                    <p className="text-[10px] text-tab-inactive">Amount responds to color properties</p>
+                  </div>
+                  <Toggle checked={diffuse.adaptiveEnabled ?? false} onChange={(v) => setDiffuse({ adaptiveEnabled: v })} />
+                </div>
+                <div>
+                  <p className="mb-1 text-xs text-deep">Adaptive Source</p>
+                  <InputDrum
+                    value={diffuse.adaptiveChannel}
+                    options={ADAPTIVE_CHANNELS}
+                    labels={ADAPTIVE_CHANNEL_LABELS}
+                    onChange={(adaptiveChannel) => adaptiveChannel !== undefined && setDiffuse({ adaptiveChannel })}
+                    aria-label="Diffuse adaptive source"
+                    className="w-full"
+                  />
+                </div>
+                <DiffuseCurveEditor
+                  value={diffuse.luminanceBezier}
+                  onChange={(luminanceBezier) => setDiffuse({ luminanceBezier })}
+                  disabled={!diffuse.adaptiveEnabled}
+                  label="Amount Curve"
+                  description="Maps the selected source to scatter"
+                />
+                <button
+                  type="button"
+                  className="w-full border border-k-muted/60 bg-k-surface px-2 py-1 text-[10px] text-tab-inactive hover:border-k-text hover:text-k-text"
+                  onClick={() => setDiffuse({
+                    luminanceBezier: [...IDENTITY_DIFFUSE_BEZIER] as DiffuseConfig['luminanceBezier'],
+                    grainBezier: [...IDENTITY_DIFFUSE_BEZIER] as DiffuseConfig['grainBezier'],
+                  })}
+                >
+                  {t('diffuse.resetCurve')}
+                </button>
 
-            <div className="flex items-center justify-between border-t border-k-muted/40 pt-3">
-              <div>
-                <p className="text-xs text-deep">Adaptive Grain</p>
-                <p className="text-[10px] text-tab-inactive">Change cell size with the same source</p>
-              </div>
-              <Toggle checked={diffuse.grainAdaptiveEnabled ?? false} onChange={(v) => setDiffuse({ grainAdaptiveEnabled: v })} />
-            </div>
-            <SliderField
-              label="Grain Curve Amount"
-              min={0}
-              max={1}
-              step={0.01}
-              value={diffuse.grainAdaptiveAmount}
-              onChange={(v) => setDiffuse({ grainAdaptiveAmount: v })}
-              format={(v) => `${Math.round(v * 100)}%`}
-              defaultValue={D.grainAdaptiveAmount}
-              limitKey="diffuse.grainAdaptiveAmount"
-            />
-            <DiffuseCurveEditor
-              value={diffuse.grainBezier}
-              onChange={(grainBezier) => setDiffuse({ grainBezier })}
-              disabled={!diffuse.grainAdaptiveEnabled}
-              label="Grain Curve"
-              description="Maps the selected source to cell size"
-            />
+                <div className="flex items-center justify-between border-t border-k-muted/40 pt-3">
+                  <div>
+                    <p className="text-xs text-deep">Adaptive Grain</p>
+                    <p className="text-[10px] text-tab-inactive">Change cell size with the same source</p>
+                  </div>
+                  <Toggle checked={diffuse.grainAdaptiveEnabled ?? false} onChange={(v) => setDiffuse({ grainAdaptiveEnabled: v })} />
+                </div>
+                <SliderField
+                  label="Grain Curve Amount"
+                  min={0}
+                  max={1}
+                  step={0.01}
+                  value={diffuse.grainAdaptiveAmount}
+                  onChange={(v) => setDiffuse({ grainAdaptiveAmount: v })}
+                  format={(v) => `${Math.round(v * 100)}%`}
+                  defaultValue={D.grainAdaptiveAmount}
+                  limitKey="diffuse.grainAdaptiveAmount"
+                />
+                <DiffuseCurveEditor
+                  value={diffuse.grainBezier}
+                  onChange={(grainBezier) => setDiffuse({ grainBezier })}
+                  disabled={!diffuse.grainAdaptiveEnabled}
+                  label="Grain Curve"
+                  description="Maps the selected source to cell size"
+                />
+              </>
+            )}
 
             <SliderField
               label="Seed"
@@ -295,6 +301,16 @@ export function DiffusePanel() {
               trackId="diffuse.seed"
               limitKey="diffuse.seed"
             />
+            {diffuse.mode === 'legacy' && (
+              <AnimatedButton
+                onClick={() => setDiffuse({ seedAnimEnabled: !(diffuse.seedAnimEnabled ?? false) })}
+                isActive={diffuse.seedAnimEnabled ?? false}
+                className="w-full"
+                title="Change the Stipple seed every frame"
+              >
+                Seed Per Frame
+              </AnimatedButton>
+            )}
           </div>
         </Collapsible>
       </div>

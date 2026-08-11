@@ -23,4 +23,30 @@ describe('legacy Diffuse preset migration', () => {
       expect(value).toBeCloseTo([1 / 3, 1 / 3, 2 / 3, 2 / 3][index], 10);
     });
   });
+
+  it('round-trips Stipple with its legacy internal mode value', () => {
+    const state = {
+      diffuse: {
+        ...STORE_DEFAULTS.diffuse,
+        mode: 'legacy' as const,
+        scatter: 47,
+        grain: 0.23,
+        seed: 0,
+        seedAnimEnabled: true,
+      },
+    } as unknown as StoreSnapshot;
+
+    const saved = makePreset('Stipple', state);
+    const reloaded: unknown = JSON.parse(JSON.stringify(saved));
+
+    expect(isPreset(reloaded)).toBe(true);
+    if (!isPreset(reloaded)) throw new Error('Expected the serialized preset to reload');
+    expect(reloaded.state.diffuse).toMatchObject({
+      mode: 'legacy',
+      scatter: 47,
+      grain: 0.23,
+      seed: 0,
+      seedAnimEnabled: true,
+    });
+  });
 });

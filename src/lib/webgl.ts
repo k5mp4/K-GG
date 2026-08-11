@@ -27,7 +27,7 @@ import {
   normalizeGlassV2ColorParameters,
 } from './glass';
 import { getActivePostprocessStackLayers } from './postprocessStack';
-import { canRenderV2Direct, getV2RenderPlan } from './effectPipeline';
+import { getV2RenderPlan } from './effectPipeline';
 import { buildDiffuseBezierLut, normalizeDiffuseBezier } from './diffuseCurve';
 import { buildMeshGradientField, MESH_FIELD_SIZE, MESH_FIELD_SUBDIVISIONS } from './meshGradientField';
 import { noiseAngleDegreesForShader, noiseAngleRadiansForShader } from './noiseAngle';
@@ -1141,9 +1141,13 @@ export function getRequiredExportProgramKeys(state: LatestState): LazyProgramKey
       normalMapEnabled: state.normalMap.enabled,
       normalMapBlur: state.normalMap.blur,
       prismGlowRadius: state.postprocess.prismGlowRadius ?? 0,
+      forceTextureDiffusePass: state.diffuse.mode === 'legacy',
     });
+    const protectedStipple = imageGradientProtected
+      && state.diffuse.mode === 'legacy'
+      && plan.diffuseEnabled;
     add('generator', imageGradientProtected);
-    add('stackCore', !imageGradientProtected && plan.programs.stackCore);
+    add('stackCore', (!imageGradientProtected || protectedStipple) && plan.programs.stackCore);
     add('noiseStack', !imageGradientProtected && plan.programs.noiseStack);
     add('glassV2', !imageGradientProtected && plan.programs.glassV2 && !isGlassOpticallyIdentity(state.postprocess));
     add('normalMap', plan.programs.normalMap);
@@ -1407,7 +1411,7 @@ export function hexToRgb(hex: string): [number, number, number] {
 
 export const NOISE_TYPE_MAP = { simplex: 0, fbm: 1, voronoi: 2, curl: 3, domain_warp_anim: 4, seamless: 5, ridged_fbm: 6, ae_fractal: 7, fast_curl: 8, caustics: 9, phasor: 10 } as const;
 export const GRADIENT_TYPE_MAP = { linear: 0, radial: 1, fourcolor: 2, diamond: 3, angle: 4, bezier: 5, mesh: 6 } as const;
-const DIFFUSE_MODE_MAP = { block: 0, smooth: 1, dither: 2, halftone: 3, ascii: 4 } as const;
+const DIFFUSE_MODE_MAP = { block: 0, smooth: 1, dither: 2, halftone: 3, ascii: 4, legacy: 5 } as const;
 const PARTICLE_EMITTER_TYPE_MAP = { field: 0, line: 1, burst: 2, point: 3 } as const;
 const ASCII_ATLAS_COLUMNS = 16;
 const ASCII_GLYPH_WIDTH = 32;
@@ -2717,7 +2721,8 @@ export function render(
   const [animDirX, animDirY] = getAnimationDirectionVector(animDirection);
   gl.uniform2f(uniforms.u_animDir, animDirX, animDirY);
   const diffuseScale = diffuseResolutionScale(width, height);
-  gl.uniform1i(uniforms.u_diffuseEnabled, generatorColorFieldEnabled && diffuse.enabled ? 1 : 0);
+  const generatorDiffuseEnabled = generatorColorFieldEnabled && diffuse.enabled && !(isV2Pipeline && imageGradientProtected && diffuse.mode === 'legacy');
+  gl.uniform1i(uniforms.u_diffuseEnabled, generatorDiffuseEnabled ? 1 : 0);
   gl.uniform1i(uniforms.u_diffuseMode, DIFFUSE_MODE_MAP[diffuse.mode ?? 'block'] ?? 0);
   gl.uniform1f(uniforms.u_diffuseScatter, diffuse.mode === 'dither' ? 100 : diffuse.scatter * diffuseScale);
   gl.uniform1f(uniforms.u_diffuseGrain, diffuse.grain * diffuseScale);
@@ -2908,11 +2913,19 @@ export function render(
       normalMapBlur: normalMap.blur,
       prismGlowRadius: postprocess.prismGlowRadius ?? 0,
       clothGradientEnabled: clothGradient?.enabled ?? false,
+      forceTextureDiffusePass: diffuse.mode === 'legacy',
     });
     const diffuseLayerEnabled = renderPlan.diffuseEnabled;
     const protectedLayerEnabled = (kind: EffectPipelineConfig['effectStack'][number]['kind']) =>
       renderPlan.normalizedStack.some(layer => layer.kind === kind && layer.enabled);
-    const mainLayers = imageGradientProtected ? [] : renderPlan.enabledLayers;
+    // Protected Image Gradient normally bypasses reorderable geometry layers.
+    // Stipple is the exception: it needs the old texture postprocess path.
+    const protectedStipple = imageGradientProtected
+      && diffuse.mode === 'legacy'
+      && diffuseLayerEnabled;
+    const mainLayers = imageGradientProtected
+      ? (protectedStipple ? renderPlan.enabledLayers.filter(layer => layer.kind === 'diffuse') : [])
+      : renderPlan.enabledLayers;
     const normalRequested = renderPlan.normalRequested;
     const normalNeedsBlur = renderPlan.normalNeedsBlur;
     const prismRequested = renderPlan.prismRequested;
@@ -2920,12 +2933,15 @@ export function render(
     const particlesRequested = renderPlan.particlesRequested;
     const glassIdentity = isGlassOpticallyIdentity(postprocess);
 
-    // The V2 default is Diffuse-only. Base and Diffuse use the same panel
-    // uniforms/algorithm, so no intermediate texture is needed when there are
-    // no intervening stages. Avoid compiling the large texture-stack shader
-    // and allocating full-size ping-pong FBOs for this common path.
-    const protectedDirect = imageGradientProtected && !normalRequested && !renderPlan.prismRequested && !renderPlan.particlesRequested;
-    if (canRenderV2Direct(effectPipeline, normalRequested, clothGradient?.enabled ?? false) || protectedDirect) {
+    // The V2 default is Diffuse-only. Most modes can stay in the Generator,
+    // but Stipple is intentionally a texture pass so it preserves the old
+    // postprocess hash and one-pixel grain floor even without another layer.
+    const protectedDirect = imageGradientProtected
+      && !protectedStipple
+      && !normalRequested
+      && !renderPlan.prismRequested
+      && !renderPlan.particlesRequested;
+    if (renderPlan.framebufferAllocationMode === 'direct' || protectedDirect) {
       if (imageGradientProtected) {
         gl.uniform1i(uniforms.u_noiseEnabled, protectedLayerEnabled('noise') && noiseDistortion.enabled ? 1 : 0);
         gl.uniform1i(uniforms.u_slitEnabled, protectedLayerEnabled('slit') && slitScan.enabled ? 1 : 0);
@@ -2939,7 +2955,7 @@ export function render(
       return;
     }
 
-    const stackCoreRequested = imageGradientProtected ? false : renderPlan.programs.stackCore;
+    const stackCoreRequested = (!imageGradientProtected || protectedStipple) && renderPlan.programs.stackCore;
     // V2's texture stack has its own specialized programs. It must not wait
     // for the Legacy generator, which is intentionally not requested by V2.
     const stackCoreReady = !stackCoreRequested || requestLazyProgram(ctx, 'stackCore');

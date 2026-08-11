@@ -30,4 +30,13 @@ describe('export WebGL program plan', () => {
   ])('requires the dedicated programs for %s', (_label, enabled, expected) => {
     expect(getRequiredExportProgramKeys(stateWithGlass(enabled))).toEqual(expected);
   });
+
+  it('requests Stack Core for Stipple over a protected Image Gradient', () => {
+    const state = stateWithGlass(false);
+    state.imageGradient = { ...state.imageGradient, enabled: true };
+    state.imageGradientSource = { width: 1, height: 1 } as unknown as HTMLCanvasElement;
+    state.diffuse = { enabled: true, mode: 'legacy' } as LatestState['diffuse'];
+
+    expect(getRequiredExportProgramKeys(state)).toEqual(['generator', 'stackCore']);
+  });
 });

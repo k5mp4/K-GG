@@ -1,0 +1,25 @@
+# Tasks
+
+- [x] 現行Effect Stack、UI仕様、関連ADR、Normal／Prism／Particlesの実装を確認する
+- [x] 初回の`proposal.md` と`delta.md`をレビュー・承認する
+- [x] `design.md` のSANDBOX内部レイアウトと名称を確定する
+- [x] Normal／Prism／Particlesの詳細コントロールをSANDBOXへ再構成する
+- [x] TOPバー、Effect Stack、Postprocessの重複入口を整理する
+- [x] 日本語・英語ラベルとアクセシブルな説明を追加する
+- [x] 受け入れ条件ごとの自動テストまたは再現可能な手動確認を追加する
+- [x] current spec、利用者向け文書、関連ファイル一覧を同期する
+- [x] `validation.md`へ実行結果と未確認事項を記録する
+- [x] 追加要件の`proposal.md`、`delta.md`、`design.md`をレビュー・再承認する
+- [x] SANDBOXの3モジュールをPostprocessの`Edit Layer`と同じ選択要素へ置き換え、選択中だけ詳細を表示する
+- [x] TOPバーの独立Distort入口を削除し、Postprocess Distortを正規の編集・描画源へ統合する
+- [x] 旧`manualDistort`を持つPresetの読み込み互換と、Distortの二重上書き防止を追加する
+- [x] Legacy V1／Effect Stack V2のNormal Map描画を同一入力・同一エンコードへ修正する
+- [x] NormalのLegacy／V2代表ケース比較テストを追加する
+- [x] NormalのLegacy／V2実WebGL確認を行う
+- [x] 追加要件をcurrent spec、利用者向け文書、関連ファイル一覧へ反映する
+- [x] 追加受け入れ条件の検証結果を`validation.md`へ追記する
+- [x] TOPバーをDiffuse／Noise／Slit／Postprocess／SANDBOX／Export／Presetの順に整理し、Stretchをプロパティモジュールから外す
+- [x] SANDBOXのトップバー文字色をPostprocessと同じ通常色へ統一する
+- [x] Postprocess内部の個別ON／OFFを外し、Effect Stackの有効状態からPostprocess全体を同期する
+- [x] ブラウザー通常幅・モバイル幅でSANDBOXの操作を手動確認する
+- [x] 変更仕様をArchiveへ移動する
