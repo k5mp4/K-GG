@@ -18,7 +18,10 @@ void main() {
       ? ditherCellCenter(globalCoord)
       : globalCoord;
     vec2 diffuseUv = diffuseGlobalUv(diffuseSampleCoord / u_fullResolution, globalCoord);
-    gl_FragColor = applyDiffuseDither(texture2D(u_sourceTex, sourceUvFromGlobal(diffuseUv)), globalCoord);
+    gl_FragColor = applyDiffuseDither(
+      texture2D(u_sourceTex, diffuseTexelCenterUv(sourceUvFromGlobal(diffuseUv))),
+      globalCoord
+    );
     return;
   }
 #if !defined(KGG_STACK_CORE_NO_NOISE)
@@ -33,7 +36,9 @@ void main() {
     vec2 sampleUv = u_stackSlitDiffuseAfter
       ? diffuseGlobalUv(slitUv, globalCoord)
       : slitUv;
-    vec4 slitColor = texture2D(u_sourceTex, sourceUvFromGlobal(sampleUv));
+    vec2 slitSourceUv = sourceUvFromGlobal(sampleUv);
+    if (u_stackSlitDiffuseAfter) slitSourceUv = diffuseTexelCenterUv(slitSourceUv);
+    vec4 slitColor = texture2D(u_sourceTex, slitSourceUv);
     gl_FragColor = u_stackSlitDiffuseAfter
       ? applyDiffuseDither(slitColor, globalCoord)
       : slitColor;

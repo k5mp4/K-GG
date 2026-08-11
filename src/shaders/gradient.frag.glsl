@@ -806,9 +806,12 @@
     if (!rawSourceActive) {
       uv = applyNoiseUV(uv);
     }
-    if (u_diffuseEnabled && u_diffuseMode <= 1) {
+    if (u_diffuseEnabled && (u_diffuseMode <= 1 || u_diffuseMode == 5)) {
       vec2 seedOff = vec2(u_diffuseSeed * 31.41, u_diffuseSeed * 59.26);
-      float cellSize = diffuseCellSizeAtCoord(globalCoord, vec3(0.0));
+      bool isLegacyStipple = u_diffuseMode == 5;
+      float cellSize = isLegacyStipple
+        ? max(u_diffuseGrain, 0.01)
+        : diffuseCellSizeAtCoord(globalCoord, vec3(0.0));
       vec2 disp;
       if (u_diffuseMode == 1) {
         vec2 ci = floor(globalCoord / max(cellSize, 0.01));
@@ -828,7 +831,7 @@
       vec3 adaptiveColor = u_imageGradientEnabled
         ? texture2D(u_gradientRamp, vec2(clamp(imageGradientT(imageUV), 0.0, 1.0), 0.5)).rgb
         : sampleGradientColor(uv).rgb;
-      float adaptiveFactor = u_diffuseAdaptiveEnabled
+      float adaptiveFactor = !isLegacyStipple && u_diffuseAdaptiveEnabled
         ? diffuseCurveValue(diffuseAdaptiveInput(adaptiveColor), false)
         : 1.0;
       uv += disp * clamp(u_diffuseScatter, 0.0, 300.0) * adaptiveFactor / u_resolution;

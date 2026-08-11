@@ -234,8 +234,9 @@ export function canRenderV2Direct(
   pipeline: EffectPipelineConfig,
   normalMapEnabled: boolean,
   clothGradientEnabled = false,
+  forceTextureDiffusePass = false,
 ): boolean {
-  if (clothGradientEnabled) return false;
+  if (clothGradientEnabled || forceTextureDiffusePass) return false;
   const stack = normalizeEffectStack(pipeline.effectStack);
   return pipeline.version === 'stack-v2'
     && !normalMapEnabled
@@ -248,8 +249,9 @@ export function getV2FramebufferAllocationMode(
   pipeline: EffectPipelineConfig,
   normalMapEnabled: boolean,
   clothGradientEnabled = false,
+  forceTextureDiffusePass = false,
 ): 'direct' | 'core' | 'full' {
-  if (canRenderV2Direct(pipeline, normalMapEnabled, clothGradientEnabled)) return 'direct';
+  if (canRenderV2Direct(pipeline, normalMapEnabled, clothGradientEnabled, forceTextureDiffusePass)) return 'direct';
   if (normalMapEnabled || pipeline.prismEnabled) return 'full';
   return 'core';
 }
@@ -263,8 +265,10 @@ export function requiresV2StackCore(
   pipeline: EffectPipelineConfig,
   normalMapEnabled = false,
   clothGradientEnabled = false,
+  forceTextureDiffusePass = false,
 ): boolean {
-  return pipeline.version === 'stack-v2' && !canRenderV2Direct(pipeline, normalMapEnabled, clothGradientEnabled);
+  return pipeline.version === 'stack-v2'
+    && !canRenderV2Direct(pipeline, normalMapEnabled, clothGradientEnabled, forceTextureDiffusePass);
 }
 
 export type V2RenderPlanOptions = {
@@ -272,6 +276,8 @@ export type V2RenderPlanOptions = {
   normalMapBlur: number;
   prismGlowRadius: number;
   clothGradientEnabled?: boolean;
+  /** Requires Diffuse to run as a texture stack pass even when it is the only layer. */
+  forceTextureDiffusePass?: boolean;
 };
 
 export type V2RenderPlan = {
@@ -311,6 +317,7 @@ export function getV2RenderPlan(
   const normalizedStack = normalizeEffectStack(pipeline.effectStack);
   const enabledLayers = normalizedStack.filter(layer => layer.enabled);
   const diffuseEnabled = enabledLayers.some(layer => layer.kind === 'diffuse');
+  const forceTextureDiffusePass = diffuseEnabled && Boolean(options.forceTextureDiffusePass);
   const normalRequested = shouldRenderNormalMap(options.normalMapEnabled, diffuseEnabled);
   const normalNeedsBlur = normalRequested && options.normalMapBlur >= 0.5;
   const prismRequested = pipeline.prismEnabled;
@@ -330,9 +337,19 @@ export function getV2RenderPlan(
     prismRequested,
     prismNeedsBlur,
     particlesRequested,
-    framebufferAllocationMode: getV2FramebufferAllocationMode(pipeline, normalRequested, options.clothGradientEnabled),
+    framebufferAllocationMode: getV2FramebufferAllocationMode(
+      pipeline,
+      normalRequested,
+      options.clothGradientEnabled,
+      forceTextureDiffusePass,
+    ),
     programs: {
-      stackCore: requiresV2StackCore(pipeline, normalRequested, options.clothGradientEnabled),
+      stackCore: requiresV2StackCore(
+        pipeline,
+        normalRequested,
+        options.clothGradientEnabled,
+        forceTextureDiffusePass,
+      ),
       noiseStack: noiseRequested,
       glassV2: glassV2Requested,
       normalMap: normalRequested,

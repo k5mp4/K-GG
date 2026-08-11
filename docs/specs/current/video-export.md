@@ -61,7 +61,7 @@ Coneモードではexport sessionのnormalizedTimeをFlow Mappingへ使用しま
 
 ## 変更履歴
 
-- [CHANGE-011 GLASS／GLASS V2書き出し決定性修正](../../changes/active/CHANGE-011-deterministic-glass-export/proposal)
+- [CHANGE-011 GLASS／GLASS V2書き出し決定性修正](../../changes/archive/CHANGE-011-deterministic-glass-export/proposal)
 - [SPEC-005 動画出力表示名とファイル名](../SPEC-005-video-export-naming)
 - [SPEC-023 動画書き出しUXとMP4品質](../SPEC-023-video-export-ux-and-mp4-quality)
 - [SPEC-024 動画書き出しFFmpeg待機の応答性](../SPEC-024-video-export-encode-responsiveness)

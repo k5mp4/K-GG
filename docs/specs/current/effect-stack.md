@@ -5,12 +5,12 @@ title: Effect Stack
 status: current
 owners: [maintainer]
 created: 2026-07-27
-updated: 2026-08-10
-requirement_ids: [EFFECT-001, EFFECT-002, EFFECT-003, EFFECT-004, EFFECT-005, EFFECT-006, EFFECT-007, EFFECT-008, EFFECT-009, EFFECT-010, EFFECT-011, EFFECT-012, EFFECT-013, EFFECT-014, EFFECT-015, EFFECT-016, EFFECT-017, EFFECT-018, EFFECT-019, EFFECT-020, EFFECT-021, CLOTH-001, CLOTH-002, CLOTH-003, SANDBOX-001]
+updated: 2026-08-11
+requirement_ids: [EFFECT-001, EFFECT-002, EFFECT-003, EFFECT-004, EFFECT-005, EFFECT-006, EFFECT-007, EFFECT-008, EFFECT-009, EFFECT-010, EFFECT-011, EFFECT-012, EFFECT-013, EFFECT-014, EFFECT-015, EFFECT-016, EFFECT-017, EFFECT-018, EFFECT-019, EFFECT-020, EFFECT-021, EFFECT-022, EFFECT-023, DISTORT-001, DISTORT-002, CLOTH-001, CLOTH-002, CLOTH-003, SANDBOX-001]
 related_adrs: [ADR-0004, ADR-0005, ADR-0010]
-related_changes: [CHANGE-001, CHANGE-011, CHANGE-012, CHANGE-013, CHANGE-014, CHANGE-015, CHANGE-018, CHANGE-019, CHANGE-021, CHANGE-022, CHANGE-023, CHANGE-024, CHANGE-025]
+related_changes: [CHANGE-001, CHANGE-011, CHANGE-012, CHANGE-013, CHANGE-014, CHANGE-015, CHANGE-018, CHANGE-019, CHANGE-020, CHANGE-021, CHANGE-022, CHANGE-023, CHANGE-024, CHANGE-025, CHANGE-026]
 related_code: [src/types/distortion.ts, src/types/renderView.ts, src/types/coneView.ts, src/lib/effectPipeline.ts, src/lib/normalMap.ts, src/lib/effectStackTransition.ts, src/lib/postprocessStack.ts, src/lib/postprocessAnimation.ts, src/lib/sceneEvaluation.ts, src/lib/glass.ts, src/lib/webgl.ts, src/lib/presetModel.ts, src/lib/presetThumbnail.ts, src/lib/coneView.ts, src/lib/coneViewRenderer.ts, src/lib/processedCanvasClock.ts, src/store/gradientStore.ts, src/components/PostprocessStackPanel.tsx, src/components/EffectStackWorkspace.tsx, src/components/PostprocessPanel.tsx, src/components/DistortOverlay.tsx, src/components/SandboxPanel.tsx, src/components/BlockNoisePanel.tsx, src/components/DiffuseCurveEditor.tsx, src/components/SlitScanPanel.tsx, src/components/StretchPanel.tsx, src/components/PresetPanel.tsx, src/components/ClothGradientPanel.tsx, src/components/ClothCanvas.tsx, src/components/ConeCanvas.tsx, src/components/ConeViewPanel.tsx, src/lib/clothGradientRenderer.ts, src/lib/clothView.ts, src/types/clothGradient.ts, src/shaders/normalmap.frag.glsl, src/shaders/postprocess/glass-optics.glsl]
-related_tests: [src/lib/effectPipeline.test.ts, src/lib/webglNormalMapParity.test.ts, src/lib/effectStackTransition.test.ts, src/lib/postprocessStack.test.ts, src/lib/postprocessAnimation.test.ts, src/lib/effectStackDrag.test.ts, src/lib/effectShaderParity.test.ts, src/lib/glass.test.ts, src/store/gradientStore.effectPipeline.test.ts, src/store/gradientStore.postprocessStack.test.ts, src/store/gradientStore.glass.test.ts, src/lib/sceneEvaluation.glass.test.ts, src/lib/presetThumbnail.test.ts, src/lib/clothView.test.ts, src/lib/coneView.test.ts, src/lib/processedCanvasClock.test.ts, src/types/coneView.test.ts, tests/clothGradient.test.ts]
+related_tests: [src/lib/effectPipeline.test.ts, src/lib/webglNormalMapParity.test.ts, src/lib/effectStackTransition.test.ts, src/lib/postprocessStack.test.ts, src/lib/postprocessAnimation.test.ts, src/lib/effectStackDrag.test.ts, src/lib/effectShaderParity.test.ts, src/lib/imageGradientProtected.test.ts, src/lib/webglExportPrograms.test.ts, src/lib/glass.test.ts, src/store/gradientStore.effectPipeline.test.ts, src/store/gradientStore.postprocessStack.test.ts, src/store/gradientStore.glass.test.ts, src/lib/sceneEvaluation.glass.test.ts, src/lib/presetThumbnail.test.ts, src/lib/clothView.test.ts, src/lib/coneView.test.ts, src/lib/processedCanvasClock.test.ts, src/types/coneView.test.ts, tests/clothGradient.test.ts]
 ---
 
 # Effect Stack
@@ -53,6 +53,14 @@ Diffuseは主スタック内の一つのレイヤーです。旧来の固定最�
 
 Diffuseへ追加されたHalftone、ASCII、適応ソース、粒度カーブの値がない旧Presetは既定値で補完します。Slitの旧Presetに残る`autoLoop`は読み込み時に破棄し、保存済みの`animMode`、`offsetSpeed`、`phaseSpeed`を使います。
 
+### DISTORT-001 歪みマップテクスチャの浮動小数点化
+
+WebGL2の`manualDistortTexture`は`RGBA32F`（32-bit float RGBA）内部フォーマットを使用し、データ転送には`Float32Array`と`gl.FLOAT`を使用します。これにより、歪みマップの8-bit量子化による階段状の描画段差やブロックノイズを避け、連続した歪み変位を提供します。
+
+### DISTORT-002 歪みマップ転送時の精度維持
+
+CPU側でCatmull-Rom補間した変位値は、0.0〜1.0へ正規化した小数値のまま浮動小数点バッファへ転送します。8-bit整数への丸めは行わず、シェーダー側のサンプリング精度を維持します。
+
 ### EFFECT-006 描画失敗からの復旧
 
 描画に必要なプログラムとバッファは、現在の描画計画に必要なものだけを準備します。準備中・失敗・フォールバックの状態はEffect Stack UIへ反映され、失敗した効果があっても保存済みPresetのデータ自体は失われません。再試行や別構成への変更で描画計画を再評価できます。
@@ -92,7 +100,7 @@ TOPバーのSANDBOXから、Postprocessの`Edit Layer`と同じ選択要素でNo
 Legacy V1とEffect Stack V2のNormal Mapは、同じNormal Mapシェーダー、輝度サンプリング、中心差分、角度回転、反転、`R=右・G=上・B=手前`のRGBAエンコードを使用します。両経路はDiffuseが有効なフレームではNormalを描画せず、Diffuseを法線計算用入力の代替として扱いません。V2の`manualDistort`状態がPostprocessのNormal入力やDistort値を上書きすることはありません。
 ### EFFECT-015 DiffuseのHalftoneとASCII
 
-DiffuseはBlock、Smooth、Dither、Halftone、ASCIIの5モードを持ちます。Halftoneは円形または四角形の形状、セルサイズ、形状サイズ、背景色を持ち、入力色の濃度に応じて形状の占有率を変えます。ASCIIは保存された文字セットと背景色を濃度順に割り当て、セルごとに対応文字を描画します。背景色の既定値は`#000000`です。Halftone／ASCIIはフラグメント解像度の色と座標を使い、Ditherだけがセル中心サンプリングを使います。粒度適応時もベースセル単位で代表色とセル内座標を決めるため、円形・四角形の形状を崩しません。Halftone／ASCIIのセルは指定した背景色と不透明アルファを持ち、キャンバスの裏面が透けないようにします。ASCIIアトラスはCanvasの行順を維持してアップロードし、シェーダーはアトラス座標をそのままサンプリングするため、アトラスのrow 0（先頭の文字）がキャンバス上で正しく表示されます。ASCIIは保存されたフォント指定と文字サイズ（px）を持ち、グリフアトラスの生成とグリフセルサイズへ反映されます。通常描画とEffect Stack描画は同じ保存設定を使います。
+DiffuseはBlock、Smooth、Dither、Halftone、ASCII、Stippleの6モードを持ちます。Halftoneは円形または四角形の形状、セルサイズ、形状サイズ、背景色を持ち、入力色の濃度に応じて形状の占有率を変えます。ASCIIは保存された文字セットと背景色を濃度順に割り当て、セルごとに対応文字を描画します。背景色の既定値は`#000000`です。Halftone／ASCIIはフラグメント解像度の色と座標を使い、Ditherだけがセル中心サンプリングを使います。粒度適応時もベースセル単位で代表色とセル内座標を決めるため、円形・四角形の形状を崩しません。Halftone／ASCIIのセルは指定した背景色と不透明アルファを持ち、キャンバスの裏面が透けないようにします。ASCIIアトラスはCanvasの行順を維持してアップロードし、シェーダーはアトラス座標をそのままサンプリングするため、アトラスのrow 0（先頭の文字）がキャンバス上で正しく表示されます。ASCIIは保存されたフォント指定と文字サイズ（px）を持ち、グリフアトラスの生成とグリフセルサイズへ反映されます。通常描画とEffect Stack描画は同じ保存設定を使います。Block、Smooth、Dither、Halftone、ASCIIの契約はStipple追加によって変わりません。
 
 ### EFFECT-018 ASCIIのフォントと文字サイズ
 
@@ -105,6 +113,14 @@ Tauriコマンド`list_system_fonts`は、OSの標準フォントディレクト
 ### EFFECT-016 Diffuseの適応ソースと粒度
 
 Diffuseの適応ソースは輝度、色相、彩度から選択できます。選択した値を拡散量Bezierの入力として評価し、粒度適応を有効にした場合は独立した粒度Bezierをベースセル単位の代表色へ評価します。セル内座標はベースセル基準で固定され、Halftoneの円形・四角形とASCII文字は自分のセル内に収まるため、フラグメント境界で崩れません。粒度適応はBlock/Smoothの拡散セルサイズ（`diffusePanelDisplacement`とLegacyの拡散グリッド）にも反映され、グレインカーブとアマウントが拡散セルの大きさを変化させます。ドメインワープは等方的に保たれ、セルはアスペクト比を維持したまま拡大します。粒度適応を無効にした場合は固定粒度を使います。
+
+### EFFECT-022 Diffuseの旧方式Stippleモード
+
+Stippleは保存上のモード値`legacy`で表す旧Diffuse互換モードです。色の量子化、背景色、Halftone/ASCII形状、適応量Bezier、粒度Bezier、ドメインワープは適用しません。提示された旧Diffuseパネルの見た目を作った旧`gradient.frag.glsl`と同じ、`max(grain, 0.01)`のセル、seed付きp3ハッシュ、および`mediump`精度を使います。Effect Stack V2は`highp`シェーダーですが、Stippleのセル化とハッシュだけはこの旧Generator精度を明示的に使い、Scatter（px）で直前テクスチャの入力UVを変位します。変位後の入力テクスチャは隣接画素を線形補間せず、変位先の入力画素色を保持します。これにより`Grain=0.23px`のような小数設定では、均一なドメインワープや広い中間色のぼけではなく、旧版と同じ高密度の微粒子格子になります。Seed Per Frameが有効な場合は既存の`diffuse.seed`自動トラックを使用します。
+
+### EFFECT-023 StippleのEffect Stack挿入
+
+Effect Stack V2でDiffuseレイヤーがStippleの場合、レイヤー位置で直前のテクスチャを一度だけ、旧Generator方式の粒子場でサンプリングします。Stippleが唯一の有効レイヤーでもGenerator直結最適化を使わず、テクスチャスタックを確保してこの粒子場を適用します。Direct Generatorは同じ旧Generator方式を使い、Preview、Thumbnail、静止画／連番／動画ExportはEffect Stackと同じ方式および保存済みのScatter、Grain、Seed、Seed Per Frame設定を使います。V2のping-pongバッファとレイヤー順序の契約は変更しません。
 
 ### EFFECT-017 Slitのduration基準ループ
 
@@ -152,16 +168,17 @@ Cone表示はEffect Stackの新しい段階ではなく、処理済みCanvasを�
 - [SPEC-027 Diffuse輝度カーブ](../SPEC-027-diffuse-luminance-curve)
 - [SPEC-029 パラメータ制限](../SPEC-029-unified-parameter-limits)
 - [SPEC-034〜035 Noise拡張](../index#legacy-change-specifications)
-- [CHANGE-011 GLASS／GLASS V2書き出し決定性修正](../../changes/active/CHANGE-011-deterministic-glass-export/proposal)
+- [CHANGE-011 GLASS／GLASS V2書き出し決定性修正](../../changes/archive/CHANGE-011-deterministic-glass-export/proposal)
 - [CHANGE-012 GLASS V2色調整コントロール](../../changes/archive/CHANGE-012-glass-v2-color-controls/proposal)
-- [CHANGE-013 Effect Stack GlassをGLASS V2へ統合](../../changes/active/CHANGE-013-glass-v2-only/proposal)
-- [CHANGE-014 Effect Stackのランダム順序とソロレイヤー](../../changes/active/CHANGE-014-effect-stack-controls/proposal)
-- [CHANGE-015 Effect Stack別ウィンドウの廃止](../../changes/active/CHANGE-015-effect-stack-window-repair/proposal)
-- [CHANGE-018 SANDBOX描画モジュールの新設](../../changes/active/CHANGE-018-sandbox-graphics/proposal)
-- [CHANGE-019 Diffuse描画モードとEffect Stack UIの拡張](../../changes/active/CHANGE-019-diffuse-halftone-ascii-adaptive-ui/proposal)
-- [CHANGE-021 SANDBOX Cloth Gradient Base Generator](../../changes/active/CHANGE-021-cloth-gradient/proposal)
-- [CHANGE-022 Cloth Gradientのランプ適用順序の反転](../../changes/active/CHANGE-022-cloth-ramp-last-shading/proposal)
-- [CHANGE-023 ASCIIのフォント選択と文字サイズ](../../changes/active/CHANGE-023-ascii-font-controls/proposal)
+- [CHANGE-013 Effect Stack GlassをGLASS V2へ統合](../../changes/archive/CHANGE-013-glass-v2-only/proposal)
+- [CHANGE-014 Effect Stackのランダム順序とソロレイヤー](../../changes/archive/CHANGE-014-effect-stack-controls/proposal)
+- [CHANGE-015 Effect Stack別ウィンドウの廃止](../../changes/archive/CHANGE-015-effect-stack-window-repair/proposal)
+- [CHANGE-018 SANDBOX描画モジュールの新設](../../changes/archive/CHANGE-018-sandbox-graphics/proposal)
+- [CHANGE-019 Diffuse描画モードとEffect Stack UIの拡張](../../changes/archive/CHANGE-019-diffuse-halftone-ascii-adaptive-ui/proposal)
+- [CHANGE-020 歪みマップテクスチャのFloat32化](../../changes/archive/2026-08-05-distort-float32-precision/proposal)
+- [CHANGE-021 SANDBOX Cloth Gradient Base Generator](../../changes/archive/CHANGE-021-cloth-gradient/proposal)
+- [CHANGE-022 Cloth Gradientのランプ適用順序の反転](../../changes/archive/CHANGE-022-cloth-ramp-last-shading/proposal)
+- [CHANGE-023 ASCIIのフォント選択と文字サイズ](../../changes/archive/CHANGE-023-ascii-font-controls/proposal)
 
 Legacy SPECは履歴参照用です。現行の主スタック、固定段、互換性はこの文書と関連ADRを先に確認します。
 

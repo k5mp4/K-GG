@@ -5,10 +5,10 @@ title: Preset System
 status: current
 owners: [maintainer]
 created: 2026-07-27
-updated: 2026-08-10
-requirement_ids: [PRESET-001, PRESET-002, PRESET-003, PRESET-004, PRESET-005, PRESET-006, PRESET-007, PRESET-008, PRESET-009, PRESET-011, PRESET-012, PRESET-013]
+updated: 2026-08-11
+requirement_ids: [PRESET-001, PRESET-002, PRESET-003, PRESET-004, PRESET-005, PRESET-006, PRESET-007, PRESET-008, PRESET-009, PRESET-011, PRESET-012, PRESET-013, PRESET-014]
 related_adrs: [ADR-0007, ADR-0008]
-related_changes: [CHANGE-001, CHANGE-012, CHANGE-013, CHANGE-018, CHANGE-024, CHANGE-025]
+related_changes: [CHANGE-001, CHANGE-012, CHANGE-013, CHANGE-018, CHANGE-024, CHANGE-025, CHANGE-026]
 related_code: [src/lib/presetModel.ts, src/lib/presetLibrary.ts, src/lib/presets.ts, src/lib/presetPreview.ts, src/lib/presetThumbnail.ts, src/lib/glass.ts, src/lib/postprocessStack.ts, src/store/gradientStore.ts, src/components/PresetPanel.tsx, src/components/PresetPreview.tsx, src/components/ClothCanvas.tsx, src/components/ConeCanvas.tsx, src/types/renderView.ts, src/types/coneView.ts, src/adapters/types.ts, src/adapters/browser/presetRepository.ts, src/adapters/tauri/presetRepository.ts, src-tauri/src/lib.rs]
 related_tests: [src/lib/presetLibrary.test.ts, src/lib/presetModel.diffuse.test.ts, src/lib/presetPreview.test.ts, src/lib/presetThumbnail.test.ts, src/lib/glass.test.ts, src/lib/postprocessStack.test.ts, src/store/gradientStore.glass.test.ts, src/store/gradientStore.postprocessStack.test.ts, src/lib/clothView.test.ts, src/types/coneView.test.ts]
 ---
@@ -80,6 +80,10 @@ Canvas／Cloth／Coneの選択状態、Three.js Renderer、メッシュ、カメ
 ### PRESET-013 Cone設定の永続化
 
 ConeのDepth、Rotation、Apex X、Apex Y、Texture Repeat、Seam Blend、Seam Mode、Flow Cycles、MappingはPresetへ保存します。Depthは2..30、Apex X／Apex Yは-2..2、Flow Cyclesは-30..30へ正規化します。Perspectiveは保存対象ではなく、旧Presetに残っていても無視します。Seam Modeがない、または削除済みのWrapped Smoothを指定する旧PresetはEdge Weldを使用し、未知・非有限・範囲外の値は安全な範囲へ正規化します。Coneの表示選択はPRESET-012に従い保存しません。
+
+### PRESET-014 Stippleの保存互換
+
+StippleはDiffuseの`mode: "legacy"`としてScatter、Grain、Seed、Seed Per Frameを含む既存Diffuse設定へ保存します。`mode`が欠落した旧Presetは従来どおり既定モードを補完し、Block、Smooth、Dither、Halftone、ASCIIの保存値は変換しません。
 
 ## 他領域との関係
 

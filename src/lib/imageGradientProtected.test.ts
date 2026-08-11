@@ -9,9 +9,23 @@ describe('Image Gradient protected rendering contract', () => {
     expect(gradientShader).toContain('? mix(imageGradientT(imageUV), computeGradientT(uv)');
   });
 
-  it('selects the fixed color-field generator and removes geometry layers in V2', () => {
+  it('selects the fixed color-field generator and bypasses geometry layers in V2, except Stipple', () => {
     expect(webglSource).toContain('const imageGradientProtected = imageGradient.enabled && !!imageGradientSource;');
-    expect(webglSource).toContain('const mainLayers = imageGradientProtected ? [] : renderPlan.enabledLayers;');
+    expect(webglSource).toContain("diffuse.mode === 'legacy'");
+    expect(webglSource).toContain("renderPlan.enabledLayers.filter(layer => layer.kind === 'diffuse')");
     expect(webglSource).toContain("const protectedDirect = imageGradientProtected");
+    expect(webglSource).toContain('&& !protectedStipple');
+  });
+
+  it('disables Generator Diffuse for protected V2 Stipple before applying the stack pass once', () => {
+    expect(webglSource).toContain(
+      "const generatorDiffuseEnabled = generatorColorFieldEnabled && diffuse.enabled && !(isV2Pipeline && imageGradientProtected && diffuse.mode === 'legacy');",
+    );
+    expect(webglSource).toContain(
+      'gl.uniform1i(uniforms.u_diffuseEnabled, generatorDiffuseEnabled ? 1 : 0);',
+    );
+    expect(webglSource).toContain(
+      "protectedStipple ? renderPlan.enabledLayers.filter(layer => layer.kind === 'diffuse') : []",
+    );
   });
 });

@@ -26,6 +26,7 @@ describe('effectPipeline', () => {
       const diffuseOnly = createDefaultEffectPipeline();
 
       expect(canRenderV2Direct(diffuseOnly, false)).toBe(true);
+      expect(canRenderV2Direct(diffuseOnly, false, false, true)).toBe(false);
       expect(canRenderV2Direct(diffuseOnly, true)).toBe(false);
       expect(canRenderV2Direct({ ...diffuseOnly, prismEnabled: true }, false)).toBe(false);
       expect(canRenderV2Direct({ ...diffuseOnly, particlesEnabled: true }, false)).toBe(false);
@@ -42,6 +43,7 @@ describe('effectPipeline', () => {
       const diffuseOnly = createDefaultEffectPipeline();
 
       expect(getV2FramebufferAllocationMode(diffuseOnly, false)).toBe('direct');
+      expect(getV2FramebufferAllocationMode(diffuseOnly, false, false, true)).toBe('core');
 
       for (const kind of createDefaultEffectStack()
         .map(layer => layer.kind)
@@ -114,10 +116,23 @@ describe('effectPipeline', () => {
         ),
       })).toBe(true);
       expect(requiresV2StackCore(pipeline, true)).toBe(true);
+      expect(requiresV2StackCore(pipeline, false, false, true)).toBe(true);
     });
   });
 
   describe('getV2RenderPlan', () => {
+    it('keeps legacy Stipple on the texture-stack path when Diffuse is the only layer', () => {
+      const plan = getV2RenderPlan(createDefaultEffectPipeline(), {
+        normalMapEnabled: false,
+        normalMapBlur: 0,
+        prismGlowRadius: 0,
+        forceTextureDiffusePass: true,
+      });
+
+      expect(plan.framebufferAllocationMode).toBe('core');
+      expect(plan.programs.stackCore).toBe(true);
+    });
+
     it('keeps Normal Map parity with Legacy by suppressing it while Diffuse is enabled', () => {
       const pipeline = createDefaultEffectPipeline();
       const withDiffuseOff = {

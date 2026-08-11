@@ -137,7 +137,39 @@ vec2 diffuseDomainWarp(vec2 globalCoord, float cellSize) {
   return globalCoord + warp * max(cellSize * 1.75, 1.0);
 }
 
+// The reference Diffuse panel rendered through kagaribi15-grad's Generator,
+// before that Generator evaluated the gradient color. That shader inherited
+// mediump from noise.glsl, whereas the V2 stack is highp. Preserve the former
+// explicitly: at sub-pixel Grain those precision domains form visibly
+// different p3 lattices.
+mediump vec2 stippleGeneratorHash(mediump vec2 p) {
+  mediump vec3 p3 = fract(vec3(p.xyx) * vec3(0.1031, 0.1030, 0.0973));
+  p3 += dot(p3, p3.yzx + 33.33);
+  return fract((p3.xx + p3.yz) * p3.zy) * 2.0 - 1.0;
+}
+
+vec2 diffuseLegacyDisplacement(vec2 globalCoord) {
+  mediump vec2 legacyGlobalCoord = globalCoord;
+  mediump float grain = max(u_diffuseGrain, 0.01);
+  mediump vec2 seedOffset = vec2(u_diffuseSeed * 31.41, u_diffuseSeed * 59.26);
+  mediump vec2 cell = floor(legacyGlobalCoord / grain);
+  return stippleGeneratorHash(cell + seedOffset);
+}
+
+// Stipple displaces a previously rendered color texture in Effect Stack V2.
+// Sampling a fractional source coordinate with the FBO's LINEAR filter mixes
+// adjacent colors and softens the fine boundary noise. Align only this legacy
+// mode to source texel centers so the other Diffuse modes retain their current
+// filtering behavior.
+vec2 diffuseTexelCenterUv(vec2 sampleUv) {
+  if (u_diffuseMode != 5) return sampleUv;
+  vec2 sourcePixel = floor(sampleUv * u_tileResolution) + 0.5;
+  sourcePixel = clamp(sourcePixel, vec2(0.5), max(u_tileResolution - 0.5, vec2(0.5)));
+  return sourcePixel / u_tileResolution;
+}
+
 vec2 diffusePanelDisplacement(vec2 globalCoord) {
+  if (u_diffuseMode == 5) return diffuseLegacyDisplacement(globalCoord);
   float cellSize = diffuseCellSizeAtCoord(globalCoord, vec3(0.0));
   vec2 seedOffset = vec2(u_diffuseSeed * 31.41, u_diffuseSeed * 59.26);
   vec2 grainCoord = diffuseDomainWarp(globalCoord, cellSize) / max(cellSize, 0.01);
@@ -250,32 +282,32 @@ vec2 ditherCellCenter(vec2 coord) {
 }
 
 vec2 diffuseSampleUv(vec2 sampleUv, vec2 globalCoord) {
-  if (!u_diffuseEnabled || u_diffuseMode >= 2) return sampleUv;
+  if (!u_diffuseEnabled || (u_diffuseMode >= 2 && u_diffuseMode != 5)) return sampleUv;
   vec2 sampleGlobalCoord = sampleUv * u_tileResolution + u_tileOffset;
   float luminance = dot(texture2D(u_sourceTex, clamp(sampleUv, 0.0, 1.0)).rgb, vec3(0.299, 0.587, 0.114));
-  float adaptiveFactor = u_diffuseAdaptiveEnabled
+  float adaptiveFactor = u_diffuseMode != 5 && u_diffuseAdaptiveEnabled
     ? diffuseCurveValue(diffuseAdaptiveInput(texture2D(u_sourceTex, clamp(sampleUv, 0.0, 1.0)).rgb), false)
     : 1.0;
   sampleGlobalCoord += diffusePanelDisplacement(globalCoord) * clamp(u_diffuseScatter, 0.0, 300.0) * adaptiveFactor;
-  return clamp((sampleGlobalCoord - u_tileOffset) / u_tileResolution, 0.0, 1.0);
+  return diffuseTexelCenterUv(clamp((sampleGlobalCoord - u_tileOffset) / u_tileResolution, 0.0, 1.0));
 }
 
 vec2 diffuseSampleUvMirrorRepeat(vec2 sampleUv, vec2 globalCoord) {
-  if (!u_diffuseEnabled || u_diffuseMode >= 2) return sampleUv;
+  if (!u_diffuseEnabled || (u_diffuseMode >= 2 && u_diffuseMode != 5)) return sampleUv;
   vec2 sampleGlobalCoord = sampleUv * u_tileResolution + u_tileOffset;
   float luminance = dot(texture2D(u_sourceTex, clamp(sampleUv, 0.0, 1.0)).rgb, vec3(0.299, 0.587, 0.114));
-  float adaptiveFactor = u_diffuseAdaptiveEnabled
+  float adaptiveFactor = u_diffuseMode != 5 && u_diffuseAdaptiveEnabled
     ? diffuseCurveValue(diffuseAdaptiveInput(texture2D(u_sourceTex, clamp(sampleUv, 0.0, 1.0)).rgb), false)
     : 1.0;
   sampleGlobalCoord += diffusePanelDisplacement(globalCoord) * clamp(u_diffuseScatter, 0.0, 300.0) * adaptiveFactor;
-  return mirrorRepeatUv((sampleGlobalCoord - u_tileOffset) / u_tileResolution);
+  return diffuseTexelCenterUv(mirrorRepeatUv((sampleGlobalCoord - u_tileOffset) / u_tileResolution));
 }
 
 vec2 diffuseGlobalUv(vec2 uv, vec2 globalCoord) {
-  if (!u_diffuseEnabled || u_diffuseMode >= 2) return uv;
+  if (!u_diffuseEnabled || (u_diffuseMode >= 2 && u_diffuseMode != 5)) return uv;
   vec2 sampleGlobalCoord = uv * u_fullResolution
     + diffusePanelDisplacement(globalCoord) * clamp(u_diffuseScatter, 0.0, 300.0) * (
-      u_diffuseAdaptiveEnabled
+      u_diffuseMode != 5 && u_diffuseAdaptiveEnabled
         ? diffuseCurveValue(diffuseAdaptiveInput(texture2D(u_sourceTex, clamp(uv, 0.0, 1.0)).rgb), false)
         : 1.0
     );

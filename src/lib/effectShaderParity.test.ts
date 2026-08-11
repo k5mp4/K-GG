@@ -282,8 +282,8 @@ describe('V2 effect shader parity', () => {
       .toBe(compact(panelPattern));
   });
 
-  it('keeps the five Diffuse mode mapping and adaptive pattern inputs available in both render paths', () => {
-    expect(compact(webglSource)).toContain('block:0,smooth:1,dither:2,halftone:3,ascii:4');
+  it('keeps the six Diffuse mode mapping and adaptive pattern inputs available in both render paths', () => {
+    expect(compact(webglSource)).toContain('block:0,smooth:1,dither:2,halftone:3,ascii:4,legacy:5');
     for (const source of [normalizedGradientShader, postprocessShader]) {
       expect(source).toContain('u_diffuseAdaptiveChannel');
       expect(source).toContain('u_diffuseGrainAdaptiveEnabled');
@@ -293,6 +293,81 @@ describe('V2 effect shader parity', () => {
       expect(source).toContain('applyDiffuseHalftone');
       expect(source).toContain('applyDiffuseAscii');
     }
+  });
+
+  it('restores the legacy Generator Stipple grid without adaptive or domain-warp inputs', () => {
+    const stackElse = normalizedDiffuseShader.indexOf('#else\n#if defined(KGG_PRISM_ONLY)');
+    const legacyDisplacement = extractFunction(
+      normalizedDiffuseShader.slice(stackElse),
+      'diffuseLegacyDisplacement',
+    );
+    expect(compact(legacyDisplacement)).toContain(compact(
+      'mediump float grain = max(u_diffuseGrain, 0.01);',
+    ));
+    expect(compact(legacyDisplacement)).toContain(compact(
+      'mediump vec2 seedOffset = vec2(u_diffuseSeed * 31.41, u_diffuseSeed * 59.26);',
+    ));
+    expect(legacyDisplacement).toContain('mediump vec2 legacyGlobalCoord = globalCoord;');
+    expect(legacyDisplacement).toContain('mediump vec2 cell = floor(legacyGlobalCoord / grain);');
+    expect(legacyDisplacement).toContain('return stippleGeneratorHash(cell + seedOffset);');
+    expect(legacyDisplacement).not.toContain('diffuseDomainWarp');
+    expect(legacyDisplacement).not.toContain('diffuseCellSizeAtCoord');
+
+    const generatorHash = extractFunction(
+      normalizedDiffuseShader.slice(stackElse),
+      'stippleGeneratorHash',
+    );
+    expect(generatorHash).toContain('mediump vec3 p3');
+    expect(compact(generatorHash)).toContain(compact(
+      'return fract((p3.xx + p3.yz) * p3.zy) * 2.0 - 1.0;',
+    ));
+
+    const stackDisplacement = extractFunction(
+      normalizedDiffuseShader.slice(stackElse),
+      'diffusePanelDisplacement',
+    );
+    expect(stackDisplacement).toContain('u_diffuseMode == 5');
+    expect(stackDisplacement).toContain('return diffuseLegacyDisplacement(globalCoord);');
+
+    for (const name of ['diffuseSampleUv', 'diffuseSampleUvMirrorRepeat', 'diffuseGlobalUv']) {
+      const sample = extractFunction(normalizedDiffuseShader.slice(stackElse), name);
+      expect(sample).toContain('u_diffuseMode != 5');
+      expect(sample).toContain('u_diffuseMode >= 2 && u_diffuseMode != 5');
+    }
+
+    const gradientMain = normalizedGradientShader.slice(normalizedGradientShader.indexOf('void main()'));
+    expect(gradientMain).toContain('u_diffuseMode <= 1 || u_diffuseMode == 5');
+    expect(gradientMain).toContain('bool isLegacyStipple = u_diffuseMode == 5;');
+    expect(gradientMain).toContain('? max(u_diffuseGrain, 0.01)');
+    expect(gradientMain).toContain('disp = diffuseHash(cell + seedOff);');
+    expect(gradientMain).toContain('!isLegacyStipple && u_diffuseAdaptiveEnabled');
+    expect(compact(webglSource)).toContain(compact(
+      "forceTextureDiffusePass: diffuse.mode === 'legacy'",
+    ));
+    expect(webglSource).toContain("renderPlan.framebufferAllocationMode === 'direct'");
+  });
+
+  it('point-samples the forced texture pass for legacy Stipple at source texel centers', () => {
+    const stackCore = getProgramSource('stackCore').fragment.replace(/\r\n?/g, '\n');
+    expect(stackCore).toContain('vec2 diffuseTexelCenterUv(');
+
+    const texelCenterUv = extractFunction(stackCore, 'diffuseTexelCenterUv');
+    expect(texelCenterUv).toContain('u_diffuseMode != 5');
+    expect(compact(texelCenterUv)).toContain(compact(
+      'vec2 sourcePixel = floor(sampleUv * u_tileResolution) + 0.5;',
+    ));
+    expect(compact(texelCenterUv)).toContain(compact(
+      'return sourcePixel / u_tileResolution;',
+    ));
+
+    const pureDiffuseStart = stackCore.indexOf('if (u_effectEnabled && u_effectMode == 6)');
+    const pureDiffuseEnd = stackCore.indexOf('#if !defined(KGG_STACK_CORE_NO_NOISE)', pureDiffuseStart);
+    const pureDiffusePass = stackCore.slice(pureDiffuseStart, pureDiffuseEnd);
+    expect(pureDiffuseStart).toBeGreaterThanOrEqual(0);
+    expect(pureDiffuseEnd).toBeGreaterThan(pureDiffuseStart);
+    expect(compact(pureDiffusePass)).toContain(compact(
+      'texture2D(u_sourceTex, diffuseTexelCenterUv(sourceUvFromGlobal(diffuseUv)))',
+    ));
   });
 
   it('keeps Halftone and ASCII at full fragment resolution while reserving cell snapping for Dither', () => {
@@ -351,9 +426,9 @@ describe('V2 effect shader parity', () => {
     expect(stackDisplacement).toContain('diffuseCellSizeAtCoord(globalCoord, vec3(0.0))');
     expect(stackDisplacement).toContain('/ max(cellSize, 0.01)');
     const gradientMain = normalizedGradientShader.slice(normalizedGradientShader.indexOf('void main()'));
-    expect(gradientMain).toContain(
-      'float cellSize = diffuseCellSizeAtCoord(globalCoord, vec3(0.0));',
-    );
+    expect(compact(gradientMain)).toContain(compact(
+      'float cellSize = isLegacyStipple ? max(u_diffuseGrain, 0.01) : diffuseCellSizeAtCoord(globalCoord, vec3(0.0));',
+    ));
     expect(gradientMain).toContain('floor(globalCoord / max(cellSize, 0.01))');
     expect(gradientMain).not.toMatch(/floor\(globalCoord \/ max\(u_diffuseGrain, 0\.01\)\)/);
   });
