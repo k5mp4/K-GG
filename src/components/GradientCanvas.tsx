@@ -10,6 +10,7 @@ import { renderBridge } from '../lib/renderBridge';
 import { LatestFrameScheduler } from '../lib/latestFrameScheduler';
 import { publishProcessedCanvasFrame } from '../lib/processedCanvasClock';
 import { useLanguage } from '../i18n/LanguageProvider';
+import { WebGLPerformancePanel } from './WebGLPerformancePanel';
 
 
 type Props = {
@@ -231,6 +232,7 @@ export function GradientCanvas({ width = 800, height = 800, animLoopRef, seekVer
       </div>
       <canvas
         ref={canvasRef}
+        id="kgg-preview-canvas"
         width={width}
         height={height}
         className="rounded-none shadow-2xl"
@@ -241,6 +243,18 @@ export function GradientCanvas({ width = 800, height = 800, animLoopRef, seekVer
           backgroundColor: '#3a3a3a',
           backgroundImage: 'repeating-conic-gradient(#555 0% 25%, #333 0% 50%)',
           backgroundSize: matcap.enabled ? '20px 20px' : '24px 24px',
+        }}
+      />
+      <WebGLPerformancePanel
+        profiler={webglRef.current?.performanceProfiler ?? null}
+        canvas={canvasRef.current}
+        onBenchmarkFrame={() => {
+          const ctx = webglRef.current;
+          const frameState = latestRef.current;
+          if (!ctx || !frameState) return;
+          renderSceneAtTime(ctx, frameState, frameState.animation.enabled
+            ? (animLoopRef.current?.currentNormalizedTime ?? useGradientStore.getState().currentTime)
+            : 0, { allowEffectStackTransition: false });
         }}
       />
     </div>

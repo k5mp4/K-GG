@@ -11,6 +11,7 @@ import postprocessStackGLSL from '../shaders/postprocess/stack.glsl?raw';
 import postprocessDiffuseGLSL from '../shaders/postprocess/diffuse.glsl?raw';
 import postprocessGlassFieldGLSL from '../shaders/postprocess/glass-field.glsl?raw';
 import postprocessGlassOpticsGLSL from '../shaders/postprocess/glass-optics.glsl?raw';
+import postprocessGlassCompactGLSL from '../shaders/postprocess/glass-compact.glsl?raw';
 import postprocessMainGLSL from '../shaders/postprocess/main.glsl?raw';
 import postprocessNoiseMainGLSL from '../shaders/postprocess/noise-main.glsl?raw';
 import prismCompositeGLSL from '../shaders/prismComposite.frag.glsl?raw';
@@ -60,6 +61,7 @@ export const SHADER_VERSION = (
   + normalMapGLSL.length * 997
   + stretchGLSL.length * 313
   + postprocessGLSL.length * 191
+  + postprocessGlassCompactGLSL.length * 173
   + postprocessNoiseMainGLSL.length * 179
   + prismCompositeGLSL.length * 127
   + particlesVertexGLSL.length * 89
@@ -161,8 +163,7 @@ function createSpecializedPostprocessSource(
         postprocessUniformsGLSL,
         postprocessSharedGLSL,
         GLASS_DIFFUSE_STUBS_GLSL,
-        postprocessGlassFieldGLSL,
-        postprocessGlassOpticsGLSL,
+        postprocessGlassCompactGLSL,
         postprocessMainGLSL,
       ].join('')
     : [

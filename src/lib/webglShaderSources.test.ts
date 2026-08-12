@@ -199,6 +199,17 @@ describe('webglShaderSources', () => {
     expect(specialized).not.toContain('float angleDistance(');
   });
 
+  it('keeps dedicated Glass below the full Noise compiler boundary', () => {
+    const specialized = getProgramSource('glassV2').fragment;
+
+    expect(specialized).toContain('vec4 opticalGlassV2(');
+    expect(specialized).toContain('vec4 organicGlass(');
+    expect(specialized).toContain('vec2 glassV2Gradient(');
+    expect(specialized).not.toContain('vec2 glassNoiseDomain(');
+    expect(specialized).not.toContain('float glassDomainWarpScalar(');
+    expect(specialized.length).toBeLessThan(getProgramSource('postprocess').fragment.length);
+  });
+
   it('assembles postprocess sections in dependency order', () => {
     const source = getPostprocessFragmentSource();
     const functions = [

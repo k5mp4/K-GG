@@ -65,11 +65,15 @@
     "globals": "^16.5.0",
     "markdownlint-cli": "^0.48.0",
     "postcss": "^8.5.8",
+    "spectorjs": "0.9.30",
+    "stats-gl": "4.2.3",
     "tailwindcss": "^4.2.1",
     "typescript": "~5.9.3",
     "typescript-eslint": "^8.48.0",
     "vite": "^7.3.1",
     "vitepress": "^1.6.4",
-    "vitest": "^4.1.9"
+    "vitest": "^4.1.9",
+    "webgl-lint": "1.11.4",
+    "webgl-memory": "1.1.3"
   }
 }

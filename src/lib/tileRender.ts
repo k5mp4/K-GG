@@ -11,13 +11,18 @@
 import { renderBridge, type ExportSessionToken } from './renderBridge';
 import { applySeamlessToCanvas } from './seamless';
 import type { SeamlessConfig } from '../types/seamless';
+import { getRegisteredWebGLContext } from './webgl';
 
 const DEFAULT_TILE_SIZE = 4096;
 const TILE_SIZE_FLOOR = 1024;
 
+function getWebGL2Context(canvas: HTMLCanvasElement): WebGL2RenderingContext | null {
+  return getRegisteredWebGLContext(canvas) ?? canvas.getContext('webgl2');
+}
+
 /** 安全なタイルサイズを WebGL 制限から決定する */
 export function pickTileSize(canvas: HTMLCanvasElement, requested = DEFAULT_TILE_SIZE): number {
-  const gl = canvas.getContext('webgl2');
+  const gl = getWebGL2Context(canvas);
   if (!gl) return requested;
   const maxTex = gl.getParameter(gl.MAX_TEXTURE_SIZE) as number;
   const maxRb = gl.getParameter(gl.MAX_RENDERBUFFER_SIZE) as number;
@@ -29,7 +34,7 @@ export function pickTileSize(canvas: HTMLCanvasElement, requested = DEFAULT_TILE
 
 /** タイル分割が必要か（要求サイズ > drawingBuffer 限界）を判定 */
 export function needsTiledRender(canvas: HTMLCanvasElement, fullW: number, fullH: number): boolean {
-  const gl = canvas.getContext('webgl2');
+  const gl = getWebGL2Context(canvas);
   if (!gl) return false;
   const maxTex = gl.getParameter(gl.MAX_TEXTURE_SIZE) as number;
   const maxRb = gl.getParameter(gl.MAX_RENDERBUFFER_SIZE) as number;

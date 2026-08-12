@@ -25,7 +25,6 @@ function renderSceneFrame(
   effectStack = state.effectPipeline,
 ): void {
   const scene = evaluateSceneAtTime(state, normalizedTime);
-
   render(
     ctx,
     scene.gradient,
@@ -67,37 +66,42 @@ export function renderSceneAtTime(
   normalizedTime: number,
   options: RenderSceneOptions,
 ): void {
-  const transition = options.allowEffectStackTransition === false || options.tile
-    ? null
-    : getEffectStackTransition();
-  if (!transition) {
-    renderSceneFrame(ctx, state, normalizedTime, options);
-    return;
-  }
+  ctx.performanceProfiler?.beginFrame();
+  try {
+    const transition = options.allowEffectStackTransition === false || options.tile
+      ? null
+      : getEffectStackTransition();
+    if (!transition) {
+      renderSceneFrame(ctx, state, normalizedTime, options);
+      return;
+    }
 
-  if (transition.progress >= 1) {
-    finishEffectStackTransition();
-    renderSceneFrame(ctx, state, normalizedTime, options);
-    return;
-  }
+    if (transition.progress >= 1) {
+      finishEffectStackTransition();
+      renderSceneFrame(ctx, state, normalizedTime, options);
+      return;
+    }
 
-  const fromPipeline = {
-    ...state.effectPipeline,
-    effectStack: transition.from,
-  };
-  const toPipeline = {
-    ...state.effectPipeline,
-    effectStack: transition.to,
-  };
-  renderSceneFrame(ctx, state, normalizedTime, {}, fromPipeline);
-  captureEffectStackTransitionFrame(ctx, 'from');
-  renderSceneFrame(ctx, state, normalizedTime, {}, toPipeline);
-  captureEffectStackTransitionFrame(ctx, 'to');
+    const fromPipeline = {
+      ...state.effectPipeline,
+      effectStack: transition.from,
+    };
+    const toPipeline = {
+      ...state.effectPipeline,
+      effectStack: transition.to,
+    };
+    renderSceneFrame(ctx, state, normalizedTime, {}, fromPipeline);
+    captureEffectStackTransitionFrame(ctx, 'from');
+    renderSceneFrame(ctx, state, normalizedTime, {}, toPipeline);
+    captureEffectStackTransitionFrame(ctx, 'to');
 
-  const current = getEffectStackTransition();
-  if (!current) {
-    renderSceneFrame(ctx, state, normalizedTime, options);
-    return;
+    const current = getEffectStackTransition();
+    if (!current) {
+      renderSceneFrame(ctx, state, normalizedTime, options);
+      return;
+    }
+    blendEffectStackTransitionFrames(ctx, current.progress);
+  } finally {
+    ctx.performanceProfiler?.endFrame();
   }
-  blendEffectStackTransitionFrames(ctx, current.progress);
 }

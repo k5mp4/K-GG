@@ -15,6 +15,7 @@ title: 現行仕様
 | CURRENT-VIDEO-EXPORT | [動画・連番フレーム出力](./video-export) | current |
 | CURRENT-PRESET | [Preset System](./preset-system) | current |
 | CURRENT-UI-CONTROLS | [UI入力コントロール](./ui-controls) | current |
+| CURRENT-WEBGL-PERFORMANCE | [WebGL Performance Debug / Profiler](./webgl-performance) | current |
 
 ## 読み方
 
