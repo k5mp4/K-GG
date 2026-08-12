@@ -57,6 +57,7 @@ function renderSceneFrame(
     scene.clothGradient,
     scene.clothTime,
     scene.noiseLoopPeriod,
+    state.seamless,
   );
 }
 

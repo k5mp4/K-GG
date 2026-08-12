@@ -3,6 +3,7 @@ import { createEmptyManualDistortMap, createEmptyManualSmoothMask, normalizeNois
 import { createDefaultEffectPipeline, normalizeEffectPipelineConfig } from '../lib/effectPipeline';
 import { normalizeClothGradientConfig } from '../types/clothGradient';
 import { normalizeConeViewConfig } from '../types/coneView';
+import { normalizeSeamlessConfig } from '../types/seamless';
 import { normalizeImageGradientConfig } from '../types/imageGradient';
 import { resolveDiffuseBezier } from '../lib/diffuseCurve';
 import {
@@ -341,6 +342,7 @@ export function PresetPanel({ canvasW, canvasH, setCanvasW, setCanvasH, aspectRa
     // SANDBOX の Cloth 設定を反映する。
     store.setClothGradient(normalizeClothGradientConfig(s.clothGradient));
     store.setConeView(normalizeConeViewConfig(s.coneView));
+    store.setSeamless(normalizeSeamlessConfig(s.seamless));
     // effectPipeline を持たない旧プリセット/内蔵プリセットは Legacy v1 に
     // ならないよう、既定の V2 パイプラインへ昇格する。V2 でなければ
     // SANDBOX Cloth は描画パイプラインへ一切統合されないため。
@@ -367,11 +369,11 @@ export function PresetPanel({ canvasW, canvasH, setCanvasW, setCanvasH, aspectRa
   async function handleSave() {
     const trimmed = name.trim();
     if (!trimmed) return;
-    const { gradient, noiseDistortion, diffuse, imageGradient, slitScan, stretch, animation, normalMap, coneView, radon, iridescence, manualDistort, postprocess, effectPipeline, matcap, keyframeTracks } = store;
+    const { gradient, noiseDistortion, diffuse, imageGradient, slitScan, stretch, animation, normalMap, coneView, seamless, radon, iridescence, manualDistort, postprocess, effectPipeline, matcap, keyframeTracks } = store;
     const state = {
       gradient, noiseDistortion, diffuse, imageGradient,
       slitScan: { ...slitScan, selectedSlitIdx: -1 }, stretch,
-      animation, normalMap, coneView, radon, iridescence, manualDistort: { ...manualDistort, enabled: false }, postprocess, effectPipeline, matcap,
+      animation, normalMap, coneView, seamless, radon, iridescence, manualDistort: { ...manualDistort, enabled: false }, postprocess, effectPipeline, matcap,
       keyframeTracks, colorPalettes: loadUserColorPalettes(), resolution: { width: canvasW, height: canvasH },
     };
     setSaving(true);

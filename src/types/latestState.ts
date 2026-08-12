@@ -17,6 +17,7 @@ import type { ImageGradientConfig } from './imageGradient';
 import type { PropertyTrack } from './keyframe';
 import type { ClothGradientConfig } from './clothGradient';
 import type { ConeViewConfig } from './coneView';
+import type { SeamlessConfig } from './seamless';
 
 export type LatestState = {
   gradient: GradientConfig;
@@ -28,6 +29,7 @@ export type LatestState = {
   normalMap: NormalMapConfig;
   clothGradient?: ClothGradientConfig;
   coneView?: ConeViewConfig;
+  seamless?: SeamlessConfig;
   radon: RadonConfig;
   iridescence: IridescenceConfig;
   manualDistort: ManualDistortConfig;

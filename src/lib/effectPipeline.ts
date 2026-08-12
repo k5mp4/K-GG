@@ -235,8 +235,9 @@ export function canRenderV2Direct(
   normalMapEnabled: boolean,
   clothGradientEnabled = false,
   forceTextureDiffusePass = false,
+  seamlessEnabled = false,
 ): boolean {
-  if (clothGradientEnabled || forceTextureDiffusePass) return false;
+  if (clothGradientEnabled || forceTextureDiffusePass || seamlessEnabled) return false;
   const stack = normalizeEffectStack(pipeline.effectStack);
   return pipeline.version === 'stack-v2'
     && !normalMapEnabled
@@ -250,8 +251,9 @@ export function getV2FramebufferAllocationMode(
   normalMapEnabled: boolean,
   clothGradientEnabled = false,
   forceTextureDiffusePass = false,
+  seamlessEnabled = false,
 ): 'direct' | 'core' | 'full' {
-  if (canRenderV2Direct(pipeline, normalMapEnabled, clothGradientEnabled, forceTextureDiffusePass)) return 'direct';
+  if (canRenderV2Direct(pipeline, normalMapEnabled, clothGradientEnabled, forceTextureDiffusePass, seamlessEnabled)) return 'direct';
   if (normalMapEnabled || pipeline.prismEnabled) return 'full';
   return 'core';
 }
@@ -266,9 +268,10 @@ export function requiresV2StackCore(
   normalMapEnabled = false,
   clothGradientEnabled = false,
   forceTextureDiffusePass = false,
+  seamlessEnabled = false,
 ): boolean {
   return pipeline.version === 'stack-v2'
-    && !canRenderV2Direct(pipeline, normalMapEnabled, clothGradientEnabled, forceTextureDiffusePass);
+    && !canRenderV2Direct(pipeline, normalMapEnabled, clothGradientEnabled, forceTextureDiffusePass, seamlessEnabled);
 }
 
 export type V2RenderPlanOptions = {
@@ -278,6 +281,8 @@ export type V2RenderPlanOptions = {
   clothGradientEnabled?: boolean;
   /** Requires Diffuse to run as a texture stack pass even when it is the only layer. */
   forceTextureDiffusePass?: boolean;
+  /** Requires a full color texture before the final Seamless pass. */
+  seamlessEnabled?: boolean;
 };
 
 export type V2RenderPlan = {
@@ -318,6 +323,7 @@ export function getV2RenderPlan(
   const enabledLayers = normalizedStack.filter(layer => layer.enabled);
   const diffuseEnabled = enabledLayers.some(layer => layer.kind === 'diffuse');
   const forceTextureDiffusePass = diffuseEnabled && Boolean(options.forceTextureDiffusePass);
+  const seamlessEnabled = Boolean(options.seamlessEnabled);
   const normalRequested = shouldRenderNormalMap(options.normalMapEnabled, diffuseEnabled);
   const normalNeedsBlur = normalRequested && options.normalMapBlur >= 0.5;
   const prismRequested = pipeline.prismEnabled;
@@ -342,6 +348,7 @@ export function getV2RenderPlan(
       normalRequested,
       options.clothGradientEnabled,
       forceTextureDiffusePass,
+      seamlessEnabled,
     ),
     programs: {
       stackCore: requiresV2StackCore(
@@ -349,6 +356,7 @@ export function getV2RenderPlan(
         normalRequested,
         options.clothGradientEnabled,
         forceTextureDiffusePass,
+        seamlessEnabled,
       ),
       noiseStack: noiseRequested,
       glassV2: glassV2Requested,

@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import type { LatestState } from '../types/latestState';
 import { createDefaultEffectPipeline, updateEffectStackLayer } from './effectPipeline';
 import { getRequiredExportProgramKeys } from './webgl';
+import { getProgramSource } from './webglShaderSources';
 
 function stateWithGlass(enabled: boolean): LatestState {
   const pipeline = createDefaultEffectPipeline();
@@ -38,5 +39,20 @@ describe('export WebGL program plan', () => {
     state.diffuse = { enabled: true, mode: 'legacy' } as LatestState['diffuse'];
 
     expect(getRequiredExportProgramKeys(state)).toEqual(['generator', 'stackCore']);
+  });
+
+  it('requests Stack Core and Seamless for the enabled Seamless stage', () => {
+    const state = stateWithGlass(false);
+    state.seamless = { enabled: true, blendWidth: 0.25 };
+
+    expect(getRequiredExportProgramKeys(state)).toEqual(['stackCore', 'seamless']);
+  });
+
+  it('exposes the standalone Seamless shader uniforms', () => {
+    const source = getProgramSource('seamless');
+
+    expect(source.fragment).toContain('u_sourceTex');
+    expect(source.fragment).toContain('u_blendWidth');
+    expect(source.fragment).toContain('u_axis');
   });
 });

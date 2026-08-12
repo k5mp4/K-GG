@@ -1,5 +1,6 @@
 import { pngInjectSrgb } from './pngIcc';
 import { renderBridge } from './renderBridge';
+import { useGradientStore } from '../store/gradientStore';
 import {
   canvas2dToJpegBlob,
   canvas2dToPngBlob,
@@ -36,6 +37,7 @@ export async function getExportSourceCanvas(
       fullHeight: fullH,
       time: t,
       normalizedTime: nt,
+      seamless: useGradientStore.getState().seamless,
     });
   }
 

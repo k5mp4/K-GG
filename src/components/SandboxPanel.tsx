@@ -8,12 +8,13 @@ import { CustomSelect } from './CustomSelect';
 import { Icon } from './Icon';
 import { NormalMapPanel } from './NormalMapPanel';
 import { PostprocessPanel } from './PostprocessPanel';
+import { SeamlessPanel } from './SeamlessPanel';
 import { Toggle } from './Toggle';
 import type { RenderViewMode } from '../types/renderView';
 
-type SandboxProgramKey = 'normalMap' | 'prism' | 'particles' | 'cloth' | 'cone';
+type SandboxProgramKey = 'normalMap' | 'prism' | 'particles' | 'cloth' | 'cone' | 'seamless';
 type SandboxProgramStatus = 'loading' | 'ready' | 'failed' | 'fallback';
-type SandboxModuleKey = 'cloth' | 'cone' | 'normal' | 'prism' | 'particles';
+type SandboxModuleKey = 'cloth' | 'cone' | 'normal' | 'prism' | 'particles' | 'seamless';
 
 type SandboxModuleProps = {
   id: SandboxModuleKey;
@@ -106,6 +107,8 @@ export function SandboxPanel({ renderViewMode, onRenderViewModeChange }: Sandbox
     setGradient,
     effectPipeline,
     setEffectPipeline,
+    seamless,
+    setSeamless,
   } = useGradientStore();
   const [selectedModule, setSelectedModule] = useState<SandboxModuleKey>('cloth');
   const [programStatus, setProgramStatus] = useState<Partial<Record<SandboxProgramKey, SandboxProgramStatus>>>({});
@@ -125,7 +128,8 @@ export function SandboxPanel({ renderViewMode, onRenderViewModeChange }: Sandbox
   const normalStatus = moduleStatus('normalMap', normalMap.enabled, programStatus, t);
   const prismStatus = moduleStatus('prism', effectPipeline.prismEnabled, programStatus, t);
   const particlesStatus = moduleStatus('particles', effectPipeline.particlesEnabled, programStatus, t);
-  const activeCount = [clothGradient.enabled, renderViewMode === 'cone', normalMap.enabled, effectPipeline.prismEnabled, effectPipeline.particlesEnabled]
+  const seamlessStatus = moduleStatus('seamless', seamless.enabled, programStatus, t);
+  const activeCount = [clothGradient.enabled, renderViewMode === 'cone', normalMap.enabled, effectPipeline.prismEnabled, effectPipeline.particlesEnabled, seamless.enabled]
     .filter(Boolean).length;
 
   const setNormalEnabled = (enabled: boolean) => {
@@ -139,7 +143,7 @@ export function SandboxPanel({ renderViewMode, onRenderViewModeChange }: Sandbox
       ? 'Cone'
       : selectedModule === 'normal'
         ? t('effect.normal')
-        : selectedModule === 'prism' ? 'Prism' : 'Particles';
+        : selectedModule === 'prism' ? 'Prism' : selectedModule === 'particles' ? 'Particles' : 'Seamless';
 
   return (
     <div className="space-y-4" data-sandbox-panel>
@@ -158,7 +162,7 @@ export function SandboxPanel({ renderViewMode, onRenderViewModeChange }: Sandbox
           </div>
           <div className="shrink-0 border border-cyan-200/25 bg-k-bg/35 px-2 py-1 text-right">
             <span className="block text-[8px] font-display uppercase tracking-[0.16em] text-cyan-100/60">{t('sandbox.active')}</span>
-            <span className="mt-0.5 block font-display text-sm font-bold text-cyan-100">{activeCount}<span className="text-cyan-100/40">/5</span></span>
+            <span className="mt-0.5 block font-display text-sm font-bold text-cyan-100">{activeCount}<span className="text-cyan-100/40">/6</span></span>
           </div>
         </div>
       </div>
@@ -174,6 +178,7 @@ export function SandboxPanel({ renderViewMode, onRenderViewModeChange }: Sandbox
             { value: 'normal', label: t('effect.normal') },
             { value: 'prism', label: 'Prism' },
             { value: 'particles', label: 'Particles' },
+            { value: 'seamless', label: 'Seamless' },
           ]}
           onChange={(value) => setSelectedModule(value as SandboxModuleKey)}
         />
@@ -246,6 +251,19 @@ export function SandboxPanel({ renderViewMode, onRenderViewModeChange }: Sandbox
             onToggleEnabled={(particlesEnabled) => setEffectPipeline({ particlesEnabled })}
           >
             <PostprocessPanel sandboxMode="particles" embedded />
+          </SandboxModule>
+        )}
+
+        {selectedModule === 'seamless' && (
+          <SandboxModule
+            id="seamless"
+            label={selectedLabel}
+            description={t('sandbox.seamlessDescription')}
+            enabled={seamless.enabled}
+            status={seamlessStatus}
+            onToggleEnabled={(enabled) => setSeamless({ enabled })}
+          >
+            <SeamlessPanel />
           </SandboxModule>
         )}
       </div>

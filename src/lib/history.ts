@@ -25,6 +25,7 @@ function extractSnapshot(s: StoreState): HistorySnapshot {
     slitScan: s.slitScan,
     animation: s.animation,
     normalMap: s.normalMap,
+    seamless: s.seamless,
     radon: s.radon,
     iridescence: s.iridescence,
     manualDistort: s.manualDistort,
@@ -65,6 +66,7 @@ class HistoryManager {
         state.slitScan !== prev.slitScan ||
         state.animation !== prev.animation ||
         state.normalMap !== prev.normalMap ||
+        state.seamless !== prev.seamless ||
         state.radon !== prev.radon ||
         state.iridescence !== prev.iridescence ||
         state.manualDistort !== prev.manualDistort ||
@@ -92,6 +94,7 @@ class HistoryManager {
       slitScan: snap.slitScan,
       animation: snap.animation,
       normalMap: snap.normalMap,
+      seamless: snap.seamless ?? useGradientStore.getState().seamless,
       radon: snap.radon,
       iridescence: snap.iridescence ?? useGradientStore.getState().iridescence,
       manualDistort: snap.manualDistort ?? useGradientStore.getState().manualDistort,

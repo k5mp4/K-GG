@@ -2,7 +2,7 @@ import type { UiLanguage } from './language';
 
 const uiTerms = [
   ['Amount', '量'], ['Anchor Influence', 'アンカー影響'], ['Angle', '角度'], ['Apex X', '頂点 X'], ['Apex Y', '頂点 Y'], ['Band Height', '帯の高さ'],
-  ['Bevel Size', 'ベベルサイズ'], ['Blend', '合成'], ['Blur', 'ぼかし'], ['Brightness', '明るさ'],
+  ['Bevel Size', 'ベベルサイズ'], ['Blend', '合成'], ['Blend Width', '合成幅'], ['Blur', 'ぼかし'], ['Brightness', '明るさ'],
   ['Brush Size', 'ブラシサイズ'], ['Cascade Gain', 'カスケードゲイン'], ['Cell Scale', 'セルスケール'],
   ['Center Falloff', '中心減衰'], ['Center Force', '中心力'], ['Center X', '中心 X'], ['Center Y', '中心 Y'],
   ['Channel', 'チャンネル'], ['Chromatic Aberration', '色収差'], ['Color Mode', 'カラーモード'],
@@ -11,7 +11,7 @@ const uiTerms = [
   ['Curl Evolution', 'カール展開'], ['Curl Scale', 'カールスケール'], ['Curl Seed', 'カールシード'],
   ['Curl Speed', 'カール速度'], ['Curl Strength', 'カール強度'], ['Depth', '深度'], ['Diffuse Mode', '拡散モード'],
   ['Direction', '方向'], ['Distance Metric', '距離方式'], ['Dot Size', 'ドットサイズ'], ['Drift Angle', 'ドリフト角度'], ['Drift Speed', 'ドリフト速度'],
-  ['Edge', 'エッジ'], ['Edge Fade', 'エッジ減衰'], ['Edge Weld', 'エッジ溶接'], ['Emitter Type', '放出方式'], ['Evolution', '展開'],
+  ['Edge', 'エッジ'], ['Edge Crossfade', 'エッジクロスフェード'], ['Edge Fade', 'エッジ減衰'], ['Edge Weld', 'エッジ溶接'], ['Emitter Type', '放出方式'], ['Evolution', '展開'],
   ['Exponent', '指数'], ['Falloff', '減衰'], ['Feather', 'ぼかし幅'], ['Final Mix', '最終合成'],
   ['Flow Steps', 'フローステップ'], ['Fractal Type', 'フラクタル形式'], ['Frequency', '周波数'],
   ['Glow Intensity', '発光強度'], ['Glow Radius', '発光半径'], ['Glow Threshold', '発光しきい値'], ['Grain', '粒度'],

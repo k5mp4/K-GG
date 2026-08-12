@@ -37,6 +37,7 @@ describe('presetThumbnail', () => {
     expect(preview.height).toBe(200);
     expect(preview.sourceImageCanvas).toBeNull();
     expect(preview.imageMaskEnabled).toBe(false);
+    expect(preview.seamless).toEqual(STORE_DEFAULTS.seamless);
     expect(preview.manualDistort.displacement).not.toBe(displacement);
     expect(source.manualDistort?.displacement).toBe(displacement);
   });

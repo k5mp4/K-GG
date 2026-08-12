@@ -23,6 +23,8 @@ import type { ClothGradientConfig } from '../types/clothGradient';
 import { normalizeClothGradientConfig } from '../types/clothGradient';
 import type { ConeViewConfig } from '../types/coneView';
 import { normalizeConeViewConfig } from '../types/coneView';
+import type { SeamlessConfig } from '../types/seamless';
+import { normalizeSeamlessConfig } from '../types/seamless';
 
 export type StoreSnapshot = {
   gradient: GradientConfig;
@@ -35,6 +37,7 @@ export type StoreSnapshot = {
   normalMap: NormalMapConfig;
   clothGradient?: ClothGradientConfig;
   coneView?: ConeViewConfig;
+  seamless?: SeamlessConfig;
   radon: RadonConfig;
   iridescence?: IridescenceConfig;
   manualDistort?: ManualDistortConfig;
@@ -88,6 +91,7 @@ export function makePreset(
       diffuse,
       clothGradient: normalizeClothGradientConfig(state.clothGradient),
       coneView: normalizeConeViewConfig(state.coneView),
+      seamless: normalizeSeamlessConfig(state.seamless),
       effectPipeline: state.effectPipeline
         ? normalizeEffectPipelineConfig(state.effectPipeline)
         : createDefaultEffectPipeline(),

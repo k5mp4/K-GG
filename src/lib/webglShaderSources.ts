@@ -16,6 +16,7 @@ import postprocessNoiseMainGLSL from '../shaders/postprocess/noise-main.glsl?raw
 import prismCompositeGLSL from '../shaders/prismComposite.frag.glsl?raw';
 import particlesVertexGLSL from '../shaders/particles.vert.glsl?raw';
 import particlesFragmentGLSL from '../shaders/particles.frag.glsl?raw';
+import seamlessGLSL from '../shaders/seamless.frag.glsl?raw';
 
 const postprocessGLSL = [
   postprocessUniformsGLSL,
@@ -40,7 +41,8 @@ export type LazyProgramKey =
   | 'prism'
   | 'postprocess'
   | 'prismComposite'
-  | 'particles';
+  | 'particles'
+  | 'seamless';
 
 export type ProgramSource = {
   vertex: string;
@@ -62,6 +64,7 @@ export const SHADER_VERSION = (
   + prismCompositeGLSL.length * 127
   + particlesVertexGLSL.length * 89
   + particlesFragmentGLSL.length * 83
+  + seamlessGLSL.length * 71
 ) | 0;
 
 // Keep the specialized programs independent from the declaration order in
@@ -234,6 +237,7 @@ export function getProgramSource(key: LazyProgramKey): ProgramSource {
   if (key === 'prism') return { vertex: vertexGLSL, fragment: createSpecializedPostprocessSource('KGG_PRISM_ONLY') };
   if (key === 'postprocess') return { vertex: vertexGLSL, fragment: createGeneralPostprocessSource() };
   if (key === 'prismComposite') return { vertex: vertexGLSL, fragment: prismCompositeGLSL };
+  if (key === 'seamless') return { vertex: vertexGLSL, fragment: seamlessGLSL };
   return { vertex: particlesVertexGLSL, fragment: particlesFragmentGLSL };
 }
 
