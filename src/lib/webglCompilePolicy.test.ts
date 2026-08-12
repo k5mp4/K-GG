@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { selectShaderCompileExtension } from './webgl';
 import webglSource from './webgl.ts?raw';
 
 function functionSource(name: string): string {
@@ -15,6 +16,13 @@ function functionSource(name: string): string {
 }
 
 describe('WebGL lazy compile policy', () => {
+  it('disables parallel linking while validation metadata can be active', () => {
+    const extension = { COMPLETION_STATUS_KHR: 0x91b1 };
+
+    expect(selectShaderCompileExtension(extension, true)).toBeNull();
+    expect(selectShaderCompileExtension(extension, false)).toBe(extension);
+  });
+
   it('never advances to synchronous status reads before parallel completion', () => {
     const source = functionSource('createProgramAsync');
     const completionCheck = source.indexOf('ext.COMPLETION_STATUS_KHR');
@@ -75,5 +83,37 @@ describe('WebGL lazy compile policy', () => {
     expect(passSource).toContain('Postprocess pass cannot sample from its destination texture');
     expect(passSource).toContain('gl.disable(gl.BLEND)');
     expect(passSource).toContain('gl.disable(gl.SCISSOR_TEST)');
+  });
+
+  it('publishes a lazy program only after uniform reflection succeeds', () => {
+    const source = functionSource('compileLazyProgram');
+    const installSource = functionSource('installLazyProgram');
+
+    expect(source).toContain('installLazyProgram(ctx, key, program)');
+    expect(source).toContain('if (program) gl.deleteProgram(program)');
+    expect(installSource).toContain('const uniforms = getPostprocessUniforms(gl, program)');
+    expect(installSource).toContain('ctx.noiseStackProgram = program');
+  });
+
+  it('reflects only active postprocess uniforms and restores the previous program after a failed pass', () => {
+    const uniformsSource = functionSource('getPostprocessUniforms');
+    const passSource = functionSource('drawPostprocessPass');
+
+    expect(uniformsSource).toContain('gl.getActiveUniform(program, index)');
+    expect(uniformsSource).toContain("locations.u_resolution = location");
+    expect(uniformsSource).not.toContain("gl.getUniformLocation(program, 'u_noiseStack')");
+    expect(passSource).toContain('if (!selectedProgram || !selectedUniforms) return false;');
+    expect(passSource).toContain('} finally {');
+    expect(passSource).toContain('ctx.postprocessUniforms = previousUniforms;');
+  });
+
+  it('keeps Noise usable through the general postprocess fallback after a specialized compile failure', () => {
+    const source = functionSource('requestNoiseStackProgram');
+    const compileSource = functionSource('compileLazyProgram');
+
+    expect(source).toContain("if (!noiseState.failed) return requestLazyProgram(ctx, 'noiseStack');");
+    expect(source).toContain("const fallbackReady = requestLazyProgram(ctx, 'postprocess');");
+    expect(source).toContain("state: 'fallback' as const");
+    expect(compileSource).not.toContain("key === 'glass' || key === 'glassV2' || key === 'noiseStack'");
   });
 });

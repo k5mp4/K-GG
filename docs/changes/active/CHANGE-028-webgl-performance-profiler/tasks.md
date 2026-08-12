@@ -1,0 +1,24 @@
+# Tasks
+
+- [x] 現行仕様、関連ADR、WebGL描画経路を確認する
+- [x] `proposal.md`、`delta.md`、`design.md`をユーザー要求に基づき承認済みchangeとして確定する
+- [x] 開発専用Profiler、非同期GPU query、Effect/Draw/Pass集計を実装する
+- [x] stats-gl、webgl-memory、webgl-lint、Spector.jsの開発時連携を実装する
+- [x] Debug UIと300-frame Benchmarkを実装する
+- [x] 純粋な集計・Benchmarkロジックのテストを追加する
+- [x] current spec、開発ガイド、ADRを同期する
+- [x] ACごとの検証結果を`validation.md`へ記録する
+- [x] 未検証の手動ACが残る場合はactiveのまま理由を記録する
+- [x] stats-glとEffect単位GPU queryの競合を防ぎ、描画を継続できる回帰テストを追加する
+- [x] Profiler初期化時のwebgl-lint重複disableによる描画停止を修正し、回帰テストを追加する
+- [x] webgl-lintとKHR_parallel_shader_compileの競合、未完成lazy Programの公開、Postprocess Uniform反映失敗によるEffect Stack停止を修正し、回帰テストを追加する
+- [x] stats-gl overlayの全画面当たり判定を修正し、Performance各値とDebug/Benchmarkの判定基準を開発者ガイドへ追加する
+- [x] Performanceタブへstats-glモニターをドック表示し、Profilerを開いてもCanvas描画を確認できるレイアウトへ修正する
+- [x] Glass専用Shaderから汎用Noiseの全分岐を分離し、全Effect Stack有効時のコンパイル停止・context lostを修正して回帰確認する
+- [x] Spector.jsのUMD/Vite export shapeを正規化し、Capture Frameの遅延ロード成功を回帰確認する
+- [x] Spector.js Capture中のValidation/GPU計測競合、空フレーム再試行、非同期import後の遅延起動を解消し、Profiler UIへキャンセル操作を追加する
+- [x] Noise専用lazy Shaderの反射・リンク失敗時に一般postprocessへフォールバックし、Effect Stackの描画継続を回帰確認する
+- [x] Captureタブのアンマウント後もSpector.jsを停止できる状態共有を追加し、K-GG対象Canvasの識別IDとChoose Canvas操作手順を明示する
+- [x] 静止PreviewでSpector.jsのRAF開始前タイムアウトが発生しないよう、Capture開始時に1回のPreview描画をスケジュールする
+- [x] Spector.jsのCapture中に共有Uniform契約へ存在しないsamplerを`uniform1i`へ渡さず、webgl-lintのundefined sampler例外でCaptureを中断しないようにする
+- [ ] Spector.js Capture結果表示時の`webgl-lint` `recordSamplerValues` / `uniform1i` 経路で発生する`TypeError: Cannot read properties of undefined (reading 'get')`を根本修正し、Capture結果表示まで回帰確認する（次回対応へ保留）
