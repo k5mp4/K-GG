@@ -9,6 +9,8 @@
  */
 
 import { renderBridge, type ExportSessionToken } from './renderBridge';
+import { applySeamlessToCanvas } from './seamless';
+import type { SeamlessConfig } from '../types/seamless';
 
 const DEFAULT_TILE_SIZE = 4096;
 const TILE_SIZE_FLOOR = 1024;
@@ -63,6 +65,8 @@ export type TiledRenderOptions = {
   signal?: AbortSignal;
   /** 動画export中は専用sessionで各tileを描画する */
   exportSession?: ExportSessionToken;
+  /** タイル結合後の全体画像へ適用するSeamless設定 */
+  seamless?: SeamlessConfig;
 };
 
 export type PaddedTileRegion = {
@@ -218,6 +222,7 @@ export async function renderTiledToCanvas2D(
     }
   }
 
+  if (opts.seamless) applySeamlessToCanvas(out, opts.seamless);
   console.log(`[tileRender] done`);
   return out;
 }

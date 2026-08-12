@@ -7,6 +7,7 @@ import { normalizeMeshGradientConfig } from '../types/gradient';
 import type { LatestState } from '../types/latestState';
 import { initWebGL, type WebGLContext } from './webgl';
 import { resolveDiffuseBezier } from './diffuseCurve';
+import { normalizeSeamlessConfig } from '../types/seamless';
 
 export const PRESET_THUMBNAIL_WIDTH = 320;
 export const PRESET_THUMBNAIL_HEIGHT = 200;
@@ -71,6 +72,7 @@ export function createPresetThumbnailState(snapshot: StoreSnapshot): LatestState
     })(),
     stretch: { ...STORE_DEFAULTS.stretch, ...snapshot.stretch },
     normalMap: { ...STORE_DEFAULTS.normalMap, ...snapshot.normalMap },
+    seamless: normalizeSeamlessConfig(snapshot.seamless),
     radon: { ...STORE_DEFAULTS.radon, ...snapshot.radon, enabled: false },
     iridescence: { ...STORE_DEFAULTS.iridescence, ...snapshot.iridescence, enabled: false },
     manualDistort,

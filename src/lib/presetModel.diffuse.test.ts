@@ -49,4 +49,10 @@ describe('legacy Diffuse preset migration', () => {
       seedAnimEnabled: true,
     });
   });
+
+  it('adds the disabled Seamless defaults to legacy presets', () => {
+    const saved = makePreset('Legacy', { diffuse: STORE_DEFAULTS.diffuse } as unknown as StoreSnapshot);
+
+    expect(saved.state.seamless).toEqual(STORE_DEFAULTS.seamless);
+  });
 });

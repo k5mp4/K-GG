@@ -5,7 +5,7 @@ import {
   needsTiledRender,
   renderTiledToCanvas2D,
 } from './tileRender';
-import type { AnimationEasing } from '../store/gradientStore';
+import { useGradientStore, type AnimationEasing } from '../store/gradientStore';
 import type { VideoExportFrameRenderer } from '../adapters/types';
 import {
   beginExportFrameDiagnostics,
@@ -128,6 +128,7 @@ export async function renderAndCaptureExportFrame(
       signal,
       onProgress: onTileProgress,
       exportSession: session,
+      seamless: useGradientStore.getState().seamless,
     });
     throwIfAborted(signal);
     recordExportCaptureDiagnostics('begin');

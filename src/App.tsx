@@ -112,7 +112,7 @@ const TAB_ENABLED_MAP: Partial<Record<LeftTab, (s: StoreSnapshot) => boolean>> =
   diffuse: (s) => s.diffuse.enabled,
   noise: (s) => s.noiseDistortion.enabled,
   slit: (s) => s.slitScan.enabled,
-  sandbox: (s) => s.normalMap.enabled || s.effectPipeline.prismEnabled || s.effectPipeline.particlesEnabled,
+  sandbox: (s) => s.normalMap.enabled || s.effectPipeline.prismEnabled || s.effectPipeline.particlesEnabled || s.seamless.enabled,
   postprocess: (s) => s.postprocess.enabled || hasEnabledPostprocessEffectStack(s.effectPipeline),
 };
 

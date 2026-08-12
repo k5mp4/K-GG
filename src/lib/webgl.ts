@@ -35,6 +35,7 @@ import { clampParameter, getParameterLimit } from './parameterLimits';
 import { getAnimationDirectionVector } from './animationDirection';
 import { shouldRenderNormalMap } from './normalMap';
 import type { LatestState } from '../types/latestState';
+import { DEFAULT_SEAMLESS, normalizeSeamlessConfig, type SeamlessConfig } from '../types/seamless';
 import {
   exportDiagnosticsEnabled,
   recordGlassPassDiagnostics,
@@ -106,6 +107,8 @@ export type WebGLContext = {
   blurUniforms: Record<string, WebGLUniformLocation | null>;
   stretchProgram: WebGLProgram | null;
   stretchUniforms: Record<string, WebGLUniformLocation | null>;
+  seamlessProgram: WebGLProgram | null;
+  seamlessUniforms: Record<string, WebGLUniformLocation | null>;
   postprocessProgram: WebGLProgram | null;
   postprocessUniforms: Record<string, WebGLUniformLocation | null>;
   stackCoreProgram: WebGLProgram | null;
@@ -551,7 +554,7 @@ export async function initWebGL(canvas: HTMLCanvasElement): Promise<WebGLContext
   const { fbo: prismGlowFbo, tex: prismGlowTexture } = createFboWithTexture(gl);
   const transitionTextureFrom = createTexture(gl);
   const transitionTextureTo = createTexture(gl);
-  const ctx: WebGLContext = { gl, gpuDiagnostics, renderOptimization, program, uniforms, generatorProgram: null, generatorUniforms: {}, gradientRampTexture, meshGradientTexture, meshGradientTextureSignature: '', diffuseCurveTexture, diffuseCurveSignature: '', diffuseAsciiTexture, diffuseAsciiSignature: '', diffuseAsciiCount: 1, diffuseAsciiRows: ASCII_ATLAS_MAX_ROWS, diffuseHistogramAt: 0, manualDistortTexture, manualDistortDisplacement: null, manualDistortSmoothMask: null, manualDistortMapResolution: 0, sourceImageTexture, sourceImageCanvas: null, imageGradientTexture, imageGradientSource: null, imageMaskTexture, imageMaskSource: null, normalMapProgram: null, normalMapUniforms: {}, gradFbo, gradTexture, blurProgram: null, blurUniforms: {}, stretchProgram: null, stretchUniforms: {}, stackCoreProgram: null, stackCoreUniforms: {}, noiseStackProgram: null, noiseStackUniforms: {}, glassProgram: null, glassUniforms: {}, glassFallbackActive: false, glassV2Program: null, glassV2Uniforms: {}, glassV2FallbackActive: false, prismProgram: null, prismUniforms: {}, postprocessProgram: null, postprocessUniforms: {}, prismCompositeProgram: null, prismCompositeUniforms: {}, particleProgram: null, particleUniforms: {}, particleVao: null, particleQuadBuffer: null, particleInstanceBuffer: null, particleInstanceCount: 0, particleInstanceSeed: Number.NaN, normalFbo, normalTexture, hBlurFbo, hBlurTexture, postprocessFboA, postprocessTextureA, postprocessFboB, postprocessTextureB, prismScratchFbo, prismScratchTexture, prismBlurFbo, prismBlurTexture, prismGlowFbo, prismGlowTexture, fboSize: [0, 0], v2CoreFboSize: [0, 0], shaderCompileExt: ext, lazyProgramState: createLazyProgramState(), hasPresentedFrame: false };
+  const ctx: WebGLContext = { gl, gpuDiagnostics, renderOptimization, program, uniforms, generatorProgram: null, generatorUniforms: {}, gradientRampTexture, meshGradientTexture, meshGradientTextureSignature: '', diffuseCurveTexture, diffuseCurveSignature: '', diffuseAsciiTexture, diffuseAsciiSignature: '', diffuseAsciiCount: 1, diffuseAsciiRows: ASCII_ATLAS_MAX_ROWS, diffuseHistogramAt: 0, manualDistortTexture, manualDistortDisplacement: null, manualDistortSmoothMask: null, manualDistortMapResolution: 0, sourceImageTexture, sourceImageCanvas: null, imageGradientTexture, imageGradientSource: null, imageMaskTexture, imageMaskSource: null, normalMapProgram: null, normalMapUniforms: {}, gradFbo, gradTexture, blurProgram: null, blurUniforms: {}, stretchProgram: null, stretchUniforms: {}, seamlessProgram: null, seamlessUniforms: {}, stackCoreProgram: null, stackCoreUniforms: {}, noiseStackProgram: null, noiseStackUniforms: {}, glassProgram: null, glassUniforms: {}, glassFallbackActive: false, glassV2Program: null, glassV2Uniforms: {}, glassV2FallbackActive: false, prismProgram: null, prismUniforms: {}, postprocessProgram: null, postprocessUniforms: {}, prismCompositeProgram: null, prismCompositeUniforms: {}, particleProgram: null, particleUniforms: {}, particleVao: null, particleQuadBuffer: null, particleInstanceBuffer: null, particleInstanceCount: 0, particleInstanceSeed: Number.NaN, normalFbo, normalTexture, hBlurFbo, hBlurTexture, postprocessFboA, postprocessTextureA, postprocessFboB, postprocessTextureB, prismScratchFbo, prismScratchTexture, prismBlurFbo, prismBlurTexture, prismGlowFbo, prismGlowTexture, fboSize: [0, 0], v2CoreFboSize: [0, 0], shaderCompileExt: ext, lazyProgramState: createLazyProgramState(), hasPresentedFrame: false };
   effectStackTransitionResources.set(ctx, {
     program: transitionProgram,
     from: gl.getUniformLocation(transitionProgram, 'u_transitionFrom'),
@@ -653,6 +656,7 @@ function createLazyProgramState(): Record<LazyProgramKey, LazyProgramState> {
     postprocess: { promise: null, failed: false, timedOut: false },
     prismComposite: { promise: null, failed: false, timedOut: false },
     particles: { promise: null, failed: false, timedOut: false },
+    seamless: { promise: null, failed: false, timedOut: false },
   };
 }
 
@@ -693,6 +697,15 @@ function getStretchUniforms(gl: WebGL2RenderingContext, program: WebGLProgram): 
     u_glowRadius: gl.getUniformLocation(program, 'u_glowRadius'),
     u_glowThreshold: gl.getUniformLocation(program, 'u_glowThreshold'),
     u_glowTint: gl.getUniformLocation(program, 'u_glowTint'),
+  };
+}
+
+function getSeamlessUniforms(gl: WebGL2RenderingContext, program: WebGLProgram): Record<string, WebGLUniformLocation | null> {
+  return {
+    u_sourceTex: gl.getUniformLocation(program, 'u_sourceTex'),
+    u_resolution: gl.getUniformLocation(program, 'u_resolution'),
+    u_blendWidth: gl.getUniformLocation(program, 'u_blendWidth'),
+    u_axis: gl.getUniformLocation(program, 'u_axis'),
   };
 }
 
@@ -941,6 +954,7 @@ async function compileLazyProgram(ctx: WebGLContext, key: LazyProgramKey): Promi
     (key === 'blur' && ctx.blurProgram) ||
     (key === 'normalMap' && ctx.normalMapProgram) ||
     (key === 'stretch' && ctx.stretchProgram) ||
+    (key === 'seamless' && ctx.seamlessProgram) ||
     (key === 'stackCore' && ctx.stackCoreProgram) ||
     (key === 'noiseStack' && ctx.noiseStackProgram) ||
     (key === 'glass' && ctx.glassProgram) ||
@@ -994,6 +1008,9 @@ async function compileLazyProgram(ctx: WebGLContext, key: LazyProgramKey): Promi
   } else if (key === 'stretch') {
     ctx.stretchProgram = program;
     ctx.stretchUniforms = getStretchUniforms(gl, program);
+  } else if (key === 'seamless') {
+    ctx.seamlessProgram = program;
+    ctx.seamlessUniforms = getSeamlessUniforms(gl, program);
   } else if (key === 'stackCore') {
     ctx.stackCoreProgram = program;
     ctx.stackCoreUniforms = getPostprocessUniforms(gl, program);
@@ -1028,6 +1045,7 @@ function requestLazyProgram(ctx: WebGLContext, key: LazyProgramKey): boolean {
     (key === 'blur' && ctx.blurProgram) ||
     (key === 'normalMap' && ctx.normalMapProgram) ||
     (key === 'stretch' && ctx.stretchProgram) ||
+    (key === 'seamless' && ctx.seamlessProgram) ||
     (key === 'stackCore' && ctx.stackCoreProgram) ||
     (key === 'noiseStack' && ctx.noiseStackProgram) ||
     (key === 'glass' && ctx.glassProgram) ||
@@ -1070,6 +1088,7 @@ function lazyProgramReady(ctx: WebGLContext, key: LazyProgramKey): boolean {
     (key === 'blur' && ctx.blurProgram) ||
     (key === 'normalMap' && ctx.normalMapProgram) ||
     (key === 'stretch' && ctx.stretchProgram) ||
+    (key === 'seamless' && ctx.seamlessProgram) ||
     (key === 'stackCore' && ctx.stackCoreProgram) ||
     (key === 'noiseStack' && ctx.noiseStackProgram) ||
     (key === 'glass' && ctx.glassProgram) ||
@@ -1142,6 +1161,7 @@ export function getRequiredExportProgramKeys(state: LatestState): LazyProgramKey
       normalMapBlur: state.normalMap.blur,
       prismGlowRadius: state.postprocess.prismGlowRadius ?? 0,
       forceTextureDiffusePass: state.diffuse.mode === 'legacy',
+      seamlessEnabled: state.seamless?.enabled ?? false,
     });
     const protectedStipple = imageGradientProtected
       && state.diffuse.mode === 'legacy'
@@ -1172,6 +1192,8 @@ export function getRequiredExportProgramKeys(state: LatestState): LazyProgramKey
     add('prismComposite', prismRequested);
     add('particles', state.postprocess.enabled && state.postprocess.effectMode === 'particles');
   }
+
+  add('seamless', state.seamless?.enabled ?? false);
 
   return required;
 }
@@ -2241,6 +2263,128 @@ export function choosePostprocessTarget(
   return { fbo: ctx.postprocessFboA, texture: ctx.postprocessTextureA };
 }
 
+type SeamlessTarget = { fbo: WebGLFramebuffer; texture: WebGLTexture };
+
+function getSeamlessTargetCandidates(ctx: WebGLContext): SeamlessTarget[] {
+  return [
+    { fbo: ctx.postprocessFboA, texture: ctx.postprocessTextureA },
+    { fbo: ctx.postprocessFboB, texture: ctx.postprocessTextureB },
+    { fbo: ctx.gradFbo, texture: ctx.gradTexture },
+  ];
+}
+
+function drawSeamlessAxisPass(
+  ctx: WebGLContext,
+  sourceTexture: WebGLTexture,
+  width: number,
+  height: number,
+  blendWidth: number,
+  axis: 0 | 1,
+  targetFramebuffer: WebGLFramebuffer | null,
+): boolean {
+  const { gl } = ctx;
+  if (!ctx.seamlessProgram) return false;
+  const destination = targetFramebuffer === ctx.postprocessFboA
+    ? ctx.postprocessTextureA
+    : targetFramebuffer === ctx.postprocessFboB
+      ? ctx.postprocessTextureB
+      : targetFramebuffer === ctx.gradFbo
+        ? ctx.gradTexture
+        : null;
+  if (destination === sourceTexture) {
+    throw new Error('Seamless pass cannot sample from its destination texture');
+  }
+
+  gl.useProgram(ctx.seamlessProgram);
+  gl.viewport(0, 0, width, height);
+  gl.disable(gl.BLEND);
+  gl.disable(gl.SCISSOR_TEST);
+  gl.colorMask(true, true, true, true);
+  gl.bindFramebuffer(gl.FRAMEBUFFER, targetFramebuffer);
+  gl.activeTexture(gl.TEXTURE3);
+  gl.bindTexture(gl.TEXTURE_2D, sourceTexture);
+  gl.uniform1i(ctx.seamlessUniforms.u_sourceTex, 3);
+  gl.uniform2f(ctx.seamlessUniforms.u_resolution, width, height);
+  gl.uniform1f(ctx.seamlessUniforms.u_blendWidth, blendWidth);
+  gl.uniform1i(ctx.seamlessUniforms.u_axis, axis);
+  gl.drawArrays(gl.TRIANGLES, 0, 6);
+  return true;
+}
+
+function getFramebufferForTexture(ctx: WebGLContext, texture: WebGLTexture): WebGLFramebuffer | null {
+  if (texture === ctx.gradTexture) return ctx.gradFbo;
+  if (texture === ctx.normalTexture) return ctx.normalFbo;
+  if (texture === ctx.hBlurTexture) return ctx.hBlurFbo;
+  if (texture === ctx.postprocessTextureA) return ctx.postprocessFboA;
+  if (texture === ctx.postprocessTextureB) return ctx.postprocessFboB;
+  if (texture === ctx.prismScratchTexture) return ctx.prismScratchFbo;
+  if (texture === ctx.prismBlurTexture) return ctx.prismBlurFbo;
+  if (texture === ctx.prismGlowTexture) return ctx.prismGlowFbo;
+  return null;
+}
+
+function copyTextureToFramebuffer(
+  ctx: WebGLContext,
+  sourceTexture: WebGLTexture,
+  targetFramebuffer: WebGLFramebuffer,
+  width: number,
+  height: number,
+): void {
+  const sourceFramebuffer = getFramebufferForTexture(ctx, sourceTexture);
+  if (!sourceFramebuffer) throw new Error('Seamless particle composition received an unknown source texture');
+  if (sourceFramebuffer === targetFramebuffer) throw new Error('Seamless particle composition cannot copy into its source framebuffer');
+
+  const { gl } = ctx;
+  gl.bindFramebuffer(gl.READ_FRAMEBUFFER, sourceFramebuffer);
+  gl.bindFramebuffer(gl.DRAW_FRAMEBUFFER, targetFramebuffer);
+  gl.blitFramebuffer(
+    0, 0, width, height,
+    0, 0, width, height,
+    gl.COLOR_BUFFER_BIT,
+    gl.NEAREST,
+  );
+  gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+}
+
+/**
+ * Runs the two-axis Seamless pass. A texture target is used when a later
+ * overlay needs the processed frame as a sampler; null presents directly.
+ */
+function renderSeamlessPass(
+  ctx: WebGLContext,
+  sourceTexture: WebGLTexture,
+  width: number,
+  height: number,
+  config: SeamlessConfig,
+  targetFramebuffer: WebGLFramebuffer | null,
+): WebGLTexture | null {
+  const normalized = normalizeSeamlessConfig(config);
+  if (!normalized.enabled || !ctx.seamlessProgram) return targetFramebuffer === ctx.postprocessFboA
+    ? ctx.postprocessTextureA
+    : targetFramebuffer === ctx.postprocessFboB
+      ? ctx.postprocessTextureB
+      : null;
+
+  const horizontalTarget = getSeamlessTargetCandidates(ctx).find(candidate => (
+    candidate.texture !== sourceTexture && candidate.fbo !== targetFramebuffer
+  ));
+  if (!horizontalTarget) throw new Error('No safe framebuffer is available for Seamless processing');
+  if (!drawSeamlessAxisPass(ctx, sourceTexture, width, height, normalized.blendWidth, 0, horizontalTarget.fbo)) {
+    return null;
+  }
+  if (!drawSeamlessAxisPass(ctx, horizontalTarget.texture, width, height, normalized.blendWidth, 1, targetFramebuffer)) {
+    return null;
+  }
+  if (targetFramebuffer === null) ctx.hasPresentedFrame = true;
+  return targetFramebuffer === ctx.postprocessFboA
+    ? ctx.postprocessTextureA
+    : targetFramebuffer === ctx.postprocessFboB
+      ? ctx.postprocessTextureB
+      : targetFramebuffer === ctx.gradFbo
+        ? ctx.gradTexture
+        : null;
+}
+
 function drawPostprocessStackOutput(
   ctx: WebGLContext,
   sourceTexture: WebGLTexture,
@@ -2350,6 +2494,7 @@ function drawParticleOverlay(
   offsetX: number,
   offsetY: number,
   time: number,
+  targetFramebuffer: WebGLFramebuffer | null = null,
 ): void {
   const { gl } = ctx;
   if (!ctx.particleProgram || !ctx.particleVao) return;
@@ -2364,9 +2509,11 @@ function drawParticleOverlay(
   const anchors = gradient.anchors ?? GRADIENT_ANCHOR_DEFAULTS[gradient.gradientType ?? 'linear'];
   gl.useProgram(ctx.particleProgram);
   gl.viewport(0, 0, width, height);
-  gl.bindFramebuffer(gl.FRAMEBUFFER, null);
-  gl.clearColor(0, 0, 0, 1);
-  gl.clear(gl.COLOR_BUFFER_BIT);
+  gl.bindFramebuffer(gl.FRAMEBUFFER, targetFramebuffer);
+  if (!targetFramebuffer) {
+    gl.clearColor(0, 0, 0, 1);
+    gl.clear(gl.COLOR_BUFFER_BIT);
+  }
   gl.activeTexture(gl.TEXTURE3);
   gl.bindTexture(gl.TEXTURE_2D, sourceTexture);
   gl.uniform1i(ctx.particleUniforms.u_sourceTex, 3);
@@ -2543,7 +2690,9 @@ export function render(
   clothGradient?: ClothGradientConfig,
   clothTime = 0,
   clothLoopPeriod = 1,
+  seamless: SeamlessConfig = DEFAULT_SEAMLESS,
 ): void {
+  seamless = normalizeSeamlessConfig(seamless);
   const isV2Pipeline = effectPipeline?.version === 'stack-v2';
   const imageGradientProtected = imageGradient.enabled && !!imageGradientSource;
   // Only Legacy uses the full generator. V2 deliberately keeps its Base stage
@@ -2616,6 +2765,7 @@ export function render(
   const vpH = tile ? tile.viewport[1] : height;
   const tileOx = tile ? tile.offset[0] : 0;
   const tileOy = tile ? tile.offset[1] : 0;
+  const seamlessRequested = seamless.enabled && !tile;
 
   // キャンバスサイズをチェック（readPixels や toBlob が失敗する可能性がある）
   const maxTexSize = gl.getParameter(gl.MAX_TEXTURE_SIZE) as number;
@@ -2914,6 +3064,7 @@ export function render(
       prismGlowRadius: postprocess.prismGlowRadius ?? 0,
       clothGradientEnabled: clothGradient?.enabled ?? false,
       forceTextureDiffusePass: diffuse.mode === 'legacy',
+      seamlessEnabled: seamlessRequested,
     });
     const diffuseLayerEnabled = renderPlan.diffuseEnabled;
     const protectedLayerEnabled = (kind: EffectPipelineConfig['effectStack'][number]['kind']) =>
@@ -2940,7 +3091,8 @@ export function render(
       && !protectedStipple
       && !normalRequested
       && !renderPlan.prismRequested
-      && !renderPlan.particlesRequested;
+      && !renderPlan.particlesRequested
+      && !seamlessRequested;
     if (renderPlan.framebufferAllocationMode === 'direct' || protectedDirect) {
       if (imageGradientProtected) {
         gl.uniform1i(uniforms.u_noiseEnabled, protectedLayerEnabled('noise') && noiseDistortion.enabled ? 1 : 0);
@@ -2970,6 +3122,7 @@ export function render(
       (!normalNeedsBlur || requestLazyProgram(ctx, 'blur'))
     );
     const stretchReady = imageGradientProtected || !renderPlan.programs.stretch || requestLazyProgram(ctx, 'stretch');
+    const seamlessReady = !seamlessRequested || requestLazyProgram(ctx, 'seamless');
     const prismReady = !prismRequested || (
       requestLazyProgram(ctx, 'prism') &&
       requestLazyProgram(ctx, 'prismComposite') &&
@@ -2979,7 +3132,7 @@ export function render(
 
     // Lazy programs compile asynchronously. Keep a usable base frame until every
     // requested V2 stage is available instead of presenting a partial stack.
-    if (!stackCoreReady || !normalReady || !stretchReady || !prismReady || !particlesReady) {
+    if (!stackCoreReady || !normalReady || !stretchReady || !prismReady || !particlesReady || !seamlessReady) {
       // Cloth is a Base generator and does not depend on the stack programs:
       // present the cloth frame even while they compile.
       const clothReady = clothGradient?.enabled
@@ -3144,10 +3297,22 @@ export function render(
       currentTexture = target.texture;
     }
 
-    // Present the color texture, then draw the optional particle overlay on top.
-    drawPostprocessPass(ctx, currentTexture, gradient, disabledStackNoise, v2Postprocess, 'diffuse', vpW, vpH, width, height, tileOx, tileOy, time, noiseLoopPeriod, animationSpeed, false, null, null, 0, null, true);
-    if (particlesRequested) {
+    // Particles are composited into a texture when Seamless is enabled so the
+    // final boundary pass has the same input as tiled CPU export.
+    let seamlessSourceTexture = currentTexture;
+    if (seamlessRequested && particlesRequested) {
+      const particleTarget = choosePostprocessTarget(ctx, currentTexture);
+      copyTextureToFramebuffer(ctx, currentTexture, particleTarget.fbo, vpW, vpH);
+      drawParticleOverlay(ctx, currentTexture, gradient, postprocess, vpW, vpH, width, height, tileOx, tileOy, time, particleTarget.fbo);
+      seamlessSourceTexture = particleTarget.texture;
+    }
+    if (seamlessRequested) {
+      renderSeamlessPass(ctx, seamlessSourceTexture, vpW, vpH, seamless, null);
+    }
+    if (particlesRequested && !seamlessRequested) {
       drawParticleOverlay(ctx, currentTexture, gradient, postprocess, vpW, vpH, width, height, tileOx, tileOy, time);
+    } else if (!seamlessRequested) {
+      drawPostprocessPass(ctx, currentTexture, gradient, disabledStackNoise, v2Postprocess, 'diffuse', vpW, vpH, width, height, tileOx, tileOy, time, noiseLoopPeriod, animationSpeed, false, null, null, 0, null, true);
     }
     return;
   }
@@ -3176,14 +3341,17 @@ export function render(
   );
   const normalMapActive = normalMapRequested && normalMapReady;
   const postprocessActive = postprocessRequested && postprocessReady;
+  const seamlessReady = !seamlessRequested || requestLazyProgram(ctx, 'seamless');
+  const seamlessActive = seamlessRequested && seamlessReady;
   const stretchScan = stretchScanOverride ?? 0;
   const stretchSeed = stretchScanOverride != null
     ? stretch.seed + (1 - Math.cos(stretchScan * Math.PI * 2)) * 0.5
     : stretch.seed;
-  if ((stretchActive || postprocessActive || particleActive) && (ctx.fboSize[0] !== vpW || ctx.fboSize[1] !== vpH)) {
+  if ((stretchActive || postprocessActive || particleActive || seamlessActive) && (ctx.fboSize[0] !== vpW || ctx.fboSize[1] !== vpH)) {
     resizeFboTextures(gl, ctx, vpW, vpH);
   }
   let particleSourceTexture: WebGLTexture | null = null;
+  let seamlessSourceTexture: WebGLTexture | null = null;
   const applyPostprocessStack = (sourceTexture: WebGLTexture, renderWidth: number, renderHeight: number) => {
     const stackTexture = drawPostprocessStackOutput(
       ctx,
@@ -3200,9 +3368,10 @@ export function render(
       time,
       noiseLoopPeriod,
       animationSpeed,
-      particleActive,
+      particleActive || seamlessActive,
     );
     if (particleActive) particleSourceTexture = stackTexture ?? sourceTexture;
+    if (seamlessActive) seamlessSourceTexture = stackTexture ?? sourceTexture;
   };
 
   if (normalMapActive) {
@@ -3249,48 +3418,66 @@ export function render(
       gl.drawArrays(gl.TRIANGLES, 0, 6);
       gl.bindTexture(gl.TEXTURE_2D, ctx.hBlurTexture);
       gl.uniform2f(ctx.blurUniforms.u_blurDir, 0.0, 1.0);
-      gl.bindFramebuffer(gl.FRAMEBUFFER, (stretchActive || postprocessActive || particleActive) ? ctx.gradFbo : null);
+      gl.bindFramebuffer(gl.FRAMEBUFFER, (stretchActive || postprocessActive || particleActive || seamlessActive) ? ctx.gradFbo : null);
       gl.drawArrays(gl.TRIANGLES, 0, 6);
       if (stretchActive) {
-        drawStretchPass(ctx, ctx.gradTexture, stretch, stretchScan, stretchSeed, fboW, fboH, (postprocessActive || particleActive) ? ctx.normalFbo : null);
+        drawStretchPass(ctx, ctx.gradTexture, stretch, stretchScan, stretchSeed, fboW, fboH, (postprocessActive || particleActive || seamlessActive) ? ctx.normalFbo : null);
         if (postprocessActive) applyPostprocessStack(ctx.normalTexture, fboW, fboH);
         else if (particleActive) particleSourceTexture = ctx.normalTexture;
+        else if (seamlessActive) seamlessSourceTexture = ctx.normalTexture;
       } else if (postprocessActive) {
         applyPostprocessStack(ctx.gradTexture, fboW, fboH);
       } else if (particleActive) {
         particleSourceTexture = ctx.gradTexture;
+      } else if (seamlessActive) {
+        seamlessSourceTexture = ctx.gradTexture;
       }
     } else {
       // ブラーなし: stretch有効時はノーマル結果をテクスチャ化してからポスト処理
-      gl.bindFramebuffer(gl.FRAMEBUFFER, (stretchActive || postprocessActive || particleActive) ? ctx.normalFbo : null);
+      gl.bindFramebuffer(gl.FRAMEBUFFER, (stretchActive || postprocessActive || particleActive || seamlessActive) ? ctx.normalFbo : null);
       gl.drawArrays(gl.TRIANGLES, 0, 6);
       if (stretchActive) {
-        drawStretchPass(ctx, ctx.normalTexture, stretch, stretchScan, stretchSeed, fboW, fboH, (postprocessActive || particleActive) ? ctx.gradFbo : null);
+        drawStretchPass(ctx, ctx.normalTexture, stretch, stretchScan, stretchSeed, fboW, fboH, (postprocessActive || particleActive || seamlessActive) ? ctx.gradFbo : null);
         if (postprocessActive) applyPostprocessStack(ctx.gradTexture, fboW, fboH);
         else if (particleActive) particleSourceTexture = ctx.gradTexture;
+        else if (seamlessActive) seamlessSourceTexture = ctx.gradTexture;
       } else if (postprocessActive) {
         applyPostprocessStack(ctx.normalTexture, fboW, fboH);
       } else if (particleActive) {
         particleSourceTexture = ctx.normalTexture;
+      } else if (seamlessActive) {
+        seamlessSourceTexture = ctx.normalTexture;
       }
     }
   } else {
     // ノーマルマップ無効: stretch有効時は一度FBOへ描いて、その画素を参照する
     gl.uniform1i(uniforms.u_matcapEnabled, matcap.enabled ? 1 : 0);
-    gl.bindFramebuffer(gl.FRAMEBUFFER, (stretchActive || postprocessActive || particleActive) ? ctx.gradFbo : null);
+    gl.bindFramebuffer(gl.FRAMEBUFFER, (stretchActive || postprocessActive || particleActive || seamlessActive) ? ctx.gradFbo : null);
     gl.drawArrays(gl.TRIANGLES, 0, 6);
     if (stretchActive) {
-      drawStretchPass(ctx, ctx.gradTexture, stretch, stretchScan, stretchSeed, vpW, vpH, (postprocessActive || particleActive) ? ctx.normalFbo : null);
+      drawStretchPass(ctx, ctx.gradTexture, stretch, stretchScan, stretchSeed, vpW, vpH, (postprocessActive || particleActive || seamlessActive) ? ctx.normalFbo : null);
       if (postprocessActive) applyPostprocessStack(ctx.normalTexture, vpW, vpH);
       else if (particleActive) particleSourceTexture = ctx.normalTexture;
+      else if (seamlessActive) seamlessSourceTexture = ctx.normalTexture;
     } else if (postprocessActive) {
       applyPostprocessStack(ctx.gradTexture, vpW, vpH);
     } else if (particleActive) {
       particleSourceTexture = ctx.gradTexture;
+    } else if (seamlessActive) {
+      seamlessSourceTexture = ctx.gradTexture;
     }
   }
 
-  if (particleActive) {
+  if (seamlessActive) {
+    let sourceTexture = seamlessSourceTexture ?? particleSourceTexture ?? ctx.gradTexture;
+    if (particleActive) {
+      const particleTarget = choosePostprocessTarget(ctx, sourceTexture);
+      copyTextureToFramebuffer(ctx, sourceTexture, particleTarget.fbo, vpW, vpH);
+      drawParticleOverlay(ctx, sourceTexture, gradient, postprocess, vpW, vpH, width, height, tileOx, tileOy, time, particleTarget.fbo);
+      sourceTexture = particleTarget.texture;
+    }
+    renderSeamlessPass(ctx, sourceTexture, vpW, vpH, seamless, null);
+  } else if (particleActive) {
     drawParticleOverlay(ctx, particleSourceTexture ?? ctx.gradTexture, gradient, postprocess, vpW, vpH, width, height, tileOx, tileOy, time);
   }
 }

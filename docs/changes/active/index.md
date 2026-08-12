@@ -13,3 +13,4 @@ title: 進行中の変更
 | ID | 変更 | 状態 |
 | --- | --- | --- |
 | CHANGE-026 | [Diffuse旧アルゴリズムのEffect Stack対応](./CHANGE-026-legacy-diffuse-stipple/proposal) | approved |
+| CHANGE-027 | [SANDBOX Seamless Tiling](./CHANGE-027-sandbox-seamless-tiling/proposal) | approved |
