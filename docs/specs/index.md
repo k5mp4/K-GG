@@ -16,6 +16,7 @@ title: 仕様一覧
 | CURRENT-PRESET | [Preset System](./current/preset-system) | current |
 | CURRENT-UI-CONTROLS | [UI入力コントロール](./current/ui-controls) | current |
 | CURRENT-WEBGL-PERFORMANCE | [WebGL Performance Debug / Profiler](./current/webgl-performance) | current |
+| CURRENT-MCP-DEVELOPER-INTERFACE | [MCP Developer Interface](./current/mcp-developer-interface) | current |
 
 変更の経緯は[完了済み変更](../changes/archive/)と、下記のLegacy Change Specificationsから確認できます。現行仕様を読む際にLegacy SPECを必須資料にしないでください。
 

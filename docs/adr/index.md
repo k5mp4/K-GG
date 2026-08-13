@@ -25,6 +25,7 @@ ADRは、複数の機能や将来の実装を拘束する重要な技術判断�
 | ADR-0013 | [Mesh Gradationを単一Coons Patchの構造化データとして保持する](./0013-mesh-gradient-data-model.md) | accepted |
 | ADR-0014 | [承認済み変更パッケージをコミット単位の基本にする](./0014-commit-centered-change-workflow.md) | accepted |
 | ADR-0015 | [開発専用WebGL観測層を既存Canvasへ接続する](./0015-development-webgl-observability.md) | accepted |
+| ADR-0016 | [MCPをControl APIとloopback Runtime Bridgeへ分離し、公開前tarballで配布する](./0016-mcp-control-api-and-local-distribution.md) | accepted |
 
 ## 作成基準
 

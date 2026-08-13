@@ -11,9 +11,13 @@
   "scripts": {
     "dev": "vite",
     "dev:local": "node tools/dev-local.mjs",
+    "mcp:build": "node tools/mcp-server/clean-dist.mjs && tsc -p tools/mcp-server/tsconfig.json",
+    "mcp": "npm run mcp:build && node tools/mcp-server/dist/tools/mcp-server/src/cli.js",
+    "mcp:pack": "npm run mcp:build && npm pack ./tools/mcp-server",
+    "mcp:verify": "npm run mcp:build && node tools/mcp-server/verify-tarball.mjs",
     "dev:lan": "vite --host 0.0.0.0 --port 5173 --strictPort",
     "tauri": "tauri",
-    "tauri:dev": "tauri dev",
+    "tauri:dev": "node tools/tauri-dev.mjs",
     "tauri:build": "tauri build",
     "tauri:build:windows": "tauri build --bundles nsis --target x86_64-pc-windows-msvc",
     "build": "tsc -b && vite build",
@@ -52,6 +56,8 @@
   },
   "devDependencies": {
     "@eslint/js": "^9.39.1",
+    "@modelcontextprotocol/node": "^2.0.0",
+    "@modelcontextprotocol/server": "^2.0.0",
     "@tailwindcss/vite": "^4.2.1",
     "@tauri-apps/cli": "^2.11.2",
     "@types/node": "^24.10.1",
@@ -74,6 +80,7 @@
     "vitepress": "^1.6.4",
     "vitest": "^4.1.9",
     "webgl-lint": "1.11.4",
-    "webgl-memory": "1.1.3"
+    "webgl-memory": "1.1.3",
+    "zod": "^4.4.3"
   }
 }

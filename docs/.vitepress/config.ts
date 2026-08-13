@@ -31,6 +31,7 @@ export default defineConfig({
             { text: 'アーキテクチャ', link: '/development/architecture' },
             { text: '開発・検証', link: '/development/development-guide' },
             { text: 'DocDD運用', link: '/development/docdd' },
+            { text: 'MCP Developer Interface', link: '/development/mcp' },
           ],
         },
       ],
@@ -42,6 +43,7 @@ export default defineConfig({
             { text: '現行仕様一覧', link: '/specs/current/' },
             { text: 'Gradient System', link: '/specs/current/gradient-system' },
             { text: 'Effect Stack', link: '/specs/current/effect-stack' },
+            { text: 'MCP Developer Interface', link: '/specs/current/mcp-developer-interface' },
             { text: 'Preset System', link: '/specs/current/preset-system' },
             { text: 'Legacy SPEC一覧', link: '/specs/#legacy-change-specifications' },
             { text: 'Legacy SPECテンプレート', link: '/specs/_template' },
@@ -82,6 +84,10 @@ export default defineConfig({
             {
               text: 'ADR-0001 文書を一次情報とする',
               link: '/adr/0001-documentation-source-of-truth',
+            },
+            {
+              text: 'ADR-0016 MCP Control APIとtarball',
+              link: '/adr/0016-mcp-control-api-and-local-distribution',
             },
             { text: 'ADRテンプレート', link: '/adr/_template' },
           ],

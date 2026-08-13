@@ -55,7 +55,9 @@ import {
   openFfmpegBuildsPage,
   openNativeFfmpegFolder,
 } from './lib/exportVideo';
-import type { ExportStage, NativeFfmpegStatus, VideoExportFrameRenderer } from './adapters';
+import { adapters, type ExportStage, type NativeFfmpegStatus, type VideoExportFrameRenderer } from './adapters';
+import type { StoreSnapshot as PresetStoreSnapshot } from './lib/presetModel';
+import type { KggControlProjectAdapter, KggControlUiAdapter } from './lib/kggControlRuntime';
 
 const MAX_DISPLAY_W = 1000;
 
@@ -247,7 +249,7 @@ export default function App() {
     zoom, pan,
     gestureFeedbacks,
     handleMiddleDown, handleMiddleMove, handleMiddleUp, handleMiddleLeave,
-    resetViewport, cursor,
+    resetViewport, setViewport, cursor,
   } = useViewportControl();
 
   useKeyboardShortcuts();
@@ -482,6 +484,109 @@ export default function App() {
   const displayW = fitHByW <= availH ? fitByW : Math.round(availH * (canvasW / canvasH));
   const displayH = Math.round(displayW * (canvasH / canvasW));
   const gpuInfo = gpuSummary(gpuDiagnostics);
+
+  // MCP UI control adapter. The object identity remains stable while its
+  // methods are refreshed each render, so the bridge can safely retain it
+  // without causing the WebGL/runtime registration effect to restart.
+  const kggUiAdapterRef = useRef<KggControlUiAdapter | null>(null);
+  if (!kggUiAdapterRef.current) {
+    kggUiAdapterRef.current = { getState: () => ({}), setState: () => undefined };
+  }
+  const kggUiAdapter = kggUiAdapterRef.current;
+  kggUiAdapter.getState = () => ({
+    canvasW,
+    canvasH,
+    lockAspect,
+    renderViewMode,
+    leftTab,
+    tabHoverSwitchEnabled,
+    isHoverLocked,
+    showTimeline,
+    showTimeRemap,
+    timelineHeight,
+    leftPanelOpen,
+    rightPanelOpen,
+    showLeftSidebar,
+    showRightSidebar,
+    showGradientRamp,
+    showOverlaySettings,
+    showImageGradientSource,
+    showGradientAnchors,
+    overlayImageMode,
+    overlayOpacity,
+    leftPanelW,
+    rightPanelW,
+    showHelp,
+    showFeedback,
+    showPropertyModulesSettings,
+    zoom,
+    pan,
+  });
+  kggUiAdapter.setState = (patch) => {
+    let nextW = canvasW;
+    let nextH = canvasH;
+    if (typeof patch.canvasW === 'number') { nextW = patch.canvasW; setCanvasW(nextW); setWDraft(String(nextW)); }
+    if (typeof patch.canvasH === 'number') { nextH = patch.canvasH; setCanvasH(nextH); setHDraft(String(nextH)); }
+    if (patch.canvasW !== undefined || patch.canvasH !== undefined) aspectRatioRef.current = nextW / nextH;
+    if (typeof patch.lockAspect === 'boolean') setLockAspect(patch.lockAspect);
+    if (patch.renderViewMode === 'canvas' || patch.renderViewMode === 'cloth' || patch.renderViewMode === 'cone') setRenderViewMode(patch.renderViewMode);
+    if (typeof patch.leftTab === 'string') { activeLeftTabRef.current = patch.leftTab as LeftTab; setLeftTab(patch.leftTab as LeftTab); }
+    if (typeof patch.tabHoverSwitchEnabled === 'boolean') setTabHoverSwitchMode(patch.tabHoverSwitchEnabled);
+    if (typeof patch.isHoverLocked === 'boolean') setIsHoverLocked(patch.isHoverLocked);
+    if (typeof patch.showTimeline === 'boolean') setShowTimeline(patch.showTimeline);
+    if (typeof patch.showTimeRemap === 'boolean') setShowTimeRemap(patch.showTimeRemap);
+    if (typeof patch.timelineHeight === 'number') setTimelineHeight(patch.timelineHeight);
+    if (typeof patch.leftPanelOpen === 'boolean') setLeftPanelOpen(patch.leftPanelOpen);
+    if (typeof patch.rightPanelOpen === 'boolean') setRightPanelOpen(patch.rightPanelOpen);
+    if (typeof patch.showLeftSidebar === 'boolean') setShowLeftSidebar(patch.showLeftSidebar);
+    if (typeof patch.showRightSidebar === 'boolean') setShowRightSidebar(patch.showRightSidebar);
+    if (typeof patch.showGradientRamp === 'boolean') setShowGradientRamp(patch.showGradientRamp);
+    if (typeof patch.showOverlaySettings === 'boolean') setShowOverlaySettings(patch.showOverlaySettings);
+    if (typeof patch.showImageGradientSource === 'boolean') setShowImageGradientSource(patch.showImageGradientSource);
+    if (typeof patch.showGradientAnchors === 'boolean') setShowGradientAnchors(patch.showGradientAnchors);
+    if (patch.overlayImageMode === 'overlay' || patch.overlayImageMode === 'mask' || patch.overlayImageMode === 'off') setOverlayImageMode(patch.overlayImageMode);
+    if (typeof patch.overlayOpacity === 'number') setOverlayOpacity(patch.overlayOpacity);
+    if (typeof patch.leftPanelW === 'number') setLeftPanelW(patch.leftPanelW);
+    if (typeof patch.rightPanelW === 'number') setRightPanelW(patch.rightPanelW);
+    if (typeof patch.showHelp === 'boolean') setShowHelp(patch.showHelp);
+    if (typeof patch.showFeedback === 'boolean') setShowFeedback(patch.showFeedback);
+    if (typeof patch.showPropertyModulesSettings === 'boolean') setShowPropertyModulesSettings(patch.showPropertyModulesSettings);
+    const nextZoom = typeof patch.zoom === 'number' ? patch.zoom : zoom;
+    const nextPan = patch.pan && typeof patch.pan === 'object' && !Array.isArray(patch.pan)
+      ? { x: typeof (patch.pan as { x?: unknown }).x === 'number' ? (patch.pan as { x: number }).x : pan.x, y: typeof (patch.pan as { y?: unknown }).y === 'number' ? (patch.pan as { y: number }).y : pan.y }
+      : pan;
+    if (patch.zoom !== undefined || patch.pan !== undefined) setViewport(nextZoom, nextPan);
+  };
+  kggUiAdapter.resetViewport = resetViewport;
+  kggUiAdapter.requestApproval = ({ operationId, input }) => {
+    if (typeof window === 'undefined' || typeof window.confirm !== 'function') return false;
+    const detail = JSON.stringify(input).slice(0, 600);
+    return window.confirm(`K-GG MCPから「${operationId}」を実行します。\n\n${detail}`);
+  };
+
+  const kggProjectAdapterRef = useRef<KggControlProjectAdapter | null>(null);
+  if (!kggProjectAdapterRef.current) kggProjectAdapterRef.current = {};
+  const kggProjectAdapter = kggProjectAdapterRef.current;
+  kggProjectAdapter.listPresets = () => adapters.presetRepository.loadPresetLibrary();
+  kggProjectAdapter.getPreset = async (presetId) => {
+    const library = await adapters.presetRepository.loadPresetLibrary();
+    return library.presets.find(preset => preset.id === presetId) ?? null;
+  };
+  kggProjectAdapter.savePreset = (name, state, folderId, thumbnail) => adapters.presetRepository.savePreset(name, state as PresetStoreSnapshot, folderId, thumbnail);
+  kggProjectAdapter.deletePreset = (presetId) => adapters.presetRepository.deletePreset(presetId);
+  kggProjectAdapter.exportPresetPackage = (scope) => {
+    if (scope.kind === 'library') return adapters.presetRepository.exportPresetPackage({ kind: 'library' });
+    if (!scope.id) throw new Error('An id is required for this export scope');
+    if (scope.kind === 'preset') return adapters.presetRepository.exportPresetPackage({ kind: 'preset', presetId: scope.id });
+    return adapters.presetRepository.exportPresetPackage({ kind: 'folder', folderId: scope.id });
+  };
+  kggProjectAdapter.listPalettes = () => adapters.colorPaletteRepository.loadUserColorPalettes();
+  kggProjectAdapter.getPalette = async (paletteId) => {
+    const palettes = await adapters.colorPaletteRepository.loadUserColorPalettes();
+    return palettes.find(palette => palette.id === paletteId) ?? null;
+  };
+  kggProjectAdapter.savePalette = (name, stops) => adapters.colorPaletteRepository.saveUserColorPalette(name, stops);
+  kggProjectAdapter.deletePalette = (paletteId) => adapters.colorPaletteRepository.deleteUserColorPalette(paletteId);
 
   return (
     <InteractionSettingsProvider value={{ hoverInteractionsEnabled: tabHoverSwitchEnabled }}>
@@ -838,6 +943,8 @@ export default function App() {
                     imageMaskSource={overlayImageElement}
                     imageMaskEnabled={overlayImageMode === 'mask'}
                     disableClothBase={renderViewMode === 'cloth'}
+                    controlUi={kggUiAdapter}
+                    controlProject={kggProjectAdapter}
                   />
                 </div>
                 {renderViewMode === 'cloth' && (

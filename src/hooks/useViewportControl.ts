@@ -341,6 +341,18 @@ export function useViewportControl() {
     setPan({ x: 0, y: 0 });
   };
 
+  const setViewport = (nextZoom: number, nextPan: Pan) => {
+    const safeZoom = Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, Number.isFinite(nextZoom) ? nextZoom : 1));
+    const safePan = {
+      x: Number.isFinite(nextPan.x) ? nextPan.x : 0,
+      y: Number.isFinite(nextPan.y) ? nextPan.y : 0,
+    };
+    zoomRef.current = safeZoom;
+    panRef.current = safePan;
+    setZoom(safeZoom);
+    setPan(safePan);
+  };
+
   const cursor = isDragging 
     ? 'grabbing' 
     : (isSpacePressed && !animationEnabled ? 'grab' : 'default');
@@ -356,6 +368,7 @@ export function useViewportControl() {
     handleMiddleUp,
     handleMiddleLeave,
     resetViewport,
+    setViewport,
     cursor,
   };
 }

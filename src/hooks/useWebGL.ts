@@ -16,6 +16,10 @@ import type { WebGLContext } from '../lib/webgl';
 import type { GradientConfig } from '../types/gradient';
 import type { LatestState } from '../types/latestState';
 import { createExportStateSnapshot } from '../lib/exportRenderState';
+import { registerKggControlRuntime, unregisterKggControlRuntime } from '../lib/kggControlRuntime';
+import { KggRuntimeBridgeClient } from '../lib/kggRuntimeBridgeClient';
+import { isTauriWebView, resolveKggRuntimeBridgeConfig } from '../lib/kggRuntimeBridgeConfig';
+import type { KggControlProjectAdapter, KggControlUiAdapter } from '../lib/kggControlRuntime';
 
 type WebGLInitRequest = {
   canvas: HTMLCanvasElement;
@@ -27,13 +31,35 @@ export function useWebGL(
   canvasRef: React.RefObject<HTMLCanvasElement | null>,
   animLoopRef: React.MutableRefObject<AnimationLoop | null>,
   gradient: GradientConfig,
+  controlAdapters: { ui?: KggControlUiAdapter; project?: KggControlProjectAdapter } = {},
 ) {
   const webglRef = useRef<WebGLContext | null>(null);
   const latestRef = useRef<LatestState | null>(null);
   const initRequestRef = useRef<WebGLInitRequest | null>(null);
   const compiledShaderVersionRef = useRef(0); // コンパイル済みシェーダーのバージョン
   const [isWebGLReady, setIsWebGLReady] = useState(false);
+  const [contextEpoch, setContextEpoch] = useState(0);
   const shaderVersion = SHADER_VERSION;
+
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const handleContextLost = (event: Event) => {
+      event.preventDefault();
+      webglRef.current = null;
+      compiledShaderVersionRef.current = 0;
+      setIsWebGLReady(false);
+    };
+    const handleContextRestored = () => {
+      setContextEpoch(epoch => epoch + 1);
+    };
+    canvas.addEventListener('webglcontextlost', handleContextLost);
+    canvas.addEventListener('webglcontextrestored', handleContextRestored);
+    return () => {
+      canvas.removeEventListener('webglcontextlost', handleContextLost);
+      canvas.removeEventListener('webglcontextrestored', handleContextRestored);
+    };
+  }, [canvasRef]);
 
   // WebGL 初期化（非同期・stale チェック付き）
   useEffect(() => {
@@ -106,7 +132,7 @@ export function useWebGL(
     return () => {
       disposed = true;
     };
-  }, [canvasRef, shaderVersion]);
+  }, [canvasRef, shaderVersion, contextEpoch]);
 
   // renderBridge への登録
   useEffect(() => {
@@ -213,6 +239,41 @@ export function useWebGL(
       },
     );
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // MCP developer interface bridge. It is opt-in: without both environment
+  // variables the renderer has no polling loop and no external surface.
+  useEffect(() => {
+    if (!isWebGLReady) return;
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const runtime = registerKggControlRuntime({
+      canvas,
+      getWebGLContext: () => webglRef.current,
+      ui: controlAdapters.ui,
+      project: controlAdapters.project,
+    });
+    const bridgeConfig = import.meta.env.DEV
+      ? resolveKggRuntimeBridgeConfig({
+        bridgeUrl: import.meta.env.VITE_KGG_MCP_BRIDGE_URL as string | undefined,
+        token: import.meta.env.VITE_KGG_MCP_TOKEN as string | undefined,
+        isTauriDevelopment: import.meta.env.VITE_KGG_TAURI_DEV === '1'
+          || isTauriWebView(),
+        isDevelopment: true,
+      })
+      : null;
+    const bridge = bridgeConfig
+      ? new KggRuntimeBridgeClient({
+        baseUrl: bridgeConfig.baseUrl,
+        token: bridgeConfig.token,
+        handleRequest: (method, params) => runtime.handleRequest(method, params),
+      })
+      : null;
+    bridge?.start();
+    return () => {
+      bridge?.stop();
+      unregisterKggControlRuntime(runtime);
+    };
+  }, [canvasRef, isWebGLReady, controlAdapters.ui, controlAdapters.project]);
 
   // グラデーションランプテクスチャの更新
   useEffect(() => {

@@ -16,6 +16,7 @@ title: 現行仕様
 | CURRENT-PRESET | [Preset System](./preset-system) | current |
 | CURRENT-UI-CONTROLS | [UI入力コントロール](./ui-controls) | current |
 | CURRENT-WEBGL-PERFORMANCE | [WebGL Performance Debug / Profiler](./webgl-performance) | current |
+| CURRENT-MCP-DEVELOPER-INTERFACE | [MCP Developer Interface](./mcp-developer-interface) | current |
 
 ## 読み方
 
