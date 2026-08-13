@@ -143,7 +143,7 @@ export function useWebGL(
         if (!ctx || !latest) return;
         const totalDuration = Math.max((latest.animation.speed ?? 1) * (latest.animation.duration ?? 1), 0.0001);
         const normalizedTime = nt !== undefined ? nt : t / totalDuration;
-        renderSceneAtTime(ctx, latest, normalizedTime, { tile });
+        renderSceneAtTime(ctx, latest, normalizedTime, { tile, renderSessionId: 'preview' });
       },
       () => { animLoopRef.current?.stop(); },
       () => { animLoopRef.current?.start(); },
@@ -170,6 +170,7 @@ export function useWebGL(
           renderSceneAtTime(ctx, snapshot, normalizedTime, {
             tile,
             allowEffectStackTransition: false,
+            renderSessionId: 'export',
           });
         },
         finishGpu: () => ctx.gl.finish(),

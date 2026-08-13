@@ -89,6 +89,20 @@ const RAW_CONTROL_PARAMETER_DEFINITIONS: readonly ParameterDefinition[] = [
   numberParameter('diffuse.asciiFontSize', 'diffuse', 'asciiFontSize', 8, 128, 1, 'ASCII font size', { integer: true }),
   numberParameter('diffuse.asciiRotation', 'diffuse', 'asciiRotation', 0, 360, 1, 'ASCII glyph rotation', degrees),
 
+  numberParameter('flow.seed', 'flowGradient', 'seed', 0, 9999, 1, 'Flow field seed', { integer: true }),
+  numberParameter('flow.particleCount', 'flowGradient', 'particleCount', 10000, 500000, 1000, 'Flow particle count', { integer: true }),
+  numberParameter('flow.curlScale', 'flowGradient', 'curlScale', 0.1, 20, 0.1, 'Flow curl scale'),
+  numberParameter('flow.curlStrength', 'flowGradient', 'curlStrength', 0, 2, 0.01, 'Flow curl strength'),
+  numberParameter('flow.speed', 'flowGradient', 'speed', 0, 2, 0.01, 'Flow speed'),
+  numberParameter('flow.ribbonWidth', 'flowGradient', 'ribbonWidth', 0.5, 128, 0.5, 'Flow ribbon width'),
+  numberParameter('flow.stretch', 'flowGradient', 'stretch', 0, 8, 0.05, 'Flow stretch'),
+  numberParameter('flow.density', 'flowGradient', 'density', 0, 4, 0.01, 'Flow density'),
+  numberParameter('flow.trail', 'flowGradient', 'trail', 0, 1, 0.01, 'Flow trail retention'),
+  numberParameter('flow.contrast', 'flowGradient', 'contrast', 0.1, 4, 0.01, 'Flow contrast'),
+  numberParameter('flow.flowOpacity', 'flowGradient', 'flowOpacity', 0, 1, 0.01, 'Flow composite opacity'),
+  numberParameter('flow.particleOpacity', 'flowGradient', 'particleOpacity', 0, 1, 0.01, 'Flow particle opacity'),
+  numberParameter('flow.particleSize', 'flowGradient', 'particleSize', 0.25, 2, 0.01, 'Flow particle size'),
+
 
   booleanParameter('slit.enabled', 'slitScan', 'enabled', 'Enable slit-scan distortion'),
   enumParameter('slit.mode', 'slitScan', 'mode', ['linear', 'circular', 'polygon', 'wave'], 'Slit-scan mode'),

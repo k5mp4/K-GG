@@ -5,12 +5,12 @@ title: Gradient System
 status: current
 owners: [maintainer]
 created: 2026-07-27
-updated: 2026-08-10
-requirement_ids: [GRAD-001, GRAD-002, GRAD-003, GRAD-004, GRAD-005, GRAD-006, GRAD-007, GRAD-008, GRAD-009, GRAD-010, GRAD-011, GRAD-012, GRAD-013, GRAD-014, GRAD-015, GRAD-016, GRAD-017, GRAD-018, GRAD-019, GRAD-020]
+updated: 2026-08-13
+requirement_ids: [GRAD-001, GRAD-002, GRAD-003, GRAD-004, GRAD-005, GRAD-006, GRAD-007, GRAD-008, GRAD-009, GRAD-010, GRAD-011, GRAD-012, GRAD-013, GRAD-014, GRAD-015, GRAD-016, GRAD-017, GRAD-018, GRAD-019, GRAD-020, GRAD-021]
 related_adrs: [ADR-0001, ADR-0003, ADR-0010, ADR-0013]
-related_changes: [CHANGE-001, CHANGE-010, CHANGE-024, CHANGE-025]
-related_code: [src/types/gradient.ts, src/types/imageGradient.ts, src/types/renderView.ts, src/types/coneView.ts, src/store/gradientStore.ts, src/lib/gradientRampUtils.ts, src/lib/gradientPreview.ts, src/lib/imageGradient.ts, src/lib/meshGradientField.ts, src/lib/sceneEvaluation.ts, src/lib/webgl.ts, src/lib/clothGradientRenderer.ts, src/lib/coneView.ts, src/lib/coneViewRenderer.ts, src/lib/processedCanvasClock.ts, src/lib/presetModel.ts, src/components/GradientRamp.tsx, src/components/CustomSelect.tsx, src/components/ColorPaletteGenerator.tsx, src/components/GradientCanvas.tsx, src/components/SandboxPanel.tsx, src/components/ClothGradientPanel.tsx, src/components/ClothCanvas.tsx, src/components/ConeCanvas.tsx, src/components/ConeViewPanel.tsx, src/components/ExportPanel.tsx, src/lib/videoExportFrames.ts, src/adapters/types.ts, src/lib/clothView.ts, src/lib/colorHarmony.ts, src/i18n/uiLabels.ts, src/i18n/messages.ts]
-related_tests: [src/types/gradient.test.ts, src/types/coneView.test.ts, src/lib/imageGradient.test.ts, src/lib/imageGradientProtected.test.ts, src/lib/meshGradient.test.ts, src/lib/proportionalRampEdit.test.ts, src/lib/sceneEvaluation.glass.test.ts, src/lib/colorHarmony.test.ts, src/lib/gradientPreview.test.ts, src/lib/videoExportFrames.test.ts, src/lib/clothView.test.ts, src/lib/coneView.test.ts, src/lib/processedCanvasClock.test.ts]
+related_changes: [CHANGE-001, CHANGE-010, CHANGE-024, CHANGE-025, CHANGE-030, CHANGE-032]
+related_code: [src/types/gradient.ts, src/types/flowGradient.ts, src/types/imageGradient.ts, src/types/renderView.ts, src/types/coneView.ts, src/store/gradientStore.ts, src/lib/gradientRampUtils.ts, src/lib/flowGradientRenderer.ts, src/lib/flowSimulation.ts, src/lib/gradientPreview.ts, src/lib/imageGradient.ts, src/lib/meshGradientField.ts, src/lib/sceneEvaluation.ts, src/lib/webgl.ts, src/lib/webglShaderSources.ts, src/lib/clothGradientRenderer.ts, src/lib/coneView.ts, src/lib/coneViewRenderer.ts, src/lib/processedCanvasClock.ts, src/lib/presetModel.ts, src/components/GradientRamp.tsx, src/components/CustomSelect.tsx, src/components/ColorPaletteGenerator.tsx, src/components/GradientCanvas.tsx, src/components/SandboxPanel.tsx, src/components/FlowGradientPanel.tsx, src/components/ClothGradientPanel.tsx, src/components/ClothCanvas.tsx, src/components/ConeCanvas.tsx, src/components/ConeViewPanel.tsx, src/components/ExportPanel.tsx, src/lib/videoExportFrames.ts, src/adapters/types.ts, src/lib/clothView.ts, src/lib/colorHarmony.ts, src/i18n/uiLabels.ts, src/i18n/messages.ts]
+related_tests: [src/types/gradient.test.ts, src/types/coneView.test.ts, src/lib/flowSimulation.test.ts, src/lib/flowGradientPreset.test.ts, src/lib/imageGradient.test.ts, src/lib/imageGradientProtected.test.ts, src/lib/meshGradient.test.ts, src/lib/proportionalRampEdit.test.ts, src/lib/sceneEvaluation.glass.test.ts, src/lib/colorHarmony.test.ts, src/lib/gradientPreview.test.ts, src/lib/videoExportFrames.test.ts, src/lib/clothView.test.ts, src/lib/coneView.test.ts, src/lib/processedCanvasClock.test.ts]
 ---
 
 # Gradient System
@@ -112,6 +112,10 @@ Exportは現在Previewで選択されている表示面を使用します。2D�
 ### GRAD-020 Cone Texture Flow
 
 ConeのTexture Flowは共通のnormalizedTimeと整数Flow Cycles（-30..30）から位相を決めます。正数は頂点から開口部、負数は逆方向、0は停止として扱い、Previewの再生・停止・シークと連番・動画出力で同じ位相を使用します。ループ境界では整数テクスチャオフセットへ戻ります。Texture RepeatとFlow Cyclesの円周方向・高さ方向の境界は、0..0.5のSeam Blend幅とSeam Modeで連続化します。Mirror Repeatは反復座標を鏡面化し、Edge Weldは継ぎ目両側の端色を一つの不透明な最終色へ溶接します。方式はこの2つから切り替えられ、既定値はEdge Weldです。各方式はアニメーション中も反復境界の位置を固定し、硬い直線や円形の切れ目、半透明レイヤーの重なりを表示しません。Depthは2..30で編集できます。
+
+### GRAD-021 Flow Gradient Ramp mapping
+
+SANDBOXのFlow Gradientは、3DエミッタからCurl場を固定ステップ積分し、透視投影後の速度方向付きDensityとTemporal Trailを0..1のスカラー値として既存Gradient Rampへ渡します。Flow専用の固定色は最終色にせず、Rampの色ストップ、透明度、補間設定をPreview、Thumbnail、静止画、連番、動画で共有します。深度は投影位置、splatサイズ、Density寄与へ反映され、Tileでは全画面基準の投影を切り出します。Flow OpacityはRamp適用後の最終合成強度、Particle Opacityは個々のsplatがDensityへ加える寄与、Particle Sizeは速度方向splatの長さ・幅を制御します。
 
 ## 他領域との関係
 

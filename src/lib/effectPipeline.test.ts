@@ -36,6 +36,20 @@ describe('effectPipeline', () => {
       }, false)).toBe(false);
       expect(canRenderV2Direct({ ...diffuseOnly, version: 'legacy-v1' }, false)).toBe(false);
     });
+
+    it('keeps Flow Gradient on the texture path so its output can reach the screen', () => {
+      const pipeline = { ...createDefaultEffectPipeline(), flowGradientEnabled: true };
+      const plan = getV2RenderPlan(pipeline, {
+        normalMapEnabled: false,
+        normalMapBlur: 0,
+        prismGlowRadius: 0,
+        flowGradientEnabled: true,
+      });
+
+      expect(canRenderV2Direct(pipeline, false)).toBe(false);
+      expect(plan.framebufferAllocationMode).toBe('core');
+      expect(plan.programs.stackCore).toBe(true);
+    });
   });
 
   describe('getV2FramebufferAllocationMode', () => {
@@ -221,6 +235,7 @@ describe('effectPipeline', () => {
       selectedKind: 'diffuse',
       prismEnabled: false,
       particlesEnabled: false,
+      flowGradientEnabled: false,
     });
   });
 
@@ -314,6 +329,7 @@ describe('effectPipeline', () => {
       selectedKind: 'diffuse',
       prismEnabled: false,
       particlesEnabled: false,
+      flowGradientEnabled: false,
     });
   });
 

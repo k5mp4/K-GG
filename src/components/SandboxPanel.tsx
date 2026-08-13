@@ -5,6 +5,7 @@ import { useLanguage } from '../i18n/LanguageProvider';
 import { ClothGradientPanel } from './ClothGradientPanel';
 import { ConeViewPanel } from './ConeViewPanel';
 import { CustomSelect } from './CustomSelect';
+import { FlowGradientPanel } from './FlowGradientPanel';
 import { Icon } from './Icon';
 import { NormalMapPanel } from './NormalMapPanel';
 import { PostprocessPanel } from './PostprocessPanel';
@@ -12,9 +13,9 @@ import { SeamlessPanel } from './SeamlessPanel';
 import { Toggle } from './Toggle';
 import type { RenderViewMode } from '../types/renderView';
 
-type SandboxProgramKey = 'normalMap' | 'prism' | 'particles' | 'cloth' | 'cone' | 'seamless';
+type SandboxProgramKey = 'normalMap' | 'prism' | 'particles' | 'flowGradient' | 'flowSplat' | 'flowTrail' | 'flowComposite' | 'cloth' | 'cone' | 'seamless';
 type SandboxProgramStatus = 'loading' | 'ready' | 'failed' | 'fallback';
-type SandboxModuleKey = 'cloth' | 'cone' | 'normal' | 'prism' | 'particles' | 'seamless';
+type SandboxModuleKey = 'cloth' | 'cone' | 'normal' | 'prism' | 'particles' | 'flowGradient' | 'seamless';
 
 type SandboxModuleProps = {
   id: SandboxModuleKey;
@@ -117,7 +118,8 @@ export function SandboxPanel({ renderViewMode, onRenderViewModeChange }: Sandbox
     const handleProgramState = (event: Event) => {
       const detail = (event as CustomEvent<{ key?: SandboxProgramKey; state?: SandboxProgramStatus }>).detail;
       if (!detail?.key || !detail.state) return;
-      setProgramStatus(current => ({ ...current, [detail.key!]: detail.state }));
+      const key = detail.key.startsWith('flow') ? 'flowGradient' : detail.key;
+      setProgramStatus(current => ({ ...current, [key]: detail.state }));
     };
     window.addEventListener('kgg:webgl-lazy-program-state', handleProgramState);
     return () => window.removeEventListener('kgg:webgl-lazy-program-state', handleProgramState);
@@ -128,8 +130,9 @@ export function SandboxPanel({ renderViewMode, onRenderViewModeChange }: Sandbox
   const normalStatus = moduleStatus('normalMap', normalMap.enabled, programStatus, t);
   const prismStatus = moduleStatus('prism', effectPipeline.prismEnabled, programStatus, t);
   const particlesStatus = moduleStatus('particles', effectPipeline.particlesEnabled, programStatus, t);
+  const flowStatus = moduleStatus('flowGradient', Boolean(effectPipeline.flowGradientEnabled), programStatus, t);
   const seamlessStatus = moduleStatus('seamless', seamless.enabled, programStatus, t);
-  const activeCount = [clothGradient.enabled, renderViewMode === 'cone', normalMap.enabled, effectPipeline.prismEnabled, effectPipeline.particlesEnabled, seamless.enabled]
+  const activeCount = [clothGradient.enabled, renderViewMode === 'cone', normalMap.enabled, effectPipeline.prismEnabled, effectPipeline.particlesEnabled, Boolean(effectPipeline.flowGradientEnabled), seamless.enabled]
     .filter(Boolean).length;
 
   const setNormalEnabled = (enabled: boolean) => {
@@ -143,7 +146,7 @@ export function SandboxPanel({ renderViewMode, onRenderViewModeChange }: Sandbox
       ? 'Cone'
       : selectedModule === 'normal'
         ? t('effect.normal')
-        : selectedModule === 'prism' ? 'Prism' : selectedModule === 'particles' ? 'Particles' : 'Seamless';
+        : selectedModule === 'prism' ? 'Prism' : selectedModule === 'particles' ? 'Particles' : selectedModule === 'flowGradient' ? 'Flow Gradient' : 'Seamless';
 
   return (
     <div className="space-y-4" data-sandbox-panel>
@@ -162,7 +165,7 @@ export function SandboxPanel({ renderViewMode, onRenderViewModeChange }: Sandbox
           </div>
           <div className="shrink-0 border border-cyan-200/25 bg-k-bg/35 px-2 py-1 text-right">
             <span className="block text-[8px] font-display uppercase tracking-[0.16em] text-cyan-100/60">{t('sandbox.active')}</span>
-            <span className="mt-0.5 block font-display text-sm font-bold text-cyan-100">{activeCount}<span className="text-cyan-100/40">/6</span></span>
+            <span className="mt-0.5 block font-display text-sm font-bold text-cyan-100">{activeCount}<span className="text-cyan-100/40">/7</span></span>
           </div>
         </div>
       </div>
@@ -178,6 +181,7 @@ export function SandboxPanel({ renderViewMode, onRenderViewModeChange }: Sandbox
             { value: 'normal', label: t('effect.normal') },
             { value: 'prism', label: 'Prism' },
             { value: 'particles', label: 'Particles' },
+            { value: 'flowGradient', label: 'Flow Gradient' },
             { value: 'seamless', label: 'Seamless' },
           ]}
           onChange={(value) => setSelectedModule(value as SandboxModuleKey)}
@@ -251,6 +255,19 @@ export function SandboxPanel({ renderViewMode, onRenderViewModeChange }: Sandbox
             onToggleEnabled={(particlesEnabled) => setEffectPipeline({ particlesEnabled })}
           >
             <PostprocessPanel sandboxMode="particles" embedded />
+          </SandboxModule>
+        )}
+
+        {selectedModule === 'flowGradient' && (
+          <SandboxModule
+            id="flowGradient"
+            label={selectedLabel}
+            description={t('sandbox.flowDescription')}
+            enabled={Boolean(effectPipeline.flowGradientEnabled)}
+            status={flowStatus}
+            onToggleEnabled={(flowGradientEnabled) => setEffectPipeline({ flowGradientEnabled })}
+          >
+            <FlowGradientPanel />
           </SandboxModule>
         )}
 

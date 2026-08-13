@@ -28,6 +28,8 @@ import {
 import { IDENTITY_DIFFUSE_BEZIER, normalizeDiffuseBezier, resolveDiffuseBezier } from '../lib/diffuseCurve';
 import { clampParameter, getParameterLimit, normalizeTrackValue } from '../lib/parameterLimits';
 import { GLASS_V2_COLOR_DEFAULTS, normalizeGlassV2ColorParameters } from '../lib/glass';
+import type { FlowGradientConfig } from '../types/flowGradient';
+import { FLOW_GRADIENT_DEFAULTS, normalizeFlowGradientConfig } from '../types/flowGradient';
 
 export type AnimationEasing = {
   enabled: boolean;
@@ -80,6 +82,7 @@ type GradientStore = {
   clothGradient: ClothGradientConfig;
   coneView: ConeViewConfig;
   seamless: SeamlessConfig;
+  flowGradient: FlowGradientConfig;
   radon: RadonConfig;
   iridescence: IridescenceConfig;
   manualDistort: ManualDistortConfig;
@@ -115,6 +118,7 @@ type GradientStore = {
   setClothGradient: (v: Partial<ClothGradientConfig>) => void;
   setConeView: (v: Partial<ConeViewConfig>) => void;
   setSeamless: (v: Partial<SeamlessConfig>) => void;
+  setFlowGradient: (v: Partial<FlowGradientConfig>) => void;
   setRadon: (v: Partial<RadonConfig>) => void;
   setIridescence: (v: Partial<IridescenceConfig>) => void;
   setManualDistort: (v: Partial<ManualDistortConfig>) => void;
@@ -360,6 +364,7 @@ export const STORE_DEFAULTS = {
   clothGradient: { ...DEFAULT_CLOTH_GRADIENT },
   coneView: { ...DEFAULT_CONE_VIEW },
   seamless: { ...DEFAULT_SEAMLESS },
+  flowGradient: { ...FLOW_GRADIENT_DEFAULTS },
   radon: {
     enabled: false,
     strength: 1.0,
@@ -678,6 +683,7 @@ export const useGradientStore = create<GradientStore>((set) => ({
   clothGradient: { ...STORE_DEFAULTS.clothGradient },
   coneView: { ...STORE_DEFAULTS.coneView },
   seamless: { ...STORE_DEFAULTS.seamless },
+  flowGradient: { ...STORE_DEFAULTS.flowGradient },
   radon: { ...STORE_DEFAULTS.radon },
   iridescence: { ...STORE_DEFAULTS.iridescence },
   manualDistort: {
@@ -908,6 +914,9 @@ export const useGradientStore = create<GradientStore>((set) => ({
   setClothGradient: (v) => set((s) => ({ clothGradient: normalizeClothGradientConfig({ ...s.clothGradient, ...v }) })),
   setConeView: (v) => set((s) => ({ coneView: normalizeConeViewConfig({ ...s.coneView, ...v }) })),
   setSeamless: (v) => set((s) => ({ seamless: normalizeSeamlessConfig({ ...s.seamless, ...v }) })),
+  setFlowGradient: (v) => set((s) => ({
+    flowGradient: normalizeFlowGradientConfig({ ...s.flowGradient, ...v }),
+  })),
   setRadon: (v) => set((s) => {
     const radon = { ...s.radon, ...v };
     radon.angle = clampParameter(radon.angle, s.radon.angle, getParameterLimit('radon.angle'));

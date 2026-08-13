@@ -72,4 +72,28 @@ describe('AnimationLoop', () => {
     staleFrame?.(326);
     expect(onFrame).toHaveBeenLastCalledWith(0.1, 0.1);
   });
+
+  it('wraps directly from the last loop frame to phase zero without emitting phase one', () => {
+    const normalizedFrames: number[] = [];
+    const queuedFrames: FrameRequestCallback[] = [];
+    vi.stubGlobal('requestAnimationFrame', (callback: FrameRequestCallback) => {
+      queuedFrames.push(callback);
+      return queuedFrames.length;
+    });
+    vi.stubGlobal('cancelAnimationFrame', vi.fn());
+    const now = vi.spyOn(performance, 'now');
+    now.mockReturnValue(0);
+    const loop = new AnimationLoop(1, (_time, normalizedTime) => {
+      normalizedFrames.push(normalizedTime);
+    }, { loop: true, fps: 2 });
+
+    loop.start();
+    now.mockReturnValue(500);
+    queuedFrames.shift()?.(500);
+    now.mockReturnValue(1000);
+    queuedFrames.shift()?.(1000);
+
+    expect(normalizedFrames).toEqual([0, 0.5, 0]);
+    expect(normalizedFrames).not.toContain(1);
+  });
 });

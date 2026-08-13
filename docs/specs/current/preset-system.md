@@ -5,12 +5,12 @@ title: Preset System
 status: current
 owners: [maintainer]
 created: 2026-07-27
-updated: 2026-08-11
-requirement_ids: [PRESET-001, PRESET-002, PRESET-003, PRESET-004, PRESET-005, PRESET-006, PRESET-007, PRESET-008, PRESET-009, PRESET-011, PRESET-012, PRESET-013, PRESET-014]
+updated: 2026-08-13
+requirement_ids: [PRESET-001, PRESET-002, PRESET-003, PRESET-004, PRESET-005, PRESET-006, PRESET-007, PRESET-008, PRESET-009, PRESET-011, PRESET-012, PRESET-013, PRESET-014, PRESET-016]
 related_adrs: [ADR-0007, ADR-0008]
-related_changes: [CHANGE-001, CHANGE-012, CHANGE-013, CHANGE-018, CHANGE-024, CHANGE-025, CHANGE-026]
-related_code: [src/lib/presetModel.ts, src/lib/presetLibrary.ts, src/lib/presets.ts, src/lib/presetPreview.ts, src/lib/presetThumbnail.ts, src/lib/glass.ts, src/lib/postprocessStack.ts, src/store/gradientStore.ts, src/components/PresetPanel.tsx, src/components/PresetPreview.tsx, src/components/ClothCanvas.tsx, src/components/ConeCanvas.tsx, src/types/renderView.ts, src/types/coneView.ts, src/adapters/types.ts, src/adapters/browser/presetRepository.ts, src/adapters/tauri/presetRepository.ts, src-tauri/src/lib.rs]
-related_tests: [src/lib/presetLibrary.test.ts, src/lib/presetModel.diffuse.test.ts, src/lib/presetPreview.test.ts, src/lib/presetThumbnail.test.ts, src/lib/glass.test.ts, src/lib/postprocessStack.test.ts, src/store/gradientStore.glass.test.ts, src/store/gradientStore.postprocessStack.test.ts, src/lib/clothView.test.ts, src/types/coneView.test.ts]
+related_changes: [CHANGE-001, CHANGE-012, CHANGE-013, CHANGE-018, CHANGE-024, CHANGE-025, CHANGE-026, CHANGE-030, CHANGE-032]
+related_code: [src/lib/presetModel.ts, src/lib/presetLibrary.ts, src/lib/presets.ts, src/lib/presetPreview.ts, src/lib/presetThumbnail.ts, src/lib/flowGradientRenderer.ts, src/types/flowGradient.ts, src/lib/effectPipeline.ts, src/lib/glass.ts, src/lib/postprocessStack.ts, src/store/gradientStore.ts, src/components/PresetPanel.tsx, src/components/FlowGradientPanel.tsx, src/components/PresetPreview.tsx, src/components/ClothCanvas.tsx, src/components/ConeCanvas.tsx, src/types/renderView.ts, src/types/coneView.ts, src/adapters/types.ts, src/adapters/browser/presetRepository.ts, src/adapters/tauri/presetRepository.ts, src-tauri/src/lib.rs]
+related_tests: [src/lib/presetLibrary.test.ts, src/lib/presetModel.diffuse.test.ts, src/lib/flowGradientPreset.test.ts, src/lib/presetPreview.test.ts, src/lib/presetThumbnail.test.ts, src/lib/glass.test.ts, src/lib/postprocessStack.test.ts, src/store/gradientStore.glass.test.ts, src/store/gradientStore.postprocessStack.test.ts, src/lib/clothView.test.ts, src/types/coneView.test.ts]
 ---
 
 # Preset System
@@ -84,6 +84,10 @@ ConeのDepth、Rotation、Apex X、Apex Y、Texture Repeat、Seam Blend、Seam M
 ### PRESET-014 Stippleの保存互換
 
 StippleはDiffuseの`mode: "legacy"`としてScatter、Grain、Seed、Seed Per Frameを含む既存Diffuse設定へ保存します。`mode`が欠落した旧Presetは従来どおり既定モードを補完し、Block、Smooth、Dither、Halftone、ASCIIの保存値は変換しません。
+
+### PRESET-016 Flow Gradientの保存互換
+
+Presetは`effectPipeline.flowGradientEnabled`と`flowGradient`のFlow設定を保存します。Flow Opacity、Particle Opacity、Particle SizeもFlow設定として保存・復元し、欠落した旧Presetはそれぞれの既定値へ正規化します。Flow設定がない旧Presetは安全な既定値へ正規化し、Flowを無効として読み込みます。Thumbnail用の独立WebGLコンテキストではFlowの履歴を前フレームから引き継がず、対象時刻へ決定的に事前評価してから描画します。既存ParticlesやEffect Stackの保存値は変更しません。
 
 ## 他領域との関係
 

@@ -5,12 +5,12 @@ title: 動画・連番フレーム出力
 status: current
 owners: [maintainer]
 created: 2026-07-31
-updated: 2026-08-10
-requirement_ids: [EXPORT-001, EXPORT-002, EXPORT-003, EXPORT-004, EXPORT-005, EXPORT-006, EXPORT-007, EXPORT-008]
+updated: 2026-08-13
+requirement_ids: [EXPORT-001, EXPORT-002, EXPORT-003, EXPORT-004, EXPORT-005, EXPORT-006, EXPORT-007, EXPORT-008, EXPORT-021]
 related_adrs: [ADR-0004, ADR-0005]
-related_changes: [CHANGE-011, CHANGE-024, CHANGE-025]
-related_code: [src/adapters/browser/videoExportService.ts, src/adapters/tauri/videoExportService.ts, src/adapters/types.ts, src/lib/renderBridge.ts, src/lib/videoExportFrames.ts, src/lib/tileRender.ts, src/lib/webgl.ts, src/lib/coneViewRenderer.ts, src/components/GradientCanvas.tsx, src/components/ClothCanvas.tsx, src/components/ConeCanvas.tsx, src/components/ExportPanel.tsx]
-related_tests: [src/lib/renderBridge.test.ts, src/lib/effectPipeline.test.ts, src/lib/glass.test.ts, src/lib/videoExportFrames.test.ts, src/lib/coneView.test.ts]
+related_changes: [CHANGE-011, CHANGE-024, CHANGE-025, CHANGE-030]
+related_code: [src/adapters/browser/videoExportService.ts, src/adapters/tauri/videoExportService.ts, src/adapters/types.ts, src/lib/renderBridge.ts, src/lib/renderSceneAtTime.ts, src/lib/flowGradientRenderer.ts, src/lib/flowSimulation.ts, src/lib/videoExportFrames.ts, src/lib/tileRender.ts, src/lib/webgl.ts, src/lib/coneViewRenderer.ts, src/components/GradientCanvas.tsx, src/components/ClothCanvas.tsx, src/components/ConeCanvas.tsx, src/components/ExportPanel.tsx]
+related_tests: [src/lib/renderBridge.test.ts, src/lib/effectPipeline.test.ts, src/lib/flowSimulation.test.ts, src/lib/flowGradientPreset.test.ts, src/lib/webglExportPrograms.test.ts, src/lib/glass.test.ts, src/lib/videoExportFrames.test.ts, src/lib/coneView.test.ts]
 ---
 
 # 動画・連番フレーム出力
@@ -52,6 +52,10 @@ AbortSignalによるcancellation、shader program準備失敗、CanvasまたはG
 ### EXPORT-008 Cone表示面のフレームキャプチャ
 
 Coneモードではexport sessionのnormalizedTimeをFlow Mappingへ使用します。Direct ProjectionではV offsetを固定します。各フレームの処理済み2D Canvasを生成・GPU完了した後にCone Rendererを同期描画し、そのCone Canvasを静止画、連番PNG、MOV、MP4のキャプチャ対象にします。
+
+### EXPORT-021 Flow Gradientの論理フレーム
+
+Flow Gradientを有効にした出力は、Seed、正規化時刻、設定、Render Session、固定3D投影を共通入力として評価します。Export開始時はFlowの履歴をリセットし、必要な事前評価を行ってから対象フレームを描画します。同じ論理フレームを複数タイルで描画してもTrailをタイル数だけ進めず、Preview、Thumbnail、静止画、連番、動画で同じフレーム規則を使用します。Loop有効時は終端フレームを重複せず位相0へ戻り、Flow無効時の既存出力経路は変えません。
 
 ## 他領域との関係
 
