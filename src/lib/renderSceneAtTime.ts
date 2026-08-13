@@ -15,13 +15,14 @@ import {
 type RenderSceneOptions = {
   tile?: TileRenderOptions;
   allowEffectStackTransition?: boolean;
+  renderSessionId?: string;
 };
 
 function renderSceneFrame(
   ctx: WebGLContext,
   state: LatestState,
   normalizedTime: number,
-  options: { tile?: TileRenderOptions },
+  options: RenderSceneOptions,
   effectStack = state.effectPipeline,
 ): void {
   const scene = evaluateSceneAtTime(state, normalizedTime);
@@ -57,6 +58,10 @@ function renderSceneFrame(
     scene.clothTime,
     scene.noiseLoopPeriod,
     state.seamless,
+    state.flowGradient,
+    normalizedTime,
+    state.animation.previewLoop ?? true,
+    options.renderSessionId ?? 'preview',
   );
 }
 

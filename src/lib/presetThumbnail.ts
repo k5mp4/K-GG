@@ -8,6 +8,7 @@ import type { LatestState } from '../types/latestState';
 import { initWebGL, type WebGLContext } from './webgl';
 import { resolveDiffuseBezier } from './diffuseCurve';
 import { normalizeSeamlessConfig } from '../types/seamless';
+import { normalizeFlowGradientConfig } from '../types/flowGradient';
 
 export const PRESET_THUMBNAIL_WIDTH = 320;
 export const PRESET_THUMBNAIL_HEIGHT = 200;
@@ -73,6 +74,7 @@ export function createPresetThumbnailState(snapshot: StoreSnapshot): LatestState
     stretch: { ...STORE_DEFAULTS.stretch, ...snapshot.stretch },
     normalMap: { ...STORE_DEFAULTS.normalMap, ...snapshot.normalMap },
     seamless: normalizeSeamlessConfig(snapshot.seamless),
+    flowGradient: normalizeFlowGradientConfig(snapshot.flowGradient),
     radon: { ...STORE_DEFAULTS.radon, ...snapshot.radon, enabled: false },
     iridescence: { ...STORE_DEFAULTS.iridescence, ...snapshot.iridescence, enabled: false },
     manualDistort,
@@ -117,7 +119,7 @@ async function captureNow(snapshot: StoreSnapshot): Promise<string> {
   const state = createPresetThumbnailState(snapshot);
   canvas.width = PRESET_THUMBNAIL_WIDTH;
   canvas.height = PRESET_THUMBNAIL_HEIGHT;
-  renderSceneAtTime(context, state, 0, {});
+  renderSceneAtTime(context, state, 0, { renderSessionId: 'thumbnail' });
   return canvas.toDataURL('image/png');
 }
 

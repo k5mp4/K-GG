@@ -231,6 +231,8 @@ export type EffectPipelineConfig = {
   selectedKind: EffectStackKind;
   prismEnabled: boolean;
   particlesEnabled: boolean;
+  /** Fixed SANDBOX Flow Gradient stage. Optional for legacy snapshots. */
+  flowGradientEnabled?: boolean;
 };
 
 export type PostprocessConfig = ManualDistortConfig & {

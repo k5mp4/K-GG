@@ -50,6 +50,7 @@ export function createDefaultEffectPipeline(): EffectPipelineConfig {
     selectedKind: 'diffuse',
     prismEnabled: false,
     particlesEnabled: false,
+    flowGradientEnabled: false,
   };
 }
 
@@ -133,6 +134,7 @@ export function normalizeEffectPipelineConfig(value: unknown): EffectPipelineCon
     selectedKind,
     prismEnabled: Boolean(raw.prismEnabled),
     particlesEnabled: Boolean(raw.particlesEnabled),
+    flowGradientEnabled: Boolean(raw.flowGradientEnabled),
   };
 }
 
@@ -236,8 +238,10 @@ export function canRenderV2Direct(
   clothGradientEnabled = false,
   forceTextureDiffusePass = false,
   seamlessEnabled = false,
+  flowGradientEnabled = false,
 ): boolean {
-  if (clothGradientEnabled || forceTextureDiffusePass || seamlessEnabled) return false;
+  const flowStageEnabled = flowGradientEnabled || pipeline.flowGradientEnabled === true;
+  if (clothGradientEnabled || forceTextureDiffusePass || seamlessEnabled || flowStageEnabled) return false;
   const stack = normalizeEffectStack(pipeline.effectStack);
   return pipeline.version === 'stack-v2'
     && !normalMapEnabled
@@ -252,8 +256,9 @@ export function getV2FramebufferAllocationMode(
   clothGradientEnabled = false,
   forceTextureDiffusePass = false,
   seamlessEnabled = false,
+  flowGradientEnabled = false,
 ): 'direct' | 'core' | 'full' {
-  if (canRenderV2Direct(pipeline, normalMapEnabled, clothGradientEnabled, forceTextureDiffusePass, seamlessEnabled)) return 'direct';
+  if (canRenderV2Direct(pipeline, normalMapEnabled, clothGradientEnabled, forceTextureDiffusePass, seamlessEnabled, flowGradientEnabled)) return 'direct';
   if (normalMapEnabled || pipeline.prismEnabled) return 'full';
   return 'core';
 }
@@ -269,9 +274,10 @@ export function requiresV2StackCore(
   clothGradientEnabled = false,
   forceTextureDiffusePass = false,
   seamlessEnabled = false,
+  flowGradientEnabled = false,
 ): boolean {
   return pipeline.version === 'stack-v2'
-    && !canRenderV2Direct(pipeline, normalMapEnabled, clothGradientEnabled, forceTextureDiffusePass, seamlessEnabled);
+    && !canRenderV2Direct(pipeline, normalMapEnabled, clothGradientEnabled, forceTextureDiffusePass, seamlessEnabled, flowGradientEnabled);
 }
 
 export type V2RenderPlanOptions = {
@@ -283,6 +289,8 @@ export type V2RenderPlanOptions = {
   forceTextureDiffusePass?: boolean;
   /** Requires a full color texture before the final Seamless pass. */
   seamlessEnabled?: boolean;
+  /** Requires a texture path so Flow Gradient can be presented after compositing. */
+  flowGradientEnabled?: boolean;
 };
 
 export type V2RenderPlan = {
@@ -333,6 +341,7 @@ export function getV2RenderPlan(
   const glassV2Requested = enabledLayers.some(layer => layer.kind === 'glass');
   const noiseRequested = enabledLayers.some(layer => layer.kind === 'noise');
   const stretchRequested = enabledLayers.some(layer => layer.kind === 'stretch');
+  const flowGradientEnabled = Boolean(options.flowGradientEnabled);
 
   return {
     normalizedStack,
@@ -349,6 +358,7 @@ export function getV2RenderPlan(
       options.clothGradientEnabled,
       forceTextureDiffusePass,
       seamlessEnabled,
+      flowGradientEnabled,
     ),
     programs: {
       stackCore: requiresV2StackCore(
@@ -357,6 +367,7 @@ export function getV2RenderPlan(
         options.clothGradientEnabled,
         forceTextureDiffusePass,
         seamlessEnabled,
+        flowGradientEnabled,
       ),
       noiseStack: noiseRequested,
       glassV2: glassV2Requested,

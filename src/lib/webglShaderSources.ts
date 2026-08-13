@@ -18,6 +18,10 @@ import prismCompositeGLSL from '../shaders/prismComposite.frag.glsl?raw';
 import particlesVertexGLSL from '../shaders/particles.vert.glsl?raw';
 import particlesFragmentGLSL from '../shaders/particles.frag.glsl?raw';
 import seamlessGLSL from '../shaders/seamless.frag.glsl?raw';
+import flowSplatVertexGLSL from '../shaders/flow-splat.vert.glsl?raw';
+import flowSplatFragmentGLSL from '../shaders/flow-splat.frag.glsl?raw';
+import flowTrailFragmentGLSL from '../shaders/flow-trail.frag.glsl?raw';
+import flowGradientFragmentGLSL from '../shaders/flow-gradient.frag.glsl?raw';
 
 const postprocessGLSL = [
   postprocessUniformsGLSL,
@@ -43,7 +47,10 @@ export type LazyProgramKey =
   | 'postprocess'
   | 'prismComposite'
   | 'particles'
-  | 'seamless';
+  | 'seamless'
+  | 'flowSplat'
+  | 'flowTrail'
+  | 'flowComposite';
 
 export type ProgramSource = {
   vertex: string;
@@ -67,6 +74,10 @@ export const SHADER_VERSION = (
   + particlesVertexGLSL.length * 89
   + particlesFragmentGLSL.length * 83
   + seamlessGLSL.length * 71
+  + flowSplatVertexGLSL.length * 67
+  + flowSplatFragmentGLSL.length * 61
+  + flowTrailFragmentGLSL.length * 59
+  + flowGradientFragmentGLSL.length * 53
 ) | 0;
 
 // Keep the specialized programs independent from the declaration order in
@@ -239,6 +250,9 @@ export function getProgramSource(key: LazyProgramKey): ProgramSource {
   if (key === 'postprocess') return { vertex: vertexGLSL, fragment: createGeneralPostprocessSource() };
   if (key === 'prismComposite') return { vertex: vertexGLSL, fragment: prismCompositeGLSL };
   if (key === 'seamless') return { vertex: vertexGLSL, fragment: seamlessGLSL };
+  if (key === 'flowSplat') return { vertex: flowSplatVertexGLSL, fragment: flowSplatFragmentGLSL };
+  if (key === 'flowTrail') return { vertex: vertexGLSL, fragment: flowTrailFragmentGLSL };
+  if (key === 'flowComposite') return { vertex: vertexGLSL, fragment: flowGradientFragmentGLSL };
   return { vertex: particlesVertexGLSL, fragment: particlesFragmentGLSL };
 }
 

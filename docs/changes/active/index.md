@@ -16,4 +16,6 @@ title: 進行中の変更
 | CHANGE-027 | [SANDBOX Seamless Tiling](./CHANGE-027-sandbox-seamless-tiling/proposal) | approved |
 | CHANGE-028 | [WebGL Performance Debug / Profiler基盤](./CHANGE-028-webgl-performance-profiler/proposal) | approved |
 | CHANGE-029 | [MCP Developer Interface](./CHANGE-029-mcp-developer-interface/proposal) | approved |
+| CHANGE-030 | [SANDBOX Flow Gradient Phase A](./CHANGE-030-sandbox-flow-gradient/proposal) | approved |
 | CHANGE-031 | [MCP UI Control Parity](./CHANGE-031-mcp-ui-control-parity/proposal) | approved |
+| CHANGE-032 | [Flow Gradient continuous particle field and expanded controls](./CHANGE-032-flow-gradient-continuous-controls/proposal) | draft |

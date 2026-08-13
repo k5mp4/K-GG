@@ -34,4 +34,31 @@ describe('K-GG control parameter registry', () => {
     expect(scatter).not.toBeNull();
     if (scatter) expect(validateParameterValue(scatter, 301)).toMatchObject({ ok: false });
   });
+
+  it('exposes Flow compositing controls with shared limits', () => {
+    expect(getParameterDefinition('flow.flowOpacity')).toMatchObject({
+      path: 'flow.flowOpacity',
+      min: 0,
+      max: 1,
+      step: 0.01,
+    });
+    expect(getParameterDefinition('flow.particleOpacity')).toMatchObject({
+      path: 'flow.particleOpacity',
+      min: 0,
+      max: 1,
+      step: 0.01,
+    });
+    expect(getParameterDefinition('flow.particleSize')).toMatchObject({
+      path: 'flow.particleSize',
+      min: 0.25,
+      max: 2,
+      step: 0.01,
+    });
+    const particleSize = getParameterDefinition('flow.particleSize');
+    expect(particleSize).not.toBeNull();
+    if (particleSize) {
+      expect(validateParameterValue(particleSize, 3)).toMatchObject({ ok: false });
+      expect(validateParameterValue(particleSize, 1.25)).toEqual({ ok: true, value: 1.25 });
+    }
+  });
 });

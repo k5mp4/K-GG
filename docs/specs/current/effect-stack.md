@@ -5,12 +5,12 @@ title: Effect Stack
 status: current
 owners: [maintainer]
 created: 2026-07-27
-updated: 2026-08-11
-requirement_ids: [EFFECT-001, EFFECT-002, EFFECT-003, EFFECT-004, EFFECT-005, EFFECT-006, EFFECT-007, EFFECT-008, EFFECT-009, EFFECT-010, EFFECT-011, EFFECT-012, EFFECT-013, EFFECT-014, EFFECT-015, EFFECT-016, EFFECT-017, EFFECT-018, EFFECT-019, EFFECT-020, EFFECT-021, EFFECT-022, EFFECT-023, DISTORT-001, DISTORT-002, CLOTH-001, CLOTH-002, CLOTH-003, SANDBOX-001]
+updated: 2026-08-13
+requirement_ids: [EFFECT-001, EFFECT-002, EFFECT-003, EFFECT-004, EFFECT-005, EFFECT-006, EFFECT-007, EFFECT-008, EFFECT-009, EFFECT-010, EFFECT-011, EFFECT-012, EFFECT-013, EFFECT-014, EFFECT-015, EFFECT-016, EFFECT-017, EFFECT-018, EFFECT-019, EFFECT-020, EFFECT-021, EFFECT-022, EFFECT-023, DISTORT-001, DISTORT-002, CLOTH-001, CLOTH-002, CLOTH-003, SANDBOX-001, FLOW-001, FLOW-002, FLOW-003, FLOW-004, FLOW-005, FLOW-006, FLOW-007, FLOW-008, FLOW-009, FLOW-010, FLOW-011, FLOW-012]
 related_adrs: [ADR-0004, ADR-0005, ADR-0010]
-related_changes: [CHANGE-001, CHANGE-011, CHANGE-012, CHANGE-013, CHANGE-014, CHANGE-015, CHANGE-018, CHANGE-019, CHANGE-020, CHANGE-021, CHANGE-022, CHANGE-023, CHANGE-024, CHANGE-025, CHANGE-026]
-related_code: [src/types/distortion.ts, src/types/renderView.ts, src/types/coneView.ts, src/lib/effectPipeline.ts, src/lib/normalMap.ts, src/lib/effectStackTransition.ts, src/lib/postprocessStack.ts, src/lib/postprocessAnimation.ts, src/lib/sceneEvaluation.ts, src/lib/glass.ts, src/lib/webgl.ts, src/lib/presetModel.ts, src/lib/presetThumbnail.ts, src/lib/coneView.ts, src/lib/coneViewRenderer.ts, src/lib/processedCanvasClock.ts, src/store/gradientStore.ts, src/components/PostprocessStackPanel.tsx, src/components/EffectStackWorkspace.tsx, src/components/PostprocessPanel.tsx, src/components/DistortOverlay.tsx, src/components/SandboxPanel.tsx, src/components/BlockNoisePanel.tsx, src/components/DiffuseCurveEditor.tsx, src/components/SlitScanPanel.tsx, src/components/StretchPanel.tsx, src/components/PresetPanel.tsx, src/components/ClothGradientPanel.tsx, src/components/ClothCanvas.tsx, src/components/ConeCanvas.tsx, src/components/ConeViewPanel.tsx, src/lib/clothGradientRenderer.ts, src/lib/clothView.ts, src/types/clothGradient.ts, src/shaders/normalmap.frag.glsl, src/shaders/postprocess/glass-optics.glsl]
-related_tests: [src/lib/effectPipeline.test.ts, src/lib/webglNormalMapParity.test.ts, src/lib/effectStackTransition.test.ts, src/lib/postprocessStack.test.ts, src/lib/postprocessAnimation.test.ts, src/lib/effectStackDrag.test.ts, src/lib/effectShaderParity.test.ts, src/lib/imageGradientProtected.test.ts, src/lib/webglExportPrograms.test.ts, src/lib/glass.test.ts, src/store/gradientStore.effectPipeline.test.ts, src/store/gradientStore.postprocessStack.test.ts, src/store/gradientStore.glass.test.ts, src/lib/sceneEvaluation.glass.test.ts, src/lib/presetThumbnail.test.ts, src/lib/clothView.test.ts, src/lib/coneView.test.ts, src/lib/processedCanvasClock.test.ts, src/types/coneView.test.ts, tests/clothGradient.test.ts]
+related_changes: [CHANGE-001, CHANGE-011, CHANGE-012, CHANGE-013, CHANGE-014, CHANGE-015, CHANGE-018, CHANGE-019, CHANGE-020, CHANGE-021, CHANGE-022, CHANGE-023, CHANGE-024, CHANGE-025, CHANGE-026, CHANGE-030, CHANGE-032]
+related_code: [src/types/distortion.ts, src/types/renderView.ts, src/types/coneView.ts, src/lib/effectPipeline.ts, src/lib/normalMap.ts, src/lib/effectStackTransition.ts, src/lib/postprocessStack.ts, src/lib/postprocessAnimation.ts, src/lib/sceneEvaluation.ts, src/lib/glass.ts, src/lib/webgl.ts, src/lib/webglShaderSources.ts, src/lib/flowGradientRenderer.ts, src/lib/flowSimulation.ts, src/lib/presetModel.ts, src/lib/presetThumbnail.ts, src/lib/coneView.ts, src/lib/coneViewRenderer.ts, src/lib/processedCanvasClock.ts, src/store/gradientStore.ts, src/components/PostprocessStackPanel.tsx, src/components/EffectStackWorkspace.tsx, src/components/PostprocessPanel.tsx, src/components/DistortOverlay.tsx, src/components/SandboxPanel.tsx, src/components/FlowGradientPanel.tsx, src/components/BlockNoisePanel.tsx, src/components/DiffuseCurveEditor.tsx, src/components/SlitScanPanel.tsx, src/components/StretchPanel.tsx, src/components/PresetPanel.tsx, src/components/ClothGradientPanel.tsx, src/components/ClothCanvas.tsx, src/components/ConeCanvas.tsx, src/components/ConeViewPanel.tsx, src/lib/clothGradientRenderer.ts, src/lib/clothView.ts, src/types/clothGradient.ts, src/types/flowGradient.ts, src/shaders/normalmap.frag.glsl, src/shaders/postprocess/glass-optics.glsl, src/shaders/flow-splat.vert.glsl, src/shaders/flow-splat.frag.glsl, src/shaders/flow-trail.frag.glsl, src/shaders/flow-gradient.frag.glsl]
+related_tests: [src/lib/effectPipeline.test.ts, src/lib/webglNormalMapParity.test.ts, src/lib/effectStackTransition.test.ts, src/lib/postprocessStack.test.ts, src/lib/postprocessAnimation.test.ts, src/lib/effectStackDrag.test.ts, src/lib/effectShaderParity.test.ts, src/lib/imageGradientProtected.test.ts, src/lib/webglExportPrograms.test.ts, src/lib/webglShaderSources.test.ts, src/lib/flowSimulation.test.ts, src/lib/flowGradientPreset.test.ts, src/lib/glass.test.ts, src/store/gradientStore.effectPipeline.test.ts, src/store/gradientStore.postprocessStack.test.ts, src/store/gradientStore.glass.test.ts, src/lib/sceneEvaluation.glass.test.ts, src/lib/presetThumbnail.test.ts, src/lib/clothView.test.ts, src/lib/coneView.test.ts, src/lib/processedCanvasClock.test.ts, src/types/coneView.test.ts, tests/clothGradient.test.ts]
 ---
 
 # Effect Stack
@@ -39,9 +39,57 @@ Unified Effect Stack V2の主スタックは、`Noise`、`Slit`、`Stretch`、`D
 
 ### EFFECT-003 固定段と描画順
 
-V2の全体順序は `Base → Surface → Main Stack → Prism → Particles` です。Normal/MatcapはSurface、PrismはGlowを含む専用段、Particlesは最終オーバーレイとして扱い、主スタックの並べ替え対象には含めません。これらの固定段の有効状態とパラメータはSANDBOXで編集し、Effect Stackには表示しません。
+V2の全体順序は `Base → Surface → Main Stack → Prism → Flow Gradient → Particles` です。Normal/MatcapはSurface、PrismはGlowを含む専用段、Flow GradientはGPU密度・Temporal TrailをGradient Rampへ合成する固定段、Particlesは最終オーバーレイとして扱い、これらを主スタックの並べ替え対象には含めません。固定段の有効状態とパラメータはSANDBOXで編集し、Effect Stackには表示しません。Flow Gradientを無効にした場合は、従来のParticlesまでの経路を使用します。
 
 有効な主スタックレイヤーは前段の結果を次段の入力として処理します。レイヤーが0件の場合の直接描画、軽量な主スタック、追加の中間バッファが必要な構成は描画計画として一貫して決定されます。
+
+### FLOW-001 SANDBOX Flow Gradient module
+
+Flow GradientはSANDBOXから選択・有効化する固定段であり、Main Stackの自由な並べ替え対象には含めません。
+
+### FLOW-002 deterministic velocity-oriented density
+
+FlowはSeedと正規化時刻から決定的に生成したサンプルを、速度方向へ伸ばしたsplatとして低解像度Density FBOへGPU蓄積します。CPU側の近傍探索や隣接線分生成は使用しません。
+
+### FLOW-003 Phase A temporal trail
+
+Phase AはDensity FBOとTrail Ping-Pong FBOを使い、現在密度と前Trailを減衰合成します。Directional Diffusionは含めません。
+
+### FLOW-004 scalar gradient mapping
+
+Flowの密度スカラーは既存Gradient Rampへ入力し、Rampの色・透明度設定で最終合成色を決定します。
+
+### FLOW-005 loop and lifecycle
+
+Loop時のFlow位相は既存Animationの正規化時刻を使い、Seek、設定変更、解像度変更、Export、Thumbnailの境界でTrail履歴をリセットまたは決定的に事前評価します。実時間時計は結果へ使用しません。
+
+### FLOW-006 logical-frame idempotence
+
+同一Render Sessionの同一論理フレームを再描画しても、FlowのDensity生成とTrail更新を重複して進めません。Tileは各領域を同じ論理フレーム規則で評価します。
+
+### FLOW-007 resource and capability fallback
+
+FlowのProgram、FBO、Texture、VAO、Bufferは再利用し、サイズ変更時にだけ再構成します。RGBA8のFramebuffer完整性を確認し、Flowが利用できない場合は既存描画を継続します。
+
+### FLOW-008 3D radial emitter and periodic curl integration
+
+Flowは共通の3Dエミッタ原点から決定的な単位方向へ放射し、粒子ID、Seed、正規化時刻から同じspawn phaseとlifetimeを再評価します。粒子の位置と速度は周期的な3D Curl場を固定ステップで積分して求め、2Dキャンバス座標だけで流線を生成しません。
+
+### FLOW-009 deterministic perspective projection
+
+Flowの3D位置は固定されたview/projection基準で画面全体へ投影します。深度は画面位置、splatの大きさ、Density寄与へ反映し、near/far範囲外とカメラ後方をクリップします。Tileは同じ全画面投影を切り出します。
+
+### FLOW-010 depth-aware density compositing
+
+投影後の速度方向splatはDensity FBOへ加算し、Temporal Trail後に指数型の飽和応答で連続したスカラー場へ再構成します。重なりが多い領域ほどDensityが高くなり、既存Gradient Rampが最終色を決定します。低密度部は粒や元画像の平坦な背景Gradientを主表示にしません。
+
+### FLOW-011 3D render parity
+
+Preview、Thumbnail、静止画、連番、動画、Transition、Tile Renderは同じ3Dエミッタ、Curl積分、固定投影、論理フレーム規則を共有します。同一論理フレームの再描画でTrailを余分に進めません。
+
+### FLOW-012 playback loop continuity
+
+Animationの既存`previewLoop`、`duration`、`fps`、normalized timeをFlowが共有します。Loop有効時は位相0へ戻る際に決定的なreset/prewarmを行い、終端フレームを重複せず再生を継続します。Loop無効時は既存の非ループ挙動に従います。
 
 ### EFFECT-004 DiffuseとImage Gradient Source
 
@@ -93,7 +141,7 @@ Hueの既定値は`0°`、Saturationの既定値は`100%`、両Tintの既定値�
 
 ### EFFECT-012 SANDBOX固定段
 
-TOPバーのSANDBOXから、Postprocessの`Edit Layer`と同じ選択要素でNormal、Prism、Particlesのいずれか一つを選択して編集できます。SANDBOXのモジュール選択は描画順を変更せず、NormalはSurface、Prismは主スタック後、Particlesは最終オーバーレイとして既存のEffect Pipelineへ反映します。SANDBOXの選択状態は保存せず、各モジュールの既存設定だけをPreset、Preview、Thumbnail、Exportへ引き継ぎます。
+TOPバーのSANDBOXから、Postprocessの`Edit Layer`と同じ選択要素でNormal、Prism、Particles、Flow Gradientのいずれか一つを選択して編集できます。SANDBOXのモジュール選択は描画順を変更せず、NormalはSurface、Prismは主スタック後、Flow GradientはPrismとParticlesの間、Particlesは最終オーバーレイとして既存のEffect Pipelineへ反映します。SANDBOXの選択状態は保存せず、各モジュールの設定だけをPreset、Preview、Thumbnail、Exportへ引き継ぎます。Flow Gradientの設定はSeed、Particle Count、Curl Scale、Curl Strength、Speed、Ribbon Width、Stretch、Density、Trail、Contrast、Flow Opacity、Particle Opacity、Particle Sizeで構成し、LoopとDurationは既存Animationを参照します。Flow Opacityは最終合成、Particle Opacityは各splatのDensity寄与、Particle Sizeは速度方向Ribbonの投影サイズへ適用します。DiffusionはPhase Aでは提供しません。
 
 ### EFFECT-013 Normal Mapの描画互換
 
