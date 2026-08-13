@@ -1,0 +1,25 @@
+# Tasks
+
+- [x] 既存State、Effect、Renderer、Canvas、Shader、Tauri、Profiler、Parameter limitsを調査する
+- [x] 公式TypeScript MCP SDKの現行server/stdio/HTTP APIを確認する
+- [x] Current Architecture、Integration Points、予定ファイル、リスクを計画へ記録する
+- [x] Codex/Claude Code共通のstdio接続、`kgg-mcp`名、公開前tarball検証の方針を記録する
+- [x] `proposal.md`、`delta.md`、`design.md`を人間レビューし、承認する
+- [x] Control API契約、Parameter Registry、schema validationを実装する
+- [x] Snapshot/restoreと許可済みScenario実行を実装する
+- [x] K-GG WebView側Runtime Bridgeを実装し、WebGL context/Canvas/Profilerへ接続する
+- [x] Shader diagnostics ring buffer、Renderer/WebGL state、Uniform、Performance adapterを実装する
+- [x] 公式SDKベースのstdio/Streamable HTTP MCP ServerとCore/Developer Toolsを実装する（Gradient color mutationを含む20 Tool）
+- [x] `kgg-mcp` package manifest、CLI entrypoint、tarball install fixtureを実装する（ユーザーの明示的な実装依頼後）
+- [x] Runtime Bridgeのauth、Host/Origin、timeout、disconnect、malformed inputを検証する
+- [x] 明示設定された開発セッションtokenとloopback bridge URL、Tauri起動フラグを`npm run tauri:dev`からViteへ渡し、Tauri WebViewからGradient color mutationを確認する。token未設定時はBridgeを有効化しない
+- [x] MCP Client→Runtime Bridge→K-GGの往復integration testを追加する
+- [ ] MCP Inspectorでtool discovery、schema、read/mutation、invalid input、disconnect、preview、diagnosticsを確認する（未導入のため未確認）
+- [x] Codex `config.toml`/`codex mcp add`でstdio接続を確認する（global登録、cwd指定、stdio discoveryまでpass。Desktop `/mcp`表示は再起動後確認）
+- [ ] Claude Code `claude mcp add`/`.mcp.json`からstdio接続を手動確認する（Host実環境で未確認）
+- [x] `npm pack`→fixture install→`npx --no-install kgg-mcp`を検証する。公開NPMへはpublishしない
+- [x] `docs/development/mcp.md`、current spec、ADRを同期する
+- [ ] `npm run docs:check`、`npm run docs:build`、`npm test`、`npm run lint`、`npm run build`を実行する（docs check/build、lint/buildはpass。full testはCHANGE-030の既存差分で2件失敗）
+- [ ] `cargo test --manifest-path src-tauri/Cargo.toml`、`cargo check --manifest-path src-tauri/Cargo.toml`を実行する
+- [x] ACごとの結果を`validation.md`へ記録し、未確認事項があればactiveのまま理由を残す
+- [ ] 実装完了後にdeltaをcurrentへ統合し、changeをArchiveへ移動する

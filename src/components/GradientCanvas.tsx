@@ -11,6 +11,7 @@ import { LatestFrameScheduler } from '../lib/latestFrameScheduler';
 import { publishProcessedCanvasFrame } from '../lib/processedCanvasClock';
 import { useLanguage } from '../i18n/LanguageProvider';
 import { WebGLPerformancePanel } from './WebGLPerformancePanel';
+import type { KggControlProjectAdapter, KggControlUiAdapter } from '../lib/kggControlRuntime';
 
 
 type Props = {
@@ -23,11 +24,13 @@ type Props = {
   imageGradientSource?: HTMLCanvasElement | null;
   imageMaskSource?: TexImageSource | null;
   imageMaskEnabled?: boolean;
+  controlUi?: KggControlUiAdapter;
+  controlProject?: KggControlProjectAdapter;
   /** 3D preview consumes this canvas as a texture, so the base cloth pass must stay out of it. */
   disableClothBase?: boolean;
 };
 
-export function GradientCanvas({ width = 800, height = 800, animLoopRef, seekVersion = 0, canvasRef, sourceImageCanvas = null, imageGradientSource = null, imageMaskSource = null, imageMaskEnabled = false, disableClothBase = false }: Props) {
+export function GradientCanvas({ width = 800, height = 800, animLoopRef, seekVersion = 0, canvasRef, sourceImageCanvas = null, imageGradientSource = null, imageMaskSource = null, imageMaskEnabled = false, disableClothBase = false, controlUi, controlProject }: Props) {
   const { t } = useLanguage();
   const fallbackCanvasRef = useRef<HTMLCanvasElement | null>(null);
   const staticRenderSchedulerRef = useRef<LatestFrameScheduler | null>(null);
@@ -41,7 +44,7 @@ export function GradientCanvas({ width = 800, height = 800, animLoopRef, seekVer
     ? { ...clothGradient, enabled: false }
     : clothGradient;
 
-  const { webglRef, latestRef, isWebGLReady } = useWebGL(canvasRef, animLoopRef, gradient);
+  const { webglRef, latestRef, isWebGLReady } = useWebGL(canvasRef, animLoopRef, gradient, { ui: controlUi, project: controlProject });
 
   const [lazyProgramReadyCount, setLazyProgramReadyCount] = useState(0);
 

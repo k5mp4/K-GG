@@ -1,0 +1,26 @@
+{
+  "name": "kgg-mcp",
+  "version": "0.1.0",
+  "description": "K-GG developer interface MCP server",
+  "license": "Apache-2.0",
+  "type": "module",
+  "bin": {
+    "kgg-mcp": "dist/tools/mcp-server/src/cli.js"
+  },
+  "files": [
+    "dist",
+    "README.md"
+  ],
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "prepack": "node clean-dist.mjs && npm run build"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/node": "2.0.0",
+    "@modelcontextprotocol/server": "2.0.0",
+    "zod": "4.4.3"
+  }
+}

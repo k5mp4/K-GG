@@ -15,3 +15,5 @@ title: 進行中の変更
 | CHANGE-026 | [Diffuse旧アルゴリズムのEffect Stack対応](./CHANGE-026-legacy-diffuse-stipple/proposal) | approved |
 | CHANGE-027 | [SANDBOX Seamless Tiling](./CHANGE-027-sandbox-seamless-tiling/proposal) | approved |
 | CHANGE-028 | [WebGL Performance Debug / Profiler基盤](./CHANGE-028-webgl-performance-profiler/proposal) | approved |
+| CHANGE-029 | [MCP Developer Interface](./CHANGE-029-mcp-developer-interface/proposal) | approved |
+| CHANGE-031 | [MCP UI Control Parity](./CHANGE-031-mcp-ui-control-parity/proposal) | approved |
