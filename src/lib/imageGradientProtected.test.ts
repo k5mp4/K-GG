@@ -19,7 +19,10 @@ describe('Image Gradient protected rendering contract', () => {
 
   it('disables Generator Diffuse for protected V2 Stipple before applying the stack pass once', () => {
     expect(webglSource).toContain(
-      "const generatorDiffuseEnabled = generatorColorFieldEnabled && diffuse.enabled && !(isV2Pipeline && imageGradientProtected && diffuse.mode === 'legacy');",
+      'const generatorDiffuseEnabled = isV2Pipeline && !imageGradientProtected',
+    );
+    expect(webglSource).toContain(
+      "generatorLegacyColorFieldEnabled && diffuse.enabled && !(isV2Pipeline && imageGradientProtected && diffuse.mode === 'legacy')",
     );
     expect(webglSource).toContain(
       'setUniform1i(gl, uniforms.u_diffuseEnabled, generatorDiffuseEnabled ? 1 : 0);',

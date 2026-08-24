@@ -1,9 +1,12 @@
 import type {
+  DiffuseMode,
   EffectPipelineConfig,
   EffectPipelineVersion,
   EffectStackKind,
   EffectStackLayer,
+  NoiseDistortionConfig,
 } from '../types/distortion';
+import type { GradientType } from '../types/gradient';
 import { shouldRenderNormalMap } from './normalMap';
 
 /** V2 で新規作成する主スタックの初期順序。 */
@@ -31,6 +34,27 @@ export const POSTPROCESS_EFFECT_STACK_KINDS = [
 
 const EFFECT_STACK_KIND_SET = new Set<string>(EFFECT_STACK_KINDS);
 const POSTPROCESS_EFFECT_STACK_KIND_SET = new Set<string>(POSTPROCESS_EFFECT_STACK_KINDS);
+const ANALYTIC_GRADIENT_TYPES = new Set<GradientType>([
+  'linear',
+  'radial',
+  'fourcolor',
+  'diamond',
+  'angle',
+  'bezier',
+]);
+const ANALYTIC_NOISE_TYPES = new Set<NoiseDistortionConfig['type']>([
+  'simplex',
+  'fbm',
+  'voronoi',
+  'curl',
+  'fast_curl',
+  'domain_warp_anim',
+  'ridged_fbm',
+  'ae_fractal',
+  'caustics',
+  'phasor',
+]);
+const ANALYTIC_DIFFUSE_MODES = new Set<DiffuseMode>(['block', 'smooth']);
 
 export function isEffectStackKind(value: unknown): value is EffectStackKind {
   return typeof value === 'string' && EFFECT_STACK_KIND_SET.has(value);
@@ -291,11 +315,47 @@ export type V2RenderPlanOptions = {
   seamlessEnabled?: boolean;
   /** Requires a texture path so Flow Gradient can be presented after compositing. */
   flowGradientEnabled?: boolean;
+  /** The analytic Generator can only consume these source-independent gradients. */
+  gradientType?: GradientType;
+  sourceImageEnabled?: boolean;
+  imageGradientEnabled?: boolean;
+  noiseType?: NoiseDistortionConfig['type'];
+  noiseLoopMode?: NoiseDistortionConfig['noiseLoopMode'];
+  diffuseMode?: DiffuseMode;
+};
+
+export type AnalyticPrefixReason =
+  | 'enabled'
+  | 'legacy-pipeline'
+  | 'missing-analytic-inputs'
+  | 'non-analytic-gradient'
+  | 'source-image'
+  | 'image-gradient'
+  | 'cloth'
+  | 'flow-gradient'
+  | 'seamless'
+  | 'normal-map'
+  | 'prism'
+  | 'particles'
+  | 'forced-texture-diffuse'
+  | 'unsupported-noise'
+  | 'unsupported-diffuse'
+  | 'invalid-order'
+  | 'texture-first'
+  | 'no-prefix-layers';
+
+export type AnalyticPrefixPlan = {
+  enabled: boolean;
+  consumedLayers: Extract<EffectStackKind, 'noise' | 'diffuse'>[];
+  /** Index in `enabledLayers`, or null when the prefix reaches the final output. */
+  firstTextureLayerIndex: number | null;
+  reason: AnalyticPrefixReason;
 };
 
 export type V2RenderPlan = {
   normalizedStack: EffectStackLayer[];
   enabledLayers: EffectStackLayer[];
+  analyticPrefix: AnalyticPrefixPlan;
   diffuseEnabled: boolean;
   normalRequested: boolean;
   normalNeedsBlur: boolean;
@@ -315,6 +375,85 @@ export type V2RenderPlan = {
     particles: boolean;
   };
 };
+
+function disabledAnalyticPrefix(reason: AnalyticPrefixReason, firstTextureLayerIndex: number | null = null): AnalyticPrefixPlan {
+  return {
+    enabled: false,
+    consumedLayers: [],
+    firstTextureLayerIndex,
+    reason,
+  };
+}
+
+/**
+ * Determines which leading V2 layers can stay in the analytic Generator.
+ *
+ * The returned index is relative to the enabled layer list. This keeps the
+ * value useful to the renderer even when disabled layers are interspersed in
+ * the normalized persisted stack.
+ */
+export function getAnalyticGradientPrefixPlan(
+  pipeline: EffectPipelineConfig,
+  enabledLayers: EffectStackLayer[],
+  options: V2RenderPlanOptions,
+): AnalyticPrefixPlan {
+  if (pipeline.version !== 'stack-v2') return disabledAnalyticPrefix('legacy-pipeline');
+  if (options.gradientType === undefined || options.noiseType === undefined || options.diffuseMode === undefined) {
+    return disabledAnalyticPrefix('missing-analytic-inputs');
+  }
+  if (!ANALYTIC_GRADIENT_TYPES.has(options.gradientType)) return disabledAnalyticPrefix('non-analytic-gradient');
+  if (options.sourceImageEnabled) return disabledAnalyticPrefix('source-image');
+  if (options.imageGradientEnabled) return disabledAnalyticPrefix('image-gradient');
+  if (options.clothGradientEnabled) return disabledAnalyticPrefix('cloth');
+  if (options.flowGradientEnabled || pipeline.flowGradientEnabled) return disabledAnalyticPrefix('flow-gradient');
+  if (options.seamlessEnabled) return disabledAnalyticPrefix('seamless');
+  if (options.normalMapEnabled) return disabledAnalyticPrefix('normal-map');
+  if (pipeline.prismEnabled) return disabledAnalyticPrefix('prism');
+  if (pipeline.particlesEnabled) return disabledAnalyticPrefix('particles');
+
+  const firstTextureLayerIndex = enabledLayers.findIndex(layer => layer.kind !== 'noise' && layer.kind !== 'diffuse');
+  const prefixLayers = firstTextureLayerIndex < 0
+    ? enabledLayers
+    : enabledLayers.slice(0, firstTextureLayerIndex);
+  if (prefixLayers.length === 0) {
+    return disabledAnalyticPrefix(firstTextureLayerIndex === 0 ? 'texture-first' : 'no-prefix-layers', firstTextureLayerIndex < 0 ? null : firstTextureLayerIndex);
+  }
+  if (prefixLayers.some(layer => layer.kind !== 'noise' && layer.kind !== 'diffuse')) {
+    return disabledAnalyticPrefix('texture-first', firstTextureLayerIndex);
+  }
+
+  const noiseIndex = prefixLayers.findIndex(layer => layer.kind === 'noise');
+  const diffuseIndex = prefixLayers.findIndex(layer => layer.kind === 'diffuse');
+  if (noiseIndex >= 0 && diffuseIndex >= 0 && diffuseIndex < noiseIndex) {
+    return disabledAnalyticPrefix('invalid-order', firstTextureLayerIndex < 0 ? null : firstTextureLayerIndex);
+  }
+  if (
+    noiseIndex >= 0
+    && (
+      !ANALYTIC_NOISE_TYPES.has(options.noiseType)
+      || options.noiseLoopMode === 'seamless'
+    )
+  ) {
+    return disabledAnalyticPrefix('unsupported-noise', firstTextureLayerIndex < 0 ? null : firstTextureLayerIndex);
+  }
+  if (diffuseIndex >= 0 && (!ANALYTIC_DIFFUSE_MODES.has(options.diffuseMode) || options.forceTextureDiffusePass)) {
+    return disabledAnalyticPrefix(
+      options.forceTextureDiffusePass ? 'forced-texture-diffuse' : 'unsupported-diffuse',
+      firstTextureLayerIndex < 0 ? null : firstTextureLayerIndex,
+    );
+  }
+
+  const consumedLayers = prefixLayers
+    .filter((layer): layer is EffectStackLayer & { kind: 'noise' | 'diffuse' } => layer.kind === 'noise' || layer.kind === 'diffuse')
+    .map(layer => layer.kind);
+  if (consumedLayers.length === 0) return disabledAnalyticPrefix('no-prefix-layers', firstTextureLayerIndex < 0 ? null : firstTextureLayerIndex);
+  return {
+    enabled: true,
+    consumedLayers,
+    firstTextureLayerIndex: firstTextureLayerIndex < 0 ? null : firstTextureLayerIndex,
+    reason: 'enabled',
+  };
+}
 
 /**
  * Builds the immutable V2 render contract once per frame.
@@ -342,26 +481,32 @@ export function getV2RenderPlan(
   const noiseRequested = enabledLayers.some(layer => layer.kind === 'noise');
   const stretchRequested = enabledLayers.some(layer => layer.kind === 'stretch');
   const flowGradientEnabled = Boolean(options.flowGradientEnabled);
-
-  return {
-    normalizedStack,
-    enabledLayers,
-    diffuseEnabled,
-    normalRequested,
-    normalNeedsBlur,
-    prismRequested,
-    prismNeedsBlur,
-    particlesRequested,
-    framebufferAllocationMode: getV2FramebufferAllocationMode(
+  const analyticPrefix = getAnalyticGradientPrefixPlan(pipeline, enabledLayers, options);
+  const analyticPrefixDirect = analyticPrefix.enabled && analyticPrefix.firstTextureLayerIndex === null;
+  const framebufferAllocationMode = analyticPrefixDirect
+    ? 'direct'
+    : getV2FramebufferAllocationMode(
       pipeline,
       normalRequested,
       options.clothGradientEnabled,
       forceTextureDiffusePass,
       seamlessEnabled,
       flowGradientEnabled,
-    ),
+    );
+
+  return {
+    normalizedStack,
+    enabledLayers,
+    analyticPrefix,
+    diffuseEnabled,
+    normalRequested,
+    normalNeedsBlur,
+    prismRequested,
+    prismNeedsBlur,
+    particlesRequested,
+    framebufferAllocationMode,
     programs: {
-      stackCore: requiresV2StackCore(
+      stackCore: framebufferAllocationMode !== 'direct' && requiresV2StackCore(
         pipeline,
         normalRequested,
         options.clothGradientEnabled,
@@ -369,7 +514,7 @@ export function getV2RenderPlan(
         seamlessEnabled,
         flowGradientEnabled,
       ),
-      noiseStack: noiseRequested,
+      noiseStack: noiseRequested && !analyticPrefix.consumedLayers.includes('noise'),
       glassV2: glassV2Requested,
       normalMap: normalRequested,
       blur: normalNeedsBlur || prismNeedsBlur,

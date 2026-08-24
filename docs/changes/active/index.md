@@ -19,3 +19,4 @@ title: 進行中の変更
 | CHANGE-030 | [SANDBOX Flow Gradient Phase A](./CHANGE-030-sandbox-flow-gradient/proposal) | approved |
 | CHANGE-031 | [MCP UI Control Parity](./CHANGE-031-mcp-ui-control-parity/proposal) | approved |
 | CHANGE-032 | [Flow Gradient continuous particle field and expanded controls](./CHANGE-032-flow-gradient-continuous-controls/proposal) | draft |
+| CHANGE-033 | [WebGL解析的Gradient Prefix統合](./CHANGE-033-analytic-gradient-prefix/proposal) | approved |

@@ -48,6 +48,32 @@ describe('export WebGL program plan', () => {
     expect(getRequiredExportProgramKeys(state)).toEqual(['stackCore', 'seamless']);
   });
 
+  it('requests the full Generator for an analytic prefix and keeps Glass on the texture path', () => {
+    const state = stateWithGlass(true);
+    state.effectPipeline.effectStack = [
+      { kind: 'noise', enabled: true },
+      { kind: 'diffuse', enabled: true },
+      { kind: 'glass', enabled: true },
+      ...state.effectPipeline.effectStack.filter(layer => !['noise', 'diffuse', 'glass'].includes(layer.kind)),
+    ];
+    state.gradient = { gradientType: 'linear' } as LatestState['gradient'];
+    state.noiseDistortion = { type: 'simplex', noiseLoopMode: 'legacy' } as LatestState['noiseDistortion'];
+    state.diffuse = { enabled: true, mode: 'block' } as LatestState['diffuse'];
+
+    expect(getRequiredExportProgramKeys(state)).toEqual(['generator', 'stackCore', 'glassV2']);
+  });
+
+  it('does not request the analytic Generator when Seamless is configured', () => {
+    const state = stateWithGlass(false);
+    state.gradient = { gradientType: 'linear' } as LatestState['gradient'];
+    state.noiseDistortion = { type: 'simplex', noiseLoopMode: 'legacy' } as LatestState['noiseDistortion'];
+    state.diffuse = { enabled: true, mode: 'block' } as LatestState['diffuse'];
+    state.effectPipeline.effectStack = updateEffectStackLayer(state.effectPipeline.effectStack, 'noise', { enabled: true });
+    state.seamless = { enabled: true, blendWidth: 0.25 };
+
+    expect(getRequiredExportProgramKeys(state)).toEqual(['stackCore', 'noiseStack', 'seamless']);
+  });
+
   it('requests all Flow Gradient passes when the fixed stage is enabled', () => {
     const state = stateWithGlass(false);
     state.effectPipeline.flowGradientEnabled = true;

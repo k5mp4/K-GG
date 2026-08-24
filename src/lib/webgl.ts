@@ -1159,11 +1159,19 @@ export function getRequiredExportProgramKeys(state: LatestState): LazyProgramKey
       prismGlowRadius: state.postprocess.prismGlowRadius ?? 0,
       forceTextureDiffusePass: state.diffuse.mode === 'legacy',
       seamlessEnabled: state.seamless?.enabled ?? false,
+      gradientType: state.gradient?.gradientType,
+      sourceImageEnabled: Boolean(state.sourceImageCanvas),
+      imageGradientEnabled: imageGradientProtected,
+      noiseType: state.noiseDistortion?.type,
+      noiseLoopMode: state.noiseDistortion?.noiseLoopMode,
+      diffuseMode: state.diffuse?.mode,
+      clothGradientEnabled: state.clothGradient?.enabled ?? false,
+      flowGradientEnabled: state.effectPipeline.flowGradientEnabled === true,
     });
     const protectedStipple = imageGradientProtected
       && state.diffuse.mode === 'legacy'
       && plan.diffuseEnabled;
-    add('generator', imageGradientProtected);
+    add('generator', imageGradientProtected || plan.analyticPrefix.enabled);
     add('stackCore', (!imageGradientProtected || protectedStipple) && plan.programs.stackCore);
     add('noiseStack', !imageGradientProtected && plan.programs.noiseStack);
     add('glassV2', !imageGradientProtected && plan.programs.glassV2 && !isGlassOpticallyIdentity(state.postprocess));
@@ -2819,11 +2827,6 @@ export function render(
     requestLazyProgram(ctx, 'flowComposite')
   );
   let flowActive = flowRequested && flowProgramsReady && normalizedFlowGradient != null;
-  // Only Legacy uses the full generator. V2 deliberately keeps its Base stage
-  // on the Bootstrap shader, then applies Noise/Slit/Distort in texture-stack
-  // passes. Waiting for the Legacy generator here can otherwise leave every
-  // V2 layer visually stuck at Base-only while it compiles or times out.
-  if (!isV2Pipeline || imageGradientProtected) requestLazyProgram(ctx, 'generator');
   const { gl, program, uniforms, gradientRampTexture, meshGradientTexture, sourceImageTexture, imageGradientTexture, imageMaskTexture } = ctx;
   gradient = { ...gradient, angle: clampParameter(gradient.angle, 0, getParameterLimit('gradient.angle')) };
   noiseDistortion = {
@@ -2890,6 +2893,28 @@ export function render(
   const tileOx = tile ? tile.offset[0] : 0;
   const tileOy = tile ? tile.offset[1] : 0;
   const seamlessRequested = seamless.enabled && !tile;
+  const renderPlan = isV2Pipeline && effectPipeline
+    ? getV2RenderPlan(effectPipeline, {
+      normalMapEnabled: normalMap.enabled,
+      normalMapBlur: normalMap.blur,
+      prismGlowRadius: postprocess.prismGlowRadius ?? 0,
+      clothGradientEnabled: clothGradient?.enabled ?? false,
+      forceTextureDiffusePass: diffuse.mode === 'legacy',
+      seamlessEnabled: seamless.enabled,
+      flowGradientEnabled: flowRequested,
+      gradientType: gradient.gradientType,
+      sourceImageEnabled: Boolean(sourceImageCanvas),
+      imageGradientEnabled: imageGradientProtected,
+      noiseType: noiseDistortion.type,
+      noiseLoopMode: noiseDistortion.noiseLoopMode,
+      diffuseMode: diffuse.mode,
+    })
+    : null;
+  const analyticPrefixEnabled = renderPlan?.analyticPrefix.enabled === true;
+  // Legacy and protected Image Gradient rendering still use the full
+  // generator. V2 requests it only when the Render Plan can safely consume a
+  // leading Noise/Diffuse prefix in one analytic pass.
+  if (!isV2Pipeline || imageGradientProtected || analyticPrefixEnabled) requestLazyProgram(ctx, 'generator');
   if (flowActive) {
     resizeFlowGradientResources(
       gl,
@@ -2946,8 +2971,14 @@ export function render(
   }
   gl.uniform2f(uniforms.u_gradDir, gradDirX, gradDirY);
   gl.uniform2f(uniforms.u_resolution, width, height);
-  const generatorColorFieldEnabled = !isV2Pipeline || imageGradientProtected;
-  setUniform1i(gl, uniforms.u_noiseEnabled, generatorColorFieldEnabled && noiseDistortion.enabled ? 1 : 0);
+  const generatorLegacyColorFieldEnabled = !isV2Pipeline || imageGradientProtected;
+  const analyticNoiseConsumed = renderPlan?.analyticPrefix.consumedLayers.includes('noise') === true;
+  const analyticDiffuseConsumed = renderPlan?.analyticPrefix.consumedLayers.includes('diffuse') === true;
+  const generatorColorFieldEnabled = generatorLegacyColorFieldEnabled || analyticPrefixEnabled;
+  const generatorNoiseEnabled = isV2Pipeline && !imageGradientProtected
+    ? analyticNoiseConsumed
+    : noiseDistortion.enabled;
+  setUniform1i(gl, uniforms.u_noiseEnabled, generatorColorFieldEnabled && generatorNoiseEnabled ? 1 : 0);
   setUniform1i(gl, uniforms.u_noiseType, NOISE_TYPE_MAP[noiseDistortion.type]);
   gl.uniform1f(uniforms.u_noiseAmount, noiseDistortion.amount);
   gl.uniform1f(uniforms.u_noiseScale, noiseDistortion.scale);
@@ -3004,7 +3035,9 @@ export function render(
   const [animDirX, animDirY] = getAnimationDirectionVector(animDirection);
   gl.uniform2f(uniforms.u_animDir, animDirX, animDirY);
   const diffuseScale = diffuseResolutionScale(width, height);
-  const generatorDiffuseEnabled = generatorColorFieldEnabled && diffuse.enabled && !(isV2Pipeline && imageGradientProtected && diffuse.mode === 'legacy');
+  const generatorDiffuseEnabled = isV2Pipeline && !imageGradientProtected
+    ? analyticDiffuseConsumed
+    : generatorLegacyColorFieldEnabled && diffuse.enabled && !(isV2Pipeline && imageGradientProtected && diffuse.mode === 'legacy');
   setUniform1i(gl, uniforms.u_diffuseEnabled, generatorDiffuseEnabled ? 1 : 0);
   setUniform1i(gl, uniforms.u_diffuseMode, DIFFUSE_MODE_MAP[diffuse.mode ?? 'block'] ?? 0);
   gl.uniform1f(uniforms.u_diffuseScatter, diffuse.mode === 'dither' ? 100 : diffuse.scatter * diffuseScale);
@@ -3091,7 +3124,7 @@ export function render(
   gl.uniform1f(uniforms.u_dwDist2, noiseDistortion.dwDist2);
   gl.uniform1f(uniforms.u_dwDist3, noiseDistortion.dwDist3);
   gl.uniform1f(uniforms.u_dwDriftAngle, noiseAngleDegreesForShader(noiseDistortion.dwDriftAngle));
-  setUniform1i(gl, uniforms.u_slitEnabled, generatorColorFieldEnabled && slitScan.enabled ? 1 : 0);
+  setUniform1i(gl, uniforms.u_slitEnabled, generatorLegacyColorFieldEnabled && slitScan.enabled ? 1 : 0);
   setUniform1i(gl, uniforms.u_slitMode, slitScan.mode === 'circular' ? 1 : slitScan.mode === 'polygon' ? 2 : slitScan.mode === 'wave' ? 3 : 0);
   gl.uniform1f(uniforms.u_slitAngle, (slitScan.angle * Math.PI) / 180);
   const slitWaveTypeMap = { sine: 0, sawtooth: 1, semicircle: 2 } as const;
@@ -3166,7 +3199,7 @@ export function render(
   setUniform1i(gl, uniforms.u_slitNoiseAfter, 0);
   setUniform1i(gl, uniforms.u_slitPixelPerfect, _pp ? 1 : 0);
   // Stretch is applied later as a post-process that samples the rendered texture.
-  setUniform1i(gl, uniforms.u_radonEnabled, generatorColorFieldEnabled && radon.enabled ? 1 : 0);
+  setUniform1i(gl, uniforms.u_radonEnabled, generatorLegacyColorFieldEnabled && radon.enabled ? 1 : 0);
   gl.uniform1f(uniforms.u_radonStrength, radon.strength);
   gl.uniform1f(uniforms.u_radonFreq, radon.freq);
   gl.uniform1f(uniforms.u_radonRadius, radon.radius);
@@ -3176,7 +3209,7 @@ export function render(
   gl.uniform1f(uniforms.u_radonSpeed, radon.speed);
   
   // Fluid Warp
-  setUniform1i(gl, uniforms.u_iridEnabled, generatorColorFieldEnabled && iridescence.enabled ? 1 : 0);
+  setUniform1i(gl, uniforms.u_iridEnabled, generatorLegacyColorFieldEnabled && iridescence.enabled ? 1 : 0);
   gl.uniform1f(uniforms.u_iridAngle, (iridescence.angle * Math.PI) / 180);
   gl.uniform1f(uniforms.u_iridSpeed, iridescence.speed);
   gl.uniform1f(uniforms.u_iridFreq, iridescence.frequency);
@@ -3185,21 +3218,12 @@ export function render(
   gl.activeTexture(gl.TEXTURE5);
   gl.bindTexture(gl.TEXTURE_2D, ctx.manualDistortTexture);
   setUniform1i(gl, uniforms.u_manualDistortMap, 5);
-  setUniform1i(gl, uniforms.u_manualDistortEnabled, generatorColorFieldEnabled && manualDistort.enabled ? 1 : 0);
+  setUniform1i(gl, uniforms.u_manualDistortEnabled, generatorLegacyColorFieldEnabled && manualDistort.enabled ? 1 : 0);
   gl.uniform1f(uniforms.u_manualDistortMaxDisplacement, manualDistort.maxDisplacement);
   gl.uniform1f(uniforms.u_manualDistortSmoothStrength, manualDistort.smoothStrength ?? 0.65);
   gl.uniform1f(uniforms.u_manualDistortSmoothRadius, manualDistort.smoothRadius ?? 18);
 
-  if (isV2Pipeline && effectPipeline) {
-    const renderPlan = getV2RenderPlan(effectPipeline, {
-      normalMapEnabled: normalMap.enabled,
-      normalMapBlur: normalMap.blur,
-      prismGlowRadius: postprocess.prismGlowRadius ?? 0,
-      clothGradientEnabled: clothGradient?.enabled ?? false,
-      forceTextureDiffusePass: diffuse.mode === 'legacy',
-      seamlessEnabled: seamlessRequested,
-      flowGradientEnabled: flowRequested,
-    });
+  if (isV2Pipeline && effectPipeline && renderPlan) {
     const diffuseLayerEnabled = renderPlan.diffuseEnabled;
     const protectedLayerEnabled = (kind: EffectPipelineConfig['effectStack'][number]['kind']) =>
       renderPlan.normalizedStack.some(layer => layer.kind === kind && layer.enabled);
@@ -3208,9 +3232,10 @@ export function render(
     const protectedStipple = imageGradientProtected
       && diffuse.mode === 'legacy'
       && diffuseLayerEnabled;
+    const consumedAnalyticLayers = new Set<string>(renderPlan.analyticPrefix.consumedLayers);
     const mainLayers = imageGradientProtected
       ? (protectedStipple ? renderPlan.enabledLayers.filter(layer => layer.kind === 'diffuse') : [])
-      : renderPlan.enabledLayers;
+      : renderPlan.enabledLayers.filter(layer => !consumedAnalyticLayers.has(layer.kind));
     const normalRequested = renderPlan.normalRequested;
     const normalNeedsBlur = renderPlan.normalNeedsBlur;
     const prismRequested = renderPlan.prismRequested;
@@ -3218,16 +3243,17 @@ export function render(
     const particlesRequested = renderPlan.particlesRequested;
     const glassIdentity = isGlassOpticallyIdentity(postprocess);
 
-    // The V2 default is Diffuse-only. Most modes can stay in the Generator,
-    // but Stipple is intentionally a texture pass so it preserves the old
-    // postprocess hash and one-pixel grain floor even without another layer.
+    // The V2 default is Diffuse-only. Analytic Block/Smooth prefixes stay in
+    // the Generator, while Stipple and other legacy modes remain texture
+    // passes so their existing postprocess contract is preserved.
     const protectedDirect = imageGradientProtected
       && !protectedStipple
       && !normalRequested
       && !renderPlan.prismRequested
       && !renderPlan.particlesRequested
       && !seamlessRequested;
-    if ((renderPlan.framebufferAllocationMode === 'direct' || protectedDirect) && !flowActive) {
+    const generatorReady = !analyticPrefixEnabled || requestLazyProgram(ctx, 'generator');
+    if ((renderPlan.framebufferAllocationMode === 'direct' || protectedDirect) && !flowActive && generatorReady) {
       if (imageGradientProtected) {
         setUniform1i(gl, uniforms.u_noiseEnabled, protectedLayerEnabled('noise') && noiseDistortion.enabled ? 1 : 0);
         setUniform1i(gl, uniforms.u_slitEnabled, protectedLayerEnabled('slit') && slitScan.enabled ? 1 : 0);
@@ -3243,7 +3269,8 @@ export function render(
 
     const stackCoreRequested = (!imageGradientProtected || protectedStipple) && renderPlan.programs.stackCore;
     // V2's texture stack has its own specialized programs. It must not wait
-    // for the Legacy generator, which is intentionally not requested by V2.
+    // for the Legacy generator unless the analytic prefix explicitly needs
+    // the full Generator output.
     const stackCoreReady = !stackCoreRequested || requestLazyProgram(ctx, 'stackCore');
     const noiseStackReady = imageGradientProtected || !renderPlan.programs.noiseStack || (
       stackCoreReady && requestNoiseStackProgram(ctx)
@@ -3266,7 +3293,7 @@ export function render(
 
     // Lazy programs compile asynchronously. Keep a usable base frame until every
     // requested V2 stage is available instead of presenting a partial stack.
-    if (!stackCoreReady || !normalReady || !stretchReady || !prismReady || !particlesReady || !seamlessReady || !flowProgramsReady) {
+    if (!generatorReady || !stackCoreReady || !normalReady || !stretchReady || !prismReady || !particlesReady || !seamlessReady || !flowProgramsReady) {
       // Cloth is a Base generator and does not depend on the stack programs:
       // present the cloth frame even while they compile.
       const clothReady = clothGradient?.enabled
@@ -3312,8 +3339,9 @@ export function render(
       resizeV2CoreFboTextures(gl, ctx, vpW, vpH);
     }
 
-    // Base -> Surface. Base-only uniforms above deliberately disabled the
-    // stackable generator effects, so every V2 layer receives a color texture.
+    // Base -> Surface. When the analytic prefix is enabled, the Generator
+    // evaluates its consumed Noise/Diffuse layers here once; otherwise the
+    // Bootstrap/Base result is the input for the existing texture stack.
     let clothRenderSuccess = false;
     if (clothGradient?.enabled) {
       clothRenderSuccess = renderClothIntoGradTexture(ctx, gradient, clothGradient, clothTime, vpW, vpH, tile, clothLoopPeriod);
