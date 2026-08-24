@@ -20,6 +20,21 @@ import {
 } from './effectPipeline';
 import { shouldRenderNormalMap } from './normalMap';
 
+function analyticPlanOptions(overrides: Partial<Parameters<typeof getV2RenderPlan>[1]> = {}) {
+  return {
+    normalMapEnabled: false,
+    normalMapBlur: 0,
+    prismGlowRadius: 0,
+    gradientType: 'linear' as const,
+    sourceImageEnabled: false,
+    imageGradientEnabled: false,
+    noiseType: 'simplex' as const,
+    noiseLoopMode: 'legacy' as const,
+    diffuseMode: 'block' as const,
+    ...overrides,
+  };
+}
+
 describe('effectPipeline', () => {
   describe('canRenderV2Direct', () => {
     it('only allows the V2 Diffuse-only pipeline without fixed or main-stack stages', () => {
@@ -135,6 +150,126 @@ describe('effectPipeline', () => {
   });
 
   describe('getV2RenderPlan', () => {
+    it('consumes Base + Noise + Diffuse as a direct analytic prefix', () => {
+      const pipeline = createDefaultEffectPipeline();
+      const plan = getV2RenderPlan({
+        ...pipeline,
+        effectStack: updateEffectStackLayer(pipeline.effectStack, 'noise', { enabled: true }),
+      }, analyticPlanOptions());
+
+      expect(plan.analyticPrefix).toEqual({
+        enabled: true,
+        consumedLayers: ['noise', 'diffuse'],
+        firstTextureLayerIndex: null,
+        reason: 'enabled',
+      });
+      expect(plan.framebufferAllocationMode).toBe('direct');
+      expect(plan.programs.stackCore).toBe(false);
+      expect(plan.programs.noiseStack).toBe(false);
+    });
+
+    it('materializes the analytic prefix once before the first Glass texture layer', () => {
+      const pipeline = createDefaultEffectPipeline();
+      const plan = getV2RenderPlan({
+        ...pipeline,
+        effectStack: [
+          { kind: 'noise', enabled: true },
+          { kind: 'diffuse', enabled: true },
+          { kind: 'glass', enabled: true },
+          ...pipeline.effectStack.filter(layer => !['noise', 'diffuse', 'glass'].includes(layer.kind)),
+        ],
+      }, analyticPlanOptions());
+
+      expect(plan.analyticPrefix).toEqual({
+        enabled: true,
+        consumedLayers: ['noise', 'diffuse'],
+        firstTextureLayerIndex: 2,
+        reason: 'enabled',
+      });
+      expect(plan.framebufferAllocationMode).toBe('core');
+      expect(plan.programs.stackCore).toBe(true);
+    });
+
+    it('falls back when Diffuse precedes Noise in the same prefix', () => {
+      const pipeline = createDefaultEffectPipeline();
+      const reordered = [
+        { kind: 'diffuse' as const, enabled: true },
+        { kind: 'noise' as const, enabled: true },
+        ...pipeline.effectStack.filter(layer => layer.kind !== 'diffuse' && layer.kind !== 'noise'),
+      ];
+      const plan = getV2RenderPlan({ ...pipeline, effectStack: reordered }, analyticPlanOptions());
+
+      expect(plan.analyticPrefix.enabled).toBe(false);
+      expect(plan.analyticPrefix.consumedLayers).toEqual([]);
+      expect(plan.analyticPrefix.reason).toBe('invalid-order');
+    });
+
+    it('falls back when a texture layer precedes Noise and Diffuse', () => {
+      const pipeline = createDefaultEffectPipeline();
+      const reordered = [
+        { kind: 'glass' as const, enabled: true },
+        { kind: 'noise' as const, enabled: true },
+        { kind: 'diffuse' as const, enabled: true },
+        ...pipeline.effectStack.filter(layer => !['glass', 'noise', 'diffuse'].includes(layer.kind)),
+      ];
+      const plan = getV2RenderPlan({ ...pipeline, effectStack: reordered }, analyticPlanOptions());
+
+      expect(plan.analyticPrefix).toEqual({
+        enabled: false,
+        consumedLayers: [],
+        firstTextureLayerIndex: 0,
+        reason: 'texture-first',
+      });
+    });
+
+    it.each([
+      ['Diffuse → Glass', ['diffuse', 'glass'], ['diffuse'], 1],
+      ['Noise → Glass → Diffuse', ['noise', 'glass', 'diffuse'], ['noise'], 1],
+      ['Glass → Noise → Diffuse', ['glass', 'noise', 'diffuse'], [], 0],
+    ] as const)('selects the expected prefix boundary for %s', (_label, kinds, consumedLayers, firstTextureLayerIndex) => {
+      const pipeline = createDefaultEffectPipeline();
+      const reordered = kinds.map(kind => ({ kind, enabled: true }));
+      const plan = getV2RenderPlan({ ...pipeline, effectStack: reordered }, analyticPlanOptions());
+
+      expect(plan.analyticPrefix.consumedLayers).toEqual(consumedLayers);
+      expect(plan.analyticPrefix.firstTextureLayerIndex).toBe(firstTextureLayerIndex);
+      expect(plan.analyticPrefix.enabled).toBe(consumedLayers.length > 0);
+      expect(plan.analyticPrefix.reason).toBe(consumedLayers.length > 0 ? 'enabled' : 'texture-first');
+    });
+
+    it.each([
+      ['source-image', { sourceImageEnabled: true }, 'source-image'],
+      ['image-gradient', { imageGradientEnabled: true }, 'image-gradient'],
+      ['normal-map', { normalMapEnabled: true }, 'normal-map'],
+      ['seamless', { seamlessEnabled: true }, 'seamless'],
+      ['flow-gradient', { flowGradientEnabled: true }, 'flow-gradient'],
+      ['mesh-gradient', { gradientType: 'mesh' as const }, 'non-analytic-gradient'],
+      ['seamless-noise-loop', { noiseLoopMode: 'seamless' as const }, 'unsupported-noise'],
+      ['seamless-noise-type', { noiseType: 'seamless' as const }, 'unsupported-noise'],
+    ] as const)('falls back for the protected %s input', (_label, options, reason) => {
+      const pipeline = createDefaultEffectPipeline();
+      const plan = getV2RenderPlan({
+        ...pipeline,
+        effectStack: updateEffectStackLayer(pipeline.effectStack, 'noise', { enabled: true }),
+      }, analyticPlanOptions(options));
+
+      expect(plan.analyticPrefix.enabled).toBe(false);
+      expect(plan.analyticPrefix.reason).toBe(reason);
+    });
+
+    it('keeps legacy Diffuse forced texture behavior out of the analytic prefix', () => {
+      const pipeline = createDefaultEffectPipeline();
+      const plan = getV2RenderPlan(pipeline, analyticPlanOptions({
+        diffuseMode: 'legacy',
+        forceTextureDiffusePass: true,
+      }));
+
+      expect(plan.analyticPrefix.enabled).toBe(false);
+      expect(plan.analyticPrefix.reason).toBe('forced-texture-diffuse');
+      expect(plan.framebufferAllocationMode).toBe('core');
+      expect(plan.programs.stackCore).toBe(true);
+    });
+
     it('keeps legacy Stipple on the texture-stack path when Diffuse is the only layer', () => {
       const plan = getV2RenderPlan(createDefaultEffectPipeline(), {
         normalMapEnabled: false,

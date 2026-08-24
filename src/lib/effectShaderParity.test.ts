@@ -523,6 +523,24 @@ describe('V2 effect shader parity', () => {
     expect(main).toContain('diffuseGlobalUv(slitUv, globalCoord)');
   });
 
+  it('keeps the analytic Generator order as Noise, Diffuse, then Gradient Ramp', () => {
+    const generatorMain = normalizedGradientShader.slice(normalizedGradientShader.lastIndexOf('void main()'));
+    const noiseIndex = generatorMain.indexOf('uv = applyNoiseUV(uv);');
+    const diffuseIndex = generatorMain.indexOf('if (u_diffuseEnabled && (u_diffuseMode <= 1 || u_diffuseMode == 5))');
+    const rampIndex = generatorMain.indexOf('rampColor = texture2D(u_gradientRamp, vec2(rampT, 0.5));');
+
+    expect(noiseIndex).toBeGreaterThanOrEqual(0);
+    expect(diffuseIndex).toBeGreaterThan(noiseIndex);
+    expect(rampIndex).toBeGreaterThan(diffuseIndex);
+  });
+
+  it('skips analytic-consumed layers and avoids requesting a second Noise pass', () => {
+    expect(webglSource).toContain('const consumedAnalyticLayers = new Set<string>(renderPlan.analyticPrefix.consumedLayers);');
+    expect(webglSource).toContain('renderPlan.enabledLayers.filter(layer => !consumedAnalyticLayers.has(layer.kind))');
+    expect(webglSource).toContain('const generatorNoiseEnabled = isV2Pipeline && !imageGradientProtected');
+    expect(webglSource).toContain('const analyticDiffuseConsumed = renderPlan?.analyticPrefix.consumedLayers.includes(\'diffuse\') === true;');
+  });
+
   it('uses only the preceding stack texture as Voronoi color input', () => {
     const voronoi = extractFunction(postprocessShader, 'voronoiGradient');
     expect(voronoi).toContain('vec2 tiledUv = fract(rotatedLocal + 0.5 + vec2(cellPhase, cellPhase * 0.731));');
