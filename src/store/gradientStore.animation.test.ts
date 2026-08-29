@@ -6,6 +6,8 @@ import {
   ANIMATION_SPEED_MIN,
   useGradientStore,
 } from './gradientStore';
+import type { PropertyTrack } from '../types/keyframe';
+import type { SlitScanConfig } from '../types/distortion';
 
 describe('animation store constraints', () => {
   const initialAnimation = useGradientStore.getState().animation;
@@ -46,5 +48,27 @@ describe('animation store constraints', () => {
     });
 
     expect(useGradientStore.getState().keyframeTracks['test.value'].keyframes[0].time).toBe(0.5);
+  });
+
+  it('removes legacy Slit phase motion from state and tracks', () => {
+    const legacyTrack: PropertyTrack = {
+      propertyId: 'slitScan.slitPhase',
+      label: 'Phase Motion',
+      mode: 'auto',
+      enabled: true,
+      keyframes: [],
+    };
+
+    useGradientStore.getState().setKeyframeTracks({ 'slitScan.slitPhase': legacyTrack });
+    expect(useGradientStore.getState().keyframeTracks).not.toHaveProperty('slitScan.slitPhase');
+
+    useGradientStore.getState().setSlitScan({
+      phaseAnimEnabled: true,
+      phaseSpeed: 0,
+      slitPhase: 12,
+    } as unknown as Partial<SlitScanConfig>);
+    expect(useGradientStore.getState().slitScan).not.toHaveProperty('phaseAnimEnabled');
+    expect(useGradientStore.getState().slitScan).not.toHaveProperty('phaseSpeed');
+    expect(useGradientStore.getState().slitScan.slitPhase).toBe(12);
   });
 });

@@ -23,5 +23,6 @@ title: 完了済み変更
 | CHANGE-023 | [ASCIIのフォント選択と文字サイズ](./CHANGE-023-ascii-font-controls/proposal) | archived |
 | CHANGE-024 | [SANDBOXの2D Canvas／3D Cloth表示モード](./CHANGE-024-cloth-preview-view-mode/proposal) | archived |
 | CHANGE-025 | [SANDBOX 3D Cone Preview View](./CHANGE-025-cone-preview-view/proposal) | archived |
+| CHANGE-034 | [Slitのオフセット速度のみのループ](./CHANGE-034-slit-offset-only-motion/proposal) | archived |
 
 Archiveは履歴参照用です。現在有効な振る舞いを確認するときは、先に[現行仕様](../../specs/current/)を読みます。

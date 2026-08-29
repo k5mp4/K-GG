@@ -6,6 +6,7 @@ import { normalizeConeViewConfig } from '../types/coneView';
 import { normalizeSeamlessConfig } from '../types/seamless';
 import { normalizeFlowGradientConfig } from '../types/flowGradient';
 import { normalizeImageGradientConfig } from '../types/imageGradient';
+import { stripSlitPhaseMotionFields } from '../types/distortion';
 import { resolveDiffuseBezier } from '../lib/diffuseCurve';
 import {
   createFolder,
@@ -313,7 +314,7 @@ export function PresetPanel({ canvasW, canvasH, setCanvasW, setCanvasH, aspectRa
     if (s.slitScan) {
       const loadedSlit = {
         ...STORE_DEFAULTS.slitScan,
-        ...s.slitScan,
+        ...stripSlitPhaseMotionFields(s.slitScan),
       };
       delete (loadedSlit as Record<string, unknown>).autoLoop;
       store.setSlitScan(loadedSlit);

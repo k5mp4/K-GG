@@ -152,41 +152,6 @@ export function SlitScanPanel({ sourceImageName, hasSourceImage, onSourceImageLo
             />
           </div>
 
-          <div className="border border-panel-border border-panel bg-k-bg/40 p-2 space-y-2">
-            <div className="flex items-center justify-between gap-2">
-              <p className="text-xs text-deep">Source Image</p>
-              <div className="flex items-center gap-1">
-                {hasSourceImage && (
-                  <button
-                    onClick={() => {
-                      setImageError(null);
-                      onSourceImageClear();
-                    }}
-                    className="text-[10px] text-red-400 hover:text-red-300 px-2 py-0.5 bg-red-900/30 hover:bg-red-900/50 transition-colors"
-                  >
-                    削除
-                  </button>
-                )}
-                <button
-                  onClick={() => imageInputRef.current?.click()}
-                  disabled={isLoadingImage}
-                  className="text-[10px] text-cream hover:text-k-text px-2 py-0.5 bg-cream/10 hover:bg-cream/20 transition-all"
-                >
-                  {isLoadingImage ? 'Loading...' : '読み込み'}
-                </button>
-                <input ref={imageInputRef} type="file" accept="image/*" onChange={handleImageChange} className="hidden" />
-              </div>
-            </div>
-
-            {hasSourceImage ? (
-              <p className="text-[10px] text-k-text/60 truncate">{sourceImageName}</p>
-            ) : (
-              <p className="text-[10px] text-k-muted">画像未選択</p>
-            )}
-            <p className="text-[10px] text-tab-inactive">読み込んだ画像をメインキャンバスに表示し、現在のSlit設定を適用します</p>
-            {imageError && <p className="text-[10px] text-red-400">{imageError}</p>}
-          </div>
-
           {/* Angle / Twist */}
           <SliderField
             label={slitScan.mode === 'linear' ? 'Angle' : slitScan.mode === 'polygon' ? 'Rotation / Twist' : slitScan.mode === 'wave' ? 'Direction' : 'Twist'}
@@ -276,15 +241,6 @@ export function SlitScanPanel({ sourceImageName, hasSourceImage, onSourceImageLo
               defaultValue={D.offsetSpeed}
               trackId="slitScan.offsetSpeed"
             />
-            <SliderField
-              label="Phase Speed"
-              min={-4} max={4} step={0.01}
-              value={slitScan.phaseSpeed ?? D.phaseSpeed}
-              onChange={(v) => setSlitScan({ phaseSpeed: v })}
-              format={(v) => v.toFixed(2)}
-              defaultValue={D.phaseSpeed}
-              trackId="slitScan.phaseSpeed"
-            />
           </div>
 
           {slitScan.mode === 'linear' && (
@@ -318,6 +274,41 @@ export function SlitScanPanel({ sourceImageName, hasSourceImage, onSourceImageLo
               aria-label={t('common.shuffle')}
               title={t('common.shuffle')}
             />
+          </div>
+
+          <div className="border border-panel-border border-panel bg-k-bg/40 p-2 space-y-2">
+            <div className="flex items-center justify-between gap-2">
+              <p className="text-xs text-deep">Source Image</p>
+              <div className="flex items-center gap-1">
+                {hasSourceImage && (
+                  <button
+                    onClick={() => {
+                      setImageError(null);
+                      onSourceImageClear();
+                    }}
+                    className="text-[10px] text-red-400 hover:text-red-300 px-2 py-0.5 bg-red-900/30 hover:bg-red-900/50 transition-colors"
+                  >
+                    削除
+                  </button>
+                )}
+                <button
+                  onClick={() => imageInputRef.current?.click()}
+                  disabled={isLoadingImage}
+                  className="text-[10px] text-cream hover:text-k-text px-2 py-0.5 bg-cream/10 hover:bg-cream/20 transition-all"
+                >
+                  {isLoadingImage ? 'Loading...' : '読み込み'}
+                </button>
+                <input ref={imageInputRef} type="file" accept="image/*" onChange={handleImageChange} className="hidden" />
+              </div>
+            </div>
+
+            {hasSourceImage ? (
+              <p className="text-[10px] text-k-text/60 truncate">{sourceImageName}</p>
+            ) : (
+              <p className="text-[10px] text-k-muted">画像未選択</p>
+            )}
+            <p className="text-[10px] text-tab-inactive">読み込んだ画像をメインキャンバスに表示し、現在のSlit設定を適用します</p>
+            {imageError && <p className="text-[10px] text-red-400">{imageError}</p>}
           </div>
         </div>
       </Collapsible>

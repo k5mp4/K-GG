@@ -5,10 +5,10 @@ title: UI入力コントロール
 status: current
 owners: [maintainer]
 created: 2026-07-28
-updated: 2026-08-13
+updated: 2026-08-28
 requirement_ids: [UI-001, UI-002, UI-003, UI-004, UI-005, UI-006, UI-007, UI-008, UI-009, UI-010, UI-011, UI-012, UI-013, UI-014, UI-015, UI-019, UI-021]
 related_adrs: [ADR-0011, ADR-0012]
-related_changes: [CHANGE-010, CHANGE-012, CHANGE-013, CHANGE-014, CHANGE-015, CHANGE-018, CHANGE-019, CHANGE-024, CHANGE-025, CHANGE-026, CHANGE-030, CHANGE-032]
+related_changes: [CHANGE-010, CHANGE-012, CHANGE-013, CHANGE-014, CHANGE-015, CHANGE-018, CHANGE-019, CHANGE-024, CHANGE-025, CHANGE-026, CHANGE-030, CHANGE-032, CHANGE-034]
 related_code: [src/App.tsx, src/App.css, src/types/renderView.ts, src/types/coneView.ts, src/components/CustomSelect.tsx, src/components/GradientRamp.tsx, src/components/SliderField.tsx, src/components/NoiseDistortionPanel.tsx, src/components/BlockNoisePanel.tsx, src/components/DiffuseCurveEditor.tsx, src/components/SlitScanPanel.tsx, src/components/StretchPanel.tsx, src/components/TimelineBar.tsx, src/components/IridescencePanel.tsx, src/components/NormalMapPanel.tsx, src/components/SandboxPanel.tsx, src/components/FlowGradientPanel.tsx, src/components/ClothGradientPanel.tsx, src/components/ClothCanvas.tsx, src/components/ConeCanvas.tsx, src/components/ConeApexEditor.tsx, src/components/ConeViewPanel.tsx, src/components/RadonPanel.tsx, src/components/PostprocessPanel.tsx, src/components/PostprocessStackPanel.tsx, src/components/PresetPanel.tsx, src/components/Toggle.tsx, src/lib/effectPipeline.ts, src/lib/parameterLimits.ts, src/types/flowGradient.ts, src/i18n/uiLabels.ts, src/i18n/messages.ts]
 related_tests: [src/lib/tweeqAngle.test.ts, src/lib/effectPipeline.test.ts, src/lib/parameterLimits.test.ts, src/lib/animationDirection.test.ts, src/lib/effectShaderParity.test.ts, src/lib/flowSimulation.test.ts, src/lib/flowGradientPreset.test.ts, src/lib/presetThumbnail.test.ts, src/types/coneView.test.ts, src/lib/coneView.test.ts, 'manual: SANDBOX Edit Layer and Flow Gradient controls browser check', 'manual: Cone background coverage and color check']
 ---
@@ -31,7 +31,7 @@ Noise、Slit、StretchのSeed行では、InputShuffleは対応するSeedスラ�
 
 ### UI-003 Slitの選択コントロール
 
-SlitのModeはLinear、Circular、Polygon、WaveをInputDrumで選択できます。MotionはUnidirectional（Loop）とPingPongをInputRadioで選択し、Offset SpeedとPhase Speedで速度を調整できます。Timeline Loop切替や速度の自動上書きは表示しません。
+SlitのModeはLinear、Circular、Polygon、WaveをInputDrumで選択できます。MotionはUnidirectional（Loop）とPingPongをInputRadioで選択し、Offset Speedだけで速度を調整できます。Phase SpeedおよびTimeline Loop切替は表示しません。Source ImageはSlitプロパティモジュール内の全設定とSeedの下端に置き、既存の読込・削除・エラー表示を維持します。
 
 ### UI-004 Animationの名称
 
@@ -70,7 +70,7 @@ Stipple選択時はScatter、Grain、Seed、Seed Per Frameだけを表示し、�
 
 ### UI-012 Slitのモーション速度
 
-SlitのMotionにはLoop／PingPongのInputRadio、Offset Speed、Phase Speedだけを表示します。キャンバスと書き出しは同じ秒ベースのSlit時計を使います。
+SlitのMotionにはLoop／PingPongのInputRadioとOffset Speedだけを表示します。位相速度は独立した入力・アニメーションパラメータとして持たず、キャンバスと書き出しは同じ秒ベースのSlit時計を使います。
 
 ### UI-013 共通Tweeq入力への統一
 

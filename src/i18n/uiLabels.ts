@@ -24,7 +24,7 @@ const uiTerms = [
   ['Mirroring Type', 'ミラー形式'], ['Mix', 'ミックス'], ['Motion', '動き'], ['Noise Distortion', 'ノイズ歪み'],
   ['Octaves', 'オクターブ'], ['Offset', 'オフセット'], ['Offset Angle', 'オフセット角度'],
   ['Offset Speed', 'オフセット速度'], ['Opacity', '不透明度'], ['Outer Speed', '外側速度'],
-  ['Persistence', '持続率'], ['Phase Motion', '位相移動'], ['Phase Speed', '位相速度'],
+  ['Persistence', '持続率'],
   ['Point X', '点 X'], ['Point Y', '点 Y'], ['Radius', '半径'], ['Randomness', 'ランダム量'],
   ['Particle Count', 'パーティクル数'], ['Ray Count', '光線数'], ['Refraction', '屈折'], ['Ribbon Width', 'リボン幅'], ['Rot Angle 1', '回転角 1'], ['Rot Angle 2', '回転角 2'],
   ['Rotation', '回転'], ['Roughness', '粗さ'], ['Scale', 'スケール'], ['Scan Position', '走査位置'], ['Seam Mode', 'シーム方式'],

@@ -1,4 +1,5 @@
 import type { AnimationConfig } from '../store/gradientStore';
+import { stripSlitPhaseMotionFields } from '../types/distortion';
 import type {
   DiffuseConfig,
   EffectPipelineConfig,
@@ -27,6 +28,7 @@ import type { SeamlessConfig } from '../types/seamless';
 import { normalizeSeamlessConfig } from '../types/seamless';
 import type { FlowGradientConfig } from '../types/flowGradient';
 import { normalizeFlowGradientConfig } from '../types/flowGradient';
+import { isRemovedAnimationProperty } from './animationRegistry';
 
 export type StoreSnapshot = {
   gradient: GradientConfig;
@@ -78,6 +80,12 @@ export function makePreset(
     luminanceBezier: resolveDiffuseBezier(state.diffuse.luminanceBezier, state.diffuse.luminanceCurve),
   };
   delete diffuse.luminanceCurve;
+  const slitScan = state.slitScan ? stripSlitPhaseMotionFields(state.slitScan) : state.slitScan;
+  const keyframeTracks = state.keyframeTracks
+    ? Object.fromEntries(Object.entries(state.keyframeTracks).filter(([id, track]) => (
+      !isRemovedAnimationProperty(id) && !isRemovedAnimationProperty(track.propertyId)
+    )))
+    : state.keyframeTracks;
   const gradient = state.gradient?.gradientType === 'mesh'
     ? { ...state.gradient, mesh: normalizeMeshGradientConfig(state.gradient.mesh) }
     : state.gradient;
@@ -92,6 +100,8 @@ export function makePreset(
       ...state,
       gradient,
       diffuse,
+      slitScan,
+      keyframeTracks,
       clothGradient: normalizeClothGradientConfig(state.clothGradient),
       coneView: normalizeConeViewConfig(state.coneView),
       seamless: normalizeSeamlessConfig(state.seamless),

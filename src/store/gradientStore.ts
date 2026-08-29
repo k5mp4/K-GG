@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { DEFAULT_MESH_GRADIENT, normalizeMeshGradientConfig, type GradientConfig, type MeshEdge, type Vec2Tuple } from '../types/gradient';
-import type { NoiseDistortionConfig, DiffuseConfig, SlitScanConfig, StretchConfig, NormalMapConfig, RadonConfig, IridescenceConfig, ManualDistortConfig, PostprocessConfig, MatcapConfig, HistogramConfig, EffectPipelineConfig, DiffuseAdaptiveChannel, DiffuseHalftoneShape } from '../types/distortion';
+import { stripSlitPhaseMotionFields, type NoiseDistortionConfig, type DiffuseConfig, type SlitScanConfig, type StretchConfig, type NormalMapConfig, type RadonConfig, type IridescenceConfig, type ManualDistortConfig, type PostprocessConfig, type MatcapConfig, type HistogramConfig, type EffectPipelineConfig, type DiffuseAdaptiveChannel, type DiffuseHalftoneShape } from '../types/distortion';
 import type { ClothGradientConfig } from '../types/clothGradient';
 import { DEFAULT_CLOTH_GRADIENT, normalizeClothGradientConfig } from '../types/clothGradient';
 import type { ConeViewConfig } from '../types/coneView';
@@ -14,7 +14,7 @@ import { gradientRampPresets } from '../lib/gradientRampUtils';
 import type { AnimationMode, Keyframe, PropertyTrack } from '../types/keyframe';
 import { normalizePropertyTrack } from '../types/keyframe';
 import { computeAutoHandles } from '../lib/autoBezier';
-import { createAnimationTrack, getAnimationDefinition } from '../lib/animationRegistry';
+import { createAnimationTrack, getAnimationDefinition, isRemovedAnimationProperty } from '../lib/animationRegistry';
 import { clampKeyframeTime } from '../lib/loopKeyframes';
 import { isPostprocessTimeAnimationActive } from '../lib/postprocessAnimation';
 import { createDefaultPostprocessStack, normalizePostprocessEffectMode, normalizePostprocessEffectStack } from '../lib/postprocessStack';
@@ -306,8 +306,6 @@ export const STORE_DEFAULTS = {
     offsetSpeed: 0.3,
     animEnabled: false,
     animMode: 'unidirectional' as const,
-    phaseAnimEnabled: true,
-    phaseSpeed: 1.0,
     variance: 0.5,
     seed: 0,
     slitPhase: 0,
@@ -643,7 +641,6 @@ function ensureDefaultAutoTracks(
   if (state.iridescence.enabled) tracks = ensureAutoTrack(tracks, 'iridescence.__time');
   if (state.slitScan.enabled && state.animation.affectSlit) {
     tracks = ensureAutoTrack(tracks, 'slitScan.offset');
-    if (state.slitScan.phaseAnimEnabled) tracks = ensureAutoTrack(tracks, 'slitScan.slitPhase');
   }
   if (state.stretch.enabled) tracks = ensureAutoTrack(tracks, 'stretch.__scan');
   if (state.diffuse.enabled && state.diffuse.seedAnimEnabled) tracks = ensureAutoTrack(tracks, 'diffuse.seed');
@@ -658,7 +655,9 @@ export function migratePropertyTracks(
 ): Record<string, PropertyTrack> {
   if (!tracks) return {};
   return Object.fromEntries(
-    Object.entries(tracks).map(([id, track]) => {
+    Object.entries(tracks).filter(([id, track]) => (
+      !isRemovedAnimationProperty(id) && !isRemovedAnimationProperty(track.propertyId)
+    )).map(([id, track]) => {
       const normalized = normalizePropertyTrack(track);
       return [id, {
         ...normalized,
@@ -858,13 +857,12 @@ export const useGradientStore = create<GradientStore>((set) => ({
   }),
   setImageGradient: (v) => set((s) => ({ imageGradient: normalizeImageGradientConfig({ ...s.imageGradient, ...v }) })),
   setSlitScan: (v) => set((s) => {
-    const slitScan = { ...s.slitScan, ...v };
+    const slitScan = stripSlitPhaseMotionFields({ ...s.slitScan, ...v });
     slitScan.angle = clampParameter(slitScan.angle, s.slitScan.angle, getParameterLimit('slit.angle'));
     slitScan.offsetAngle = clampParameter(slitScan.offsetAngle, s.slitScan.offsetAngle ?? 0, getParameterLimit('slit.offsetAngle'));
     let keyframeTracks = s.keyframeTracks;
     if (s.animation.enabled && slitScan.enabled && s.animation.affectSlit) {
       keyframeTracks = ensureAutoTrack(keyframeTracks, 'slitScan.offset');
-      if (slitScan.phaseAnimEnabled) keyframeTracks = ensureAutoTrack(keyframeTracks, 'slitScan.slitPhase');
     }
     const effectPipeline = v.enabled !== undefined && s.effectPipeline.version === 'stack-v2'
       ? { ...s.effectPipeline, effectStack: updateEffectStackLayer(s.effectPipeline.effectStack, 'slit', { enabled: v.enabled }) }
@@ -1016,6 +1014,7 @@ export const useGradientStore = create<GradientStore>((set) => ({
     keyframeTracks: migratePropertyTracks(typeof v === 'function' ? v(s.keyframeTracks) : v),
   })),
   setTrackMode: (trackId, requestedMode, options) => set((s) => {
+    if (isRemovedAnimationProperty(trackId)) return {};
     const definition = getAnimationDefinition(trackId);
     const mode: AnimationMode = requestedMode === 'auto' && !definition?.autoCapable
       ? 'static'

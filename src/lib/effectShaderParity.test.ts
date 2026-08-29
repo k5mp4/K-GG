@@ -593,8 +593,10 @@ describe('V2 effect shader parity', () => {
     expect(slitIndex).toContain(compact('cumulativeDelta += entry.y'));
   });
 
-  it('bounds Slit phase motion to one normalized cycle for stable playback', () => {
-    expect(compact(webglSource)).toContain(compact('const stackSlitPhaseProgress = ((stackSlitAnimationBaseTime * (stackSlit.phaseSpeed ?? 1)) % 1 + 1) % 1;'));
-    expect(compact(webglSource)).toContain(compact('const slitPhaseProgress = ((slitAnimBaseTime * (slitScan.phaseSpeed ?? 1)) % 1 + 1) % 1;'));
+  it('uses Offset Speed as the only Slit animation speed', () => {
+    expect(compact(webglSource)).toContain(compact('stackSlit.offsetSpeed'));
+    expect(compact(webglSource)).toContain(compact('slitScan.offsetSpeed'));
+    expect(webglSource).not.toContain('phaseSpeed');
+    expect(webglSource).not.toContain('phaseAnimEnabled');
   });
 });

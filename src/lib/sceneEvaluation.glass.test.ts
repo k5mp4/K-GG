@@ -84,7 +84,6 @@ describe('Glass scene animation', () => {
     );
     expect(start.slitScan.animEnabled).toBe(true);
     expect(start.slitScan.offsetSpeed).toBe(0.5);
-    expect(start.slitScan.phaseSpeed).toBe(1);
   });
 
   it('keeps Slit own animation running without a timeline loop switch', () => {
@@ -104,13 +103,35 @@ describe('Glass scene animation', () => {
       enabled: true,
       animMode: 'off',
       offsetSpeed: 0,
-      phaseAnimEnabled: false,
-      phaseSpeed: 0,
     };
     state.animation = { ...state.animation, affectSlit: false };
 
     expect(hasActiveAnimation(state)).toBe(false);
     expect(evaluateSceneAtTime(state, 0.5).slitScan.animEnabled).toBe(false);
+  });
+
+  it('ignores legacy Slit phase motion tracks while preserving manual phase', () => {
+    const state = createGlassState(0);
+    state.slitScan = {
+      ...STORE_DEFAULTS.slitScan,
+      enabled: true,
+      offsetSpeed: 0,
+      slitPhase: 17,
+    };
+    state.animation = { ...state.animation, affectSlit: false };
+    state.keyframeTracks['slitScan.slitPhase'] = {
+      propertyId: 'slitScan.slitPhase',
+      label: 'Phase Motion',
+      mode: 'keys',
+      enabled: true,
+      keyframes: [
+        { id: 'start', time: 0, value: 17, interpolation: 'linear' },
+        { id: 'end', time: 1, value: 99, interpolation: 'linear' },
+      ],
+    };
+
+    expect(hasActiveAnimation(state)).toBe(false);
+    expect(evaluateSceneAtTime(state, 0.5).slitScan.slitPhase).toBe(17);
   });
 
   it('maps the loop endpoints to the same shader phase', () => {

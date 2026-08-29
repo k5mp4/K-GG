@@ -118,8 +118,6 @@ export type SlitScanConfig = {
   offsetSpeed: number;        // アニメーション速度 (0=静止, 正=順方向, 負=逆方向)
   animEnabled: boolean;       // スリットスキャン独自アニメーションの有効/無効
   animMode: 'off' | 'unidirectional' | 'pingpong'; // off=スリットごとの変化なし, unidirectional=一方向(fract), pingpong=往復(sin)
-  phaseAnimEnabled: boolean;  // スリット帯域全体の移動アニメーション
-  phaseSpeed: number;         // スリット帯域の移動速度（slitWidth 倍/アニメーション周期、正=左→右）
   variance: number;   // 0–1, 幅のランダム変化量
   seed: number;       // 0–99, ランダムシード
   slitPhase: number;       // スリット帯域の位置オフセット（px）
@@ -128,6 +126,18 @@ export type SlitScanConfig = {
   pixelPerfect: boolean;   // true=スリット位置・幅・移動量をキャンバス1px単位に丸める
   offsetAngle: number;     // 0–360 deg, スリットオフセット方向（スリット角度からの相対角度）
 };
+
+type LegacySlitPhaseMotionFields = {
+  phaseAnimEnabled?: unknown;
+  phaseSpeed?: unknown;
+};
+
+/** Remove the phase-motion fields used by presets before offset-only Slit motion. */
+export function stripSlitPhaseMotionFields<T extends object>(value: T): Omit<T, keyof LegacySlitPhaseMotionFields> {
+  const legacyValue = value as T & LegacySlitPhaseMotionFields;
+  const { phaseAnimEnabled: _phaseAnimEnabled, phaseSpeed: _phaseSpeed, ...withoutPhaseMotion } = legacyValue;
+  return withoutPhaseMotion as Omit<T, keyof LegacySlitPhaseMotionFields>;
+}
 
 export type StretchConfig = {
   enabled: boolean;
