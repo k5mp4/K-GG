@@ -341,6 +341,7 @@ export type AnalyticPrefixReason =
   | 'unsupported-noise'
   | 'unsupported-diffuse'
   | 'invalid-order'
+  | 'diffuse-before-slit'
   | 'texture-first'
   | 'no-prefix-layers';
 
@@ -441,6 +442,10 @@ export function getAnalyticGradientPrefixPlan(
       options.forceTextureDiffusePass ? 'forced-texture-diffuse' : 'unsupported-diffuse',
       firstTextureLayerIndex < 0 ? null : firstTextureLayerIndex,
     );
+  }
+  const firstTextureLayer = firstTextureLayerIndex >= 0 ? enabledLayers[firstTextureLayerIndex] : null;
+  if (diffuseIndex >= 0 && firstTextureLayer?.kind === 'slit') {
+    return disabledAnalyticPrefix('diffuse-before-slit', firstTextureLayerIndex);
   }
 
   const consumedLayers = prefixLayers

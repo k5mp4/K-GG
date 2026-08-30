@@ -596,6 +596,8 @@ describe('V2 effect shader parity', () => {
   it('uses Offset Speed as the only Slit animation speed', () => {
     expect(compact(webglSource)).toContain(compact('stackSlit.offsetSpeed'));
     expect(compact(webglSource)).toContain(compact('slitScan.offsetSpeed'));
+    expect(compact(webglSource)).toContain(compact('getSlitAnimationPhase(stackSlitAnimationBaseTime, noiseLoopPeriod, stackSlit.offsetSpeed)'));
+    expect(compact(webglSource)).toContain(compact('getSlitAnimationPhase(slitAnimBaseTime, noiseLoopPeriod, slitScan.offsetSpeed)'));
     expect(webglSource).not.toContain('phaseSpeed');
     expect(webglSource).not.toContain('phaseAnimEnabled');
   });

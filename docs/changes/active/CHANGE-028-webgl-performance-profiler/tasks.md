@@ -12,6 +12,8 @@
 - [x] stats-glとEffect単位GPU queryの競合を防ぎ、描画を継続できる回帰テストを追加する
 - [x] Profiler初期化時のwebgl-lint重複disableによる描画停止を修正し、回帰テストを追加する
 - [x] webgl-lintとKHR_parallel_shader_compileの競合、未完成lazy Programの公開、Postprocess Uniform反映失敗によるEffect Stack停止を修正し、回帰テストを追加する
+- [x] webgl-lintが利用可能な通常起動まで同期コンパイルへ切り替わる回帰を修正し、DiffuseとProfilerのTauri起動を確認する
+- [x] KHR並列Shaderの完了通知がwatchdog期限内に返らないNoise系lazy Shaderを、Program破棄ではなく同期status確認へフォールバックさせ、回帰テストを追加する
 - [x] stats-gl overlayの全画面当たり判定を修正し、Performance各値とDebug/Benchmarkの判定基準を開発者ガイドへ追加する
 - [x] Performanceタブへstats-glモニターをドック表示し、Profilerを開いてもCanvas描画を確認できるレイアウトへ修正する
 - [x] Glass専用Shaderから汎用Noiseの全分岐を分離し、全Effect Stack有効時のコンパイル停止・context lostを修正して回帰確認する

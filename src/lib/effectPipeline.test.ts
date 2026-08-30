@@ -223,6 +223,24 @@ describe('effectPipeline', () => {
     });
 
     it.each([
+      ['Diffuse → Slit', ['diffuse', 'slit'], 1],
+      ['Noise → Diffuse → Slit', ['noise', 'diffuse', 'slit'], 2],
+    ] as const)('keeps %s in the texture stack for Slit output-space Diffuse evaluation', (_label, kinds, firstTextureLayerIndex) => {
+      const pipeline = createDefaultEffectPipeline();
+      const reordered = kinds.map(kind => ({ kind, enabled: true }));
+      const plan = getV2RenderPlan({ ...pipeline, effectStack: reordered }, analyticPlanOptions());
+
+      expect(plan.analyticPrefix).toEqual({
+        enabled: false,
+        consumedLayers: [],
+        firstTextureLayerIndex,
+        reason: 'diffuse-before-slit',
+      });
+      expect(plan.framebufferAllocationMode).toBe('core');
+      expect(plan.programs.stackCore).toBe(true);
+    });
+
+    it.each([
       ['Diffuse → Glass', ['diffuse', 'glass'], ['diffuse'], 1],
       ['Noise → Glass → Diffuse', ['noise', 'glass', 'diffuse'], ['noise'], 1],
       ['Glass → Noise → Diffuse', ['glass', 'noise', 'diffuse'], [], 0],
