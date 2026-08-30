@@ -5,7 +5,7 @@ title: WebGL Performance Debug / Profiler
 status: current
 owners: [maintainer]
 created: 2026-08-12
-updated: 2026-08-12
+updated: 2026-08-30
 requirement_ids: [PERF-001, PERF-002, PERF-003, PERF-004, PERF-005, PERF-006, PERF-007, PERF-008, PERF-009, PERF-010]
 related_adrs: [ADR-0005, ADR-0015]
 related_changes: [CHANGE-028]
@@ -67,6 +67,8 @@ Effect StackのGlass/glassv2は、汎用Noiseの全アルゴリズムを同じ�
 
 Noise専用lazy Shaderの反射またはリンクが失敗した場合は、一般postprocess ShaderをNoise passのフォールバックとして使用し、Noise行が描画不能な`Unavailable`状態で固定されないようにする。専用Shaderが利用できる場合は専用passを優先する。
 
+同一WebGL context上で要求されたlazy Shaderは、コンパイル・リンクを一度に一つだけ実行する。後続の`generator`、`stackCore`、Noise専用Shaderなどは前の処理が完了してから開始し、重いShaderの同時コンパイルによるGPU/ANGLEの`context lost`を防ぐ。
+
 ## 境界と互換性
 
-Profiler設定は保存しない。ProfilerはCanvas領域内のドックUIとして表示し、Performanceタブのstats-glモニターもその中へマウントする。独立したstats-gl overlayは表示せず、Canvasやエディタのポインター入力を遮らない。`EXT_disjoint_timer_query_webgl2`が利用できる場合は、K-GGのEffect単位GPU queryを優先し、`stats-gl`のGPU queryを同時に有効化しない。同じ`TIME_ELAPSED_EXT`ターゲットのquery入れ子を避けるためであり、この場合もFPS/CPUはstats-gl、GPU frame/effect値はK-GGのProfilerで確認できる。`webgl-lint`のProgram情報とKHR並列Shaderコンパイルが競合する環境では、Developmentのリンクを同期経路へ切り替える。Timer Query、Spector.js、webgl-memory、webgl-lintが未対応でもPreviewとFallbackは利用でき、lazy Shaderの単独失敗でEffect Stack全体を停止させない。SpectorのUIが残る環境でもProfiler dockを優先して表示し、Captureキャンセル後の操作を可能にする。ProfilerはDevelopment専用であり、製品の画像出力やPreset互換性を保証する層ではない。
+Profiler設定は保存しない。ProfilerはCanvas領域内のドックUIとして表示し、Performanceタブのstats-glモニターもその中へマウントする。独立したstats-gl overlayは表示せず、Canvasやエディタのポインター入力を遮らない。`EXT_disjoint_timer_query_webgl2`が利用できる場合は、K-GGのEffect単位GPU queryを優先し、`stats-gl`のGPU queryを同時に有効化しない。同じ`TIME_ELAPSED_EXT`ターゲットのquery入れ子を避けるためであり、この場合もFPS/CPUはstats-gl、GPU frame/effect値はK-GGのProfilerで確認できる。`webgl-lint`のProgram情報とKHR並列Shaderコンパイルが競合する環境では、Validationを有効化したDevelopmentのリンクだけを同期経路へ切り替え、通常起動の並列コンパイルは維持する。並列完了通知がwatchdog期限内に返らないlazy ShaderはProgramを破棄せず、最終compile/link status参照へ同期フォールバックし、実際のcompile/link失敗だけを単独の失敗として扱う。Timer Query、Spector.js、webgl-memory、webgl-lintが未対応でもPreviewとFallbackは利用でき、lazy Shaderの単独失敗でEffect Stack全体を停止させない。SpectorのUIが残る環境でもProfiler dockを優先して表示し、Captureキャンセル後の操作を可能にする。ProfilerはDevelopment専用であり、製品の画像出力やPreset互換性を保証する層ではない。

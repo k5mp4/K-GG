@@ -42,6 +42,7 @@ import { buildMeshGradientField, MESH_FIELD_SIZE, MESH_FIELD_SUBDIVISIONS } from
 import { noiseAngleDegreesForShader, noiseAngleRadiansForShader } from './noiseAngle';
 import { clampParameter, getParameterLimit } from './parameterLimits';
 import { getAnimationDirectionVector } from './animationDirection';
+import { getSlitAnimationPhase } from './slitAnimation';
 import { shouldRenderNormalMap } from './normalMap';
 import type { LatestState } from '../types/latestState';
 import { DEFAULT_SEAMLESS, normalizeSeamlessConfig, type SeamlessConfig } from '../types/seamless';
@@ -55,6 +56,7 @@ import {
   type WebGLPerformanceProfiler,
   type DevelopmentTools,
 } from './webglPerformance';
+import type { PerformanceSnapshot } from '../types/webglPerformance';
 
 export { SHADER_VERSION };
 
@@ -69,18 +71,41 @@ type LazyProgramState = {
   fallback: boolean;
 };
 
+export type SerialAsyncQueue = {
+  enqueue<T>(task: () => Promise<T>): Promise<T>;
+};
+
+export function createSerialAsyncQueue(): SerialAsyncQueue {
+  let tail: Promise<void> = Promise.resolve();
+
+  return {
+    enqueue<T>(task: () => Promise<T>): Promise<T> {
+      const next = tail.then(() => task(), () => task());
+      tail = next.then(() => undefined, () => undefined);
+      return next;
+    },
+  };
+}
+
 /**
  * webgl-lint records program/uniform metadata from the synchronous link
  * callback. KHR_parallel_shader_compile can report LINK_STATUS before that
  * metadata is available, which leaves webgl-lint with no entry for the
- * program. Keep the parallel path for production, but use synchronous linking
- * whenever the development validation extension is available.
+ * program. Keep the parallel path for normal startup, but use synchronous
+ * linking whenever development validation is enabled.
  */
 export function selectShaderCompileExtension(
   extension: ShaderCompileExt,
-  validationAvailable: boolean,
+  validationEnabled: boolean,
 ): ShaderCompileExt {
-  return validationAvailable ? null : extension;
+  return validationEnabled ? null : extension;
+}
+
+export function selectShaderCompileExtensionForSnapshot(
+  extension: ShaderCompileExt,
+  snapshot: Pick<PerformanceSnapshot, 'validationAvailable' | 'validationEnabled'> | null | undefined,
+): ShaderCompileExt {
+  return selectShaderCompileExtension(extension, snapshot?.validationEnabled ?? false);
 }
 
 const EFFECT_STACK_TRANSITION_FRAGMENT_SHADER = `
@@ -182,6 +207,7 @@ export type WebGLContext = {
   v2CoreFboSize: [number, number];
   shaderCompileExt: ShaderCompileExt;
   lazyProgramState: Record<LazyProgramKey, LazyProgramState>;
+  lazyProgramCompileQueue: SerialAsyncQueue;
   clothRenderer?: ClothGradientRenderer | null;
   clothStatus?: 'loading' | 'ready' | 'failed' | 'fallback';
   hasPresentedFrame: boolean;
@@ -348,9 +374,9 @@ export async function initWebGL(canvas: HTMLCanvasElement): Promise<WebGLContext
 
   // KHR_parallel_shader_compile: シェーダーコンパイルを非同期化してメインスレッドをブロックしない
   const ext = gl.getExtension('KHR_parallel_shader_compile') as ShaderCompileExt;
-  const shaderCompileExt = selectShaderCompileExtension(
+  const shaderCompileExt = selectShaderCompileExtensionForSnapshot(
     ext,
-    performanceProfiler?.getSnapshot().validationAvailable ?? false,
+    performanceProfiler?.getSnapshot(),
   );
   // 浮動小数点テクスチャのリニアフィルタリング用拡張 (RGBA32F distortion map)
   gl.getExtension('OES_texture_float_linear');
@@ -611,7 +637,7 @@ export async function initWebGL(canvas: HTMLCanvasElement): Promise<WebGLContext
   const flowGradient = createFlowGradientResources(gl);
   const transitionTextureFrom = createTexture(gl);
   const transitionTextureTo = createTexture(gl);
-  const ctx: WebGLContext = { gl, performanceProfiler, gpuDiagnostics, renderOptimization, program, uniforms, generatorProgram: null, generatorUniforms: {}, gradientRampTexture, meshGradientTexture, meshGradientTextureSignature: '', diffuseCurveTexture, diffuseCurveSignature: '', diffuseAsciiTexture, diffuseAsciiSignature: '', diffuseAsciiCount: 1, diffuseAsciiRows: ASCII_ATLAS_MAX_ROWS, diffuseHistogramAt: 0, manualDistortTexture, manualDistortDisplacement: null, manualDistortSmoothMask: null, manualDistortMapResolution: 0, sourceImageTexture, sourceImageCanvas: null, imageGradientTexture, imageGradientSource: null, imageMaskTexture, imageMaskSource: null, normalMapProgram: null, normalMapUniforms: {}, gradFbo, gradTexture, blurProgram: null, blurUniforms: {}, stretchProgram: null, stretchUniforms: {}, seamlessProgram: null, seamlessUniforms: {}, stackCoreProgram: null, stackCoreUniforms: {}, noiseStackProgram: null, noiseStackUniforms: {}, glassProgram: null, glassUniforms: {}, glassFallbackActive: false, glassV2Program: null, glassV2Uniforms: {}, glassV2FallbackActive: false, prismProgram: null, prismUniforms: {}, postprocessProgram: null, postprocessUniforms: {}, prismCompositeProgram: null, prismCompositeUniforms: {}, particleProgram: null, particleUniforms: {}, particleVao: null, particleQuadBuffer: null, particleInstanceBuffer: null, particleInstanceCount: 0, particleInstanceSeed: Number.NaN, flowGradient, normalFbo, normalTexture, hBlurFbo, hBlurTexture, postprocessFboA, postprocessTextureA, postprocessFboB, postprocessTextureB, prismScratchFbo, prismScratchTexture, prismBlurFbo, prismBlurTexture, prismGlowFbo, prismGlowTexture, fboSize: [0, 0], v2CoreFboSize: [0, 0], shaderCompileExt, lazyProgramState: createLazyProgramState(), hasPresentedFrame: false };
+  const ctx: WebGLContext = { gl, performanceProfiler, gpuDiagnostics, renderOptimization, program, uniforms, generatorProgram: null, generatorUniforms: {}, gradientRampTexture, meshGradientTexture, meshGradientTextureSignature: '', diffuseCurveTexture, diffuseCurveSignature: '', diffuseAsciiTexture, diffuseAsciiSignature: '', diffuseAsciiCount: 1, diffuseAsciiRows: ASCII_ATLAS_MAX_ROWS, diffuseHistogramAt: 0, manualDistortTexture, manualDistortDisplacement: null, manualDistortSmoothMask: null, manualDistortMapResolution: 0, sourceImageTexture, sourceImageCanvas: null, imageGradientTexture, imageGradientSource: null, imageMaskTexture, imageMaskSource: null, normalMapProgram: null, normalMapUniforms: {}, gradFbo, gradTexture, blurProgram: null, blurUniforms: {}, stretchProgram: null, stretchUniforms: {}, seamlessProgram: null, seamlessUniforms: {}, stackCoreProgram: null, stackCoreUniforms: {}, noiseStackProgram: null, noiseStackUniforms: {}, glassProgram: null, glassUniforms: {}, glassFallbackActive: false, glassV2Program: null, glassV2Uniforms: {}, glassV2FallbackActive: false, prismProgram: null, prismUniforms: {}, postprocessProgram: null, postprocessUniforms: {}, prismCompositeProgram: null, prismCompositeUniforms: {}, particleProgram: null, particleUniforms: {}, particleVao: null, particleQuadBuffer: null, particleInstanceBuffer: null, particleInstanceCount: 0, particleInstanceSeed: Number.NaN, flowGradient, normalFbo, normalTexture, hBlurFbo, hBlurTexture, postprocessFboA, postprocessTextureA, postprocessFboB, postprocessTextureB, prismScratchFbo, prismScratchTexture, prismBlurFbo, prismBlurTexture, prismGlowFbo, prismGlowTexture, fboSize: [0, 0], v2CoreFboSize: [0, 0], shaderCompileExt, lazyProgramState: createLazyProgramState(), lazyProgramCompileQueue: createSerialAsyncQueue(), hasPresentedFrame: false };
   effectStackTransitionResources.set(ctx, {
     program: transitionProgram,
     from: gl.getUniformLocation(transitionProgram, 'u_transitionFrom'),
@@ -653,7 +679,9 @@ async function createProgramAsync(
   gl.linkProgram(program);
   if (ext) {
     // KHR_parallel_shader_compileの完了前にステータスを参照すると同期化される。
-    // Glass系はドライバ側の長いコンパイルを許容し、通常のprogramだけ有限時間で打ち切る。
+    // Glass系はドライバ側の長いコンパイルを許容し、通常のprogramは有限時間の
+    // watchdog後にステータス参照へフォールバックする。完了通知を返さないドライバでも
+    // 有効なProgramをタイムアウト扱いで破棄しないための最後の同期確認になる。
     await new Promise<void>((resolve, reject) => {
       const poll = () => {
         if (gl.isContextLost()) {
@@ -665,7 +693,11 @@ async function createProgramAsync(
           return;
         }
         if (Number.isFinite(compileTimeoutMs) && performance.now() - compileStartedAt >= compileTimeoutMs) {
-          reject(new Error(`Parallel shader compile timed out (${diagnosticLabel})`));
+          console.warn('[WebGL shader] Parallel shader compile completion watchdog expired; falling back to synchronous status checks', {
+            program: diagnosticLabel,
+            elapsedMs: Math.round(performance.now() - compileStartedAt),
+          });
+          resolve();
           return;
         }
         requestAnimationFrame(poll);
@@ -673,7 +705,8 @@ async function createProgramAsync(
       requestAnimationFrame(poll);
     });
   }
-  // エラーチェック（ext なし = ここで初めて同期ブロック、ext あり = すでにコンパイル完了済み）
+  // エラーチェック（extなし = ここで初めて同期ブロック、extあり = 完了通知を受信済み、
+  // またはwatchdog後の同期フォールバック）
   if (!gl.getShaderParameter(vert, gl.COMPILE_STATUS)) {
     const log = gl.getShaderInfoLog(vert);
     console.error('[GLSL] VERTEX compile error:', log);
@@ -924,9 +957,9 @@ async function compileLazyProgram(ctx: WebGLContext, key: LazyProgramKey): Promi
   const source = getProgramSource(key);
   const fragSrc = source.fragment;
   const compileStartedAt = performance.now();
-  const shaderCompileExt = selectShaderCompileExtension(
+  const shaderCompileExt = selectShaderCompileExtensionForSnapshot(
     ctx.shaderCompileExt,
-    ctx.performanceProfiler?.getSnapshot().validationAvailable ?? false,
+    ctx.performanceProfiler?.getSnapshot(),
   );
   let program: WebGLProgram | null = null;
   try {
@@ -1035,7 +1068,7 @@ function requestLazyProgram(ctx: WebGLContext, key: LazyProgramKey): boolean {
     window.dispatchEvent(new CustomEvent('kgg:webgl-lazy-program-state', {
       detail: { key, state: 'loading' as const },
     }));
-    state.promise = compileLazyProgram(ctx, key).catch((error) => {
+    state.promise = ctx.lazyProgramCompileQueue.enqueue(() => compileLazyProgram(ctx, key)).catch((error) => {
       state.failed = true;
       state.timedOut = error instanceof Error && error.message.includes('timed out');
       console.error(`[WebGL] Lazy shader compile failed (${key}):`, error);
@@ -2154,7 +2187,7 @@ function drawPostprocessPass(
     && stackSlit.animMode !== 'off'
     && stackSlit.offsetSpeed !== 0;
   const stackSlitAnimationTime = stackSlitOffsetAnimationActive
-    ? ((stackSlitAnimationBaseTime * stackSlit.offsetSpeed) % 1 + 1) % 1
+    ? getSlitAnimationPhase(stackSlitAnimationBaseTime, noiseLoopPeriod, stackSlit.offsetSpeed)
     : 0;
   gl.uniform2f(
     ctx.postprocessUniforms.u_stackSlitParams,
@@ -3133,7 +3166,7 @@ export function render(
     : 0.0;
   const slitOffsetAnimActive = slitScan.animEnabled && slitScan.animMode !== 'off' && slitScan.offsetSpeed !== 0;
   const slitTime = slitOffsetAnimActive
-    ? ((slitAnimBaseTime * slitScan.offsetSpeed) % 1.0 + 1.0) % 1.0
+    ? getSlitAnimationPhase(slitAnimBaseTime, noiseLoopPeriod, slitScan.offsetSpeed)
     : 0.0;
   gl.uniform2f(uniforms.u_slitParams, _ppR(slitScan.slitPhase ?? 0), slitScan.seed);
   {

@@ -1,5 +1,9 @@
 import { describe, expect, it } from 'vitest';
-import { selectShaderCompileExtension } from './webgl';
+import {
+  createSerialAsyncQueue,
+  selectShaderCompileExtension,
+  selectShaderCompileExtensionForSnapshot,
+} from './webgl';
 import webglSource from './webgl.ts?raw';
 
 function functionSource(name: string): string {
@@ -16,26 +20,82 @@ function functionSource(name: string): string {
 }
 
 describe('WebGL lazy compile policy', () => {
-  it('disables parallel linking while validation metadata can be active', () => {
+  it('disables parallel linking only while validation is enabled', () => {
     const extension = { COMPLETION_STATUS_KHR: 0x91b1 };
 
     expect(selectShaderCompileExtension(extension, true)).toBeNull();
     expect(selectShaderCompileExtension(extension, false)).toBe(extension);
   });
 
-  it('never advances to synchronous status reads before parallel completion', () => {
+  it('keeps parallel linking when validation is available but disabled', () => {
+    const extension = { COMPLETION_STATUS_KHR: 0x91b1 };
+
+    expect(selectShaderCompileExtensionForSnapshot(extension, {
+      validationAvailable: true,
+      validationEnabled: false,
+    })).toBe(extension);
+    expect(selectShaderCompileExtensionForSnapshot(extension, {
+      validationAvailable: true,
+      validationEnabled: true,
+    })).toBeNull();
+    expect(selectShaderCompileExtensionForSnapshot(extension, undefined)).toBe(extension);
+  });
+
+  it('serializes lazy shader compilation requests on one WebGL context', async () => {
+    const queue = createSerialAsyncQueue();
+    let active = 0;
+    let maximumActive = 0;
+    let releaseFirst: () => void = () => {
+      throw new Error('first task did not start');
+    };
+    let firstStartedResolve: (() => void) | null = null;
+    const firstStarted = new Promise<void>((resolve) => {
+      firstStartedResolve = resolve;
+    });
+
+    const first = queue.enqueue(async () => {
+      active += 1;
+      maximumActive = Math.max(maximumActive, active);
+      firstStartedResolve?.();
+      await new Promise<void>((resolve) => {
+        releaseFirst = resolve;
+      });
+      active -= 1;
+    });
+    const second = queue.enqueue(async () => {
+      active += 1;
+      maximumActive = Math.max(maximumActive, active);
+      active -= 1;
+    });
+
+    await firstStarted;
+    expect(active).toBe(1);
+    expect(maximumActive).toBe(1);
+
+    releaseFirst();
+    await Promise.all([first, second]);
+    expect(maximumActive).toBe(1);
+  });
+
+  it('routes lazy program requests through the context-local compile queue', () => {
+    const source = functionSource('requestLazyProgram');
+
+    expect(source).toContain('ctx.lazyProgramCompileQueue.enqueue');
+  });
+
+  it('falls back to synchronous status reads when parallel completion watchdog expires', () => {
     const source = functionSource('createProgramAsync');
     const completionCheck = source.indexOf('ext.COMPLETION_STATUS_KHR');
-    const timeoutReject = source.indexOf('Parallel shader compile timed out');
+    const timeoutFallback = source.indexOf('Parallel shader compile completion watchdog expired');
     const compileStatus = source.indexOf('gl.COMPILE_STATUS');
     const linkStatus = source.indexOf('gl.LINK_STATUS');
 
     expect(source).not.toContain('frames > 600');
     expect(completionCheck).toBeGreaterThanOrEqual(0);
-    expect(timeoutReject).toBeGreaterThan(completionCheck);
-    expect(compileStatus).toBeGreaterThan(timeoutReject);
+    expect(timeoutFallback).toBeGreaterThan(completionCheck);
+    expect(compileStatus).toBeGreaterThan(timeoutFallback);
     expect(linkStatus).toBeGreaterThan(compileStatus);
-    expect(source.slice(timeoutReject - 80, timeoutReject + 120)).toContain('reject(');
+    expect(source.slice(timeoutFallback - 100, timeoutFallback + 260)).toContain('resolve();');
     expect(source).not.toContain('gl.deleteProgram(program)');
   });
 

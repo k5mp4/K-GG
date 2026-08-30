@@ -6,6 +6,7 @@ import { evaluateSceneAtTime, hasActiveAnimation } from './sceneEvaluation';
 import { createDefaultPostprocessStack } from './postprocessStack';
 import { updateEffectStackLayer } from './effectPipeline';
 import { calcExportRenderTime } from './videoExportFrames';
+import { getSlitAnimationPhase } from './slitAnimation';
 
 function createGlassState(glassMotion: number): LatestState {
   return {
@@ -94,6 +95,27 @@ describe('Glass scene animation', () => {
     expect(hasActiveAnimation(state)).toBe(true);
     expect(evaluateSceneAtTime(state, 0.5).slitAnimationTime).toBeCloseTo(2.5);
     expect(evaluateSceneAtTime(state, 0.5).slitScan.animEnabled).toBe(true);
+  });
+
+  it('closes the Slit shader phase at the duration boundary', () => {
+    const state = createGlassState(0);
+    state.slitScan = { ...STORE_DEFAULTS.slitScan, enabled: true, offsetSpeed: 0.3 };
+    state.animation = {
+      ...state.animation,
+      duration: 5,
+      speed: 1,
+      affectSlit: false,
+    };
+
+    const start = evaluateSceneAtTime(state, 0);
+    const end = evaluateSceneAtTime(state, 1);
+    const shaderPhaseAt = (scene: ReturnType<typeof evaluateSceneAtTime>) => getSlitAnimationPhase(
+      scene.slitAnimationTime ?? 0,
+      scene.noiseLoopPeriod,
+      state.slitScan.offsetSpeed,
+    );
+
+    expect(shaderPhaseAt(start)).toBeCloseTo(shaderPhaseAt(end));
   });
 
   it('keeps Slit static when its own animation settings are disabled', () => {

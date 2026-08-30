@@ -24,5 +24,7 @@ title: 完了済み変更
 | CHANGE-024 | [SANDBOXの2D Canvas／3D Cloth表示モード](./CHANGE-024-cloth-preview-view-mode/proposal) | archived |
 | CHANGE-025 | [SANDBOX 3D Cone Preview View](./CHANGE-025-cone-preview-view/proposal) | archived |
 | CHANGE-034 | [Slitのオフセット速度のみのループ](./CHANGE-034-slit-offset-only-motion/proposal) | archived |
+| CHANGE-035 | [Slit Motionのduration境界ループ](./CHANGE-035-slit-duration-loop/proposal) | archived |
+| CHANGE-036 | [Diffuse直後のSlitでDiffuseが反映されない不具合修正](./CHANGE-036-diffuse-before-slit/proposal) | archived |
 
 Archiveは履歴参照用です。現在有効な振る舞いを確認するときは、先に[現行仕様](../../specs/current/)を読みます。

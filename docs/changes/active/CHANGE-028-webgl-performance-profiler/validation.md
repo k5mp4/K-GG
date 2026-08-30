@@ -29,6 +29,38 @@
 - `npm run docs:build` — pass (VitePress 1.6.4; dead links and page rendering passed).
 - `npm run tauri:dev` — Tauri process and WebView/GPU processes launched before the 30-second command timeout; no attached browser console or manual visual confirmation was available in this environment.
 
+## 追加検証（2026-08-24）
+
+- `npm test -- --run src/lib/webglCompilePolicy.test.ts` — pass（1 file、11 tests）。通常起動時は`validationAvailable`ではなく、実際にValidationを有効化した状態を同期コンパイルの条件にする回帰テストを追加した。
+- `npm test -- --reporter=dot` — pass（69 files、407 tests）。
+- `npm run lint` — pass（0 errors、21 existing warnings）。
+- `npm run build` — pass。既存のTauri dynamic-import、500KB超chunk警告は残る。
+- `npm run docs:check` — pass（41 legacy specs、7 current specs、23 changes、17 ADRs）。
+- `npm run docs:build` — pass（VitePress 1.6.4）。
+- `npm run tauri:dev` — pass（単独のTauriプロセスで起動）。起動直後にDiffuseが`APPLIED`となりCanvasへ粒状効果が描画され、`PROFILER`を開くとPerformanceタブのFPS、CPU/GPU frame、Draw calls、Render passes、Timer queryが表示された。
+- 起動ログに残る`vendor/tweeq/index.es.js.map`の`ENOENT`とBabelの500KB超コード生成メモは警告であり、Tauri起動・Diffuse描画・Profiler表示を妨げないことを確認した。
+
+### Noise Shader watchdog
+
+- `npm test -- --run src/lib/webglCompilePolicy.test.ts` — pass（1 file、11 tests）。`KHR_parallel_shader_compile`の完了通知が30秒以内に返らない場合、Programを破棄せずcompile/link status確認へ同期フォールバックする回帰テストを追加した。
+- `npm test -- --reporter=dot` — pass（69 files、407 tests）。
+- `npm run tauri:dev` — pass（Vite/Rust/WebViewプロセスの起動を確認）。今回の環境ではTauri WebViewのNoise操作とブラウザ自動化を同じGPUコンテキストへ接続できず、実GPUで30秒watchdogから同期確認へ入る経路は未確認。回帰テストと既存のTauri起動/Diffuse/Profiler確認で検証した。
+
+### Noise lazy shader serialization (2026-08-30)
+
+- `npm test -- --run src/lib/webglCompilePolicy.test.ts` — pass（1 file、13 tests）。同一WebGL context内のlazy Shader要求を直列化し、`generator`と`stackCore`のcompile/linkが重ならない回帰テストを追加した。
+- `npm run lint` — pass（0 errors、21 existing warnings）。
+- `npm run build` — pass。既存のTauri dynamic-import、500KB超chunk警告は残る。
+- `npm run docs:check` — pass（41 legacy specs、7 current specs、23 changes、17 ADRs）。
+- `npm run docs:build` — not completed。VitePress 1.6.4のclient/server bundle工程がエラーを出さず長時間停止したため、検証プロセスを中断した。文書の内容エラーは出力されていない。
+- `npm test` — partial（68 files、407 tests pass、`tools/mcp-server/src/runtimeBridge.test.ts`の2 testsが既定5秒timeout）。WebGL関連テストの失敗はなく、runtimeBridgeは変更範囲外。
+- `npm run dev`相当のローカルブラウザ確認 — pass。1920×1080でNoiseを有効化し、`generator`完了後に`stackCore`が要求されること、Noiseがオン状態で描画されること、`error`ログ0件・`context lost`なしを確認した。遅いドライバによる30秒watchdog警告はstatus確認への既存フォールバックである。
+
+### Review残留リスク
+
+- Validationを有効化する操作が、並列lazy Shaderのコンパイル完了前に行われた場合のwebgl-lint再有効化順序は未確認。今回の起動経路の修正対象外として、別途イベント順序の回帰テストを追加する。
+- 並列完了通知が30秒以上遅れるドライバでは、最後の同期status確認時に一時的なメインスレッド待機が発生し得る。タイムアウトで有効なProgramを破棄してNoise全体を失敗扱いにするより、実際のcompile/link結果を確認して適用を継続するための互換性フォールバックである。
+
 ## 手動確認
 
 - `npm run dev`で起動し、ブラウザ上でCanvas描画、ProfilerのPerformance/GPU Profiler/Resourcesタブを確認 — pass。stats-glはPerformanceタブ内へドック表示され、GPU/Resourcesの説明文表示中もCanvasが継続描画された。Profiler外のCanvas領域とエディタ操作を覆う独立overlayは表示されなかった。
