@@ -1,7 +1,9 @@
 import { browserColorPaletteRepository } from './browser/colorPaletteRepository';
+import { browserAfterEffectsService } from './browser/afterEffectsService';
 import { browserExportService } from './browser/exportService';
 import { browserPresetRepository } from './browser/presetRepository';
 import { browserVideoExportService } from './browser/videoExportService';
+import { tauriAfterEffectsService } from './tauri/afterEffectsService';
 import { isTauriRuntime, tauriExportService } from './tauri/exportService';
 import { tauriPresetRepository } from './tauri/presetRepository';
 import { tauriVideoExportService } from './tauri/videoExportService';
@@ -12,6 +14,7 @@ export const browserAdapters: AppAdapters = {
   colorPaletteRepository: browserColorPaletteRepository,
   exportService: browserExportService,
   videoExportService: browserVideoExportService,
+  afterEffectsService: browserAfterEffectsService,
 };
 
 export const tauriAdapters: AppAdapters = {
@@ -19,12 +22,17 @@ export const tauriAdapters: AppAdapters = {
   presetRepository: tauriPresetRepository,
   exportService: tauriExportService,
   videoExportService: tauriVideoExportService,
+  afterEffectsService: tauriAfterEffectsService,
 };
 
 export const adapters = isTauriRuntime() ? tauriAdapters : browserAdapters;
 
 export type {
   AppAdapters,
+  AeRuntime,
+  AeSaveDirStatus,
+  AeStatus,
+  AfterEffectsService,
   ColorPaletteRepository,
   ExportDirectoryHandle,
   ExportStage,

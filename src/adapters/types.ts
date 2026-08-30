@@ -7,6 +7,34 @@ import type { ExportSessionToken } from '../lib/renderBridge';
 
 export type MaybePromise<T> = T | Promise<T>;
 export type ExportDirectoryHandle = FileSystemDirectoryHandle | string;
+
+export type AeStatus =
+  | 'ok'
+  | 'not-running'
+  | 'save-failed'
+  | 'jsx-failed'
+  | 'composition-unavailable'
+  | 'unsupported'
+  | 'error';
+
+export type AeSaveDirStatus = {
+  mode: 'auto' | 'custom';
+  path: string | null;
+  name: string | null;
+};
+
+export type AeRuntime = 'browser-bridge' | 'tauri-native';
+
+export interface AfterEffectsService {
+  runtime: AeRuntime;
+  isAvailable(): Promise<boolean>;
+  ping(): Promise<AeStatus>;
+  getSaveDir(): Promise<AeSaveDirStatus>;
+  chooseSaveDir(): Promise<AeSaveDirStatus>;
+  clearSaveDir(): Promise<AeSaveDirStatus>;
+  importImage(blob: Blob, name?: string): Promise<AeStatus>;
+  importVideo(blob: Blob, ext?: 'mov' | 'mp4', name?: string): Promise<AeStatus>;
+}
 export const MP4_QUALITY_PRESETS = [
   { value: 'high', label: 'High', crf: 18, description: '画質優先' },
   { value: 'balanced', label: 'Balanced', crf: 22, description: 'バランス' },
@@ -119,4 +147,5 @@ export interface AppAdapters {
   colorPaletteRepository: ColorPaletteRepository;
   exportService: ExportService;
   videoExportService: VideoExportService;
+  afterEffectsService: AfterEffectsService;
 }

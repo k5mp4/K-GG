@@ -1675,6 +1675,7 @@ dependencies = [
  "tauri-plugin-fs",
  "tauri-plugin-process",
  "tauri-plugin-updater",
+ "uuid",
 ]
 
 [[package]]

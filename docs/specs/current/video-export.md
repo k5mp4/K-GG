@@ -5,10 +5,10 @@ title: 動画・連番フレーム出力
 status: current
 owners: [maintainer]
 created: 2026-07-31
-updated: 2026-08-13
+updated: 2026-08-30
 requirement_ids: [EXPORT-001, EXPORT-002, EXPORT-003, EXPORT-004, EXPORT-005, EXPORT-006, EXPORT-007, EXPORT-008, EXPORT-021]
 related_adrs: [ADR-0004, ADR-0005]
-related_changes: [CHANGE-011, CHANGE-024, CHANGE-025, CHANGE-030]
+related_changes: [CHANGE-011, CHANGE-024, CHANGE-025, CHANGE-030, CHANGE-038]
 related_code: [src/adapters/browser/videoExportService.ts, src/adapters/tauri/videoExportService.ts, src/adapters/types.ts, src/lib/renderBridge.ts, src/lib/renderSceneAtTime.ts, src/lib/flowGradientRenderer.ts, src/lib/flowSimulation.ts, src/lib/videoExportFrames.ts, src/lib/tileRender.ts, src/lib/webgl.ts, src/lib/coneViewRenderer.ts, src/components/GradientCanvas.tsx, src/components/ClothCanvas.tsx, src/components/ConeCanvas.tsx, src/components/ExportPanel.tsx]
 related_tests: [src/lib/renderBridge.test.ts, src/lib/effectPipeline.test.ts, src/lib/flowSimulation.test.ts, src/lib/flowGradientPreset.test.ts, src/lib/webglExportPrograms.test.ts, src/lib/glass.test.ts, src/lib/videoExportFrames.test.ts, src/lib/coneView.test.ts]
 ---
