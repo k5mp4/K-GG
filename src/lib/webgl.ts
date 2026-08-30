@@ -2126,8 +2126,6 @@ function drawPostprocessPass(
     offsetSpeed: 0,
     animEnabled: false,
     animMode: 'off',
-    phaseAnimEnabled: false,
-    phaseSpeed: 0,
     variance: 0,
     seed: 0,
     slitPhase: 0,
@@ -2158,17 +2156,9 @@ function drawPostprocessPass(
   const stackSlitAnimationTime = stackSlitOffsetAnimationActive
     ? ((stackSlitAnimationBaseTime * stackSlit.offsetSpeed) % 1 + 1) % 1
     : 0;
-  const stackSlitPhaseProgress = ((
-    stackSlitAnimationBaseTime * (stackSlit.phaseSpeed ?? 1)
-  ) % 1 + 1) % 1;
-  const stackSlitPhaseOffset = stackSlit.animEnabled
-    && (stackSlit.phaseAnimEnabled ?? false)
-    && (stackSlit.phaseSpeed ?? 0) !== 0
-    ? -stackSlitPhaseProgress * stackSlitWidth
-    : 0;
   gl.uniform2f(
     ctx.postprocessUniforms.u_stackSlitParams,
-    roundStackSlit((stackSlit.slitPhase ?? 0) + stackSlitPhaseOffset),
+    roundStackSlit(stackSlit.slitPhase ?? 0),
     stackSlit.seed,
   );
   const stackSlitDeltas: Array<[number, number]> = [];
@@ -3145,11 +3135,7 @@ export function render(
   const slitTime = slitOffsetAnimActive
     ? ((slitAnimBaseTime * slitScan.offsetSpeed) % 1.0 + 1.0) % 1.0
     : 0.0;
-  const slitPhaseProgress = ((slitAnimBaseTime * (slitScan.phaseSpeed ?? 1)) % 1 + 1) % 1;
-  const phaseOffset = slitScan.animEnabled && (slitScan.phaseAnimEnabled ?? false) && (slitScan.phaseSpeed ?? 0) !== 0
-    ? -slitPhaseProgress * Math.max(_ppR(slitScan.slitWidth), 1)
-    : 0;
-  gl.uniform2f(uniforms.u_slitParams, _ppR((slitScan.slitPhase ?? 0) + phaseOffset), slitScan.seed);
+  gl.uniform2f(uniforms.u_slitParams, _ppR(slitScan.slitPhase ?? 0), slitScan.seed);
   {
     // 最大32エントリ。スリットインデックス昇順ソート。空スロットは (-9999, 0)。
     // センチネルを -9999 にすることでスリットインデックス -1 との混同を回避。

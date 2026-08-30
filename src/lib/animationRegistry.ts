@@ -38,13 +38,6 @@ const DEFINITIONS: AnimationPropertyDefinition[] = [
     defaultAuto: { kind: 'pingpong', speed: 1, direction: 0, phase: 0 },
   },
   {
-    propertyId: 'slitScan.slitPhase',
-    label: 'Phase Motion',
-    group: 'Slit Scan',
-    autoCapable: true,
-    defaultAuto: { kind: 'loop', speed: 1, direction: 0, phase: 0 },
-  },
-  {
     propertyId: 'stretch.__scan',
     label: 'Scan Position',
     group: 'Stretch',
@@ -75,6 +68,10 @@ export function getAnimationDefinition(propertyId: string): AnimationPropertyDef
 
 export function isAutoCapableProperty(propertyId: string): boolean {
   return getAnimationDefinition(propertyId)?.autoCapable ?? false;
+}
+
+export function isRemovedAnimationProperty(propertyId: string): boolean {
+  return propertyId === 'slitScan.slitPhase';
 }
 
 export function getAnimationGroup(propertyId: string, fallback = 'Properties'): string {

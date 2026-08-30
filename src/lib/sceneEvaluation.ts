@@ -17,6 +17,7 @@ import { applyTimeRemap } from './timeRemap';
 import { hexToRgb255, rgb255ToHex } from './gradientRampUtils';
 import { withAnimatedDiffuseSeed } from './diffuseSeed';
 import { isPostprocessTimeAnimationActive } from './postprocessAnimation';
+import { isRemovedAnimationProperty } from './animationRegistry';
 
 import type { ClothGradientConfig } from '../types/clothGradient';
 import { normalizeClothGradientConfig } from '../types/clothGradient';
@@ -174,6 +175,7 @@ function applyObjectTracks<T extends object>(
   const sourceRecord = source as Record<string, unknown>;
   for (const track of Object.values(tracks)) {
     if (!isKeysTrack(track)) continue;
+    if (isRemovedAnimationProperty(track.propertyId)) continue;
     const [trackCategory, field] = track.propertyId.split('.');
     if (trackCategory !== category || !(field in sourceRecord)) continue;
     result = {
@@ -218,14 +220,14 @@ function keyedTrackValue(state: LatestState, propertyId: string, time: number): 
 function hasSlitOwnAnimation(slit: SlitScanConfig): boolean {
   if (!slit.enabled) return false;
   const offsetAnimationActive = slit.animMode !== 'off' && Math.abs(slit.offsetSpeed) > 1e-6;
-  const phaseAnimationActive = slit.phaseAnimEnabled && Math.abs(slit.phaseSpeed) > 1e-6;
-  return offsetAnimationActive || phaseAnimationActive;
+  return offsetAnimationActive;
 }
 
 export function hasActiveAnimation(state: LatestState): boolean {
   if (!state.animation.enabled) return false;
   if (Object.values(state.keyframeTracks).some(track => (
     propertyOwnerEnabled(state, track.propertyId)
+      && !isRemovedAnimationProperty(track.propertyId)
       && getTrackMode(track) !== 'static'
   ))) return true;
   return (
@@ -249,8 +251,7 @@ export function evaluateSceneAtTime(state: LatestState, normalizedTime: number):
   const radonMode = trackMode(state, 'radon.evolution', animation.affectNoise && state.radon.enabled);
   const iridescenceMode = trackMode(state, 'iridescence.__time', animation.affectNoise && state.iridescence.enabled);
   const rawSlitOffsetMode = trackMode(state, 'slitScan.offset', animation.affectSlit && state.slitScan.enabled);
-  const rawSlitPhaseMode = trackMode(state, 'slitScan.slitPhase', animation.affectSlit && state.slitScan.enabled && state.slitScan.phaseAnimEnabled);
-  const slitTrackAnimationActive = rawSlitOffsetMode === 'auto' || rawSlitPhaseMode === 'auto';
+  const slitTrackAnimationActive = rawSlitOffsetMode === 'auto';
   const slitOwnAnimationActive = animation.enabled && hasSlitOwnAnimation(state.slitScan);
   const slitAnimationActive = animation.enabled && (slitTrackAnimationActive || slitOwnAnimationActive);
   const stretchMode = trackMode(state, 'stretch.__scan', animation.affectStretch && state.stretch.enabled);
@@ -332,7 +333,6 @@ export function evaluateSceneAtTime(state: LatestState, normalizedTime: number):
   slitScan = {
     ...slitScan,
     animEnabled: slitAnimationActive,
-    phaseAnimEnabled: rawSlitPhaseMode === 'auto' || slitScan.phaseAnimEnabled,
   };
   const stretch = applyObjectTracks(
     'stretch',
