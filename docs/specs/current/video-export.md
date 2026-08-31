@@ -5,7 +5,7 @@ title: 動画・連番フレーム出力
 status: current
 owners: [maintainer]
 created: 2026-07-31
-updated: 2026-08-30
+updated: 2026-08-31
 requirement_ids: [EXPORT-001, EXPORT-002, EXPORT-003, EXPORT-004, EXPORT-005, EXPORT-006, EXPORT-007, EXPORT-008, EXPORT-021]
 related_adrs: [ADR-0004, ADR-0005]
 related_changes: [CHANGE-011, CHANGE-024, CHANGE-025, CHANGE-030, CHANGE-037, CHANGE-038]

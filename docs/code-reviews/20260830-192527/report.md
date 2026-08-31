@@ -23,7 +23,7 @@ Resolved implementation points include four-corner convergence, shared CPU/GPU z
 Residual risks are verification gaps rather than confirmed defects:
 
 - Gradient Reapply has CPU and source coverage, but no browser WebGL compile or visual Preview/Export check was possible.
-- The new helper is included in the shared fragment shader for all seam modes; mode-specific shader variants can be considered in a separate performance change.
+- The new helper remains in the shared fragment shader for all seam modes; mode-specific shader variants can be considered in a separate performance change.
 
 ## Validation
 
