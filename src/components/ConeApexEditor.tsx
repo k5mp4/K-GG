@@ -81,23 +81,6 @@ export function ConeApexEditor({ width, height, visible = true }: Props) {
       aria-label={t('cone.apexPosition')}
       style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', pointerEvents: 'none', overflow: 'visible', zIndex: 25 }}
     >
-      <div
-        aria-hidden="true"
-        style={{
-          position: 'absolute',
-          left: position.x,
-          top: position.y,
-          width: 44,
-          height: 44,
-          transform: 'translate(-50%, -50%)',
-          border: '1px dashed rgba(86, 224, 245, 0.5)',
-          borderRadius: '50%',
-          pointerEvents: 'none',
-        }}
-      >
-        <span style={{ position: 'absolute', left: '50%', top: 0, bottom: 0, width: 1, transform: 'translateX(-50%)', background: 'rgba(86, 224, 245, 0.36)' }} />
-        <span style={{ position: 'absolute', top: '50%', left: 0, right: 0, height: 1, transform: 'translateY(-50%)', background: 'rgba(86, 224, 245, 0.36)' }} />
-      </div>
       <button
         type="button"
         data-cone-apex-anchor
@@ -114,15 +97,13 @@ export function ConeApexEditor({ width, height, visible = true }: Props) {
           border: '2px solid #071b24',
           borderRadius: '50%',
           background: '#56e0f5',
-          boxShadow: '0 0 0 2px rgba(86,224,245,0.42), 0 0 14px rgba(86,224,245,0.76)',
+          boxShadow: '0 2px 8px rgba(7,27,36,0.45)',
           cursor: 'grab',
           pointerEvents: 'auto',
           touchAction: 'none',
           padding: 0,
         }}
-      >
-        <span aria-hidden="true" style={{ position: 'absolute', left: '50%', top: '50%', width: 7, height: 7, transform: 'translate(-50%, -50%)', borderRadius: '50%', background: '#071b24' }} />
-      </button>
+      />
     </div>
   );
 }

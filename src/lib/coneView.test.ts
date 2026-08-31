@@ -54,6 +54,7 @@ describe('cone texture flow', () => {
   it('maps each seam mode to a stable shader branch', () => {
     expect(getConeSeamModeIndex('mirror')).toBe(0);
     expect(getConeSeamModeIndex('weld')).toBe(1);
+    expect(getConeSeamModeIndex('reapply')).toBe(2);
   });
 
   it('maps rotation, repeat, and the shared normalized timeline deterministically', () => {
@@ -62,7 +63,7 @@ describe('cone texture flow', () => {
       rotation: -90,
       textureRepeat: 3,
       flowCycles: 2,
-    }, 0.25)).toEqual({ repeatU: 3, offsetU: 0.75, offsetV: 0.5, seamBlend: DEFAULT_CONE_VIEW.seamBlend, seamMode: 'weld' });
+    }, 0.25)).toEqual({ repeatU: 3, offsetU: 0.75, offsetV: 0.5, seamBlend: DEFAULT_CONE_VIEW.seamBlend, seamMode: 'mirror' });
   });
 
   it('returns to an integer offset at the loop boundary and supports reverse flow', () => {
@@ -84,10 +85,10 @@ describe('cone texture flow', () => {
       textureRepeat: 3,
       flowCycles: 8,
     }, 0.75);
-    expect(transform).toEqual({ repeatU: 3, offsetU: 0.25, offsetV: 0, seamBlend: DEFAULT_CONE_VIEW.seamBlend, seamMode: 'weld' });
+    expect(transform).toEqual({ repeatU: 3, offsetU: 0.25, offsetV: 0, seamBlend: DEFAULT_CONE_VIEW.seamBlend, seamMode: 'mirror' });
   });
 
-  it.each(['mirror', 'weld'] as const)('keeps seam mode stable during flow for %s', (seamMode) => {
+  it.each(['mirror', 'weld', 'reapply'] as const)('keeps seam mode stable during flow for %s', (seamMode) => {
     const start = getConeTextureTransform({ ...DEFAULT_CONE_VIEW, seamMode, flowCycles: 4 }, 0);
     const end = getConeTextureTransform({ ...DEFAULT_CONE_VIEW, seamMode, flowCycles: 4 }, 1);
     expect(start.seamMode).toBe(seamMode);
