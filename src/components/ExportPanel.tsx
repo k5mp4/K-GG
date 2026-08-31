@@ -16,7 +16,7 @@ import {
 } from '../lib/export';
 import { exportSlits } from '../lib/exportSlits';
 import {
-  aePing, aeImportImage, aeImportVideo, aeBridgeAvailable,
+  aePing, aeImportImage, aeImportVideo, aeBridgeAvailable, aeRuntime,
   aeGetSaveDir, aeChooseSaveDir, aeClearSaveDir,
 } from '../lib/aftereffectsExport';
 import { MP4_QUALITY_PRESETS } from '../adapters';
@@ -676,7 +676,7 @@ export function ExportPanel({
       {/* After Effects Connect */}
       <div className="border-t border-panel-border border-t-panel pt-4 space-y-2 transition-opacity">
         <div className="flex items-center gap-2">
-          <p className="text-xs text-deep">After Effects Connect</p>
+          <p className="text-xs text-deep">{t('export.aeConnectionTitle')}</p>
           <span className="px-1.5 py-0.5 border border-fire/40 bg-fire/10 text-[9px] font-display font-semibold uppercase tracking-wider text-fire">
             Beta
           </span>
@@ -684,22 +684,34 @@ export function ExportPanel({
 
         {/* ステータス表示 */}
         {aeStatus === 'sending' && (
-          <p className="text-xs text-yellow-400">AE に送信中...</p>
+          <p className="text-xs text-yellow-400">{t('export.aeSending')}</p>
         )}
         {aeStatus === 'ok' && (
-          <p className="text-xs text-green-400">✓ AE に送信しました</p>
+          <p className="text-xs text-green-400">✓ {t('export.aeSent')}</p>
         )}
         {aeStatus === 'not-running' && (
-          <p className="text-xs text-red-400">After Effects が起動していません</p>
+          <p className="text-xs text-red-400">{t('export.aeNotRunning')}</p>
+        )}
+        {aeStatus === 'save-failed' && (
+          <p className="text-xs text-red-400">{t('export.aeSaveFailed')}</p>
+        )}
+        {aeStatus === 'jsx-failed' && (
+          <p className="text-xs text-red-400">{t('export.aeJsxFailed')}</p>
+        )}
+        {aeStatus === 'composition-unavailable' && (
+          <p className="text-xs text-red-400">{t('export.aeCompositionUnavailable')}</p>
+        )}
+        {aeStatus === 'unsupported' && (
+          <p className="text-xs text-red-400">{t('export.aeUnsupported')}</p>
         )}
         {aeStatus === 'error' && (
-          <p className="text-xs text-red-400">エラーが発生しました（コンソールを確認）</p>
+          <p className="text-xs text-red-400">{t('export.aeError')}</p>
         )}
 
         {bridgeAvailable ? (
           <>
             <div className="space-y-1.5">
-              <p className="text-xs text-tab-inactive">AE送信ファイル保存先</p>
+              <p className="text-xs text-tab-inactive">{t('export.aeSaveDirectory')}</p>
               {aeSaveDirStatus.mode === 'custom' ? (
                 <div className="flex items-center gap-2">
                   <span className="flex-1 px-2 py-1.5 bg-k-surface border border-panel-border border-panel rounded-none text-xs text-k-text truncate">
@@ -709,7 +721,7 @@ export function ExportPanel({
                     type="button"
                     onClick={handleAeClearDirectory}
                     className="px-2 py-1.5 bg-k-muted hover:bg-k-muted/70 rounded-none text-xs text-k-text/80"
-                    title="AE送信ファイルの保存先指定を解除"
+                    title={t('export.aeClearDirectory')}
                   >
                     ✕
                   </button>
@@ -720,11 +732,11 @@ export function ExportPanel({
                   onClick={handleAePickDirectory}
                   className="w-full px-3 py-1.5 bg-k-surface hover:bg-k-muted border border-panel-border border-panel border-dashed rounded-none text-xs text-deep hover:text-k-text transition-colors"
                 >
-                  フォルダを選択…
+                  {t('export.aeChooseDirectory')}
                 </button>
               )}
               <p className="text-xs text-tab-inactive">
-                未指定の場合はAEプロジェクトの場所に保存します。AEプロジェクト未保存の場合はtempに保存します
+                {t('export.aeSaveDirectoryDescription')}
               </p>
             </div>
 
@@ -734,7 +746,7 @@ export function ExportPanel({
               disabled={aeStatus === 'sending'}
               className="w-full py-1.5 bg-k-surface hover:bg-k-muted disabled:opacity-40 disabled:cursor-not-allowed rounded-none text-xs text-k-text/80"
             >
-              AE 接続テスト (alert)
+              {t('export.aePing')}
             </button>
 
             {/* 画像送信 */}
@@ -743,13 +755,13 @@ export function ExportPanel({
               disabled={aeStatus === 'sending'}
               className="w-full py-1.5 bg-k-surface hover:bg-k-muted disabled:opacity-40 disabled:cursor-not-allowed rounded-none text-xs text-k-text/80"
             >
-              現在の画像を AE に送る (PNG)
+              {t('export.aeSendImage')}
             </button>
 
             {/* 動画エクスポート後に自動送信するトグル */}
             <label className="flex items-center gap-2 cursor-pointer select-none">
               <Toggle size="sm" checked={sendToAe} onChange={setSendToAe} />
-              <span className="text-xs text-k-text/80">動画エクスポート後に AE に自動送信</span>
+              <span className="text-xs text-k-text/80">{t('export.aeAutoSend')}</span>
             </label>
 
             {/* 手動送信（前回エクスポート分） */}
@@ -759,7 +771,7 @@ export function ExportPanel({
               className="w-full py-1.5 bg-k-surface hover:bg-k-muted disabled:opacity-40 disabled:cursor-not-allowed rounded-none text-xs text-k-text/80"
               title={lastVideoRef.current ? undefined : '先に動画をエクスポートしてください'}
             >
-              前回エクスポートした動画を AE に送る
+              {t('export.aeSendVideo')}
               {lastVideoRef.current && (
                 <span className="ml-1 text-tab-inactive">(.{lastVideoRef.current.ext})</span>
               )}
@@ -767,15 +779,19 @@ export function ExportPanel({
           </>
         ) : (
           <div className="rounded-none bg-k-bg border border-panel-border border-panel px-3 py-2 space-y-1">
-            <p className="text-xs text-yellow-400">{t('export.aeDevelopment')}</p>
-            <p className="text-xs text-deep">{t('export.aeDevelopmentDescription')}</p>
+            <p className="text-xs text-yellow-400">
+              {t(aeRuntime === 'tauri-native' ? 'export.aeUnavailable' : 'export.aeDevelopment')}
+            </p>
+            <p className="text-xs text-deep">
+              {t(aeRuntime === 'tauri-native' ? 'export.aeUnavailableDescription' : 'export.aeDevelopmentDescription')}
+            </p>
             <button
               type="button"
               onClick={handleAeRefresh}
               disabled={bridgeChecking}
               className="w-full py-1.5 bg-k-surface hover:bg-k-muted disabled:opacity-40 disabled:cursor-not-allowed rounded-none text-xs text-k-text/80"
             >
-              {bridgeChecking ? t('common.checking') : t('export.checkBridge')}
+              {bridgeChecking ? t('common.checking') : t('export.aePing')}
             </button>
           </div>
         )}

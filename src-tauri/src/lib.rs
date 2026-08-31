@@ -7,6 +7,8 @@ use std::thread;
 use std::time::{Duration, Instant};
 use tauri::Manager;
 
+mod after_effects;
+
 #[cfg(windows)]
 use std::os::windows::process::CommandExt;
 
@@ -40,7 +42,10 @@ pub fn run() {
             open_ffmpeg_builds_page,
             load_presets_file,
             save_presets_file,
-            list_system_fonts
+            list_system_fonts,
+            after_effects::get_after_effects_status,
+            after_effects::ping_after_effects,
+            after_effects::send_after_effects_asset
         ])
         .run(tauri::generate_context!())
         .expect("error while running KAGARIBI Grad");

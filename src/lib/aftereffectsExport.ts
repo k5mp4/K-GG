@@ -1,108 +1,49 @@
 /**
- * aftereffectsExport.ts
+ * After Effects連携の環境差をUIから隠すFacade。
  *
- * クライアントサイドから After Effects 連携 API を呼び出すユーティリティ。
- *
- * dev/prod ともに、ユーザーの PC で起動中の KGG_AE_Bridge (localhost:7749) を使う。
- * Vite dev server の /api/ae/* middleware には依存しない。
+ * Web版は既存のlocalhost Bridge、Tauri版はRust commandを使用する。
+ * Tauri版で大きなBlobをIPCへ直接渡さないよう、保存・送信の詳細はAdapter側に置く。
  */
 
-const AE_BASE = 'http://localhost:7749';
+import { adapters } from '../adapters';
+import type { AeSaveDirStatus, AeStatus } from '../adapters';
 
-export type AeStatus = 'ok' | 'not-running' | 'error';
+export type { AeSaveDirStatus, AeStatus } from '../adapters';
 
-export type AeSaveDirStatus = {
-  mode: 'auto' | 'custom';
-  path: string | null;
-  name: string | null;
-};
+export const aeRuntime = adapters.afterEffectsService.runtime;
 
-/**
- * AE Bridge が起動中かを確認する。
- * alert を発生させない status endpoint を使う。
- */
+/** After EffectsまたはWeb版Bridgeが利用可能かを確認する。 */
 export async function aeBridgeAvailable(): Promise<boolean> {
-  try {
-    const res = await fetch(`${AE_BASE}/api/ae/status`, {
-      signal: AbortSignal.timeout(1500),
-    });
-    return res.ok;
-  } catch {
-    return false;
-  }
+  return adapters.afterEffectsService.isAvailable();
 }
 
-/** AE が起動中かを確認し、alert を出す（接続テスト） */
+/** After Effectsへの接続テストを実行する。 */
 export async function aePing(): Promise<AeStatus> {
-  try {
-    const res = await fetch(`${AE_BASE}/api/ae/ping`);
-    const body = await res.json() as { status: AeStatus };
-    return body.status;
-  } catch {
-    return 'error';
-  }
+  return adapters.afterEffectsService.ping();
 }
 
 export async function aeGetSaveDir(): Promise<AeSaveDirStatus> {
-  try {
-    const res = await fetch(`${AE_BASE}/api/ae/save-dir`, {
-      signal: AbortSignal.timeout(1500),
-    });
-    if (!res.ok) throw new Error('save-dir unavailable');
-    return await res.json() as AeSaveDirStatus;
-  } catch {
-    return { mode: 'auto', path: null, name: null };
-  }
+  return adapters.afterEffectsService.getSaveDir();
 }
 
 export async function aeChooseSaveDir(): Promise<AeSaveDirStatus> {
-  try {
-    const res = await fetch(`${AE_BASE}/api/ae/save-dir/choose`, { method: 'POST' });
-    if (!res.ok) throw new Error('save-dir choose failed');
-    return await res.json() as AeSaveDirStatus;
-  } catch {
-    return { mode: 'auto', path: null, name: null };
-  }
+  return adapters.afterEffectsService.chooseSaveDir();
 }
 
 export async function aeClearSaveDir(): Promise<AeSaveDirStatus> {
-  try {
-    const res = await fetch(`${AE_BASE}/api/ae/save-dir/clear`, { method: 'POST' });
-    if (!res.ok) throw new Error('save-dir clear failed');
-    return await res.json() as AeSaveDirStatus;
-  } catch {
-    return { mode: 'auto', path: null, name: null };
-  }
+  return adapters.afterEffectsService.clearSaveDir();
 }
 
-/** 現在の canvas の PNG を AE にインポートする */
+/** 現在のcanvasのPNGをAfter Effectsへ送信する。 */
 export async function aeImportImage(blob: Blob, name = 'kagaribi'): Promise<AeStatus> {
-  try {
-    const params = new URLSearchParams({ name });
-    const res = await fetch(`${AE_BASE}/api/ae/import-image?${params.toString()}`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'image/png' },
-      body: blob,
-    });
-    const body = await res.json() as { status: AeStatus };
-    return body.status;
-  } catch {
-    return 'error';
-  }
+  return adapters.afterEffectsService.importImage(blob, name);
 }
 
-/** 動画 Blob を AE にインポートする */
-export async function aeImportVideo(blob: Blob, ext: 'mov' | 'mp4' = 'mov', name = 'kagaribi'): Promise<AeStatus> {
-  try {
-    const params = new URLSearchParams({ ext, name });
-    const res = await fetch(`${AE_BASE}/api/ae/import-video?${params.toString()}`, {
-      method: 'POST',
-      headers: { 'Content-Type': blob.type || 'video/quicktime' },
-      body: blob,
-    });
-    const body = await res.json() as { status: AeStatus };
-    return body.status;
-  } catch {
-    return 'error';
-  }
+/** 動画BlobをAfter Effectsへ送信する。 */
+export async function aeImportVideo(
+  blob: Blob,
+  ext: 'mov' | 'mp4' = 'mov',
+  name = 'kagaribi',
+): Promise<AeStatus> {
+  return adapters.afterEffectsService.importVideo(blob, ext, name);
 }

@@ -17,6 +17,7 @@ title: 現行仕様
 | CURRENT-UI-CONTROLS | [UI入力コントロール](./ui-controls) | current |
 | CURRENT-WEBGL-PERFORMANCE | [WebGL Performance Debug / Profiler](./webgl-performance) | current |
 | CURRENT-MCP-DEVELOPER-INTERFACE | [MCP Developer Interface](./mcp-developer-interface) | current |
+| CURRENT-AFTER-EFFECTS-INTEGRATION | [After Effects連携](./after-effects-integration) | current |
 
 ## 読み方
 

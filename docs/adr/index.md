@@ -27,6 +27,7 @@ ADRは、複数の機能や将来の実装を拘束する重要な技術判断�
 | ADR-0015 | [開発専用WebGL観測層を既存Canvasへ接続する](./0015-development-webgl-observability.md) | accepted |
 | ADR-0016 | [MCPをControl APIとloopback Runtime Bridgeへ分離し、公開前tarballで配布する](./0016-mcp-control-api-and-local-distribution.md) | accepted |
 | ADR-0017 | [V2の解析的Gradient Prefixを最初のtexture境界で固定する](./0017-analytic-gradient-prefix.md) | accepted |
+| ADR-0018 | [TauriからAfter Effectsへ固定JSXと一時ファイルで接続する](./0018-tauri-after-effects-connector.md) | accepted |
 
 ## 作成基準
 
