@@ -61,6 +61,12 @@
 - Validationを有効化する操作が、並列lazy Shaderのコンパイル完了前に行われた場合のwebgl-lint再有効化順序は未確認。今回の起動経路の修正対象外として、別途イベント順序の回帰テストを追加する。
 - 並列完了通知が30秒以上遅れるドライバでは、最後の同期status確認時に一時的なメインスレッド待機が発生し得る。タイムアウトで有効なProgramを破棄してNoise全体を失敗扱いにするより、実際のcompile/link結果を確認して適用を継続するための互換性フォールバックである。
 
+### Context loss / 補助Renderer安定性（2026-08-30）
+
+- `npm test -- --run src/lib/coneViewRenderer.test.ts src/lib/webglPerformance.test.ts`: pass（2 files、19 tests）。Three.js補助contextのValidation分離、失われたcontextでのProfiler初期化、ConeのCanvasTexture再生成、冪等dispose、context loss/restore後の再描画を確認した。
+- `npx tsc -p tsconfig.app.json --noEmit`: pass。
+- ブラウザ再確認: 修正前は1920×1080から3840×2160へ変更した直後にCone用CanvasTextureの`texSubImage2D(INVALID_VALUE)`を再現した。修正後の同一手順は、検証ブラウザ側でcontext loss後にWebGL2自体が利用不能となったため未完了。実GPUでの再確認は未確認として扱う。
+
 ## 手動確認
 
 - `npm run dev`で起動し、ブラウザ上でCanvas描画、ProfilerのPerformance/GPU Profiler/Resourcesタブを確認 — pass。stats-glはPerformanceタブ内へドック表示され、GPU/Resourcesの説明文表示中もCanvasが継続描画された。Profiler外のCanvas領域とエディタ操作を覆う独立overlayは表示されなかった。

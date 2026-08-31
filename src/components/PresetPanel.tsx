@@ -8,6 +8,7 @@ import { normalizeFlowGradientConfig } from '../types/flowGradient';
 import { normalizeImageGradientConfig } from '../types/imageGradient';
 import { stripSlitPhaseMotionFields } from '../types/distortion';
 import { resolveDiffuseBezier } from '../lib/diffuseCurve';
+import { createPresetSaveState } from '../lib/presetModel';
 import {
   createFolder,
   deleteFolder,
@@ -372,13 +373,13 @@ export function PresetPanel({ canvasW, canvasH, setCanvasW, setCanvasH, aspectRa
   async function handleSave() {
     const trimmed = name.trim();
     if (!trimmed) return;
-    const { gradient, noiseDistortion, diffuse, imageGradient, slitScan, stretch, animation, normalMap, coneView, seamless, flowGradient, radon, iridescence, manualDistort, postprocess, effectPipeline, matcap, keyframeTracks } = store;
-    const state = {
-      gradient, noiseDistortion, diffuse, imageGradient,
-      slitScan: { ...slitScan, selectedSlitIdx: -1 }, stretch,
-      animation, normalMap, coneView, seamless, flowGradient, radon, iridescence, manualDistort: { ...manualDistort, enabled: false }, postprocess, effectPipeline, matcap,
-      keyframeTracks, colorPalettes: loadUserColorPalettes(), resolution: { width: canvasW, height: canvasH },
-    };
+    const { gradient, noiseDistortion, diffuse, imageGradient, slitScan, stretch, animation, normalMap, clothGradient, coneView, seamless, flowGradient, radon, iridescence, manualDistort, postprocess, effectPipeline, matcap, keyframeTracks } = store;
+    const state = createPresetSaveState({
+      gradient, noiseDistortion, diffuse, imageGradient, slitScan, stretch,
+      animation, normalMap, clothGradient, coneView, seamless, flowGradient,
+      radon, iridescence, manualDistort, postprocess, effectPipeline, matcap,
+      keyframeTracks,
+    }, loadUserColorPalettes(), { width: canvasW, height: canvasH });
     setSaving(true);
     try {
       const thumbnail = await capturePresetThumbnail(state);

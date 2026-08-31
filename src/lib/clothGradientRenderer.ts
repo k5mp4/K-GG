@@ -1,6 +1,8 @@
 import * as THREE from 'three';
 import type { ClothGradientConfig } from '../types/clothGradient';
 import type { TileRenderOptions } from './webgl';
+import { disableWebGLContextValidation } from './webglPerformance';
+import { createWebGL2Context, WebGL2UnavailableError } from './webglCapability';
 
 // ---------------------------------------------------------------------------
 // GLSL Shaders for 3D Cloth Wave & Gradient Ramp Lighting
@@ -270,8 +272,20 @@ export class ClothGradientRenderer {
     this.canvas.width = 512;
     this.canvas.height = 512;
 
+    const gl = createWebGL2Context(this.canvas, {
+      alpha: false,
+      antialias: true,
+      depth: true,
+      stencil: false,
+      preserveDrawingBuffer: true,
+      powerPreference: 'high-performance',
+    });
+    if (!gl) throw new WebGL2UnavailableError();
+    if (gl.isContextLost()) throw new Error('WebGL context is currently lost');
+
     this.renderer = new THREE.WebGLRenderer({
       canvas: this.canvas,
+      context: gl,
       antialias: true,
       alpha: false,
       preserveDrawingBuffer: true,
@@ -281,6 +295,7 @@ export class ClothGradientRenderer {
     this.renderer.toneMapping = THREE.NoToneMapping;
     this.renderer.outputColorSpace = THREE.LinearSRGBColorSpace;
     this.renderer.debug.checkShaderErrors = true;
+    disableWebGLContextValidation(this.renderer.getContext());
 
     this.scene = new THREE.Scene();
 

@@ -1,0 +1,16 @@
+{
+  "run_id": "20260830-192527",
+  "branch": "codex/sandbox-preset-cone-seams",
+  "verdict": "Ready with fixes",
+  "scope": "CHANGE-037 only",
+  "completed_at": "2026-08-30T11:31:00Z",
+  "coverage": {
+    "mechanical_findings": 0,
+    "cross_model": "peer ran without usable output; local fallback timed out",
+    "local_personas": "malformed or failed returns"
+  },
+  "residual_risks": [
+    "WebGL shader compilation and visual Preview/Export parity were not exercised",
+    "The new helper remains in the shared fragment shader for all seam modes"
+  ]
+}

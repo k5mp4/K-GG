@@ -1,5 +1,10 @@
 import * as THREE from 'three';
-import { CONE_SEAM_BLEND_MIN, type ConeViewConfig } from '../types/coneView';
+import {
+  CONE_SEAM_BLEND_MAX,
+  CONE_SEAM_BLEND_MIN,
+  CONE_SEAM_MODE_INDEX,
+  type ConeViewConfig,
+} from '../types/coneView';
 import {
   CONE_CAMERA_DISTANCE,
   CONE_CAMERA_FOV,
@@ -8,8 +13,24 @@ import {
   getConeSeamModeIndex,
   getConeTextureTransform,
 } from './coneView';
+import { CONE_GRADIENT_REAPPLY_SHADER } from './coneSeam';
+import { disableWebGLContextValidation } from './webglPerformance';
+import { createWebGL2Context, WebGL2UnavailableError } from './webglCapability';
 
 const RADIAL_SEGMENTS = 128;
+
+type CanvasSourceDimensions = Pick<HTMLCanvasElement, 'width' | 'height'>;
+
+export function isConeSourceTextureStale(
+  previousCanvas: CanvasSourceDimensions | null,
+  previousSize: readonly [number, number] | null,
+  sourceCanvas: CanvasSourceDimensions,
+): boolean {
+  return previousCanvas !== sourceCanvas
+    || previousSize === null
+    || previousSize[0] !== sourceCanvas.width
+    || previousSize[1] !== sourceCanvas.height;
+}
 
 export class ConeViewRenderer {
   private readonly canvas: HTMLCanvasElement;
@@ -25,15 +46,52 @@ export class ConeViewRenderer {
     coneTextureSeamMode: { value: 1 },
   };
   private sourceTexture: THREE.CanvasTexture | null = null;
+  private sourceTextureCanvas: HTMLCanvasElement | null = null;
+  private sourceTextureSize: readonly [number, number] | null = null;
   private geometrySignature = '';
+  private disposed = false;
+  private contextLost = false;
+  private readonly handleContextLost = () => {
+    this.contextLost = true;
+    this.geometrySignature = '';
+
+    // Three.js rebuilds its internal WebGL caches after context restore, but
+    // the old geometry dispose listener can otherwise retain buffers from the
+    // lost context. Dispose while the context is lost so the wrapper is a
+    // no-op, then force the next frame to allocate fresh resources.
+    if (this.sourceTexture) this.disposeResource(this.sourceTexture, 'source texture after context loss');
+    this.sourceTexture = null;
+    this.sourceTextureCanvas = null;
+    this.sourceTextureSize = null;
+    this.material.map = null;
+    this.disposeResource(this.material, 'material after context loss');
+    this.disposeResource(this.mesh.geometry, 'geometry after context loss');
+  };
+  private readonly handleContextRestored = () => {
+    this.contextLost = false;
+    this.geometrySignature = '';
+    this.material.needsUpdate = true;
+  };
 
   constructor() {
     this.canvas = document.createElement('canvas');
     this.canvas.width = 512;
     this.canvas.height = 512;
 
+    const gl = createWebGL2Context(this.canvas, {
+      alpha: false,
+      antialias: true,
+      depth: true,
+      stencil: false,
+      preserveDrawingBuffer: true,
+      powerPreference: 'high-performance',
+    });
+    if (!gl) throw new WebGL2UnavailableError();
+    if (gl.isContextLost()) throw new Error('WebGL context is currently lost');
+
     this.renderer = new THREE.WebGLRenderer({
       canvas: this.canvas,
+      context: gl,
       antialias: true,
       alpha: false,
       preserveDrawingBuffer: true,
@@ -43,6 +101,7 @@ export class ConeViewRenderer {
     this.renderer.outputColorSpace = THREE.SRGBColorSpace;
     this.renderer.toneMapping = THREE.NoToneMapping;
     this.renderer.debug.checkShaderErrors = true;
+    disableWebGLContextValidation(this.renderer.getContext());
 
     this.scene = new THREE.Scene();
     this.camera = new THREE.PerspectiveCamera(CONE_CAMERA_FOV, 1, 0.01, 64);
@@ -62,12 +121,14 @@ export class ConeViewRenderer {
         `#ifdef USE_MAP
   vec2 coneUnwrappedUv = vMapUv * coneTextureRepeat + coneTextureOffset;
   vec2 coneSampleUv = fract(coneUnwrappedUv);
-  float coneBlendWidth = clamp(coneTextureSeamBlend, 0.0, 0.5);
+  float coneBlendWidth = clamp(coneTextureSeamBlend, 0.0, ${CONE_SEAM_BLEND_MAX});
   vec4 sampledDiffuseColor;
-  if (coneTextureSeamMode < 0.5) {
+  if (coneTextureSeamMode < ${CONE_SEAM_MODE_INDEX.weld - 0.5}) {
     sampledDiffuseColor = coneMirrorRepeatSample(coneUnwrappedUv, coneBlendWidth);
-  } else {
+  } else if (coneTextureSeamMode < ${CONE_SEAM_MODE_INDEX.reapply - 0.5}) {
     sampledDiffuseColor = coneEdgeWeldSample(coneSampleUv, coneBlendWidth);
+  } else {
+    sampledDiffuseColor = coneGradientReapplySample(coneSampleUv, coneBlendWidth);
   }
   diffuseColor *= sampledDiffuseColor;
 #endif`,
@@ -131,11 +192,15 @@ vec4 coneEdgeWeldSample(vec2 uv, float blendWidth) {
   return welded;
 }
 
+${CONE_GRADIENT_REAPPLY_SHADER}
+
 #endif`,
       );
     };
     this.mesh = new THREE.Mesh(new THREE.BufferGeometry(), this.material);
     this.scene.add(this.mesh);
+    this.canvas.addEventListener('webglcontextlost', this.handleContextLost, false);
+    this.canvas.addEventListener('webglcontextrestored', this.handleContextRestored, false);
   }
 
   public getCanvas(): HTMLCanvasElement {
@@ -143,19 +208,46 @@ vec4 coneEdgeWeldSample(vec2 uv, float blendWidth) {
   }
 
   private updateSourceTexture(sourceCanvas: HTMLCanvasElement): void {
-    if (!this.sourceTexture || this.sourceTexture.image !== sourceCanvas) {
-      this.sourceTexture?.dispose();
-      this.sourceTexture = new THREE.CanvasTexture(sourceCanvas);
-      this.sourceTexture.colorSpace = THREE.SRGBColorSpace;
-      this.sourceTexture.minFilter = THREE.LinearFilter;
-      this.sourceTexture.magFilter = THREE.LinearFilter;
-      this.sourceTexture.wrapS = THREE.ClampToEdgeWrapping;
-      this.sourceTexture.wrapT = THREE.ClampToEdgeWrapping;
-      this.sourceTexture.generateMipmaps = false;
-      this.material.map = this.sourceTexture;
+    if (
+      !this.sourceTexture
+      || isConeSourceTextureStale(this.sourceTextureCanvas, this.sourceTextureSize, sourceCanvas)
+    ) {
+      const previousTexture = this.sourceTexture;
+      if (previousTexture) this.disposeResource(previousTexture, 'source texture');
+
+      const nextTexture = new THREE.CanvasTexture(sourceCanvas);
+      nextTexture.colorSpace = THREE.SRGBColorSpace;
+      nextTexture.minFilter = THREE.LinearFilter;
+      nextTexture.magFilter = THREE.LinearFilter;
+      nextTexture.wrapS = THREE.ClampToEdgeWrapping;
+      nextTexture.wrapT = THREE.ClampToEdgeWrapping;
+      nextTexture.generateMipmaps = false;
+      this.sourceTexture = nextTexture;
+      this.sourceTextureCanvas = sourceCanvas;
+      this.sourceTextureSize = [sourceCanvas.width, sourceCanvas.height];
+      this.material.map = nextTexture;
       this.material.needsUpdate = true;
     }
-    this.sourceTexture.needsUpdate = true;
+    if (this.sourceTexture) this.sourceTexture.needsUpdate = true;
+  }
+
+  private disposeResource(resource: { dispose: () => void }, label: string): void {
+    try {
+      resource.dispose();
+    } catch (error) {
+      // A stale WebGL object must not take down the React tree during fallback
+      // or unmount. The renderer is discarded immediately after this path.
+      console.warn(`[Cone view] Failed to dispose ${label}; discarding renderer.`, error);
+    }
+  }
+
+  private isContextLost(): boolean {
+    try {
+      const context = this.renderer.getContext();
+      return this.contextLost || context.isContextLost();
+    } catch {
+      return true;
+    }
   }
 
   private configureGeometry(config: ConeViewConfig, aspect: number): void {
@@ -184,8 +276,9 @@ vec4 coneEdgeWeldSample(vec2 uv, float blendWidth) {
       }
       positions.needsUpdate = true;
       geometry.computeBoundingSphere();
-      this.mesh.geometry.dispose();
+      const previousGeometry = this.mesh.geometry;
       this.mesh.geometry = geometry;
+      this.disposeResource(previousGeometry, 'geometry');
       this.mesh.position.set(0, 0, -config.depth / 2);
       this.geometrySignature = signature;
     }
@@ -206,6 +299,9 @@ vec4 coneEdgeWeldSample(vec2 uv, float blendWidth) {
     targetWidth: number,
     targetHeight: number,
   ): HTMLCanvasElement {
+    if (this.disposed) throw new Error('Cone renderer has already been disposed');
+    if (this.isContextLost()) throw new Error('WebGL context lost');
+
     const width = Math.max(1, Math.round(targetWidth));
     const height = Math.max(1, Math.round(targetHeight));
     if (this.canvas.width !== width || this.canvas.height !== height) {
@@ -228,9 +324,19 @@ vec4 coneEdgeWeldSample(vec2 uv, float blendWidth) {
   }
 
   public dispose(): void {
-    this.mesh.geometry.dispose();
-    this.material.dispose();
-    this.sourceTexture?.dispose();
-    this.renderer.dispose();
+    if (this.disposed) return;
+    this.disposed = true;
+    this.canvas.removeEventListener('webglcontextlost', this.handleContextLost, false);
+    this.canvas.removeEventListener('webglcontextrestored', this.handleContextRestored, false);
+
+    if (!this.isContextLost()) {
+      this.disposeResource(this.mesh.geometry, 'geometry');
+      this.disposeResource(this.material, 'material');
+      if (this.sourceTexture) this.disposeResource(this.sourceTexture, 'source texture');
+    }
+    this.sourceTexture = null;
+    this.sourceTextureCanvas = null;
+    this.sourceTextureSize = null;
+    this.disposeResource(this.renderer, 'renderer');
   }
 }

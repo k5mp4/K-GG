@@ -52,11 +52,13 @@ import {
 } from './exportDiagnostics';
 import {
   createWebGLPerformanceProfiler,
+  getSafeWebGLExtension,
   loadDevelopmentWebGLTools,
   type WebGLPerformanceProfiler,
   type DevelopmentTools,
 } from './webglPerformance';
 import type { PerformanceSnapshot } from '../types/webglPerformance';
+import { createWebGL2Context, WebGL2UnavailableError } from './webglCapability';
 
 export { SHADER_VERSION };
 
@@ -303,7 +305,7 @@ function sampleManualDistortChannel(
 
 export async function initWebGL(canvas: HTMLCanvasElement): Promise<WebGLContext> {
   const developmentTools: DevelopmentTools = await loadDevelopmentWebGLTools();
-  const gl = canvas.getContext('webgl2', {
+  const gl = createWebGL2Context(canvas, {
     alpha: true,
     antialias: false,
     depth: false,
@@ -313,7 +315,8 @@ export async function initWebGL(canvas: HTMLCanvasElement): Promise<WebGLContext
     preserveDrawingBuffer: true,
     premultipliedAlpha: false,
   });
-  if (!gl) throw new Error('WebGL2 is required but was not available');
+  if (!gl) throw new WebGL2UnavailableError();
+  if (gl.isContextLost()) throw new Error('WebGL context is currently lost');
   registeredWebGLContexts.set(canvas, gl);
   const performanceProfiler = createWebGLPerformanceProfiler(gl, canvas, developmentTools);
   const previousLifecycleHandlers = webglLifecycleHandlers.get(canvas);
@@ -343,6 +346,7 @@ export async function initWebGL(canvas: HTMLCanvasElement): Promise<WebGLContext
   const dbH = gl.drawingBufferHeight;
   const clamped = dbW !== canvasWidth || dbH !== canvasHeight;
   const gpuDiagnostics = await collectGpuDiagnostics(gl);
+  if (gl.isContextLost()) throw new Error('WebGL context was lost during initialization');
   const renderOptimization = gpuDiagnostics.optimization;
 
   if (clamped) {
@@ -369,17 +373,17 @@ export async function initWebGL(canvas: HTMLCanvasElement): Promise<WebGLContext
   }
 
   // 浮動小数点テクスチャのリニアフィルタリングとFBOアタッチメント用拡張
-  gl.getExtension('OES_texture_float_linear');
-  gl.getExtension('EXT_color_buffer_float');
+  getSafeWebGLExtension(gl, 'OES_texture_float_linear');
+  getSafeWebGLExtension(gl, 'EXT_color_buffer_float');
 
   // KHR_parallel_shader_compile: シェーダーコンパイルを非同期化してメインスレッドをブロックしない
-  const ext = gl.getExtension('KHR_parallel_shader_compile') as ShaderCompileExt;
+  const ext = getSafeWebGLExtension<ShaderCompileExt>(gl, 'KHR_parallel_shader_compile');
   const shaderCompileExt = selectShaderCompileExtensionForSnapshot(
     ext,
     performanceProfiler?.getSnapshot(),
   );
   // 浮動小数点テクスチャのリニアフィルタリング用拡張 (RGBA32F distortion map)
-  gl.getExtension('OES_texture_float_linear');
+  getSafeWebGLExtension(gl, 'OES_texture_float_linear');
   // 初期表示はメインのグラデーションプログラムだけを待つ。
   // 補助プログラムは init 完了後に順次コンパイルし、最初のグラデーション表示を早める。
   const initialSource = getInitialProgramSource();

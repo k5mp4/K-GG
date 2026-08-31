@@ -1,6 +1,6 @@
 import { useLanguage } from '../i18n/LanguageProvider';
 import { useGradientStore } from '../store/gradientStore';
-import { CONE_SEAM_BLEND_MAX, DEFAULT_CONE_VIEW, type ConeSeamMode } from '../types/coneView';
+import { CONE_SEAM_BLEND_MAX, CONE_SEAM_MODE_OPTIONS, DEFAULT_CONE_VIEW, type ConeSeamMode } from '../types/coneView';
 import { CustomSelect } from './CustomSelect';
 import { SliderField } from './SliderField';
 
@@ -77,10 +77,9 @@ export function ConeViewPanel() {
         <CustomSelect
           label="Seam Mode"
           value={coneView.seamMode}
-          options={[
-            { value: 'mirror', label: 'Mirror Repeat' },
-            { value: 'weld', label: 'Edge Weld' },
-          ]}
+          localizeLabel={false}
+          localizeOptions={false}
+          options={[...CONE_SEAM_MODE_OPTIONS]}
           onChange={(seamMode) => setConeView({ seamMode: seamMode as ConeSeamMode })}
         />
         <SliderField
@@ -110,6 +109,7 @@ export function ConeViewPanel() {
           ? 'Direct Projection keeps the processed 2D frame fixed on the cone and does not advance Flow Cycles.'
           : t('cone.flowHint')}
       </p>
+      <p className="px-1 text-[9px] leading-relaxed text-cream/55">{t('cone.seamHint')}</p>
     </div>
   );
 }

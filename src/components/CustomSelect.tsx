@@ -18,6 +18,7 @@ interface CustomSelectProps {
   optionPreview?: (option: Option) => ReactNode;
   alwaysShowPreviews?: boolean;
   previewOnly?: boolean;
+  localizeLabel?: boolean;
   localizeOptions?: boolean;
 }
 
@@ -30,6 +31,7 @@ export function CustomSelect({
   optionPreview,
   alwaysShowPreviews = false,
   previewOnly = false,
+  localizeLabel = true,
   localizeOptions = true,
 }: CustomSelectProps) {
   const { language } = useLanguage();
@@ -120,13 +122,14 @@ export function CustomSelect({
         if (!isPreviewOnly && hoverInteractionsEnabled) setIsOpen(false);
       }}
     >
-      {label && <label className="block text-xs mb-1 text-deep font-display uppercase tracking-wider">{localizeUiLabel(label, language)}</label>}
+      {label && <label className="block text-xs mb-1 text-deep font-display uppercase tracking-wider">{localizeLabel ? localizeUiLabel(label, language) : label}</label>}
       {!isPreviewOnly && (
         <button
             ref={triggerRef}
             type="button"
             onClick={() => setIsOpen(!isOpen)}
             aria-expanded={isOpen}
+            title={localizeOptions ? localizeUiLabel(selectedOption.label, language) : selectedOption.label}
             className="relative w-full overflow-hidden bg-k-surface border border-panel-border border-panel rounded-none px-2 py-1 text-sm text-cream text-left flex justify-between items-center hover:border-fire transition-colors focus:outline-none focus:ring-1 focus:ring-fire"
           >
             {optionPreview && (
@@ -156,6 +159,7 @@ export function CustomSelect({
                 <button
                   key={option.value}
                   type="button"
+                  title={localizeOptions ? localizeUiLabel(option.label, language) : option.label}
                   onClick={() => {
                     onChange(option.value);
                     setIsOpen(false);

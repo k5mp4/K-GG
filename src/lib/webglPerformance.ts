@@ -16,6 +16,43 @@ type ValidationExtension = {
   setConfiguration?: (settings: Record<string, unknown>) => void;
 };
 
+type WebGLContextExtensionSource = Pick<WebGLRenderingContext, 'getExtension'> & {
+  isContextLost?: () => boolean;
+};
+
+export function getSafeWebGLExtension<T>(
+  gl: WebGLContextExtensionSource,
+  name: string,
+): T | null {
+  try {
+    // A lost context rejects extension queries in some browser/validator
+    // combinations. Treat that as an unavailable optional capability instead
+    // of allowing the profiler to abort WebGL initialization.
+    if (gl.isContextLost?.()) return null;
+    return gl.getExtension(name) as T | null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * The development validator wraps every WebGL context discovered through
+ * canvas.getContext(). Three.js display adapters own separate contexts from
+ * the main preview, so keep those helper contexts outside the opt-in
+ * validation pass. The memory profiler remains available when installed.
+ */
+export function disableWebGLContextValidation(
+  gl: WebGLContextExtensionSource,
+): void {
+  const extension = getSafeWebGLExtension<ValidationExtension>(gl, 'GMAN_debug_helper');
+  try {
+    extension?.disable?.();
+  } catch {
+    // A context can be lost between getExtension() and disable(). The helper
+    // is optional, so leave validation disabled for this context.
+  }
+}
+
 type MemoryExtension = {
   getMemoryInfo?: () => unknown;
 };
@@ -253,9 +290,9 @@ export class WebGLPerformanceProfiler {
   constructor(gl: WebGL2RenderingContext, canvas: HTMLCanvasElement, tools: DevelopmentTools) {
     this.gl = gl;
     this.canvas = canvas;
-    this.timerExtension = gl.getExtension('EXT_disjoint_timer_query_webgl2') as TimerQueryExtension | null;
-    this.validationExtension = gl.getExtension('GMAN_debug_helper') as ValidationExtension | null;
-    this.memoryExtension = gl.getExtension('GMAN_webgl_memory') as MemoryExtension | null;
+    this.timerExtension = getSafeWebGLExtension<TimerQueryExtension>(gl, 'EXT_disjoint_timer_query_webgl2');
+    this.validationExtension = getSafeWebGLExtension<ValidationExtension>(gl, 'GMAN_debug_helper');
+    this.memoryExtension = getSafeWebGLExtension<MemoryExtension>(gl, 'GMAN_webgl_memory');
 
     const Stats = getStatsConstructor(tools.statsModule);
     let stats: StatsLike | null = null;
@@ -350,16 +387,26 @@ export class WebGLPerformanceProfiler {
       // webgl-lint's disable() removes the context wrappers. Asking the
       // canvas for its existing context re-applies them when validation is
       // explicitly enabled again.
-      this.canvas.getContext('webgl2');
-      this.validationExtension = this.gl.getExtension('GMAN_debug_helper') as ValidationExtension | null;
+      try {
+        this.canvas.getContext('webgl2');
+      } catch {
+        this.validationExtension = null;
+      }
+      this.validationExtension = getSafeWebGLExtension<ValidationExtension>(this.gl, 'GMAN_debug_helper');
       this.validationDisabled = false;
     }
     if (!this.validationExtension) return;
     this.validationEnabled = enabled;
-    if (enabled) {
-      this.validationExtension.setConfiguration?.(WEBGL_VALIDATION_CONFIG);
-    } else {
-      this.disableValidationChecks();
+    try {
+      if (enabled) {
+        this.validationExtension.setConfiguration?.(WEBGL_VALIDATION_CONFIG);
+      } else {
+        this.disableValidationChecks();
+      }
+    } catch {
+      // Validation is a development aid. A context loss between the optional
+      // rebind and configuration must not break the preview controls.
+      this.validationEnabled = false;
     }
     this.snapshot = { ...this.snapshot, validationEnabled: this.validationEnabled };
     this.publish();
@@ -409,12 +456,16 @@ export class WebGLPerformanceProfiler {
   }
 
   private disableValidationChecks(): void {
-    const activeExtension = this.gl.getExtension('GMAN_debug_helper') as ValidationExtension | null;
+    const activeExtension = getSafeWebGLExtension<ValidationExtension>(this.gl, 'GMAN_debug_helper');
     const extension = activeExtension ?? this.validationExtension;
     if (!extension || this.validationDisabled) return;
     this.validationExtension = extension;
-    extension.disable?.();
-    this.validationDisabled = true;
+    try {
+      extension.disable?.();
+      this.validationDisabled = true;
+    } catch {
+      this.validationDisabled = true;
+    }
   }
 
   reportValidationError(error: unknown): void {

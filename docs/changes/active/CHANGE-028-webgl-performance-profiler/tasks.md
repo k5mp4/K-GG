@@ -23,4 +23,5 @@
 - [x] Captureタブのアンマウント後もSpector.jsを停止できる状態共有を追加し、K-GG対象Canvasの識別IDとChoose Canvas操作手順を明示する
 - [x] 静止PreviewでSpector.jsのRAF開始前タイムアウトが発生しないよう、Capture開始時に1回のPreview描画をスケジュールする
 - [x] Spector.jsのCapture中に共有Uniform契約へ存在しないsamplerを`uniform1i`へ渡さず、webgl-lintのundefined sampler例外でCaptureを中断しないようにする
+- [x] 補助WebGL contextのValidationを無効化し、context loss中のoptional extension問い合わせでProfiler初期化が停止しない回帰を修正する
 - [ ] Spector.js Capture結果表示時の`webgl-lint` `recordSamplerValues` / `uniform1i` 経路で発生する`TypeError: Cannot read properties of undefined (reading 'get')`を根本修正し、Capture結果表示まで回帰確認する（次回対応へ保留）

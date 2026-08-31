@@ -77,7 +77,16 @@ function getStringParameter(gl: WebGL2RenderingContext, parameter: number): stri
 }
 
 export function collectWebGLGpuCaps(gl: WebGL2RenderingContext): WebGLGpuCaps {
-  const debugInfo = gl.getExtension('WEBGL_debug_renderer_info') as DebugRendererInfo | null;
+  let debugInfo: DebugRendererInfo | null = null;
+  try {
+    if (!gl.isContextLost()) {
+      debugInfo = gl.getExtension('WEBGL_debug_renderer_info') as DebugRendererInfo | null;
+    }
+  } catch {
+    // Optional diagnostics must not turn a transient context loss into an
+    // initialization failure.
+    debugInfo = null;
+  }
   const maxViewportDimsValue = gl.getParameter(gl.MAX_VIEWPORT_DIMS) as Int32Array | number[];
   const maxViewportDims: [number, number] = [
     Number(maxViewportDimsValue[0] ?? 0),

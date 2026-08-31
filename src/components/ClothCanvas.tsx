@@ -3,6 +3,7 @@ import { ClothGradientRenderer } from '../lib/clothGradientRenderer';
 import { renderBridge } from '../lib/renderBridge';
 import type { VideoExportFrameRenderer } from '../adapters/types';
 import type { ClothGradientConfig } from '../types/clothGradient';
+import { isWebGL2UnavailableError } from '../lib/webglCapability';
 
 type Props = {
   sourceCanvasRef: RefObject<HTMLCanvasElement | null>;
@@ -49,7 +50,7 @@ export function ClothCanvas({
       notifiedUnavailable = true;
       if (outputCanvasRef) outputCanvasRef.current = null;
       if (exportFrameRendererRef) exportFrameRendererRef.current = null;
-      if (error) console.warn('[Cloth view] Texture-mapped renderer unavailable:', error);
+      if (error && !isWebGL2UnavailableError(error)) console.warn('[Cloth view] Texture-mapped renderer unavailable:', error);
       callbacksRef.current.onUnavailable();
     };
 

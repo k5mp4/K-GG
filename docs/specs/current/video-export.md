@@ -8,9 +8,9 @@ created: 2026-07-31
 updated: 2026-08-30
 requirement_ids: [EXPORT-001, EXPORT-002, EXPORT-003, EXPORT-004, EXPORT-005, EXPORT-006, EXPORT-007, EXPORT-008, EXPORT-021]
 related_adrs: [ADR-0004, ADR-0005]
-related_changes: [CHANGE-011, CHANGE-024, CHANGE-025, CHANGE-030, CHANGE-038]
-related_code: [src/adapters/browser/videoExportService.ts, src/adapters/tauri/videoExportService.ts, src/adapters/types.ts, src/lib/renderBridge.ts, src/lib/renderSceneAtTime.ts, src/lib/flowGradientRenderer.ts, src/lib/flowSimulation.ts, src/lib/videoExportFrames.ts, src/lib/tileRender.ts, src/lib/webgl.ts, src/lib/coneViewRenderer.ts, src/components/GradientCanvas.tsx, src/components/ClothCanvas.tsx, src/components/ConeCanvas.tsx, src/components/ExportPanel.tsx]
-related_tests: [src/lib/renderBridge.test.ts, src/lib/effectPipeline.test.ts, src/lib/flowSimulation.test.ts, src/lib/flowGradientPreset.test.ts, src/lib/webglExportPrograms.test.ts, src/lib/glass.test.ts, src/lib/videoExportFrames.test.ts, src/lib/coneView.test.ts]
+related_changes: [CHANGE-011, CHANGE-024, CHANGE-025, CHANGE-030, CHANGE-037, CHANGE-038]
+related_code: [src/adapters/browser/videoExportService.ts, src/adapters/tauri/videoExportService.ts, src/adapters/types.ts, src/lib/renderBridge.ts, src/lib/renderSceneAtTime.ts, src/lib/flowGradientRenderer.ts, src/lib/flowSimulation.ts, src/lib/videoExportFrames.ts, src/lib/tileRender.ts, src/lib/webgl.ts, src/lib/coneViewRenderer.ts, src/lib/coneSeam.ts, src/components/GradientCanvas.tsx, src/components/ClothCanvas.tsx, src/components/ConeCanvas.tsx, src/components/ExportPanel.tsx]
+related_tests: [src/lib/renderBridge.test.ts, src/lib/effectPipeline.test.ts, src/lib/flowSimulation.test.ts, src/lib/flowGradientPreset.test.ts, src/lib/webglExportPrograms.test.ts, src/lib/glass.test.ts, src/lib/videoExportFrames.test.ts, src/lib/coneView.test.ts, src/lib/coneSeam.test.ts, src/lib/coneViewRenderer.test.ts, src/lib/webglPerformance.test.ts]
 ---
 
 # 動画・連番フレーム出力
@@ -45,13 +45,15 @@ Glass（GLASS V2）を含む出力では、sourceとdestinationのFBO／texture�
 
 AbortSignalによるcancellation、shader program準備失敗、CanvasまたはGPU同期失敗では、途中のフレーム列を成功出力として扱わない。失敗またはcancel後はexport sessionを解除し、Preview状態と通常描画を復元する。
 
+3D出力の補助Rendererは、失敗時のdisposeを冪等に扱い、WebGL context loss中は失われたGPUオブジェクトを再利用しない。contextが復元した場合は次のフレームでGeometryとTextureを再生成する。
+
 ### EXPORT-007 Preview表示面のフレームキャプチャ
 
 2Dモードの動画・連番フレーム出力は従来のGradientCanvasを使用します。3Dモードでは、export sessionで生成した処理済み2Dフレームを選択中のClothまたはConeのCanvasTextureへ反映し、マッピング後の3D Preview Canvasをキャプチャします。Preview RAFによる上書きや、元の2D Canvasだけの出力を許可しません。
 
 ### EXPORT-008 Cone表示面のフレームキャプチャ
 
-Coneモードではexport sessionのnormalizedTimeをFlow Mappingへ使用します。Direct ProjectionではV offsetを固定します。各フレームの処理済み2D Canvasを生成・GPU完了した後にCone Rendererを同期描画し、そのCone Canvasを静止画、連番PNG、MOV、MP4のキャプチャ対象にします。
+Coneモードではexport sessionのnormalizedTimeをFlow Mappingへ使用します。Direct ProjectionではV offsetを固定します。各フレームの処理済み2D Canvasを生成・GPU完了した後にCone Rendererを同期描画し、そのCone Canvasを静止画、連番PNG、MOV、MP4のキャプチャ対象にします。入力Canvasの寸法が変わった場合は既存GPU Textureを再利用せず再確保します。ConeのSeam ModeとGradient ReapplyのRGB補正を含む設定はPreviewと同じRenderer分岐へ渡し、出力形式ごとに別の合成やalphaブレンドを行いません。
 
 ### EXPORT-021 Flow Gradientの論理フレーム
 

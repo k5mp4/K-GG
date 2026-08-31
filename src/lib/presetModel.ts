@@ -57,6 +57,35 @@ export type StoreSnapshot = {
   resolution?: { width: number; height: number };
 };
 
+/**
+ * Every serializable preset field except values deliberately supplied or reset
+ * at save time. Adding a required StoreSnapshot field makes the call site
+ * update explicit rather than silently omitting it from saved SANDBOX state.
+ */
+type PresetSaveStateSource = Omit<StoreSnapshot,
+  | 'colorPalettes'
+  | 'resolution'
+  | 'selectedStops'
+  | 'postprocessDistort'
+>;
+
+/** Builds the serializable state passed from the live store to preset storage. */
+export function createPresetSaveState(
+  state: PresetSaveStateSource,
+  colorPalettes: UserColorPalette[],
+  resolution: { width: number; height: number },
+): StoreSnapshot {
+  return {
+    ...state,
+    slitScan: { ...state.slitScan, selectedSlitIdx: -1 },
+    manualDistort: state.manualDistort
+      ? { ...state.manualDistort, enabled: false }
+      : state.manualDistort,
+    colorPalettes,
+    resolution,
+  };
+}
+
 export type Preset = {
   id: string;
   name: string;

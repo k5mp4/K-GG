@@ -20,6 +20,7 @@ import { registerKggControlRuntime, unregisterKggControlRuntime } from '../lib/k
 import { KggRuntimeBridgeClient } from '../lib/kggRuntimeBridgeClient';
 import { isTauriWebView, resolveKggRuntimeBridgeConfig } from '../lib/kggRuntimeBridgeConfig';
 import type { KggControlProjectAdapter, KggControlUiAdapter } from '../lib/kggControlRuntime';
+import { getWebGL2Availability, isWebGL2UnavailableError, markWebGL2AvailabilityUnknown } from '../lib/webglCapability';
 
 type WebGLInitRequest = {
   canvas: HTMLCanvasElement;
@@ -48,9 +49,11 @@ export function useWebGL(
       event.preventDefault();
       webglRef.current = null;
       compiledShaderVersionRef.current = 0;
+      markWebGL2AvailabilityUnknown();
       setIsWebGLReady(false);
     };
     const handleContextRestored = () => {
+      markWebGL2AvailabilityUnknown();
       setContextEpoch(epoch => epoch + 1);
     };
     canvas.addEventListener('webglcontextlost', handleContextLost);
@@ -86,6 +89,7 @@ export function useWebGL(
     }
 
     setIsWebGLReady(false);
+    if (getWebGL2Availability() === 'unavailable') return;
 
     // StrictMode は setup → cleanup → setup を意図的に行う。同じ canvas/version の
     // 初期化Promiseを共有することで、最初のcleanupが進行中のGPUコンパイルを無効化しない。
@@ -125,6 +129,10 @@ export function useWebGL(
       setIsWebGLReady(true);
     }).catch(e => {
       if (disposed) return;
+      if (isWebGL2UnavailableError(e)) {
+        setIsWebGLReady(false);
+        return;
+      }
       console.error('WebGL init failed:', e);
       setIsWebGLReady(false);
     });

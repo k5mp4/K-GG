@@ -5,10 +5,10 @@ title: Preset System
 status: current
 owners: [maintainer]
 created: 2026-07-27
-updated: 2026-08-28
-requirement_ids: [PRESET-001, PRESET-002, PRESET-003, PRESET-004, PRESET-005, PRESET-006, PRESET-007, PRESET-008, PRESET-009, PRESET-011, PRESET-012, PRESET-013, PRESET-014, PRESET-016]
+updated: 2026-08-31
+requirement_ids: [PRESET-001, PRESET-002, PRESET-003, PRESET-004, PRESET-005, PRESET-006, PRESET-007, PRESET-008, PRESET-009, PRESET-011, PRESET-012, PRESET-013, PRESET-014, PRESET-016, PRESET-017]
 related_adrs: [ADR-0007, ADR-0008]
-related_changes: [CHANGE-001, CHANGE-012, CHANGE-013, CHANGE-018, CHANGE-024, CHANGE-025, CHANGE-026, CHANGE-030, CHANGE-032, CHANGE-034]
+related_changes: [CHANGE-001, CHANGE-012, CHANGE-013, CHANGE-018, CHANGE-024, CHANGE-025, CHANGE-026, CHANGE-030, CHANGE-032, CHANGE-034, CHANGE-037, CHANGE-039]
 related_code: [src/lib/presetModel.ts, src/lib/presetLibrary.ts, src/lib/presets.ts, src/lib/presetPreview.ts, src/lib/presetThumbnail.ts, src/lib/flowGradientRenderer.ts, src/types/flowGradient.ts, src/lib/effectPipeline.ts, src/lib/glass.ts, src/lib/postprocessStack.ts, src/store/gradientStore.ts, src/components/PresetPanel.tsx, src/components/FlowGradientPanel.tsx, src/components/PresetPreview.tsx, src/components/ClothCanvas.tsx, src/components/ConeCanvas.tsx, src/types/renderView.ts, src/types/coneView.ts, src/adapters/types.ts, src/adapters/browser/presetRepository.ts, src/adapters/tauri/presetRepository.ts, src-tauri/src/lib.rs]
 related_tests: [src/lib/presetLibrary.test.ts, src/lib/presetModel.diffuse.test.ts, src/lib/presetModel.slit.test.ts, src/lib/flowGradientPreset.test.ts, src/lib/presetPreview.test.ts, src/lib/presetThumbnail.test.ts, src/lib/glass.test.ts, src/lib/postprocessStack.test.ts, src/store/gradientStore.glass.test.ts, src/store/gradientStore.postprocessStack.test.ts, src/store/gradientStore.animation.test.ts, src/lib/clothView.test.ts, src/types/coneView.test.ts]
 ---
@@ -79,7 +79,7 @@ Canvas／Cloth／Coneの選択状態、Three.js Renderer、メッシュ、カメ
 
 ### PRESET-013 Cone設定の永続化
 
-ConeのDepth、Rotation、Apex X、Apex Y、Texture Repeat、Seam Blend、Seam Mode、Flow Cycles、MappingはPresetへ保存します。Depthは2..30、Apex X／Apex Yは-2..2、Flow Cyclesは-30..30へ正規化します。Perspectiveは保存対象ではなく、旧Presetに残っていても無視します。Seam Modeがない、または削除済みのWrapped Smoothを指定する旧PresetはEdge Weldを使用し、未知・非有限・範囲外の値は安全な範囲へ正規化します。Coneの表示選択はPRESET-012に従い保存しません。
+ConeのDepth、Rotation、Apex X、Apex Y、Texture Repeat、Seam Blend、Seam Mode、Flow Cycles、MappingはPresetへ保存します。Depthは2..30、Apex X／Apex Yは-2..2、Flow Cyclesは-30..30へ正規化します。Perspectiveは保存対象ではなく、旧Presetに残っていても無視します。Seam ModeはMirror Repeat、Edge Weld、Gradient Reapplyを受け付け、欠落、削除済みのWrapped Smooth、未知・非有限・範囲外の値はMirror Repeatへ戻します。明示的に保存された有効な方式はそのまま復元し、保存形式のキーは変更しません。Coneの表示選択はPRESET-012に従い保存しません。
 
 ### PRESET-014 Stippleの保存互換
 
@@ -88,6 +88,10 @@ StippleはDiffuseの`mode: "legacy"`としてScatter、Grain、Seed、Seed Per F
 ### PRESET-016 Flow Gradientの保存互換
 
 Presetは`effectPipeline.flowGradientEnabled`と`flowGradient`のFlow設定を保存します。Flow Opacity、Particle Opacity、Particle SizeもFlow設定として保存・復元し、欠落した旧Presetはそれぞれの既定値へ正規化します。Flow設定がない旧Presetは安全な既定値へ正規化し、Flowを無効として読み込みます。Thumbnail用の独立WebGLコンテキストではFlowの履歴を前フレームから引き継がず、対象時刻へ決定的に事前評価してから描画します。既存ParticlesやEffect Stackの保存値は変更しません。
+
+### PRESET-017 SANDBOX設定の完全保存
+
+Preset保存時のスナップショットには、Cloth、Cone、Normal、Prism、Particles、Flow Gradient、Seamlessの永続化対象設定を含めます。Clothは`clothGradient`、Coneは`coneView`、Normal／Prism／Particlesは`normalMap`と`effectPipeline`、Flow Gradientは`flowGradient`と`effectPipeline.flowGradientEnabled`、Seamlessは`seamless`として保存・復元します。旧Presetで欠落している任意設定は各normalizerの既定値へ補完します。Canvas／Cloth／Coneの表示面、SANDBOXの選択中Edit Layer、Rendererやカメラは保存しません。
 
 ## 他領域との関係
 

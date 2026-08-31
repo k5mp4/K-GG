@@ -1,6 +1,6 @@
 import {
   CONE_APEX_LIMIT,
-  CONE_SEAM_MODES,
+  CONE_SEAM_MODE_INDEX,
   type ConeViewConfig,
   type ConeSeamMode,
 } from '../types/coneView';
@@ -100,5 +100,5 @@ export function getConeTextureTransform(
 }
 
 export function getConeSeamModeIndex(mode: ConeSeamMode): number {
-  return CONE_SEAM_MODES.indexOf(mode);
+  return CONE_SEAM_MODE_INDEX[mode];
 }

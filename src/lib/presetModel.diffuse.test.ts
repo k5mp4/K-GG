@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { STORE_DEFAULTS } from '../store/gradientStore';
 import type { StoreSnapshot } from './presetModel';
-import { isPreset, makePreset } from './presetModel';
+import { createPresetSaveState, isPreset, makePreset } from './presetModel';
 
 describe('legacy Diffuse preset migration', () => {
   it('saves a legacy luminance curve as Bezier only and reloads the JSON', () => {
@@ -54,5 +54,35 @@ describe('legacy Diffuse preset migration', () => {
     const saved = makePreset('Legacy', { diffuse: STORE_DEFAULTS.diffuse } as unknown as StoreSnapshot);
 
     expect(saved.state.seamless).toEqual(STORE_DEFAULTS.seamless);
+  });
+
+  it('keeps Cloth and the other SANDBOX settings in the save snapshot', () => {
+    const clothGradient = {
+      ...STORE_DEFAULTS.clothGradient,
+      enabled: true,
+      warpStrength: 1.15,
+    };
+    const coneView = {
+      ...STORE_DEFAULTS.coneView,
+      seamMode: 'reapply' as const,
+      seamBlend: 0.4,
+    };
+    const state = createPresetSaveState({
+      ...STORE_DEFAULTS,
+      clothGradient,
+      coneView,
+    }, [], { width: 800, height: 600 });
+
+    expect(state.clothGradient).toEqual(clothGradient);
+    expect(state.coneView).toEqual(coneView);
+    expect(state.normalMap).toEqual(STORE_DEFAULTS.normalMap);
+    expect(state.seamless).toEqual(STORE_DEFAULTS.seamless);
+    expect(state.flowGradient).toEqual(STORE_DEFAULTS.flowGradient);
+    expect(state.effectPipeline).toEqual(STORE_DEFAULTS.effectPipeline);
+    expect('renderViewMode' in state).toBe(false);
+
+    const saved = makePreset('SANDBOX', state);
+    expect(saved.state.clothGradient).toMatchObject({ enabled: true, warpStrength: 1.15 });
+    expect(saved.state.coneView).toEqual(coneView);
   });
 });

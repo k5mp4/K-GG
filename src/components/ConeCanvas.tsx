@@ -5,6 +5,7 @@ import { renderBridge } from '../lib/renderBridge';
 import { useGradientStore } from '../store/gradientStore';
 import type { VideoExportFrameRenderer } from '../adapters/types';
 import type { ConeViewConfig } from '../types/coneView';
+import { isWebGL2UnavailableError } from '../lib/webglCapability';
 
 type Props = {
   sourceCanvasRef: RefObject<HTMLCanvasElement | null>;
@@ -54,7 +55,7 @@ export function ConeCanvas({
       if (renderer) renderer.getCanvas().style.opacity = '0';
       if (outputCanvasRef) outputCanvasRef.current = null;
       if (exportFrameRendererRef) exportFrameRendererRef.current = null;
-      if (error) console.warn('[Cone view] Texture-mapped renderer unavailable:', error);
+      if (error && !isWebGL2UnavailableError(error)) console.warn('[Cone view] Texture-mapped renderer unavailable:', error);
       callbacksRef.current.onUnavailable();
     };
 
