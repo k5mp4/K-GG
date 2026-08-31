@@ -42,4 +42,10 @@ status: approved
 - `cargo check --manifest-path src-tauri/Cargo.toml`: pass
 - `npm test`: pass（436 tests、74 files）
 
+## 追加の3D出力安定性検証
+
+- `npm test -- --run src/lib/coneViewRenderer.test.ts src/lib/webglPerformance.test.ts`: pass（2 files、18 tests）。入力Canvasのサイズ変更時のCanvasTexture再生成、Cone rendererの冪等dispose、context loss/restore後の再描画、失われたcontextでのoptional extension無効化を確認した。
+- `npx tsc -p tsconfig.app.json --noEmit`: pass。
+- ブラウザ再確認: 修正前は1920×1080から3840×2160へ変更した直後にCone用CanvasTextureの`texSubImage2D(INVALID_VALUE)`を再現した。修正後の同一手順は、検証ブラウザ側で意図的なcontext loss後にWebGL2自体が利用不能となり、実機での再確認を完了できていない。実機確認は未確認として扱う。
+
 After Effects本体を使ったWindows x64の手動スモーク（起動中検出、アクティブコンポジションへのPNG/MOV/MP4追加、Bridge停止確認）は未実施である。P1レイヤーDTO、P2素材/レンダー、P3設定変換も未実装である。

@@ -6,10 +6,10 @@ status: approved
 change_kind: A
 owners: [maintainer]
 created: 2026-08-12
-updated: 2026-08-24
+updated: 2026-08-30
 current_specs: [CURRENT-WEBGL-PERFORMANCE]
 related_adrs: [ADR-0005, ADR-0015]
-related_code: [src/lib/webgl.ts, src/lib/webglShaderSources.ts, src/shaders/postprocess/glass-compact.glsl, src/lib/webglPerformance.ts, src/components/WebGLPerformancePanel.tsx]
+related_code: [src/lib/webgl.ts, src/lib/gpuDiagnostics.ts, src/lib/webglShaderSources.ts, src/shaders/postprocess/glass-compact.glsl, src/lib/webglPerformance.ts, src/components/WebGLPerformancePanel.tsx]
 related_tests: [src/lib/webglShaderSources.test.ts, src/lib/effectShaderParity.test.ts, src/lib/webglPerformance.test.ts, src/lib/webglCompilePolicy.test.ts]
 human_review: completed
 ---

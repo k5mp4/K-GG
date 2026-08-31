@@ -5,6 +5,8 @@ import {
   cancelSpectorCaptureRuntime,
   cancelWebGLFrame,
   configureStatsOverlay,
+  disableWebGLContextValidation,
+  getSafeWebGLExtension,
   getStatsGLOptions,
   isWebGLFrameCaptureActive,
   onePercentLowFrameMs,
@@ -14,6 +16,52 @@ import {
 } from './webglPerformance';
 
 describe('webglPerformance aggregates', () => {
+  it('disables opt-in validation on secondary WebGL contexts', () => {
+    let disableCalls = 0;
+    const gl = {
+      getExtension: (name: string) => name === 'GMAN_debug_helper'
+        ? { disable: () => { disableCalls += 1; } }
+        : null,
+    } as unknown as WebGLRenderingContext;
+
+    disableWebGLContextValidation(gl);
+
+    expect(disableCalls).toBe(1);
+  });
+
+  it('treats extension queries on a lost context as unavailable', () => {
+    let queryCalls = 0;
+    const gl = {
+      isContextLost: () => true,
+      getExtension: () => {
+        queryCalls += 1;
+        throw new Error('context lost');
+      },
+    } as unknown as WebGLRenderingContext;
+
+    expect(getSafeWebGLExtension<{ marker: boolean }>(gl, 'GMAN_debug_helper')).toBeNull();
+    expect(queryCalls).toBe(0);
+  });
+
+  it('keeps the profiler usable when initialization races with context loss', () => {
+    const gl = {
+      isContextLost: () => true,
+      getExtension: () => { throw new Error('context lost'); },
+    } as unknown as WebGL2RenderingContext;
+    const canvas = {
+      getContext: () => { throw new Error('context lost'); },
+    } as unknown as HTMLCanvasElement;
+    const profiler = new WebGLPerformanceProfiler(
+      gl,
+      canvas,
+      { statsModule: null, memoryLoaded: false, lintLoaded: true },
+    );
+
+    expect(() => profiler.setValidationEnabled(true)).not.toThrow();
+    expect(() => profiler.beginFrame()).not.toThrow();
+    expect(profiler.getSnapshot().validationAvailable).toBe(false);
+  });
+
   it('resolves Spector.js from the supported UMD/Vite export shapes', () => {
     class FakeSpector {}
 

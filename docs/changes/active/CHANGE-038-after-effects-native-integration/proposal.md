@@ -9,8 +9,8 @@ created: 2026-08-30
 updated: 2026-08-30
 current_specs: [CURRENT-AFTER-EFFECTS-INTEGRATION, CURRENT-VIDEO-EXPORT, CURRENT-UI-CONTROLS]
 related_adrs: [ADR-0018]
-related_code: [src/lib/aftereffectsExport.ts, src/components/ExportPanel.tsx, src/adapters/index.ts, src/adapters/types.ts, src/adapters/browser/afterEffectsService.ts, src/adapters/tauri/afterEffectsService.ts, src/adapters/tauri/exportService.ts, src/adapters/tauri/videoExportService.ts, src-tauri/src/lib.rs, src-tauri/src/after_effects.rs, src-tauri/tauri.conf.json, src-tauri/capabilities/default.json]
-related_tests: [src/lib/aftereffectsExport.test.ts, src-tauri/src/after_effects.rs]
+related_code: [src/lib/aftereffectsExport.ts, src/components/ExportPanel.tsx, src/adapters/index.ts, src/adapters/types.ts, src/adapters/browser/afterEffectsService.ts, src/adapters/tauri/afterEffectsService.ts, src/adapters/tauri/exportService.ts, src/adapters/tauri/videoExportService.ts, src/lib/coneViewRenderer.ts, src/lib/clothGradientRenderer.ts, src/lib/webglPerformance.ts, src/lib/webgl.ts, src/lib/gpuDiagnostics.ts, src-tauri/src/lib.rs, src-tauri/src/after_effects.rs, src-tauri/tauri.conf.json, src-tauri/capabilities/default.json]
+related_tests: [src/lib/aftereffectsExport.test.ts, src/lib/coneViewRenderer.test.ts, src/lib/webglPerformance.test.ts, src-tauri/src/after_effects.rs]
 human_review: completed
 ---
 

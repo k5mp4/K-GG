@@ -6,11 +6,11 @@ status: current
 owners: [maintainer]
 created: 2026-07-27
 updated: 2026-08-31
-requirement_ids: [GRAD-001, GRAD-002, GRAD-003, GRAD-004, GRAD-005, GRAD-006, GRAD-007, GRAD-008, GRAD-009, GRAD-010, GRAD-011, GRAD-012, GRAD-013, GRAD-014, GRAD-015, GRAD-016, GRAD-017, GRAD-018, GRAD-019, GRAD-020, GRAD-021, GRAD-022]
+requirement_ids: [GRAD-001, GRAD-002, GRAD-003, GRAD-004, GRAD-005, GRAD-006, GRAD-007, GRAD-008, GRAD-009, GRAD-010, GRAD-011, GRAD-012, GRAD-013, GRAD-014, GRAD-015, GRAD-016, GRAD-017, GRAD-018, GRAD-019, GRAD-020, GRAD-021, GRAD-022, GRAD-023]
 related_adrs: [ADR-0001, ADR-0003, ADR-0010, ADR-0013]
-related_changes: [CHANGE-001, CHANGE-010, CHANGE-024, CHANGE-025, CHANGE-030, CHANGE-032, CHANGE-037, CHANGE-039]
-related_code: [src/types/gradient.ts, src/types/flowGradient.ts, src/types/imageGradient.ts, src/types/renderView.ts, src/types/coneView.ts, src/store/gradientStore.ts, src/lib/gradientRampUtils.ts, src/lib/flowGradientRenderer.ts, src/lib/flowSimulation.ts, src/lib/gradientPreview.ts, src/lib/imageGradient.ts, src/lib/meshGradientField.ts, src/lib/sceneEvaluation.ts, src/lib/webgl.ts, src/lib/webglShaderSources.ts, src/lib/clothGradientRenderer.ts, src/lib/coneView.ts, src/lib/coneViewRenderer.ts, src/lib/coneSeam.ts, src/lib/processedCanvasClock.ts, src/lib/presetModel.ts, src/components/GradientRamp.tsx, src/components/CustomSelect.tsx, src/components/ColorPaletteGenerator.tsx, src/components/GradientCanvas.tsx, src/components/SandboxPanel.tsx, src/components/FlowGradientPanel.tsx, src/components/ClothGradientPanel.tsx, src/components/ClothCanvas.tsx, src/components/ConeCanvas.tsx, src/components/ConeViewPanel.tsx, src/components/ExportPanel.tsx, src/lib/videoExportFrames.ts, src/adapters/types.ts, src/lib/clothView.ts, src/lib/colorHarmony.ts, src/i18n/uiLabels.ts, src/i18n/messages.ts]
-related_tests: [src/types/gradient.test.ts, src/types/coneView.test.ts, src/lib/flowSimulation.test.ts, src/lib/flowGradientPreset.test.ts, src/lib/imageGradient.test.ts, src/lib/imageGradientProtected.test.ts, src/lib/meshGradient.test.ts, src/lib/proportionalRampEdit.test.ts, src/lib/sceneEvaluation.glass.test.ts, src/lib/colorHarmony.test.ts, src/lib/gradientPreview.test.ts, src/lib/videoExportFrames.test.ts, src/lib/clothView.test.ts, src/lib/coneView.test.ts, src/lib/coneSeam.test.ts, src/lib/processedCanvasClock.test.ts, src/components/ConeApexEditor.test.tsx, src/components/CustomSelect.test.tsx]
+related_changes: [CHANGE-001, CHANGE-010, CHANGE-024, CHANGE-025, CHANGE-030, CHANGE-032, CHANGE-037, CHANGE-039, CHANGE-040]
+related_code: [src/types/gradient.ts, src/types/flowGradient.ts, src/types/imageGradient.ts, src/types/renderView.ts, src/types/coneView.ts, src/store/gradientStore.ts, src/lib/gradientRampUtils.ts, src/lib/flowGradientRenderer.ts, src/lib/flowSimulation.ts, src/lib/gradientPreview.ts, src/lib/imageGradient.ts, src/lib/meshGradientField.ts, src/lib/sceneEvaluation.ts, src/lib/webgl.ts, src/lib/webglCapability.ts, src/lib/webglShaderSources.ts, src/lib/clothGradientRenderer.ts, src/lib/coneView.ts, src/lib/coneViewRenderer.ts, src/lib/coneSeam.ts, src/lib/processedCanvasClock.ts, src/lib/presetModel.ts, src/components/GradientRamp.tsx, src/components/CustomSelect.tsx, src/components/ColorPaletteGenerator.tsx, src/components/GradientCanvas.tsx, src/components/SandboxPanel.tsx, src/components/FlowGradientPanel.tsx, src/components/ClothGradientPanel.tsx, src/components/ClothCanvas.tsx, src/components/ConeCanvas.tsx, src/components/ConeViewPanel.tsx, src/components/ExportPanel.tsx, src/lib/videoExportFrames.ts, src/adapters/types.ts, src/lib/clothView.ts, src/lib/colorHarmony.ts, src/i18n/uiLabels.ts, src/i18n/messages.ts]
+related_tests: [src/types/gradient.test.ts, src/types/coneView.test.ts, src/lib/flowSimulation.test.ts, src/lib/flowGradientPreset.test.ts, src/lib/imageGradient.test.ts, src/lib/imageGradientProtected.test.ts, src/lib/meshGradient.test.ts, src/lib/proportionalRampEdit.test.ts, src/lib/sceneEvaluation.glass.test.ts, src/lib/colorHarmony.test.ts, src/lib/gradientPreview.test.ts, src/lib/videoExportFrames.test.ts, src/lib/clothView.test.ts, src/lib/coneView.test.ts, src/lib/coneSeam.test.ts, src/lib/webglCapability.test.ts, src/lib/processedCanvasClock.test.ts, src/components/ConeApexEditor.test.tsx, src/components/CustomSelect.test.tsx]
 ---
 
 # Gradient System
@@ -120,6 +120,10 @@ SANDBOXのFlow Gradientは、3DエミッタからCurl場を固定ステップ積
 ### GRAD-022 Cone Color Reapply Seam
 
 Coneの`Gradient Reapply`は、現在時刻に評価済みの処理済みCanvasを色場の入力として使います。U／V各軸の同じ位置にある対向端のRGB平均を目標色とし、継ぎ目からの距離に応じたraised-cosine重みで`center.rgb + (target.rgb - sideEdge.rgb) * weight`を0..1へクランプします。alphaは中心サンプルをそのまま保持し、端色のalphaやalpha差をシーム補正の重みへ使いません。四隅では軸補正後のRGBを4端色の平均へ`seamX * seamY`の重みで寄せ、両軸の重みが1のとき4端色の平均へ収束させます。既存のMirror Repeat／Edge Weldは別方式として保持し、Preview、静止画、連番、動画では同じCone Renderer分岐を使います。
+
+### GRAD-023 WebGL2能力不足時の3D viewフォールバック
+
+WebGL2コンテキストを作成できないブラウザ／WebViewでは、メインのGradient CanvasとSANDBOXのCloth／Cone表示を2D Canvasへフォールバックし、編集を継続できます。この状態は想定済みの能力不足として扱い、同一ページ内の再マウントでWebGL2やThree.jsのコンテキスト作成を繰り返しません。WebGL2が利用可能な場合は、作成済みコンテキストを使う既存のPreview／Export経路を維持し、context lost／restored時は能力状態を再評価します。
 
 ## 他領域との関係
 

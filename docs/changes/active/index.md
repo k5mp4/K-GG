@@ -23,3 +23,4 @@ title: 進行中の変更
 | CHANGE-037 | [SANDBOX Preset Coverage and Cone Color Reapply Seams](./CHANGE-037-sandbox-preset-cone-seam-reapply/proposal) | approved |
 | CHANGE-038 | [K-GG単独After Effects連携と段階的レイヤー取込](./CHANGE-038-after-effects-native-integration/proposal) | approved |
 | CHANGE-039 | [Cone Default Seam, English Mode Labels, and Simple Apex Control](./CHANGE-039-cone-default-labels-apex-control/proposal) | approved |
+| CHANGE-040 | [WebGL2 Capability Gate for SANDBOX 3D Fallback](./CHANGE-040-webgl2-capability-fallback/proposal) | approved |

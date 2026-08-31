@@ -9,7 +9,7 @@ updated: 2026-08-30
 requirement_ids: [PERF-001, PERF-002, PERF-003, PERF-004, PERF-005, PERF-006, PERF-007, PERF-008, PERF-009, PERF-010]
 related_adrs: [ADR-0005, ADR-0015]
 related_changes: [CHANGE-028]
-related_code: [src/lib/webglPerformance.ts, src/lib/webgl.ts, src/hooks/useWebGL.ts, src/components/WebGLPerformancePanel.tsx, src/components/GradientCanvas.tsx]
+related_code: [src/lib/webglPerformance.ts, src/lib/webgl.ts, src/lib/gpuDiagnostics.ts, src/hooks/useWebGL.ts, src/components/WebGLPerformancePanel.tsx, src/components/GradientCanvas.tsx]
 related_tests: [src/lib/webglPerformance.test.ts, src/lib/webglPerformanceBenchmark.test.ts, src/lib/webglCompilePolicy.test.ts]
 ---
 
@@ -43,7 +43,7 @@ Effectおよび固定段のDraw CallsとRender Passesを確認できる。
 
 ### PERF-006 WebGL Validation切替
 
-`webgl-lint`によるValidationをPerformance計測とは独立に切り替えられる。Benchmark中はValidationを無効化する。Spector.js Capture中も同じWebGL contextへのValidation wrapperとK-GGのGPU timer queryを一時停止し、Capture終了またはキャンセル時に開始前のValidation状態を復元する。Effect Stackの共有uniform契約に存在しないuniformはValidationの致命的エラーにしない。
+`webgl-lint`によるValidationをPerformance計測とは独立に切り替えられる。Benchmark中はValidationを無効化する。Spector.js Capture中も同じWebGL contextへのValidation wrapperとK-GGのGPU timer queryを一時停止し、Capture終了またはキャンセル時に開始前のValidation状態を復元する。Effect Stackの共有uniform契約に存在しないuniformはValidationの致命的エラーにしない。Three.jsのCone/Clothなど補助Rendererが所有する別contextは通常のValidation対象外とし、context loss中のoptional extension問い合わせはUnavailableとして扱ってProfilerの初期化を停止させず、Previewは既存のcontext loss/recovery経路へ委ねる。
 
 ### PERF-007 Capture Frame
 

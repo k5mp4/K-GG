@@ -1,0 +1,40 @@
+{
+  "scope": "CHANGE-037",
+  "status": "changes_requested",
+  "harness": {
+    "status": "fallback",
+    "error": "ce-code-review reference subagent-template.md was not found",
+    "mutated_project_files": false
+  },
+  "findings": [
+    {
+      "id": "CGS-001",
+      "severity": "P2",
+      "file": "src/lib/coneViewRenderer.ts",
+      "lines": "64-145",
+      "title": "新方式のshaderが既存方式にも常時コンパイルされる",
+      "detail": "coneTextureSeamModeのuniform分岐により、Mirror Repeat／Edge WeldでもGradient Reapplyの関数群が同一fragment shaderへ含まれる。既存方式の挙動は保たれるが、shaderサイズ・コンパイル時間・レジスタ使用量が増える可能性がある。",
+      "recommendation": "必要ならSeam Mode別のshader variantを生成・キャッシュする。今回の受入条件上は低リスクの性能改善として別change扱いでもよい。"
+    },
+    {
+      "id": "CGS-002",
+      "severity": "P2",
+      "file": "src/lib/coneSeam.test.ts",
+      "lines": "55-62",
+      "title": "GPU実装の実行時検証がsource文字列確認に留まる",
+      "detail": "CPUのraised-cosine、RGB補正、alpha保持、四隅補正は確認できるが、WebGL shaderの実コンパイルとPreview／Export描画結果は未検証。",
+      "recommendation": "WebGL利用可能な環境でshader compileと3x3反復の境界・四隅・alpha保持を手動またはRenderer統合テストで確認する。"
+    }
+  ],
+  "resolved_findings": [
+    "四隅補正はcenterとの差分へ整理され、weight=1で4隅平均へ収束するCPU回帰テストが追加済み",
+    "CPU/GPUのzero-width境界値は0.00001へ統一済み",
+    "RGB補正は共通helperへ集約済み",
+    "Seam Mode options/indexはconeView.tsへ集約済み",
+    "Preset保存型はStoreSnapshotの除外キー型へ集約され、Cloth/Coneを含む保存テストがある",
+    "CHANGE-037 validation.mdには受入条件、実行結果、未確認事項が記録済み"
+  ],
+  "excluded": [
+    "After Effects関連の変更、docs/adr/index.md、docs/specs/current/index.md、CHANGE-038、docs/plans"
+  ]
+}
