@@ -1,5 +1,10 @@
 import * as THREE from 'three';
-import { CONE_SEAM_BLEND_MIN, type ConeViewConfig } from '../types/coneView';
+import {
+  CONE_SEAM_BLEND_MAX,
+  CONE_SEAM_BLEND_MIN,
+  CONE_SEAM_MODE_INDEX,
+  type ConeViewConfig,
+} from '../types/coneView';
 import {
   CONE_CAMERA_DISTANCE,
   CONE_CAMERA_FOV,
@@ -8,6 +13,7 @@ import {
   getConeSeamModeIndex,
   getConeTextureTransform,
 } from './coneView';
+import { CONE_GRADIENT_REAPPLY_SHADER } from './coneSeam';
 
 const RADIAL_SEGMENTS = 128;
 
@@ -62,12 +68,14 @@ export class ConeViewRenderer {
         `#ifdef USE_MAP
   vec2 coneUnwrappedUv = vMapUv * coneTextureRepeat + coneTextureOffset;
   vec2 coneSampleUv = fract(coneUnwrappedUv);
-  float coneBlendWidth = clamp(coneTextureSeamBlend, 0.0, 0.5);
+  float coneBlendWidth = clamp(coneTextureSeamBlend, 0.0, ${CONE_SEAM_BLEND_MAX});
   vec4 sampledDiffuseColor;
-  if (coneTextureSeamMode < 0.5) {
+  if (coneTextureSeamMode < ${CONE_SEAM_MODE_INDEX.weld - 0.5}) {
     sampledDiffuseColor = coneMirrorRepeatSample(coneUnwrappedUv, coneBlendWidth);
-  } else {
+  } else if (coneTextureSeamMode < ${CONE_SEAM_MODE_INDEX.reapply - 0.5}) {
     sampledDiffuseColor = coneEdgeWeldSample(coneSampleUv, coneBlendWidth);
+  } else {
+    sampledDiffuseColor = coneGradientReapplySample(coneSampleUv, coneBlendWidth);
   }
   diffuseColor *= sampledDiffuseColor;
 #endif`,
@@ -130,6 +138,8 @@ vec4 coneEdgeWeldSample(vec2 uv, float blendWidth) {
   }
   return welded;
 }
+
+${CONE_GRADIENT_REAPPLY_SHADER}
 
 #endif`,
       );

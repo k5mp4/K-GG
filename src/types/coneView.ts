@@ -1,8 +1,19 @@
 export type ConeMappingMode = 'flow' | 'projection';
-export type ConeSeamMode = 'mirror' | 'weld';
+export type ConeSeamMode = 'mirror' | 'weld' | 'reapply';
 
-export const CONE_SEAM_MODES = ['mirror', 'weld'] as const satisfies readonly ConeSeamMode[];
-export const DEFAULT_CONE_SEAM_MODE: ConeSeamMode = 'weld';
+export const CONE_SEAM_MODES = ['mirror', 'weld', 'reapply'] as const satisfies readonly ConeSeamMode[];
+export const CONE_SEAM_MODE_INDEX = {
+  mirror: 0,
+  weld: 1,
+  reapply: 2,
+} as const satisfies Record<ConeSeamMode, number>;
+
+export const CONE_SEAM_MODE_OPTIONS: { value: ConeSeamMode; label: string }[] = [
+  { value: 'mirror', label: 'Mirror Repeat' },
+  { value: 'weld', label: 'Edge Weld' },
+  { value: 'reapply', label: 'Gradient Reapply' },
+];
+export const DEFAULT_CONE_SEAM_MODE: ConeSeamMode = 'mirror';
 
 export type ConeViewConfig = {
   depth: number;

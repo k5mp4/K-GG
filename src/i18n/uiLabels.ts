@@ -27,7 +27,7 @@ const uiTerms = [
   ['Persistence', '持続率'],
   ['Point X', '点 X'], ['Point Y', '点 Y'], ['Radius', '半径'], ['Randomness', 'ランダム量'],
   ['Particle Count', 'パーティクル数'], ['Ray Count', '光線数'], ['Refraction', '屈折'], ['Ribbon Width', 'リボン幅'], ['Rot Angle 1', '回転角 1'], ['Rot Angle 2', '回転角 2'],
-  ['Rotation', '回転'], ['Roughness', '粗さ'], ['Scale', 'スケール'], ['Scan Position', '走査位置'], ['Seam Mode', 'シーム方式'],
+  ['Rotation', '回転'], ['Roughness', '粗さ'], ['Scale', 'スケール'], ['Scan Position', '走査位置'], ['Seam Mode', 'シーム方式'], ['Gradient Reapply', 'グラデーション再適用'],
   ['Scatter', '拡散量'], ['Seam Blend', 'シームブレンド'], ['Seamless Animation', 'シームレスアニメーション'], ['Seamless Base', 'シームレス基準'],
   ['Seed', 'シード'], ['Sharpness', '鋭さ'], ['Sides', '辺数'], ['Size', 'サイズ'], ['Trail', 'Trail'], ['Mirror Repeat', 'ミラー反復'],
   ['Size Over Life', '寿命によるサイズ'], ['Size Random', 'サイズのランダム量'], ['Slices', '分割数'],

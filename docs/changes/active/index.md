@@ -20,4 +20,6 @@ title: 進行中の変更
 | CHANGE-031 | [MCP UI Control Parity](./CHANGE-031-mcp-ui-control-parity/proposal) | approved |
 | CHANGE-032 | [Flow Gradient continuous particle field and expanded controls](./CHANGE-032-flow-gradient-continuous-controls/proposal) | draft |
 | CHANGE-033 | [WebGL解析的Gradient Prefix統合](./CHANGE-033-analytic-gradient-prefix/proposal) | approved |
+| CHANGE-037 | [SANDBOX Preset Coverage and Cone Color Reapply Seams](./CHANGE-037-sandbox-preset-cone-seam-reapply/proposal) | approved |
 | CHANGE-038 | [K-GG単独After Effects連携と段階的レイヤー取込](./CHANGE-038-after-effects-native-integration/proposal) | approved |
+| CHANGE-039 | [Cone Default Seam, English Mode Labels, and Simple Apex Control](./CHANGE-039-cone-default-labels-apex-control/proposal) | approved |
