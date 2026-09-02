@@ -58,17 +58,16 @@ export const tauriExportService: ExportService = {
     blob: Blob,
     filename: string,
     dirHandle: ExportDirectoryHandle | null,
-  ): Promise<void> {
+  ): Promise<boolean> {
     const bytes = await blobToBytes(blob);
 
     if (typeof dirHandle === 'string') {
       await writeFile(await join(dirHandle, filename), bytes);
-      return;
+      return true;
     }
 
     if (dirHandle) {
-      await browserExportService.saveBlobToDir(blob, filename, dirHandle);
-      return;
+      return await browserExportService.saveBlobToDir(blob, filename, dirHandle);
     }
 
     const target = await saveDialog({
@@ -77,8 +76,9 @@ export const tauriExportService: ExportService = {
       filters: dialogFilters(filename),
       canCreateDirectories: true,
     });
-    if (!target) return;
+    if (!target) return false;
     await writeFile(target, bytes);
+    return true;
   },
   async saveNativeVideoArtifact(artifact, filename, dirHandle): Promise<boolean> {
     let target: string | null = null;
@@ -102,14 +102,14 @@ export const tauriExportService: ExportService = {
   canvasToPngBlob: canvasToTauriPngBlob,
   async savePNG(canvas, stem, dirHandle = null) {
     const blob = await canvasToTauriPngBlob(canvas);
-    await this.saveBlobToDir(blob, `${stem}.png`, dirHandle);
+    return await this.saveBlobToDir(blob, `${stem}.png`, dirHandle);
   },
   async saveJPG(canvas, quality, stem, dirHandle = null) {
     const blob = await canvasToJpgBlob(canvas, quality);
-    await this.saveBlobToDir(blob, `${stem}.jpg`, dirHandle);
+    return await this.saveBlobToDir(blob, `${stem}.jpg`, dirHandle);
   },
   async saveWebP(canvas, quality, stem, dirHandle = null) {
     const blob = await canvasToWebpBlob(canvas, quality);
-    await this.saveBlobToDir(blob, `${stem}.webp`, dirHandle);
+    return await this.saveBlobToDir(blob, `${stem}.webp`, dirHandle);
   },
 };

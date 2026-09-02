@@ -5,6 +5,7 @@ import {
   getProgramSource,
 } from './webglShaderSources';
 import { GRADIENT_TYPE_MAP, NOISE_TYPE_MAP } from './webgl';
+import webglSource from './webgl.ts?raw';
 
 describe('webglShaderSources', () => {
   it('adds Mesh Gradation at mapping value 6 without shifting existing types', () => {
@@ -62,6 +63,11 @@ describe('webglShaderSources', () => {
     ]) {
       expect(general.match(new RegExp(declaration.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'g'))).toHaveLength(1);
     }
+  });
+
+  it('uploads ridged noise using the declared lacunarity uniform location', () => {
+    expect(webglSource).toContain('gl.uniform1f(uniforms.u_ridgeLacunarity, noiseDistortion.ridgeLacunarity ?? 2.0);');
+    expect(webglSource).not.toContain('gl.uniform1f(uniforms.ridgeLacunarity, noiseDistortion.ridgeLacunarity ?? 2.0);');
   });
 
   it('keeps Glass and Prism compile boundaries independent', () => {

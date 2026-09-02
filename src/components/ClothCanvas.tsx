@@ -44,6 +44,7 @@ export function ClothCanvas({
     let disposed = false;
     let notifiedUnavailable = false;
     let frameReady = false;
+    let handleContextLost: ((event: Event) => void) | null = null;
 
     const fail = (error?: unknown) => {
       if (disposed || notifiedUnavailable) return;
@@ -71,6 +72,14 @@ export function ClothCanvas({
         outputCanvas.style.height = '100%';
         container.appendChild(outputCanvas);
         if (outputCanvasRef) outputCanvasRef.current = outputCanvas;
+        handleContextLost = (event: Event) => {
+          event.preventDefault();
+          // Do not leave the 2D source hidden behind a lost 3D canvas. The
+          // parent switches back to the main preview and can recreate this
+          // renderer on the next explicit 3D selection.
+          fail(new Error('Cloth preview WebGL context lost'));
+        };
+        outputCanvas.addEventListener('webglcontextlost', handleContextLost, false);
         if (exportFrameRendererRef) {
           exportFrameRendererRef.current = ({ session, time, normalizedTime }) => {
             const currentSourceCanvas = sourceCanvasRef.current;
@@ -139,6 +148,7 @@ export function ClothCanvas({
       cancelAnimationFrame(animationFrame);
       if (outputCanvasRef) outputCanvasRef.current = null;
       if (exportFrameRendererRef) exportFrameRendererRef.current = null;
+      if (handleContextLost) renderer?.getCanvas().removeEventListener('webglcontextlost', handleContextLost, false);
       renderer?.dispose();
       renderer?.getCanvas().remove();
     };

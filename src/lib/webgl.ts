@@ -318,7 +318,7 @@ export async function initWebGL(canvas: HTMLCanvasElement): Promise<WebGLContext
   if (!gl) throw new WebGL2UnavailableError();
   if (gl.isContextLost()) throw new Error('WebGL context is currently lost');
   registeredWebGLContexts.set(canvas, gl);
-  const performanceProfiler = createWebGLPerformanceProfiler(gl, canvas, developmentTools);
+  const performanceProfiler = createWebGLPerformanceProfiler(gl, developmentTools);
   const previousLifecycleHandlers = webglLifecycleHandlers.get(canvas);
   if (previousLifecycleHandlers) {
     canvas.removeEventListener('webglcontextlost', previousLifecycleHandlers.lost);
@@ -3031,7 +3031,7 @@ export function render(
   gl.uniform1f(uniforms.u_voronoiMinkowskiExp, noiseDistortion.voronoiMinkowskiExp ?? 2.0);
   gl.uniform1f(uniforms.u_ridgeSharpness, noiseDistortion.ridgeSharpness ?? 2.0);
   gl.uniform1f(uniforms.u_ridgeGain, noiseDistortion.ridgeGain ?? 0.0);
-  gl.uniform1f(uniforms.ridgeLacunarity, noiseDistortion.ridgeLacunarity ?? 2.0);
+  gl.uniform1f(uniforms.u_ridgeLacunarity, noiseDistortion.ridgeLacunarity ?? 2.0);
   gl.uniform1f(uniforms.u_ridgePersistence, noiseDistortion.ridgePersistence ?? 0.6);
   gl.uniform1f(uniforms.u_ridgeOffset, noiseDistortion.ridgeOffset ?? 1.0);
   gl.uniform1f(uniforms.u_ridgeWarp, noiseDistortion.ridgeWarp ?? 1.0);

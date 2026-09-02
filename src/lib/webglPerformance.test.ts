@@ -16,17 +16,22 @@ import {
 } from './webglPerformance';
 
 describe('webglPerformance aggregates', () => {
-  it('disables opt-in validation on secondary WebGL contexts', () => {
+  it('fully disables secondary validation wrappers used by Three.js adapters', () => {
     let disableCalls = 0;
+    const configurations: Array<Record<string, unknown>> = [];
     const gl = {
       getExtension: (name: string) => name === 'GMAN_debug_helper'
-        ? { disable: () => { disableCalls += 1; } }
+        ? {
+          disable: () => { disableCalls += 1; },
+          setConfiguration: (settings: Record<string, unknown>) => configurations.push(settings),
+        }
         : null,
     } as unknown as WebGLRenderingContext;
 
     disableWebGLContextValidation(gl);
 
     expect(disableCalls).toBe(1);
+    expect(configurations).toHaveLength(0);
   });
 
   it('treats extension queries on a lost context as unavailable', () => {
@@ -48,12 +53,8 @@ describe('webglPerformance aggregates', () => {
       isContextLost: () => true,
       getExtension: () => { throw new Error('context lost'); },
     } as unknown as WebGL2RenderingContext;
-    const canvas = {
-      getContext: () => { throw new Error('context lost'); },
-    } as unknown as HTMLCanvasElement;
     const profiler = new WebGLPerformanceProfiler(
       gl,
-      canvas,
       { statsModule: null, memoryLoaded: false, lintLoaded: true },
     );
 
@@ -156,25 +157,30 @@ describe('webglPerformance aggregates', () => {
     expect(getStatsGLOptions(false)).toMatchObject({ trackFPS: true, trackGPU: true });
   });
 
-  it('does not disable the same validation extension twice during initialization', () => {
+  it('keeps the main context wrapped while toggling validation checks', () => {
     let disableCalls = 0;
+    const configurations: Array<Record<string, unknown>> = [];
     const validationExtension = {
-      disable: () => {
-        disableCalls += 1;
-        if (disableCalls > 1) throw new Error('webgl-lint disable called twice');
-      },
+      disable: () => { disableCalls += 1; },
+      setConfiguration: (settings: Record<string, unknown>) => configurations.push(settings),
     };
     const gl = {
       getExtension: (name: string) => name === 'GMAN_debug_helper' ? validationExtension : null,
     } as unknown as WebGL2RenderingContext;
-
     const profiler = new WebGLPerformanceProfiler(
       gl,
-      {} as HTMLCanvasElement,
       { statsModule: null, memoryLoaded: false, lintLoaded: true },
     );
-    expect(() => profiler.setValidationEnabled(false)).not.toThrow();
-    expect(disableCalls).toBe(1);
+    profiler.setValidationEnabled(true);
+    profiler.setValidationEnabled(false);
+
+    expect(disableCalls).toBe(0);
+    expect(configurations.length).toBeGreaterThanOrEqual(3);
+    expect(configurations.at(-1)).toMatchObject({
+      throwOnError: false,
+      failUnsetUniforms: false,
+      failUnrenderableTextures: false,
+    });
   });
 
   it('isolates Spector capture from validation and profiler measurements, then restores validation', () => {
@@ -186,10 +192,8 @@ describe('webglPerformance aggregates', () => {
     const gl = {
       getExtension: (name: string) => name === 'GMAN_debug_helper' ? validationExtension : null,
     } as unknown as WebGL2RenderingContext;
-    const canvas = { getContext: () => gl } as unknown as HTMLCanvasElement;
     const profiler = new WebGLPerformanceProfiler(
       gl,
-      canvas,
       { statsModule: null, memoryLoaded: false, lintLoaded: true },
     );
 
@@ -225,7 +229,6 @@ describe('webglPerformance aggregates', () => {
 
     const profiler = new WebGLPerformanceProfiler(
       gl,
-      {} as HTMLCanvasElement,
       { statsModule: { default: FakeStats }, memoryLoaded: false, lintLoaded: false },
     );
 
@@ -247,7 +250,6 @@ describe('webglPerformance aggregates', () => {
     const gl = { getExtension: () => null } as unknown as WebGL2RenderingContext;
     const profiler = new WebGLPerformanceProfiler(
       gl,
-      {} as HTMLCanvasElement,
       { statsModule: { default: FakeStats }, memoryLoaded: false, lintLoaded: false },
     );
     const host = { appendChild: (element: unknown) => { appended = element; } } as unknown as HTMLElement;

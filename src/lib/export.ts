@@ -31,8 +31,8 @@ export async function saveBlobToDir(
   blob: Blob,
   filename: string,
   dirHandle: ExportDirectoryHandle | null,
-): Promise<void> {
-  await adapters.exportService.saveBlobToDir(blob, filename, dirHandle);
+): Promise<boolean> {
+  return await adapters.exportService.saveBlobToDir(blob, filename, dirHandle);
 }
 
 export async function canvasToPngBlob(canvas: HTMLCanvasElement): Promise<Blob> {
@@ -45,8 +45,8 @@ export async function downloadPNG(
   canvas: HTMLCanvasElement,
   stem = 'gradient',
   dirHandle: ExportDirectoryHandle | null = null,
-): Promise<void> {
-  await adapters.exportService.savePNG(canvas, stem, dirHandle);
+): Promise<boolean> {
+  return await adapters.exportService.savePNG(canvas, stem, dirHandle);
 }
 
 export async function downloadJPG(
@@ -54,8 +54,8 @@ export async function downloadJPG(
   quality = 0.92,
   stem = 'gradient',
   dirHandle: ExportDirectoryHandle | null = null,
-): Promise<void> {
-  await adapters.exportService.saveJPG(canvas, quality, stem, dirHandle);
+): Promise<boolean> {
+  return await adapters.exportService.saveJPG(canvas, quality, stem, dirHandle);
 }
 
 export async function downloadWebP(
@@ -63,6 +63,6 @@ export async function downloadWebP(
   quality = 0.92,
   stem = 'gradient',
   dirHandle: ExportDirectoryHandle | null = null,
-): Promise<void> {
-  await adapters.exportService.saveWebP(canvas, quality, stem, dirHandle);
+): Promise<boolean> {
+  return await adapters.exportService.saveWebP(canvas, quality, stem, dirHandle);
 }

@@ -48,6 +48,7 @@ export function ConeCanvas({
     let failed = false;
     let frameReady = false;
     let unsubscribeSourceFrame: (() => void) | null = null;
+    let handleContextLost: ((event: Event) => void) | null = null;
 
     const fail = (error?: unknown) => {
       if (disposed || failed) return;
@@ -77,6 +78,14 @@ export function ConeCanvas({
         outputCanvas.style.opacity = '0';
         container.appendChild(outputCanvas);
         if (outputCanvasRef) outputCanvasRef.current = outputCanvas;
+        handleContextLost = (event: Event) => {
+          event.preventDefault();
+          // A lost output context can otherwise remain selected while its
+          // canvas is blank and no new source frame is published. Fall back
+          // immediately so the main preview remains usable.
+          fail(new Error('Cone preview WebGL context lost'));
+        };
+        outputCanvas.addEventListener('webglcontextlost', handleContextLost, false);
         if (exportFrameRendererRef) {
           exportFrameRendererRef.current = ({ session, time, normalizedTime }) => {
             const currentSourceCanvas = sourceCanvasRef.current;
@@ -140,6 +149,7 @@ export function ConeCanvas({
       if (outputCanvasRef) outputCanvasRef.current = null;
       if (exportFrameRendererRef) exportFrameRendererRef.current = null;
       renderSourceFrameRef.current = null;
+      if (handleContextLost) renderer?.getCanvas().removeEventListener('webglcontextlost', handleContextLost, false);
       renderer?.dispose();
       renderer?.getCanvas().remove();
     };

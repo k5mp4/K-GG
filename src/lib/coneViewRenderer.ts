@@ -46,7 +46,6 @@ export class ConeViewRenderer {
     coneTextureSeamMode: { value: 1 },
   };
   private sourceTexture: THREE.CanvasTexture | null = null;
-  private sourceTextureCanvas: HTMLCanvasElement | null = null;
   private sourceTextureSize: readonly [number, number] | null = null;
   private geometrySignature = '';
   private disposed = false;
@@ -61,7 +60,6 @@ export class ConeViewRenderer {
     // no-op, then force the next frame to allocate fresh resources.
     if (this.sourceTexture) this.disposeResource(this.sourceTexture, 'source texture after context loss');
     this.sourceTexture = null;
-    this.sourceTextureCanvas = null;
     this.sourceTextureSize = null;
     this.material.map = null;
     this.disposeResource(this.material, 'material after context loss');
@@ -89,6 +87,10 @@ export class ConeViewRenderer {
     if (!gl) throw new WebGL2UnavailableError();
     if (gl.isContextLost()) throw new Error('WebGL context is currently lost');
 
+    // This context belongs exclusively to Three.js. Remove the development
+    // validator before Three initializes its program and VAO caches.
+    disableWebGLContextValidation(gl);
+
     this.renderer = new THREE.WebGLRenderer({
       canvas: this.canvas,
       context: gl,
@@ -101,7 +103,6 @@ export class ConeViewRenderer {
     this.renderer.outputColorSpace = THREE.SRGBColorSpace;
     this.renderer.toneMapping = THREE.NoToneMapping;
     this.renderer.debug.checkShaderErrors = true;
-    disableWebGLContextValidation(this.renderer.getContext());
 
     this.scene = new THREE.Scene();
     this.camera = new THREE.PerspectiveCamera(CONE_CAMERA_FOV, 1, 0.01, 64);
@@ -210,7 +211,7 @@ ${CONE_GRADIENT_REAPPLY_SHADER}
   private updateSourceTexture(sourceCanvas: HTMLCanvasElement): void {
     if (
       !this.sourceTexture
-      || isConeSourceTextureStale(this.sourceTextureCanvas, this.sourceTextureSize, sourceCanvas)
+      || isConeSourceTextureStale(this.sourceTexture?.image ?? null, this.sourceTextureSize, sourceCanvas)
     ) {
       const previousTexture = this.sourceTexture;
       if (previousTexture) this.disposeResource(previousTexture, 'source texture');
@@ -223,7 +224,6 @@ ${CONE_GRADIENT_REAPPLY_SHADER}
       nextTexture.wrapT = THREE.ClampToEdgeWrapping;
       nextTexture.generateMipmaps = false;
       this.sourceTexture = nextTexture;
-      this.sourceTextureCanvas = sourceCanvas;
       this.sourceTextureSize = [sourceCanvas.width, sourceCanvas.height];
       this.material.map = nextTexture;
       this.material.needsUpdate = true;
@@ -308,6 +308,9 @@ ${CONE_GRADIENT_REAPPLY_SHADER}
       this.canvas.width = width;
       this.canvas.height = height;
       this.renderer.setSize(width, height, false);
+      // Changing canvas dimensions resets the WebGL state, while Three.js
+      // keeps cached program/VAO bindings. Reconcile both before drawElements.
+      this.renderer.resetState();
     }
 
     this.updateSourceTexture(sourceCanvas);
@@ -335,7 +338,6 @@ ${CONE_GRADIENT_REAPPLY_SHADER}
       if (this.sourceTexture) this.disposeResource(this.sourceTexture, 'source texture');
     }
     this.sourceTexture = null;
-    this.sourceTextureCanvas = null;
     this.sourceTextureSize = null;
     this.disposeResource(this.renderer, 'renderer');
   }

@@ -12,7 +12,10 @@ status: approved
 - [x] P0のTauri/Rust After Effects接続、プロセス検出、固定JSX、完了結果、作業領域を実装する
 - [x] P0の画像・MOV・MP4送信と保存先選択をTauri Adapterへ接続する
 - [ ] P0のMOV・MP4をネイティブ成果物のまま保存・AE送信し、WebViewへの最終動画Blob読戻しを除去したうえで、書き出し後の自動AE送信によるフリーズを解消する（手動再送は成功、自動送信は未解消）
+- [x] 動画保存後にexport状態を先に解除し、AE送信待ちと保存ダイアログキャンセルを成功扱いしない
+- [x] Generatorの未定義uniform参照、Preview停止例外時の停止フラグ残留、初回フレーム前のPreview復元漏れを回帰テスト付きで修正する
 - [x] P0の3D出力で高解像度CanvasTextureを再確保し、WebGL context loss後のConeリソース破棄・再生成を安全化する
+- [x] WebGL validationの切替でメインcontextを再取得せず、3D出力Canvasのリサイズ後にThree.jsのGL状態を同期する
 - [ ] P0のAE未起動、JSX失敗、保存失敗、対象コンポジション不在を検証する
 - [ ] P1の選択コンポジション・選択レイヤーDTOと読み込みUIを追加する
 - [ ] P2のFootage元ファイルとレンダー結果の取り込みを追加する

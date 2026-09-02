@@ -94,7 +94,7 @@ export interface ExportService {
     blob: Blob,
     filename: string,
     dirHandle: ExportDirectoryHandle | null,
-  ): Promise<void>;
+  ): Promise<boolean>;
   saveNativeVideoArtifact?(
     artifact: NativeVideoArtifact,
     filename: string,
@@ -105,19 +105,19 @@ export interface ExportService {
     canvas: HTMLCanvasElement,
     stem: string,
     dirHandle?: ExportDirectoryHandle | null,
-  ): Promise<void>;
+  ): Promise<boolean>;
   saveJPG(
     canvas: HTMLCanvasElement,
     quality: number,
     stem: string,
     dirHandle?: ExportDirectoryHandle | null,
-  ): Promise<void>;
+  ): Promise<boolean>;
   saveWebP(
     canvas: HTMLCanvasElement,
     quality: number,
     stem: string,
     dirHandle?: ExportDirectoryHandle | null,
-  ): Promise<void>;
+  ): Promise<boolean>;
 }
 
 export type VideoExportConfig = {

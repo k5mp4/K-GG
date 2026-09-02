@@ -20,6 +20,18 @@ type WebGLContextExtensionSource = Pick<WebGLRenderingContext, 'getExtension'> &
   isContextLost?: () => boolean;
 };
 
+const WEBGL_VALIDATION_DISABLED_CONFIG = {
+  throwOnError: false,
+  failBadShadersAndPrograms: false,
+  failUnsetUniforms: false,
+  failUnsetSamplerUniforms: false,
+  failZeroMatrixUniforms: false,
+  failUnrenderableTextures: false,
+  failUndefinedUniforms: false,
+  warnUndefinedUniforms: false,
+  maxDrawCalls: 0,
+};
+
 export function getSafeWebGLExtension<T>(
   gl: WebGLContextExtensionSource,
   name: string,
@@ -38,18 +50,30 @@ export function getSafeWebGLExtension<T>(
 /**
  * The development validator wraps every WebGL context discovered through
  * canvas.getContext(). Three.js display adapters own separate contexts from
- * the main preview, so keep those helper contexts outside the opt-in
- * validation pass. The memory profiler remains available when installed.
+ * the main preview. Those helper contexts must be fully unwrapped: changing
+ * only the validator configuration still leaves texture/VAO tracking hooks
+ * around Three.js' resource cache and can throw while texParameteri or
+ * drawElements is called. The memory profiler on the main context remains
+ * available when installed.
  */
 export function disableWebGLContextValidation(
   gl: WebGLContextExtensionSource,
 ): void {
   const extension = getSafeWebGLExtension<ValidationExtension>(gl, 'GMAN_debug_helper');
   try {
-    extension?.disable?.();
+    // `disable()` restores the original WebGL methods and removes the lint
+    // state for this secondary context. `setConfiguration()` is intentionally
+    // not enough here because its texture/VAO wrappers remain installed.
+    if (extension?.disable) {
+      extension.disable();
+    } else {
+      // Keep compatibility with validator versions that expose configuration
+      // but not the full disable helper.
+      extension?.setConfiguration?.(WEBGL_VALIDATION_DISABLED_CONFIG);
+    }
   } catch {
-    // A context can be lost between getExtension() and disable(). The helper
-    // is optional, so leave validation disabled for this context.
+    // A context can be lost between getExtension() and configuration. The
+    // helper is optional, so leave validation disabled for this context.
   }
 }
 
@@ -258,7 +282,6 @@ function emptyResources(): ResourcePerformanceSnapshot {
 
 export class WebGLPerformanceProfiler {
   private readonly gl: WebGL2RenderingContext;
-  private readonly canvas: HTMLCanvasElement;
   private readonly timerExtension: TimerQueryExtension | null;
   private validationExtension: ValidationExtension | null;
   private readonly memoryExtension: MemoryExtension | null;
@@ -283,13 +306,11 @@ export class WebGLPerformanceProfiler {
   private readonly benchmarkGpuFramesSeen = new Set<number>();
   private snapshot: PerformanceSnapshot;
   private statsRuntimeDisabled = false;
-  private validationDisabled = false;
   private externalCaptureActive = false;
   private validationBeforeExternalCapture = false;
 
-  constructor(gl: WebGL2RenderingContext, canvas: HTMLCanvasElement, tools: DevelopmentTools) {
+  constructor(gl: WebGL2RenderingContext, tools: DevelopmentTools) {
     this.gl = gl;
-    this.canvas = canvas;
     this.timerExtension = getSafeWebGLExtension<TimerQueryExtension>(gl, 'EXT_disjoint_timer_query_webgl2');
     this.validationExtension = getSafeWebGLExtension<ValidationExtension>(gl, 'GMAN_debug_helper');
     this.memoryExtension = getSafeWebGLExtension<MemoryExtension>(gl, 'GMAN_webgl_memory');
@@ -310,8 +331,9 @@ export class WebGLPerformanceProfiler {
         stats = null;
       }
     }
-    // Keep webgl-lint disabled during normal rendering. Validation is opt-in
-    // from the profiler panel and re-enables the wrapper explicitly.
+    // Keep the webgl-lint wrapper installed while suppressing its checks during
+    // normal rendering. Removing the wrapper destroys its program/uniform maps;
+    // re-adding it later cannot recover metadata for already-linked programs.
     this.disableValidationChecks();
     this.stats = stats;
     this.snapshot = {
@@ -383,18 +405,6 @@ export class WebGLPerformanceProfiler {
   }
 
   setValidationEnabled(enabled: boolean): void {
-    if (enabled) {
-      // webgl-lint's disable() removes the context wrappers. Asking the
-      // canvas for its existing context re-applies them when validation is
-      // explicitly enabled again.
-      try {
-        this.canvas.getContext('webgl2');
-      } catch {
-        this.validationExtension = null;
-      }
-      this.validationExtension = getSafeWebGLExtension<ValidationExtension>(this.gl, 'GMAN_debug_helper');
-      this.validationDisabled = false;
-    }
     if (!this.validationExtension) return;
     this.validationEnabled = enabled;
     try {
@@ -404,8 +414,8 @@ export class WebGLPerformanceProfiler {
         this.disableValidationChecks();
       }
     } catch {
-      // Validation is a development aid. A context loss between the optional
-      // rebind and configuration must not break the preview controls.
+      // Validation is a development aid. A context loss while changing its
+      // configuration must not break the preview controls.
       this.validationEnabled = false;
     }
     this.snapshot = { ...this.snapshot, validationEnabled: this.validationEnabled };
@@ -414,8 +424,9 @@ export class WebGLPerformanceProfiler {
 
   /**
    * Spector.js temporarily hooks the same WebGL context used by the preview.
-   * Stop K-GG's timer queries and validation wrapper while that hook is active
-   * so neither tool observes the other's transient program/uniform state.
+   * Stop K-GG's timer queries and validation checks while that hook is active.
+   * Keep the validator wrapper installed so its program/uniform metadata stays
+   * valid when capture ends.
    */
   setExternalCaptureActive(active: boolean): void {
     if (active === this.externalCaptureActive) return;
@@ -458,13 +469,13 @@ export class WebGLPerformanceProfiler {
   private disableValidationChecks(): void {
     const activeExtension = getSafeWebGLExtension<ValidationExtension>(this.gl, 'GMAN_debug_helper');
     const extension = activeExtension ?? this.validationExtension;
-    if (!extension || this.validationDisabled) return;
+    if (!extension) return;
     this.validationExtension = extension;
     try {
-      extension.disable?.();
-      this.validationDisabled = true;
+      extension.setConfiguration?.(WEBGL_VALIDATION_DISABLED_CONFIG);
     } catch {
-      this.validationDisabled = true;
+      // Validation is optional. Keep the existing wrapper in place even when
+      // a lost context rejects the configuration update.
     }
   }
 
@@ -635,7 +646,7 @@ export class WebGLPerformanceProfiler {
     if (this.validationEnabled) {
       this.validationExtension?.setConfiguration?.(WEBGL_VALIDATION_CONFIG);
     } else {
-      this.validationExtension?.disable?.();
+      this.disableValidationChecks();
     }
     this.snapshot = {
       ...this.snapshot,
@@ -809,11 +820,10 @@ export class WebGLPerformanceProfiler {
 
 export function createWebGLPerformanceProfiler(
   gl: WebGL2RenderingContext,
-  canvas: HTMLCanvasElement,
   tools: DevelopmentTools,
 ): WebGLPerformanceProfiler | null {
   if (!import.meta.env.DEV) return null;
-  return new WebGLPerformanceProfiler(gl, canvas, tools);
+  return new WebGLPerformanceProfiler(gl, tools);
 }
 
 let activeSpector: SpectorLike | null = null;

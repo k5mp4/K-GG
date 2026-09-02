@@ -5,12 +5,12 @@ title: After Effects連携
 status: current
 owners: [maintainer]
 created: 2026-08-30
-updated: 2026-08-30
+updated: 2026-09-02
 requirement_ids: [AE-001, AE-002, AE-003, AE-004, AE-005, AE-006]
 related_adrs: [ADR-0018]
 related_changes: [CHANGE-038]
-related_code: [src/lib/aftereffectsExport.ts, src/components/ExportPanel.tsx, src-tauri/src/lib.rs, src-tauri/tauri.conf.json, src-tauri/capabilities/default.json]
-related_tests: []
+related_code: [src/lib/aftereffectsExport.ts, src/lib/aeStatusController.ts, src/lib/videoExportLifecycle.ts, src/components/ExportPanel.tsx, src/adapters/types.ts, src/adapters/browser/exportService.ts, src/adapters/tauri/exportService.ts, src/lib/export.ts, src-tauri/src/lib.rs, src-tauri/tauri.conf.json, src-tauri/capabilities/default.json]
+related_tests: [src/lib/aeStatusController.test.ts, src/lib/videoExportLifecycle.test.ts, src/adapters/tauri/exportService.test.ts]
 ---
 
 # After Effects連携
@@ -29,9 +29,13 @@ Web版のAfter Effects連携は、利用者が起動した`KGG_AE_Bridge`へ現�
 
 Web版のAfter Effects連携は、直前に書き出したMOVまたはMP4を`KGG_AE_Bridge`へ送信し、After Effectsのコンポジションへ読み込む。
 
+動画の保存成功を確認してからAfter Effects送信を開始する。After Effectsの完了待ち中も、K-GGの動画書き出し状態、Previewのアニメーション、タイムライン操作は送信待ちの影響を受けない。複数の送信が重なった場合は、最新の送信結果だけをAEステータスへ反映する。
+
 ### AE-003 送信ファイル保存先
 
 Bridgeは指定された保存先を優先し、未指定または利用できない場合はAfter Effectsプロジェクトの場所または一時フォルダへ送信ファイルを保存する。
+
+保存ダイアログがキャンセルされた場合は保存成功とみなさず、動画の成功表示とAfter Effects送信を行わない。
 
 ### AE-004 After Effectsレイヤー読み込み
 

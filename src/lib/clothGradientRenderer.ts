@@ -283,6 +283,10 @@ export class ClothGradientRenderer {
     if (!gl) throw new WebGL2UnavailableError();
     if (gl.isContextLost()) throw new Error('WebGL context is currently lost');
 
+    // This context belongs exclusively to Three.js. Remove the development
+    // validator before Three initializes its program and VAO caches.
+    disableWebGLContextValidation(gl);
+
     this.renderer = new THREE.WebGLRenderer({
       canvas: this.canvas,
       context: gl,
@@ -295,7 +299,6 @@ export class ClothGradientRenderer {
     this.renderer.toneMapping = THREE.NoToneMapping;
     this.renderer.outputColorSpace = THREE.LinearSRGBColorSpace;
     this.renderer.debug.checkShaderErrors = true;
-    disableWebGLContextValidation(this.renderer.getContext());
 
     this.scene = new THREE.Scene();
 
@@ -485,6 +488,9 @@ export class ClothGradientRenderer {
       this.canvas.width = targetWidth;
       this.canvas.height = targetHeight;
       this.renderer.setSize(targetWidth, targetHeight, false);
+      // Resizing the drawing buffer clears the actual WebGL bindings but not
+      // Three.js' cached program/VAO state. Reconcile them before rendering.
+      this.renderer.resetState();
       this.camera.aspect = targetWidth / targetHeight;
       this.camera.updateProjectionMatrix();
     }
