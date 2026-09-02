@@ -8,6 +8,7 @@ import { CustomSelect } from './CustomSelect';
 import { Icon } from './Icon';
 import { InputShuffle, fromNumber } from 'tweeq';
 import { useLanguage } from '../i18n/LanguageProvider';
+import { getNoiseSeedField } from '../lib/noiseSeed';
 
 const D = STORE_DEFAULTS.noiseDistortion;
 
@@ -20,17 +21,17 @@ const isNoiseDirty = (value: NoiseDistortionConfig) =>
 
 // hidden: true にするとUIに表示されなくなる（コード・機能は保持される）
 const NOISE_TYPES = [
+  { value: 'fast_curl',        label: 'Fast Curl' },
+  { value: 'curl',             label: 'Curl (Legacy)' },
   { value: 'simplex',          label: 'Simplex' },
   { value: 'fbm',              label: 'fBm' },
+  { value: 'ridged_fbm',       label: 'Aura Ridges' },
+  { value: 'ae_fractal',       label: 'Fractal Drift' },
+  { value: 'domain_warp_anim', label: 'Domain Warp' },
+  { value: 'seamless',         label: 'Seamless' },
   { value: 'voronoi',          label: 'Voronoi' },
   { value: 'caustics',         label: 'Caustics' },
-  { value: 'ridged_fbm',       label: 'Aura Ridges' },
   { value: 'phasor',           label: 'Phasor Lines' },
-  { value: 'ae_fractal',       label: 'Fractal Drift' },
-  { value: 'curl',             label: 'Curl (Legacy)' },
-  { value: 'fast_curl',        label: 'Fast Curl' },
-  { value: 'domain_warp_anim', label: 'Domain Warp' },
-  { value: 'seamless',         label: 'Seamless'},
 ] as { value: string; label: string; hidden?: boolean }[];
 
 const AE_FRACTAL_TYPES = [
@@ -78,6 +79,8 @@ export function NoiseDistortionPanel() {
   const isAeFractal = noiseDistortion.type === 'ae_fractal';
   const isCurl = noiseDistortion.type === 'curl';
   const isFastCurl = noiseDistortion.type === 'fast_curl';
+  const seedField = getNoiseSeedField(noiseDistortion.type);
+  const seed = noiseDistortion[seedField] ?? 0;
   const isCaustics = noiseDistortion.type === 'caustics';
   const isPhasor = noiseDistortion.type === 'phasor';
   const hasOctaves = noiseDistortion.type === 'fbm' ||
@@ -117,6 +120,48 @@ export function NoiseDistortionPanel() {
             options={NOISE_TYPES.filter(t => !t.hidden)}
             onChange={(val) => setNoiseDistortion({ type: val as NoiseDistortionConfig['type'] })}
           />
+
+          <SliderField
+            label="Amount"
+            min={0} max={0.5} step={0.01}
+            value={noiseDistortion.amount}
+            onChange={(v) => setNoiseDistortion({ amount: v })}
+            format={(v) => v.toFixed(2)}
+            defaultValue={D.amount}
+            trackId="noiseDistortion.amount"
+          />
+
+          <SliderField
+            label="Scale"
+            min={isCaustics ? 0 : 0.01} max={isCaustics ? 3 : 10} step={0.01}
+            value={noiseDistortion.scale}
+            onChange={(v) => setNoiseDistortion({ scale: v })}
+            format={(v) => v.toFixed(isCaustics ? 2 : 1)}
+            defaultValue={D.scale}
+            trackId="noiseDistortion.scale"
+          />
+
+          <div className="flex items-end gap-2">
+            <div className="flex-1">
+              <SliderField
+                label="Seed"
+                min={0} max={100} step={0.1}
+                value={seed}
+                onChange={(v) => setNoiseDistortion({ [seedField]: v })}
+                format={(v) => v.toFixed(1)}
+                defaultValue={D[seedField] ?? 0}
+                trackId={`noiseDistortion.${seedField}`}
+              />
+            </div>
+            <InputShuffle
+              value={seed}
+              onChange={(seed) => setNoiseDistortion({ [seedField]: seed })}
+              generate={fromNumber(0, 100, 0)}
+              className="shrink-0"
+              aria-label={t('common.shuffle')}
+              title={t('common.shuffle')}
+            />
+          </div>
 
           {isSeamless && (
             <CustomSelect
@@ -457,26 +502,6 @@ export function NoiseDistortionPanel() {
             </>
           )}
 
-          <SliderField
-            label="Amount"
-            min={0} max={0.5} step={0.01}
-            value={noiseDistortion.amount}
-            onChange={(v) => setNoiseDistortion({ amount: v })}
-            format={(v) => v.toFixed(2)}
-            defaultValue={D.amount}
-            trackId="noiseDistortion.amount"
-          />
-
-          <SliderField
-            label="Scale"
-            min={isCaustics ? 0 : 0.01} max={isCaustics ? 3 : 10} step={0.01}
-            value={noiseDistortion.scale}
-            onChange={(v) => setNoiseDistortion({ scale: v })}
-            format={(v) => v.toFixed(isCaustics ? 2 : 1)}
-            defaultValue={D.scale}
-            trackId="noiseDistortion.scale"
-          />
-
           {hasOctaves && (
             <SliderField
               label="Octaves"
@@ -486,30 +511,6 @@ export function NoiseDistortionPanel() {
               defaultValue={D.octaves}
               trackId="noiseDistortion.octaves"
             />
-          )}
-
-          {!isCurl && !isFastCurl && (
-            <div className="flex items-end gap-2">
-              <div className="flex-1">
-                <SliderField
-                  label="Seed"
-                  min={0} max={100} step={0.1}
-                  value={noiseDistortion.noiseSeed ?? 0}
-                  onChange={(v) => setNoiseDistortion({ noiseSeed: v })}
-                  format={(v) => v.toFixed(1)}
-                  defaultValue={D.noiseSeed ?? 0}
-                  trackId="noiseDistortion.noiseSeed"
-                />
-              </div>
-              <InputShuffle
-                value={noiseDistortion.noiseSeed ?? 0}
-                onChange={(noiseSeed) => setNoiseDistortion({ noiseSeed })}
-                generate={fromNumber(0, 100, 0)}
-                className="shrink-0"
-                aria-label={t('common.shuffle')}
-                title={t('common.shuffle')}
-              />
-            </div>
           )}
 
           {(isCaustics || isPhasor) && (
@@ -561,27 +562,6 @@ export function NoiseDistortionPanel() {
                 defaultValue={D.curlEps ?? 0.01}
                 trackId="noiseDistortion.curlEps"
               />}
-              <div className="flex items-end gap-2">
-                <div className="flex-1">
-                  <SliderField
-                    label="Curl Seed"
-                    min={0} max={100} step={0.1}
-                    value={noiseDistortion.curlSeed ?? 0}
-                    onChange={(v) => setNoiseDistortion({ curlSeed: v })}
-                    format={(v) => v.toFixed(1)}
-                    defaultValue={D.curlSeed ?? 0}
-                    trackId="noiseDistortion.curlSeed"
-                  />
-                </div>
-                <InputShuffle
-                  value={noiseDistortion.curlSeed ?? 0}
-                  onChange={(curlSeed) => setNoiseDistortion({ curlSeed })}
-                  generate={fromNumber(0, 100, 0)}
-                  className="shrink-0"
-                  aria-label={t('common.shuffle')}
-                  title={t('common.shuffle')}
-                />
-              </div>
             </>
           )}
 

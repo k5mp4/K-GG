@@ -6,11 +6,11 @@ status: current
 owners: [maintainer]
 created: 2026-07-28
 updated: 2026-08-31
-requirement_ids: [UI-001, UI-002, UI-003, UI-004, UI-005, UI-006, UI-007, UI-008, UI-009, UI-010, UI-011, UI-012, UI-013, UI-014, UI-015, UI-019, UI-021, UI-022]
+requirement_ids: [UI-001, UI-002, UI-003, UI-004, UI-005, UI-006, UI-007, UI-008, UI-009, UI-010, UI-011, UI-012, UI-013, UI-014, UI-015, UI-019, UI-021, UI-022, UI-023]
 related_adrs: [ADR-0011, ADR-0012]
-related_changes: [CHANGE-010, CHANGE-012, CHANGE-013, CHANGE-014, CHANGE-015, CHANGE-018, CHANGE-019, CHANGE-024, CHANGE-025, CHANGE-026, CHANGE-030, CHANGE-032, CHANGE-034, CHANGE-037, CHANGE-039]
-related_code: [src/App.tsx, src/App.css, src/types/renderView.ts, src/types/coneView.ts, src/components/CustomSelect.tsx, src/components/GradientRamp.tsx, src/components/SliderField.tsx, src/components/NoiseDistortionPanel.tsx, src/components/BlockNoisePanel.tsx, src/components/DiffuseCurveEditor.tsx, src/components/SlitScanPanel.tsx, src/components/StretchPanel.tsx, src/components/TimelineBar.tsx, src/components/IridescencePanel.tsx, src/components/NormalMapPanel.tsx, src/components/SandboxPanel.tsx, src/components/FlowGradientPanel.tsx, src/components/ClothGradientPanel.tsx, src/components/ClothCanvas.tsx, src/components/ConeCanvas.tsx, src/components/ConeApexEditor.tsx, src/components/ConeViewPanel.tsx, src/components/RadonPanel.tsx, src/components/PostprocessPanel.tsx, src/components/PostprocessStackPanel.tsx, src/components/PresetPanel.tsx, src/components/Toggle.tsx, src/lib/effectPipeline.ts, src/lib/parameterLimits.ts, src/types/flowGradient.ts, src/i18n/uiLabels.ts, src/i18n/messages.ts]
-related_tests: [src/lib/tweeqAngle.test.ts, src/lib/effectPipeline.test.ts, src/lib/parameterLimits.test.ts, src/lib/animationDirection.test.ts, src/lib/effectShaderParity.test.ts, src/lib/flowSimulation.test.ts, src/lib/flowGradientPreset.test.ts, src/lib/presetThumbnail.test.ts, src/types/coneView.test.ts, src/lib/coneView.test.ts, src/lib/coneSeam.test.ts, src/components/CustomSelect.test.tsx, src/components/ConeApexEditor.test.tsx, 'manual: SANDBOX Edit Layer and Flow Gradient controls browser check', 'manual: Cone background coverage and color check']
+related_changes: [CHANGE-010, CHANGE-012, CHANGE-013, CHANGE-014, CHANGE-015, CHANGE-018, CHANGE-019, CHANGE-024, CHANGE-025, CHANGE-026, CHANGE-030, CHANGE-032, CHANGE-034, CHANGE-037, CHANGE-039, CHANGE-041]
+related_code: [src/App.tsx, src/App.css, src/types/renderView.ts, src/types/coneView.ts, src/components/CustomSelect.tsx, src/components/GradientRamp.tsx, src/components/SliderField.tsx, src/components/NoiseDistortionPanel.tsx, src/components/BlockNoisePanel.tsx, src/components/DiffuseCurveEditor.tsx, src/components/SlitScanPanel.tsx, src/components/StretchPanel.tsx, src/components/TimelineBar.tsx, src/components/IridescencePanel.tsx, src/components/NormalMapPanel.tsx, src/components/SandboxPanel.tsx, src/components/FlowGradientPanel.tsx, src/components/ClothGradientPanel.tsx, src/components/ClothCanvas.tsx, src/components/ConeCanvas.tsx, src/components/ConeApexEditor.tsx, src/components/ConeViewPanel.tsx, src/components/RadonPanel.tsx, src/components/PostprocessPanel.tsx, src/components/PostprocessStackPanel.tsx, src/components/PresetPanel.tsx, src/components/Toggle.tsx, src/lib/effectPipeline.ts, src/lib/parameterLimits.ts, src/lib/noiseSeed.ts, src/types/flowGradient.ts, src/i18n/uiLabels.ts, src/i18n/messages.ts]
+related_tests: [src/lib/tweeqAngle.test.ts, src/lib/effectPipeline.test.ts, src/lib/parameterLimits.test.ts, src/lib/animationDirection.test.ts, src/lib/effectShaderParity.test.ts, src/lib/flowSimulation.test.ts, src/lib/flowGradientPreset.test.ts, src/lib/presetThumbnail.test.ts, src/types/coneView.test.ts, src/lib/coneView.test.ts, src/lib/coneSeam.test.ts, src/components/CustomSelect.test.tsx, src/components/ConeApexEditor.test.tsx, src/components/NoiseDistortionPanel.test.tsx, 'manual: SANDBOX Edit Layer and Flow Gradient controls browser check', 'manual: Cone background coverage and color check']
 ---
 
 # UI入力コントロール
@@ -91,6 +91,12 @@ SANDBOXのEdit Layerには`Flow Gradient`を表示し、固定段のON/OFFと設
 ### UI-022 Cone Apex circular handle
 
 Coneの頂点操作点は、シアン色の単一の円形ボタンとして表示します。外周の補助リング、水平・垂直の補助線、内側の別マーカーは表示しません。ドラッグ、`Reset Position`、`aria-label`、`title`は既存の操作契約を維持します。
+
+### UI-023 Noise共通プロパティとType順序
+
+Noiseが有効な場合、Type選択の直後に`Amount`、`Scale`、`Seed`をこの順序で表示します。`Seed`のShuffle操作は共通行へ置き、通常Noiseでは`noiseSeed`、Curl系では`curlSeed`を更新します。Type固有の設定はこの共通プロパティの後ろへ表示します。
+
+Noise Typeの候補は、`Fast Curl`、`Curl (Legacy)`、`Simplex`、`fBm`、`Aura Ridges`、`Fractal Drift`、`Domain Warp`、`Seamless`、`Voronoi`、`Caustics`、`Phasor Lines`の順で表示します。この順序はFlow、Base / Fractal、Warp / Periodic、Structured Fieldの性質が近い候補を隣接させ、Flow系を先頭へ置きます。候補の内部値、入力範囲、既定値、保存・描画上の意味は変更しません。
 
 ## 互換性
 
