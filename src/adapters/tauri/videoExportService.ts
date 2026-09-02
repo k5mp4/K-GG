@@ -1,10 +1,15 @@
 import { invoke } from '@tauri-apps/api/core';
 import { join, tempDir } from '@tauri-apps/api/path';
-import { mkdir, readFile, remove, writeFile } from '@tauri-apps/plugin-fs';
+import { mkdir, remove, writeFile } from '@tauri-apps/plugin-fs';
 import { browserVideoExportService } from '../browser/videoExportService';
 import { needsTiledRender } from '../../lib/tileRender';
 import { renderAndCaptureExportFrame, withExportSession } from '../../lib/videoExportFrames';
-import type { NativeFfmpegStatus, VideoExportConfig, VideoExportService } from '../types';
+import type {
+  NativeFfmpegStatus,
+  NativeVideoArtifact,
+  VideoExportConfig,
+  VideoExportService,
+} from '../types';
 import { isTauriRuntime } from './exportService';
 
 async function writePngSequenceToTempDir(
@@ -46,6 +51,26 @@ async function writePngSequenceToTempDir(
   });
 }
 
+function nativeVideoArtifact(
+  path: string,
+  workspace: string,
+  mimeType: NativeVideoArtifact['mimeType'],
+): NativeVideoArtifact {
+  let releasePromise: Promise<void> | null = null;
+  return {
+    kind: 'native-path',
+    path,
+    mimeType,
+    release(): Promise<void> {
+      releasePromise ??= remove(workspace, { recursive: true }).catch((error: unknown) => {
+        releasePromise = null;
+        throw error;
+      });
+      return releasePromise;
+    },
+  };
+}
+
 export const tauriVideoExportService: VideoExportService = {
   exportFrameZip: browserVideoExportService.exportFrameZip,
   nativeFfmpegSupported: isTauriRuntime,
@@ -58,7 +83,7 @@ export const tauriVideoExportService: VideoExportService = {
   async openFfmpegBuildsPage(): Promise<void> {
     await invoke('open_ffmpeg_builds_page');
   },
-  async exportLosslessMOV(config: VideoExportConfig): Promise<Blob> {
+  async exportLosslessMOV(config: VideoExportConfig): Promise<NativeVideoArtifact> {
     const totalFrames = Math.ceil(config.fps * config.duration);
     const rootTemp = await join(await tempDir(), 'kagaribi-grad');
     const exportTemp = await join(rootTemp, `mov-${Date.now()}-${Math.random().toString(36).slice(2)}`);
@@ -66,6 +91,7 @@ export const tauriVideoExportService: VideoExportService = {
 
     await mkdir(exportTemp, { recursive: true });
 
+    let retained = false;
     try {
       await writePngSequenceToTempDir(config, exportTemp, totalFrames);
       config.onProgress?.(0.7);
@@ -77,13 +103,14 @@ export const tauriVideoExportService: VideoExportService = {
       });
       config.onProgress?.(0.95);
       config.onStage?.('saving');
-      const movieBytes = await readFile(outputPath);
-      return new Blob([movieBytes], { type: 'video/quicktime' });
+      const artifact = nativeVideoArtifact(outputPath, exportTemp, 'video/quicktime');
+      retained = true;
+      return artifact;
     } finally {
-      await remove(exportTemp, { recursive: true }).catch(() => undefined);
+      if (!retained) await remove(exportTemp, { recursive: true }).catch(() => undefined);
     }
   },
-  async exportHighQualityMP4(config: VideoExportConfig): Promise<Blob> {
+  async exportHighQualityMP4(config: VideoExportConfig): Promise<NativeVideoArtifact> {
     const totalFrames = Math.ceil(config.fps * config.duration);
     const rootTemp = await join(await tempDir(), 'kagaribi-grad');
     const exportTemp = await join(rootTemp, `mp4-${Date.now()}-${Math.random().toString(36).slice(2)}`);
@@ -91,6 +118,7 @@ export const tauriVideoExportService: VideoExportService = {
 
     await mkdir(exportTemp, { recursive: true });
 
+    let retained = false;
     try {
       await writePngSequenceToTempDir(config, exportTemp, totalFrames);
       config.onProgress?.(0.7);
@@ -103,10 +131,11 @@ export const tauriVideoExportService: VideoExportService = {
       });
       config.onProgress?.(0.95);
       config.onStage?.('saving');
-      const movieBytes = await readFile(outputPath);
-      return new Blob([movieBytes], { type: 'video/mp4' });
+      const artifact = nativeVideoArtifact(outputPath, exportTemp, 'video/mp4');
+      retained = true;
+      return artifact;
     } finally {
-      await remove(exportTemp, { recursive: true }).catch(() => undefined);
+      if (!retained) await remove(exportTemp, { recursive: true }).catch(() => undefined);
     }
   },
 };

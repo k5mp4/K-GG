@@ -8,6 +8,7 @@ import {
   exportLosslessMOV,
   nativeFfmpegSupported,
   openNativeFfmpegFolder,
+  saveNativeVideoArtifact,
 } from '../lib/exportVideo';
 import {
   downloadPNG, downloadJPG, downloadWebP,
@@ -25,6 +26,7 @@ import type {
   ExportStage,
   Mp4QualityPreset,
   NativeFfmpegStatus,
+  NativeVideoArtifact,
   VideoExportFrameRenderer,
 } from '../adapters';
 import type { AeSaveDirStatus, AeStatus } from '../lib/aftereffectsExport';
@@ -34,6 +36,21 @@ import { useLanguage } from '../i18n/LanguageProvider';
 
 type ExportJob = 'mov' | 'mp4' | 'zip' | 'slits' | null;
 type VideoExt = 'mov' | 'mp4';
+
+async function releaseVideoArtifact(artifact: NativeVideoArtifact): Promise<void> {
+  let lastError: unknown;
+  for (const delayMs of [0, 100, 500]) {
+    if (delayMs > 0) await new Promise(resolve => setTimeout(resolve, delayMs));
+    try {
+      await artifact.release();
+      return;
+    } catch (error) {
+      lastError = error;
+    }
+  }
+  console.warn('Native video workspace cleanup failed after retries:', lastError);
+  throw lastError;
+}
 
 type Props = {
   onExportProgress?: (progress: number | null) => void;
@@ -82,10 +99,12 @@ export function ExportPanel({
   const [slitTrimMode, setSlitTrimMode] = useState(false);
   const abortControllerRef = useRef<AbortController | null>(null);
   const previewWasPlayingRef = useRef<boolean | null>(null);
+  const mountedRef = useRef(true);
 
   // After Effects 連携
   const [aeStatus, setAeStatus] = useState<AeStatus | 'idle' | 'sending'>('idle');
   const [sendToAe, setSendToAe] = useState(false);
+  const [pendingAeVideoSends, setPendingAeVideoSends] = useState(0);
   const [aeSaveDirStatus, setAeSaveDirStatus] = useState<AeSaveDirStatus>({ mode: 'auto', path: null, name: null });
   const [bridgeAvailable, setBridgeAvailable] = useState(false);
   const [bridgeChecking, setBridgeChecking] = useState(false);
@@ -106,8 +125,36 @@ export function ExportPanel({
     };
   }, [bridgeAvailable]);
 
-  // 動画エクスポート完了時に AE 送信できるよう最後の Blob を保持
-  const lastVideoRef = useRef<{ blob: Blob; ext: VideoExt } | null>(null);
+  // 動画エクスポート完了時に AE 送信できるよう最後のネイティブ成果物を保持
+  const lastVideoRef = useRef<{ artifact: NativeVideoArtifact; ext: VideoExt } | null>(null);
+  const videoSendPromisesRef = useRef(new Map<NativeVideoArtifact, Promise<void>>());
+  const videoSendQueueRef = useRef<Promise<void>>(Promise.resolve());
+  const aeOperationRef = useRef(0);
+  const aeStatusResetTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  async function releaseVideoWhenIdle(artifact: NativeVideoArtifact): Promise<void> {
+    await videoSendPromisesRef.current.get(artifact)?.catch(() => undefined);
+    await releaseVideoArtifact(artifact);
+  }
+
+  useEffect(() => {
+    mountedRef.current = true;
+    const sendPromises = videoSendPromisesRef.current;
+    return () => {
+      mountedRef.current = false;
+      abortControllerRef.current?.abort();
+      if (aeStatusResetTimerRef.current) clearTimeout(aeStatusResetTimerRef.current);
+      const lastVideo = lastVideoRef.current;
+      lastVideoRef.current = null;
+      if (lastVideo) {
+        const pendingSend = sendPromises.get(lastVideo.artifact);
+        void (async () => {
+          await pendingSend?.catch(() => undefined);
+          await releaseVideoArtifact(lastVideo.artifact);
+        })().catch(() => undefined);
+      }
+    };
+  }, []);
 
   function flashSaved(format: string) {
     setSavedFormats((prev) => ({ ...prev, [format]: true }));
@@ -115,6 +162,7 @@ export function ExportPanel({
   }
 
   function reportProgress(p: number) {
+    if (!mountedRef.current) return;
     console.log(`[Export] reportProgress: ${p.toFixed(3)}`);
     // 進捗更新頻度を制限（最低 1% 以上変化したとき、または 100% のときのみ更新）
     if (Math.abs(p - lastReportedProgressRef.current) < 0.01 && p < 0.99) return;
@@ -124,6 +172,7 @@ export function ExportPanel({
   }
 
   function reportStage(stage: ExportStage) {
+    if (!mountedRef.current) return;
     setExportStage(stage);
     onExportStage?.(stage);
   }
@@ -150,7 +199,7 @@ export function ExportPanel({
 
   function finishExport() {
     abortControllerRef.current = null;
-    reportDone();
+    if (mountedRef.current) reportDone();
     const wasPlaying = previewWasPlayingRef.current;
     previewWasPlayingRef.current = null;
     renderBridge.resumeAnimation(wasPlaying ?? false);
@@ -160,19 +209,56 @@ export function ExportPanel({
     abortControllerRef.current?.abort();
   }
 
-  async function sendVideoToAe(blob: Blob, ext: VideoExt) {
-    setAeStatus('sending');
-    const s = await aeImportVideo(blob, ext, stem);
-    setAeStatus(s);
-    setTimeout(() => setAeStatus('idle'), 4000);
+  function beginAeOperation(): number {
+    const operationId = ++aeOperationRef.current;
+    if (aeStatusResetTimerRef.current) clearTimeout(aeStatusResetTimerRef.current);
+    if (mountedRef.current) setAeStatus('sending');
+    return operationId;
+  }
+
+  function finishAeOperation(operationId: number, status: AeStatus) {
+    if (!mountedRef.current || operationId !== aeOperationRef.current) return;
+    setAeStatus(status);
+    aeStatusResetTimerRef.current = setTimeout(() => {
+      if (mountedRef.current && operationId === aeOperationRef.current) setAeStatus('idle');
+    }, 4000);
+  }
+
+  async function sendVideoToAe(artifact: NativeVideoArtifact, ext: VideoExt) {
+    const operationId = beginAeOperation();
+    if (mountedRef.current) setPendingAeVideoSends(count => count + 1);
+
+    const send = videoSendQueueRef.current
+      .catch(() => undefined)
+      .then(() => aeImportVideo(artifact, ext, stem));
+    const sendSettled = send.then(() => undefined, () => undefined);
+    videoSendQueueRef.current = sendSettled;
+
+    const previousForArtifact = videoSendPromisesRef.current.get(artifact) ?? Promise.resolve();
+    const tracked = Promise.allSettled([previousForArtifact, sendSettled]).then(() => undefined);
+    videoSendPromisesRef.current.set(artifact, tracked);
+    try {
+      const status = await send;
+      finishAeOperation(operationId, status);
+    } catch (error) {
+      console.error('After Effects video send failed:', error);
+      finishAeOperation(operationId, 'error');
+    } finally {
+      await tracked;
+      if (videoSendPromisesRef.current.get(artifact) === tracked) {
+        videoSendPromisesRef.current.delete(artifact);
+      }
+      if (mountedRef.current) setPendingAeVideoSends(count => Math.max(0, count - 1));
+    }
   }
 
   async function handleAePing() {
-    setAeStatus('sending');
+    const operationId = beginAeOperation();
     const s = await aePing();
-    setBridgeAvailable(s === 'ok');
-    setAeStatus(s);
-    setTimeout(() => setAeStatus('idle'), 4000);
+    if (mountedRef.current && operationId === aeOperationRef.current) {
+      setBridgeAvailable(s === 'ok');
+    }
+    finishAeOperation(operationId, s);
   }
 
   async function handleAeRefresh() {
@@ -185,20 +271,16 @@ export function ExportPanel({
   async function handleAeSendImage() {
     const canvas = getOutputCanvas();
     if (!canvas) return;
-    setAeStatus('sending');
+    const operationId = beginAeOperation();
     const blob = await canvasToPngBlob(canvas);
     const s = await aeImportImage(blob, stem);
-    setAeStatus(s);
-    setTimeout(() => setAeStatus('idle'), 4000);
+    finishAeOperation(operationId, s);
   }
 
   async function handleAeSendVideo() {
     if (!lastVideoRef.current) return;
-    setAeStatus('sending');
-    const { blob, ext } = lastVideoRef.current;
-    const s = await aeImportVideo(blob, ext, stem);
-    setAeStatus(s);
-    setTimeout(() => setAeStatus('idle'), 4000);
+    const { artifact, ext } = lastVideoRef.current;
+    await sendVideoToAe(artifact, ext);
   }
 
   // 書き出し先フォルダハンドル（セッション中保持）
@@ -217,6 +299,7 @@ export function ExportPanel({
   const nativeVideoEncodeReady = nativeFfmpegAvailable
     && !ffmpegChecking
     && ffmpegStatus?.available === true;
+  const videoExportBlockedByAeQueue = sendToAe && pendingAeVideoSends >= 2;
 
   async function ensureNativeVideoEncodeReady(): Promise<boolean> {
     const status = await onCheckFfmpeg(true);
@@ -262,8 +345,11 @@ export function ExportPanel({
       setTimeout(resolve, 500);
     });
 
+    let artifact: NativeVideoArtifact | null = null;
+    let retained = false;
+    let exportFinished = false;
     try {
-      const blob = await exportLosslessMOV({
+      artifact = await exportLosslessMOV({
         canvas,
         renderFrame,
         fps: animation.fps,
@@ -274,12 +360,20 @@ export function ExportPanel({
         onProgress: reportProgress,
         onStage: reportStage,
       });
+      if (controller.signal.aborted || !mountedRef.current) return;
       reportStage('saving');
-      await saveBlobToDir(blob, `${stem}.mov`, dirHandleRef.current);
+      const saved = await saveNativeVideoArtifact(artifact, `${stem}.mov`, dirHandleRef.current);
+      if (!saved) return;
+      if (controller.signal.aborted || !mountedRef.current) return;
       reportProgress(1);
-      lastVideoRef.current = { blob, ext: 'mov' };
+      const previous = lastVideoRef.current;
+      lastVideoRef.current = { artifact, ext: 'mov' };
+      retained = true;
+      if (previous) void releaseVideoWhenIdle(previous.artifact).catch(() => undefined);
       flashSaved('mov');
-      if (sendToAe) await sendVideoToAe(blob, 'mov');
+      finishExport();
+      exportFinished = true;
+      if (sendToAe) void sendVideoToAe(artifact, 'mov');
     } catch (e) {
       if (e instanceof DOMException && e.name === 'AbortError') { /* cancelled */ }
       else {
@@ -291,7 +385,8 @@ export function ExportPanel({
         setTimeout(() => setExportError(null), 8000);
       }
     } finally {
-      finishExport();
+      if (!retained && artifact) await releaseVideoArtifact(artifact).catch(() => undefined);
+      if (!exportFinished) finishExport();
     }
   }
 
@@ -308,8 +403,11 @@ export function ExportPanel({
       setTimeout(resolve, 500);
     });
 
+    let artifact: NativeVideoArtifact | null = null;
+    let retained = false;
+    let exportFinished = false;
     try {
-      const blob = await exportHighQualityMP4({
+      artifact = await exportHighQualityMP4({
         canvas,
         renderFrame,
         fps: animation.fps,
@@ -321,12 +419,20 @@ export function ExportPanel({
         onProgress: reportProgress,
         onStage: reportStage,
       });
+      if (controller.signal.aborted || !mountedRef.current) return;
       reportStage('saving');
-      await saveBlobToDir(blob, `${stem}_h264rgb.mp4`, dirHandleRef.current);
+      const saved = await saveNativeVideoArtifact(artifact, `${stem}_h264rgb.mp4`, dirHandleRef.current);
+      if (!saved) return;
+      if (controller.signal.aborted || !mountedRef.current) return;
       reportProgress(1);
-      lastVideoRef.current = { blob, ext: 'mp4' };
+      const previous = lastVideoRef.current;
+      lastVideoRef.current = { artifact, ext: 'mp4' };
+      retained = true;
+      if (previous) void releaseVideoWhenIdle(previous.artifact).catch(() => undefined);
       flashSaved('mp4');
-      if (sendToAe) await sendVideoToAe(blob, 'mp4');
+      finishExport();
+      exportFinished = true;
+      if (sendToAe) void sendVideoToAe(artifact, 'mp4');
     } catch (e) {
       if (e instanceof DOMException && e.name === 'AbortError') { /* cancelled */ }
       else {
@@ -336,7 +442,8 @@ export function ExportPanel({
         setTimeout(() => setExportError(null), 8000);
       }
     } finally {
-      finishExport();
+      if (!retained && artifact) await releaseVideoArtifact(artifact).catch(() => undefined);
+      if (!exportFinished) finishExport();
     }
   }
 
@@ -626,7 +733,7 @@ export function ExportPanel({
             <div style={{ display: exportJob === null ? 'block' : 'none' }}>
               <button
                 onClick={handleExportMov}
-                disabled={recording || !videoReady || !nativeVideoEncodeReady}
+                disabled={recording || !videoReady || !nativeVideoEncodeReady || videoExportBlockedByAeQueue}
                 className="w-full py-1.5 bg-fire hover:brightness-110 disabled:opacity-40 disabled:cursor-not-allowed rounded-none text-xs font-display font-semibold text-k-text uppercase tracking-wider"
               >
                 {savedFormats['mov'] ? `✓ ${t('export.saved')}` : t('export.exportMov')}
@@ -641,7 +748,7 @@ export function ExportPanel({
             <div style={{ display: exportJob === null ? 'block' : 'none' }}>
               <button
                 onClick={handleExportMP4}
-                disabled={recording || !videoReady || !nativeVideoEncodeReady}
+                disabled={recording || !videoReady || !nativeVideoEncodeReady || videoExportBlockedByAeQueue}
                 className="w-full py-1.5 bg-fire hover:brightness-110 disabled:opacity-40 disabled:cursor-not-allowed rounded-none text-xs font-display font-semibold text-k-text uppercase tracking-wider"
               >
                 {savedFormats['mp4'] ? `✓ ${t('export.saved')}` : t('export.exportMp4')}

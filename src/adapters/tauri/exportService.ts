@@ -1,6 +1,6 @@
 import { join } from '@tauri-apps/api/path';
 import { open as openDialog, save as saveDialog } from '@tauri-apps/plugin-dialog';
-import { mkdir, writeFile } from '@tauri-apps/plugin-fs';
+import { copyFile, mkdir, writeFile } from '@tauri-apps/plugin-fs';
 import {
   canvasToJpgBlob,
   canvasToPngBlob as canvasToTauriPngBlob,
@@ -79,6 +79,25 @@ export const tauriExportService: ExportService = {
     });
     if (!target) return;
     await writeFile(target, bytes);
+  },
+  async saveNativeVideoArtifact(artifact, filename, dirHandle): Promise<boolean> {
+    let target: string | null = null;
+    if (typeof dirHandle === 'string') {
+      target = await join(dirHandle, filename);
+    } else if (dirHandle) {
+      throw new Error('ネイティブ動画はローカルフォルダーにのみ保存できます。');
+    } else {
+      target = await saveDialog({
+        title: 'ファイルを保存',
+        defaultPath: filename,
+        filters: dialogFilters(filename),
+        canCreateDirectories: true,
+      });
+    }
+
+    if (!target) return false;
+    await copyFile(artifact.path, target);
+    return true;
   },
   canvasToPngBlob: canvasToTauriPngBlob,
   async savePNG(canvas, stem, dirHandle = null) {

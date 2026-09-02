@@ -2,6 +2,7 @@ import type {
   AeSaveDirStatus,
   AeStatus,
   AfterEffectsService,
+  NativeVideoArtifact,
 } from '../types';
 
 const AE_BASE = 'http://localhost:7749';
@@ -79,13 +80,14 @@ export const browserAfterEffectsService: AfterEffectsService = {
     }
   },
 
-  async importVideo(blob: Blob, ext: 'mov' | 'mp4' = 'mov', name = 'kagaribi'): Promise<AeStatus> {
+  async importVideo(source: Blob | NativeVideoArtifact, ext: 'mov' | 'mp4' = 'mov', name = 'kagaribi'): Promise<AeStatus> {
+    if (!(source instanceof Blob)) return 'unsupported';
     try {
       const params = new URLSearchParams({ ext, name });
       const res = await fetch(`${AE_BASE}/api/ae/import-video?${params.toString()}`, {
         method: 'POST',
-        headers: { 'Content-Type': blob.type || 'video/quicktime' },
-        body: blob,
+        headers: { 'Content-Type': source.type || 'video/quicktime' },
+        body: source,
       });
       const body = await res.json() as { status: AeStatus };
       return body.status;
