@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { renderBridge } from './renderBridge';
 
 describe('renderBridge export suspension', () => {
@@ -59,6 +59,46 @@ describe('renderBridge export suspension', () => {
     expect(renderBridge.isAnimationSuspended()).toBe(false);
   });
 
+  it('clears the suspension flag when pausing the preview throws', () => {
+    renderBridge.registerPause(
+      () => undefined,
+      () => false,
+      () => 0,
+      undefined,
+      undefined,
+      () => {
+        throw new Error('preview render failed while pausing');
+      },
+      undefined,
+    );
+
+    expect(() => renderBridge.suspendAnimation()).toThrow('preview render failed while pausing');
+    expect(renderBridge.isAnimationSuspended()).toBe(false);
+  });
+
+  it('contains a synchronous preview resume failure after export cleanup', () => {
+    const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+    renderBridge.registerPause(
+      () => undefined,
+      () => false,
+      () => 0,
+      undefined,
+      undefined,
+      undefined,
+      () => {
+        throw new Error('preview render failed while resuming');
+      },
+    );
+
+    expect(() => renderBridge.resumeAnimation(true)).not.toThrow();
+    expect(renderBridge.isAnimationSuspended()).toBe(false);
+    expect(errorSpy).toHaveBeenCalledWith(
+      '[Export] Preview resume failed after export.',
+      expect.any(Error),
+    );
+    errorSpy.mockRestore();
+  });
+
   it('keeps an initial play request until the animation loop exists', () => {
     renderBridge.requestPlay();
 
@@ -82,6 +122,36 @@ describe('renderBridge export suspension', () => {
 
     renderBridge.endExportSession(session);
     expect(restoreCalls).toBe(1);
+  });
+
+  it('restores the preview even when an export session ends before its first frame', async () => {
+    const session = await renderBridge.beginExportSession();
+
+    renderBridge.endExportSession(session);
+
+    expect(restoreCalls).toBe(1);
+    expect(renderBridge.isExportSessionActive()).toBe(false);
+  });
+
+  it('keeps the bridge released and falls back to a preview render when restore fails', async () => {
+    let restoreAttempts = 0;
+    renderBridge.registerExportRenderer(async () => ({
+      renderAtTime: () => { exportRenderCalls += 1; },
+      finishGpu: () => undefined,
+      restorePreview: () => {
+        restoreAttempts += 1;
+        throw new Error('preview restore failed');
+      },
+      tilePadding: 0,
+    }));
+
+    const session = await renderBridge.beginExportSession();
+    renderBridge.renderExportFrame(session, 0, 0);
+
+    expect(() => renderBridge.endExportSession(session)).not.toThrow();
+    expect(restoreAttempts).toBe(1);
+    expect(previewRenderCalls).toBe(1);
+    expect(renderBridge.isExportSessionActive()).toBe(false);
   });
 
   it('rejects nested sessions and stale tokens without corrupting the active session', async () => {

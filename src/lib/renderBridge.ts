@@ -56,7 +56,6 @@ let _nextExportSessionId = 1;
 let _nextRenderSequence = 1;
 let _preparingExportSession = false;
 let _activeExportSession: ActiveExportSession | null = null;
-let _previewRenderQueued = false;
 
 function assertActiveExportSession(token: ExportSessionToken): ActiveExportSession {
   const active = _activeExportSession;
@@ -64,6 +63,27 @@ function assertActiveExportSession(token: ExportSessionToken): ActiveExportSessi
     throw new Error('Invalid or inactive export session');
   }
   return active;
+}
+
+function renderCurrentPreview(): void {
+  _renderAtTime?.(_getCurrentTime?.() ?? 0, _getCurrentNormalizedTime?.() ?? 0);
+}
+
+function restorePreviewSafely(renderer: PreparedExportRenderer): void {
+  try {
+    renderer.restorePreview();
+  } catch (error) {
+    // Preview restoration is cleanup. A transient WebGL/Three.js state error
+    // must not leave the export bridge active or propagate into the React
+    // commit that clears the progress UI. Retry the main renderer once after
+    // the export owner has already been released.
+    console.error('[Export] Preview restore failed; retrying the main renderer.', error);
+    try {
+      renderCurrentPreview();
+    } catch (fallbackError) {
+      console.error('[Export] Main preview retry failed after export.', fallbackError);
+    }
+  }
 }
 
 export const renderBridge = {
@@ -105,7 +125,6 @@ export const renderBridge = {
   /** React scheduler / AnimationLoop の直接描画を export session から隔離する。 */
   renderPreview(renderPreview: VoidFn): boolean {
     if (_preparingExportSession || _activeExportSession) {
-      _previewRenderQueued = true;
       return false;
     }
     renderPreview();
@@ -120,7 +139,6 @@ export const renderBridge = {
     }
 
     _preparingExportSession = true;
-    _previewRenderQueued = false;
     try {
       if (signal?.aborted) throw new DOMException('Export cancelled', 'AbortError');
       const renderer = await _prepareExportRenderer(signal);
@@ -130,8 +148,11 @@ export const renderBridge = {
       beginExportDiagnostics(token.id, renderer.diagnostics);
       return token;
     } catch (error) {
-      _previewRenderQueued = false;
-      _renderAtTime?.(_getCurrentTime?.() ?? 0, _getCurrentNormalizedTime?.() ?? 0);
+      try {
+        renderCurrentPreview();
+      } catch (restoreError) {
+        console.error('[Export] Preview restore failed after export preparation.', restoreError);
+      }
       throw error;
     } finally {
       _preparingExportSession = false;
@@ -173,10 +194,13 @@ export const renderBridge = {
   endExportSession(token: ExportSessionToken): void {
     const active = assertActiveExportSession(token);
     _activeExportSession = null;
-    const shouldRestore = _previewRenderQueued || active.lastRenderSequence > 0;
-    _previewRenderQueued = false;
     endExportDiagnostics();
-    if (shouldRestore) active.renderer.restorePreview();
+    // Export preparation can change programs, framebuffer bindings, or the
+    // drawing buffer before the first frame gets a sequence number. Always
+    // restore the preview when an active session ends, including that failure
+    // path, otherwise the canvas can remain blank while the UI says the export
+    // has already finished.
+    restorePreviewSafely(active.renderer);
   },
   isExportSessionActive(): boolean {
     return _preparingExportSession || _activeExportSession !== null;
@@ -203,12 +227,39 @@ export const renderBridge = {
   suspendAnimation(): boolean {
     if (_animationSuspended) return false;
     _animationSuspended = true;
-    return _pauseAnimation?.() ?? false;
+    try {
+      return _pauseAnimation?.() ?? false;
+    } catch (error) {
+      // AnimationLoop.pause() renders the snapped frame synchronously. If
+      // that preview render fails, do not leave the bridge permanently
+      // suspended and make every later export look frozen.
+      _animationSuspended = false;
+      throw error;
+    }
   },
   /** Export終了後に、開始前に再生中だった場合だけ再開する。 */
   resumeAnimation(wasPlaying: boolean): void {
     _animationSuspended = false;
-    if (wasPlaying && !_preparingExportSession && !_activeExportSession) _resumeAnimation?.();
+    if (!wasPlaying || _preparingExportSession || _activeExportSession) return;
+    try {
+      _resumeAnimation?.();
+    } catch (error) {
+      // AnimationLoop.resume() emits one frame synchronously. Treat a failure
+      // in that cleanup frame as recoverable: cancel the loop so a broken
+      // callback cannot keep throwing on every RAF, then make one best-effort
+      // preview render after the export owner has been released.
+      console.error('[Export] Preview resume failed after export.', error);
+      try {
+        _stopAnim?.();
+      } catch (stopError) {
+        console.error('[Export] Failed to stop the preview after resume failure.', stopError);
+      }
+      try {
+        renderCurrentPreview();
+      } catch (restoreError) {
+        console.error('[Export] Preview retry failed after resume failure.', restoreError);
+      }
+    }
   },
   isAnimationSuspended(): boolean {
     return _animationSuspended;
@@ -232,7 +283,6 @@ export const renderBridge = {
   },
   seekTo(normalizedTime: number): void {
     if (_preparingExportSession || _activeExportSession) {
-      _previewRenderQueued = true;
       return;
     }
     _seekTo?.(Math.max(0, Math.min(1, normalizedTime)));

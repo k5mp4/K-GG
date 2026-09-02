@@ -166,6 +166,7 @@ const fakeThree = vi.hoisted(() => {
       isContextLost: () => boolean;
     };
     disposeCount = 0;
+    resetStateCount = 0;
 
     readonly options: { canvas: TestCanvas; context?: TestWebGLContext };
 
@@ -183,6 +184,9 @@ const fakeThree = vi.hoisted(() => {
     setSize(): void {}
     getContext(): typeof this.context {
       return this.context;
+    }
+    resetState(): void {
+      this.resetStateCount += 1;
     }
     render(): void {}
     dispose(): void {
@@ -284,6 +288,18 @@ describe('ConeViewRenderer resource lifecycle', () => {
 
     expect(fakeThree.FakeCanvasTexture.instances).toHaveLength(2);
     expect(firstTexture?.disposeCount).toBe(1);
+    renderer.dispose();
+  });
+
+  it('resets Three.js state after resizing the export canvas', () => {
+    const renderer = new ConeViewRenderer();
+    const source = createCanvas(1920, 1080) as unknown as HTMLCanvasElement;
+    const webglRenderer = fakeThree.FakeWebGLRenderer.instances[0];
+
+    renderer.renderMappedTexture(source, config, 0, 512, 512);
+    renderer.renderMappedTexture(source, config, 0, 1920, 1080);
+
+    expect(webglRenderer?.resetStateCount).toBe(1);
     renderer.dispose();
   });
 

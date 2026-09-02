@@ -5,12 +5,12 @@ title: WebGL Performance Debug / Profiler
 status: current
 owners: [maintainer]
 created: 2026-08-12
-updated: 2026-08-30
+updated: 2026-09-02
 requirement_ids: [PERF-001, PERF-002, PERF-003, PERF-004, PERF-005, PERF-006, PERF-007, PERF-008, PERF-009, PERF-010]
 related_adrs: [ADR-0005, ADR-0015]
-related_changes: [CHANGE-028]
-related_code: [src/lib/webglPerformance.ts, src/lib/webgl.ts, src/lib/gpuDiagnostics.ts, src/hooks/useWebGL.ts, src/components/WebGLPerformancePanel.tsx, src/components/GradientCanvas.tsx]
-related_tests: [src/lib/webglPerformance.test.ts, src/lib/webglPerformanceBenchmark.test.ts, src/lib/webglCompilePolicy.test.ts]
+related_changes: [CHANGE-028, CHANGE-038]
+related_code: [src/lib/webglPerformance.ts, src/lib/webgl.ts, src/lib/gpuDiagnostics.ts, src/hooks/useWebGL.ts, src/components/WebGLPerformancePanel.tsx, src/components/GradientCanvas.tsx, src/lib/coneViewRenderer.ts, src/lib/clothGradientRenderer.ts]
+related_tests: [src/lib/webglPerformance.test.ts, src/lib/webglPerformanceBenchmark.test.ts, src/lib/webglCompilePolicy.test.ts, src/lib/webglShaderSources.test.ts, src/lib/coneViewRenderer.test.ts]
 ---
 
 # WebGL Performance Debug / Profiler
@@ -43,13 +43,13 @@ Effectおよび固定段のDraw CallsとRender Passesを確認できる。
 
 ### PERF-006 WebGL Validation切替
 
-`webgl-lint`によるValidationをPerformance計測とは独立に切り替えられる。Benchmark中はValidationを無効化する。Spector.js Capture中も同じWebGL contextへのValidation wrapperとK-GGのGPU timer queryを一時停止し、Capture終了またはキャンセル時に開始前のValidation状態を復元する。Effect Stackの共有uniform契約に存在しないuniformはValidationの致命的エラーにしない。Three.jsのCone/Clothなど補助Rendererが所有する別contextは通常のValidation対象外とし、context loss中のoptional extension問い合わせはUnavailableとして扱ってProfilerの初期化を停止させず、Previewは既存のcontext loss/recovery経路へ委ねる。
+`webgl-lint`によるValidationをPerformance計測とは独立に切り替えられる。Benchmark中はValidationのチェックを無効化する。Spector.js Capture中も同じWebGL contextへのValidationチェックとK-GGのGPU timer queryを一時停止し、Capture終了またはキャンセル時に開始前のValidation状態を復元する。Program／Uniformの追跡Mapを保持するため、ValidationのON/OFFやCaptureの切替でメインcontextのwrapperを外したり、Canvasからcontextを再取得したりしない。Effect Stackの共有uniform契約に存在しないuniformはValidationの致命的エラーにしない。Three.jsのCone/Clothなど補助Rendererが所有する別contextは、Three.jsの初期化前にValidationのwrapper自体を完全に無効化し、Three.jsのテクスチャ／Program／VAOキャッシュへ検証ラッパーが介入しないようにする。context loss中のoptional extension問い合わせはUnavailableとして扱ってProfilerの初期化を停止させず、Previewは既存のcontext loss/recovery経路へ委ねる。
 
 ### PERF-007 Capture Frame
 
 Capture Frame操作時だけSpector.jsで既存CanvasのWebGL frameをCaptureする。通常の操作ではK-GGが`kgg-preview-canvas`を直接Spector.jsへ渡すため、手動のCanvas選択を必要としない。Spectorの`Choose Canvas...`を使う場合は、一覧から`Id: kgg-preview-canvas`を選択する。静止PreviewでアニメーションRAFがない場合も、Capture開始時に1回のPreview再描画を行い、GLコマンドを捕捉できる状態にする。Spector.jsはUMD/CommonJS配布物のため、Viteの`default`、`SPECTOR`、および限定された入れ子export形状を解決してから既存Canvasへ渡す。Capture Frameタブの`Cancel Spector Capture`、またはCapture Frameタブを離れても表示されるフローティング`Cancel Spector Capture`で、空フレーム時の再試行を含むCaptureを停止できる。Captureに失敗またはキャンセルしてもPreviewのCanvas、render loop、Effect Stack操作は継続する。
 
-現時点では、静止Previewの再描画後もSpector.jsのCapture結果表示時に`webgl-lint`の`recordSamplerValues`から`TypeError: Cannot read properties of undefined (reading 'get')`が発生する既知の未解決経路がある。これはPreviewやEffect Stackを停止させてよいという仕様ではなく、`CHANGE-028`の次回調査対象である。Captureの確認では、`no frames with gl commands detected`が出ないことと、Capture結果が表示されることを別の結果として記録する。
+Captureの確認では、`no frames with gl commands detected`が出ないことと、Capture結果が表示されることを別の結果として記録する。Validationの切替やCapture復帰で既存Program／Uniform情報が失われ、`recordSamplerValues`が未定義Mapへアクセスすることは期待動作ではない。
 
 ### PERF-008 Benchmark
 

@@ -43,13 +43,13 @@ export async function saveBlobToDir(
   blob: Blob,
   filename: string,
   dirHandle: ExportDirectoryHandle | null,
-): Promise<void> {
+): Promise<boolean> {
   if (dirHandle && typeof dirHandle !== 'string') {
     const fileHandle = await dirHandle.getFileHandle(filename, { create: true });
     const writable = await fileHandle.createWritable();
     await writable.write(blob);
     await writable.close();
-    return;
+    return true;
   }
   // フォールバック: <a download>
   const url = URL.createObjectURL(blob);
@@ -60,6 +60,7 @@ export async function saveBlobToDir(
   link.click();
   document.body.removeChild(link);
   URL.revokeObjectURL(url);
+  return true;
 }
 
 export async function canvasToPngBlob(canvas: HTMLCanvasElement): Promise<Blob> {
@@ -80,9 +81,9 @@ export async function downloadPNG(
   canvas: HTMLCanvasElement,
   stem = 'gradient',
   dirHandle: ExportDirectoryHandle | null = null,
-): Promise<void> {
+): Promise<boolean> {
   const blob = await canvasToPngBlob(canvas);
-  await saveBlobToDir(blob, `${stem}.png`, dirHandle);
+  return await saveBlobToDir(blob, `${stem}.png`, dirHandle);
 }
 
 export async function downloadJPG(
@@ -90,9 +91,9 @@ export async function downloadJPG(
   quality = 0.92,
   stem = 'gradient',
   dirHandle: ExportDirectoryHandle | null = null,
-): Promise<void> {
+): Promise<boolean> {
   const blob = await canvasToJpgBlob(canvas, quality);
-  await saveBlobToDir(blob, `${stem}.jpg`, dirHandle);
+  return await saveBlobToDir(blob, `${stem}.jpg`, dirHandle);
 }
 
 export async function downloadWebP(
@@ -100,9 +101,9 @@ export async function downloadWebP(
   quality = 0.92,
   stem = 'gradient',
   dirHandle: ExportDirectoryHandle | null = null,
-): Promise<void> {
+): Promise<boolean> {
   const blob = await canvasToWebpBlob(canvas, quality);
-  await saveBlobToDir(blob, `${stem}.webp`, dirHandle);
+  return await saveBlobToDir(blob, `${stem}.webp`, dirHandle);
 }
 
 export const browserExportService: ExportService = {

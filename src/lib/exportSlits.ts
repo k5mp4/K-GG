@@ -149,22 +149,23 @@ async function saveOrZip(
   filename: string,
   dirHandle: ExportDirectoryHandle | null,
   zipFiles: Record<string, Uint8Array>,
-): Promise<void> {
+): Promise<boolean> {
   if (dirHandle) {
-    await saveBlobToDir(blob, filename, dirHandle);
+    return await saveBlobToDir(blob, filename, dirHandle);
   } else {
     const arrayBuffer = await blob.arrayBuffer();
     zipFiles[filename] = new Uint8Array(arrayBuffer);
+    return true;
   }
 }
 
 async function flushZip(
   zipFiles: Record<string, Uint8Array>,
   stem: string,
-): Promise<void> {
+): Promise<boolean> {
   const zipped = zipSync(zipFiles, { level: 0 });
   const zipBlob = new Blob([zipped.buffer as ArrayBuffer], { type: 'application/zip' });
-  await saveBlobToDir(zipBlob, `${stem}_slits.zip`, null);
+  return await saveBlobToDir(zipBlob, `${stem}_slits.zip`, null);
 }
 
 // ─── Circular export ───────────────────────────────────────────────────────
@@ -177,7 +178,7 @@ async function exportCircularSlits({
   signal,
   onProgress,
   trimToSlit = false,
-}: ExportSlitsOptions): Promise<void> {
+}: ExportSlitsOptions): Promise<boolean> {
   const { width, height } = canvas;
   const _pp = slitScan.pixelPerfect;
   const _ppR = (v: number) => _pp ? Math.round(v) : v;
@@ -214,10 +215,10 @@ async function exportCircularSlits({
   // 可視リングの index 範囲をシェーダー式で導出
   const circCoordMin = Math.max(0, slitPhase);
   const circCoordMax = insR + slitPhase;
-  if (circCoordMax <= 0) return;
+  if (circCoordMax <= 0) return true;
   const firstRingIdx = computeSlitIdx(circCoordMin, sw, sortedDeltas);
   const lastRingIdx  = computeSlitIdx(circCoordMax, sw, sortedDeltas);
-  if (lastRingIdx < firstRingIdx) return;
+  if (lastRingIdx < firstRingIdx) return true;
 
   const readCanvas = document.createElement('canvas');
   readCanvas.width = width;
@@ -323,7 +324,8 @@ async function exportCircularSlits({
       blob = await canvasToPngBlob(outCanvas!);
     }
 
-    await saveOrZip(blob, filename, slitDirHandle, zipFiles);
+    const saved = await saveOrZip(blob, filename, slitDirHandle, zipFiles);
+    if (!saved) return false;
     onProgress?.((ringIdx - firstRingIdx + 1) / total);
     
     // UI 更新を許可
@@ -332,7 +334,8 @@ async function exportCircularSlits({
     }
   }
 
-  if (!dirHandle) await flushZip(zipFiles, stem);
+  if (!dirHandle) return await flushZip(zipFiles, stem);
+  return true;
 }
 
 // ─── Linear export ─────────────────────────────────────────────────────────
@@ -345,7 +348,7 @@ async function exportLinearSlits({
   signal,
   onProgress,
   trimToSlit = false,
-}: ExportSlitsOptions): Promise<void> {
+}: ExportSlitsOptions): Promise<boolean> {
   const { width, height } = canvas;
 
   const readCanvas = document.createElement('canvas');
@@ -361,7 +364,7 @@ async function exportLinearSlits({
   const slitGroups = groupPixelsBySlitId(indexBuffer, width, height);
   const sortedSlitIds = Array.from(slitGroups.keys()).sort((a, b) => a - b);
   const total = sortedSlitIds.length;
-  if (total === 0) return;
+  if (total === 0) return true;
 
   let slitDirHandle: ExportDirectoryHandle | null = null;
   if (dirHandle) {
@@ -449,7 +452,8 @@ async function exportLinearSlits({
       blob = await canvasToPngBlob(outCanvas!);
     }
 
-    await saveOrZip(blob, filename, slitDirHandle, zipFiles);
+    const saved = await saveOrZip(blob, filename, slitDirHandle, zipFiles);
+    if (!saved) return false;
     onProgress?.((i + 1) / total);
 
     // UI 更新を許可
@@ -458,7 +462,8 @@ async function exportLinearSlits({
     }
   }
 
-  if (!dirHandle) await flushZip(zipFiles, stem);
+  if (!dirHandle) return await flushZip(zipFiles, stem);
+  return true;
 }
 
 // ─── Public entry point ────────────────────────────────────────────────────
@@ -471,7 +476,7 @@ export async function exportSlits({
   signal,
   onProgress,
   trimToSlit,
-}: ExportSlitsOptions): Promise<void> {
+}: ExportSlitsOptions): Promise<boolean> {
   console.log('[ExportSlits] START, mode:', slitScan.mode);
   if (slitScan.mode === 'circular') {
     return exportCircularSlits({ canvas, slitScan, stem, dirHandle, signal, onProgress, trimToSlit });

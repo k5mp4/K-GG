@@ -67,4 +67,39 @@ status: approved
 - 未解消: 「動画書き出し後に自動送信」を有効にした経路は動作せず、K-GGがフリーズする。自動送信経路の追加調査と修正が必要である。
 - 未確認: Bridge停止状態での送信、AE側120秒timeout時の最終挙動は未確認である。
 
+## AE送信待ちと保存キャンセルの追加回帰検証
+
+- `src/lib/videoExportLifecycle.test.ts`で、保存成功後にexport sessionを解放し、AE送信の完了を待たずに書き出し処理を完了することを検証する。保存キャンセル・保存失敗では成功表示とAE送信を行わず、送信失敗は切り離した処理内で扱う。
+- `src/lib/aeStatusController.test.ts`で、古いAE送信の完了とidleタイマーが最新送信のステータスを上書きしないことを検証する。
+- `src/adapters/tauri/exportService.test.ts`で、Tauri保存ダイアログのキャンセルは`false`を返し、ファイル書き込みを行わないことを検証する。
+- 前回の実機確認で自動送信時のフリーズが残ったため、統合後のWindows x64 Tauri版で再確認するまで動画送信の受け入れ結果はfail / partialを維持する。
+
+## WebGL validationと動画出力の回帰検証
+
+- 修正前の検証ブラウザで初回描画後に`Enable webgl-lint`を有効化すると、`recordSamplerValues`の`TypeError: Cannot read properties of undefined (reading 'get')`を再現した。これは既存contextへwrapperを再適用してProgram／Uniform追跡Mapを失う経路である。
+- 修正後の検証ブラウザで同じValidation切替とCone有効化を行い、同じ`recordSamplerValues`例外および`drawElements(...): no current program`例外の新規発生は確認されなかった。出力サイズ切替も完了した。
+- 追加修正後の検証ブラウザでClothを有効化し、Three.jsのCanvasTexture更新を5秒以上継続した。`textureInfo.parameters`、`texParameteri`、`drawElements(...): no current program`の例外は発生しなかった。これはViteブラウザ経路の確認であり、Tauri版のMOV/MP4 encodeとAE送信は未確認である。
+- 検証ブラウザはTauriネイティブAPIを提供しないため、Windows x64 Tauri版の実MOV／MP4 encode、保存ダイアログ、AE送信までの実機スモークは未確認である。既存のANGLE shader warningと、Validation有効時に表示される未設定optional uniformの診断ログは残るが、今回の例外とは別経路である。
+
+## 書き出し後の白画面回帰検証
+
+- `src/lib/webgl.ts`のGenerator描画で、`u_ridgeLacunarity`を未定義の`uniforms.ridgeLacunarity`へ渡していたため、WebGL validation環境で`uniform1f(undefined, 2)`が発生していた。宣言済みlocationを使うよう修正し、`src/lib/webglShaderSources.test.ts`で誤参照が再発しないことを確認した。
+- `renderBridge.suspendAnimation()`は、停止時に同期実行されるPreview描画が例外を投げると停止フラグを残していた。例外時にフラグを解除して再送可能にする回帰テストを`src/lib/renderBridge.test.ts`へ追加した。
+- Export sessionが初回フレーム前に終了した場合も、WebGLのProgram／Framebuffer状態を変更済みの可能性があるため、`endExportSession()`が常にPreviewを復元するよう修正した。3D出力向けの処理済みCanvas通知もBridgeのPreview復元経路へ統合した。
+- Windows x64 Tauri開発版で、1920×1080・5秒・MP4 Highの書き出しを実行した。進捗は`7% → 22% → 56% → 保存中`と進行し、Tauri/WebViewは全工程で応答状態を維持した。保存ダイアログの上書き確認を確定後、K-GGのPreview・タイムラインが通常表示へ復帰し、動画ファイル（1,688,848 bytes）が生成された。白画面は再現しなかった。
+- この実機確認はPR #40統合前の実装に対する結果である。統合後の自動AE送信は未確認とする。
+
+## 2026-09-03 PR #40統合後の検証
+
+- `npx vitest run src/lib/videoExportLifecycle.test.ts src/lib/aeStatusController.test.ts src/adapters/tauri/exportService.test.ts src/adapters/tauri/videoExportService.native-artifact.test.ts src/adapters/tauri/exportService.native-artifact.test.ts src/adapters/tauri/afterEffectsService.native-artifact.test.ts src/lib/aftereffectsExport.test.ts src/lib/renderBridge.test.ts src/lib/coneViewRenderer.test.ts src/lib/webglPerformance.test.ts src/lib/webglShaderSources.test.ts`: pass（11 files、76 tests）。
+- `npx tsc -p tsconfig.app.json --noEmit`: pass。
+- `npm test`: pass（84 files、481 tests）。既存の`vendor/tweeq/index.es.js.map`欠落によるsource map警告は残るが、テストエラーではない。
+- `npm run lint`: pass（0 errors、既存21 warnings）。今回差分由来の警告はない。
+- `npm run build`: pass。既存のdynamic/static import混在とchunk size警告は残るが、ビルドエラーではない。
+- `cargo test --manifest-path src-tauri/Cargo.toml`: pass（21 tests）。
+- `cargo check --manifest-path src-tauri/Cargo.toml`: pass。
+- `npm run docs:check`: pass。
+- `npm run docs:build`: pass。
+- 未確認: 統合後のWindows x64 Tauri版で、書き出し後の自動AE送信中もK-GGが応答し、動画がアクティブコンポジションへ追加されること。
+
 After Effects本体を使ったWindows x64の手動スモークは一部実施済みで、動画の手動再送は成功した。起動中検出、PNG、自動動画送信、Bridge停止確認は完了していない。P1レイヤーDTO、P2素材/レンダー、P3設定変換も未実装である。

@@ -10,6 +10,7 @@ import { renderBridge } from '../lib/renderBridge';
 import { AnimationLoop } from '../lib/animation';
 import { RAMP_TEX_WIDTH } from '../lib/constants';
 import { renderSceneAtTime } from '../lib/renderSceneAtTime';
+import { publishProcessedCanvasFrame } from '../lib/processedCanvasClock';
 import { getPostprocessStackSamplePadding } from '../lib/glass';
 import { useGradientStore } from '../store/gradientStore';
 import type { WebGLContext } from '../lib/webgl';
@@ -152,6 +153,10 @@ export function useWebGL(
         const totalDuration = Math.max((latest.animation.speed ?? 1) * (latest.animation.duration ?? 1), 0.0001);
         const normalizedTime = nt !== undefined ? nt : t / totalDuration;
         renderSceneAtTime(ctx, latest, normalizedTime, { tile, renderSessionId: 'preview' });
+        // Keep the 3D output canvases in sync for every bridge-owned preview
+        // render, including the cleanup render after an export preparation or
+        // first-frame failure.
+        publishProcessedCanvasFrame(normalizedTime);
       },
       () => { animLoopRef.current?.stop(); },
       () => { animLoopRef.current?.start(); },
@@ -202,6 +207,10 @@ export function useWebGL(
             ? (animLoopRef.current?.currentNormalizedTime ?? useGradientStore.getState().currentTime)
             : 0;
           renderSceneAtTime(currentContext, currentState, normalizedTime, {});
+          // Cone/Cloth output canvases consume the processed source through
+          // this clock. Publish the restored frame as well, otherwise Cone
+          // can keep the last export frame after a stopped/failed export.
+          publishProcessedCanvasFrame(normalizedTime);
         },
       };
     });

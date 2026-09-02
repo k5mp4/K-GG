@@ -32,6 +32,8 @@ import type {
 import type { AeSaveDirStatus, AeStatus } from '../lib/aftereffectsExport';
 import { renderBridge } from '../lib/renderBridge';
 import { exportDisplayProgress, exportProgressPercent, exportStageLabel } from '../lib/exportProgress';
+import { completeVideoExport } from '../lib/videoExportLifecycle';
+import { createAeStatusController } from '../lib/aeStatusController';
 import { useLanguage } from '../i18n/LanguageProvider';
 
 type ExportJob = 'mov' | 'mp4' | 'zip' | 'slits' | null;
@@ -108,6 +110,11 @@ export function ExportPanel({
   const [aeSaveDirStatus, setAeSaveDirStatus] = useState<AeSaveDirStatus>({ mode: 'auto', path: null, name: null });
   const [bridgeAvailable, setBridgeAvailable] = useState(false);
   const [bridgeChecking, setBridgeChecking] = useState(false);
+  const aeStatusControllerRef = useRef<ReturnType<typeof createAeStatusController> | null>(null);
+  if (aeStatusControllerRef.current === null) {
+    aeStatusControllerRef.current = createAeStatusController(setAeStatus);
+  }
+  const aeStatusController = aeStatusControllerRef.current;
 
   useEffect(() => {
     if (!bridgeAvailable) {
@@ -129,8 +136,6 @@ export function ExportPanel({
   const lastVideoRef = useRef<{ artifact: NativeVideoArtifact; ext: VideoExt } | null>(null);
   const videoSendPromisesRef = useRef(new Map<NativeVideoArtifact, Promise<void>>());
   const videoSendQueueRef = useRef<Promise<void>>(Promise.resolve());
-  const aeOperationRef = useRef(0);
-  const aeStatusResetTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   async function releaseVideoWhenIdle(artifact: NativeVideoArtifact): Promise<void> {
     await videoSendPromisesRef.current.get(artifact)?.catch(() => undefined);
@@ -143,7 +148,7 @@ export function ExportPanel({
     return () => {
       mountedRef.current = false;
       abortControllerRef.current?.abort();
-      if (aeStatusResetTimerRef.current) clearTimeout(aeStatusResetTimerRef.current);
+      aeStatusController.dispose();
       const lastVideo = lastVideoRef.current;
       lastVideoRef.current = null;
       if (lastVideo) {
@@ -154,7 +159,7 @@ export function ExportPanel({
         })().catch(() => undefined);
       }
     };
-  }, []);
+  }, [aeStatusController]);
 
   function flashSaved(format: string) {
     setSavedFormats((prev) => ({ ...prev, [format]: true }));
@@ -197,7 +202,8 @@ export function ExportPanel({
     onExportProgress?.(null);
   }
 
-  function finishExport() {
+  function finishExport(controller: AbortController) {
+    if (abortControllerRef.current !== controller) return;
     abortControllerRef.current = null;
     if (mountedRef.current) reportDone();
     const wasPlaying = previewWasPlayingRef.current;
@@ -209,23 +215,8 @@ export function ExportPanel({
     abortControllerRef.current?.abort();
   }
 
-  function beginAeOperation(): number {
-    const operationId = ++aeOperationRef.current;
-    if (aeStatusResetTimerRef.current) clearTimeout(aeStatusResetTimerRef.current);
-    if (mountedRef.current) setAeStatus('sending');
-    return operationId;
-  }
-
-  function finishAeOperation(operationId: number, status: AeStatus) {
-    if (!mountedRef.current || operationId !== aeOperationRef.current) return;
-    setAeStatus(status);
-    aeStatusResetTimerRef.current = setTimeout(() => {
-      if (mountedRef.current && operationId === aeOperationRef.current) setAeStatus('idle');
-    }, 4000);
-  }
-
   async function sendVideoToAe(artifact: NativeVideoArtifact, ext: VideoExt) {
-    const operationId = beginAeOperation();
+    const requestId = aeStatusController.begin();
     if (mountedRef.current) setPendingAeVideoSends(count => count + 1);
 
     const send = videoSendQueueRef.current
@@ -239,10 +230,10 @@ export function ExportPanel({
     videoSendPromisesRef.current.set(artifact, tracked);
     try {
       const status = await send;
-      finishAeOperation(operationId, status);
+      aeStatusController.complete(requestId, status);
     } catch (error) {
       console.error('After Effects video send failed:', error);
-      finishAeOperation(operationId, 'error');
+      aeStatusController.complete(requestId, 'error');
     } finally {
       await tracked;
       if (videoSendPromisesRef.current.get(artifact) === tracked) {
@@ -253,12 +244,12 @@ export function ExportPanel({
   }
 
   async function handleAePing() {
-    const operationId = beginAeOperation();
+    const requestId = aeStatusController.begin();
     const s = await aePing();
-    if (mountedRef.current && operationId === aeOperationRef.current) {
+    if (mountedRef.current && aeStatusController.isCurrent(requestId)) {
       setBridgeAvailable(s === 'ok');
     }
-    finishAeOperation(operationId, s);
+    aeStatusController.complete(requestId, s);
   }
 
   async function handleAeRefresh() {
@@ -271,10 +262,11 @@ export function ExportPanel({
   async function handleAeSendImage() {
     const canvas = getOutputCanvas();
     if (!canvas) return;
-    const operationId = beginAeOperation();
+    const requestId = aeStatusController.begin();
     const blob = await canvasToPngBlob(canvas);
+    if (!aeStatusController.isCurrent(requestId)) return;
     const s = await aeImportImage(blob, stem);
-    finishAeOperation(operationId, s);
+    aeStatusController.complete(requestId, s);
   }
 
   async function handleAeSendVideo() {
@@ -362,18 +354,27 @@ export function ExportPanel({
       });
       if (controller.signal.aborted || !mountedRef.current) return;
       reportStage('saving');
-      const saved = await saveNativeVideoArtifact(artifact, `${stem}.mov`, dirHandleRef.current);
+      const completedArtifact = artifact;
+      const saved = await completeVideoExport({
+        save: async () => {
+          const saved = await saveNativeVideoArtifact(completedArtifact, `${stem}.mov`, dirHandleRef.current);
+          return saved && !controller.signal.aborted && mountedRef.current;
+        },
+        onSaved: () => {
+          reportProgress(1);
+          const previous = lastVideoRef.current;
+          lastVideoRef.current = { artifact: completedArtifact, ext: 'mov' };
+          retained = true;
+          if (previous) void releaseVideoWhenIdle(previous.artifact).catch(() => undefined);
+          flashSaved('mov');
+        },
+        releaseExport: () => {
+          finishExport(controller);
+          exportFinished = true;
+        },
+        sendToAe: sendToAe ? () => sendVideoToAe(completedArtifact, 'mov') : undefined,
+      });
       if (!saved) return;
-      if (controller.signal.aborted || !mountedRef.current) return;
-      reportProgress(1);
-      const previous = lastVideoRef.current;
-      lastVideoRef.current = { artifact, ext: 'mov' };
-      retained = true;
-      if (previous) void releaseVideoWhenIdle(previous.artifact).catch(() => undefined);
-      flashSaved('mov');
-      finishExport();
-      exportFinished = true;
-      if (sendToAe) void sendVideoToAe(artifact, 'mov');
     } catch (e) {
       if (e instanceof DOMException && e.name === 'AbortError') { /* cancelled */ }
       else {
@@ -386,7 +387,7 @@ export function ExportPanel({
       }
     } finally {
       if (!retained && artifact) await releaseVideoArtifact(artifact).catch(() => undefined);
-      if (!exportFinished) finishExport();
+      if (!exportFinished) finishExport(controller);
     }
   }
 
@@ -421,18 +422,27 @@ export function ExportPanel({
       });
       if (controller.signal.aborted || !mountedRef.current) return;
       reportStage('saving');
-      const saved = await saveNativeVideoArtifact(artifact, `${stem}_h264rgb.mp4`, dirHandleRef.current);
+      const completedArtifact = artifact;
+      const saved = await completeVideoExport({
+        save: async () => {
+          const saved = await saveNativeVideoArtifact(completedArtifact, `${stem}_h264rgb.mp4`, dirHandleRef.current);
+          return saved && !controller.signal.aborted && mountedRef.current;
+        },
+        onSaved: () => {
+          reportProgress(1);
+          const previous = lastVideoRef.current;
+          lastVideoRef.current = { artifact: completedArtifact, ext: 'mp4' };
+          retained = true;
+          if (previous) void releaseVideoWhenIdle(previous.artifact).catch(() => undefined);
+          flashSaved('mp4');
+        },
+        releaseExport: () => {
+          finishExport(controller);
+          exportFinished = true;
+        },
+        sendToAe: sendToAe ? () => sendVideoToAe(completedArtifact, 'mp4') : undefined,
+      });
       if (!saved) return;
-      if (controller.signal.aborted || !mountedRef.current) return;
-      reportProgress(1);
-      const previous = lastVideoRef.current;
-      lastVideoRef.current = { artifact, ext: 'mp4' };
-      retained = true;
-      if (previous) void releaseVideoWhenIdle(previous.artifact).catch(() => undefined);
-      flashSaved('mp4');
-      finishExport();
-      exportFinished = true;
-      if (sendToAe) void sendVideoToAe(artifact, 'mp4');
     } catch (e) {
       if (e instanceof DOMException && e.name === 'AbortError') { /* cancelled */ }
       else {
@@ -443,7 +453,7 @@ export function ExportPanel({
       }
     } finally {
       if (!retained && artifact) await releaseVideoArtifact(artifact).catch(() => undefined);
-      if (!exportFinished) finishExport();
+      if (!exportFinished) finishExport(controller);
     }
   }
 
@@ -473,7 +483,8 @@ export function ExportPanel({
         onProgress: reportProgress,
       });
       reportStage('saving');
-      await saveBlobToDir(blob, `${stem}_frames.zip`, dirHandleRef.current);
+      const saved = await saveBlobToDir(blob, `${stem}_frames.zip`, dirHandleRef.current);
+      if (!saved) return;
       reportProgress(1);
       flashSaved('zip');
     } catch (e) {
@@ -484,7 +495,7 @@ export function ExportPanel({
         setTimeout(() => setExportError(null), 5000);
       }
     } finally {
-      finishExport();
+      finishExport(controller);
     }
   }
 
@@ -503,7 +514,7 @@ export function ExportPanel({
 
     try {
       reportStage('rendering');
-      await exportSlits({
+      const saved = await exportSlits({
         canvas,
         slitScan,
         stem,
@@ -512,6 +523,7 @@ export function ExportPanel({
         onProgress: reportProgress,
         trimToSlit: slitTrimMode,
       });
+      if (!saved) return;
       reportStage('saving');
       reportProgress(1);
       flashSaved('slits');
@@ -523,7 +535,7 @@ export function ExportPanel({
         setTimeout(() => setExportError(null), 5000);
       }
     } finally {
-      finishExport();
+      finishExport(controller);
     }
   }
 
@@ -580,20 +592,20 @@ export function ExportPanel({
       <div className="space-y-2">
         <p className="text-xs text-deep">{t('export.stillImage')}</p>
         <button
-          onClick={() => { const c = getOutputCanvas(); if (c) downloadPNG(c, stem, dirHandleRef.current).then(() => flashSaved('png')); }}
+          onClick={() => { const c = getOutputCanvas(); if (c) void downloadPNG(c, stem, dirHandleRef.current).then(saved => { if (saved) flashSaved('png'); }); }}
           className="w-full py-2 bg-fire hover:brightness-110 disabled:opacity-40 disabled:cursor-not-allowed rounded-none text-sm font-display font-semibold text-k-text uppercase tracking-wider"
         >
           {savedFormats['png'] ? `✓ ${t('export.saved')}` : t('export.savePng')}
         </button>
         <div className="flex gap-2">
           <button
-            onClick={() => { const c = getOutputCanvas(); if (c) downloadJPG(c, 0.92, stem, dirHandleRef.current).then(() => flashSaved('jpg')); }}
+            onClick={() => { const c = getOutputCanvas(); if (c) void downloadJPG(c, 0.92, stem, dirHandleRef.current).then(saved => { if (saved) flashSaved('jpg'); }); }}
             className="flex-1 py-1.5 bg-k-muted hover:bg-k-muted/70 disabled:opacity-40 disabled:cursor-not-allowed rounded-none text-xs text-k-text"
           >
             {savedFormats['jpg'] ? '✓' : 'JPG'}
           </button>
           <button
-            onClick={() => { const c = getOutputCanvas(); if (c) downloadWebP(c, 0.92, stem, dirHandleRef.current).then(() => flashSaved('webp')); }}
+            onClick={() => { const c = getOutputCanvas(); if (c) void downloadWebP(c, 0.92, stem, dirHandleRef.current).then(saved => { if (saved) flashSaved('webp'); }); }}
             className="flex-1 py-1.5 bg-k-muted hover:bg-k-muted/70 disabled:opacity-40 disabled:cursor-not-allowed rounded-none text-xs text-k-text"
           >
             {savedFormats['webp'] ? '✓' : 'WebP'}
