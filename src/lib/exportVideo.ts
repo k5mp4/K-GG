@@ -1,4 +1,10 @@
-import { adapters, type NativeFfmpegStatus, type VideoExportConfig } from '../adapters';
+import {
+  adapters,
+  type ExportDirectoryHandle,
+  type NativeFfmpegStatus,
+  type NativeVideoArtifact,
+  type VideoExportConfig,
+} from '../adapters';
 
 export type ExportConfig = VideoExportConfig;
 const FFMPEG_BUILDS_URL = 'https://www.gyan.dev/ffmpeg/builds/#release-builds';
@@ -14,12 +20,22 @@ function isFfmpegMissingDebugEnabled(): boolean {
   );
 }
 
-export async function exportLosslessMOV(config: ExportConfig): Promise<Blob> {
+export async function exportLosslessMOV(config: ExportConfig): Promise<NativeVideoArtifact> {
   return await adapters.videoExportService.exportLosslessMOV(config);
 }
 
-export async function exportHighQualityMP4(config: ExportConfig): Promise<Blob> {
+export async function exportHighQualityMP4(config: ExportConfig): Promise<NativeVideoArtifact> {
   return await adapters.videoExportService.exportHighQualityMP4(config);
+}
+
+export async function saveNativeVideoArtifact(
+  artifact: NativeVideoArtifact,
+  filename: string,
+  dirHandle: ExportDirectoryHandle | null,
+): Promise<boolean> {
+  const save = adapters.exportService.saveNativeVideoArtifact;
+  if (!save) throw new Error('この環境ではネイティブ動画ファイルを保存できません。');
+  return await save(artifact, filename, dirHandle);
 }
 
 export async function exportFrameZip(config: ExportConfig): Promise<Blob> {

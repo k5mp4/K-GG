@@ -7,6 +7,7 @@ import type {
   AeSaveDirStatus,
   AeStatus,
   AfterEffectsService,
+  NativeVideoArtifact,
 } from '../types';
 
 type NativeStatus = {
@@ -137,9 +138,12 @@ export const tauriAfterEffectsService: AfterEffectsService = {
     }
   },
 
-  async importVideo(blob: Blob, ext: 'mov' | 'mp4' = 'mov', name = 'kagaribi'): Promise<AeStatus> {
+  async importVideo(source: Blob | NativeVideoArtifact, ext: 'mov' | 'mp4' = 'mov', name = 'kagaribi'): Promise<AeStatus> {
     try {
-      return await withTemporaryInput(blob, ext, inputPath => invokeTransfer(inputPath, ext, name));
+      if (source instanceof Blob) {
+        return await withTemporaryInput(source, ext, inputPath => invokeTransfer(inputPath, ext, name));
+      }
+      return await invokeTransfer(source.path, ext, name);
     } catch {
       return 'save-failed';
     }

@@ -6,7 +6,7 @@
  */
 
 import { adapters } from '../adapters';
-import type { AeSaveDirStatus, AeStatus } from '../adapters';
+import type { AeSaveDirStatus, AeStatus, NativeVideoArtifact } from '../adapters';
 
 export type { AeSaveDirStatus, AeStatus } from '../adapters';
 
@@ -39,11 +39,11 @@ export async function aeImportImage(blob: Blob, name = 'kagaribi'): Promise<AeSt
   return adapters.afterEffectsService.importImage(blob, name);
 }
 
-/** 動画BlobをAfter Effectsへ送信する。 */
+/** 動画またはネイティブ動画成果物をAfter Effectsへ送信する。 */
 export async function aeImportVideo(
-  blob: Blob,
+  source: Blob | NativeVideoArtifact,
   ext: 'mov' | 'mp4' = 'mov',
   name = 'kagaribi',
 ): Promise<AeStatus> {
-  return adapters.afterEffectsService.importVideo(blob, ext, name);
+  return adapters.afterEffectsService.importVideo(source, ext, name);
 }

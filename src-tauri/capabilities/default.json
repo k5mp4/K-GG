@@ -17,6 +17,7 @@
     "process:allow-restart",
     "fs:allow-mkdir",
     "fs:allow-write-file",
+    "fs:allow-copy-file",
     "fs:allow-read-file",
     "fs:allow-remove",
     {

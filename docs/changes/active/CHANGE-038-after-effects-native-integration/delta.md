@@ -29,7 +29,7 @@ Tauri版のK-GGは別途`KGG_AE_Bridge`を手動起動せず、固定されたTa
 
 ### AE-002 動画のAfter Effects送信
 
-Tauri版のK-GGは直前に書き出したMOVまたはMP4を一時作業領域へ保存し、別途Bridgeを手動起動せずにAfter Effectsへ送信する。Web版は既存Bridge経路を維持する。
+Tauri版のK-GGは直前に書き出したMOVまたはMP4を一時作業領域のネイティブ動画成果物として保持し、最終動画全体をWebViewの`Blob`へ読み戻さず、別途Bridgeを手動起動せずにAfter Effectsへ送信する。自動送信は書き出し完了とPreview復帰を待たせず、複数のAE操作は直列化する。Web版は既存Bridge経路を維持する。
 
 ### AE-003 送信ファイル保存先
 

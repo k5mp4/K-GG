@@ -2,7 +2,12 @@ import { Zip, ZipPassThrough } from 'fflate';
 import { needsTiledRender } from '../../lib/tileRender';
 import { renderAndCaptureExportFrame, withExportSession } from '../../lib/videoExportFrames';
 import type { AnimationEasing } from '../../store/gradientStore';
-import type { VideoExportConfig, VideoExportFrameRenderer, VideoExportService } from '../types';
+import type {
+  NativeVideoArtifact,
+  VideoExportConfig,
+  VideoExportFrameRenderer,
+  VideoExportService,
+} from '../types';
 
 /** PNG ZIP 用: フレームを描画・キャプチャしながら ZIP チャンクへ流す。 */
 async function captureFrameZipChunks(
@@ -83,13 +88,13 @@ export type ExportConfig = VideoExportConfig;
 
 // ---------- Lossless RGB MOV エクスポート ----------
 
-/** QuickTime Animation (qtrle) でロスレス RGB MOV を生成して Blob を返す。
+/** QuickTime Animation (qtrle) でロスレス RGB MOV を生成する。
  *  YUV 変換を行わないため PNG と同一の色が保持される。 */
-export async function exportLosslessMOV(_config: ExportConfig): Promise<Blob> {
+export async function exportLosslessMOV(_config: ExportConfig): Promise<NativeVideoArtifact> {
   throw new Error('MOV エクスポートには Tauri ローカルアプリと外部 FFmpeg バイナリが必要です。');
 }
 
-export async function exportHighQualityMP4(_config: ExportConfig): Promise<Blob> {
+export async function exportHighQualityMP4(_config: ExportConfig): Promise<NativeVideoArtifact> {
   throw new Error('MP4 エクスポートには Tauri ローカルアプリと外部 FFmpeg バイナリが必要です。');
 }
 

@@ -25,6 +25,13 @@ export type AeSaveDirStatus = {
 
 export type AeRuntime = 'browser-bridge' | 'tauri-native';
 
+export type NativeVideoArtifact = {
+  kind: 'native-path';
+  path: string;
+  mimeType: 'video/quicktime' | 'video/mp4';
+  release(): Promise<void>;
+};
+
 export interface AfterEffectsService {
   runtime: AeRuntime;
   isAvailable(): Promise<boolean>;
@@ -33,7 +40,7 @@ export interface AfterEffectsService {
   chooseSaveDir(): Promise<AeSaveDirStatus>;
   clearSaveDir(): Promise<AeSaveDirStatus>;
   importImage(blob: Blob, name?: string): Promise<AeStatus>;
-  importVideo(blob: Blob, ext?: 'mov' | 'mp4', name?: string): Promise<AeStatus>;
+  importVideo(source: Blob | NativeVideoArtifact, ext?: 'mov' | 'mp4', name?: string): Promise<AeStatus>;
 }
 export const MP4_QUALITY_PRESETS = [
   { value: 'high', label: 'High', crf: 18, description: '画質優先' },
@@ -88,6 +95,11 @@ export interface ExportService {
     filename: string,
     dirHandle: ExportDirectoryHandle | null,
   ): Promise<void>;
+  saveNativeVideoArtifact?(
+    artifact: NativeVideoArtifact,
+    filename: string,
+    dirHandle: ExportDirectoryHandle | null,
+  ): Promise<boolean>;
   canvasToPngBlob(canvas: HTMLCanvasElement): Promise<Blob>;
   savePNG(
     canvas: HTMLCanvasElement,
@@ -133,8 +145,8 @@ export type NativeFfmpegStatus = {
 };
 
 export interface VideoExportService {
-  exportLosslessMOV(config: VideoExportConfig): Promise<Blob>;
-  exportHighQualityMP4(config: VideoExportConfig): Promise<Blob>;
+  exportLosslessMOV(config: VideoExportConfig): Promise<NativeVideoArtifact>;
+  exportHighQualityMP4(config: VideoExportConfig): Promise<NativeVideoArtifact>;
   exportFrameZip(config: VideoExportConfig): Promise<Blob>;
   nativeFfmpegSupported?(): boolean;
   getNativeFfmpegStatus?(): Promise<NativeFfmpegStatus>;

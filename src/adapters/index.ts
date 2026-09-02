@@ -38,6 +38,7 @@ export type {
   ExportStage,
   ExportService,
   Mp4QualityPreset,
+  NativeVideoArtifact,
   NativeFfmpegStatus,
   PresetRepository,
   VideoExportConfig,
