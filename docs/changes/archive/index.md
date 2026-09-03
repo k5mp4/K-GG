@@ -4,7 +4,7 @@ title: 完了済み変更
 
 # 完了済み変更
 
-07-28の既存履歴は、元のCHANGE IDと検証記録を保ったまま[日付bundle](./2026-07-28-day-bundle/index)へ統合しています。正規の変更パッケージはCHANGE-010で、元のIDはbundle内の履歴スナップショットとして参照できます。
+Archiveは過去の変更履歴です。現在の動作を確認するときは先に[現行仕様](../../specs/current/)を読みます。`outcome: follow-up`の記録は、未完了AC、Release Gate、ObservationなどをIssueへ移すための追跡情報です。
 
 | ID | 変更 | 状態 |
 | --- | --- | --- |
@@ -23,8 +23,20 @@ title: 完了済み変更
 | CHANGE-023 | [ASCIIのフォント選択と文字サイズ](./CHANGE-023-ascii-font-controls/proposal) | archived |
 | CHANGE-024 | [SANDBOXの2D Canvas／3D Cloth表示モード](./CHANGE-024-cloth-preview-view-mode/proposal) | archived |
 | CHANGE-025 | [SANDBOX 3D Cone Preview View](./CHANGE-025-cone-preview-view/proposal) | archived |
+| CHANGE-026 | [Diffuse旧アルゴリズムのEffect Stack対応](./CHANGE-026-legacy-diffuse-stipple/proposal) | archived |
+| CHANGE-027 | [SANDBOX Seamless Tiling](./CHANGE-027-sandbox-seamless-tiling/proposal) | archived |
+| CHANGE-028 | [WebGL Performance Debug / Profiler基盤](./CHANGE-028-webgl-performance-profiler/proposal) | archived |
+| CHANGE-029 | [MCP Developer Interface](./CHANGE-029-mcp-developer-interface/proposal) | archived |
+| CHANGE-030 | [SANDBOX Flow Gradient Phase A](./CHANGE-030-sandbox-flow-gradient/proposal) | archived |
+| CHANGE-031 | [MCP UI Control Parity](./CHANGE-031-mcp-ui-control-parity/proposal) | archived |
+| CHANGE-032 | [Flow Gradient continuous particle field and expanded controls](./CHANGE-032-flow-gradient-continuous-controls/proposal) | archived |
+| CHANGE-033 | [WebGL解析的Gradient Prefix統合](./CHANGE-033-analytic-gradient-prefix/proposal) | archived |
 | CHANGE-034 | [Slitのオフセット速度のみのループ](./CHANGE-034-slit-offset-only-motion/proposal) | archived |
 | CHANGE-035 | [Slit Motionのduration境界ループ](./CHANGE-035-slit-duration-loop/proposal) | archived |
 | CHANGE-036 | [Diffuse直後のSlitでDiffuseが反映されない不具合修正](./CHANGE-036-diffuse-before-slit/proposal) | archived |
-
-Archiveは履歴参照用です。現在有効な振る舞いを確認するときは、先に[現行仕様](../../specs/current/)を読みます。
+| CHANGE-037 | [SANDBOX Preset Coverage and Cone Color Reapply Seams](./CHANGE-037-sandbox-preset-cone-seam-reapply/proposal) | archived |
+| CHANGE-038 | [K-GG単独After Effects連携と段階的レイヤー取込](./CHANGE-038-after-effects-native-integration/proposal) | archived |
+| CHANGE-039 | [Cone Default Seam, English Mode Labels, and Simple Apex Control](./CHANGE-039-cone-default-labels-apex-control/proposal) | archived |
+| CHANGE-040 | [WebGL2 Capability Gate for SANDBOX 3D Fallback](./CHANGE-040-webgl2-capability-fallback/proposal) | archived |
+| CHANGE-041 | [Noise UI共通プロパティとタイプ順序](./CHANGE-041-noise-ui-order/proposal) | archived |
+| CHANGE-042 | [Request-first開発フローへの移行](./CHANGE-042-development-flow-redesign/proposal) | archived |

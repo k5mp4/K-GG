@@ -27,6 +27,11 @@ export default defineConfig({
           text: '開発者向け',
           items: [
             { text: '入口', link: '/development/' },
+            { text: '開発ワークフロー', link: '/development/workflow' },
+            { text: 'ValidationとCI', link: '/development/validation' },
+            { text: 'AI駆動開発', link: '/development/ai-development' },
+            { text: 'Change Capsule運用', link: '/development/change-workflow' },
+            { text: 'Releaseと環境検証', link: '/development/releasing' },
             { text: 'プロジェクト概要', link: '/development/project-overview' },
             { text: 'アーキテクチャ', link: '/development/architecture' },
             { text: '開発・検証', link: '/development/development-guide' },

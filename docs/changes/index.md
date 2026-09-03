@@ -4,7 +4,7 @@ title: 変更仕様
 
 # 変更仕様
 
-変更仕様は、これから実装する変更または実装中の変更を、現行仕様との差分として記録します。完了時には差分を現行仕様へ反映し、変更フォルダをArchiveへ移動します。
+変更仕様（Change Capsule）は、複雑なDesigned ChangeのWhy・仕様差分・設計・検証を一時的に記録します。Quick Changeと通常のTracked Changeは、必要がなければ変更フォルダを作りません。完了時には必要な差分を現行仕様へ反映し、CapsuleをArchiveへ移動します。
 
 - [進行中の変更](./active/)
 - [完了済み変更](./archive/)

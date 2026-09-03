@@ -14,8 +14,52 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  verify:
-    name: Verify Windows application
+  changes:
+    name: Determine validation scope
+    runs-on: ubuntu-latest
+    outputs:
+      render: ${{ steps.scope.outputs.render }}
+      native: ${{ steps.scope.outputs.native }}
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+        with:
+          fetch-depth: 0
+
+      - name: Detect changed validation surfaces
+        id: scope
+        shell: bash
+        run: |
+          if [[ "${{ github.event_name }}" == "pull_request" ]]; then
+            base="${{ github.event.pull_request.base.sha }}"
+          else
+            base="${{ github.event.before }}"
+          fi
+
+          if [[ -z "$base" || "$base" =~ ^0+$ ]]; then
+            base="$(git rev-list --max-parents=0 HEAD)"
+          fi
+
+          render=false
+          native=false
+          while IFS= read -r file; do
+            echo "$file"
+            case "$file" in
+              src/shaders/*|src/rendering/*|src/lib/webgl*|src/lib/effect*|src/lib/render*|src/lib/export*|src/lib/tile*|src/lib/*Renderer*|src/components/*Canvas*)
+                render=true
+                ;;
+              src-tauri/*|src-tauri/Cargo.toml|src-tauri/Cargo.lock|Cargo.toml|Cargo.lock)
+                native=true
+                ;;
+            esac
+          done < <(git diff --name-only "$base" "$GITHUB_SHA")
+
+          echo "render=$render" >> "$GITHUB_OUTPUT"
+          echo "native=$native" >> "$GITHUB_OUTPUT"
+
+  fast-check:
+    name: fast-check
     runs-on: windows-latest
     timeout-minutes: 30
 
@@ -29,6 +73,49 @@ jobs:
           node-version-file: .nvmrc
           cache: npm
 
+      - name: Install frontend dependencies
+        run: npm ci
+
+      - name: Check Change Capsule and Active boundary
+        run: npm run change:check
+
+      - name: Run fast Merge Gate
+        run: npm run check:fast
+
+  render-check:
+    name: render-check
+    needs: changes
+    if: needs.changes.outputs.render == 'true'
+    runs-on: windows-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+
+      - name: Install frontend dependencies
+        run: npm ci
+
+      - name: Run focused render checks
+        run: npm run check:render
+
+  native-check:
+    name: native-check
+    needs: changes
+    if: needs.changes.outputs.native == 'true'
+    runs-on: windows-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+
       - name: Set up Rust
         uses: dtolnay/rust-toolchain@4be7066ada62dd38de10e7b70166bc74ed198c30
         with:
@@ -39,26 +126,5 @@ jobs:
         with:
           workspaces: src-tauri -> target
 
-      - name: Install frontend dependencies
-        run: npm ci
-
-      - name: Check documentation metadata
-        run: npm run docs:check
-
-      - name: Build documentation
-        run: npm run docs:build
-
-      - name: Run frontend tests
-        run: npm test
-
-      - name: Lint frontend
-        run: npm run lint
-
-      - name: Build frontend
-        run: npm run build
-
-      - name: Run Rust tests
-        run: cargo test --manifest-path src-tauri/Cargo.toml
-
-      - name: Check Rust application
-        run: cargo check --manifest-path src-tauri/Cargo.toml
+      - name: Run native Merge Gate
+        run: npm run check:native

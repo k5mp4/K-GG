@@ -1,7 +1,7 @@
 ---
 id: ADR-0014
 title: 承認済み変更パッケージをコミット単位の基本にする
-status: accepted
+status: superseded
 date: 2026-07-28
 deciders: [maintainer]
 related_specs: []
@@ -25,6 +25,10 @@ Why／What／対象外／受け入れ条件がまとまった承認済み変更�
 - 会話ターンごとにchangeを作る: 履歴は細かくなるが、同じ目的の差分が分散し管理コストが高い。
 - すべての期間の作業を1つのchangeへまとめる: 管理は簡単だが、独立した変更のレビューとArchiveが追跡できない。
 - コミット単位をAIが自動判断してcommitする: 利便性はあるが、ユーザーのGit操作承認境界を越えるため採用しない。
+
+## 状態
+
+このADRは、Request-firstの分類とValidation Gate分離を定める[ADR-0019](./0019-request-first-development-lifecycle)によりsupersededとなった。過去の変更Packageを一つのコミットへまとめる考え方は履歴として残るが、すべての変更にPackageを要求する運用は採用しない。
 
 ## 結果
 

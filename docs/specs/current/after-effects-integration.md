@@ -57,7 +57,7 @@ Bridgeは指定された保存先を優先し、未指定または利用でき�
 
 ## 変更履歴
 
-- [CHANGE-038 K-GG単独After Effects連携と段階的レイヤー取込](../../changes/active/CHANGE-038-after-effects-native-integration/proposal)
+- [CHANGE-038 K-GG単独After Effects連携と段階的レイヤー取込](../../changes/archive/CHANGE-038-after-effects-native-integration/proposal)
 
 ## 未確認・今後の現行仕様化
 

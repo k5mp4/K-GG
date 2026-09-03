@@ -23,11 +23,12 @@ ADRは、複数の機能や将来の実装を拘束する重要な技術判断�
 | ADR-0011 | [Tweeq vendorを固定上流ソースから最小構成で生成する](./0011-tweeq-vendor-source-and-api.md) | accepted |
 | ADR-0012 | [型付き辞書と意味的アイコンをUI表記の基盤とする](./0012-typed-localization-and-icon-semantics.md) | accepted |
 | ADR-0013 | [Mesh Gradationを単一Coons Patchの構造化データとして保持する](./0013-mesh-gradient-data-model.md) | accepted |
-| ADR-0014 | [承認済み変更パッケージをコミット単位の基本にする](./0014-commit-centered-change-workflow.md) | accepted |
+| ADR-0014 | [承認済み変更パッケージをコミット単位の基本にする](./0014-commit-centered-change-workflow.md) | superseded |
 | ADR-0015 | [開発専用WebGL観測層を既存Canvasへ接続する](./0015-development-webgl-observability.md) | accepted |
 | ADR-0016 | [MCPをControl APIとloopback Runtime Bridgeへ分離し、公開前tarballで配布する](./0016-mcp-control-api-and-local-distribution.md) | accepted |
 | ADR-0017 | [V2の解析的Gradient Prefixを最初のtexture境界で固定する](./0017-analytic-gradient-prefix.md) | accepted |
 | ADR-0018 | [TauriからAfter Effectsへ固定JSXと一時ファイルで接続する](./0018-tauri-after-effects-connector.md) | accepted |
+| ADR-0019 | [Request-first開発ライフサイクルとValidation Gate分離](./0019-request-first-development-lifecycle.md) | accepted |
 
 ## 作成基準
 

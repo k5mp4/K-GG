@@ -1,68 +1,54 @@
-## 変更区分
+## Request source
 
-- [ ] S: 軽微
-- [ ] B: 不具合
-- [ ] F: 機能
-- [ ] A: 設計
-- [ ] X: 実験
+- 種別: <!-- Issue / Direct request / AI request / CLI-MCP request / External request -->
+- Issue / Request link: <!-- ない場合は「なし」 -->
+
+## 変更分類
+
+- [ ] Quick Change（Issue/Change Capsuleなし可）
+- [ ] Tracked Change（Issueで継続追跡）
+- [ ] Designed Change（必要なSpec Delta / Capsule / ADRあり）
+
+補助分類: <!-- S / B / F / A / X -->
 
 ## 変更理由
 
-<!-- 解決する問題と、この変更が必要な理由を記載してください。 -->
-
-## 対象の現行仕様
-
-- Current Spec: <!-- CURRENT-*。S区分は「なし」可 -->
-- Requirement IDs: <!-- GRAD-* / EFFECT-* / PRESET-*。なければ「なし」 -->
-
-## 変更仕様
-
-- Change ID: <!-- CHANGE-###。S区分は「なし」可 -->
-- active/archive path: <!-- docs/changes/active/... または docs/changes/archive/...。S区分は「なし」可 -->
-- 状態: <!-- draft / review / approved / implemented / archived / cancelled / 該当なし -->
-- Human review: <!-- required / completed / 該当なし -->
-- 関連ADR: <!-- ADR-NNNN、なければ「なし」 -->
-
-## Delta
-
-- ADDED: <!-- 要件IDと変更内容、なければ「なし」 -->
-- MODIFIED: <!-- 要件IDと変更内容、なければ「なし」 -->
-- REMOVED: <!-- 要件IDと変更内容、なければ「なし」 -->
+<!-- 解決する問題と、この変更が必要な理由。 -->
 
 ## 変更内容
 
-<!-- 仕様のスコープに対応する変更を簡潔に記載してください。 -->
+<!-- 実装した内容と対象外。 -->
 
-## 影響
+## Source of Truth同期
 
-<!-- 利用者・開発者・互換性への影響を記載してください。影響がない場合は「なし」としてください。 -->
+- Current Spec: <!-- CURRENT-* または「なし / 変更不要」 -->
+- Requirement IDs: <!-- 例: GRAD-* / EFFECT-*。なければ「なし」 -->
+- 関連ADR: <!-- ADR-NNNN または「なし」 -->
+- Change Capsule: <!-- docs/changes/archive/... / PR内active path / 「なし」 -->
+- 同期メモ: <!-- Current Spec/ADR/利用者文書を更新したか、不要な理由 -->
 
-## 検証
+## Validation
 
-<!-- 各受け入れ条件とテストまたは手動確認結果を対応付けてください。 -->
+### Merge Gate
 
-- [ ] 受け入れ条件をすべて検証した
-- [ ] `npm run docs:check`
-- [ ] `npm run docs:build`
-- [ ] 変更範囲に必要なテスト、lint、buildを実行した
-- [ ] 実行していない手動確認、環境依存の失敗、既存警告を「未確認事項」に記載した
+- [ ] `npm run change:check`
+- [ ] `npm run check:merge`
+- [ ] 変更範囲に応じた`npm run check:render` / `npm run check:native`
 
-## 受け入れ条件と検証
+### Release Gate / Observation
 
-| AC | テスト・確認方法 | 結果 |
-| --- | --- | --- |
-| AC-001 |  |  |
+<!-- 実GPU、Tauri、FFmpeg、After Effects、installer/updater、特殊環境など。未実施は未実施と書く。 -->
 
-## 同期確認
+## 実行したコマンドと結果
 
-- [ ] current specを更新した、または変更不要の理由を記載した
-- [ ] current specの要件ID、タイトル、statusと一覧のリンクが一致している
-- [ ] コード、テスト、current specの内容が一致している
-- [ ] changeをArchiveへ移動した、またはactiveのままにする理由を記載した
-- [ ] 利用者向けの動作変更を`docs/index.md`へ反映した、または変更不要
-- [ ] 仕様外の変更を含めていない
-- [ ] 仕様との差異がある場合、仕様を再レビューした
+<!-- CIが実行する機械的検証の全文ではなく、コマンド・結果・警告の要約を記載。 -->
 
-## 補足・リスク
+## 未確認事項 / Follow-up
 
-<!-- 未確認事項、手動確認、互換性、ロールバック方法など。なければ「なし」としてください。 -->
+<!-- 手動確認、環境依存の失敗、残る作業。必要ならIssue化する。 -->
+
+## 影響とロールバック
+
+- 利用者への影響:
+- 互換性への影響:
+- ロールバック方法:
