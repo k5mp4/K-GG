@@ -1,6 +1,7 @@
 import { useMemo, useRef, useState, useSyncExternalStore, type CSSProperties } from 'react';
 import { InputAngle, InputNumber } from 'tweeq';
 import { useGradientStore } from '../store/gradientStore';
+import { applicationCommands } from '../application/commands';
 import { getTimelineTime, getTimelineTimeSnapshot, subscribeTimelineTime } from '../lib/timelineClock';
 import { interpolateKeyframesWithLoop, getKeyframeEditTime } from '../lib/loopKeyframes';
 import { inferFormatInfo } from '../lib/tweeqNumberFormat';
@@ -61,7 +62,8 @@ export function SliderField({
 }: Props) {
   const { language, t } = useLanguage();
   const localizedLabel = localizeUiLabel(label, language);
-  const { keyframeTracks, currentTime, animation, addKeyframe, setKeyframe } = useGradientStore();
+  const { keyframeTracks, currentTime, animation } = useGradientStore();
+  const { addKeyframe, setKeyframe } = applicationCommands;
   const track = trackId ? keyframeTracks[trackId] : null;
   const isKeyframed = getTrackMode(track) === 'keys';
   const loopEnabled = animation.previewLoop ?? true;

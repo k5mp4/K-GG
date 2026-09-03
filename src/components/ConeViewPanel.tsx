@@ -1,12 +1,14 @@
 import { useLanguage } from '../i18n/LanguageProvider';
 import { useGradientStore } from '../store/gradientStore';
+import { applicationCommands } from '../application/commands';
 import { CONE_SEAM_BLEND_MAX, CONE_SEAM_MODE_OPTIONS, DEFAULT_CONE_VIEW, type ConeSeamMode } from '../types/coneView';
 import { CustomSelect } from './CustomSelect';
 import { SliderField } from './SliderField';
 
 export function ConeViewPanel() {
   const { t } = useLanguage();
-  const { coneView, setConeView } = useGradientStore();
+  const { coneView } = useGradientStore();
+  const { setConeView } = applicationCommands;
 
   return (
     <div className="space-y-3 text-[11px]" data-cone-view-panel>

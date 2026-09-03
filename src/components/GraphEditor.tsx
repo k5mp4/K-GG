@@ -1,5 +1,6 @@
 import { useRef, useCallback, useEffect, useMemo, useState, useLayoutEffect } from 'react';
 import { useGradientStore } from '../store/gradientStore';
+import { applicationCommands } from '../application/commands';
 import { computeAutoHandles } from '../lib/autoBezier';
 import { getTimelineTime, setTimelineTime } from '../lib/timelineClock';
 import type { Keyframe, PropertyTrack } from '../types/keyframe';
@@ -58,7 +59,8 @@ export function GraphEditor({
   onSelectKeyframes,
   onSeek,
 }: Props) {
-  const { currentTime, setKeyframe, setKeyframeTracks, setCurrentTime } = useGradientStore();
+  const { currentTime } = useGradientStore();
+  const { setKeyframe, setKeyframeTracks, setCurrentTime, removeKeyframe } = applicationCommands;
   const containerRef = useRef<HTMLDivElement>(null);
   const svgRef       = useRef<SVGSVGElement>(null);
   const [dims, setDims] = useState({ w: 600, h: 200 });
@@ -467,7 +469,7 @@ export function GraphEditor({
         })}
         {sorted.map((kf) => {
           const key = kfKey(track.propertyId, kf.id), isSelected = selectedKeys.has(key), cx = toX(kf.time), cy = toY(kf.value);
-          return <g key={kf.id}><rect x={cx - KF_HALF} y={cy - KF_HALF} width={KF_HALF * 2} height={KF_HALF * 2} fill={isSelected ? '#FFF' : color} stroke={isSelected ? color : '#0D0D0D'} strokeWidth={isSelected ? 1.5 : 1} transform={`rotate(45 ${cx} ${cy})`} style={{ cursor: 'grab' }} onPointerDown={e => startKfDrag(e, kf)} onContextMenu={e => { e.preventDefault(); useGradientStore.getState().removeKeyframe(track.propertyId, kf.id); onSelectKeyframes(new Set()); }} />{isSelected && <text x={cx + KF_HALF + 4} y={Math.max(12, cy - KF_HALF - 2)} fontSize="9" fill="#ECDBBE" opacity="0.7" style={{ pointerEvents: 'none' }}>{`${(kf.time * duration).toFixed(2)}s  ${kf.value.toFixed(3)}`}</text>}</g>;
+          return <g key={kf.id}><rect x={cx - KF_HALF} y={cy - KF_HALF} width={KF_HALF * 2} height={KF_HALF * 2} fill={isSelected ? '#FFF' : color} stroke={isSelected ? color : '#0D0D0D'} strokeWidth={isSelected ? 1.5 : 1} transform={`rotate(45 ${cx} ${cy})`} style={{ cursor: 'grab' }} onPointerDown={e => startKfDrag(e, kf)} onContextMenu={e => { e.preventDefault(); removeKeyframe(track.propertyId, kf.id); onSelectKeyframes(new Set()); }} />{isSelected && <text x={cx + KF_HALF + 4} y={Math.max(12, cy - KF_HALF - 2)} fontSize="9" fill="#ECDBBE" opacity="0.7" style={{ pointerEvents: 'none' }}>{`${(kf.time * duration).toFixed(2)}s  ${kf.value.toFixed(3)}`}</text>}</g>;
         })}
         {sorted.map((kf, i) => {
           const key = kfKey(track.propertyId, kf.id); if (!(selectedKeys.has(key) || isDraggingHandle) || kf.interpolation !== 'bezier') return null;

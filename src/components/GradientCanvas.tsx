@@ -1,5 +1,8 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { useShallow } from 'zustand/react/shallow';
 import { useGradientStore } from '../store/gradientStore';
+import { applicationCommands } from '../application/commands';
+import { selectRenderState } from '../store/selectors';
 import { AnimationLoop } from '../lib/animation';
 import { useWebGL } from '../hooks/useWebGL';
 import { renderFallbackPreview } from '../lib/presetPreview';
@@ -39,7 +42,7 @@ export function GradientCanvas({ width = 800, height = 800, animLoopRef, seekVer
     staticRenderSchedulerRef.current = new LatestFrameScheduler();
   }
 
-  const { gradient, noiseDistortion, diffuse, imageGradient, slitScan, stretch, animation, normalMap, radon, iridescence, manualDistort, postprocess, effectPipeline, matcap, keyframeTracks, currentTime, clothGradient, seamless, flowGradient } = useGradientStore();
+  const { gradient, noiseDistortion, diffuse, imageGradient, slitScan, stretch, animation, normalMap, radon, iridescence, manualDistort, postprocess, effectPipeline, matcap, keyframeTracks, currentTime, clothGradient, seamless, flowGradient } = useGradientStore(useShallow(selectRenderState));
   const clothGradientForCanvas = disableClothBase
     ? { ...clothGradient, enabled: false }
     : clothGradient;
@@ -135,7 +138,7 @@ export function GradientCanvas({ width = 800, height = 800, animLoopRef, seekVer
         {
           loop: animation.previewLoop ?? true,
           fps: animation.fps,
-          onEnd: () => useGradientStore.getState().setCurrentTime(animLoopRef.current?.currentNormalizedTime ?? 1),
+          onEnd: () => applicationCommands.setCurrentTime(animLoopRef.current?.currentNormalizedTime ?? 1),
         },
       );
 

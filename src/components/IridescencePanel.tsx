@@ -1,10 +1,12 @@
 import { useGradientStore, STORE_DEFAULTS } from '../store/gradientStore';
+import { applicationCommands } from '../application/commands';
 import { ManualDistortControls } from './PostprocessPanel';
 import { SliderField } from './SliderField';
 import { Toggle } from './Toggle';
 
 export function IridescencePanel() {
-  const { manualDistort, setManualDistort, iridescence, setIridescence } = useGradientStore();
+  const { manualDistort, iridescence } = useGradientStore();
+  const { setManualDistort, setIridescence } = applicationCommands;
 
   return (
     <div className="space-y-4">

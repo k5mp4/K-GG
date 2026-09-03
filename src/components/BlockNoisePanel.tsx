@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useGradientStore, STORE_DEFAULTS } from '../store/gradientStore';
+import { applicationCommands } from '../application/commands';
 import { SliderField } from './SliderField';
 import { Collapsible } from './Collapsible';
 import { AnimatedButton } from './AnimatedButton';
@@ -50,7 +51,8 @@ async function loadSystemFonts(): Promise<string[]> {
 
 export function DiffusePanel() {
   const { t } = useLanguage();
-  const { diffuse, setDiffuse } = useGradientStore();
+  const { diffuse } = useGradientStore();
+  const { setDiffuse } = applicationCommands;
   const canReset = isDiffuseDirty(diffuse);
   const [systemFonts, setSystemFonts] = useState<string[] | null>(null);
 

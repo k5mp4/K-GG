@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { createEmptyManualDistortMap, createEmptyManualSmoothMask, STORE_DEFAULTS, useGradientStore } from '../store/gradientStore';
+import { applicationCommands } from '../application/commands';
 import { applyMirrorT, applyRampRepeatT, getColorAtPosition } from '../lib/gradientRampUtils';
 import type { ColorStop, RampColorMode, RampInterpolation } from '../types/gradient';
 import type { ManualDistortConfig, PostprocessParticleEmitterType } from '../types/distortion';
@@ -343,7 +344,8 @@ type PostprocessPanelProps = {
 
 export function PostprocessPanel({ sandboxMode, embedded = false }: PostprocessPanelProps = {}) {
   const { t } = useLanguage();
-  const { gradient, setGradient, postprocess, setPostprocess, effectPipeline } = useGradientStore();
+  const { gradient, postprocess, effectPipeline } = useGradientStore();
+  const { setGradient, setPostprocess } = applicationCommands;
   const activeEffectMode = sandboxMode ?? (
     postprocess.effectMode === 'prism' || postprocess.effectMode === 'particles'
       ? 'distort'

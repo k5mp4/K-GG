@@ -1,4 +1,5 @@
 import { useGradientStore, STORE_DEFAULTS } from '../store/gradientStore';
+import { applicationCommands } from '../application/commands';
 import type { NormalMapConfig } from '../types/distortion';
 import { gradientRampPresets } from '../lib/gradientRampUtils';
 import { SliderField } from './SliderField';
@@ -21,7 +22,8 @@ type NormalMapPanelProps = {
 
 export function NormalMapPanel({ embedded = false }: NormalMapPanelProps = {}) {
   const { t } = useLanguage();
-  const { normalMap, setNormalMap, diffuse, setDiffuse, setGradient } = useGradientStore();
+  const { normalMap, diffuse } = useGradientStore();
+  const { setNormalMap, setDiffuse, setGradient } = applicationCommands;
   const canReset = isNormalMapDirty(normalMap);
 
   return (

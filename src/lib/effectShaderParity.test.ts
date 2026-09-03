@@ -3,6 +3,7 @@ import gradientShader from '../shaders/gradient.frag.glsl?raw';
 import noiseShader from '../shaders/noise.glsl?raw';
 import postprocessDiffuseShader from '../shaders/postprocess/diffuse.glsl?raw';
 import webglSource from './webgl.ts?raw';
+import sceneRenderPlanSource from './sceneRenderPlan.ts?raw';
 import { getPostprocessFragmentSource, getProgramSource } from './webglShaderSources';
 
 // Normalize line endings so indexOf-based guards (e.g. '#else\n#if ...') stay
@@ -341,8 +342,8 @@ describe('V2 effect shader parity', () => {
     expect(gradientMain).toContain('? max(u_diffuseGrain, 0.01)');
     expect(gradientMain).toContain('disp = diffuseHash(cell + seedOff);');
     expect(gradientMain).toContain('!isLegacyStipple && u_diffuseAdaptiveEnabled');
-    expect(compact(webglSource)).toContain(compact(
-      "forceTextureDiffusePass: diffuse.mode === 'legacy'",
+    expect(compact(sceneRenderPlanSource)).toContain(compact(
+      "forceTextureDiffusePass: overrides.forceTextureDiffusePass ?? state.diffuse.mode === 'legacy'",
     ));
     expect(webglSource).toContain("renderPlan.framebufferAllocationMode === 'direct'");
   });

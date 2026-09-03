@@ -1,4 +1,5 @@
-import { normalizeNoiseDistortionConfig, useGradientStore } from '../store/gradientStore';
+import { normalizeNoiseDistortionConfig } from '../store/documentModel';
+import { useGradientStore } from '../store/gradientStore';
 import type { StoreSnapshot as PresetStoreSnapshot } from './presets';
 import { MAX_HISTORY, HISTORY_DEBOUNCE_MS } from './constants';
 import { debounce } from './debounce';

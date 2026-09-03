@@ -1,6 +1,7 @@
 import { useEffect, useRef } from 'react';
 import { getConeApexCanvasPoint } from '../lib/coneView';
 import { useGradientStore } from '../store/gradientStore';
+import { applicationCommands } from '../application/commands';
 import { CONE_APEX_LIMIT } from '../types/coneView';
 import { useLanguage } from '../i18n/LanguageProvider';
 
@@ -16,7 +17,8 @@ function clampApex(value: number): number {
 
 export function ConeApexEditor({ width, height, visible = true }: Props) {
   const { t } = useLanguage();
-  const { coneView, setConeView } = useGradientStore();
+  const { coneView } = useGradientStore();
+  const { setConeView } = applicationCommands;
   const containerRef = useRef<HTMLDivElement | null>(null);
   const draggingRef = useRef(false);
   const cleanupDragRef = useRef<(() => void) | null>(null);

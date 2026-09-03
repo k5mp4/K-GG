@@ -5,6 +5,7 @@ import {
   createFlowGradientResources,
   resetFlowGradientResources,
   resizeFlowGradientResources,
+  disposeFlowGradientResources,
   type FlowGradientResources,
   renderFlowGradient,
 } from './flowGradientRenderer';
@@ -12,7 +13,7 @@ import type { GradientConfig } from '../types/gradient';
 import type { NoiseDistortionConfig, DiffuseConfig, SlitScanConfig, StretchConfig, NormalMapConfig, RadonConfig, IridescenceConfig, ManualDistortConfig, PostprocessConfig, MatcapConfig, PostprocessStackKind, EffectPipelineConfig } from '../types/distortion';
 import { DEFAULT_DIFFUSE_ASCII_CHARSET, DEFAULT_DIFFUSE_BACKGROUND_COLOR } from '../types/distortion';
 import { IMAGE_GRADIENT_DEFAULTS, type ImageGradientConfig } from '../types/imageGradient';
-import { GRADIENT_ANCHOR_DEFAULTS, defaultBezierControlsForAnchors } from '../store/gradientStore';
+import { GRADIENT_ANCHOR_DEFAULTS, defaultBezierControlsForAnchors } from '../store/documentModel';
 import { normalizeMeshGradientConfig, type MeshGradientConfig } from '../types/gradient';
 import { buildRampTextureData, RAMP_TEX_WIDTH } from './gradientRampUtils';
 import {
@@ -36,7 +37,7 @@ import {
   normalizeGlassV2ColorParameters,
 } from './glass';
 import { getActivePostprocessStackLayers } from './postprocessStack';
-import { getV2RenderPlan } from './effectPipeline';
+import { getSceneRenderPlan, getSceneRenderPlanInput } from './sceneRenderPlan';
 import { buildDiffuseBezierLut, normalizeDiffuseBezier } from './diffuseCurve';
 import { buildMeshGradientField, MESH_FIELD_SIZE, MESH_FIELD_SUBDIVISIONS } from './meshGradientField';
 import { noiseAngleDegreesForShader, noiseAngleRadiansForShader } from './noiseAngle';
@@ -59,6 +60,10 @@ import {
 } from './webglPerformance';
 import type { PerformanceSnapshot } from '../types/webglPerformance';
 import { createWebGL2Context, WebGL2UnavailableError } from './webglCapability';
+import type { TileRenderOptions } from '../types/rendering';
+import { createWebGLFramebufferWithTexture, createWebGLTexture2D } from './webglResources';
+
+export type { TileRenderOptions } from '../types/rendering';
 
 export { SHADER_VERSION };
 
@@ -133,6 +138,8 @@ export type WebGLContext = {
   renderOptimization: RenderOptimization;
   program: WebGLProgram;
   uniforms: Record<string, WebGLUniformLocation | null>;
+  geometryBuffer: WebGLBuffer;
+  transitionGeometryBuffer: WebGLBuffer;
   generatorProgram: WebGLProgram | null;
   generatorUniforms: Record<string, WebGLUniformLocation | null>;
   gradientRampTexture: WebGLTexture; // TEXTURE1: グラデーションランプ
@@ -213,6 +220,7 @@ export type WebGLContext = {
   clothRenderer?: ClothGradientRenderer | null;
   clothStatus?: 'loading' | 'ready' | 'failed' | 'fallback';
   hasPresentedFrame: boolean;
+  disposed: boolean;
 };
 
 type EffectStackTransitionResources = {
@@ -336,6 +344,55 @@ export async function initWebGL(canvas: HTMLCanvasElement): Promise<WebGLContext
   canvas.addEventListener('webglcontextrestored', handleContextRestored);
   webglLifecycleHandlers.set(canvas, { lost: handleContextLost, restored: handleContextRestored });
 
+  // Initialization is asynchronous and can fail after several GPU objects
+  // have already been allocated. Keep a temporary ownership ledger until the
+  // complete context can take over those objects.
+  const ownedPrograms = new Set<WebGLProgram>();
+  const ownedBuffers = new Set<WebGLBuffer>();
+  const ownedTextures = new Set<WebGLTexture>();
+  const ownedFramebuffers = new Set<WebGLFramebuffer>();
+  let ownedFlowGradient: FlowGradientResources | null = null;
+  const ownProgram = (resource: WebGLProgram) => {
+    ownedPrograms.add(resource);
+    return resource;
+  };
+  const ownBuffer = (resource: WebGLBuffer) => {
+    ownedBuffers.add(resource);
+    return resource;
+  };
+  const ownTexture = (resource: WebGLTexture) => {
+    ownedTextures.add(resource);
+    return resource;
+  };
+  const ownFramebufferPair = () => {
+    const resources = createFboWithTexture(gl);
+    ownedFramebuffers.add(resources.fbo);
+    ownedTextures.add(resources.tex);
+    return resources;
+  };
+  const createOwnedTexture = () => {
+    const resource = gl.createTexture();
+    if (!resource) throw new Error('Failed to create WebGL texture');
+    return ownTexture(resource);
+  };
+  const cleanupFailedInitialization = () => {
+    if (ownedFlowGradient) disposeFlowGradientResources(gl, ownedFlowGradient);
+    for (const buffer of ownedBuffers) gl.deleteBuffer(buffer);
+    for (const framebuffer of ownedFramebuffers) gl.deleteFramebuffer(framebuffer);
+    for (const texture of ownedTextures) gl.deleteTexture(texture);
+    for (const program of ownedPrograms) gl.deleteProgram(program);
+    performanceProfiler?.dispose();
+    const handlers = webglLifecycleHandlers.get(canvas);
+    if (handlers?.lost === handleContextLost) {
+      canvas.removeEventListener('webglcontextlost', handlers.lost);
+      canvas.removeEventListener('webglcontextrestored', handlers.restored);
+      webglLifecycleHandlers.delete(canvas);
+    }
+    if (registeredWebGLContexts.get(canvas) === gl) registeredWebGLContexts.delete(canvas);
+  };
+
+  try {
+
   // WebGL テクスチャサイズ制限を確認（デバッグ用）
   const maxTextureSize = gl.getParameter(gl.MAX_TEXTURE_SIZE);
   const maxRenderbufferSize = gl.getParameter(gl.MAX_RENDERBUFFER_SIZE);
@@ -387,16 +444,16 @@ export async function initWebGL(canvas: HTMLCanvasElement): Promise<WebGLContext
   // 初期表示はメインのグラデーションプログラムだけを待つ。
   // 補助プログラムは init 完了後に順次コンパイルし、最初のグラデーション表示を早める。
   const initialSource = getInitialProgramSource();
-  const program = await createProgramAsync(gl, initialSource.fragment, shaderCompileExt, initialSource.vertex);
-  setupGeometry(gl, program);
-  const transitionProgram = await createProgramAsync(
+  const program = ownProgram(await createProgramAsync(gl, initialSource.fragment, shaderCompileExt, initialSource.vertex));
+  const geometryBuffer = ownBuffer(setupGeometry(gl, program));
+  const transitionProgram = ownProgram(await createProgramAsync(
     gl,
     EFFECT_STACK_TRANSITION_FRAGMENT_SHADER,
     shaderCompileExt,
     initialSource.vertex,
     'effect-stack-transition',
-  );
-  setupGeometry(gl, transitionProgram);
+  ));
+  const transitionGeometryBuffer = ownBuffer(setupGeometry(gl, transitionProgram));
   const uniforms: Record<string, WebGLUniformLocation | null> = {
     u_gradientType: gl.getUniformLocation(program, 'u_gradientType'),
     u_resolution: gl.getUniformLocation(program, 'u_resolution'),
@@ -564,14 +621,14 @@ export async function initWebGL(canvas: HTMLCanvasElement): Promise<WebGLContext
     u_tileOffset: gl.getUniformLocation(program, 'u_tileOffset'),
     u_tileSize: gl.getUniformLocation(program, 'u_tileSize'),
   };
-  const imageMaskTexture = gl.createTexture()!;
+  const imageMaskTexture = createOwnedTexture();
   gl.bindTexture(gl.TEXTURE_2D, imageMaskTexture);
   gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, 1, 1, 0, gl.RGBA, gl.UNSIGNED_BYTE, new Uint8Array([255, 255, 255, 255]));
   gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
   gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
   gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
   gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
-  const gradientRampTexture = gl.createTexture()!;
+  const gradientRampTexture = createOwnedTexture();
   gl.bindTexture(gl.TEXTURE_2D, gradientRampTexture);
   const initRamp = new Uint8Array(256 * 4);
   for (let i = 0; i < 256; i++) { initRamp[i * 4] = i; initRamp[i * 4 + 1] = i; initRamp[i * 4 + 2] = i; initRamp[i * 4 + 3] = 255; }
@@ -580,14 +637,14 @@ export async function initWebGL(canvas: HTMLCanvasElement): Promise<WebGLContext
   gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
   gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
   gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
-  const meshGradientTexture = gl.createTexture()!;
+  const meshGradientTexture = createOwnedTexture();
   gl.bindTexture(gl.TEXTURE_2D, meshGradientTexture);
   gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, MESH_FIELD_SIZE, MESH_FIELD_SIZE, 0, gl.RGBA, gl.UNSIGNED_BYTE, new Uint8Array(MESH_FIELD_SIZE * MESH_FIELD_SIZE * 4));
   gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
   gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
   gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
   gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
-  const diffuseCurveTexture = gl.createTexture()!;
+  const diffuseCurveTexture = createOwnedTexture();
   gl.bindTexture(gl.TEXTURE_2D, diffuseCurveTexture);
   const identityCurve = new Uint8Array(256 * 4);
   for (let i = 0; i < 256; i++) {
@@ -601,28 +658,28 @@ export async function initWebGL(canvas: HTMLCanvasElement): Promise<WebGLContext
   gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
   gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
   gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
-  const diffuseAsciiTexture = gl.createTexture()!;
+  const diffuseAsciiTexture = createOwnedTexture();
   gl.bindTexture(gl.TEXTURE_2D, diffuseAsciiTexture);
   gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, ASCII_ATLAS_WIDTH, ASCII_ATLAS_HEIGHT, 0, gl.RGBA, gl.UNSIGNED_BYTE, null);
   gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
   gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
   gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
   gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
-  const manualDistortTexture = gl.createTexture()!;
+  const manualDistortTexture = createOwnedTexture();
   gl.bindTexture(gl.TEXTURE_2D, manualDistortTexture);
   gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA32F, 1, 1, 0, gl.RGBA, gl.FLOAT, new Float32Array([0.5, 0.5, 0.0, 1.0]));
   gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
   gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
   gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
   gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
-  const sourceImageTexture = gl.createTexture()!;
+  const sourceImageTexture = createOwnedTexture();
   gl.bindTexture(gl.TEXTURE_2D, sourceImageTexture);
   gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, 1, 1, 0, gl.RGBA, gl.UNSIGNED_BYTE, new Uint8Array([0, 0, 0, 255]));
   gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
   gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
   gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
   gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
-  const imageGradientTexture = gl.createTexture()!;
+  const imageGradientTexture = createOwnedTexture();
   gl.bindTexture(gl.TEXTURE_2D, imageGradientTexture);
   gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, 1, 1, 0, gl.RGBA, gl.UNSIGNED_BYTE, new Uint8Array([0, 0, 0, 0]));
   gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
@@ -630,18 +687,19 @@ export async function initWebGL(canvas: HTMLCanvasElement): Promise<WebGLContext
   gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
   gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
   gl.useProgram(program);
-  const { fbo: normalFbo, tex: normalTexture } = createFboWithTexture(gl);
-  const { fbo: hBlurFbo, tex: hBlurTexture } = createFboWithTexture(gl);
-  const { fbo: gradFbo, tex: gradTexture } = createFboWithTexture(gl);
-  const { fbo: postprocessFboA, tex: postprocessTextureA } = createFboWithTexture(gl);
-  const { fbo: postprocessFboB, tex: postprocessTextureB } = createFboWithTexture(gl);
-  const { fbo: prismScratchFbo, tex: prismScratchTexture } = createFboWithTexture(gl);
-  const { fbo: prismBlurFbo, tex: prismBlurTexture } = createFboWithTexture(gl);
-  const { fbo: prismGlowFbo, tex: prismGlowTexture } = createFboWithTexture(gl);
+  const { fbo: normalFbo, tex: normalTexture } = ownFramebufferPair();
+  const { fbo: hBlurFbo, tex: hBlurTexture } = ownFramebufferPair();
+  const { fbo: gradFbo, tex: gradTexture } = ownFramebufferPair();
+  const { fbo: postprocessFboA, tex: postprocessTextureA } = ownFramebufferPair();
+  const { fbo: postprocessFboB, tex: postprocessTextureB } = ownFramebufferPair();
+  const { fbo: prismScratchFbo, tex: prismScratchTexture } = ownFramebufferPair();
+  const { fbo: prismBlurFbo, tex: prismBlurTexture } = ownFramebufferPair();
+  const { fbo: prismGlowFbo, tex: prismGlowTexture } = ownFramebufferPair();
   const flowGradient = createFlowGradientResources(gl);
-  const transitionTextureFrom = createTexture(gl);
-  const transitionTextureTo = createTexture(gl);
-  const ctx: WebGLContext = { gl, performanceProfiler, gpuDiagnostics, renderOptimization, program, uniforms, generatorProgram: null, generatorUniforms: {}, gradientRampTexture, meshGradientTexture, meshGradientTextureSignature: '', diffuseCurveTexture, diffuseCurveSignature: '', diffuseAsciiTexture, diffuseAsciiSignature: '', diffuseAsciiCount: 1, diffuseAsciiRows: ASCII_ATLAS_MAX_ROWS, diffuseHistogramAt: 0, manualDistortTexture, manualDistortDisplacement: null, manualDistortSmoothMask: null, manualDistortMapResolution: 0, sourceImageTexture, sourceImageCanvas: null, imageGradientTexture, imageGradientSource: null, imageMaskTexture, imageMaskSource: null, normalMapProgram: null, normalMapUniforms: {}, gradFbo, gradTexture, blurProgram: null, blurUniforms: {}, stretchProgram: null, stretchUniforms: {}, seamlessProgram: null, seamlessUniforms: {}, stackCoreProgram: null, stackCoreUniforms: {}, noiseStackProgram: null, noiseStackUniforms: {}, glassProgram: null, glassUniforms: {}, glassFallbackActive: false, glassV2Program: null, glassV2Uniforms: {}, glassV2FallbackActive: false, prismProgram: null, prismUniforms: {}, postprocessProgram: null, postprocessUniforms: {}, prismCompositeProgram: null, prismCompositeUniforms: {}, particleProgram: null, particleUniforms: {}, particleVao: null, particleQuadBuffer: null, particleInstanceBuffer: null, particleInstanceCount: 0, particleInstanceSeed: Number.NaN, flowGradient, normalFbo, normalTexture, hBlurFbo, hBlurTexture, postprocessFboA, postprocessTextureA, postprocessFboB, postprocessTextureB, prismScratchFbo, prismScratchTexture, prismBlurFbo, prismBlurTexture, prismGlowFbo, prismGlowTexture, fboSize: [0, 0], v2CoreFboSize: [0, 0], shaderCompileExt, lazyProgramState: createLazyProgramState(), lazyProgramCompileQueue: createSerialAsyncQueue(), hasPresentedFrame: false };
+  ownedFlowGradient = flowGradient;
+  const transitionTextureFrom = ownTexture(createTexture(gl));
+  const transitionTextureTo = ownTexture(createTexture(gl));
+  const ctx: WebGLContext = { gl, performanceProfiler, gpuDiagnostics, renderOptimization, program, uniforms, geometryBuffer, transitionGeometryBuffer, generatorProgram: null, generatorUniforms: {}, gradientRampTexture, meshGradientTexture, meshGradientTextureSignature: '', diffuseCurveTexture, diffuseCurveSignature: '', diffuseAsciiTexture, diffuseAsciiSignature: '', diffuseAsciiCount: 1, diffuseAsciiRows: ASCII_ATLAS_MAX_ROWS, diffuseHistogramAt: 0, manualDistortTexture, manualDistortDisplacement: null, manualDistortSmoothMask: null, manualDistortMapResolution: 0, sourceImageTexture, sourceImageCanvas: null, imageGradientTexture, imageGradientSource: null, imageMaskTexture, imageMaskSource: null, normalMapProgram: null, normalMapUniforms: {}, gradFbo, gradTexture, blurProgram: null, blurUniforms: {}, stretchProgram: null, stretchUniforms: {}, seamlessProgram: null, seamlessUniforms: {}, stackCoreProgram: null, stackCoreUniforms: {}, noiseStackProgram: null, noiseStackUniforms: {}, glassProgram: null, glassUniforms: {}, glassFallbackActive: false, glassV2Program: null, glassV2Uniforms: {}, glassV2FallbackActive: false, prismProgram: null, prismUniforms: {}, postprocessProgram: null, postprocessUniforms: {}, prismCompositeProgram: null, prismCompositeUniforms: {}, particleProgram: null, particleUniforms: {}, particleVao: null, particleQuadBuffer: null, particleInstanceBuffer: null, particleInstanceCount: 0, particleInstanceSeed: Number.NaN, flowGradient, normalFbo, normalTexture, hBlurFbo, hBlurTexture, postprocessFboA, postprocessTextureA, postprocessFboB, postprocessTextureB, prismScratchFbo, prismScratchTexture, prismBlurFbo, prismBlurTexture, prismGlowFbo, prismGlowTexture, fboSize: [0, 0], v2CoreFboSize: [0, 0], shaderCompileExt, lazyProgramState: createLazyProgramState(), lazyProgramCompileQueue: createSerialAsyncQueue(), hasPresentedFrame: false, disposed: false };
   effectStackTransitionResources.set(ctx, {
     program: transitionProgram,
     from: gl.getUniformLocation(transitionProgram, 'u_transitionFrom'),
@@ -653,6 +711,106 @@ export async function initWebGL(canvas: HTMLCanvasElement): Promise<WebGLContext
     textureSize: [0, 0],
   });
   return ctx;
+  } catch (error) {
+    cleanupFailedInitialization();
+    throw error;
+  }
+}
+
+/**
+ * Releases all resources owned by one WebGL renderer instance.
+ *
+ * The editor can recreate this context after HMR, context restoration, or a
+ * canvas replacement.  Keeping cleanup beside init makes the owner explicit
+ * and prevents stale programs, FBOs, hidden Cloth contexts, and lifecycle
+ * listeners from surviving the React component that created them.
+ */
+export function disposeWebGL(ctx: WebGLContext): void {
+  if (ctx.disposed) return;
+  ctx.disposed = true;
+  const { gl } = ctx;
+  const canvas = gl.canvas as HTMLCanvasElement;
+  const isRegisteredContext = registeredWebGLContexts.get(canvas) === gl;
+  const lifecycleHandlers = webglLifecycleHandlers.get(canvas);
+  if (isRegisteredContext && lifecycleHandlers) {
+    canvas.removeEventListener('webglcontextlost', lifecycleHandlers.lost);
+    canvas.removeEventListener('webglcontextrestored', lifecycleHandlers.restored);
+    webglLifecycleHandlers.delete(canvas);
+  }
+
+  ctx.performanceProfiler?.dispose();
+
+  const transition = effectStackTransitionResources.get(ctx);
+  if (transition) {
+    gl.deleteProgram(transition.program);
+    gl.deleteTexture(transition.textureFrom);
+    gl.deleteTexture(transition.textureTo);
+    effectStackTransitionResources.delete(ctx);
+  }
+
+  const programs = [
+    ctx.program,
+    ctx.generatorProgram,
+    ctx.normalMapProgram,
+    ctx.blurProgram,
+    ctx.stretchProgram,
+    ctx.seamlessProgram,
+    ctx.postprocessProgram,
+    ctx.stackCoreProgram,
+    ctx.noiseStackProgram,
+    ctx.glassProgram,
+    ctx.glassV2Program,
+    ctx.prismProgram,
+    ctx.prismCompositeProgram,
+    ctx.particleProgram,
+  ];
+  const uniquePrograms = new Set(programs.filter((program): program is WebGLProgram => Boolean(program)));
+  for (const program of uniquePrograms) gl.deleteProgram(program);
+
+  const textures = [
+    ctx.gradientRampTexture,
+    ctx.meshGradientTexture,
+    ctx.diffuseCurveTexture,
+    ctx.diffuseAsciiTexture,
+    ctx.manualDistortTexture,
+    ctx.sourceImageTexture,
+    ctx.imageGradientTexture,
+    ctx.imageMaskTexture,
+    ctx.gradTexture,
+    ctx.normalTexture,
+    ctx.hBlurTexture,
+    ctx.postprocessTextureA,
+    ctx.postprocessTextureB,
+    ctx.prismScratchTexture,
+    ctx.prismBlurTexture,
+    ctx.prismGlowTexture,
+  ];
+  for (const texture of textures) gl.deleteTexture(texture);
+
+  const framebuffers = [
+    ctx.gradFbo,
+    ctx.normalFbo,
+    ctx.hBlurFbo,
+    ctx.postprocessFboA,
+    ctx.postprocessFboB,
+    ctx.prismScratchFbo,
+    ctx.prismBlurFbo,
+    ctx.prismGlowFbo,
+  ];
+  for (const framebuffer of framebuffers) gl.deleteFramebuffer(framebuffer);
+
+  if (ctx.particleVao) gl.deleteVertexArray(ctx.particleVao);
+  for (const buffer of [ctx.particleQuadBuffer, ctx.particleInstanceBuffer]) {
+    if (buffer) gl.deleteBuffer(buffer);
+  }
+  for (const buffer of [ctx.geometryBuffer, ctx.transitionGeometryBuffer]) {
+    gl.deleteBuffer(buffer);
+  }
+  disposeFlowGradientResources(gl, ctx.flowGradient);
+  ctx.clothRenderer?.dispose();
+  ctx.clothRenderer = null;
+  ctx.clothStatus = undefined;
+  if (isRegisteredContext) registeredWebGLContexts.delete(canvas);
 }
 
 async function createProgramAsync(
@@ -662,6 +820,7 @@ async function createProgramAsync(
   vertSrc: string,
   diagnosticLabel = 'gradient',
   compileTimeoutMs = PARALLEL_SHADER_COMPILE_TIMEOUT_MS,
+  shouldCancel: () => boolean = () => false,
 ): Promise<WebGLProgram> {
   const compileStartedAt = performance.now();
   console.info('[WebGL shader] compile requested', {
@@ -670,73 +829,97 @@ async function createProgramAsync(
     parallelCompile: Boolean(ext),
   });
   if (gl.isContextLost()) throw new Error('WebGL context lost before compile');
-  const vert = gl.createShader(gl.VERTEX_SHADER)!;
-  gl.shaderSource(vert, vertSrc);
-  gl.compileShader(vert);
-  const frag = gl.createShader(gl.FRAGMENT_SHADER)!;
-  gl.shaderSource(frag, fragSrc);
-  gl.compileShader(frag);
-  const program = gl.createProgram()!;
-  gl.attachShader(program, vert);
-  gl.attachShader(program, frag);
-  gl.bindAttribLocation(program, 0, 'a_position');
-  gl.linkProgram(program);
-  if (ext) {
+  let vert: WebGLShader | null = null;
+  let frag: WebGLShader | null = null;
+  let program: WebGLProgram | null = null;
+  try {
+    vert = gl.createShader(gl.VERTEX_SHADER);
+    if (!vert) throw new Error('Failed to create vertex shader');
+    gl.shaderSource(vert, vertSrc);
+    gl.compileShader(vert);
+    frag = gl.createShader(gl.FRAGMENT_SHADER);
+    if (!frag) throw new Error('Failed to create fragment shader');
+    gl.shaderSource(frag, fragSrc);
+    gl.compileShader(frag);
+    program = gl.createProgram();
+    if (!program) throw new Error('Failed to create WebGL program');
+    gl.attachShader(program, vert);
+    gl.attachShader(program, frag);
+    gl.bindAttribLocation(program, 0, 'a_position');
+    gl.linkProgram(program);
+    if (ext) {
     // KHR_parallel_shader_compileの完了前にステータスを参照すると同期化される。
     // Glass系はドライバ側の長いコンパイルを許容し、通常のprogramは有限時間の
     // watchdog後にステータス参照へフォールバックする。完了通知を返さないドライバでも
     // 有効なProgramをタイムアウト扱いで破棄しないための最後の同期確認になる。
-    await new Promise<void>((resolve, reject) => {
-      const poll = () => {
-        if (gl.isContextLost()) {
-          reject(new Error('WebGL context lost during compilation'));
-          return;
-        }
-        if (gl.getProgramParameter(program, ext.COMPLETION_STATUS_KHR)) {
-          resolve();
-          return;
-        }
-        if (Number.isFinite(compileTimeoutMs) && performance.now() - compileStartedAt >= compileTimeoutMs) {
-          console.warn('[WebGL shader] Parallel shader compile completion watchdog expired; falling back to synchronous status checks', {
-            program: diagnosticLabel,
-            elapsedMs: Math.round(performance.now() - compileStartedAt),
-          });
-          resolve();
-          return;
-        }
+      await new Promise<void>((resolve, reject) => {
+        const poll = () => {
+          if (shouldCancel()) {
+            resolve();
+            return;
+          }
+          if (gl.isContextLost()) {
+            reject(new Error('WebGL context lost during compilation'));
+            return;
+          }
+          if (gl.getProgramParameter(program!, ext.COMPLETION_STATUS_KHR)) {
+            resolve();
+            return;
+          }
+          if (Number.isFinite(compileTimeoutMs) && performance.now() - compileStartedAt >= compileTimeoutMs) {
+            console.warn('[WebGL shader] Parallel shader compile completion watchdog expired; falling back to synchronous status checks', {
+              program: diagnosticLabel,
+              elapsedMs: Math.round(performance.now() - compileStartedAt),
+            });
+            resolve();
+            return;
+          }
+          requestAnimationFrame(poll);
+        };
         requestAnimationFrame(poll);
-      };
-      requestAnimationFrame(poll);
+      });
+    }
+    if (shouldCancel()) return program;
+    // エラーチェック（extなし = ここで初めて同期ブロック、extあり = 完了通知を受信済み、
+    // またはwatchdog後の同期フォールバック）
+    if (!gl.getShaderParameter(vert, gl.COMPILE_STATUS)) {
+      const log = gl.getShaderInfoLog(vert);
+      console.error('[GLSL] VERTEX compile error:', log);
+      recordShaderError('vertex', diagnosticLabel, String(log ?? 'unknown vertex shader compile error'));
+      throw new Error('Shader compile failed: ' + log);
+    }
+    if (!gl.getShaderParameter(frag, gl.COMPILE_STATUS)) {
+      const log = gl.getShaderInfoLog(frag);
+      console.error('[GLSL] FRAGMENT compile error:', log);
+      recordShaderError('fragment', diagnosticLabel, String(log ?? 'unknown fragment shader compile error'));
+      throw new Error('Shader compile failed: ' + log);
+    }
+    if (!gl.getProgramParameter(program, gl.LINK_STATUS)) {
+      const log = gl.getProgramInfoLog(program);
+      console.error('[WebGL] Link failed:', log);
+      console.error('[WebGL] MAX_FRAGMENT_UNIFORM_VECTORS:', gl.getParameter(gl.MAX_FRAGMENT_UNIFORM_VECTORS));
+      console.error('[WebGL] MAX_VERTEX_UNIFORM_VECTORS:', gl.getParameter(gl.MAX_VERTEX_UNIFORM_VECTORS));
+      console.error('[WebGL] MAX_VARYING_VECTORS:', gl.getParameter(gl.MAX_VARYING_VECTORS));
+      recordShaderError('link', diagnosticLabel, String(log ?? 'unknown program link error'));
+      throw new Error('Program link failed: ' + log);
+    }
+    console.info('[WebGL shader] compile completed', {
+      program: diagnosticLabel,
+      durationMs: Math.round(performance.now() - compileStartedAt),
     });
+    return program;
+  } catch (error) {
+    if (program) {
+      const failedProgram = program;
+      gl.deleteProgram(failedProgram);
+    }
+    throw error;
+  } finally {
+    // Shader objects are only link inputs. The linked program keeps its binary
+    // after these handles are deleted, so they must not remain unowned.
+    if (vert) gl.deleteShader(vert);
+    if (frag) gl.deleteShader(frag);
   }
-  // エラーチェック（extなし = ここで初めて同期ブロック、extあり = 完了通知を受信済み、
-  // またはwatchdog後の同期フォールバック）
-  if (!gl.getShaderParameter(vert, gl.COMPILE_STATUS)) {
-    const log = gl.getShaderInfoLog(vert);
-    console.error('[GLSL] VERTEX compile error:', log);
-    recordShaderError('vertex', diagnosticLabel, String(log ?? 'unknown vertex shader compile error'));
-    throw new Error('Shader compile failed: ' + log);
-  }
-  if (!gl.getShaderParameter(frag, gl.COMPILE_STATUS)) {
-    const log = gl.getShaderInfoLog(frag);
-    console.error('[GLSL] FRAGMENT compile error:', log);
-    recordShaderError('fragment', diagnosticLabel, String(log ?? 'unknown fragment shader compile error'));
-    throw new Error('Shader compile failed: ' + log);
-  }
-  if (!gl.getProgramParameter(program, gl.LINK_STATUS)) {
-    const log = gl.getProgramInfoLog(program);
-    console.error('[WebGL] Link failed:', log);
-    console.error('[WebGL] MAX_FRAGMENT_UNIFORM_VECTORS:', gl.getParameter(gl.MAX_FRAGMENT_UNIFORM_VECTORS));
-    console.error('[WebGL] MAX_VERTEX_UNIFORM_VECTORS:', gl.getParameter(gl.MAX_VERTEX_UNIFORM_VECTORS));
-    console.error('[WebGL] MAX_VARYING_VECTORS:', gl.getParameter(gl.MAX_VARYING_VECTORS));
-    recordShaderError('link', diagnosticLabel, String(log ?? 'unknown program link error'));
-    throw new Error('Program link failed: ' + log);
-  }
-  console.info('[WebGL shader] compile completed', {
-    program: diagnosticLabel,
-    durationMs: Math.round(performance.now() - compileStartedAt),
-  });
-  return program;
 }
 
 function createLazyProgramState(): Record<LazyProgramKey, LazyProgramState> {
@@ -956,7 +1139,7 @@ function getGeneratorUniforms(gl: WebGL2RenderingContext, program: WebGLProgram)
 
 async function compileLazyProgram(ctx: WebGLContext, key: LazyProgramKey): Promise<void> {
   const { gl } = ctx;
-  if (gl.isContextLost() || lazyProgramReady(ctx, key)) return;
+  if (ctx.disposed || gl.isContextLost() || lazyProgramReady(ctx, key)) return;
 
   const source = getProgramSource(key);
   const fragSrc = source.fragment;
@@ -976,13 +1159,21 @@ async function compileLazyProgram(ctx: WebGLContext, key: LazyProgramKey): Promi
       key === 'glass' || key === 'glassV2'
         ? GLASS_PARALLEL_SHADER_COMPILE_TIMEOUT_MS
         : PARALLEL_SHADER_COMPILE_TIMEOUT_MS,
+      () => ctx.disposed,
     );
-    if (gl.isContextLost()) return;
+    if (ctx.disposed || gl.isContextLost()) {
+      gl.deleteProgram(program);
+      return;
+    }
     // Reflect uniforms before publishing the program. If webgl-lint or a
     // driver rejects reflection, no partially initialized program can enter
     // the render path and make the whole effect stack unusable.
     installLazyProgram(ctx, key, program);
   } catch (error) {
+    if (ctx.disposed) {
+      if (program) gl.deleteProgram(program);
+      return;
+    }
     console.error('[WebGL shader] compile failed', {
       program: key,
       durationMs: Math.round(performance.now() - compileStartedAt),
@@ -1065,7 +1256,7 @@ function installLazyProgram(ctx: WebGLContext, key: LazyProgramKey, program: Web
 }
 
 function requestLazyProgram(ctx: WebGLContext, key: LazyProgramKey): boolean {
-  if (lazyProgramReady(ctx, key)) return true;
+  if (ctx.disposed || lazyProgramReady(ctx, key)) return !ctx.disposed;
 
   const state = ctx.lazyProgramState[key];
   if (!state.promise && !state.failed) {
@@ -1073,6 +1264,7 @@ function requestLazyProgram(ctx: WebGLContext, key: LazyProgramKey): boolean {
       detail: { key, state: 'loading' as const },
     }));
     state.promise = ctx.lazyProgramCompileQueue.enqueue(() => compileLazyProgram(ctx, key)).catch((error) => {
+      if (ctx.disposed) return;
       state.failed = true;
       state.timedOut = error instanceof Error && error.message.includes('timed out');
       console.error(`[WebGL] Lazy shader compile failed (${key}):`, error);
@@ -1081,6 +1273,7 @@ function requestLazyProgram(ctx: WebGLContext, key: LazyProgramKey): boolean {
       }));
     }).finally(() => {
       state.promise = null;
+      if (ctx.disposed) return;
       if (!state.failed) {
         window.dispatchEvent(new CustomEvent('kgg:webgl-lazy-program-state', {
           detail: { key, state: 'ready' as const },
@@ -1190,21 +1383,10 @@ export function getRequiredExportProgramKeys(state: LatestState): LazyProgramKey
   const imageGradientProtected = state.imageGradient.enabled && Boolean(state.imageGradientSource);
 
   if (state.effectPipeline.version === 'stack-v2') {
-    const plan = getV2RenderPlan(state.effectPipeline, {
-      normalMapEnabled: state.normalMap.enabled,
-      normalMapBlur: state.normalMap.blur,
-      prismGlowRadius: state.postprocess.prismGlowRadius ?? 0,
-      forceTextureDiffusePass: state.diffuse.mode === 'legacy',
-      seamlessEnabled: state.seamless?.enabled ?? false,
-      gradientType: state.gradient?.gradientType,
-      sourceImageEnabled: Boolean(state.sourceImageCanvas),
+    const plan = getSceneRenderPlan(getSceneRenderPlanInput(state, {
       imageGradientEnabled: imageGradientProtected,
-      noiseType: state.noiseDistortion?.type,
-      noiseLoopMode: state.noiseDistortion?.noiseLoopMode,
-      diffuseMode: state.diffuse?.mode,
-      clothGradientEnabled: state.clothGradient?.enabled ?? false,
-      flowGradientEnabled: state.effectPipeline.flowGradientEnabled === true,
-    });
+    }));
+    if (!plan) return required;
     const protectedStipple = imageGradientProtected
       && state.diffuse.mode === 'legacy'
       && plan.diffuseEnabled;
@@ -1281,77 +1463,86 @@ function setupParticleGeometry(ctx: WebGLContext): void {
   const vao = gl.createVertexArray();
   const quadBuffer = gl.createBuffer();
   const instanceBuffer = gl.createBuffer();
-  if (!vao || !quadBuffer || !instanceBuffer) return;
+  if (!vao || !quadBuffer || !instanceBuffer) {
+    if (vao) gl.deleteVertexArray(vao);
+    if (quadBuffer) gl.deleteBuffer(quadBuffer);
+    if (instanceBuffer) gl.deleteBuffer(instanceBuffer);
+    return;
+  }
 
-  gl.bindVertexArray(vao);
+  try {
+    gl.bindVertexArray(vao);
 
-  const quad = new Float32Array([
-    -1, -1,
-     1, -1,
-    -1,  1,
-    -1,  1,
-     1, -1,
-     1,  1,
-  ]);
-  gl.bindBuffer(gl.ARRAY_BUFFER, quadBuffer);
-  gl.bufferData(gl.ARRAY_BUFFER, quad, gl.STATIC_DRAW);
-  gl.enableVertexAttribArray(0);
-  gl.vertexAttribPointer(0, 2, gl.FLOAT, false, 0, 0);
-  gl.vertexAttribDivisor(0, 0);
+    const quad = new Float32Array([
+      -1, -1,
+       1, -1,
+      -1,  1,
+      -1,  1,
+       1, -1,
+       1,  1,
+    ]);
+    gl.bindBuffer(gl.ARRAY_BUFFER, quadBuffer);
+    gl.bufferData(gl.ARRAY_BUFFER, quad, gl.STATIC_DRAW);
+    gl.enableVertexAttribArray(0);
+    gl.vertexAttribPointer(0, 2, gl.FLOAT, false, 0, 0);
+    gl.vertexAttribDivisor(0, 0);
 
-  gl.bindBuffer(gl.ARRAY_BUFFER, instanceBuffer);
-  const stride = 8 * Float32Array.BYTES_PER_ELEMENT;
-  gl.enableVertexAttribArray(1);
-  gl.vertexAttribPointer(1, 4, gl.FLOAT, false, stride, 0);
-  gl.vertexAttribDivisor(1, 1);
-  gl.enableVertexAttribArray(2);
-  gl.vertexAttribPointer(2, 4, gl.FLOAT, false, stride, 4 * Float32Array.BYTES_PER_ELEMENT);
-  gl.vertexAttribDivisor(2, 1);
+    gl.bindBuffer(gl.ARRAY_BUFFER, instanceBuffer);
+    const stride = 8 * Float32Array.BYTES_PER_ELEMENT;
+    gl.enableVertexAttribArray(1);
+    gl.vertexAttribPointer(1, 4, gl.FLOAT, false, stride, 0);
+    gl.vertexAttribDivisor(1, 1);
+    gl.enableVertexAttribArray(2);
+    gl.vertexAttribPointer(2, 4, gl.FLOAT, false, stride, 4 * Float32Array.BYTES_PER_ELEMENT);
+    gl.vertexAttribDivisor(2, 1);
 
-  gl.bindVertexArray(null);
-  gl.bindBuffer(gl.ARRAY_BUFFER, null);
+    gl.bindVertexArray(null);
+    gl.bindBuffer(gl.ARRAY_BUFFER, null);
 
-  ctx.particleVao = vao;
-  ctx.particleQuadBuffer = quadBuffer;
-  ctx.particleInstanceBuffer = instanceBuffer;
+    ctx.particleVao = vao;
+    ctx.particleQuadBuffer = quadBuffer;
+    ctx.particleInstanceBuffer = instanceBuffer;
+  } catch (error) {
+    gl.deleteVertexArray(vao);
+    gl.deleteBuffer(quadBuffer);
+    gl.deleteBuffer(instanceBuffer);
+    throw error;
+  }
 }
 
-function setupGeometry(gl: WebGL2RenderingContext, program: WebGLProgram): void {
+function setupGeometry(gl: WebGL2RenderingContext, program: WebGLProgram): WebGLBuffer {
   const vertices = new Float32Array([-1, -1, 1, -1, -1, 1, -1, 1, 1, -1, 1, 1]);
   const buf = gl.createBuffer();
-  gl.bindBuffer(gl.ARRAY_BUFFER, buf);
-  gl.bufferData(gl.ARRAY_BUFFER, vertices, gl.STATIC_DRAW);
-  const loc = gl.getAttribLocation(program, 'a_position');
-  gl.enableVertexAttribArray(loc);
-  gl.vertexAttribPointer(loc, 2, gl.FLOAT, false, 0, 0);
+  if (!buf) throw new Error('Failed to create WebGL geometry buffer');
+  try {
+    gl.bindBuffer(gl.ARRAY_BUFFER, buf);
+    gl.bufferData(gl.ARRAY_BUFFER, vertices, gl.STATIC_DRAW);
+    const loc = gl.getAttribLocation(program, 'a_position');
+    gl.enableVertexAttribArray(loc);
+    gl.vertexAttribPointer(loc, 2, gl.FLOAT, false, 0, 0);
+    gl.bindBuffer(gl.ARRAY_BUFFER, null);
+    return buf;
+  } catch (error) {
+    gl.deleteBuffer(buf);
+    throw error;
+  }
 }
 
 function createTexture(gl: WebGL2RenderingContext): WebGLTexture {
-  const texture = gl.createTexture()!;
-  gl.bindTexture(gl.TEXTURE_2D, texture);
-  gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, 1, 1, 0, gl.RGBA, gl.UNSIGNED_BYTE, null);
-  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
-  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
-  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
-  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
-  gl.bindTexture(gl.TEXTURE_2D, null);
-  return texture;
+  return createWebGLTexture2D(gl, 'Failed to create WebGL texture');
 }
 
 function createFboWithTexture(gl: WebGL2RenderingContext): { fbo: WebGLFramebuffer; tex: WebGLTexture } {
-  const tex = gl.createTexture()!;
-  gl.bindTexture(gl.TEXTURE_2D, tex);
-  gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, 1, 1, 0, gl.RGBA, gl.UNSIGNED_BYTE, null);
-  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
-  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
-  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
-  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
-  const fbo = gl.createFramebuffer()!;
-  gl.bindFramebuffer(gl.FRAMEBUFFER, fbo);
-  gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, tex, 0);
-  gl.bindFramebuffer(gl.FRAMEBUFFER, null);
-  gl.bindTexture(gl.TEXTURE_2D, null);
-  return { fbo, tex };
+  const tex = createWebGLTexture2D(gl, 'Failed to create WebGL framebuffer texture');
+  try {
+    return {
+      fbo: createWebGLFramebufferWithTexture(gl, tex, 'Failed to create WebGL framebuffer'),
+      tex,
+    };
+  } catch (error) {
+    gl.deleteTexture(tex);
+    throw error;
+  }
 }
 
 export function captureEffectStackTransitionFrame(
@@ -1780,11 +1971,6 @@ function uploadManualDistortMap(ctx: WebGLContext, manualDistort: ManualDistortC
  * - offset:   u_resolution（最終出力サイズ）空間における、このタイルの左下原点
  *             gl_FragCoord は bottom-up なので、Y も bottom-up で指定する。
  */
-export type TileRenderOptions = {
-  viewport: [number, number];
-  offset: [number, number];
-};
-
 function drawArraysDirect(
   ctx: WebGLContext,
   _label: string,
@@ -2921,21 +3107,23 @@ export function render(
   const tileOy = tile ? tile.offset[1] : 0;
   const seamlessRequested = seamless.enabled && !tile;
   const renderPlan = isV2Pipeline && effectPipeline
-    ? getV2RenderPlan(effectPipeline, {
-      normalMapEnabled: normalMap.enabled,
-      normalMapBlur: normalMap.blur,
-      prismGlowRadius: postprocess.prismGlowRadius ?? 0,
-      clothGradientEnabled: clothGradient?.enabled ?? false,
-      forceTextureDiffusePass: diffuse.mode === 'legacy',
-      seamlessEnabled: seamless.enabled,
-      flowGradientEnabled: flowRequested,
-      gradientType: gradient.gradientType,
-      sourceImageEnabled: Boolean(sourceImageCanvas),
+    ? getSceneRenderPlan(getSceneRenderPlanInput({
+      gradient,
+      noiseDistortion,
+      diffuse,
+      imageGradient,
+      normalMap,
+      postprocess,
+      effectPipeline,
+      clothGradient,
+      seamless,
+      flowGradient,
+      sourceImageCanvas,
+      imageGradientSource,
+    }, {
       imageGradientEnabled: imageGradientProtected,
-      noiseType: noiseDistortion.type,
-      noiseLoopMode: noiseDistortion.noiseLoopMode,
-      diffuseMode: diffuse.mode,
-    })
+      flowGradientEnabled: flowRequested,
+    }))
     : null;
   const analyticPrefixEnabled = renderPlan?.analyticPrefix.enabled === true;
   // Legacy and protected Image Gradient rendering still use the full

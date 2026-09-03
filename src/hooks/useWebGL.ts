@@ -3,6 +3,7 @@ import {
   getRequiredExportProgramKeys,
   initWebGL,
   prepareExportPrograms,
+  disposeWebGL,
   SHADER_VERSION,
 } from '../lib/webgl';
 import { buildRampTextureData } from '../lib/gradientRampUtils';
@@ -13,7 +14,9 @@ import { renderSceneAtTime } from '../lib/renderSceneAtTime';
 import { publishProcessedCanvasFrame } from '../lib/processedCanvasClock';
 import { getPostprocessStackSamplePadding } from '../lib/glass';
 import { useGradientStore } from '../store/gradientStore';
+import { applicationCommands } from '../application/commands';
 import type { WebGLContext } from '../lib/webgl';
+import type { TileRenderOptions } from '../types/rendering';
 import type { GradientConfig } from '../types/gradient';
 import type { LatestState } from '../types/latestState';
 import { createExportStateSnapshot } from '../lib/exportRenderState';
@@ -22,12 +25,12 @@ import { KggRuntimeBridgeClient } from '../lib/kggRuntimeBridgeClient';
 import { isTauriWebView, resolveKggRuntimeBridgeConfig } from '../lib/kggRuntimeBridgeConfig';
 import type { KggControlProjectAdapter, KggControlUiAdapter } from '../lib/kggControlRuntime';
 import { getWebGL2Availability, isWebGL2UnavailableError, markWebGL2AvailabilityUnknown } from '../lib/webglCapability';
-
-type WebGLInitRequest = {
-  canvas: HTMLCanvasElement;
-  shaderVersion: number;
-  promise: Promise<WebGLContext>;
-};
+import {
+  acquireSharedWebGLInitRequest,
+  releaseSharedWebGLInitRequest,
+  shouldDisposeResolvedWebGLRequest,
+  type SharedWebGLInitRequest,
+} from './webglLifecycle';
 
 export function useWebGL(
   canvasRef: React.RefObject<HTMLCanvasElement | null>,
@@ -37,7 +40,7 @@ export function useWebGL(
 ) {
   const webglRef = useRef<WebGLContext | null>(null);
   const latestRef = useRef<LatestState | null>(null);
-  const initRequestRef = useRef<WebGLInitRequest | null>(null);
+  const initRequestRef = useRef<SharedWebGLInitRequest<HTMLCanvasElement, WebGLContext> | null>(null);
   const compiledShaderVersionRef = useRef(0); // コンパイル済みシェーダーのバージョン
   const [isWebGLReady, setIsWebGLReady] = useState(false);
   const [contextEpoch, setContextEpoch] = useState(0);
@@ -48,7 +51,9 @@ export function useWebGL(
     if (!canvas) return;
     const handleContextLost = (event: Event) => {
       event.preventDefault();
+      const current = webglRef.current;
       webglRef.current = null;
+      if (current && current.gl.canvas === canvas) disposeWebGL(current);
       compiledShaderVersionRef.current = 0;
       markWebGL2AvailabilityUnknown();
       setIsWebGLReady(false);
@@ -95,23 +100,13 @@ export function useWebGL(
     // StrictMode は setup → cleanup → setup を意図的に行う。同じ canvas/version の
     // 初期化Promiseを共有することで、最初のcleanupが進行中のGPUコンパイルを無効化しない。
     // HMRでversionが変わった場合は、ドライバー上のlinkProgramを並列化しないよう直列実行する。
-    const currentRequest = initRequestRef.current;
-    let request: WebGLInitRequest;
-    if (
-      currentRequest &&
-      currentRequest.canvas === canvas &&
-      currentRequest.shaderVersion === shaderVersion
-    ) {
-      request = currentRequest;
-    } else {
-      const waitForPrevious = currentRequest
-        ? currentRequest.promise.then(() => undefined, () => undefined)
-        : Promise.resolve();
-      request = {
-        canvas,
-        shaderVersion,
-        promise: waitForPrevious.then(() => initWebGL(canvas)),
-      };
+    const { request } = acquireSharedWebGLInitRequest(
+      initRequestRef.current,
+      canvas,
+      shaderVersion,
+      () => initWebGL(canvas),
+    );
+    if (initRequestRef.current !== request) {
       initRequestRef.current = request;
       void request.promise.then(
         () => {
@@ -124,7 +119,13 @@ export function useWebGL(
     }
 
     void request.promise.then(ctx => {
-      if (disposed) return;
+      if (disposed) {
+        // StrictMode can clean up one effect setup while a second setup shares
+        // the same initialization promise. Only release the context when no
+        // setup still owns the in-flight request.
+        if (shouldDisposeResolvedWebGLRequest(request, disposed)) disposeWebGL(ctx);
+        return;
+      }
       webglRef.current = ctx;
       compiledShaderVersionRef.current = shaderVersion;
       setIsWebGLReady(true);
@@ -140,13 +141,21 @@ export function useWebGL(
 
     return () => {
       disposed = true;
+      releaseSharedWebGLInitRequest(request);
+      const current = webglRef.current;
+      if (current && current.gl.canvas === canvas) {
+        disposeWebGL(current);
+        webglRef.current = null;
+        compiledShaderVersionRef.current = 0;
+        setIsWebGLReady(false);
+      }
     };
   }, [canvasRef, shaderVersion, contextEpoch]);
 
   // renderBridge への登録
   useEffect(() => {
     renderBridge.register(
-      (t: number, nt?: number, tile?: import('../lib/webgl').TileRenderOptions) => {
+      (t: number, nt?: number, tile?: TileRenderOptions) => {
         const ctx = webglRef.current;
         const latest = latestRef.current;
         if (!ctx || !latest) return;
@@ -220,14 +229,14 @@ export function useWebGL(
         const state = useGradientStore.getState();
         if (!loop || !state.animation.enabled) {
           renderBridge.requestPlay();
-          state.setAnimation({ enabled: true });
+          applicationCommands.setAnimation({ enabled: true });
           return;
         }
         if (loop.isPaused && loop.currentNormalizedTime >= 0.999999) {
           loop.seekTo(0);
         }
         loop.togglePause();
-        useGradientStore.getState().setCurrentTime(loop.currentNormalizedTime);
+        applicationCommands.setCurrentTime(loop.currentNormalizedTime);
       },
       () => animLoopRef.current?.isPaused ?? false,
       () => animLoopRef.current?.currentLoopTime ?? 0,
@@ -235,7 +244,7 @@ export function useWebGL(
         const loop = animLoopRef.current;
         loop?.seekTo(normalizedTime);
         const snappedTime = loop?.currentNormalizedTime ?? normalizedTime;
-        useGradientStore.getState().setCurrentTime(snappedTime);
+        applicationCommands.setCurrentTime(snappedTime);
         const ctx = webglRef.current;
         const latest = latestRef.current;
         if (ctx && latest) {

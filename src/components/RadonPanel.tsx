@@ -1,4 +1,5 @@
 import { useGradientStore } from '../store/gradientStore';
+import { applicationCommands } from '../application/commands';
 import { STORE_DEFAULTS } from '../store/gradientStore';
 import { SliderField } from './SliderField';
 import { Collapsible } from './Collapsible';
@@ -7,7 +8,8 @@ import { Toggle } from './Toggle';
 const D = STORE_DEFAULTS.radon;
 
 export function RadonPanel() {
-  const { radon, setRadon } = useGradientStore();
+  const { radon } = useGradientStore();
+  const { setRadon } = applicationCommands;
 
   return (
     <div className="space-y-4">

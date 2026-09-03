@@ -1,6 +1,7 @@
 import { useState, type ReactNode } from 'react';
 import { InputColor } from 'tweeq';
 import { useGradientStore } from '../store/gradientStore';
+import { applicationCommands } from '../application/commands';
 import { Collapsible } from './Collapsible';
 import { CustomSelect } from './CustomSelect';
 import { SliderField } from './SliderField';
@@ -35,7 +36,8 @@ function ClothControlGroup({ title, defaultOpen = true, children }: ControlGroup
 }
 
 export function ClothGradientPanel() {
-  const { clothGradient, setClothGradient } = useGradientStore();
+  const { clothGradient } = useGradientStore();
+  const { setClothGradient } = applicationCommands;
 
   return (
     <div className="space-y-3 text-[11px]" data-cloth-panel>

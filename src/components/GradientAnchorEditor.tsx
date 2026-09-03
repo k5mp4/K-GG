@@ -1,5 +1,6 @@
 import { useRef, useEffect } from 'react';
 import { useGradientStore, GRADIENT_ANCHOR_DEFAULTS, defaultBezierControlsForAnchors } from '../store/gradientStore';
+import { applicationCommands } from '../application/commands';
 import { interpolateKeyframesWithLoop } from '../lib/loopKeyframes';
 import { getKeyframeEditTime } from '../lib/loopKeyframes';
 import { getTrackMode } from '../types/keyframe';
@@ -71,7 +72,8 @@ function computeAnchorColors(
 }
 
 export function GradientAnchorEditor({ width, height, visible = true }: Props) {
-  const { gradient, keyframeTracks, setKeyframeTracks, addKeyframe, setKeyframe, currentTime, animation, selectedGradientAnchors, setSelectedGradientAnchors, setIsGradientAnchorDragging } = useGradientStore();
+  const { gradient, keyframeTracks, currentTime, animation, selectedGradientAnchors } = useGradientStore();
+  const { setKeyframeTracks, addKeyframe, setKeyframe, setGradient, setSelectedGradientAnchors, setIsGradientAnchorDragging } = applicationCommands;
   const containerRef = useRef<HTMLDivElement>(null);
   const draggingRef = useRef<number | null>(null);
   const draggingBezierControlRef = useRef<0 | 1 | null>(null);
@@ -168,15 +170,15 @@ export function GradientAnchorEditor({ width, height, visible = true }: Props) {
         // キーフレームが有効な軸はキーフレームを更新 or 作成
         const upsertKf = (trackId: string, track: typeof xTrack, val: number) => {
           const nearKf = track!.keyframes.find(k => Math.abs(k.time - nt) < 1e-4);
-          if (nearKf) state.setKeyframe(trackId, { id: nearKf.id, value: val });
-          else state.addKeyframe(trackId, { time: nt, value: val, interpolation: 'linear' });
+          if (nearKf) setKeyframe(trackId, { id: nearKf.id, value: val });
+          else addKeyframe(trackId, { time: nt, value: val, interpolation: 'linear' });
         };
         if (xActive) upsertKf(xTrackId, xTrack, uvPos[0]);
         if (yActive) upsertKf(yTrackId, yTrack, uvPos[1]);
         // キーフレームがない軸はrawアンカーを更新
         if (!xActive || !yActive) {
           const cur = state.gradient.anchors ?? GRADIENT_ANCHOR_DEFAULTS[state.gradient.gradientType ?? 'linear'];
-          state.setGradient({ anchors: cur.map((a, j) => j !== index ? a : [
+          setGradient({ anchors: cur.map((a, j) => j !== index ? a : [
             xActive ? a[0] : uvPos[0],
             yActive ? a[1] : uvPos[1],
           ] as [number, number]) as typeof cur });
@@ -202,7 +204,7 @@ export function GradientAnchorEditor({ width, height, visible = true }: Props) {
                 : cp
             )) as [[number, number], [number, number]]
           : currentControls;
-        state.setGradient({
+        setGradient({
           anchors: nextAnchors,
           ...(nextControls ? { bezierControls: nextControls } : {}),
         });
@@ -242,7 +244,7 @@ export function GradientAnchorEditor({ width, height, visible = true }: Props) {
       ];
       const state = useGradientStore.getState();
       const controls = state.gradient.bezierControls ?? fallbackBezierControls;
-      state.setGradient({
+      setGradient({
         bezierControls: controls.map((cp, j) => (
           j === index ? uvPos : cp
         )) as [[number, number], [number, number]],

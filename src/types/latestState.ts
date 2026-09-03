@@ -1,4 +1,4 @@
-import type { AnimationConfig } from '../store/gradientStore';
+import type { AnimationConfig } from './animation';
 import type {
   DiffuseConfig,
   EffectPipelineConfig,

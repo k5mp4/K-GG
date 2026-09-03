@@ -19,7 +19,9 @@ import {
   type RuntimeState,
   type ScenarioCommand,
 } from '../../packages/kgg-control/src/index';
-import { GRADIENT_ANCHOR_DEFAULTS, useGradientStore } from '../store/gradientStore';
+import { GRADIENT_ANCHOR_DEFAULTS } from '../store/documentModel';
+import { useGradientStore } from '../store/gradientStore';
+import { applicationCommands } from '../application/commands';
 import {
   createDefaultEffectPipeline,
   isEffectStackKind,
@@ -503,21 +505,19 @@ export class KggControlRuntime {
     const validated = validateParameterValue(definition, rawValue);
     if (!validated.ok) return error('invalid_parameter', validated.message);
 
-    const actions = useGradientStore.getState();
-    const optionalActions = actions as unknown as OptionalFlowStoreState;
     const patch = { [definition.property]: validated.value } as never;
     const setter = {
-      gradient: actions.setGradient,
-      noiseDistortion: actions.setNoiseDistortion,
-      diffuse: actions.setDiffuse,
-      flowGradient: optionalActions.setFlowGradient,
-      slitScan: actions.setSlitScan,
-      stretch: actions.setStretch,
-      animation: actions.setAnimation,
-      normalMap: actions.setNormalMap,
-      radon: actions.setRadon,
-      iridescence: actions.setIridescence,
-      postprocess: actions.setPostprocess,
+      gradient: applicationCommands.setGradient,
+      noiseDistortion: applicationCommands.setNoiseDistortion,
+      diffuse: applicationCommands.setDiffuse,
+      flowGradient: applicationCommands.setFlowGradient,
+      slitScan: applicationCommands.setSlitScan,
+      stretch: applicationCommands.setStretch,
+      animation: applicationCommands.setAnimation,
+      normalMap: applicationCommands.setNormalMap,
+      radon: applicationCommands.setRadon,
+      iridescence: applicationCommands.setIridescence,
+      postprocess: applicationCommands.setPostprocess,
     }[definition.target];
     if (!setter) return error('unsupported_parameter', `Parameter target is not writable: ${definition.target}`);
     setter(patch);
@@ -541,7 +541,7 @@ export class KggControlRuntime {
       position: index / (colors.length - 1),
       color: color.toUpperCase(),
     }));
-    useGradientStore.getState().setGradient({ stops });
+    applicationCommands.setGradient({ stops });
     return {
       ok: true,
       value: {
@@ -573,28 +573,26 @@ export class KggControlRuntime {
     }
     const validatedPatch = validateControlGroupPatch(groupValue, patch, current);
     if (!validatedPatch.ok) return validatedPatch;
-    const actions = useGradientStore.getState();
-    const optionalActions = actions as unknown as OptionalFlowStoreState;
     const setters: Partial<Record<Exclude<ControlGroup, 'ui' | 'keyframeTracks'>, (value: never) => void>> = {
-      gradient: actions.setGradient,
-      noiseDistortion: actions.setNoiseDistortion,
-      diffuse: actions.setDiffuse,
-      imageGradient: actions.setImageGradient,
-      slitScan: actions.setSlitScan,
-      stretch: actions.setStretch,
-      animation: actions.setAnimation,
-      normalMap: actions.setNormalMap,
-      clothGradient: actions.setClothGradient,
-      coneView: actions.setConeView,
-      seamless: actions.setSeamless,
-      flowGradient: optionalActions.setFlowGradient as ((value: never) => void) | undefined,
-      radon: actions.setRadon,
-      iridescence: actions.setIridescence,
-      manualDistort: actions.setManualDistort,
-      postprocess: actions.setPostprocess,
-      effectPipeline: actions.setEffectPipeline,
-      matcap: actions.setMatcap,
-      histogram: actions.setHistogram,
+      gradient: applicationCommands.setGradient,
+      noiseDistortion: applicationCommands.setNoiseDistortion,
+      diffuse: applicationCommands.setDiffuse,
+      imageGradient: applicationCommands.setImageGradient,
+      slitScan: applicationCommands.setSlitScan,
+      stretch: applicationCommands.setStretch,
+      animation: applicationCommands.setAnimation,
+      normalMap: applicationCommands.setNormalMap,
+      clothGradient: applicationCommands.setClothGradient,
+      coneView: applicationCommands.setConeView,
+      seamless: applicationCommands.setSeamless,
+      flowGradient: applicationCommands.setFlowGradient as ((value: never) => void),
+      radon: applicationCommands.setRadon,
+      iridescence: applicationCommands.setIridescence,
+      manualDistort: applicationCommands.setManualDistort,
+      postprocess: applicationCommands.setPostprocess,
+      effectPipeline: applicationCommands.setEffectPipeline,
+      matcap: applicationCommands.setMatcap,
+      histogram: applicationCommands.setHistogram,
     };
     const setter = setters[groupValue];
     if (!setter) return error('unsupported_control', `Control group is not writable: ${groupValue}`);
@@ -625,7 +623,7 @@ export class KggControlRuntime {
         color: raw.color.toUpperCase(),
       });
     }
-    useGradientStore.getState().setGradient({ stops });
+    applicationCommands.setGradient({ stops });
     return this.getControlState(['gradient']);
   }
 
@@ -648,7 +646,7 @@ export class KggControlRuntime {
         opacity: raw.opacity,
       });
     }
-    useGradientStore.getState().setGradient({ opacityStops: stops });
+    applicationCommands.setGradient({ opacityStops: stops });
     return this.getControlState(['gradient']);
   }
 
@@ -660,7 +658,7 @@ export class KggControlRuntime {
     const anchors = (state.gradient.anchors ?? GRADIENT_ANCHOR_DEFAULTS[state.gradient.gradientType]).map(anchor => [...anchor]) as GradientConfig['anchors'];
     if (!anchors) return error('unsupported_control', 'Gradient anchors are not available');
     anchors[index] = position;
-    state.setGradient({ anchors });
+    applicationCommands.setGradient({ anchors });
     return this.getControlState(['gradient']);
   }
 
@@ -668,7 +666,7 @@ export class KggControlRuntime {
     const index = normalizedIndex(input.index, 3);
     const position = tuple2(input.position);
     if (index === null || !position) return error('invalid_control_input', 'index must be 0..3 and position must be a finite [x, y] tuple');
-    useGradientStore.getState().setMeshCorner(index, position);
+    applicationCommands.setMeshCorner(index, position);
     return this.getControlState(['gradient']);
   }
 
@@ -678,7 +676,7 @@ export class KggControlRuntime {
     const position = tuple2(input.position);
     if (edge !== 'bottom' && edge !== 'right' && edge !== 'top' && edge !== 'left') return error('invalid_control_input', 'edge must be bottom, right, top, or left');
     if (index === null || !position) return error('invalid_control_input', 'index must be 0 or 1 and position must be a finite [x, y] tuple');
-    useGradientStore.getState().setMeshHandle(edge as MeshEdge, index as 0 | 1, position);
+    applicationCommands.setMeshHandle(edge as MeshEdge, index as 0 | 1, position);
     return this.getControlState(['gradient']);
   }
 
@@ -687,7 +685,7 @@ export class KggControlRuntime {
     if (index === null || typeof input.value !== 'number' || !Number.isFinite(input.value) || input.value < 0 || input.value > 1) {
       return error('invalid_control_input', 'index must be 0..3 and value must be between 0 and 1');
     }
-    useGradientStore.getState().setMeshColorPosition(index, input.value);
+    applicationCommands.setMeshColorPosition(index, input.value);
     return this.getControlState(['gradient']);
   }
 
@@ -697,18 +695,17 @@ export class KggControlRuntime {
     const indices = input.indices.map(value => normalizedIndex(value, max));
     if (indices.some(value => value === null)) return error('invalid_control_input', `indices must contain integers between 0 and ${max}`);
     const unique = Array.from(new Set(indices as number[]));
-    if (anchors) useGradientStore.getState().setSelectedGradientAnchors(unique);
-    else useGradientStore.getState().setSelectedStops(unique);
+    if (anchors) applicationCommands.setSelectedGradientAnchors(unique);
+    else applicationCommands.setSelectedStops(unique);
     return this.getControlState(['gradient']);
   }
 
   private setSlitOverlayInput(input: Record<string, unknown>): RuntimeResult<unknown> {
     if (typeof input.enabled !== 'boolean') return error('invalid_control_input', 'enabled must be a boolean');
-    const state = useGradientStore.getState();
-    state.setSlitOverlayEnabled(input.enabled);
+    applicationCommands.setSlitOverlayEnabled(input.enabled);
     if (input.adjusting !== undefined) {
       if (typeof input.adjusting !== 'boolean') return error('invalid_control_input', 'adjusting must be a boolean when provided');
-      state.setIsSlitAdjusting(input.adjusting);
+      applicationCommands.setIsSlitAdjusting(input.adjusting);
     }
     return this.getControlState(['slitScan']);
   }
@@ -722,19 +719,19 @@ export class KggControlRuntime {
       if (typeof input.normalizedTime !== 'number' || !Number.isFinite(input.normalizedTime)) return error('invalid_control_input', 'normalizedTime must be a finite number for seek');
       const normalizedTime = Math.max(0, Math.min(1, input.normalizedTime));
       renderBridge.seekTo(normalizedTime);
-      state.setCurrentTime(normalizedTime);
+      applicationCommands.setCurrentTime(normalizedTime);
     } else if (input.action === 'play') {
-      if (!state.animation.enabled) state.setAnimation({ enabled: true });
+      if (!state.animation.enabled) applicationCommands.setAnimation({ enabled: true });
       renderBridge.requestPlay();
     } else if (input.action === 'pause') {
       if (!renderBridge.isPaused()) renderBridge.togglePause();
-      state.setCurrentTime(renderBridge.getCurrentNormalizedTime());
+      applicationCommands.setCurrentTime(renderBridge.getCurrentNormalizedTime());
     } else if (!state.animation.enabled) {
-      state.setAnimation({ enabled: true });
+      applicationCommands.setAnimation({ enabled: true });
       renderBridge.requestPlay();
     } else {
       renderBridge.togglePause();
-      state.setCurrentTime(renderBridge.getCurrentNormalizedTime());
+      applicationCommands.setCurrentTime(renderBridge.getCurrentNormalizedTime());
     }
     const nextState = useGradientStore.getState();
     return {
@@ -755,7 +752,7 @@ export class KggControlRuntime {
     if (input.label !== undefined && typeof input.label !== 'string') return error('invalid_control_input', 'label must be a string when provided');
     if (input.value !== undefined && (typeof input.value !== 'number' || !Number.isFinite(input.value))) return error('invalid_control_input', 'value must be a finite number when provided');
     if (input.time !== undefined && (typeof input.time !== 'number' || !Number.isFinite(input.time) || input.time < 0 || input.time > 1)) return error('invalid_control_input', 'time must be between 0 and 1 when provided');
-    useGradientStore.getState().setTrackMode(trackIdResult.value, input.mode as AnimationMode, {
+    applicationCommands.setTrackMode(trackIdResult.value, input.mode as AnimationMode, {
       ...(typeof input.label === 'string' ? { label: input.label } : {}),
       ...(typeof input.value === 'number' ? { value: input.value } : {}),
       ...(typeof input.time === 'number' ? { time: input.time } : {}),
@@ -784,7 +781,7 @@ export class KggControlRuntime {
     const outHandle = this.keyframeTuple(input.outHandle);
     if (cp1 === null || cp2 === null || inHandle === null || outHandle === null) return error('invalid_control_input', 'keyframe handle values must be finite [x, y] tuples');
     if (input.preserveHandles !== undefined && typeof input.preserveHandles !== 'boolean') return error('invalid_control_input', 'preserveHandles must be boolean when provided');
-    state.addKeyframe(trackIdResult.value, {
+    applicationCommands.addKeyframe(trackIdResult.value, {
       time: input.time,
       value: input.value,
       interpolation: input.interpolation as InterpolationType,
@@ -823,7 +820,7 @@ export class KggControlRuntime {
       if (tuple === null) return error('invalid_control_input', `${field} must be a finite [x, y] tuple`);
       if (tuple) patch[field] = tuple;
     }
-    state.setKeyframe(trackIdResult.value, patch);
+    applicationCommands.setKeyframe(trackIdResult.value, patch);
     return this.getControlState(['keyframeTracks']);
   }
 
@@ -835,7 +832,7 @@ export class KggControlRuntime {
     const track = useGradientStore.getState().keyframeTracks[trackIdResult.value];
     if (!track) return error('unknown_track', `Unknown keyframe track: ${trackIdResult.value}`);
     if (!track.keyframes.some(keyframe => keyframe.id === idResult.value)) return error('unknown_keyframe', `Unknown keyframe: ${idResult.value}`);
-    useGradientStore.getState().removeKeyframe(trackIdResult.value, idResult.value);
+    applicationCommands.removeKeyframe(trackIdResult.value, idResult.value);
     return this.getControlState(['keyframeTracks']);
   }
 
@@ -1034,10 +1031,10 @@ export class KggControlRuntime {
       case 'set_mesh_handle': return this.setMeshHandleInput(input);
       case 'set_mesh_color_position': return this.setMeshColorPositionInput(input);
       case 'reset_mesh_gradient':
-        useGradientStore.getState().resetMeshGradient();
+        applicationCommands.resetMeshGradient();
         return this.getControlState(['gradient']);
       case 'straighten_mesh_handles':
-        useGradientStore.getState().straightenMeshHandles();
+        applicationCommands.straightenMeshHandles();
         return this.getControlState(['gradient']);
       case 'set_selected_stops': return this.setSelectedStopsInput(input);
       case 'set_selected_gradient_anchors': return this.setSelectedStopsInput(input, true);
@@ -1050,7 +1047,7 @@ export class KggControlRuntime {
       case 'set_preset_name': {
         const nameResult = requiredString(input.name, 'name', 120);
         if (!nameResult.ok) return nameResult;
-        useGradientStore.getState().setPresetName(nameResult.value);
+        applicationCommands.setPresetName(nameResult.value);
         return this.getControlState(['ui']);
       }
       case 'set_ui_state':
@@ -1081,7 +1078,7 @@ export class KggControlRuntime {
   enableEffect(kind: string, enabled: boolean): RuntimeResult<EffectState[]> {
     if (!isEffectStackKind(kind)) return error('unknown_effect', `Unknown effect kind: ${kind}`);
     const state = useGradientStore.getState();
-    useGradientStore.getState().setEffectPipeline({
+    applicationCommands.setEffectPipeline({
       effectStack: updateEffectStackLayer(state.effectPipeline.effectStack, kind, { enabled }),
     });
     return this.listEffects();
@@ -1092,19 +1089,19 @@ export class KggControlRuntime {
     if (!Number.isFinite(targetIndex)) return error('invalid_index', 'targetIndex must be finite');
     const state = useGradientStore.getState();
     const effectStack = moveEffectStackLayer(state.effectPipeline.effectStack, kind, targetIndex);
-    useGradientStore.getState().setEffectPipeline({ effectStack });
+    applicationCommands.setEffectPipeline({ effectStack });
     return this.listEffects();
   }
 
   resetEffect(kind?: string): RuntimeResult<EffectState[]> {
     if (kind !== undefined && !isEffectStackKind(kind)) return error('unknown_effect', `Unknown effect kind: ${kind}`);
     if (kind === undefined) {
-      useGradientStore.getState().setEffectPipeline(createDefaultEffectPipeline());
+      applicationCommands.setEffectPipeline(createDefaultEffectPipeline());
     } else {
       const defaultStack = createDefaultEffectPipeline().effectStack;
       const defaultLayer = defaultStack.find(layer => layer.kind === kind);
       const state = useGradientStore.getState();
-      useGradientStore.getState().setEffectPipeline({
+      applicationCommands.setEffectPipeline({
         effectStack: updateEffectStackLayer(state.effectPipeline.effectStack, kind, {
           enabled: defaultLayer?.enabled ?? false,
         }),
@@ -1262,42 +1259,38 @@ export class KggControlRuntime {
 
   private applySnapshot(snapshot: ControlSnapshot): void {
     const store = cloneSerializable(snapshot.store) as Record<string, unknown>;
-    const actions = useGradientStore.getState();
-    const optionalActions = actions as unknown as OptionalFlowStoreState;
     const partial = (key: string) => (isRecord(store[key]) ? store[key] : undefined);
     const setIfPresent = (key: string, setter: (value: never) => void) => {
       const value = partial(key);
       if (value) setter(value as never);
     };
-    setIfPresent('gradient', actions.setGradient);
-    setIfPresent('noiseDistortion', actions.setNoiseDistortion);
-    setIfPresent('diffuse', actions.setDiffuse);
-    if (optionalActions.setFlowGradient) {
-      setIfPresent('flowGradient', optionalActions.setFlowGradient as (value: never) => void);
-    }
-    setIfPresent('imageGradient', actions.setImageGradient);
-    setIfPresent('slitScan', actions.setSlitScan);
-    setIfPresent('stretch', actions.setStretch);
-    setIfPresent('animation', actions.setAnimation);
-    setIfPresent('normalMap', actions.setNormalMap);
-    setIfPresent('clothGradient', actions.setClothGradient);
-    setIfPresent('coneView', actions.setConeView);
-    setIfPresent('seamless', actions.setSeamless);
-    setIfPresent('radon', actions.setRadon);
-    setIfPresent('iridescence', actions.setIridescence);
-    setIfPresent('manualDistort', actions.setManualDistort);
-    setIfPresent('postprocess', actions.setPostprocess);
-    setIfPresent('effectPipeline', actions.setEffectPipeline);
-    setIfPresent('matcap', actions.setMatcap);
-    setIfPresent('histogram', actions.setHistogram);
-    if (isRecord(store.keyframeTracks)) actions.setKeyframeTracks(store.keyframeTracks as never);
-    if (Array.isArray(store.selectedStops)) actions.setSelectedStops(store.selectedStops as number[]);
-    if (Array.isArray(store.selectedGradientAnchors)) actions.setSelectedGradientAnchors(store.selectedGradientAnchors as number[]);
-    if (typeof store.slitOverlayEnabled === 'boolean') actions.setSlitOverlayEnabled(store.slitOverlayEnabled);
-    if (typeof store.isSlitAdjusting === 'boolean') actions.setIsSlitAdjusting(store.isSlitAdjusting);
-    if (typeof store.isGradientAnchorDragging === 'boolean') actions.setIsGradientAnchorDragging(store.isGradientAnchorDragging);
-    actions.setCurrentTime(Math.min(1, Math.max(0, finiteNumber(snapshot.currentTime, 0))));
-    actions.setPresetName(snapshot.presetName);
+    setIfPresent('gradient', applicationCommands.setGradient);
+    setIfPresent('noiseDistortion', applicationCommands.setNoiseDistortion);
+    setIfPresent('diffuse', applicationCommands.setDiffuse);
+    setIfPresent('flowGradient', applicationCommands.setFlowGradient);
+    setIfPresent('imageGradient', applicationCommands.setImageGradient);
+    setIfPresent('slitScan', applicationCommands.setSlitScan);
+    setIfPresent('stretch', applicationCommands.setStretch);
+    setIfPresent('animation', applicationCommands.setAnimation);
+    setIfPresent('normalMap', applicationCommands.setNormalMap);
+    setIfPresent('clothGradient', applicationCommands.setClothGradient);
+    setIfPresent('coneView', applicationCommands.setConeView);
+    setIfPresent('seamless', applicationCommands.setSeamless);
+    setIfPresent('radon', applicationCommands.setRadon);
+    setIfPresent('iridescence', applicationCommands.setIridescence);
+    setIfPresent('manualDistort', applicationCommands.setManualDistort);
+    setIfPresent('postprocess', applicationCommands.setPostprocess);
+    setIfPresent('effectPipeline', applicationCommands.setEffectPipeline);
+    setIfPresent('matcap', applicationCommands.setMatcap);
+    setIfPresent('histogram', applicationCommands.setHistogram);
+    if (isRecord(store.keyframeTracks)) applicationCommands.setKeyframeTracks(store.keyframeTracks as never);
+    if (Array.isArray(store.selectedStops)) applicationCommands.setSelectedStops(store.selectedStops as number[]);
+    if (Array.isArray(store.selectedGradientAnchors)) applicationCommands.setSelectedGradientAnchors(store.selectedGradientAnchors as number[]);
+    if (typeof store.slitOverlayEnabled === 'boolean') applicationCommands.setSlitOverlayEnabled(store.slitOverlayEnabled);
+    if (typeof store.isSlitAdjusting === 'boolean') applicationCommands.setIsSlitAdjusting(store.isSlitAdjusting);
+    if (typeof store.isGradientAnchorDragging === 'boolean') applicationCommands.setIsGradientAnchorDragging(store.isGradientAnchorDragging);
+    applicationCommands.setCurrentTime(Math.min(1, Math.max(0, finiteNumber(snapshot.currentTime, 0))));
+    applicationCommands.setPresetName(snapshot.presetName);
     renderBridge.renderAtTime(renderBridge.getCurrentTime(), renderBridge.getCurrentNormalizedTime());
   }
 }

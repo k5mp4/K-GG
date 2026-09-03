@@ -17,6 +17,7 @@ import {
   type EffectStackDragState,
 } from '../lib/effectStackDrag';
 import { useGradientStore } from '../store/gradientStore';
+import { applicationCommands } from '../application/commands';
 import { Toggle } from './Toggle';
 import { Icon } from './Icon';
 import { useLanguage } from '../i18n/LanguageProvider';
@@ -86,7 +87,8 @@ function programKeyForEffect(kind: EffectStackKind): LazyProgramKey {
 
 export function PostprocessStackPanel({ onSwapWorkspace, onSelectEffectStack }: Props = {}) {
   const { t } = useLanguage();
-  const { setPostprocess, effectPipeline, normalMap, imageGradient, setEffectPipeline } = useGradientStore();
+  const { effectPipeline, normalMap, imageGradient } = useGradientStore();
+  const { setPostprocess, setEffectPipeline } = applicationCommands;
   const stack = normalizeEffectStack(effectPipeline.effectStack);
   const movableStack = stack;
   const stackRef = useRef(stack);
@@ -229,7 +231,7 @@ export function PostprocessStackPanel({ onSwapWorkspace, onSelectEffectStack }: 
 
   const commitDrag = (drag: DragState) => {
     const current = useGradientStore.getState().effectPipeline;
-    useGradientStore.getState().setEffectPipeline({
+    setEffectPipeline({
       selectedKind: drag.kind,
       effectStack: moveEffectStackLayer(current.effectStack, drag.kind, drag.targetIndex),
     });

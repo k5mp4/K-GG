@@ -1,4 +1,4 @@
-import type { AnimationEasing } from '../store/gradientStore';
+import type { AnimationEasing } from '../types/animation';
 import { evaluateCubicBezier } from './easingBezier';
 
 function clamp01(value: number): number {

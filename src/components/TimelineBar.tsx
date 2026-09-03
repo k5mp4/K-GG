@@ -8,6 +8,7 @@ import {
   ANIMATION_SPEED_MIN,
   ANIMATION_SPEED_MAX,
 } from '../store/gradientStore';
+import { applicationCommands } from '../application/commands';
 import { AnimationLoop } from '../lib/animation';
 import { GraphEditor, GRAPH_COLORS } from './GraphEditor';
 import { solveBezierU, splitBezier } from '../lib/easingBezier';
@@ -54,8 +55,10 @@ export function TimelineBar({ animLoopRef, onSeek, exportProgress = null, export
   const isExporting = exportProgress !== null;
   const {
     animation, keyframeTracks, currentTime,
-    addKeyframe, removeKeyframe, setKeyframe, setCurrentTime, setAnimation,
   } = useGradientStore();
+  const {
+    addKeyframe, removeKeyframe, setKeyframe, setCurrentTime, setAnimation,
+  } = applicationCommands;
 
   // ── ビューモード ──
   const [viewMode,      setViewMode]      = useState<'track' | 'graph'>('track');

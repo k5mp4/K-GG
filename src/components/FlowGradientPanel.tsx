@@ -1,11 +1,13 @@
 import { useGradientStore } from '../store/gradientStore';
+import { applicationCommands } from '../application/commands';
 import { FLOW_GRADIENT_DEFAULTS } from '../types/flowGradient';
 import { SliderField } from './SliderField';
 import { useLanguage } from '../i18n/LanguageProvider';
 
 export function FlowGradientPanel() {
   const { t } = useLanguage();
-  const { gradient, flowGradient, animation, setFlowGradient } = useGradientStore();
+  const { gradient, flowGradient, animation } = useGradientStore();
+  const { setFlowGradient } = applicationCommands;
   const defaults = FLOW_GRADIENT_DEFAULTS;
   const rampStops = [...gradient.stops].sort((a, b) => a.position - b.position);
   const rampPreview = rampStops.length > 0
