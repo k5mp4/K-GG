@@ -4,7 +4,7 @@ title: 開発・検証ガイド
 
 # 開発・検証ガイド
 
-変更の作成単位、追加指示の取り込み、コミット準備、Archiveは[変更パッケージ運用](./change-workflow.md)を参照してください。会話ターンごとにchangeディレクトリを増やさず、承認済みの目的・影響範囲・受け入れ条件を1つのパッケージへまとめます。
+Requestの分類とライフサイクルは[開発ワークフロー](./workflow.md)、Capsuleの作成・finalizeは[Change Capsule運用](./change-workflow.md)、検証の階層は[ValidationとCI](./validation.md)を参照してください。小変更に形式的なIssueやChange directoryを要求せず、必要な変更だけを追跡します。
 
 ## 必要環境
 
@@ -59,12 +59,13 @@ Remove-Item Env:VITE_KGG_DEBUG_FFMPEG_MISSING -ErrorAction SilentlyContinue
 └─ tools/                リリース・検証用スクリプト
 ```
 
-## AIと人間がレビューしやすい変更方針
+## AIと人間がレビューしやすい実装方針
 
 K-GGは生成AIによる開発参加を歓迎するため、変更の一次情報と責務の置き場所を明確にします。
 
-- 仕様、ADR、開発者ガイドを読んでからコードを変更する。
-- 実装中の関連する追加指示は既存changeへ取り込み、目的・影響範囲・受け入れ条件が変わる場合だけ新しいchangeへ分離する。
+- `AGENTS.md`、関連する開発ガイド、Current Spec、accepted ADR、Requestの順に必要な範囲だけ読む。ArchiveとLegacy SPECは履歴調査時だけ読む。
+- Issueの有無だけでworkflowを決めず、Quick / Tracked / Designedを変更規模と追跡必要性から判断する。
+- 実装中に目的、対象外、受け入れ条件、互換性が変わる場合はRequestを再レビューし、必要ならTracked/Designedへ昇格する。
 - 観測可能な挙動を変えないリファクタリングでは、既存の契約、ファイル名、保存先、エラー文言を維持する。
 - 型や型ガードを複数箇所へ複製しない。プリセット永続化の型は`src/lib/presetModel.ts`を参照する。
 - Canvasから画像Blobを作る共通処理は`src/lib/exportCanvas.ts`へ集約し、ブラウザ/Tauriごとの保存処理はアダプターに残す。
@@ -75,22 +76,22 @@ K-GGは生成AIによる開発参加を歓迎するため、変更の一次情�
 
 | 変更 | 最低限の確認 |
 | --- | --- |
-| 文書のみ | `npm run docs:check`, `npm run docs:build` |
-| TypeScript/React | `npm test`, `npm run lint`, `npm run build` |
-| 描画・GLSL | 上記に加えて対象機能のプレビューと代表的なエクスポート |
+| 文書・workflow・template・tooling | `npm run docs:check`, `npm run docs:build`, `npm run change:check` |
+| TypeScript/React | `npm run check:merge` |
+| 描画・GLSL | 上記に加えて`npm run check:render`、対象機能のプレビューと代表的なエクスポート |
 | プリセット形式 | 旧データ読込、新規保存、再読込、ブラウザ/Tauri差分 |
-| Rust/Tauri | `cargo fmt --manifest-path src-tauri/Cargo.toml --check`, `cargo test`, `cargo check`, 対象デスクトップ操作 |
-| リリース/更新 | 上記に加えてリリース設定・更新ワークフローと配布環境でのWindows版起動・更新確認 |
+| Rust/Tauri | `npm run check:native`、対象デスクトップ操作 |
+| リリース/更新 | `npm run check:release`に加えてリリース設定・更新ワークフローと配布環境でのWindows版起動・更新確認 |
 
 ## GitとPull Request
 
-変更パッケージとコミットの関係、追加指示の再承認条件は[変更パッケージ運用](./change-workflow.md)を一次情報とします。1つのパッケージは原則1コミットへまとめられる粒度で作業し、複数コミットに分ける場合は理由をvalidationへ記録します。
+Branch、PR、追加指示、finalizeの扱いは[開発ワークフロー](./workflow.md)と[Change Capsule運用](./change-workflow.md)を一次情報とします。1つのPRはレビュー可能な範囲へ保ち、Change Capsuleがある場合も必要な成果物だけを含めます。
 
 - Pull Requestを作成する前に`git status`とステージ済み差分を確認し、依頼範囲に含まれる変更だけをコミットする。
 - 既定ブランチから作業を始める場合は、目的が分かる短い作業ブランチを作成する。
 - ユーザーがコミットまたは公開を明示的に依頼した場合、Codexは対象差分を確認してコミット・pushし、特に指定がなければドラフトPull Requestまで作成する。レビュー可能状態のPull Requestは、ユーザーが明示した場合だけ作成する。
 - Pull Requestのタイトルと本文は日本語で書く。本文には`変更理由`、`変更内容`、`影響`、`検証`、`未確認事項`の見出しを使用し、英語のみの`Summary`、`Impact`、`Validation`の見出しは使用しない。
-- 検証欄には実行したコマンドと結果を記載する。警告が残る場合は、エラーではないことと残っている警告の性質を明記する。
+- 検証欄には実行したコマンドと結果を記載する。警告が残る場合は、エラーではないことと残っている警告の性質を明記する。CI結果の全文をChangeへ複製しない。
 - Gitの所有者チェックなど安全設定で操作が止まった場合は、永続的なグローバル設定を変更する前に理由と影響を確認する。
 
 ## テスト方針

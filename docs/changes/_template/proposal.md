@@ -7,12 +7,16 @@ change_kind: F
 owners: [maintainer]
 created: YYYY-MM-DD
 updated: YYYY-MM-DD
-current_specs: [CURRENT-example]
+current_specs: []
 related_adrs: []
+related_code: []
+related_tests: []
 human_review: required
 ---
 
 # CHANGE-XXX 変更の短い名前
+
+このテンプレートはDesigned Change用です。Quick ChangeはPRだけ、Tracked ChangeはIssueとPRだけで開始できるため、必要がない場合はChange Capsuleを作成しません。
 
 ## 背景・問題
 

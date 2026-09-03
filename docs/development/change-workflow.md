@@ -1,77 +1,109 @@
 ---
-title: 変更パッケージ運用
+title: Change Capsule運用
 ---
 
-# 変更パッケージ運用
+# Change Capsule運用
 
-K-GGでは、会話ターンではなく、Why／What／対象外／受け入れ条件がまとまった「変更パッケージ」を開発の基本単位にします。1つのパッケージに1つの`CHANGE-###-short-name`ディレクトリを割り当てます。
+Change Capsuleは、複雑なDesigned ChangeのWhy、仕様差分、設計、検証を一時的にまとめるための成果物です。すべてのRequestに作るものではありません。Requestの分類とLifecycleは[開発ワークフロー](./workflow.md)を一次情報とします。
 
-## 変更パッケージを作る基準
+## 作成する基準
 
-次のどれかに当てはまる観測可能な変更は、新しいパッケージとしてproposalを作成します。
+次のいずれかに当てはまる場合に、Issueまたは既存Requestと同じ短命ブランチ上へCapsuleを作ります。
 
-- 新しい目的または利用者影響がある。
-- 保存、出力、描画、UI、外部連携の契約が変わる。
-- 既存パッケージの対象外、受け入れ条件、互換性を変える。
-- 既存パッケージと同時にレビューすると、責任範囲やロールバック単位が不明瞭になる。
+- Current Specの受け入れ可能な動作を変更する。
+- 保存、出力、描画、UI、外部連携の契約を変更する。
+- 複数機能を拘束するArchitecture Decisionが必要になる。
+- 複数PRへ分ける大きな変更で、PRだけではWhy/対象外/移行を追跡できない。
+- 実装中の追加要求が既存Requestの対象外、AC、互換性を変更する。
 
-誤字や外部から観測できない整理は、S区分としてchangeを省略できます。判断が曖昧な場合は、まず既存パッケージへ混ぜず、候補として記録します。
+誤字、局所CSS、明確な小修正、外部契約を変えない内部整理はQuick ChangeとしてCapsuleを省略できます。Bugや将来作業を後から参照する価値がある場合はTracked ChangeとしてIssueを作成しますが、Issueの存在だけでCapsuleを要求しません。
 
-## 過去履歴の日付整理
-
-既存履歴を見やすくする目的で、同じ日に完了したchangeを日付bundleへまとめることがあります。日付bundleは履歴の格納単位であり、元のCHANGE ID、proposal、delta、tasks、validationの対応関係を保持します。日付bundleへの整理は、独立した要求のWhy／Whatや受け入れ条件を後から1つの実装契約へ合成することを意味しません。
-
-このリポジトリでは、2026-07-28のCHANGE-002〜009を履歴スナップショットとして保持し、正規の統合パッケージCHANGE-010を日付bundle直下に置いています。これ以降の実装は、日付bundleではなく、承認済みの1つのchangeパッケージをコード・テスト・文書・検証の基本単位にします。
-
-## 追加指示の扱い
-
-実装中の追加指示は、次の順に判定します。
+## 成果物の選び方
 
 ```text
-追加指示
-  ├─ 同じ目的・利用者影響・契約・対象外に収まる
-  │    └─ 既存changeのproposal / delta / tasks / validationへ追記
-  │        必要ならreviewへ戻して再承認
-  └─ 独立した目的・影響、またはAC・対象外を変更する
-       └─ 新しいchange候補として分離
+Quick       → PR
+Tracked     → Issue + PR
+Designed    → Issue + 必要なCapsule/Spec Delta/ADR + PR
 ```
 
-細かな修正や検証の追加だけで新しいディレクトリを作りません。既存パッケージへ追記した場合は、追加後の全受け入れ条件を再確認します。
+Capsuleに含めるファイルは必要最小限にします。
 
-## 変更パッケージのファイル
+| ファイル | 使う場合 |
+| --- | --- |
+| `proposal.md` | Designed ChangeのWhy、What、対象外、AC、metadata |
+| `delta.md` | Current Specの要件を追加・変更・削除する場合 |
+| `design.md` | 複数の実装判断、データ移行、外部境界、ロールバックがある場合 |
+| `tasks.md` | Issue/PR checklistだけでは追跡できない作業分解がある場合 |
+| `validation.md` | Change固有のAC、Gate、環境依存の未確認事項を残す場合 |
 
-```text
-CHANGE-###-short-name/
-  proposal.md   Why / What / scope / acceptance criteria
-  delta.md      current specとの差分
-  design.md     複数の実装判断がある場合のHow
-  tasks.md      作業項目
-  validation.md ACごとの検証結果と未確認事項
+`tasks.md`はIssue/PR checklistの代替ではありません。`validation.md`はCIログの複製場所ではなく、Merge Gate、Release Gate、Observationの判断を記録する場所です。
+
+## metadata
+
+既存の`proposal.md`は次のfrontmatterを使います。
+
+```yaml
+type: change
+id: CHANGE-###
+title: 変更の短い名前
+status: draft
+change_kind: F
+owners: [maintainer]
+created: YYYY-MM-DD
+updated: YYYY-MM-DD
+current_specs: [CURRENT-example]
+related_adrs: []
+human_review: required
 ```
 
-F/B変更ではproposal、delta、tasks、validationを必須とします。A変更ではdesignと、長期的な判断を拘束する場合のADRを追加します。X変更は製品コードへ統合するまで実験として隔離します。
+Archiveへ移したChangeは必要に応じて次を追加します。
 
-## 状態と実装開始条件
+```yaml
+outcome: merged       # merged / follow-up / cancelled / superseded
+follow_up: issue-needed: Release Gateの実機確認
+```
+
+`outcome: follow-up`は実装が完全だという意味ではありません。未完了のAC、失敗、Release Gate待ち、ObservationをArchiveへ移した理由と、Issue化が必要な内容を明示します。
+
+## 状態とReview
 
 ```text
 draft → review → approved → implemented → archived
                          └→ cancelled
 ```
 
-`proposal.md`が`status: approved`、`human_review: completed`で、レビュー済みのdeltaがある場合だけ本実装を開始します。承認後にWhy／What、対象外、受け入れ条件、互換性を変える場合は、同じchangeをreviewへ戻して再承認します。
+仕様・対象外・AC・互換性に影響する変更は人間レビューへ戻します。AIや`docs:check`は人間レビューを代替しません。承認済みChangeの本文を変更する場合は、PRで変更理由を明記し、必要なら再承認します。
 
-## コミットとの関係
+## Finalize
 
-1つの変更パッケージは、原則としてコード・テスト・文書を1コミットへまとめられる単位にします。機械的整形や生成物の都合で複数コミットが合理的な場合は、changeパッケージを増やさず、各コミットの目的をvalidationへ記録します。
+実装とMerge Gateが完了し、Current Spec/ADRの意味的な同期を人間またはAIが済ませたら、feature branch/PR上で実行します。
 
-これはGit操作の自動許可ではありません。commit、push、Pull Request、公開はユーザーが明示的に依頼した場合だけ行います。依頼がない間は、作業ツリーの差分確認、検証、文書同期までを行います。
+```sh
+npm run change:check
+npm run change:finalize CHANGE-###
+npm run change:check -- --require-empty
+```
 
-## 完了とArchive
+`change:finalize`は次を自動化します。
 
-1. 受け入れ条件を自動テストまたは再現可能な手動確認で検証する。
-2. deltaをcurrent specへ統合し、関連コード・テスト・利用者向け文書を同期する。
-3. `validation.md`へ実行コマンド、結果、未確認事項を記録する。
-4. tasksを完了し、proposalを`archived`へ更新する。
-5. `docs/changes/archive/YYYY-MM-DD-short-name/`へ移動し、active/archive indexを同期する。
+- proposal metadataとChange IDの検査
+- Current Specの`related_changes`逆参照の検査
+- Change内とindexの相対リンク検査
+- Active/Archiveの構造確認
+- proposalの`status: archived`と`outcome`の記録
+- Archive directoryへの安全な移動
+- active/archive indexの再生成
 
-未検証の受け入れ条件がある場合は、Archiveへ移動せず、残る理由をvalidationへ記録します。
+Current Spec本文の意味的な書換え、ADRの判断、GitHub Issue作成は自動化しません。Issueが必要な場合は人間が作成し、Archiveの`follow_up`またはPRから追跡できるようにします。
+
+通常のfinalizeは`status: implemented`とMerge Gate成功を要求します。既存Activeの整理など、実装完了と移行を区別する必要がある場合だけ次を使います。
+
+```sh
+npm run change:finalize CHANGE-### -- --migration --outcome=follow-up --follow-up="issue-needed: 残作業"
+```
+
+Migration modeはMerge Gateの成功を捏造せず、元のValidationを保ったまま履歴をArchiveへ移します。新しい実装に通常利用しません。
+
+## mainの境界
+
+`docs/changes/active/`はPR中の一時成果物です。mainへマージするPRでは、実装、Current Spec/ADR同期、finalize、index更新を同じPRへ含めます。手動・GPU・Tauri・FFmpeg・After Effects確認が残る場合も、Release Gate/ObservationとしてArchive後にIssueで追跡し、mainにActiveを残しません。

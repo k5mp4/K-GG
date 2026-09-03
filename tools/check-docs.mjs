@@ -31,6 +31,12 @@ const allowedChangeStatuses = new Set([
   'archived',
   'cancelled',
 ]);
+const allowedChangeOutcomes = new Set([
+  'merged',
+  'follow-up',
+  'cancelled',
+  'superseded',
+]);
 
 function parseList(value) {
   const trimmed = value.trim();
@@ -38,6 +44,19 @@ function parseList(value) {
   const body = trimmed.slice(1, -1).trim();
   if (!body) return [];
   return body.split(',').map(item => item.trim().replace(/^['"]|['"]$/g, ''));
+}
+
+function parseScalar(value) {
+  const trimmed = value.trim();
+  if (trimmed.startsWith('"') && trimmed.endsWith('"')) {
+    try {
+      return JSON.parse(trimmed);
+    } catch {
+      return trimmed.slice(1, -1);
+    }
+  }
+  if (trimmed.startsWith("'") && trimmed.endsWith("'")) return trimmed.slice(1, -1).replaceAll("''", "'");
+  return trimmed;
 }
 
 function parseFrontmatter(content, file) {
@@ -51,7 +70,7 @@ function parseFrontmatter(content, file) {
     if (separator < 1) throw new Error(`${file}: invalid frontmatter line: ${line}`);
     const key = line.slice(0, separator).trim();
     const rawValue = line.slice(separator + 1).trim();
-    data[key] = rawValue.startsWith('[') ? parseList(rawValue) : rawValue;
+    data[key] = rawValue.startsWith('[') ? parseList(rawValue) : parseScalar(rawValue);
     if (data[key] === null) {
       throw new Error(`${file}: ${key} must use a one-line YAML list`);
     }
@@ -274,30 +293,34 @@ function validateChanges(changes, currentById, adrs, errors) {
     if (!allowedChangeStatuses.has(change.data.status)) errors.push(`${file}: invalid status "${change.data.status}"`);
     if (!['S', 'B', 'F', 'A', 'X'].includes(change.data.change_kind)) errors.push(`${file}: invalid change_kind "${change.data.change_kind}"`);
     if (!['required', 'completed'].includes(change.data.human_review)) errors.push(`${file}: human_review must be required or completed`);
-    if (['approved', 'implemented', 'archived'].includes(change.data.status) && change.data.human_review !== 'completed') errors.push(`${file}: ${change.data.status} changes require completed human review`);
+    const historicalMigration = change.data.status === 'archived'
+      && change.data.outcome === 'follow-up'
+      && change.data.migration === 'historical';
+    if (['approved', 'implemented'].includes(change.data.status) && change.data.human_review !== 'completed') {
+      errors.push(`${file}: ${change.data.status} changes require completed human review`);
+    }
+    if (change.data.status === 'archived' && !historicalMigration && change.data.human_review !== 'completed') {
+      errors.push(`${file}: archived changes require completed human review unless marked as historical migration`);
+    }
+    if (change.data.outcome !== undefined && !allowedChangeOutcomes.has(change.data.outcome)) errors.push(`${file}: invalid outcome "${change.data.outcome}"`);
+    if (change.data.outcome === 'follow-up' && !change.data.follow_up) errors.push(`${file}: outcome follow-up requires follow_up`);
+    if (change.data.migration !== undefined && change.data.migration !== 'historical') errors.push(`${file}: invalid migration "${change.data.migration}"`);
     validateDate(change.data.created, proposal, 'created', errors);
     validateDate(change.data.updated, proposal, 'updated', errors);
     if (change.bucket === 'archive' && change.data.status !== 'archived') errors.push(`${file}: archived changes must have status archived`);
     if (change.bucket === 'active' && change.data.status === 'archived') errors.push(`${file}: archived changes belong under docs/changes/archive`);
     for (const currentSpec of change.data.current_specs ?? []) if (!currentById.has(currentSpec)) errors.push(`${file}: unknown current specification "${currentSpec}"`);
     for (const adr of change.data.related_adrs ?? []) if (!adrIds.has(adr)) errors.push(`${file}: unknown ADR reference "${adr}"`);
-    if (!change.files['delta.md']) {
-      errors.push(`${change.relativeDirectory}: delta.md is missing`);
-    } else {
+    if (change.files['delta.md']) {
       for (const heading of ['ADDED Requirements', 'MODIFIED Requirements', 'REMOVED Requirements']) {
         if (!new RegExp(`^##\\s+${heading}$`, 'm').test(change.files['delta.md'])) errors.push(`${change.relativeDirectory}/delta.md: missing "## ${heading}"`);
       }
+    } else if ((change.data.current_specs ?? []).length > 0 && change.data.change_kind !== 'S') {
+      errors.push(`${change.relativeDirectory}: delta.md is required when current_specs is not empty`);
     }
-    if (['implemented', 'archived'].includes(change.data.status)) {
-      if (!change.files['tasks.md']) errors.push(`${change.relativeDirectory}: tasks.md is required for ${change.data.status} changes`);
-      if (!change.files['validation.md']) errors.push(`${change.relativeDirectory}: validation.md is required for ${change.data.status} changes`);
-      if (change.files['tasks.md'] && /- \[ \]/.test(change.files['tasks.md'])) errors.push(`${change.relativeDirectory}/tasks.md: completed changes cannot have unchecked tasks`);
-      if (change.files['validation.md']) {
-        const results = [...change.files['validation.md'].matchAll(/\|\s*(pass|fail|partial|manual|not-run)\s*\|/gi)];
-        if (results.length === 0) errors.push(`${change.relativeDirectory}/validation.md: a validation result is required`);
-        if (/\|\s*pending\s*\|/i.test(change.files['validation.md'])) errors.push(`${change.relativeDirectory}/validation.md: completed changes cannot have pending validation results`);
-      }
-    }
+    // tasks.md and validation.md are optional. Historical validation prose is
+    // preserved as-is; CI owns mechanical results and Release Gate/Observation
+    // may remain pending after a Change is archived.
     if (change.files['validation.md']) {
       const ids = [...change.files['validation.md'].matchAll(/\bAC-\d{3}\b/g)].map(match => match[0]);
       validateUnique(ids, 'acceptance criterion ID', `${change.relativeDirectory}/validation.md`, errors);

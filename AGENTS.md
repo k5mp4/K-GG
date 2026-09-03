@@ -1,77 +1,62 @@
 # K-GG repository instructions
 
-このリポジトリでは、文書を実装とテストの一次情報として扱う。仕様の詳細とテンプレートは [`docs/development/docdd.md`](docs/development/docdd.md) を参照する。
+K-GGはRequest-firstの開発フローとDocsDDを採用します。利用者向けの現在動作は[`docs/specs/current/`](docs/specs/current/)、長期的な設計判断は[`docs/adr/`](docs/adr/)、開発フローの詳細は[`docs/development/workflow.md`](docs/development/workflow.md)と[`docs/development/change-workflow.md`](docs/development/change-workflow.md)を参照してください。
 
-## 作業を始める前に
+## Requestの入口と分類
 
-1. [`docs/development/index.md`](docs/development/index.md) と [`docs/development/change-workflow.md`](docs/development/change-workflow.md)、必要に応じて [`CONTRIBUTING.md`](CONTRIBUTING.md) を読む。
-2. 変更を `S`（文書整理）、`B`（不具合）、`F`（機能）、`A`（長期的な設計）、`X`（実験）に分類する。利用者、保存形式、出力、描画、UI、外部連携から観測できる動作が変わるなら、原則 `S` にはしない。
-3. 対象領域の `docs/specs/current/`、関連ADR、`docs/changes/active/` を確認する。対象のcurrent specがない場合は、Legacy SPEC、コード、テストから現行動作を調査し、必要なcurrent specとchangeをレビューへ出す。
-4. 今回の要求が既存changeのWhy／What／対象外／受け入れ条件に収まるなら、そのchangeへ追記する。収まらない独立要求だけ新しいactive changeを作成する。会話ターンや小さな修正ごとにディレクトリを増やさない。
-5. 観測可能な変更は、`proposal.md` の `status: approved` と `human_review: completed`、レビュー済みの `delta.md` を確認してから実装する。承認状態をAIや自動検査だけで作らない。
+- 変更要求をDevelopment Requestと呼び、GitHub Issue、PR、AIへの直接指示、CLI、MCP、API、外部サービス、開発中の発見を同じ入口として扱う。
+- Issueは必須入口ではない。Why、Problem、将来作業、複数PR、Release Gate待ちを追跡する価値がある場合に作成または既存Issueへ紐付ける。
+- Quick ChangeはIssueとChange directoryなしで開始できる。Tracked ChangeはIssueを使い、Designed Changeは仕様・設計への影響に応じて必要なSpec Delta、Change Capsule、ADRを使う。
+- 実装中に複数PR、後続作業、再現条件の保存、Architecture判断、保存・出力・描画契約の変更が分かったらTracked/Designedへ昇格する。
+- S/B/F/A/Xは補助分類として使う。外部から観測できる動作を変えるものをS（文書整理）として扱わない。
 
-## 文書の境界
+## 作業前に読むもの
 
-- current specは「現在有効な動作」を記録する。current specだけを実装許可とは解釈しない。
-- approved active changeは「今回実装してよい差分、対象外、受け入れ条件」を記録する。
-- `design.md`は一つのchangeのHow、ADRは複数機能を拘束する長期的なWhy/Decisionとして使い分ける。
-- Archiveは完了した変更の履歴であり、現行動作の根拠として先に参照しない。
-- `docs/specs/SPEC-*.md`はLegacy Change Specificationである。公開リンクとIDを維持し、現在の仕様として無条件に採用しない。
+1. [`docs/development/`](docs/development/)から対象に合うworkflow、validation、AI開発ガイドを読む。
+2. 対象のCurrent Specと、frontmatterの`related_adrs`にあるaccepted ADRを読む。
+3. Tracked/DesignedではRequest/IssueのWhy、対象外、未決定事項を確認する。
+4. Current Specがない場合はLegacy SPEC、コード、テストから現在動作を調査し、未確認の挙動を確定仕様として書かない。
+5. `docs/changes/archive/`と`docs/specs/SPEC-*.md`は履歴調査が必要な場合だけ読む。
 
-## 実装ルール
+仕様、テスト、実装が矛盾した場合は、どれかへ黙って合わせず、差異・影響・選択肢をRequest/PRへ報告する。
 
-- `approved` active changeの対象、受け入れ条件、禁止スコープだけを実装する。
-- 1つの変更パッケージに属する関連コード、テスト、文書は、検証結果とともに1コミットへまとめられる粒度で管理する。複数コミットが必要な場合も、合理的な理由をvalidationへ記録し、changeディレクトリは増やさない。
-- 過去の同日履歴を整理する場合は、元のCHANGE IDと検証記録を保持した日付bundleへまとめる。日付bundleを新しい実装changeの単位とは解釈しない。
-- 新機能、UI、描画、保存、出力、外部連携など外部から観測できる変更を、承認済みchangeなしに実装しない。
-- `S`区分で変更仕様を省略できるのは、利用者向け契約や外部から観測できる振る舞いを変えない文書・整理だけである。
-- `B`では期待動作をcurrent specへ追記または明確化し、再現テストを追加する。対応する仕様がなければ短いcurrent specとB changeを先に作る。
-- 仕様とコード、テストが矛盾した場合、どれかへ黙って合わせない。該当箇所、影響、選択肢を報告し、currentまたはchangeを再レビューする。
-- `approved`後にWhy/What、スコープ、受け入れ条件を変える場合は、実装を続けず `review`へ戻して再承認する。
-- `status`、`human_review`、validationの結果を、実際のレビューや確認なしに `approved`・`implemented`・`archived`・`pass`へ変更しない。手動確認をしていない場合は未確認として記録する。
-- 受け入れ条件ごとに自動テストまたは再現可能な手動確認を行い、実行コマンドはchangeの `validation.md`、ファイルパスはfrontmatterの `related_code` / `related_tests`に記録する。
-- commit、push、Pull Requestなどの外部Git操作は、ユーザーが明示的に依頼した場合だけ実行する。
-- 完了時はdeltaをcurrent specへ統合し、関連コード・テスト・ADR・利用者向け文書を同期してからchangeをArchiveへ移動する。Archiveだけを更新してcurrentを古いままにしない。
-- 仕様外の改善を同じchangeへ含めない。必要なら別のCHANGEを作る。
+## Changeとmain
 
-## 変更区分ごとの最低限の文書
+- Change CapsuleはDesigned Changeなど複雑な変更に限定し、必要なファイルだけ作る。Quick Changeでは作らない。
+- `docs/changes/active/`はfeature branch/PR上の一時領域であり、`main`上は原則0件にする。
+- Merge前にCurrent Spec/ADRを同期し、`npm run change:check`で構造・参照・indexを確認してから`npm run change:finalize CHANGE-###`を実行する。
+- 手動・GPU・Tauri・FFmpeg・After Effects確認はRelease GateまたはObservationとして記録する。未確認だけを理由にActiveへ残さず、必要な継続作業はIssueへ移す。
+- Archiveは現在仕様の根拠ではない。Current Specへdeltaを統合し、Archiveには経緯と検証証拠を残す。
 
-| 区分 | 条件 | 最低限必要なもの |
-| --- | --- | --- |
-| S | 外部から観測できる契約を変えない | 対象文書、index/linkの同期、`npm run docs:check` |
-| B | 期待動作との差異を修正する | `proposal.md`、`delta.md`、`tasks.md`、`validation.md`、再現テスト |
-| F | 利用者向け動作を追加・変更する | `proposal.md`、`delta.md`、`tasks.md`、`validation.md` |
-| A | 永続化、主要依存、層構造、配布、セキュリティ等を長期拘束する | Fの文書に加えて`design.md`とADR |
-| X | 隔離した実験・技術検証 | `proposal.md`またはexperiment、`validation.md`。承認までcurrentへ統合しない |
+## Validation
 
-## 参照の優先順位
+Merge Gate、Release Gate、Observationを分離する。変更範囲に応じて次を使う。
 
-```text
-approved active change
-→ current spec
-→ accepted ADR
-→ tests
-→ implementation
-→ Legacy Change Specification
+```sh
+npm run change:check
+npm run check:merge
+npm run check:render     # Shader / WebGL / Render Plan変更時
+npm run check:native     # src-tauri / Rust変更時
+npm run release:check    # version / updater設定
+npm run change:finalize CHANGE-###
 ```
 
-これは矛盾を自動解決する規則ではない。差異を検出した場合は人間へ報告する。
+`npm run check:fast`はtypecheck、unit/component、lint、frontend build、docs check/buildを含みます。既存互換の`npm run verify`はrelease設定・fast・nativeをまとめて実行します。警告はエラーと区別し、実行していない手動確認をpassにしない。
 
-## サブエージェント運用
+## Git / PR
 
-`.agents/*.yaml` は親エージェントの判断を置き換えず、実装、テスト、セキュリティレビューを分担する補助役として使う。
+```text
+main ← Pull Request ← short-lived branch
+```
 
-- `implementation-expert`: approved change、関連current spec/ADR、対象ファイル、受け入れ条件、禁止スコープを渡して指定範囲だけを任せる。
-- `test-automation-engineer`: 受け入れ条件と実装差分を渡し、VitestまたはRustテストと手動確認観点を任せる。
-- `security-auditor`: Tauri/Rust、ファイル操作、外部FFmpeg、更新機構、依存関係、外部入力を触る差分で必ずレビューに使う。
+- 長寿命feature branchを避け、大きな変更は独立してmerge可能な縦方向のPRへ分割する。
+- Quick ChangeでもPRに分類、変更理由、対象外、検証、未確認事項を記載する。Issueがない場合はRequest sourceを`Direct request`等と明記する。
+- commit、push、Pull Request、GitHub Issue作成などの外部操作は、ユーザーが明示した範囲だけ実行する。
+- PRでは対象差分だけを確認し、CI結果・Review・Current Spec/ADR同期を揃える。GitHub側のbranch protectionは[`docs/development/releasing.md`](docs/development/releasing.md)の管理者設定を参照する。
 
-結果を受け取った後、親エージェントが文書、コード、テスト、検証結果の整合を最終確認する。
+## 守る境界
 
-## 完了条件
-
-- changeの全受け入れ条件を検証し、`validation.md`へ結果と未確認事項を記録している。
-- current spec、コード、テスト、ADR、利用者向け文書に矛盾がない。
-- `npm run docs:check` と `npm run docs:build` が成功する。
-- コード変更時は範囲に応じて `npm test`、`npm run lint`、`npm run build` を実行する。
-- Tauri/Rust変更時は `cargo test --manifest-path src-tauri/Cargo.toml` と `cargo check --manifest-path src-tauri/Cargo.toml` を実行する。
-- 完了したchangeはcurrentへ統合し、`status: archived`としてArchiveへ移動している。activeのままの場合は未完了の理由を記録する。
+- 利用者向け機能、描画結果、Preset形式は、明示されたRequestの範囲外で変更しない。
+- React/UI、WebGL/GLSL、保存、出力、Tauri/Rustを変更する場合は、関連Current Spec・テスト・アダプター境界を確認する。
+- プリセット型は`src/lib/presetModel.ts`を一次情報とし、Browser/Tauriの保存処理を直接混ぜない。
+- RendererからTauriへ渡る外部入力を信頼しない。パス、FFmpeg、OS機能は既存のRust境界と安全検証を維持する。
