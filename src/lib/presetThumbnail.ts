@@ -1,11 +1,11 @@
-import { createEmptyManualDistortMap, createEmptyManualSmoothMask, normalizeNoiseDistortionConfig, normalizePostprocessConfig, STORE_DEFAULTS } from '../store/gradientStore';
+import { createEmptyManualDistortMap, createEmptyManualSmoothMask, normalizeNoiseDistortionConfig, normalizePostprocessConfig, STORE_DEFAULTS } from '../store/documentModel';
 import { normalizeEffectPipelineConfig } from './effectPipeline';
 import type { StoreSnapshot } from './presetModel';
 import { renderSceneAtTime } from './renderSceneAtTime';
 import { normalizeImageGradientConfig } from '../types/imageGradient';
 import { normalizeMeshGradientConfig } from '../types/gradient';
 import type { LatestState } from '../types/latestState';
-import { initWebGL, type WebGLContext } from './webgl';
+import { disposeWebGL, initWebGL, type WebGLContext } from './webgl';
 import { resolveDiffuseBezier } from './diffuseCurve';
 import { normalizeSeamlessConfig } from '../types/seamless';
 import { normalizeFlowGradientConfig } from '../types/flowGradient';
@@ -94,7 +94,7 @@ export function createPresetThumbnailState(snapshot: StoreSnapshot): LatestState
 }
 
 let rendererPromise: Promise<{ canvas: HTMLCanvasElement; context: WebGLContext }> | null = null;
-let captureQueue: Promise<unknown> = Promise.resolve();
+let captureQueue: Promise<void> = Promise.resolve();
 
 async function getRenderer(): Promise<{ canvas: HTMLCanvasElement; context: WebGLContext }> {
   if (typeof document === 'undefined') throw new Error('Document is not available');
@@ -109,7 +109,12 @@ async function getRenderer(): Promise<{ canvas: HTMLCanvasElement; context: WebG
     canvas.style.width = `${PRESET_THUMBNAIL_WIDTH}px`;
     canvas.style.height = `${PRESET_THUMBNAIL_HEIGHT}px`;
     document.body.appendChild(canvas);
-    rendererPromise = initWebGL(canvas).then(context => ({ canvas, context }));
+    const nextRenderer = initWebGL(canvas).then(context => ({ canvas, context })).catch(error => {
+      if (rendererPromise === nextRenderer) rendererPromise = null;
+      canvas.remove();
+      throw error;
+    });
+    rendererPromise = nextRenderer;
   }
   return await rendererPromise;
 }
@@ -121,6 +126,31 @@ async function captureNow(snapshot: StoreSnapshot): Promise<string> {
   canvas.height = PRESET_THUMBNAIL_HEIGHT;
   renderSceneAtTime(context, state, 0, { renderSessionId: 'thumbnail' });
   return canvas.toDataURL('image/png');
+}
+
+/**
+ * Releases the hidden thumbnail renderer for HMR, tests, or app teardown.
+ * The renderer otherwise intentionally lives for the app lifetime so repeated
+ * preset saves reuse the same WebGL context.
+ */
+export function disposePresetThumbnailRenderer(): Promise<void> {
+  const disposeJob = captureQueue.then(async () => {
+    const pendingRenderer = rendererPromise;
+    rendererPromise = null;
+    if (!pendingRenderer) return;
+    try {
+      const { canvas, context } = await pendingRenderer;
+      try {
+        disposeWebGL(context);
+      } finally {
+        canvas.remove();
+      }
+    } catch {
+      // Initialization/capture failures already clean up their own canvas.
+    }
+  });
+  captureQueue = disposeJob.then(() => undefined, () => undefined);
+  return disposeJob;
 }
 
 /** Captures one static effect-stack frame. Failure is intentionally non-fatal. */

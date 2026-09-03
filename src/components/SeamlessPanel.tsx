@@ -1,11 +1,13 @@
 import { useGradientStore, STORE_DEFAULTS } from '../store/gradientStore';
+import { applicationCommands } from '../application/commands';
 import { SEAMLESS_MAX_BLEND_WIDTH, SEAMLESS_MIN_BLEND_WIDTH } from '../types/seamless';
 import { useLanguage } from '../i18n/LanguageProvider';
 import { SliderField } from './SliderField';
 
 export function SeamlessPanel() {
   const { t } = useLanguage();
-  const { seamless, setSeamless } = useGradientStore();
+  const { seamless } = useGradientStore();
+  const { setSeamless } = applicationCommands;
 
   return (
     <div className="space-y-3 text-[11px]" data-seamless-panel>

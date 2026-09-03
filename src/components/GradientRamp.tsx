@@ -26,6 +26,7 @@ import { IconButton } from './IconButton';
 import { useLanguage } from '../i18n/LanguageProvider';
 import { localizeUiLabel } from '../i18n/uiLabels';
 import { InputNumber, InputShuffle } from 'tweeq';
+import { applicationCommands } from '../application/commands';
 
 const BAR_H = RAMP_BAR_H;
 const HANDLE_AREA = RAMP_HANDLE_AREA;
@@ -381,7 +382,8 @@ type GradientRampProps = {
 
 export function GradientRamp({ overlayImageElement = null, showHeader = true }: GradientRampProps = {}) {
   const { t, language } = useLanguage();
-  const { gradient, setGradient, resetMeshGradient, isSlitAdjusting, selectedStops, setSelectedStops, keyframeTracks, setKeyframeTracks, addKeyframe, setKeyframe, currentTime } = useGradientStore();
+  const { gradient, isSlitAdjusting, selectedStops, keyframeTracks, currentTime } = useGradientStore();
+  const { setGradient, resetMeshGradient, setSelectedStops, setKeyframeTracks, addKeyframe, setKeyframe } = applicationCommands;
   const selectedIdxs = new Set(selectedStops);
   const [selectedOpacityStops, setSelectedOpacityStops] = useState<number[]>([]);
   const selectedOpacityIdxs = new Set(selectedOpacityStops);

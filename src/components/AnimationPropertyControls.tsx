@@ -1,4 +1,5 @@
 import { useGradientStore } from '../store/gradientStore';
+import { applicationCommands } from '../application/commands';
 import { getTrackMode, type AnimationMode } from '../types/keyframe';
 import { isAutoCapableProperty } from '../lib/animationRegistry';
 import { getTimelineTime, setTimelineTime } from '../lib/timelineClock';
@@ -15,7 +16,8 @@ type Props = {
 
 export function AnimationPropertyControls({ trackId, label, value, compact = false }: Props) {
   const { t } = useLanguage();
-  const { animation, keyframeTracks, setTrackMode, addKeyframe, removeKeyframe } = useGradientStore();
+  const { animation, keyframeTracks } = useGradientStore();
+  const { setTrackMode, addKeyframe, removeKeyframe } = applicationCommands;
   const track = keyframeTracks[trackId];
   const mode = getTrackMode(track);
   const autoCapable = isAutoCapableProperty(trackId);

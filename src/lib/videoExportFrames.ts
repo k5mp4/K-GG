@@ -5,7 +5,8 @@ import {
   needsTiledRender,
   renderTiledToCanvas2D,
 } from './tileRender';
-import { useGradientStore, type AnimationEasing } from '../store/gradientStore';
+import { useGradientStore } from '../store/gradientStore';
+import type { AnimationEasing } from '../types/animation';
 import type { VideoExportFrameRenderer } from '../adapters/types';
 import {
   beginExportFrameDiagnostics,

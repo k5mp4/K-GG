@@ -1,4 +1,5 @@
 import { useGradientStore } from '../store/gradientStore';
+import { applicationCommands } from '../application/commands';
 import { STORE_DEFAULTS } from '../store/gradientStore';
 import type { NoiseDistortionConfig } from '../types/distortion';
 import { SliderField } from './SliderField';
@@ -70,7 +71,8 @@ const PHASOR_DIRECTION_MODES = [
 
 export function NoiseDistortionPanel() {
   const { t } = useLanguage();
-  const { noiseDistortion, setNoiseDistortion } = useGradientStore();
+  const { noiseDistortion } = useGradientStore();
+  const { setNoiseDistortion } = applicationCommands;
   const canReset = isNoiseDirty(noiseDistortion);
   const isDWAnim = noiseDistortion.type === 'domain_warp_anim';
   const isSeamless = noiseDistortion.type === 'seamless';

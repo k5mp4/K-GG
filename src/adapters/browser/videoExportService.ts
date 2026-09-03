@@ -1,7 +1,7 @@
 import { Zip, ZipPassThrough } from 'fflate';
 import { needsTiledRender } from '../../lib/tileRender';
 import { renderAndCaptureExportFrame, withExportSession } from '../../lib/videoExportFrames';
-import type { AnimationEasing } from '../../store/gradientStore';
+import type { AnimationEasing } from '../../types/animation';
 import type {
   NativeVideoArtifact,
   VideoExportConfig,

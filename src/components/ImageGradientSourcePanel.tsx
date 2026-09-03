@@ -1,6 +1,7 @@
 import { useRef, useState } from 'react';
 import { imageFileToCanvas } from '../lib/applySlitToImage';
 import { useGradientStore } from '../store/gradientStore';
+import { applicationCommands } from '../application/commands';
 import type { ImageGradientChannel } from '../types/imageGradient';
 import { Toggle } from './Toggle';
 import { CustomSelect } from './CustomSelect';
@@ -15,7 +16,8 @@ type Props = {
 };
 
 export function ImageGradientSourcePanel({ sourceImageCanvas, sourceImageName, onSourceImageLoad, onSourceImageClear, embedded = false }: Props) {
-  const { imageGradient, setImageGradient } = useGradientStore();
+  const { imageGradient } = useGradientStore();
+  const { setImageGradient } = applicationCommands;
   const inputRef = useRef<HTMLInputElement>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);

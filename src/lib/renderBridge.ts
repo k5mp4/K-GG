@@ -4,7 +4,7 @@
  * は専用 token と render sequence を使って排他制御する。
  */
 
-import type { TileRenderOptions } from './webgl';
+import type { TileRenderOptions } from '../types/rendering';
 import {
   beginExportDiagnostics,
   endExportDiagnostics,

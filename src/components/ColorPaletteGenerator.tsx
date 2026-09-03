@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect, useMemo } from 'react';
 import { SliderField } from './SliderField';
 import { CustomSelect } from './CustomSelect';
-import { useGradientStore } from '../store/gradientStore';
+import { applicationCommands } from '../application/commands';
 import { useLanguage } from '../i18n/LanguageProvider';
 import {
   extractColorsFromPixels,
@@ -31,7 +31,7 @@ interface ColorPaletteGeneratorProps {
 
 export function ColorPaletteGenerator({ overlayImageElement, embedded = false }: ColorPaletteGeneratorProps) {
   const { t } = useLanguage();
-  const setGradient = useGradientStore((state) => state.setGradient);
+  const { setGradient } = applicationCommands;
 
   const [colorCount, setColorCount] = useState<number>(5);
   const [sortBy, setSortBy] = useState<'dominance' | 'luminance' | 'hue'>('dominance');

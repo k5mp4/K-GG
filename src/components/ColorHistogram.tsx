@@ -1,5 +1,6 @@
 import React, { useRef, useEffect, useState, useMemo, useCallback } from 'react';
 import { useGradientStore } from '../store/gradientStore';
+import { applicationCommands } from '../application/commands';
 import { buildRampTextureData } from '../lib/gradientRampUtils';
 import { useLanguage } from '../i18n/LanguageProvider';
 
@@ -11,7 +12,8 @@ export function ColorHistogram({ sourceCanvasRef }: Props) {
   const { t } = useLanguage();
   const histogramCanvasRef = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
-  const { histogram, setHistogram, gradient } = useGradientStore();
+  const { histogram, gradient } = useGradientStore();
+  const { setHistogram } = applicationCommands;
   
   const [colorStats, setColorStats] = useState<{ color: string, percent: number }[]>([]);
 

@@ -31,6 +31,7 @@ import { capturePresetThumbnail } from '../lib/presetThumbnail';
 import defaultPresets from '../assets/gradPreset_kg_defaultPresets.json';
 import { useLanguage } from '../i18n/LanguageProvider';
 import { IconButton } from './IconButton';
+import { applicationCommands } from '../application/commands';
 
 type PresetPanelProps = {
   canvasW: number;
@@ -300,8 +301,8 @@ export function PresetPanel({ canvasW, canvasH, setCanvasW, setCanvasH, aspectRa
 
   function handleLoad(preset: Preset) {
     const s = preset.state;
-    if (s.gradient) store.setGradient(s.gradient);
-    if (s.noiseDistortion) store.setNoiseDistortion(normalizeNoiseDistortionConfig(s.noiseDistortion));
+    if (s.gradient) applicationCommands.setGradient(s.gradient);
+    if (s.noiseDistortion) applicationCommands.setNoiseDistortion(normalizeNoiseDistortionConfig(s.noiseDistortion));
     // Always pass Diffuse through STORE_DEFAULTS so legacy presets receive
     // adaptiveEnabled=false and the identity luminance curve.
     const loadedDiffuse = {
@@ -310,20 +311,20 @@ export function PresetPanel({ canvasW, canvasH, setCanvasW, setCanvasH, aspectRa
       luminanceBezier: resolveDiffuseBezier(s.diffuse?.luminanceBezier, s.diffuse?.luminanceCurve),
     };
     delete loadedDiffuse.luminanceCurve;
-    store.setDiffuse(loadedDiffuse);
-    store.setImageGradient(normalizeImageGradientConfig(s.imageGradient, s.imageGradient ? 0 : STORE_DEFAULTS.imageGradient.anchorInfluence));
+    applicationCommands.setDiffuse(loadedDiffuse);
+    applicationCommands.setImageGradient(normalizeImageGradientConfig(s.imageGradient, s.imageGradient ? 0 : STORE_DEFAULTS.imageGradient.anchorInfluence));
     if (s.slitScan) {
       const loadedSlit = {
         ...STORE_DEFAULTS.slitScan,
         ...stripSlitPhaseMotionFields(s.slitScan),
       };
       delete (loadedSlit as Record<string, unknown>).autoLoop;
-      store.setSlitScan(loadedSlit);
+      applicationCommands.setSlitScan(loadedSlit);
     }
-    if (s.stretch) store.setStretch(s.stretch);
-    if (s.normalMap) store.setNormalMap(s.normalMap);
-    store.setRadon({ ...STORE_DEFAULTS.radon, ...s.radon, enabled: false });
-    store.setIridescence({ ...STORE_DEFAULTS.iridescence, ...s.iridescence, enabled: false });
+    if (s.stretch) applicationCommands.setStretch(s.stretch);
+    if (s.normalMap) applicationCommands.setNormalMap(s.normalMap);
+    applicationCommands.setRadon({ ...STORE_DEFAULTS.radon, ...s.radon, enabled: false });
+    applicationCommands.setIridescence({ ...STORE_DEFAULTS.iridescence, ...s.iridescence, enabled: false });
     const loadedPostprocess = normalizePostprocessConfig(
       s.postprocess ?? s.postprocessDistort,
       s.manualDistort,
@@ -332,7 +333,7 @@ export function PresetPanel({ canvasW, canvasH, setCanvasW, setCanvasH, aspectRa
     const resolution = normalizeManualDistortResolution(legacyDistort.mapResolution);
     const displacementLength = resolution * resolution * 2;
     const smoothMaskLength = resolution * resolution;
-    store.setManualDistort({
+    applicationCommands.setManualDistort({
       ...STORE_DEFAULTS.manualDistort,
       ...legacyDistort,
       enabled: false,
@@ -340,22 +341,22 @@ export function PresetPanel({ canvasW, canvasH, setCanvasW, setCanvasH, aspectRa
       displacement: validFiniteArray(legacyDistort.displacement, displacementLength) ? legacyDistort.displacement : createEmptyManualDistortMap(resolution),
       smoothMask: validFiniteArray(legacyDistort.smoothMask, smoothMaskLength) ? legacyDistort.smoothMask : createEmptyManualSmoothMask(resolution),
     });
-    store.setPostprocess(loadedPostprocess);
+    applicationCommands.setPostprocess(loadedPostprocess);
     // clothGradient が無い旧プリセットでも安全にデフォルトで初期化し、
     // SANDBOX の Cloth 設定を反映する。
-    store.setClothGradient(normalizeClothGradientConfig(s.clothGradient));
-    store.setConeView(normalizeConeViewConfig(s.coneView));
-    store.setSeamless(normalizeSeamlessConfig(s.seamless));
-    store.setFlowGradient(normalizeFlowGradientConfig(s.flowGradient));
+    applicationCommands.setClothGradient(normalizeClothGradientConfig(s.clothGradient));
+    applicationCommands.setConeView(normalizeConeViewConfig(s.coneView));
+    applicationCommands.setSeamless(normalizeSeamlessConfig(s.seamless));
+    applicationCommands.setFlowGradient(normalizeFlowGradientConfig(s.flowGradient));
     // effectPipeline を持たない旧プリセット/内蔵プリセットは Legacy v1 に
     // ならないよう、既定の V2 パイプラインへ昇格する。V2 でなければ
     // SANDBOX Cloth は描画パイプラインへ一切統合されないため。
-    store.setEffectPipeline(s.effectPipeline
+    applicationCommands.setEffectPipeline(s.effectPipeline
       ? normalizeEffectPipelineConfig(s.effectPipeline)
       : createDefaultEffectPipeline());
-    if (s.matcap) store.setMatcap(s.matcap);
-    store.setKeyframeTracks(s.keyframeTracks ?? {});
-    if (s.animation) store.setAnimation({ ...s.animation, previewLoop: s.animation.previewLoop ?? true });
+    if (s.matcap) applicationCommands.setMatcap(s.matcap);
+    applicationCommands.setKeyframeTracks(s.keyframeTracks ?? {});
+    if (s.animation) applicationCommands.setAnimation({ ...s.animation, previewLoop: s.animation.previewLoop ?? true });
     if (s.colorPalettes) mergeUserColorPalettes(s.colorPalettes);
     if (s.resolution) {
       const normalizeResolution = (value: number) => Number.isFinite(value) ? Math.max(1, Math.min(4096, Math.round(value))) : 1024;
@@ -365,7 +366,7 @@ export function PresetPanel({ canvasW, canvasH, setCanvasW, setCanvasH, aspectRa
       setCanvasH(presetHeight);
       aspectRatioRef.current = presetWidth / presetHeight;
     }
-    store.setPresetName(preset.name);
+    applicationCommands.setPresetName(preset.name);
     setSelectedPresetId(preset.id);
     onPresetLoad();
   }
@@ -384,7 +385,7 @@ export function PresetPanel({ canvasW, canvasH, setCanvasW, setCanvasH, aspectRa
     try {
       const thumbnail = await capturePresetThumbnail(state);
       const saved = await savePreset(trimmed, state, selectedFolderId, thumbnail);
-      store.setPresetName(trimmed);
+      applicationCommands.setPresetName(trimmed);
       setSelectedPresetId(saved.id);
       setName('');
       await refresh();

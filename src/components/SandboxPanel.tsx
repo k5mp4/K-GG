@@ -1,6 +1,7 @@
 import { useEffect, useState, type ReactNode } from 'react';
 import { gradientRampPresets } from '../lib/gradientRampUtils';
 import { useGradientStore } from '../store/gradientStore';
+import { applicationCommands } from '../application/commands';
 import { useLanguage } from '../i18n/LanguageProvider';
 import { ClothGradientPanel } from './ClothGradientPanel';
 import { ConeViewPanel } from './ConeViewPanel';
@@ -102,15 +103,11 @@ export function SandboxPanel({ renderViewMode, onRenderViewModeChange }: Sandbox
   const { t } = useLanguage();
   const {
     normalMap,
-    setNormalMap,
     clothGradient,
-    setClothGradient,
-    setGradient,
     effectPipeline,
-    setEffectPipeline,
     seamless,
-    setSeamless,
   } = useGradientStore();
+  const { setNormalMap, setClothGradient, setGradient, setEffectPipeline, setSeamless } = applicationCommands;
   const [selectedModule, setSelectedModule] = useState<SandboxModuleKey>('cloth');
   const [programStatus, setProgramStatus] = useState<Partial<Record<SandboxProgramKey, SandboxProgramStatus>>>({});
 

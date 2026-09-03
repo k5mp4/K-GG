@@ -1,5 +1,6 @@
 import { useRef, useState } from 'react';
 import { useGradientStore, STORE_DEFAULTS } from '../store/gradientStore';
+import { applicationCommands } from '../application/commands';
 import type { SlitScanConfig } from '../types/distortion';
 import { SliderField } from './SliderField';
 import { Collapsible } from './Collapsible';
@@ -39,7 +40,8 @@ type Props = {
 
 export function SlitScanPanel({ sourceImageName, hasSourceImage, onSourceImageLoad, onSourceImageClear }: Props) {
   const { t } = useLanguage();
-  const { slitScan, setSlitScan, slitOverlayEnabled, setSlitOverlayEnabled } = useGradientStore();
+  const { slitScan, slitOverlayEnabled } = useGradientStore();
+  const { setSlitScan, setSlitOverlayEnabled } = applicationCommands;
   const canReset = isSlitDirty(slitScan);
   const [imageError, setImageError] = useState<string | null>(null);
   const [isLoadingImage, setIsLoadingImage] = useState(false);

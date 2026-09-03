@@ -3,6 +3,7 @@ import { getKeyframeEditTime, interpolateKeyframesWithLoop } from '../lib/loopKe
 import { getTrackMode } from '../types/keyframe';
 import { normalizeMeshGradientConfig, type MeshEdge, type Vec2Tuple } from '../types/gradient';
 import { useGradientStore } from '../store/gradientStore';
+import { applicationCommands } from '../application/commands';
 import { getColorAtPosition } from '../lib/gradientRampUtils';
 import { Icon } from './Icon';
 
@@ -44,13 +45,18 @@ export function MeshGradientEditor({ width, height, visible = true }: Props) {
     animation,
     currentTime,
     selectedGradientAnchors,
+  } = useGradientStore();
+  const {
     setKeyframeTracks,
     setMeshCorner,
     setMeshHandle,
     setMeshColorPosition,
     resetMeshGradient,
     straightenMeshHandles,
-  } = useGradientStore();
+    setKeyframe,
+    addKeyframe,
+    setSelectedGradientAnchors,
+  } = applicationCommands;
   const containerRef = useRef<HTMLDivElement>(null);
   const draggingRef = useRef<{ kind: 'corner' | 'handle'; index: number; edge?: MeshEdge; start: Vec2Tuple; pointerOffset: Vec2Tuple } | null>(null);
   const selectedRef = useRef(useGradientStore.getState().selectedGradientAnchors);
@@ -90,8 +96,8 @@ export function MeshGradientEditor({ width, height, visible = true }: Props) {
     const time = getKeyframeEditTime(state.currentTime, state.animation.previewLoop ?? true);
     if (!track || getTrackMode(track) !== 'keys' || track.keyframes.length === 0) return;
     const existing = track.keyframes.find(keyframe => Math.abs(keyframe.time - time) < 1e-4);
-    if (existing) state.setKeyframe(trackId, { id: existing.id, value });
-    else state.addKeyframe(trackId, { time, value, interpolation: 'linear' });
+    if (existing) setKeyframe(trackId, { id: existing.id, value });
+    else addKeyframe(trackId, { time, value, interpolation: 'linear' });
   };
 
   const handleCornerPointerDown = (index: number) => (event: React.PointerEvent<HTMLDivElement>) => {
@@ -106,7 +112,7 @@ export function MeshGradientEditor({ width, height, visible = true }: Props) {
     const selected = selectedRef.current.includes(index) ? selectedRef.current : [index];
     const nextSelected = event.shiftKey ? [...new Set([...selectedRef.current, index])] : selected;
     selectedRef.current = nextSelected;
-    useGradientStore.getState().setSelectedGradientAnchors(nextSelected);
+    setSelectedGradientAnchors(nextSelected);
     draggingRef.current = { kind: 'corner', index, start: point, pointerOffset: offset };
 
     const onMove = (moveEvent: PointerEvent) => {
@@ -182,8 +188,8 @@ export function MeshGradientEditor({ width, height, visible = true }: Props) {
       const value = corner[axis === 'x' ? 0 : 1];
       if (existing) {
         const keyframe = existing.keyframes.find(item => Math.abs(item.time - time) < 1e-4);
-        if (keyframe) state.setKeyframe(trackId, { id: keyframe.id, value });
-        else state.addKeyframe(trackId, { time, value, interpolation: 'linear' });
+        if (keyframe) setKeyframe(trackId, { id: keyframe.id, value });
+        else addKeyframe(trackId, { time, value, interpolation: 'linear' });
       } else {
         setKeyframeTracks(previous => ({
           ...previous,

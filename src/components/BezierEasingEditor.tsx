@@ -1,6 +1,7 @@
 import { useRef, useCallback, useEffect, useState } from 'react';
 import { InputCubicBezier, type CubicBezierValue } from 'tweeq';
 import { BEAT_SYNC_BEATS_PER_LOOP, getBeatSyncDurationSeconds, useGradientStore } from '../store/gradientStore';
+import { applicationCommands } from '../application/commands';
 import { EASING_PRESETS, type EasingPreset } from '../lib/easingBezier';
 import { applyCubicBezierLink } from '../lib/linkedCubicBezier';
 import { Toggle } from './Toggle';
@@ -18,7 +19,8 @@ const PRESET_LABELS: { key: EasingPreset; label: string }[] = [
 
 export function BezierEasingEditor({ compact = false }: { compact?: boolean }) {
   const { language, t } = useLanguage();
-  const { animation, setAnimation } = useGradientStore();
+  const { animation } = useGradientStore();
+  const { setAnimation } = applicationCommands;
   const { easing } = animation;
   const beatSync = easing.beatSync ?? { enabled: false, bpm: 120, beatsPerBar: 4, subdivision: 4 as 3 | 4 };
   const timeRemapActive = easing.enabled || beatSync.enabled;

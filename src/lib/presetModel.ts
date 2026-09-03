@@ -1,4 +1,4 @@
-import type { AnimationConfig } from '../store/gradientStore';
+import type { AnimationConfig } from '../types/animation';
 import { stripSlitPhaseMotionFields } from '../types/distortion';
 import type {
   DiffuseConfig,

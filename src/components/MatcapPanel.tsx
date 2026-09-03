@@ -1,8 +1,10 @@
 import { useGradientStore } from '../store/gradientStore';
+import { applicationCommands } from '../application/commands';
 import { Toggle } from './Toggle';
 
 export function MatcapPanel() {
-  const { matcap, setMatcap } = useGradientStore();
+  const { matcap } = useGradientStore();
+  const { setMatcap } = applicationCommands;
 
   return (
     <div className="space-y-4">

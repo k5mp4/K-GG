@@ -2,15 +2,15 @@ import type { LatestState } from '../types/latestState';
 import {
   blendEffectStackTransitionFrames,
   captureEffectStackTransitionFrame,
-  render,
-  type TileRenderOptions,
   type WebGLContext,
 } from './webgl';
+import type { TileRenderOptions } from '../types/rendering';
 import { evaluateSceneAtTime } from './sceneEvaluation';
 import {
   finishEffectStackTransition,
   getEffectStackTransition,
 } from './effectStackTransition';
+import { renderFrame } from './renderFrame';
 
 type RenderSceneOptions = {
   tile?: TileRenderOptions;
@@ -26,43 +26,42 @@ function renderSceneFrame(
   effectStack = state.effectPipeline,
 ): void {
   const scene = evaluateSceneAtTime(state, normalizedTime);
-  render(
-    ctx,
-    scene.gradient,
-    scene.noiseDistortion,
-    scene.diffuse,
-    scene.slitScan,
-    scene.stretch,
-    state.normalMap,
-    scene.radon,
-    scene.iridescence,
-    state.manualDistort,
-    scene.postprocess,
-    state.matcap,
-    state.width,
-    state.height,
-    scene.renderTime,
-    state.animation.direction,
-    scene.slitAnimationTime,
-    scene.stretchTime,
-    options.tile,
-    state.sourceImageCanvas ?? null,
-    state.imageGradientSource ?? null,
-    state.imageGradient,
-    scene.noiseLoopPeriod,
-    scene.animationSpeed,
-    state.imageMaskSource ?? null,
-    state.imageMaskEnabled ?? false,
-    effectStack,
-    scene.clothGradient,
-    scene.clothTime,
-    scene.noiseLoopPeriod,
-    state.seamless,
-    state.flowGradient,
-    normalizedTime,
-    state.animation.previewLoop ?? true,
-    options.renderSessionId ?? 'preview',
-  );
+  renderFrame(ctx, {
+    gradient: scene.gradient,
+    noiseDistortion: scene.noiseDistortion,
+    diffuse: scene.diffuse,
+    slitScan: scene.slitScan,
+    stretch: scene.stretch,
+    normalMap: state.normalMap,
+    radon: scene.radon,
+    iridescence: scene.iridescence,
+    manualDistort: state.manualDistort,
+    postprocess: scene.postprocess,
+    matcap: state.matcap,
+    width: state.width,
+    height: state.height,
+    time: scene.renderTime,
+    animDirection: state.animation.direction,
+    slitAnimTimeOverride: scene.slitAnimationTime,
+    stretchScanOverride: scene.stretchTime,
+    tile: options.tile,
+    sourceImageCanvas: state.sourceImageCanvas ?? null,
+    imageGradientSource: state.imageGradientSource ?? null,
+    imageGradient: state.imageGradient,
+    noiseLoopPeriod: scene.noiseLoopPeriod,
+    animationSpeed: scene.animationSpeed,
+    imageMaskSource: state.imageMaskSource ?? null,
+    imageMaskEnabled: state.imageMaskEnabled ?? false,
+    effectPipeline: effectStack,
+    clothGradient: scene.clothGradient,
+    clothTime: scene.clothTime,
+    clothLoopPeriod: scene.noiseLoopPeriod,
+    seamless: state.seamless,
+    flowGradient: state.flowGradient,
+    flowNormalizedTime: normalizedTime,
+    flowLoopEnabled: state.animation.previewLoop ?? true,
+    flowSessionId: options.renderSessionId ?? 'preview',
+  });
 }
 
 export function renderSceneAtTime(

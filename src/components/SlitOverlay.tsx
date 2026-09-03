@@ -1,5 +1,6 @@
 import { useEffect, useRef, useCallback, useState, useMemo } from 'react';
 import { useGradientStore } from '../store/gradientStore';
+import { applicationCommands } from '../application/commands';
 
 interface Props {
   width: number;
@@ -109,7 +110,8 @@ type HitResult = { type: 'boundary'; idx: number } | { type: 'slit'; idx: number
 type DragState = { type: 'move' | 'slit'; hitIdx: number; startClientX: number; startClientY: number; startPhase: number; startWidth: number; startDelta: number; startDeltaNext: number; startSlitDeltas: Record<number, number>; };
 
 export function SlitOverlay({ width, height, canvasW, canvasH }: Props) {
-  const { slitScan, setSlitScan, setIsSlitAdjusting, slitOverlayEnabled } = useGradientStore();
+  const { slitScan, slitOverlayEnabled } = useGradientStore();
+  const { setSlitScan, setIsSlitAdjusting } = applicationCommands;
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const dragRef = useRef<DragState | null>(null);
   const hoverHitRef = useRef<HitResult>(null);

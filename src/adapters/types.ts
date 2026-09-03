@@ -1,4 +1,4 @@
-import type { AnimationEasing } from '../store/gradientStore';
+import type { AnimationEasing } from '../types/animation';
 import type { ColorStop } from '../types/gradient';
 import type { Preset, StoreSnapshot } from '../lib/presetModel';
 import type { PresetExportScope, PresetFolder, PresetLibrary } from '../lib/presetLibrary';

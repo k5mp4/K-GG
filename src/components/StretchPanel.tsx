@@ -1,4 +1,5 @@
 import { useGradientStore, STORE_DEFAULTS } from '../store/gradientStore';
+import { applicationCommands } from '../application/commands';
 import type { StretchConfig } from '../types/distortion';
 import { SliderField } from './SliderField';
 import { Collapsible } from './Collapsible';
@@ -18,7 +19,8 @@ const isStretchDirty = (value: StretchConfig) =>
 
 export function StretchPanel() {
   const { t } = useLanguage();
-  const { stretch, setStretch } = useGradientStore();
+  const { stretch } = useGradientStore();
+  const { setStretch } = applicationCommands;
   const canReset = isStretchDirty(stretch);
 
   return (

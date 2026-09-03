@@ -1,10 +1,9 @@
 import { useState, useRef, useEffect } from 'react';
 import { undo, redo } from '../lib/history';
 import { useGradientStore } from '../store/gradientStore';
+import type { GestureFeedback, Pan } from '../types/workspace';
 
-type Pan = { x: number; y: number };
 type TouchPoint = { x: number; y: number };
-type GestureFeedback = { id: number; x: number; y: number; action: 'undo' | 'redo' };
 
 const MIN_ZOOM = 0.25;
 const MAX_ZOOM = 5;

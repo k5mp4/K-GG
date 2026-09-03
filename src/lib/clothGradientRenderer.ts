@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import type { ClothGradientConfig } from '../types/clothGradient';
-import type { TileRenderOptions } from './webgl';
+import type { TileRenderOptions } from '../types/rendering';
 import { disableWebGLContextValidation } from './webglPerformance';
 import { createWebGL2Context, WebGL2UnavailableError } from './webglCapability';
 

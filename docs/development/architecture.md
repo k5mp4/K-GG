@@ -4,29 +4,35 @@ title: アーキテクチャ
 
 # アーキテクチャ
 
-最終確認日: 2026-07-07
+最終確認日: 2026-09-03
 
 ## 全体像
 
 ```mermaid
 flowchart LR
-  UI["React UI<br/>components / hooks"] --> Store["Zustand store<br/>編集状態"]
+  UI["React UI<br/>App Shell / Workspace"] --> Commands["Application commands"]
+  Commands --> Store["Zustand store<br/>Document / Workspace slices"]
   Store --> Eval["sceneEvaluation<br/>時刻ごとの状態評価"]
-  Eval --> Render["WebGL2 renderer<br/>GLSL shaders"]
+  Eval --> Plan["Scene Render Plan<br/>effectPipeline"]
+  Plan --> Bridge["renderSceneAtTime / renderBridge"]
+  Bridge --> Frame["renderFrame<br/>named frame contract"]
+  Frame --> Render["WebGL2 renderer<br/>GLSL shaders"]
   Render --> Canvas["Canvas preview"]
-  Canvas --> Export["Export pipeline"]
-  Export --> Browser["Browser adapters<br/>download / storage"]
-  Export --> Tauri["Tauri adapters"]
+  Bridge --> Output["Static / Sequence / Video / Tile"]
+  Output --> Browser["Browser adapters<br/>download / storage"]
+  Output --> Tauri["Tauri adapters"]
   Tauri --> Rust["Rust commands<br/>preset files / FFmpeg"]
 ```
 
-React UIは編集状態をZustandへ書き込みます。描画時には編集状態を直接シェーダーへ渡さず、`sceneEvaluation`が指定時刻の状態へ変換します。プレビューとエクスポートは同じ評価経路を使うことが重要です。
+React UIはWorkspaceとApplication commandを通じて編集状態を更新します。描画時には編集状態を直接シェーダーへ渡さず、`sceneEvaluation`と`getSceneRenderPlan`が指定時刻の状態と必要な描画資源を決定します。`renderSceneAtTime`、`renderBridge`、`renderFrame`を共通の境界として、プレビューとエクスポートが同じ条件決定を使います。
 
 ## 層と依存方向
 
 ### UI層
 
-- `src/App.tsx`: 画面全体の構成、パネル、キャンバス、タイムラインを統合する。
+- `src/App.tsx`: provider、Workspace、サイドバー、モーダル、上位orchestrationを統合する。
+- `src/features/workspace/`: `WorkspaceTopBar`、`CanvasWorkspace`、`TimelineWorkspace`が既存のDOM、props、イベント順を保った画面境界を提供する。
+- `src/features/native/useNativeFfmpeg.ts`: Native FFmpegの検出状態とダイアログ操作を所有する。
 - `src/components/`: 各パラメータの編集UIとオーバーレイを提供する。
 - `src/hooks/`: WebGL、キャンバスサイズ、入力操作などのライフサイクルを扱う。
 
@@ -34,7 +40,10 @@ UIは状態の編集と利用者操作に集中させ、時間評価やファイ
 
 ### 状態・ドメイン層
 
-- `src/store/gradientStore.ts`: 編集可能な状態、既定値、更新操作を保持する。
+- `src/store/gradientStore.ts`: 既存のStore API、既定値、Document状態を保持し、sliceをcompositionする。
+- `src/store/workspaceSlice.ts`: 現在時刻、選択、スリット表示、プリセット名などWorkspace状態を保持する。
+- `src/store/selectors.ts`: Document、Workspace、Renderの購読範囲を明示する。UI専用状態を描画購読へ混ぜない。
+- `src/application/commands.ts`: UI featureとMCP control runtimeがStore実装へ直接依存せず、既存setterのnormalizationを再利用するApplication command facadeである。通常のUI経路は安定したaction参照を一度bindし、テストや差し替えが必要な経路は動的accessorを利用できる。
 - `src/types/`: グラデーション、エフェクト、キーフレーム、描画スナップショットの型を定義する。
 - `src/lib/sceneEvaluation.ts`: Static/Auto/Keysと時刻を解決し、描画可能な状態を作る。
 - `src/lib/presetModel.ts`: プリセット永続化で共有する`Preset`、`StoreSnapshot`、型ガード、生成処理を定義する。
@@ -44,10 +53,15 @@ UIは状態の編集と利用者操作に集中させ、時間評価やファイ
 ### 描画層
 
 - `src/lib/renderSceneAtTime.ts`: 評価済みシーンを描画関数へ接続する。
+- `src/lib/sceneRenderPlan.ts`: 評価済み状態からEffect Pipelineと描画条件を決める純粋なcanonical boundaryである。readinessとframe renderingは同じ入力mappingを使う。
+- `src/lib/renderFrame.ts`: 名前付き`RenderFrameRequest`を既存の位置引数rendererへ変換する互換adapterである。
 - `src/lib/webgl.ts`: WebGLコンテキスト、テクスチャ、uniform、描画パスを管理する。
 - `src/shaders/`: GPU上で実行する各描画処理を保持する。
 - `src/lib/renderBridge.ts`: UI上の描画器をエクスポート処理から呼び出す境界である。
 - `src/lib/exportCanvas.ts`: 静止画エクスポートで共有するCanvas取得、タイル描画合成、PNG/JPEG/WebP Blob変換を担当する。
+- `src/lib/presetThumbnail.ts`: hidden thumbnail rendererのsingletonとCanvasを所有し、`disposePresetThumbnailRenderer`でキャプチャ待ちを経て明示的に解放する。App teardownではこの解放処理を呼び出す。
+
+WebGLの所有権はcontextごとに管理します。`disposeWebGL`はcontext listener、program、texture、framebuffer、buffer、VAO、Flow資源、Three.js Cloth rendererをまとめて解放します。Three.jsのCloth/ConeとOGLのIridescenceはそれぞれの既存ownerを維持し、共通化によって実行順や描画結果を変えません。
 
 Postprocessのフラグメントシェーダーは`src/shaders/postprocess/`でuniform、共通処理、Prism、主スタック、Diffuse、Glass高さ場、Glass光学合成、エントリポイントに分割する。`src/lib/webglShaderSources.ts`がこの依存順に連結し、Glass専用、Prism専用、軽量主スタック、Legacyの各プログラムへ同じ構成元を供給する。分割ファイルを単独の完結したシェーダーとして扱わず、連結順とプリプロセッサ定義をコンパイル契約として維持する。
 
@@ -78,21 +92,23 @@ TauriコマンドはRendererからの入力を信頼しません。FFmpeg実行�
 
 ### プレビュー
 
-1. パネルがストアを更新する。
+1. パネルがApplication command経由でストアを更新する。
 2. `GradientCanvas`と`useWebGL`が最新状態を保持する。
 3. `sceneEvaluation`が現在時刻のキーフレームと自動変化を評価する。
-4. `renderSceneAtTime`がWebGL描画を実行する。
+4. `getSceneRenderPlan`が必要な描画条件を決める。
+5. `renderSceneAtTime`が`renderFrame`を経由してWebGL描画を実行する。
 
 ### エクスポート
 
 1. エクスポート処理が出力フレームの正規化時刻を決める。
-2. `renderBridge`経由でプレビューと同じ描画処理を呼ぶ。
+2. `renderBridge`経由でプレビューと同じ評価、Render Plan、frame描画処理を呼ぶ。
 3. 静止画では`exportCanvas`がCanvasから画像データを得る。
 4. ブラウザではダウンロードまたはZIP化し、Tauriでは必要に応じてRust側でFFmpegを呼ぶ。
 
 ## 既知の設計上の注意
 
-- `App.tsx`は画面統合の責務が大きい。新規ロジックを追加する際は、コンポーネント、hook、ドメイン関数へ分離できるか検討する。
-- `gradientStore.ts`は多数の機能状態を集約する。破壊的な状態変更はプリセット互換性へ影響する。
+- `App.tsx`は画面統合とproviderの責務を残す。新規ロジックを追加する際は、Workspace、feature、hook、ドメイン関数へ分離できるか検討する。
+- `gradientStore.ts`は既存互換APIを持つcomposition facadeであり、まだ全機能sliceへ分割していない。次の分割ではsetterのnormalization、Effect Stackとの同期、historyの保存対象を先にcharacterizationする。
+- `StoreSnapshot`は引き続き`src/lib/presetModel.ts`の永続境界である。Application command、transport DTO、rendererの内部型と混ぜない。
 - GLSL変更はTypeScript型検査だけでは検出できないため、ビルドに加えて実描画確認が必要である。
 - ブラウザ/Tauriアダプターの重複を整理するときは、変換などの純粋な共通処理だけを`src/lib/`へ移し、権限、保存先、外部プロセス起動はプラットフォーム境界に残す。
