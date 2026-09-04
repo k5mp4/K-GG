@@ -22,9 +22,10 @@ import type { GradientConfig } from '../types/gradient';
 import type { LatestState } from '../types/latestState';
 import { createExportStateSnapshot } from '../lib/exportRenderState';
 import { registerKggControlRuntime, unregisterKggControlRuntime } from '../lib/kggControlRuntime';
+import { mountKggE2EBridge } from '../lib/e2eBridge';
 import { KggRuntimeBridgeClient } from '../lib/kggRuntimeBridgeClient';
 import { isTauriWebView, resolveKggRuntimeBridgeConfig } from '../lib/kggRuntimeBridgeConfig';
-import type { KggControlProjectAdapter, KggControlUiAdapter } from '../lib/kggControlRuntime';
+import type { KggControlProjectAdapter, KggControlRuntime, KggControlUiAdapter } from '../lib/kggControlRuntime';
 import { getWebGL2Availability, isWebGL2UnavailableError, markWebGL2AvailabilityUnknown } from '../lib/webglCapability';
 import {
   acquireSharedWebGLInitRequest,
@@ -40,6 +41,7 @@ export function useWebGL(
   controlAdapters: { ui?: KggControlUiAdapter; project?: KggControlProjectAdapter } = {},
 ) {
   const webglRef = useRef<WebGLContext | null>(null);
+  const controlRuntimeRef = useRef<KggControlRuntime | null>(null);
   const latestRef = useRef<LatestState | null>(null);
   const lostResourceLedgerRef = useRef<WebGLContext['resourceLedger']>(null);
   const initRequestRef = useRef<SharedWebGLInitRequest<HTMLCanvasElement, WebGLContext> | null>(null);
@@ -284,13 +286,11 @@ export function useWebGL(
     );
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // MCP developer interface bridge. It is opt-in: without both environment
-  // variables the renderer has no polling loop and no external surface.
+  // The control runtime and E2E bridge must exist as soon as the canvas is
+  // mounted. E2E methods wait for WebGL readiness themselves.
   useEffect(() => {
-    if (!isWebGLReady) return;
     const canvas = canvasRef.current;
     if (!canvas) return;
-    let disposed = false;
     let stopE2EBridge: (() => void) | null = null;
     const runtime = registerKggControlRuntime({
       canvas,
@@ -298,6 +298,29 @@ export function useWebGL(
       ui: controlAdapters.ui,
       project: controlAdapters.project,
     });
+    controlRuntimeRef.current = runtime;
+    if (import.meta.env.DEV && import.meta.env.VITE_KGG_E2E === '1') {
+      stopE2EBridge = mountKggE2EBridge({
+        canvas,
+        getWebGLContext: () => webglRef.current,
+        runtime,
+      });
+    }
+    return () => {
+      stopE2EBridge?.();
+      if (controlRuntimeRef.current === runtime) controlRuntimeRef.current = null;
+      unregisterKggControlRuntime(runtime);
+    };
+  }, [canvasRef, controlAdapters.ui, controlAdapters.project]);
+
+  // MCP developer interface bridge. It is opt-in: without both environment
+  // variables the renderer has no polling loop or external surface. Unlike
+  // the E2E bridge, MCP starts only after WebGL is ready.
+  useEffect(() => {
+    if (!isWebGLReady) return;
+    const canvas = canvasRef.current;
+    const runtime = controlRuntimeRef.current;
+    if (!canvas || !runtime) return;
     const bridgeConfig = import.meta.env.DEV
       ? resolveKggRuntimeBridgeConfig({
         bridgeUrl: import.meta.env.VITE_KGG_MCP_BRIDGE_URL as string | undefined,
@@ -315,21 +338,8 @@ export function useWebGL(
       })
       : null;
     bridge?.start();
-    if (import.meta.env.DEV && import.meta.env.VITE_KGG_E2E === '1') {
-      void import('../lib/e2eBridge').then(({ mountKggE2EBridge }) => {
-        if (disposed) return;
-        stopE2EBridge = mountKggE2EBridge({
-          canvas,
-          getWebGLContext: () => webglRef.current,
-          runtime,
-        });
-      });
-    }
     return () => {
-      disposed = true;
-      stopE2EBridge?.();
       bridge?.stop();
-      unregisterKggControlRuntime(runtime);
     };
   }, [canvasRef, isWebGLReady, controlAdapters.ui, controlAdapters.project]);
 

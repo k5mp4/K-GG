@@ -52,6 +52,7 @@ test('Save PNG downloads a structurally valid image', async ({ page, browserErro
 test('PNG ZIP contains sequential valid frames and Preview recovers', async ({ page, browserErrors: _browserErrors }) => {
   const { dimensions } = await openExportPanel(page);
   const expected = await prepareZipSmoke(page);
+  expect(expected).toEqual({ duration: 0.25, fps: 24, frameCount: 6 });
   const zipBytes = await downloadBytes(page, /^Export ZIP PNG$/i);
   const validation = validateFrameZip(zipBytes, { ...dimensions, frameCount: expected.frameCount });
 

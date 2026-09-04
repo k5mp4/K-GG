@@ -76,7 +76,7 @@ export type KggE2EBridge = {
   getDiagnostics(): KggE2EDiagnostics;
   getExportState(): KggE2EExportState;
   waitForExportComplete(options?: { timeoutMs?: number }): Promise<KggE2EExportState>;
-  prepareZipSmoke(): { duration: 1; fps: 24; frameCount: 24 };
+  prepareZipSmoke(): Promise<{ duration: number; fps: number; frameCount: number }>;
   exerciseResourceLifecycle(): Promise<KggE2EResourceLifecycleResult>;
   loseAndRestoreContext(options?: { timeoutMs?: number }): Promise<KggE2EContextLifecycleResult>;
 };

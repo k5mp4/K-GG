@@ -4,6 +4,7 @@ import type {
   KggE2EContextLifecycleResult,
   KggE2EDiagnostics,
   KggE2EExportState,
+  KggE2EBridge,
   KggE2ERgbaCapture,
   KggE2EResourceLifecycleResult,
 } from '../../../src/types/e2eBridge';
@@ -56,7 +57,7 @@ export async function loseAndRestoreContext(page: Page): Promise<KggE2EContextLi
   });
 }
 
-export async function prepareZipSmoke(page: Page): Promise<{ duration: 1; fps: 24; frameCount: 24 }> {
+export async function prepareZipSmoke(page: Page): Promise<Awaited<ReturnType<KggE2EBridge['prepareZipSmoke']>>> {
   return page.evaluate(() => {
     const bridge = window.__KGG_E2E__;
     if (!bridge) throw new Error('K-GG E2E bridge is not available');

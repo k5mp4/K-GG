@@ -1,4 +1,6 @@
 import { applicationCommands } from '../application/commands';
+import { useGradientStore } from '../store/gradientStore';
+import { getBeatSyncDurationSeconds } from './animationConfig';
 import type { KggControlRuntime } from './kggControlRuntime';
 import { renderBridge } from './renderBridge';
 import type { WebGLContext } from './webgl';
@@ -21,6 +23,9 @@ export type KggE2EBridgeOptions = {
 };
 
 const DEFAULT_TIMEOUT_MS = 30_000;
+const ZIP_SMOKE_BPM = 960;
+const ZIP_SMOKE_FPS = 24 as const;
+const ZIP_SMOKE_DURATION_SECONDS = getBeatSyncDurationSeconds(ZIP_SMOKE_BPM);
 
 function sleep(milliseconds: number): Promise<void> {
   return new Promise(resolve => window.setTimeout(resolve, milliseconds));
@@ -278,9 +283,30 @@ export function mountKggE2EBridge({ canvas, getWebGLContext, runtime }: KggE2EBr
       }
       throw new Error(`Timed out waiting for export completion after ${timeoutMs}ms`);
     },
-    prepareZipSmoke: () => {
-      applicationCommands.setAnimation({ enabled: true, previewLoop: false, duration: 1, fps: 24 });
-      return { duration: 1, fps: 24, frameCount: 24 };
+    async prepareZipSmoke() {
+      const currentAnimation = useGradientStore.getState().animation;
+      // The normal duration control has a one-second minimum. Use the
+      // existing beat-sync path to make this E2E-only animation short without
+      // adding a test-only branch to the production export service.
+      applicationCommands.setAnimation({
+        enabled: true,
+        previewLoop: false,
+        fps: ZIP_SMOKE_FPS,
+        easing: {
+          ...currentAnimation.easing,
+          beatSync: { enabled: true, bpm: ZIP_SMOKE_BPM, beatsPerBar: 4, subdivision: 4 },
+        },
+      });
+      // The command updates the store synchronously, but ExportPanel reads
+      // animation settings from its React render closure. Let that render
+      // commit before Playwright clicks the export action.
+      await nextFrame();
+      await nextFrame();
+      return {
+        duration: ZIP_SMOKE_DURATION_SECONDS,
+        fps: ZIP_SMOKE_FPS,
+        frameCount: Math.ceil(ZIP_SMOKE_FPS * ZIP_SMOKE_DURATION_SECONDS),
+      };
     },
     async exerciseResourceLifecycle(): Promise<KggE2EResourceLifecycleResult> {
       const snapshotResult = runtime.captureSnapshot();
