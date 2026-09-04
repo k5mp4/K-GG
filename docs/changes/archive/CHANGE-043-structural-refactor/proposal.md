@@ -2,16 +2,17 @@
 type: change
 id: CHANGE-043
 title: K-GG構造リファクタリング
-status: approved
+status: archived
 change_kind: A
 owners: [maintainer]
 created: 2026-09-03
-updated: 2026-09-03
+updated: 2026-09-04
 current_specs: []
 related_adrs: [ADR-0001, ADR-0014, ADR-0019]
 related_code: [src/App.tsx, src/store/gradientStore.ts, src/lib/presetModel.ts, src/lib/sceneEvaluation.ts, src/lib/effectPipeline.ts, src/lib/renderBridge.ts, src/lib/webgl.ts, src/lib/kggControlRuntime.ts, src/adapters/types.ts, docs/development/architecture.md]
 related_tests: [src/lib/effectPipeline.test.ts, src/lib/sceneEvaluation.glass.test.ts, src/lib/renderBridge.test.ts, src/lib/videoExportFrames.test.ts, src/lib/kggControlRuntime.test.ts]
 human_review: completed
+outcome: merged
 ---
 
 # CHANGE-043 K-GG構造リファクタリング
@@ -61,3 +62,9 @@ Rendererの入力順、Store setterの暗黙の同期、historyの保存対象�
 ## 未決定事項
 
 なし。セッションで合意した判断は、代表Goldenを必須とすること、既存Effect Pipeline/Scene Evaluation/Render Bridgeを段階的に拡張すること、明確な責務境界がある機能だけを移動すること。
+
+## Finalization
+
+- Finalized: 2026-09-04
+- Outcome: `merged`
+- Mode: normal implementation finalization.

@@ -12,7 +12,7 @@ describe('Image Gradient protected rendering contract', () => {
   it('selects the fixed color-field generator and bypasses geometry layers in V2, except Stipple', () => {
     expect(webglSource).toContain('const imageGradientProtected = imageGradient.enabled && !!imageGradientSource;');
     expect(webglSource).toContain("diffuse.mode === 'legacy'");
-    expect(webglSource).toContain("renderPlan.enabledLayers.filter(layer => layer.kind === 'diffuse')");
+    expect(webglSource).toContain(".filter(({ layer }) => imageGradientProtected");
     expect(webglSource).toContain("const protectedDirect = imageGradientProtected");
     expect(webglSource).toContain('&& !protectedStipple');
   });
@@ -28,7 +28,7 @@ describe('Image Gradient protected rendering contract', () => {
       'setUniform1i(gl, uniforms.u_diffuseEnabled, generatorDiffuseEnabled ? 1 : 0);',
     );
     expect(webglSource).toContain(
-      "protectedStipple ? renderPlan.enabledLayers.filter(layer => layer.kind === 'diffuse') : []",
+      "protectedStipple && layer.kind === 'diffuse'",
     );
   });
 });

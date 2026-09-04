@@ -190,6 +190,24 @@ describe('effectPipeline', () => {
       expect(plan.programs.stackCore).toBe(true);
     });
 
+    it('does not fuse a non-adjacent Noise and Diffuse pair', () => {
+      const pipeline = createDefaultEffectPipeline();
+      const reordered = [
+        { kind: 'noise' as const, enabled: true },
+        { kind: 'slit' as const, enabled: true },
+        { kind: 'diffuse' as const, enabled: true },
+      ];
+      const plan = getV2RenderPlan({ ...pipeline, effectStack: reordered }, analyticPlanOptions());
+
+      expect(plan.noiseDiffuseComposition).toEqual({
+        enabled: false,
+        noiseLayerIndex: 0,
+        diffuseLayerIndex: 2,
+        reason: 'not-adjacent',
+      });
+      expect(plan.programs.noiseDiffuseStack).toBe(false);
+    });
+
     it('falls back when Diffuse precedes Noise in the same prefix', () => {
       const pipeline = createDefaultEffectPipeline();
       const reordered = [
@@ -222,6 +240,26 @@ describe('effectPipeline', () => {
       });
     });
 
+    it('plans one-pass Noise + Diffuse composition after a texture boundary', () => {
+      const pipeline = createDefaultEffectPipeline();
+      const reordered = [
+        { kind: 'glass' as const, enabled: true },
+        { kind: 'noise' as const, enabled: true },
+        { kind: 'diffuse' as const, enabled: true },
+        ...pipeline.effectStack.filter(layer => !['glass', 'noise', 'diffuse'].includes(layer.kind)),
+      ];
+      const plan = getV2RenderPlan({ ...pipeline, effectStack: reordered }, analyticPlanOptions());
+
+      expect(plan.noiseDiffuseComposition).toEqual({
+        enabled: true,
+        noiseLayerIndex: 1,
+        diffuseLayerIndex: 2,
+        reason: 'enabled',
+      });
+      expect(plan.programs.noiseDiffuseStack).toBe(true);
+      expect(plan.programs.noiseStack).toBe(false);
+    });
+
     it.each([
       ['Diffuse → Slit', ['diffuse', 'slit'], 1],
       ['Noise → Diffuse → Slit', ['noise', 'diffuse', 'slit'], 2],
@@ -238,6 +276,24 @@ describe('effectPipeline', () => {
       });
       expect(plan.framebufferAllocationMode).toBe('core');
       expect(plan.programs.stackCore).toBe(true);
+    });
+
+    it('does not fuse Noise → Diffuse before Slit', () => {
+      const pipeline = createDefaultEffectPipeline();
+      const reordered = [
+        { kind: 'noise' as const, enabled: true },
+        { kind: 'diffuse' as const, enabled: true },
+        { kind: 'slit' as const, enabled: true },
+      ];
+      const plan = getV2RenderPlan({ ...pipeline, effectStack: reordered }, analyticPlanOptions());
+
+      expect(plan.noiseDiffuseComposition).toEqual({
+        enabled: false,
+        noiseLayerIndex: 0,
+        diffuseLayerIndex: 1,
+        reason: 'diffuse-before-slit',
+      });
+      expect(plan.programs.noiseDiffuseStack).toBe(false);
     });
 
     it.each([
@@ -360,6 +416,7 @@ describe('effectPipeline', () => {
       expect(plan.programs).toEqual({
         stackCore: true,
         noiseStack: false,
+        noiseDiffuseStack: false,
         glassV2: true,
         normalMap: true,
         blur: true,

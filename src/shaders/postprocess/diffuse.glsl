@@ -46,6 +46,7 @@ float diffuseCellSizeAtCoord(vec2 coord, vec3 fallbackColor) {
   return diffuseCellSize(diffuseAdaptiveInput(representativeColor));
 }
 
+#if !defined(KGG_DIFFUSE_DISPLACEMENT_ONLY)
 vec3 diffusePatternBackground(vec3 cellColor) {
   return u_diffuseBackgroundColor;
 }
@@ -99,6 +100,7 @@ vec3 applyDiffuseAscii(vec3 cellColor, vec2 coord, float cellSize) {
     : 1.0;
   return mix(cellColor, patternColor, amount);
 }
+#endif
 
 #if defined(KGG_GLASS_ONLY)
 // V2 applies Diffuse as its own stack layer, so the dedicated Glass pass
@@ -186,6 +188,7 @@ vec2 diffusePanelDisplacement(vec2 globalCoord) {
   return diffuseHash(floor(grainCoord) + seedOffset);
 }
 
+#if !defined(KGG_DIFFUSE_DISPLACEMENT_ONLY)
 float patternDither8x8(vec2 cell) {
   vec2 m = mod(cell, 8.0);
   float x = m.x;
@@ -341,4 +344,5 @@ vec4 applyDiffuseDither(vec4 color, vec2 globalCoord) {
   float amount = clamp(u_diffuseScatter / 100.0, 0.0, 1.0) * adaptiveFactor;
   return vec4(mix(color.rgb, paletteColor, amount), color.a);
 }
+#endif
 #endif

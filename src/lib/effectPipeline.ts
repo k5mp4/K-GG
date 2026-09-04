@@ -353,10 +353,31 @@ export type AnalyticPrefixPlan = {
   reason: AnalyticPrefixReason;
 };
 
+export type NoiseDiffuseCompositionReason =
+  | 'enabled'
+  | 'legacy-pipeline'
+  | 'missing-analytic-inputs'
+  | 'image-gradient'
+  | 'no-noise'
+  | 'no-diffuse'
+  | 'not-adjacent'
+  | 'analytic-prefix'
+  | 'unsupported-diffuse'
+  | 'diffuse-before-slit';
+
+export type NoiseDiffuseCompositionPlan = {
+  enabled: boolean;
+  /** Indices in `enabledLayers`; null when the pair is not available. */
+  noiseLayerIndex: number | null;
+  diffuseLayerIndex: number | null;
+  reason: NoiseDiffuseCompositionReason;
+};
+
 export type V2RenderPlan = {
   normalizedStack: EffectStackLayer[];
   enabledLayers: EffectStackLayer[];
   analyticPrefix: AnalyticPrefixPlan;
+  noiseDiffuseComposition: NoiseDiffuseCompositionPlan;
   diffuseEnabled: boolean;
   normalRequested: boolean;
   normalNeedsBlur: boolean;
@@ -367,6 +388,7 @@ export type V2RenderPlan = {
   programs: {
     stackCore: boolean;
     noiseStack: boolean;
+    noiseDiffuseStack: boolean;
     glassV2: boolean;
     normalMap: boolean;
     blur: boolean;
@@ -383,6 +405,66 @@ function disabledAnalyticPrefix(reason: AnalyticPrefixReason, firstTextureLayerI
     consumedLayers: [],
     firstTextureLayerIndex,
     reason,
+  };
+}
+
+function disabledNoiseDiffuseComposition(
+  reason: NoiseDiffuseCompositionReason,
+  noiseLayerIndex: number | null = null,
+  diffuseLayerIndex: number | null = null,
+): NoiseDiffuseCompositionPlan {
+  return {
+    enabled: false,
+    noiseLayerIndex,
+    diffuseLayerIndex,
+    reason,
+  };
+}
+
+/**
+ * Plans the one-pass fallback for an adjacent Noise -> Diffuse pair.
+ *
+ * The analytic Generator already evaluates a leading pair in the historical
+ * order. Every other adjacent pair must be evaluated from the same source
+ * texture in one pass; two independent FBO passes would sample the Noise
+ * result at the Diffuse-displaced coordinate and apply Noise twice in effect.
+ */
+function getNoiseDiffuseCompositionPlan(
+  enabledLayers: EffectStackLayer[],
+  analyticPrefix: AnalyticPrefixPlan,
+  options: V2RenderPlanOptions,
+): NoiseDiffuseCompositionPlan {
+  const noiseLayerIndex = enabledLayers.findIndex(layer => layer.kind === 'noise');
+  const diffuseLayerIndex = enabledLayers.findIndex(layer => layer.kind === 'diffuse');
+  if (noiseLayerIndex < 0) return disabledNoiseDiffuseComposition('no-noise');
+  if (diffuseLayerIndex < 0) return disabledNoiseDiffuseComposition('no-diffuse', noiseLayerIndex, null);
+  if (options.diffuseMode === undefined) {
+    return disabledNoiseDiffuseComposition('missing-analytic-inputs', noiseLayerIndex, diffuseLayerIndex);
+  }
+  if (options.imageGradientEnabled) {
+    return disabledNoiseDiffuseComposition('image-gradient', noiseLayerIndex, diffuseLayerIndex);
+  }
+  if (!ANALYTIC_DIFFUSE_MODES.has(options.diffuseMode) || options.forceTextureDiffusePass) {
+    return disabledNoiseDiffuseComposition('unsupported-diffuse', noiseLayerIndex, diffuseLayerIndex);
+  }
+  if (diffuseLayerIndex !== noiseLayerIndex + 1) {
+    return disabledNoiseDiffuseComposition('not-adjacent', noiseLayerIndex, diffuseLayerIndex);
+  }
+  if (enabledLayers[diffuseLayerIndex + 1]?.kind === 'slit') {
+    return disabledNoiseDiffuseComposition('diffuse-before-slit', noiseLayerIndex, diffuseLayerIndex);
+  }
+  const analyticPairConsumed = noiseLayerIndex === 0
+    && diffuseLayerIndex === 1
+    && analyticPrefix.consumedLayers.includes('noise')
+    && analyticPrefix.consumedLayers.includes('diffuse');
+  if (analyticPairConsumed) {
+    return disabledNoiseDiffuseComposition('analytic-prefix', noiseLayerIndex, diffuseLayerIndex);
+  }
+  return {
+    enabled: true,
+    noiseLayerIndex,
+    diffuseLayerIndex,
+    reason: 'enabled',
   };
 }
 
@@ -487,6 +569,9 @@ export function getV2RenderPlan(
   const stretchRequested = enabledLayers.some(layer => layer.kind === 'stretch');
   const flowGradientEnabled = Boolean(options.flowGradientEnabled);
   const analyticPrefix = getAnalyticGradientPrefixPlan(pipeline, enabledLayers, options);
+  const noiseDiffuseComposition = pipeline.version === 'stack-v2'
+    ? getNoiseDiffuseCompositionPlan(enabledLayers, analyticPrefix, options)
+    : disabledNoiseDiffuseComposition('legacy-pipeline');
   const analyticPrefixDirect = analyticPrefix.enabled && analyticPrefix.firstTextureLayerIndex === null;
   const framebufferAllocationMode = analyticPrefixDirect
     ? 'direct'
@@ -503,6 +588,7 @@ export function getV2RenderPlan(
     normalizedStack,
     enabledLayers,
     analyticPrefix,
+    noiseDiffuseComposition,
     diffuseEnabled,
     normalRequested,
     normalNeedsBlur,
@@ -519,7 +605,10 @@ export function getV2RenderPlan(
         seamlessEnabled,
         flowGradientEnabled,
       ),
-      noiseStack: noiseRequested && !analyticPrefix.consumedLayers.includes('noise'),
+      noiseStack: noiseRequested
+        && !analyticPrefix.consumedLayers.includes('noise')
+        && !noiseDiffuseComposition.enabled,
+      noiseDiffuseStack: noiseDiffuseComposition.enabled,
       glassV2: glassV2Requested,
       normalMap: normalRequested,
       blur: normalNeedsBlur || prismNeedsBlur,

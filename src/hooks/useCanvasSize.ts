@@ -1,8 +1,13 @@
 import { useState, useRef, useEffect } from 'react';
+import { REPRESENTATIVE_RENDER_GOLDEN } from '../lib/renderGolden';
 
 export const CANVAS_SIZE_WHEEL_ARM_DELAY_MS = 2000;
 
-export function useCanvasSize(defaultW = 1920, defaultH = 1080) {
+const DEFAULT_CANVAS_SIZE = import.meta.env.DEV && import.meta.env.VITE_KGG_E2E === '1'
+  ? REPRESENTATIVE_RENDER_GOLDEN.resolution
+  : { width: 1920, height: 1080 };
+
+export function useCanvasSize(defaultW = DEFAULT_CANVAS_SIZE.width, defaultH = DEFAULT_CANVAS_SIZE.height) {
   const [canvasW, setCanvasW] = useState(defaultW);
   const [canvasH, setCanvasH] = useState(defaultH);
   const [lockAspect, setLockAspect] = useState(true);

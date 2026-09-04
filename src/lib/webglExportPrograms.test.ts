@@ -71,7 +71,22 @@ describe('export WebGL program plan', () => {
     state.effectPipeline.effectStack = updateEffectStackLayer(state.effectPipeline.effectStack, 'noise', { enabled: true });
     state.seamless = { enabled: true, blendWidth: 0.25 };
 
-    expect(getRequiredExportProgramKeys(state)).toEqual(['stackCore', 'noiseStack', 'seamless']);
+    expect(getRequiredExportProgramKeys(state)).toEqual(['stackCore', 'noiseDiffuseStack', 'seamless']);
+  });
+
+  it('requests the combined Noise + Diffuse program after a texture boundary', () => {
+    const state = stateWithGlass(true);
+    state.effectPipeline.effectStack = [
+      { kind: 'glass', enabled: true },
+      { kind: 'noise', enabled: true },
+      { kind: 'diffuse', enabled: true },
+      ...state.effectPipeline.effectStack.filter(layer => !['noise', 'diffuse', 'glass'].includes(layer.kind)),
+    ];
+    state.gradient = { gradientType: 'linear' } as LatestState['gradient'];
+    state.noiseDistortion = { type: 'simplex', noiseLoopMode: 'legacy' } as LatestState['noiseDistortion'];
+    state.diffuse = { enabled: true, mode: 'block' } as LatestState['diffuse'];
+
+    expect(getRequiredExportProgramKeys(state)).toEqual(['stackCore', 'noiseDiffuseStack', 'glassV2']);
   });
 
   it('requests all Flow Gradient passes when the fixed stage is enabled', () => {

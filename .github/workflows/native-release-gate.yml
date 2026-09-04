@@ -1,0 +1,57 @@
+name: Native release gate
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  native-release-gate:
+    name: native-release-gate
+    runs-on: [self-hosted, windows, x64, kgg-native]
+    environment: native-release
+    timeout-minutes: 90
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+
+      - name: Set up Rust
+        uses: dtolnay/rust-toolchain@4be7066ada62dd38de10e7b70166bc74ed198c30
+        with:
+          toolchain: stable
+
+      - name: Cache Rust build
+        uses: Swatinem/rust-cache@42dc69e1aa15d09112580998cf2ef0119e2e91ae # v2
+        with:
+          workspaces: src-tauri -> target
+
+      - name: Install frontend dependencies
+        run: npm ci
+
+      - name: Run Rust and Adapter Merge Gate tests
+        run: npm run check:native
+
+      - name: Run real FFmpeg/ffprobe process smoke
+        run: npm run check:ffmpeg
+
+      - name: Build the unbundled Tauri application
+        run: npx tauri build --debug --no-bundle
+
+      - name: Upload native release evidence
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: native-release-gate-evidence-${{ github.run_id }}
+          path: |
+            test-results/**
+            src-tauri/target/debug/**
+          if-no-files-found: ignore
+          retention-days: 30

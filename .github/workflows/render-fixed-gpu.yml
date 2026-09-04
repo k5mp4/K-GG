@@ -1,0 +1,146 @@
+name: Fixed GPU render release gate
+
+on:
+  workflow_dispatch:
+    inputs:
+      base_sha:
+        description: 'Base commit SHA to capture'
+        required: true
+        type: string
+      head_sha:
+        description: 'Head commit SHA to capture'
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  fixed-gpu-render:
+    name: fixed-gpu-render
+    runs-on: [self-hosted, windows, x64, kgg-fixed-gpu]
+    environment: fixed-gpu-release
+    timeout-minutes: 120
+    env:
+      BASE_SHA_INPUT: ${{ inputs.base_sha }}
+      HEAD_SHA_INPUT: ${{ inputs.head_sha }}
+      KGG_E2E_GPU: '1'
+      KGG_CAPTURE_RUNNER_ID: ${{ runner.name }}
+
+    steps:
+      - name: Check out workflow revision
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Node.js
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+
+      - name: Resolve and validate base/head commits
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $shaPattern = '^[0-9a-fA-F]{7,64}$'
+          foreach ($candidate in @($env:BASE_SHA_INPUT, $env:HEAD_SHA_INPUT)) {
+            if ([string]::IsNullOrWhiteSpace($candidate) -or $candidate -notmatch $shaPattern) {
+              throw "Commit input is not a hexadecimal SHA: $candidate"
+            }
+          }
+          git fetch --no-tags origin $env:BASE_SHA_INPUT $env:HEAD_SHA_INPUT
+          if ($LASTEXITCODE -ne 0) { throw 'Unable to fetch the requested base/head commits' }
+          $base = (git rev-parse --verify --end-of-options "${env:BASE_SHA_INPUT}^{commit}").Trim()
+          if ($LASTEXITCODE -ne 0) { throw 'Base SHA does not resolve to a commit' }
+          $head = (git rev-parse --verify --end-of-options "${env:HEAD_SHA_INPUT}^{commit}").Trim()
+          if ($LASTEXITCODE -ne 0) { throw 'Head SHA does not resolve to a commit' }
+          "BASE_COMMIT=$base" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+          "HEAD_COMMIT=$head" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+          New-Item -ItemType Directory -Force -Path test-results | Out-Null
+          "base=$base" | Out-File -FilePath test-results/fixed-gpu-inputs.txt -Encoding utf8
+          "head=$head" | Out-File -FilePath test-results/fixed-gpu-inputs.txt -Append -Encoding utf8
+
+      - name: Record fixed GPU runner identity
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          New-Item -ItemType Directory -Force -Path test-results | Out-Null
+          $gpu = Get-CimInstance Win32_VideoController | Select-Object Name, DriverVersion, VideoProcessor, AdapterRAM
+          $details = [ordered]@{
+            runnerName = $env:RUNNER_NAME
+            os = (Get-CimInstance Win32_OperatingSystem | Select-Object -ExpandProperty Caption)
+            osVersion = [System.Environment]::OSVersion.VersionString
+            gpu = @($gpu)
+            browser = (npx playwright --version | Out-String).Trim()
+            node = (node --version).Trim()
+            capturedAt = (Get-Date).ToUniversalTime().ToString('o')
+          }
+          $details | ConvertTo-Json -Depth 6 | Set-Content -Path test-results/fixed-gpu-runner.json -Encoding utf8
+
+      - name: Install base dependencies and Playwright Chromium
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          npm ci
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          npx playwright install chromium
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+      - name: Capture base A
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          git checkout --detach $env:BASE_COMMIT
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          npm ci
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          $env:KGG_CAPTURE_COMMIT = $env:BASE_COMMIT
+          $env:KGG_CAPTURE_OUTPUT = 'test-results/fixed-gpu/base-a'
+          node tools/capture-render-rgba.mjs
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+      - name: Capture base B on the same runner
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $env:KGG_CAPTURE_COMMIT = $env:BASE_COMMIT
+          $env:KGG_CAPTURE_OUTPUT = 'test-results/fixed-gpu/base-b'
+          node tools/capture-render-rgba.mjs
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+      - name: Verify same-runner base reproducibility
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          node tools/compare-render-captures.mjs --mode reproducibility --first test-results/fixed-gpu/base-a/capture.json --second test-results/fixed-gpu/base-b/capture.json --output test-results/fixed-gpu/reproducibility.json
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+      - name: Capture head on the same runner
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          git checkout --detach $env:HEAD_COMMIT
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          npm ci
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          $env:KGG_CAPTURE_COMMIT = $env:HEAD_COMMIT
+          $env:KGG_CAPTURE_OUTPUT = 'test-results/fixed-gpu/head'
+          node tools/capture-render-rgba.mjs
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+      - name: Compare base/head RGBA captures
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          node tools/compare-render-captures.mjs --mode base-head --first test-results/fixed-gpu/base-a/capture.json --second test-results/fixed-gpu/head/capture.json --eligibility test-results/fixed-gpu/reproducibility.json --output test-results/fixed-gpu/base-head-comparison.json
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+      - name: Upload fixed GPU evidence
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: fixed-gpu-render-evidence-${{ github.run_id }}
+          path: test-results/**
+          if-no-files-found: ignore
+          retention-days: 30
