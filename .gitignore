@@ -10,6 +10,9 @@ vite-dev.*
 
 node_modules/
 dist/
+test-results/
+playwright-report/
+blob-report/
 dist-ssr/
 src-tauri/target/
 docs/.vitepress/cache/

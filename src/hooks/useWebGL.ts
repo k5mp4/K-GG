@@ -273,6 +273,8 @@ export function useWebGL(
     if (!isWebGLReady) return;
     const canvas = canvasRef.current;
     if (!canvas) return;
+    let disposed = false;
+    let stopE2EBridge: (() => void) | null = null;
     const runtime = registerKggControlRuntime({
       canvas,
       getWebGLContext: () => webglRef.current,
@@ -296,7 +298,19 @@ export function useWebGL(
       })
       : null;
     bridge?.start();
+    if (import.meta.env.DEV && import.meta.env.VITE_KGG_E2E === '1') {
+      void import('../lib/e2eBridge').then(({ mountKggE2EBridge }) => {
+        if (disposed) return;
+        stopE2EBridge = mountKggE2EBridge({
+          canvas,
+          getWebGLContext: () => webglRef.current,
+          runtime,
+        });
+      });
+    }
     return () => {
+      disposed = true;
+      stopE2EBridge?.();
       bridge?.stop();
       unregisterKggControlRuntime(runtime);
     };
