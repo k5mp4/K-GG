@@ -29,6 +29,19 @@ pwsh -NoProfile -File tools/compare-frame-zips.ps1 -FirstZip .\baseline.zip -Sec
 `DecodedRgbaMatch: true`、フレーム数、寸法が一致することを確認する。単一フレームは同じRGBA
 比較手順で確認する。
 
-このリポジトリの自動テスト環境には実GPU／ヘッドレスWebGLキャプチャ基盤がないため、画像の
-実キャプチャと比較はRelease Gate / Observationとして記録する。自動テストは代表入力と
-Render Planの取り違えを検出する。
+Browser側の代表Canvasは次のコマンドでWebGL `readPixels`由来のtop-to-bottom RGBAを取得し、
+manifestとraw frameを保存できる。
+
+```powershell
+$env:KGG_CAPTURE_OUTPUT = 'test-results/render-capture-a'
+npm run capture:render:rgba
+node tools/compare-render-captures.mjs --mode reproducibility `
+  --first test-results/render-capture-a/capture.json `
+  --second test-results/render-capture-b/capture.json `
+  --output test-results/render-reproducibility.json
+```
+
+同一commit・同一runner・同一browser・同一Canvas・同一Render Contractが揃わない比較は
+`not-eligible`となり、base/head比較へ進めない。SwiftShader captureはBrowser Merge Gateの
+証拠であり、実GPUのbase/head比較は`.github/workflows/render-fixed-gpu.yml`を使うmanual
+Release Gateとする。未接続の固定GPU runnerで取得した結果をpassとして扱わない。

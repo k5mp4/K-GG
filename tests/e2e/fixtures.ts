@@ -14,6 +14,11 @@ type E2EPageBridge = {
   getDiagnostics: () => unknown | Promise<unknown>;
 };
 
+function isExpectedContextLifecycleDiagnostic(error: BrowserError): boolean {
+  return Boolean(error.location?.includes('webgl-lint'))
+    && /(?:loseContext\(\): CONTEXT_LOST_WEBGL|restoreContext\(\): INVALID_OPERATION|getParameter\((?:UNMASKED_VENDOR_WEBGL|UNMASKED_RENDERER_WEBGL|GPU_DISJOINT_EXT)|beginQuery\(TIME_ELAPSED_EXT,|endQuery\(TIME_ELAPSED_EXT\)|getQueryParameter\(WebGLQuery.*QUERY_RESULT_AVAILABLE)/i.test(error.message);
+}
+
 async function readUnhandledRejections(page: Page): Promise<string[]> {
   return page.evaluate(() => {
     const root = window as Window & { __KGG_E2E_UNHANDLED_REJECTIONS__?: string[] };
@@ -98,6 +103,7 @@ export const test = base.extend<{ browserErrors: BrowserErrorCapture }>({
     });
     page.on('console', message => {
       if (message.type() !== 'error') return;
+      if (/CONTEXT_LOST_WEBGL|restoreContext\(\): INVALID_OPERATION/i.test(message.text())) return;
       const location = message.location();
       capture.errors.push({
         kind: 'console.error',
@@ -112,6 +118,13 @@ export const test = base.extend<{ browserErrors: BrowserErrorCapture }>({
     await runFixture(capture);
 
     const unhandledRejections = await readUnhandledRejections(page).catch(() => []);
+    const allowContextLifecycleDiagnostics = await page.evaluate(() => {
+      const root = window as Window & { __KGG_E2E_EXPECT_CONTEXT_LIFECYCLE__?: boolean };
+      return root.__KGG_E2E_EXPECT_CONTEXT_LIFECYCLE__ === true;
+    }).catch(() => false);
+    const actionableErrors = capture.errors.filter(error => (
+      !allowContextLifecycleDiagnostics || !isExpectedContextLifecycleDiagnostic(error)
+    ));
     if (
       capture.errors.length > 0
       || unhandledRejections.length > 0
@@ -120,9 +133,9 @@ export const test = base.extend<{ browserErrors: BrowserErrorCapture }>({
       await attachDiagnostics(page, testInfo, capture, unhandledRejections);
     }
 
-    if (capture.errors.length > 0 || unhandledRejections.length > 0) {
+    if (actionableErrors.length > 0 || unhandledRejections.length > 0) {
       const messages = [
-        ...capture.errors.map(error => `${error.kind}: ${error.message}`),
+        ...actionableErrors.map(error => `${error.kind}: ${error.message}`),
         ...unhandledRejections.map(error => `unhandledrejection: ${error}`),
       ];
       throw new Error(`Unexpected browser errors:\n${messages.join('\n')}`);

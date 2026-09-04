@@ -1,8 +1,11 @@
 import type { Page } from '@playwright/test';
 import type {
   KggE2ECapture,
+  KggE2EContextLifecycleResult,
   KggE2EDiagnostics,
   KggE2EExportState,
+  KggE2ERgbaCapture,
+  KggE2EResourceLifecycleResult,
 } from '../../../src/types/e2eBridge';
 
 export async function waitForWebGLReady(page: Page): Promise<KggE2EDiagnostics> {
@@ -26,6 +29,30 @@ export async function captureCanvasPng(page: Page): Promise<KggE2ECapture> {
     const bridge = window.__KGG_E2E__;
     if (!bridge) throw new Error('K-GG E2E bridge is not available');
     return bridge.captureCanvasPng();
+  });
+}
+
+export async function captureCanvasRgba(page: Page): Promise<KggE2ERgbaCapture> {
+  return page.evaluate(() => {
+    const bridge = window.__KGG_E2E__;
+    if (!bridge) throw new Error('K-GG E2E bridge is not available');
+    return bridge.captureCanvasRgba();
+  });
+}
+
+export async function exerciseResourceLifecycle(page: Page): Promise<KggE2EResourceLifecycleResult> {
+  return page.evaluate(async () => {
+    const bridge = window.__KGG_E2E__;
+    if (!bridge) throw new Error('K-GG E2E bridge is not available');
+    return bridge.exerciseResourceLifecycle();
+  });
+}
+
+export async function loseAndRestoreContext(page: Page): Promise<KggE2EContextLifecycleResult> {
+  return page.evaluate(async () => {
+    const bridge = window.__KGG_E2E__;
+    if (!bridge) throw new Error('K-GG E2E bridge is not available');
+    return bridge.loseAndRestoreContext();
   });
 }
 

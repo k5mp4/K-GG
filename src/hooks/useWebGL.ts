@@ -4,6 +4,7 @@ import {
   initWebGL,
   prepareExportPrograms,
   disposeWebGL,
+  recordWebGLResourceLifecycleEvent,
   SHADER_VERSION,
 } from '../lib/webgl';
 import { buildRampTextureData } from '../lib/gradientRampUtils';
@@ -40,6 +41,7 @@ export function useWebGL(
 ) {
   const webglRef = useRef<WebGLContext | null>(null);
   const latestRef = useRef<LatestState | null>(null);
+  const lostResourceLedgerRef = useRef<WebGLContext['resourceLedger']>(null);
   const initRequestRef = useRef<SharedWebGLInitRequest<HTMLCanvasElement, WebGLContext> | null>(null);
   const compiledShaderVersionRef = useRef(0); // コンパイル済みシェーダーのバージョン
   const [isWebGLReady, setIsWebGLReady] = useState(false);
@@ -53,12 +55,26 @@ export function useWebGL(
       event.preventDefault();
       const current = webglRef.current;
       webglRef.current = null;
-      if (current && current.gl.canvas === canvas) disposeWebGL(current);
+      if (current && current.gl.canvas === canvas) {
+        const ledger = current.resourceLedger;
+        ledger?.markContextLost();
+        if (ledger) {
+          lostResourceLedgerRef.current = ledger;
+          recordWebGLResourceLifecycleEvent('context-lost', ledger);
+        }
+        disposeWebGL(current);
+      }
       compiledShaderVersionRef.current = 0;
       markWebGL2AvailabilityUnknown();
       setIsWebGLReady(false);
     };
     const handleContextRestored = () => {
+      const ledger = lostResourceLedgerRef.current;
+      if (ledger) {
+        ledger.markContextRestored();
+        recordWebGLResourceLifecycleEvent('context-restored', ledger);
+        lostResourceLedgerRef.current = null;
+      }
       markWebGL2AvailabilityUnknown();
       setContextEpoch(epoch => epoch + 1);
     };
@@ -67,6 +83,7 @@ export function useWebGL(
     return () => {
       canvas.removeEventListener('webglcontextlost', handleContextLost);
       canvas.removeEventListener('webglcontextrestored', handleContextRestored);
+      lostResourceLedgerRef.current = null;
     };
   }, [canvasRef]);
 

@@ -62,6 +62,7 @@ import type { PerformanceSnapshot } from '../types/webglPerformance';
 import { createWebGL2Context, WebGL2UnavailableError } from './webglCapability';
 import type { TileRenderOptions } from '../types/rendering';
 import { createWebGLFramebufferWithTexture, createWebGLTexture2D } from './webglResources';
+import { installWebGLResourceLedger, type WebGLResourceLedger } from './webglResourceLedger';
 
 export type { TileRenderOptions } from '../types/rendering';
 
@@ -219,6 +220,7 @@ export type WebGLContext = {
   shaderCompileExt: ShaderCompileExt;
   lazyProgramState: Record<LazyProgramKey, LazyProgramState>;
   lazyProgramCompileQueue: SerialAsyncQueue;
+  resourceLedger: (WebGLResourceLedger & { restore: () => void }) | null;
   clothRenderer?: ClothGradientRenderer | null;
   clothStatus?: 'loading' | 'ready' | 'failed' | 'fallback';
   hasPresentedFrame: boolean;
@@ -242,6 +244,19 @@ const webglLifecycleHandlers = new WeakMap<HTMLCanvasElement, {
   lost: (event: Event) => void;
   restored: () => void;
 }>();
+
+export function recordWebGLResourceLifecycleEvent(
+  event: 'context-lost' | 'context-restored' | 'dispose',
+  ledger: WebGLResourceLedger,
+): void {
+  if (!import.meta.env.DEV) return;
+  const root = globalThis as typeof globalThis & {
+    __KGG_WEBGL_RESOURCE_EVENTS__?: unknown[];
+  };
+  const events = root.__KGG_WEBGL_RESOURCE_EVENTS__ ?? (root.__KGG_WEBGL_RESOURCE_EVENTS__ = []);
+  events.push({ event, resources: ledger.snapshot(), timestamp: new Date().toISOString() });
+  if (events.length > 128) events.splice(0, events.length - 128);
+}
 
 export function getRegisteredWebGLContext(canvas: HTMLCanvasElement): WebGL2RenderingContext | null {
   return registeredWebGLContexts.get(canvas) ?? null;
@@ -327,6 +342,7 @@ export async function initWebGL(canvas: HTMLCanvasElement): Promise<WebGLContext
   });
   if (!gl) throw new WebGL2UnavailableError();
   if (gl.isContextLost()) throw new Error('WebGL context is currently lost');
+  const resourceLedger = import.meta.env.DEV ? installWebGLResourceLedger(gl) : null;
   registeredWebGLContexts.set(canvas, gl);
   const performanceProfiler = createWebGLPerformanceProfiler(gl, developmentTools);
   const previousLifecycleHandlers = webglLifecycleHandlers.get(canvas);
@@ -336,10 +352,14 @@ export async function initWebGL(canvas: HTMLCanvasElement): Promise<WebGLContext
   }
   const handleContextLost = (event: Event) => {
     event.preventDefault();
+    resourceLedger?.markContextLost();
+    if (resourceLedger) recordWebGLResourceLifecycleEvent('context-lost', resourceLedger);
     const contextEvent = event as WebGLContextEvent;
-    console.error('[WebGL context] lost', { statusMessage: contextEvent.statusMessage });
+    console.warn('[WebGL context] lost', { statusMessage: contextEvent.statusMessage });
   };
   const handleContextRestored = () => {
+    resourceLedger?.markContextRestored();
+    if (resourceLedger) recordWebGLResourceLifecycleEvent('context-restored', resourceLedger);
     console.info('[WebGL context] restored; renderer reinitialization is required');
   };
   canvas.addEventListener('webglcontextlost', handleContextLost);
@@ -391,6 +411,11 @@ export async function initWebGL(canvas: HTMLCanvasElement): Promise<WebGLContext
       webglLifecycleHandlers.delete(canvas);
     }
     if (registeredWebGLContexts.get(canvas) === gl) registeredWebGLContexts.delete(canvas);
+    if (resourceLedger) {
+      resourceLedger.dispose();
+      recordWebGLResourceLifecycleEvent('dispose', resourceLedger);
+      resourceLedger.restore();
+    }
   };
 
   try {
@@ -701,7 +726,7 @@ export async function initWebGL(canvas: HTMLCanvasElement): Promise<WebGLContext
   ownedFlowGradient = flowGradient;
   const transitionTextureFrom = ownTexture(createTexture(gl));
   const transitionTextureTo = ownTexture(createTexture(gl));
-  const ctx: WebGLContext = { gl, performanceProfiler, gpuDiagnostics, renderOptimization, program, uniforms, geometryBuffer, transitionGeometryBuffer, generatorProgram: null, generatorUniforms: {}, gradientRampTexture, meshGradientTexture, meshGradientTextureSignature: '', diffuseCurveTexture, diffuseCurveSignature: '', diffuseAsciiTexture, diffuseAsciiSignature: '', diffuseAsciiCount: 1, diffuseAsciiRows: ASCII_ATLAS_MAX_ROWS, diffuseHistogramAt: 0, manualDistortTexture, manualDistortDisplacement: null, manualDistortSmoothMask: null, manualDistortMapResolution: 0, sourceImageTexture, sourceImageCanvas: null, imageGradientTexture, imageGradientSource: null, imageMaskTexture, imageMaskSource: null, normalMapProgram: null, normalMapUniforms: {}, gradFbo, gradTexture, blurProgram: null, blurUniforms: {}, stretchProgram: null, stretchUniforms: {}, seamlessProgram: null, seamlessUniforms: {}, stackCoreProgram: null, stackCoreUniforms: {}, noiseStackProgram: null, noiseStackUniforms: {}, noiseDiffuseStackProgram: null, noiseDiffuseStackUniforms: {}, glassProgram: null, glassUniforms: {}, glassFallbackActive: false, glassV2Program: null, glassV2Uniforms: {}, glassV2FallbackActive: false, prismProgram: null, prismUniforms: {}, postprocessProgram: null, postprocessUniforms: {}, prismCompositeProgram: null, prismCompositeUniforms: {}, particleProgram: null, particleUniforms: {}, particleVao: null, particleQuadBuffer: null, particleInstanceBuffer: null, particleInstanceCount: 0, particleInstanceSeed: Number.NaN, flowGradient, normalFbo, normalTexture, hBlurFbo, hBlurTexture, postprocessFboA, postprocessTextureA, postprocessFboB, postprocessTextureB, prismScratchFbo, prismScratchTexture, prismBlurFbo, prismBlurTexture, prismGlowFbo, prismGlowTexture, fboSize: [0, 0], v2CoreFboSize: [0, 0], shaderCompileExt, lazyProgramState: createLazyProgramState(), lazyProgramCompileQueue: createSerialAsyncQueue(), hasPresentedFrame: false, disposed: false };
+  const ctx: WebGLContext = { gl, performanceProfiler, gpuDiagnostics, renderOptimization, program, uniforms, geometryBuffer, transitionGeometryBuffer, generatorProgram: null, generatorUniforms: {}, gradientRampTexture, meshGradientTexture, meshGradientTextureSignature: '', diffuseCurveTexture, diffuseCurveSignature: '', diffuseAsciiTexture, diffuseAsciiSignature: '', diffuseAsciiCount: 1, diffuseAsciiRows: ASCII_ATLAS_MAX_ROWS, diffuseHistogramAt: 0, manualDistortTexture, manualDistortDisplacement: null, manualDistortSmoothMask: null, manualDistortMapResolution: 0, sourceImageTexture, sourceImageCanvas: null, imageGradientTexture, imageGradientSource: null, imageMaskTexture, imageMaskSource: null, normalMapProgram: null, normalMapUniforms: {}, gradFbo, gradTexture, blurProgram: null, blurUniforms: {}, stretchProgram: null, stretchUniforms: {}, seamlessProgram: null, seamlessUniforms: {}, stackCoreProgram: null, stackCoreUniforms: {}, noiseStackProgram: null, noiseStackUniforms: {}, noiseDiffuseStackProgram: null, noiseDiffuseStackUniforms: {}, glassProgram: null, glassUniforms: {}, glassFallbackActive: false, glassV2Program: null, glassV2Uniforms: {}, glassV2FallbackActive: false, prismProgram: null, prismUniforms: {}, postprocessProgram: null, postprocessUniforms: {}, prismCompositeProgram: null, prismCompositeUniforms: {}, particleProgram: null, particleUniforms: {}, particleVao: null, particleQuadBuffer: null, particleInstanceBuffer: null, particleInstanceCount: 0, particleInstanceSeed: Number.NaN, flowGradient, normalFbo, normalTexture, hBlurFbo, hBlurTexture, postprocessFboA, postprocessTextureA, postprocessFboB, postprocessTextureB, prismScratchFbo, prismScratchTexture, prismBlurFbo, prismBlurTexture, prismGlowFbo, prismGlowTexture, fboSize: [0, 0], v2CoreFboSize: [0, 0], shaderCompileExt, lazyProgramState: createLazyProgramState(), lazyProgramCompileQueue: createSerialAsyncQueue(), resourceLedger, hasPresentedFrame: false, disposed: false };
   effectStackTransitionResources.set(ctx, {
     program: transitionProgram,
     from: gl.getUniformLocation(transitionProgram, 'u_transitionFrom'),
@@ -813,6 +838,11 @@ export function disposeWebGL(ctx: WebGLContext): void {
   ctx.clothRenderer?.dispose();
   ctx.clothRenderer = null;
   ctx.clothStatus = undefined;
+  if (ctx.resourceLedger) {
+    ctx.resourceLedger.dispose();
+    recordWebGLResourceLifecycleEvent('dispose', ctx.resourceLedger);
+    ctx.resourceLedger.restore();
+  }
   if (isRegisteredContext) registeredWebGLContexts.delete(canvas);
 }
 

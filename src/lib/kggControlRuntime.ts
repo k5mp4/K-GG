@@ -300,6 +300,7 @@ function serializableDiagnostics(ctx: WebGLContext | null, canvas: HTMLCanvasEle
       performance: null,
       uniforms: [],
       renderPasses: [],
+      resources: null,
     };
   }
 
@@ -343,6 +344,7 @@ function serializableDiagnostics(ctx: WebGLContext | null, canvas: HTMLCanvasEle
     performance: cloneSerializable(performance),
     uniforms,
     renderPasses,
+    resources: ctx.resourceLedger?.snapshot() ?? null,
     limits: {
       maxTextureSize: safeGetParameter(gl.MAX_TEXTURE_SIZE),
       maxRenderbufferSize: safeGetParameter(gl.MAX_RENDERBUFFER_SIZE),
@@ -1168,6 +1170,7 @@ export class KggControlRuntime {
         contextLost: diagnostics.contextLost,
         canvas: diagnostics.canvas,
         gpu: diagnostics.gpu,
+        resources: diagnostics.resources,
         limits: diagnostics.limits,
         lazyPrograms: diagnostics.lazyPrograms,
       },

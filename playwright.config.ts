@@ -2,6 +2,7 @@ import { defineConfig } from '@playwright/test';
 
 const port = Number(process.env.KGG_E2E_PORT ?? 4173);
 const baseURL = `http://127.0.0.1:${port}`;
+const fixedGpu = process.env.KGG_E2E_GPU === '1';
 
 export default defineConfig({
   testDir: './tests/e2e',
@@ -19,7 +20,7 @@ export default defineConfig({
   use: {
     baseURL,
     acceptDownloads: true,
-    headless: true,
+    headless: process.env.KGG_E2E_HEADLESS !== '0',
     viewport: { width: 1280, height: 900 },
     deviceScaleFactor: 1,
     locale: 'en-US',
@@ -28,7 +29,7 @@ export default defineConfig({
     screenshot: 'only-on-failure',
     video: 'retain-on-failure',
     launchOptions: {
-      args: ['--use-angle=swiftshader'],
+      args: fixedGpu ? ['--enable-gpu'] : ['--use-angle=swiftshader'],
     },
   },
   webServer: {

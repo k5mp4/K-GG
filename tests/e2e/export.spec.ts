@@ -1,6 +1,7 @@
 import { readFile } from 'node:fs/promises';
 import { test, expect } from './fixtures';
 import {
+  captureCanvasRgba,
   captureCanvasPng,
   dataUrlToBytes,
   prepareZipSmoke,
@@ -8,7 +9,7 @@ import {
   waitForExportComplete,
   waitForWebGLReady,
 } from './support/bridge';
-import { parsePngMetadata, validateFrameZip } from './support/artifacts';
+import { decodePngRgba, parsePngMetadata, validateFrameZip } from './support/artifacts';
 
 async function openExportPanel(page: Parameters<typeof waitForWebGLReady>[0]) {
   await page.goto('/', { waitUntil: 'domcontentloaded' });
@@ -37,11 +38,15 @@ async function downloadBytes(page: Parameters<typeof waitForWebGLReady>[0], name
 
 test('Save PNG downloads a structurally valid image', async ({ page, browserErrors: _browserErrors }) => {
   const { dimensions } = await openExportPanel(page);
+  const canvasRgba = await captureCanvasRgba(page);
   const bytes = await downloadBytes(page, /^Save PNG$/i);
   const metadata = parsePngMetadata(bytes);
 
   expect(metadata).toMatchObject(dimensions);
   expect(metadata.byteLength).toBe(bytes.byteLength);
+  const decoded = decodePngRgba(bytes);
+  expect(decoded.rgba.byteLength).toBe(dimensions.width * dimensions.height * 4);
+  expect(decoded.rgba).toEqual(Uint8Array.from(Buffer.from(canvasRgba.dataBase64, 'base64')));
 });
 
 test('PNG ZIP contains sequential valid frames and Preview recovers', async ({ page, browserErrors: _browserErrors }) => {

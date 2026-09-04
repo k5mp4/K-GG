@@ -1,6 +1,7 @@
 import { Zip, ZipPassThrough, zipSync } from 'fflate';
+import { deflateSync } from 'node:zlib';
 import { describe, expect, it } from 'vitest';
-import { parsePngMetadata, validateFrameZip } from './artifacts';
+import { decodePngRgba, parsePngMetadata, validateFrameZip } from './artifacts';
 
 function makePng(width = 4, height = 3): Uint8Array {
   const bytes = new Uint8Array(33);
@@ -12,6 +13,58 @@ function makePng(width = 4, height = 3): Uint8Array {
   view.setUint32(20, height);
   bytes.set([8, 6, 0, 0, 0], 24);
   return bytes;
+}
+
+function crc32(bytes: Uint8Array): number {
+  let value = 0xffffffff;
+  for (const byte of bytes) {
+    value ^= byte;
+    for (let bit = 0; bit < 8; bit += 1) value = (value & 1) ? 0xedb88320 ^ (value >>> 1) : value >>> 1;
+  }
+  return (value ^ 0xffffffff) >>> 0;
+}
+
+function pngChunk(type: string, data: Uint8Array): Uint8Array {
+  const typeBytes = new TextEncoder().encode(type);
+  const crcInput = new Uint8Array(typeBytes.byteLength + data.byteLength);
+  crcInput.set(typeBytes);
+  crcInput.set(data, typeBytes.byteLength);
+  const chunk = new Uint8Array(12 + data.byteLength);
+  const view = new DataView(chunk.buffer);
+  view.setUint32(0, data.byteLength);
+  chunk.set(typeBytes, 4);
+  chunk.set(data, 8);
+  view.setUint32(8 + data.byteLength, crc32(crcInput));
+  return chunk;
+}
+
+function makeEncodedPng(
+  width: number,
+  height: number,
+  colorType: 2 | 6,
+  rows: Uint8Array[],
+): Uint8Array {
+  const channels = colorType === 6 ? 4 : 3;
+  const scanlines = new Uint8Array(height * (width * channels + 1));
+  rows.forEach((row, index) => {
+    if (row.byteLength !== width * channels) throw new Error('invalid test row');
+    scanlines.set(row, index * (width * channels + 1) + 1);
+  });
+  const header = new Uint8Array(13);
+  const headerView = new DataView(header.buffer);
+  headerView.setUint32(0, width);
+  headerView.setUint32(4, height);
+  header.set([8, colorType, 0, 0, 0], 8);
+  const signature = Uint8Array.from([137, 80, 78, 71, 13, 10, 26, 10]);
+  const chunks = [pngChunk('IHDR', header), pngChunk('IDAT', Uint8Array.from(deflateSync(scanlines))), pngChunk('IEND', new Uint8Array())];
+  const output = new Uint8Array(signature.byteLength + chunks.reduce((total, chunk) => total + chunk.byteLength, 0));
+  output.set(signature);
+  let offset = signature.byteLength;
+  for (const chunk of chunks) {
+    output.set(chunk, offset);
+    offset += chunk.byteLength;
+  }
+  return output;
 }
 
 function makeDuplicateFrameZip(): Uint8Array {
@@ -40,6 +93,28 @@ describe('PNG artifact validation', () => {
     ['zero width', makePng(0, 3)],
   ])('rejects %s', (_label, bytes) => {
     expect(() => parsePngMetadata(bytes)).toThrow();
+  });
+
+  it('decodes RGB PNG pixels into RGBA bytes', () => {
+    const bytes = makeEncodedPng(2, 1, 2, [Uint8Array.from([255, 0, 0, 0, 128, 64])]);
+
+    expect(decodePngRgba(bytes)).toMatchObject({
+      width: 2,
+      height: 1,
+      rgba: Uint8Array.from([255, 0, 0, 255, 0, 128, 64, 255]),
+    });
+  });
+
+  it('decodes RGBA PNG pixels and rejects corrupt chunk data', () => {
+    const bytes = makeEncodedPng(1, 2, 6, [
+      Uint8Array.from([1, 2, 3, 4]),
+      Uint8Array.from([5, 6, 7, 8]),
+    ]);
+    expect(decodePngRgba(bytes).rgba).toEqual(Uint8Array.from([1, 2, 3, 4, 5, 6, 7, 8]));
+
+    const corrupt = bytes.slice();
+    corrupt[corrupt.length - 1] ^= 0xff;
+    expect(() => decodePngRgba(corrupt)).toThrow(/CRC/i);
   });
 });
 

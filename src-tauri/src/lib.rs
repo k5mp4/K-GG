@@ -930,6 +930,57 @@ fn validate_video_export_path(
     Ok(path)
 }
 
+fn qtrle_ffmpeg_args(input_pattern: &Path, output_path: &Path, fps: u32) -> Vec<String> {
+    vec![
+        "-y".to_string(),
+        "-hide_banner".to_string(),
+        "-loglevel".to_string(),
+        "error".to_string(),
+        "-framerate".to_string(),
+        fps.to_string(),
+        "-start_number".to_string(),
+        "0".to_string(),
+        "-i".to_string(),
+        input_pattern.to_string_lossy().into_owned(),
+        "-c:v".to_string(),
+        "qtrle".to_string(),
+        "-pix_fmt".to_string(),
+        "rgb24".to_string(),
+        output_path.to_string_lossy().into_owned(),
+    ]
+}
+
+fn h264_rgb_ffmpeg_args(
+    input_pattern: &Path,
+    output_path: &Path,
+    fps: u32,
+    quality: &str,
+) -> Result<Vec<String>, String> {
+    Ok(vec![
+        "-y".to_string(),
+        "-hide_banner".to_string(),
+        "-loglevel".to_string(),
+        "error".to_string(),
+        "-framerate".to_string(),
+        fps.to_string(),
+        "-start_number".to_string(),
+        "0".to_string(),
+        "-i".to_string(),
+        input_pattern.to_string_lossy().into_owned(),
+        "-c:v".to_string(),
+        "libx264rgb".to_string(),
+        "-crf".to_string(),
+        mp4_crf_for_quality(quality)?.to_string(),
+        "-preset".to_string(),
+        "slow".to_string(),
+        "-pix_fmt".to_string(),
+        "rgb24".to_string(),
+        "-movflags".to_string(),
+        "+faststart".to_string(),
+        output_path.to_string_lossy().into_owned(),
+    ])
+}
+
 fn encode_qtrle_mov_blocking(
     app: tauri::AppHandle,
     input_pattern: String,
@@ -942,24 +993,8 @@ fn encode_qtrle_mov_blocking(
     let input_pattern =
         validate_video_export_path(&input_pattern, "frame_%04d.png", "入力パターン")?;
     let output_path = validate_video_export_path(&output_path, "output.mov", "出力ファイル")?;
-    let fps_string = fps.to_string();
     let mut command = Command::new(&ffmpeg_path);
-    command
-        .arg("-y")
-        .arg("-hide_banner")
-        .arg("-loglevel")
-        .arg("error")
-        .arg("-framerate")
-        .arg(&fps_string)
-        .arg("-start_number")
-        .arg("0")
-        .arg("-i")
-        .arg(&input_pattern)
-        .arg("-c:v")
-        .arg("qtrle")
-        .arg("-pix_fmt")
-        .arg("rgb24")
-        .arg(&output_path);
+    command.args(qtrle_ffmpeg_args(&input_pattern, &output_path, fps));
     configure_hidden_command(&mut command);
     let output = command
         .output()
@@ -990,31 +1025,8 @@ fn encode_h264_rgb_mp4_blocking(
     let input_pattern =
         validate_video_export_path(&input_pattern, "frame_%04d.png", "入力パターン")?;
     let output_path = validate_video_export_path(&output_path, "output.mp4", "出力ファイル")?;
-    let crf_string = mp4_crf_for_quality(&quality)?.to_string();
-    let fps_string = fps.to_string();
     let mut command = Command::new(&ffmpeg_path);
-    command
-        .arg("-y")
-        .arg("-hide_banner")
-        .arg("-loglevel")
-        .arg("error")
-        .arg("-framerate")
-        .arg(&fps_string)
-        .arg("-start_number")
-        .arg("0")
-        .arg("-i")
-        .arg(&input_pattern)
-        .arg("-c:v")
-        .arg("libx264rgb")
-        .arg("-crf")
-        .arg(&crf_string)
-        .arg("-preset")
-        .arg("slow")
-        .arg("-pix_fmt")
-        .arg("rgb24")
-        .arg("-movflags")
-        .arg("+faststart")
-        .arg(&output_path);
+    command.args(h264_rgb_ffmpeg_args(&input_pattern, &output_path, fps, &quality)?);
     configure_hidden_command(&mut command);
     let output = command
         .output()
@@ -1065,10 +1077,11 @@ async fn encode_h264_rgb_mp4(
 mod tests {
     use super::{
         append_ffmpeg_candidates_from_path_value, backup_path, choose_candidate, encoder_list_has,
-        migrate_legacy_presets, mp4_crf_for_quality, recover_interrupted_write,
+        h264_rgb_ffmpeg_args, migrate_legacy_presets, mp4_crf_for_quality, qtrle_ffmpeg_args,
+        recover_interrupted_write,
         replace_presets_file, validate_video_export_path, VIDEO_EXPORT_TEMP_DIR,
     };
-    use std::path::PathBuf;
+    use std::path::{Path, PathBuf};
     use std::time::{SystemTime, UNIX_EPOCH};
 
     fn test_dir(name: &str) -> PathBuf {
@@ -1077,6 +1090,10 @@ mod tests {
             .expect("system clock should be after the Unix epoch")
             .as_nanos();
         std::env::temp_dir().join(format!("kgg-{name}-{}-{nonce}", std::process::id()))
+    }
+
+    fn has_pair(args: &[String], first: &str, second: &str) -> bool {
+        args.windows(2).any(|pair| pair[0] == first && pair[1] == second)
     }
 
     #[test]
@@ -1113,6 +1130,37 @@ mod tests {
         assert_eq!(mp4_crf_for_quality("balanced").unwrap(), 22);
         assert_eq!(mp4_crf_for_quality("small").unwrap(), 27);
         assert!(mp4_crf_for_quality("unknown").is_err());
+    }
+
+    #[test]
+    fn builds_qtrle_arguments_with_rgb24_and_sequence_numbering() {
+        let args = qtrle_ffmpeg_args(Path::new("C:\\kgg\\frame_%04d.png"), Path::new("C:\\kgg\\output.mov"), 24);
+
+        assert_eq!(args[0], "-y");
+        assert!(has_pair(&args, "-framerate", "24"));
+        assert!(has_pair(&args, "-start_number", "0"));
+        assert!(has_pair(&args, "-c:v", "qtrle"));
+        assert!(has_pair(&args, "-pix_fmt", "rgb24"));
+        assert_eq!(args.last().map(String::as_str), Some("C:\\kgg\\output.mov"));
+    }
+
+    #[test]
+    fn builds_h264_rgb_arguments_with_quality_and_faststart() {
+        let args = h264_rgb_ffmpeg_args(
+            Path::new("C:\\kgg\\frame_%04d.png"),
+            Path::new("C:\\kgg\\output.mp4"),
+            30,
+            "balanced",
+        )
+        .expect("balanced quality should be accepted");
+
+        assert!(has_pair(&args, "-c:v", "libx264rgb"));
+        assert!(has_pair(&args, "-crf", "22"));
+        assert!(has_pair(&args, "-preset", "slow"));
+        assert!(has_pair(&args, "-pix_fmt", "rgb24"));
+        assert!(has_pair(&args, "-movflags", "+faststart"));
+        assert_eq!(args.last().map(String::as_str), Some("C:\\kgg\\output.mp4"));
+        assert!(h264_rgb_ffmpeg_args(Path::new("in"), Path::new("out"), 24, "invalid").is_err());
     }
 
     #[test]

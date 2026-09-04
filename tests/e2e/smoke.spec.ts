@@ -1,6 +1,6 @@
 import { test, expect } from './fixtures';
 import { dataUrlToBytes, setNormalizedTime, waitForWebGLReady } from './support/bridge';
-import { parsePngMetadata } from './support/artifacts';
+import { decodePngRgba, parsePngMetadata } from './support/artifacts';
 
 test('Preview renders deterministic checkpoints in a real browser Canvas', async ({ page, browserErrors: _browserErrors }) => {
   await page.goto('/', { waitUntil: 'domcontentloaded' });
@@ -25,5 +25,6 @@ test('Preview renders deterministic checkpoints in a real browser Canvas', async
     expect(capture.height).toBe(dimensions.height);
     expect(metadata).toMatchObject(dimensions);
     expect(metadata.byteLength).toBeGreaterThan(33);
+    expect(decodePngRgba(dataUrlToBytes(capture.dataUrl)).rgba.byteLength).toBe(dimensions.width * dimensions.height * 4);
   }
 });

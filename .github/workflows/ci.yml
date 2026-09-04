@@ -20,6 +20,7 @@ jobs:
     outputs:
       render: ${{ steps.scope.outputs.render }}
       native: ${{ steps.scope.outputs.native }}
+      e2e: ${{ steps.scope.outputs.e2e }}
 
     steps:
       - name: Check out repository
@@ -43,20 +44,26 @@ jobs:
 
           render=false
           native=false
+          e2e=false
           while IFS= read -r file; do
             echo "$file"
             case "$file" in
               src/shaders/*|src/rendering/*|src/lib/webgl*|src/lib/effect*|src/lib/render*|src/lib/export*|src/lib/tile*|src/lib/*Renderer*|src/components/*Canvas*)
                 render=true
+                e2e=true
                 ;;
               src-tauri/*|src-tauri/Cargo.toml|src-tauri/Cargo.lock|Cargo.toml|Cargo.lock)
                 native=true
+                ;;
+              src/App.tsx|src/components/*|src/features/workspace/*|src/adapters/*|src/hooks/useWebGL.ts|src/lib/render*|src/lib/export*|src/lib/webgl*|tests/e2e/*|playwright.config.*|tools/*e2e*|tools/*render-capture*|tools/capture-render*|tools/compare-render*|package.json|package-lock.json|.github/workflows/*)
+                e2e=true
                 ;;
             esac
           done < <(git diff --name-only "$base" "$GITHUB_SHA")
 
           echo "render=$render" >> "$GITHUB_OUTPUT"
           echo "native=$native" >> "$GITHUB_OUTPUT"
+          echo "e2e=$e2e" >> "$GITHUB_OUTPUT"
 
   fast-check:
     name: fast-check
@@ -104,6 +111,44 @@ jobs:
 
       - name: Run focused render checks
         run: npm run check:render
+
+  e2e-check:
+    name: e2e-check
+    needs: changes
+    if: needs.changes.outputs.e2e == 'true'
+    runs-on: windows-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+
+      - name: Install frontend dependencies
+        run: npm ci
+
+      - name: Install Playwright Chromium
+        run: npx playwright install chromium
+
+      - name: Run Browser E2E Merge Gate
+        run: npm run check:e2e
+
+      - name: Upload Browser E2E evidence
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: browser-e2e-evidence-${{ github.run_id }}
+          path: |
+            test-results/**
+            playwright-report/**
+            blob-report/**
+          if-no-files-found: ignore
+          retention-days: 14
 
   native-check:
     name: native-check
