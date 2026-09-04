@@ -537,9 +537,27 @@ describe('V2 effect shader parity', () => {
 
   it('skips analytic-consumed layers and avoids requesting a second Noise pass', () => {
     expect(webglSource).toContain('const consumedAnalyticLayers = new Set<string>(renderPlan.analyticPrefix.consumedLayers);');
-    expect(webglSource).toContain('renderPlan.enabledLayers.filter(layer => !consumedAnalyticLayers.has(layer.kind))');
+    expect(webglSource).toContain('const mainLayerEntries = renderPlan.enabledLayers');
+    expect(webglSource).toContain(': !consumedAnalyticLayers.has(layer.kind));');
     expect(webglSource).toContain('const generatorNoiseEnabled = isV2Pipeline && !imageGradientProtected');
     expect(webglSource).toContain('const analyticDiffuseConsumed = renderPlan?.analyticPrefix.consumedLayers.includes(\'diffuse\') === true;');
+  });
+
+  it('consumes an adjacent fallback Noise + Diffuse pair in one stack pass', () => {
+    expect(webglSource).toContain('renderPlan.programs.noiseDiffuseStack');
+    expect(webglSource).toContain('const useNoiseDiffusePair = renderPlan.programs.noiseDiffuseStack');
+    expect(webglSource).toContain('// The combined pass consumed both adjacent logical layers.');
+    expect(webglSource).toContain('markNoiseDiffuseStackFallback(ctx);');
+    expect(webglSource).toContain('noiseStackReady = requestNoiseStackProgram(ctx);');
+    expect(webglSource).toContain('useNoiseDiffuseStack: true');
+
+    const fusedMain = getProgramSource('noiseDiffuseStack').fragment.slice(
+      getProgramSource('noiseDiffuseStack').fragment.lastIndexOf('void main()'),
+    );
+    expect(fusedMain.indexOf('stackNoiseUv(globalUv)')).toBeGreaterThanOrEqual(0);
+    expect(fusedMain.indexOf('diffusePanelDisplacement(globalCoord)')).toBeGreaterThan(fusedMain.indexOf('stackNoiseUv(globalUv)'));
+    expect(fusedMain.indexOf('gl_FragColor = texture2D(u_sourceTex, sampleUv);')).toBeGreaterThan(fusedMain.indexOf('diffusePanelDisplacement(globalCoord)'));
+    expect(getProgramSource('noiseDiffuseStack').fragment).toContain('diffuseScatter > 0.0');
   });
 
   it('uses only the preceding stack texture as Voronoi color input', () => {

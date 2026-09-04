@@ -14,6 +14,7 @@ import postprocessGlassOpticsGLSL from '../shaders/postprocess/glass-optics.glsl
 import postprocessGlassCompactGLSL from '../shaders/postprocess/glass-compact.glsl?raw';
 import postprocessMainGLSL from '../shaders/postprocess/main.glsl?raw';
 import postprocessNoiseMainGLSL from '../shaders/postprocess/noise-main.glsl?raw';
+import postprocessNoiseDiffuseMainGLSL from '../shaders/postprocess/noise-diffuse-main.glsl?raw';
 import prismCompositeGLSL from '../shaders/prismComposite.frag.glsl?raw';
 import particlesVertexGLSL from '../shaders/particles.vert.glsl?raw';
 import particlesFragmentGLSL from '../shaders/particles.frag.glsl?raw';
@@ -41,6 +42,7 @@ export type LazyProgramKey =
   | 'stretch'
   | 'stackCore'
   | 'noiseStack'
+  | 'noiseDiffuseStack'
   | 'glass'
   | 'glassV2'
   | 'prism'
@@ -60,25 +62,6 @@ export type ProgramSource = {
 function normalizeShaderLineEndings(source: string): string {
   return source.replace(/\r\n?/g, '\n');
 }
-
-/** Bump this automatically when any shader source changes. */
-export const SHADER_VERSION = (
-  gradientGLSL.length * 1000003
-  + noiseGLSL.length
-  + normalMapGLSL.length * 997
-  + stretchGLSL.length * 313
-  + postprocessGLSL.length * 191
-  + postprocessGlassCompactGLSL.length * 173
-  + postprocessNoiseMainGLSL.length * 179
-  + prismCompositeGLSL.length * 127
-  + particlesVertexGLSL.length * 89
-  + particlesFragmentGLSL.length * 83
-  + seamlessGLSL.length * 71
-  + flowSplatVertexGLSL.length * 67
-  + flowSplatFragmentGLSL.length * 61
-  + flowTrailFragmentGLSL.length * 59
-  + flowGradientFragmentGLSL.length * 53
-) | 0;
 
 // Keep the specialized programs independent from the declaration order in
 // noise.glsl. This is the intentionally small contract shared by Glass/Prism
@@ -140,6 +123,42 @@ uniform float u_noiseScale;
 uniform int u_noiseOctaves;
 uniform float u_noiseEvolution;
 `;
+
+const NOISE_DIFFUSE_STACK_UNIFORMS = `
+const float PI = 3.141592653589793;
+uniform bool u_diffuseEnabled;
+uniform int u_diffuseMode;
+uniform float u_diffuseScatter;
+uniform float u_diffuseGrain;
+uniform float u_diffuseSeed;
+uniform bool u_diffuseAdaptiveEnabled;
+uniform int u_diffuseAdaptiveChannel;
+uniform bool u_diffuseGrainAdaptiveEnabled;
+uniform float u_diffuseGrainAdaptiveAmount;
+uniform sampler2D u_diffuseCurve;
+`;
+
+/** Bump this automatically when any shader source changes. */
+export const SHADER_VERSION = (
+  gradientGLSL.length * 1000003
+  + noiseGLSL.length
+  + normalMapGLSL.length * 997
+  + stretchGLSL.length * 313
+  + postprocessGLSL.length * 191
+  + postprocessGlassCompactGLSL.length * 173
+  + postprocessNoiseMainGLSL.length * 179
+  + postprocessNoiseDiffuseMainGLSL.length * 181
+  + NOISE_STACK_UNIFORMS.length * 167
+  + NOISE_DIFFUSE_STACK_UNIFORMS.length * 163
+  + prismCompositeGLSL.length * 127
+  + particlesVertexGLSL.length * 89
+  + particlesFragmentGLSL.length * 83
+  + seamlessGLSL.length * 71
+  + flowSplatVertexGLSL.length * 67
+  + flowSplatFragmentGLSL.length * 61
+  + flowTrailFragmentGLSL.length * 59
+  + flowGradientFragmentGLSL.length * 53
+) | 0;
 
 // Keep these symbols in the dedicated Glass sources explicitly instead of
 // depending on the full Diffuse module and its preprocessor branches. V2
@@ -206,16 +225,38 @@ function createStackCoreSource(): string {
   ].join('');
 }
 
-function createNoiseStackSource(): string {
+function createNoiseStackPrefix(extraUniforms = '', highPrecision = false): string {
   const noiseSource = noiseGLSL
-    .replace('uniform vec2 u_resolution;', 'uniform vec2 u_fullResolution;')
+    .replace(
+      'precision mediump float;',
+      highPrecision ? 'precision highp float;' : 'precision mediump float;',
+    )
+    .replace(
+      'uniform vec2 u_resolution;',
+      `uniform ${highPrecision ? 'highp ' : ''}vec2 u_fullResolution;`,
+    )
     .replaceAll('u_resolution', 'u_fullResolution');
   return [
     noiseSource,
     '\n#define KGG_LIGHTWEIGHT\n#define KGG_STACK_NOISE_ONLY\n',
     NOISE_STACK_UNIFORMS,
+    extraUniforms,
     postprocessStackGLSL,
+  ].join('');
+}
+
+function createNoiseStackSource(): string {
+  return [
+    createNoiseStackPrefix(),
     postprocessNoiseMainGLSL,
+  ].join('');
+}
+
+function createNoiseDiffuseStackSource(): string {
+  return [
+    createNoiseStackPrefix(`${NOISE_DIFFUSE_STACK_UNIFORMS}\n#define KGG_DIFFUSE_DISPLACEMENT_ONLY\n`, true),
+    postprocessDiffuseGLSL,
+    postprocessNoiseDiffuseMainGLSL,
   ].join('');
 }
 
@@ -244,6 +285,7 @@ export function getProgramSource(key: LazyProgramKey): ProgramSource {
   if (key === 'stretch') return { vertex: vertexGLSL, fragment: stretchGLSL };
   if (key === 'stackCore') return { vertex: vertexGLSL, fragment: createStackCoreSource() };
   if (key === 'noiseStack') return { vertex: vertexGLSL, fragment: createNoiseStackSource() };
+  if (key === 'noiseDiffuseStack') return { vertex: vertexGLSL, fragment: createNoiseDiffuseStackSource() };
   if (key === 'glass') return { vertex: vertexGLSL, fragment: createSpecializedPostprocessSource('KGG_LEGACY_GLASS_ONLY') };
   if (key === 'glassV2') return { vertex: vertexGLSL, fragment: createSpecializedPostprocessSource('KGG_GLASS_V2_ONLY') };
   if (key === 'prism') return { vertex: vertexGLSL, fragment: createSpecializedPostprocessSource('KGG_PRISM_ONLY') };

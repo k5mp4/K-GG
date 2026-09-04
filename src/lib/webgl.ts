@@ -180,6 +180,8 @@ export type WebGLContext = {
   stackCoreUniforms: Record<string, WebGLUniformLocation | null>;
   noiseStackProgram: WebGLProgram | null;
   noiseStackUniforms: Record<string, WebGLUniformLocation | null>;
+  noiseDiffuseStackProgram: WebGLProgram | null;
+  noiseDiffuseStackUniforms: Record<string, WebGLUniformLocation | null>;
   glassProgram: WebGLProgram | null;
   glassUniforms: Record<string, WebGLUniformLocation | null>;
   glassFallbackActive: boolean;
@@ -699,7 +701,7 @@ export async function initWebGL(canvas: HTMLCanvasElement): Promise<WebGLContext
   ownedFlowGradient = flowGradient;
   const transitionTextureFrom = ownTexture(createTexture(gl));
   const transitionTextureTo = ownTexture(createTexture(gl));
-  const ctx: WebGLContext = { gl, performanceProfiler, gpuDiagnostics, renderOptimization, program, uniforms, geometryBuffer, transitionGeometryBuffer, generatorProgram: null, generatorUniforms: {}, gradientRampTexture, meshGradientTexture, meshGradientTextureSignature: '', diffuseCurveTexture, diffuseCurveSignature: '', diffuseAsciiTexture, diffuseAsciiSignature: '', diffuseAsciiCount: 1, diffuseAsciiRows: ASCII_ATLAS_MAX_ROWS, diffuseHistogramAt: 0, manualDistortTexture, manualDistortDisplacement: null, manualDistortSmoothMask: null, manualDistortMapResolution: 0, sourceImageTexture, sourceImageCanvas: null, imageGradientTexture, imageGradientSource: null, imageMaskTexture, imageMaskSource: null, normalMapProgram: null, normalMapUniforms: {}, gradFbo, gradTexture, blurProgram: null, blurUniforms: {}, stretchProgram: null, stretchUniforms: {}, seamlessProgram: null, seamlessUniforms: {}, stackCoreProgram: null, stackCoreUniforms: {}, noiseStackProgram: null, noiseStackUniforms: {}, glassProgram: null, glassUniforms: {}, glassFallbackActive: false, glassV2Program: null, glassV2Uniforms: {}, glassV2FallbackActive: false, prismProgram: null, prismUniforms: {}, postprocessProgram: null, postprocessUniforms: {}, prismCompositeProgram: null, prismCompositeUniforms: {}, particleProgram: null, particleUniforms: {}, particleVao: null, particleQuadBuffer: null, particleInstanceBuffer: null, particleInstanceCount: 0, particleInstanceSeed: Number.NaN, flowGradient, normalFbo, normalTexture, hBlurFbo, hBlurTexture, postprocessFboA, postprocessTextureA, postprocessFboB, postprocessTextureB, prismScratchFbo, prismScratchTexture, prismBlurFbo, prismBlurTexture, prismGlowFbo, prismGlowTexture, fboSize: [0, 0], v2CoreFboSize: [0, 0], shaderCompileExt, lazyProgramState: createLazyProgramState(), lazyProgramCompileQueue: createSerialAsyncQueue(), hasPresentedFrame: false, disposed: false };
+  const ctx: WebGLContext = { gl, performanceProfiler, gpuDiagnostics, renderOptimization, program, uniforms, geometryBuffer, transitionGeometryBuffer, generatorProgram: null, generatorUniforms: {}, gradientRampTexture, meshGradientTexture, meshGradientTextureSignature: '', diffuseCurveTexture, diffuseCurveSignature: '', diffuseAsciiTexture, diffuseAsciiSignature: '', diffuseAsciiCount: 1, diffuseAsciiRows: ASCII_ATLAS_MAX_ROWS, diffuseHistogramAt: 0, manualDistortTexture, manualDistortDisplacement: null, manualDistortSmoothMask: null, manualDistortMapResolution: 0, sourceImageTexture, sourceImageCanvas: null, imageGradientTexture, imageGradientSource: null, imageMaskTexture, imageMaskSource: null, normalMapProgram: null, normalMapUniforms: {}, gradFbo, gradTexture, blurProgram: null, blurUniforms: {}, stretchProgram: null, stretchUniforms: {}, seamlessProgram: null, seamlessUniforms: {}, stackCoreProgram: null, stackCoreUniforms: {}, noiseStackProgram: null, noiseStackUniforms: {}, noiseDiffuseStackProgram: null, noiseDiffuseStackUniforms: {}, glassProgram: null, glassUniforms: {}, glassFallbackActive: false, glassV2Program: null, glassV2Uniforms: {}, glassV2FallbackActive: false, prismProgram: null, prismUniforms: {}, postprocessProgram: null, postprocessUniforms: {}, prismCompositeProgram: null, prismCompositeUniforms: {}, particleProgram: null, particleUniforms: {}, particleVao: null, particleQuadBuffer: null, particleInstanceBuffer: null, particleInstanceCount: 0, particleInstanceSeed: Number.NaN, flowGradient, normalFbo, normalTexture, hBlurFbo, hBlurTexture, postprocessFboA, postprocessTextureA, postprocessFboB, postprocessTextureB, prismScratchFbo, prismScratchTexture, prismBlurFbo, prismBlurTexture, prismGlowFbo, prismGlowTexture, fboSize: [0, 0], v2CoreFboSize: [0, 0], shaderCompileExt, lazyProgramState: createLazyProgramState(), lazyProgramCompileQueue: createSerialAsyncQueue(), hasPresentedFrame: false, disposed: false };
   effectStackTransitionResources.set(ctx, {
     program: transitionProgram,
     from: gl.getUniformLocation(transitionProgram, 'u_transitionFrom'),
@@ -758,6 +760,7 @@ export function disposeWebGL(ctx: WebGLContext): void {
     ctx.postprocessProgram,
     ctx.stackCoreProgram,
     ctx.noiseStackProgram,
+    ctx.noiseDiffuseStackProgram,
     ctx.glassProgram,
     ctx.glassV2Program,
     ctx.prismProgram,
@@ -930,6 +933,7 @@ function createLazyProgramState(): Record<LazyProgramKey, LazyProgramState> {
     stretch: { promise: null, failed: false, timedOut: false, fallback: false },
     stackCore: { promise: null, failed: false, timedOut: false, fallback: false },
     noiseStack: { promise: null, failed: false, timedOut: false, fallback: false },
+    noiseDiffuseStack: { promise: null, failed: false, timedOut: false, fallback: false },
     glass: { promise: null, failed: false, timedOut: false, fallback: false },
     glassV2: { promise: null, failed: false, timedOut: false, fallback: false },
     prism: { promise: null, failed: false, timedOut: false, fallback: false },
@@ -1218,6 +1222,10 @@ function installLazyProgram(ctx: WebGLContext, key: LazyProgramKey, program: Web
     const uniforms = getPostprocessUniforms(gl, program);
     ctx.noiseStackProgram = program;
     ctx.noiseStackUniforms = uniforms;
+  } else if (key === 'noiseDiffuseStack') {
+    const uniforms = getPostprocessUniforms(gl, program);
+    ctx.noiseDiffuseStackProgram = program;
+    ctx.noiseDiffuseStackUniforms = uniforms;
   } else if (key === 'glass') {
     const uniforms = getPostprocessUniforms(gl, program);
     ctx.glassProgram = program;
@@ -1305,6 +1313,15 @@ function requestNoiseStackProgram(ctx: WebGLContext): boolean {
   return true;
 }
 
+function markNoiseDiffuseStackFallback(ctx: WebGLContext): void {
+  const state = ctx.lazyProgramState.noiseDiffuseStack;
+  if (state.fallback) return;
+  state.fallback = true;
+  window.dispatchEvent(new CustomEvent('kgg:webgl-lazy-program-state', {
+    detail: { key: 'noiseDiffuseStack', state: 'fallback' as const, fallback: true },
+  }));
+}
+
 function lazyProgramReady(ctx: WebGLContext, key: LazyProgramKey): boolean {
   const resources = {
     generator: [ctx.generatorProgram, ctx.generatorUniforms],
@@ -1314,6 +1331,7 @@ function lazyProgramReady(ctx: WebGLContext, key: LazyProgramKey): boolean {
     seamless: [ctx.seamlessProgram, ctx.seamlessUniforms],
     stackCore: [ctx.stackCoreProgram, ctx.stackCoreUniforms],
     noiseStack: [ctx.noiseStackProgram, ctx.noiseStackUniforms],
+    noiseDiffuseStack: [ctx.noiseDiffuseStackProgram, ctx.noiseDiffuseStackUniforms],
     glass: [ctx.glassProgram, ctx.glassUniforms],
     glassV2: [ctx.glassV2Program, ctx.glassV2Uniforms],
     prism: [ctx.prismProgram, ctx.prismUniforms],
@@ -1393,6 +1411,7 @@ export function getRequiredExportProgramKeys(state: LatestState): LazyProgramKey
     add('generator', imageGradientProtected || plan.analyticPrefix.enabled);
     add('stackCore', (!imageGradientProtected || protectedStipple) && plan.programs.stackCore);
     add('noiseStack', !imageGradientProtected && plan.programs.noiseStack);
+    add('noiseDiffuseStack', !imageGradientProtected && plan.programs.noiseDiffuseStack);
     add('glassV2', !imageGradientProtected && plan.programs.glassV2 && !isGlassOpticallyIdentity(state.postprocess));
     add('normalMap', plan.programs.normalMap);
     add('blur', plan.programs.blur);
@@ -2073,6 +2092,16 @@ function drawStretchPass(
   return true;
 }
 
+type DrawPostprocessPassOptions = {
+  targetFramebuffer?: WebGLFramebuffer | null;
+  slitScan?: SlitScanConfig | null;
+  animDirectionDegrees?: number;
+  slitAnimTimeOverride?: number | null;
+  useV2Programs?: boolean;
+  diffuseAfterSlit?: boolean;
+  useNoiseDiffuseStack?: boolean;
+};
+
 function drawPostprocessPass(
   ctx: WebGLContext,
   sourceTexture: WebGLTexture,
@@ -2090,13 +2119,17 @@ function drawPostprocessPass(
   noiseLoopPeriod: number,
   animationSpeed: number,
   applyPostDiffuse: boolean,
-  targetFramebuffer: WebGLFramebuffer | null = null,
-  slitScan: SlitScanConfig | null = null,
-  animDirectionDegrees = 0,
-  slitAnimTimeOverride?: number | null,
-  useV2Programs = false,
-  diffuseAfterSlit = false,
+  options: DrawPostprocessPassOptions = {},
 ): boolean {
+  const {
+    targetFramebuffer = null,
+    slitScan = null,
+    animDirectionDegrees = 0,
+    slitAnimTimeOverride,
+    useV2Programs = false,
+    diffuseAfterSlit = false,
+    useNoiseDiffuseStack = false,
+  } = options;
   const { gl } = ctx;
   if (
     (targetFramebuffer === ctx.postprocessFboA && sourceTexture === ctx.postprocessTextureA) ||
@@ -2104,6 +2137,10 @@ function drawPostprocessPass(
   ) {
     throw new Error('Postprocess pass cannot sample from its destination texture');
   }
+  const useNoiseDiffuseStackProgram = useV2Programs
+    && useNoiseDiffuseStack
+    && !ctx.lazyProgramState.noiseDiffuseStack.fallback
+    && Boolean(ctx.noiseDiffuseStackProgram);
   const useNoiseStack = useV2Programs && effectMode === 'noise' && Boolean(ctx.noiseStackProgram);
   const useStackCore = useV2Programs && Boolean(ctx.stackCoreProgram) && (
     effectMode === 'slit'
@@ -2120,7 +2157,9 @@ function drawPostprocessPass(
     && (effectMode === 'glass' || effectMode === 'glassV2')
     && Boolean(glassProgram || glassFallbackActive);
   const usePrismProgram = useV2Programs && effectMode === 'prism' && Boolean(ctx.prismProgram);
-  const selectedProgram = useNoiseStack
+  const selectedProgram = useNoiseDiffuseStackProgram
+    ? ctx.noiseDiffuseStackProgram
+    : useNoiseStack
     ? ctx.noiseStackProgram
     : useStackCore
     ? ctx.stackCoreProgram
@@ -2129,7 +2168,9 @@ function drawPostprocessPass(
       : usePrismProgram
         ? ctx.prismProgram
         : ctx.postprocessProgram;
-  const selectedUniforms = useNoiseStack
+  const selectedUniforms = useNoiseDiffuseStackProgram
+    ? ctx.noiseDiffuseStackUniforms
+    : useNoiseStack
     ? ctx.noiseStackUniforms
     : useStackCore
     ? ctx.stackCoreUniforms
@@ -2155,37 +2196,52 @@ function drawPostprocessPass(
       gl.clearColor(0, 0, 0, 0);
       gl.clear(gl.COLOR_BUFFER_BIT);
     }
-  gl.activeTexture(gl.TEXTURE3);
-  gl.bindTexture(gl.TEXTURE_2D, sourceTexture);
-  setUniform1i(gl, ctx.postprocessUniforms.u_sourceTex, 3);
-  gl.activeTexture(gl.TEXTURE1);
-  gl.bindTexture(gl.TEXTURE_2D, ctx.gradientRampTexture);
-  setUniform1i(gl, ctx.postprocessUniforms.u_gradientRamp, 1);
-  gl.activeTexture(gl.TEXTURE8);
-  uploadDiffuseCurveTexture(ctx, {
-    luminanceBezier: postprocess.diffuseLuminanceBezier ?? normalizeDiffuseBezier(undefined),
-    grainBezier: postprocess.diffuseGrainBezier ?? normalizeDiffuseBezier(undefined),
-  });
-  gl.bindTexture(gl.TEXTURE_2D, ctx.diffuseCurveTexture);
-  setUniform1i(gl, ctx.postprocessUniforms.u_diffuseCurve, 8);
-  uploadDiffuseAsciiTexture(ctx, postprocess.diffuseAsciiCharset, postprocess.diffuseAsciiFont, postprocess.diffuseAsciiFontSize);
-  gl.activeTexture(gl.TEXTURE9);
-  gl.bindTexture(gl.TEXTURE_2D, ctx.diffuseAsciiTexture);
-  setUniform1i(gl, ctx.postprocessUniforms.u_diffuseAsciiAtlas, 9);
-  gl.activeTexture(gl.TEXTURE5);
-  gl.bindTexture(gl.TEXTURE_2D, ctx.manualDistortTexture);
-  setUniform1i(gl, ctx.postprocessUniforms.u_distortMap, 5);
-  gl.uniform2f(ctx.postprocessUniforms.u_resolution, width, height);
-  gl.uniform2f(ctx.postprocessUniforms.u_fullResolution, fullWidth, fullHeight);
-  gl.uniform2f(ctx.postprocessUniforms.u_tileOffset, offsetX, offsetY);
-  const anchors = gradient.anchors ?? GRADIENT_ANCHOR_DEFAULTS[gradient.gradientType ?? 'linear'];
-  gl.uniform2f(ctx.postprocessUniforms.u_gradAnchor0, anchors[0][0], anchors[0][1]);
-  gl.uniform2f(ctx.postprocessUniforms.u_gradAnchor1, anchors[1][0], anchors[1][1]);
-  gl.uniform1f(ctx.postprocessUniforms.u_maxDisplacement, postprocess.maxDisplacement);
-  setUniform1i(gl, ctx.postprocessUniforms.u_effectEnabled, 1);
-  const effectModeMap = { distort: 0, mirror: 1, kaleidoscope: 2, prism: 3, voronoi: 4, glass: 5, diffuse: 6, noise: 7, slit: 8, glassV2: 9, particles: 0 } as const;
-  setUniform1i(gl, ctx.postprocessUniforms.u_effectMode, effectModeMap[effectMode]);
-  setUniform1i(gl, ctx.postprocessUniforms.u_stackSlitDiffuseAfter, diffuseAfterSlit ? 1 : 0);
+    gl.activeTexture(gl.TEXTURE3);
+    gl.bindTexture(gl.TEXTURE_2D, sourceTexture);
+    setUniform1i(gl, ctx.postprocessUniforms.u_sourceTex, 3);
+    if (useNoiseDiffuseStackProgram) {
+      // The fused pass only samples the Diffuse curve. Avoid binding the
+      // gradient/ASCII/distort textures here; the latter would rebuild the
+      // ASCII atlas even though this shader has no pattern branch.
+      uploadDiffuseCurveTexture(ctx, {
+        luminanceBezier: postprocess.diffuseLuminanceBezier ?? normalizeDiffuseBezier(undefined),
+        grainBezier: postprocess.diffuseGrainBezier ?? normalizeDiffuseBezier(undefined),
+      });
+      gl.activeTexture(gl.TEXTURE8);
+      gl.bindTexture(gl.TEXTURE_2D, ctx.diffuseCurveTexture);
+      setUniform1i(gl, ctx.postprocessUniforms.u_diffuseCurve, 8);
+    } else {
+      gl.activeTexture(gl.TEXTURE1);
+      gl.bindTexture(gl.TEXTURE_2D, ctx.gradientRampTexture);
+      setUniform1i(gl, ctx.postprocessUniforms.u_gradientRamp, 1);
+      gl.activeTexture(gl.TEXTURE8);
+      uploadDiffuseCurveTexture(ctx, {
+        luminanceBezier: postprocess.diffuseLuminanceBezier ?? normalizeDiffuseBezier(undefined),
+        grainBezier: postprocess.diffuseGrainBezier ?? normalizeDiffuseBezier(undefined),
+      });
+      gl.bindTexture(gl.TEXTURE_2D, ctx.diffuseCurveTexture);
+      setUniform1i(gl, ctx.postprocessUniforms.u_diffuseCurve, 8);
+      uploadDiffuseAsciiTexture(ctx, postprocess.diffuseAsciiCharset, postprocess.diffuseAsciiFont, postprocess.diffuseAsciiFontSize);
+      gl.activeTexture(gl.TEXTURE9);
+      gl.bindTexture(gl.TEXTURE_2D, ctx.diffuseAsciiTexture);
+      setUniform1i(gl, ctx.postprocessUniforms.u_diffuseAsciiAtlas, 9);
+      gl.activeTexture(gl.TEXTURE5);
+      gl.bindTexture(gl.TEXTURE_2D, ctx.manualDistortTexture);
+      setUniform1i(gl, ctx.postprocessUniforms.u_distortMap, 5);
+    }
+    gl.uniform2f(ctx.postprocessUniforms.u_resolution, width, height);
+    gl.uniform2f(ctx.postprocessUniforms.u_fullResolution, fullWidth, fullHeight);
+    gl.uniform2f(ctx.postprocessUniforms.u_tileOffset, offsetX, offsetY);
+    if (!useNoiseDiffuseStackProgram) {
+      const anchors = gradient.anchors ?? GRADIENT_ANCHOR_DEFAULTS[gradient.gradientType ?? 'linear'];
+      gl.uniform2f(ctx.postprocessUniforms.u_gradAnchor0, anchors[0][0], anchors[0][1]);
+      gl.uniform2f(ctx.postprocessUniforms.u_gradAnchor1, anchors[1][0], anchors[1][1]);
+      gl.uniform1f(ctx.postprocessUniforms.u_maxDisplacement, postprocess.maxDisplacement);
+      setUniform1i(gl, ctx.postprocessUniforms.u_effectEnabled, 1);
+      const effectModeMap = { distort: 0, mirror: 1, kaleidoscope: 2, prism: 3, voronoi: 4, glass: 5, diffuse: 6, noise: 7, slit: 8, glassV2: 9, particles: 0 } as const;
+      setUniform1i(gl, ctx.postprocessUniforms.u_effectMode, effectModeMap[effectMode]);
+      setUniform1i(gl, ctx.postprocessUniforms.u_stackSlitDiffuseAfter, diffuseAfterSlit ? 1 : 0);
+    }
   setUniform1i(gl, ctx.postprocessUniforms.u_noiseEnabled, noiseDistortion.enabled ? 1 : 0);
   setUniform1i(gl, ctx.postprocessUniforms.u_noiseType, NOISE_TYPE_MAP[noiseDistortion.type]);
   gl.uniform1f(ctx.postprocessUniforms.u_noiseAmount, noiseDistortion.amount ?? 0);
@@ -2253,166 +2309,174 @@ function drawPostprocessPass(
   gl.uniform1f(ctx.postprocessUniforms.u_curlSpeed, noiseDistortion.curlSpeed ?? 1);
   gl.uniform1f(ctx.postprocessUniforms.u_curlEps, noiseDistortion.curlEps ?? 0.01);
   gl.uniform1f(ctx.postprocessUniforms.u_curlSeed, noiseDistortion.curlSeed ?? 0);
-  gl.uniform1f(ctx.postprocessUniforms.u_prismSpeed, Math.max(Math.abs(animationSpeed), 0.0));
-  const mirrorModeMap = { horizontal: 0, vertical: 1, quad: 2 } as const;
-  setUniform1i(gl, ctx.postprocessUniforms.u_mirrorMode, mirrorModeMap[postprocess.mirrorMode ?? 'horizontal']);
-  const kaleidoscopeTypeMap = { unfold: 0, flower: 1, starlish: 2 } as const;
-  setUniform1i(gl, ctx.postprocessUniforms.u_kaleidoscopeType, kaleidoscopeTypeMap[postprocess.kaleidoscopeType ?? 'unfold']);
-  gl.uniform1f(ctx.postprocessUniforms.u_kaleidoscopeSlices, postprocess.kaleidoscopeSlices ?? 8);
-  gl.uniform1f(ctx.postprocessUniforms.u_kaleidoscopeRotation, ((postprocess.kaleidoscopeRotation ?? 0) * Math.PI) / 180);
-  gl.uniform1f(ctx.postprocessUniforms.u_kaleidoscopeZoom, postprocess.kaleidoscopeZoom ?? 1);
-  const prismCenter = postprocess.prismCenter ?? [0.5, 0.5];
-  gl.uniform2f(ctx.postprocessUniforms.u_prismCenter, prismCenter[0], prismCenter[1]);
-  gl.uniform1f(ctx.postprocessUniforms.u_prismRayCount, postprocess.prismRayCount ?? 24);
-  gl.uniform1f(ctx.postprocessUniforms.u_prismLength, postprocess.prismLength ?? 0.65);
-  gl.uniform1f(ctx.postprocessUniforms.u_prismLengthRandomness, postprocess.prismLengthRandomness ?? 0.45);
-  gl.uniform1f(ctx.postprocessUniforms.u_prismWidth, postprocess.prismWidth ?? 0.018);
-  gl.uniform1f(ctx.postprocessUniforms.u_prismRandomness, postprocess.prismRandomness ?? 0.45);
-  gl.uniform1f(ctx.postprocessUniforms.u_prismBlur, postprocess.prismBlur ?? 0.35);
-  gl.uniform1f(ctx.postprocessUniforms.u_prismIntensity, postprocess.prismIntensity ?? 0.9);
-  gl.uniform1f(ctx.postprocessUniforms.u_prismSeed, postprocess.prismSeed ?? 0);
-  gl.uniform1f(ctx.postprocessUniforms.u_prismInnerRadius, postprocess.prismInnerRadius ?? 0.16);
-  gl.uniform1f(ctx.postprocessUniforms.u_postVoronoiScale, postprocess.voronoiScale ?? 8);
-  gl.uniform1f(ctx.postprocessUniforms.u_postVoronoiRandomness, postprocess.voronoiRandomness ?? 0.85);
-  gl.uniform1f(ctx.postprocessUniforms.u_postVoronoiAngle, ((postprocess.voronoiAngle ?? 35) * Math.PI) / 180);
-  gl.uniform1f(ctx.postprocessUniforms.u_postVoronoiGradientScale, postprocess.voronoiGradientScale ?? 1.15);
-  gl.uniform1f(ctx.postprocessUniforms.u_postVoronoiEdgeWidth, postprocess.voronoiEdgeWidth ?? 0.025);
-  gl.uniform1f(ctx.postprocessUniforms.u_postVoronoiSeed, postprocess.voronoiSeed ?? 0);
-  const glass = normalizeGlassRenderParameters(postprocess);
-  const glassV2Color = normalizeGlassV2ColorParameters(postprocess);
-  gl.uniform1f(ctx.postprocessUniforms.u_glassScale, glass.scale);
-  gl.uniform1f(ctx.postprocessUniforms.u_glassStretch, glass.stretch);
-  gl.uniform1f(ctx.postprocessUniforms.u_glassRotation, glass.rotationRadians);
-  setUniform1i(gl, ctx.postprocessUniforms.u_glassComplexity, glass.complexity);
-  gl.uniform1f(ctx.postprocessUniforms.u_glassWarp, glass.warp);
-  gl.uniform1f(ctx.postprocessUniforms.u_glassSeed, glass.seed);
-  gl.uniform1f(ctx.postprocessUniforms.u_glassNoiseInfluence, glass.noiseInfluence);
-  gl.uniform1f(ctx.postprocessUniforms.u_glassRefraction, glass.refraction);
-  gl.uniform1f(ctx.postprocessUniforms.u_glassChromaticAberration, glass.chromaticAberration);
-  gl.uniform1f(ctx.postprocessUniforms.u_glassRoughness, glass.roughness);
-  gl.uniform1f(ctx.postprocessUniforms.u_glassHighlight, glass.highlight);
-  gl.uniform1f(ctx.postprocessUniforms.u_glassMix, glass.mix);
-  gl.uniform1f(ctx.postprocessUniforms.u_glassEvolution, glass.evolution);
-  gl.uniform1f(ctx.postprocessUniforms.u_glassMotion, glass.motion);
-  gl.uniform1f(ctx.postprocessUniforms.u_glassV2ChromaticHue, glassV2Color.chromaticHueRadians);
-  gl.uniform1f(ctx.postprocessUniforms.u_glassV2ChromaticSaturation, glassV2Color.chromaticSaturation);
-  const [glassV2TransmissionR, glassV2TransmissionG, glassV2TransmissionB] = hexToRgb(
-    glassV2Color.transmissionTint,
-  );
-  gl.uniform3f(
-    ctx.postprocessUniforms.u_glassV2TransmissionTint,
-    glassV2TransmissionR,
-    glassV2TransmissionG,
-    glassV2TransmissionB,
-  );
-  const [glassV2HighlightR, glassV2HighlightG, glassV2HighlightB] = hexToRgb(
-    glassV2Color.highlightTint,
-  );
-  gl.uniform3f(
-    ctx.postprocessUniforms.u_glassV2HighlightTint,
-    glassV2HighlightR,
-    glassV2HighlightG,
-    glassV2HighlightB,
-  );
+  if (!useNoiseDiffuseStackProgram) {
+    gl.uniform1f(ctx.postprocessUniforms.u_prismSpeed, Math.max(Math.abs(animationSpeed), 0.0));
+    const mirrorModeMap = { horizontal: 0, vertical: 1, quad: 2 } as const;
+    setUniform1i(gl, ctx.postprocessUniforms.u_mirrorMode, mirrorModeMap[postprocess.mirrorMode ?? 'horizontal']);
+    const kaleidoscopeTypeMap = { unfold: 0, flower: 1, starlish: 2 } as const;
+    setUniform1i(gl, ctx.postprocessUniforms.u_kaleidoscopeType, kaleidoscopeTypeMap[postprocess.kaleidoscopeType ?? 'unfold']);
+    gl.uniform1f(ctx.postprocessUniforms.u_kaleidoscopeSlices, postprocess.kaleidoscopeSlices ?? 8);
+    gl.uniform1f(ctx.postprocessUniforms.u_kaleidoscopeRotation, ((postprocess.kaleidoscopeRotation ?? 0) * Math.PI) / 180);
+    gl.uniform1f(ctx.postprocessUniforms.u_kaleidoscopeZoom, postprocess.kaleidoscopeZoom ?? 1);
+    const prismCenter = postprocess.prismCenter ?? [0.5, 0.5];
+    gl.uniform2f(ctx.postprocessUniforms.u_prismCenter, prismCenter[0], prismCenter[1]);
+    gl.uniform1f(ctx.postprocessUniforms.u_prismRayCount, postprocess.prismRayCount ?? 24);
+    gl.uniform1f(ctx.postprocessUniforms.u_prismLength, postprocess.prismLength ?? 0.65);
+    gl.uniform1f(ctx.postprocessUniforms.u_prismLengthRandomness, postprocess.prismLengthRandomness ?? 0.45);
+    gl.uniform1f(ctx.postprocessUniforms.u_prismWidth, postprocess.prismWidth ?? 0.018);
+    gl.uniform1f(ctx.postprocessUniforms.u_prismRandomness, postprocess.prismRandomness ?? 0.45);
+    gl.uniform1f(ctx.postprocessUniforms.u_prismBlur, postprocess.prismBlur ?? 0.35);
+    gl.uniform1f(ctx.postprocessUniforms.u_prismIntensity, postprocess.prismIntensity ?? 0.9);
+    gl.uniform1f(ctx.postprocessUniforms.u_prismSeed, postprocess.prismSeed ?? 0);
+    gl.uniform1f(ctx.postprocessUniforms.u_prismInnerRadius, postprocess.prismInnerRadius ?? 0.16);
+    gl.uniform1f(ctx.postprocessUniforms.u_postVoronoiScale, postprocess.voronoiScale ?? 8);
+    gl.uniform1f(ctx.postprocessUniforms.u_postVoronoiRandomness, postprocess.voronoiRandomness ?? 0.85);
+    gl.uniform1f(ctx.postprocessUniforms.u_postVoronoiAngle, ((postprocess.voronoiAngle ?? 35) * Math.PI) / 180);
+    gl.uniform1f(ctx.postprocessUniforms.u_postVoronoiGradientScale, postprocess.voronoiGradientScale ?? 1.15);
+    gl.uniform1f(ctx.postprocessUniforms.u_postVoronoiEdgeWidth, postprocess.voronoiEdgeWidth ?? 0.025);
+    gl.uniform1f(ctx.postprocessUniforms.u_postVoronoiSeed, postprocess.voronoiSeed ?? 0);
+    const glass = normalizeGlassRenderParameters(postprocess);
+    const glassV2Color = normalizeGlassV2ColorParameters(postprocess);
+    gl.uniform1f(ctx.postprocessUniforms.u_glassScale, glass.scale);
+    gl.uniform1f(ctx.postprocessUniforms.u_glassStretch, glass.stretch);
+    gl.uniform1f(ctx.postprocessUniforms.u_glassRotation, glass.rotationRadians);
+    setUniform1i(gl, ctx.postprocessUniforms.u_glassComplexity, glass.complexity);
+    gl.uniform1f(ctx.postprocessUniforms.u_glassWarp, glass.warp);
+    gl.uniform1f(ctx.postprocessUniforms.u_glassSeed, glass.seed);
+    gl.uniform1f(ctx.postprocessUniforms.u_glassNoiseInfluence, glass.noiseInfluence);
+    gl.uniform1f(ctx.postprocessUniforms.u_glassRefraction, glass.refraction);
+    gl.uniform1f(ctx.postprocessUniforms.u_glassChromaticAberration, glass.chromaticAberration);
+    gl.uniform1f(ctx.postprocessUniforms.u_glassRoughness, glass.roughness);
+    gl.uniform1f(ctx.postprocessUniforms.u_glassHighlight, glass.highlight);
+    gl.uniform1f(ctx.postprocessUniforms.u_glassMix, glass.mix);
+    gl.uniform1f(ctx.postprocessUniforms.u_glassEvolution, glass.evolution);
+    gl.uniform1f(ctx.postprocessUniforms.u_glassMotion, glass.motion);
+    gl.uniform1f(ctx.postprocessUniforms.u_glassV2ChromaticHue, glassV2Color.chromaticHueRadians);
+    gl.uniform1f(ctx.postprocessUniforms.u_glassV2ChromaticSaturation, glassV2Color.chromaticSaturation);
+    const [glassV2TransmissionR, glassV2TransmissionG, glassV2TransmissionB] = hexToRgb(
+      glassV2Color.transmissionTint,
+    );
+    gl.uniform3f(
+      ctx.postprocessUniforms.u_glassV2TransmissionTint,
+      glassV2TransmissionR,
+      glassV2TransmissionG,
+      glassV2TransmissionB,
+    );
+    const [glassV2HighlightR, glassV2HighlightG, glassV2HighlightB] = hexToRgb(
+      glassV2Color.highlightTint,
+    );
+    gl.uniform3f(
+      ctx.postprocessUniforms.u_glassV2HighlightTint,
+      glassV2HighlightR,
+      glassV2HighlightG,
+      glassV2HighlightB,
+    );
+  }
   const diffuseScale = diffuseResolutionScale(fullWidth, fullHeight);
   setUniform1i(gl, ctx.postprocessUniforms.u_diffuseEnabled, applyPostDiffuse && postprocess.diffuseEnabled ? 1 : 0);
   setUniform1i(gl, ctx.postprocessUniforms.u_diffuseMode, DIFFUSE_MODE_MAP[postprocess.diffuseMode ?? 'block'] ?? 0);
   gl.uniform1f(ctx.postprocessUniforms.u_diffuseScatter, postprocess.diffuseMode === 'dither' ? 100 : postprocess.diffuseScatter * diffuseScale);
   gl.uniform1f(ctx.postprocessUniforms.u_diffuseGrain, postprocess.diffuseGrain * diffuseScale);
   gl.uniform1f(ctx.postprocessUniforms.u_diffuseSeed, postprocess.diffuseSeed);
-  gl.uniform1f(ctx.postprocessUniforms.u_diffuseDitherThreshold, postprocess.diffuseDitherThreshold ?? 0.5);
+  if (!useNoiseDiffuseStackProgram) {
+    gl.uniform1f(ctx.postprocessUniforms.u_diffuseDitherThreshold, postprocess.diffuseDitherThreshold ?? 0.5);
+  }
   setUniform1i(gl, ctx.postprocessUniforms.u_diffuseAdaptiveEnabled, postprocess.diffuseAdaptiveEnabled ? 1 : 0);
   const postDiffuseChannelMap = { luminance: 0, hue: 1, saturation: 2 } as const;
   setUniform1i(gl, ctx.postprocessUniforms.u_diffuseAdaptiveChannel, postDiffuseChannelMap[postprocess.diffuseAdaptiveChannel ?? 'luminance']);
   setUniform1i(gl, ctx.postprocessUniforms.u_diffuseGrainAdaptiveEnabled, postprocess.diffuseGrainAdaptiveEnabled ? 1 : 0);
   gl.uniform1f(ctx.postprocessUniforms.u_diffuseGrainAdaptiveAmount, postprocess.diffuseGrainAdaptiveAmount ?? 1);
-  setUniform1i(gl, ctx.postprocessUniforms.u_diffuseHalftoneShape, postprocess.diffuseHalftoneShape === 'square' ? 1 : 0);
-  gl.uniform1f(ctx.postprocessUniforms.u_diffuseHalftoneSize, postprocess.diffuseHalftoneSize ?? 0.82);
-  const [postDiffuseBackgroundR, postDiffuseBackgroundG, postDiffuseBackgroundB] = hexToRgb(
-    postprocess.diffuseBackgroundColor ?? DEFAULT_DIFFUSE_BACKGROUND_COLOR,
-  );
-  gl.uniform3f(ctx.postprocessUniforms.u_diffuseBackgroundColor, postDiffuseBackgroundR, postDiffuseBackgroundG, postDiffuseBackgroundB);
-  gl.uniform1f(ctx.postprocessUniforms.u_diffuseAsciiCount, ctx.diffuseAsciiCount);
-  gl.uniform1f(ctx.postprocessUniforms.u_diffuseAsciiColumns, ASCII_ATLAS_COLUMNS);
-  gl.uniform1f(ctx.postprocessUniforms.u_diffuseAsciiRows, ctx.diffuseAsciiRows);
-  gl.uniform1f(ctx.postprocessUniforms.u_diffuseAsciiRotation, ((postprocess.diffuseAsciiRotation ?? 0) * Math.PI) / 180);
-  const stackSlitModeMap = { linear: 0, circular: 1, polygon: 2, wave: 3 } as const;
-  const stackSlit: SlitScanConfig = slitScan ?? {
-    enabled: false,
-    mode: 'linear' as const,
-    angle: 0,
-    waveType: 'sine',
-    waveHeight: 0,
-    polygonSides: 6,
-    slitWidth: 1,
-    offset: 0,
-    offsetSpeed: 0,
-    animEnabled: false,
-    animMode: 'off',
-    variance: 0,
-    seed: 0,
-    slitPhase: 0,
-    selectedSlitIdx: -1,
-    slitDeltas: {},
-    pixelPerfect: false,
-    offsetAngle: 90,
-  };
-  setUniform1i(gl, ctx.postprocessUniforms.u_stackSlitMode, stackSlitModeMap[stackSlit.mode]);
-  gl.uniform1f(ctx.postprocessUniforms.u_stackSlitAngle, (stackSlit.angle * Math.PI) / 180);
-  const stackSlitWaveTypeMap = { sine: 0, sawtooth: 1, semicircle: 2 } as const;
-  setUniform1i(gl, ctx.postprocessUniforms.u_stackSlitWaveType, stackSlitWaveTypeMap[stackSlit.waveType ?? 'sine']);
-  gl.uniform1f(ctx.postprocessUniforms.u_stackSlitWaveHeight, stackSlit.waveHeight ?? 0);
-  setUniform1i(gl, ctx.postprocessUniforms.u_stackSlitPolygonSides, Math.max(3, Math.min(32, Math.round(stackSlit.polygonSides ?? 6))));
-  gl.uniform1f(ctx.postprocessUniforms.u_stackSlitOffsetAngle, ((stackSlit.offsetAngle ?? 90) * Math.PI) / 180);
-  const stackSlitPixelPerfect = stackSlit.pixelPerfect ?? false;
-  const roundStackSlit = (value: number) => stackSlitPixelPerfect ? Math.round(value) : value;
-  const stackSlitWidth = Math.max(1, roundStackSlit(stackSlit.slitWidth));
-  gl.uniform1f(ctx.postprocessUniforms.u_stackSlitWidth, stackSlitWidth);
-  gl.uniform1f(ctx.postprocessUniforms.u_stackSlitOffset, stackSlit.offset);
-  gl.uniform1f(ctx.postprocessUniforms.u_stackSlitVariance, stackSlit.variance);
-  const stackSlitAnimationBaseTime = stackSlit.animEnabled
-    ? (slitAnimTimeOverride != null ? slitAnimTimeOverride : performance.now() / 1000)
-    : 0;
-  const stackSlitOffsetAnimationActive = stackSlit.animEnabled
-    && stackSlit.animMode !== 'off'
-    && stackSlit.offsetSpeed !== 0;
-  const stackSlitAnimationTime = stackSlitOffsetAnimationActive
-    ? getSlitAnimationPhase(stackSlitAnimationBaseTime, noiseLoopPeriod, stackSlit.offsetSpeed)
-    : 0;
-  gl.uniform2f(
-    ctx.postprocessUniforms.u_stackSlitParams,
-    roundStackSlit(stackSlit.slitPhase ?? 0),
-    stackSlit.seed,
-  );
-  const stackSlitDeltas: Array<[number, number]> = [];
-  for (const indexKey in stackSlit.slitDeltas ?? {}) {
-    if (!Object.prototype.hasOwnProperty.call(stackSlit.slitDeltas, indexKey)) continue;
-    const index = Number(indexKey);
-    const rawDelta = stackSlit.slitDeltas[index];
-    const delta = stackSlitPixelPerfect ? Math.round(rawDelta) : rawDelta;
-    if (!Number.isFinite(index) || !Number.isFinite(delta) || delta === 0) continue;
-    stackSlitDeltas.push([index, delta]);
-    if (stackSlitDeltas.length === 32) break;
-  }
-  stackSlitDeltas.sort((a, b) => a[0] - b[0]);
-  const stackSlitDeltaUniforms = [
-    'u_stackSlitDelta01', 'u_stackSlitDelta23', 'u_stackSlitDelta45', 'u_stackSlitDelta67',
-    'u_stackSlitDelta89', 'u_stackSlitDeltaAB', 'u_stackSlitDeltaCD', 'u_stackSlitDeltaEF',
-    'u_stackSlitDeltaGH', 'u_stackSlitDeltaIJ', 'u_stackSlitDeltaKL', 'u_stackSlitDeltaMN',
-    'u_stackSlitDeltaOP', 'u_stackSlitDeltaQR', 'u_stackSlitDeltaST', 'u_stackSlitDeltaUV',
-  ] as const;
-  for (let uniformIndex = 0; uniformIndex < stackSlitDeltaUniforms.length; uniformIndex++) {
-    const first = stackSlitDeltas[uniformIndex * 2] ?? [-9999, 0];
-    const second = stackSlitDeltas[uniformIndex * 2 + 1] ?? [-9999, 0];
-    gl.uniform4f(
-      ctx.postprocessUniforms[stackSlitDeltaUniforms[uniformIndex]],
-      first[0], first[1], second[0], second[1],
+  if (!useNoiseDiffuseStackProgram) {
+    setUniform1i(gl, ctx.postprocessUniforms.u_diffuseHalftoneShape, postprocess.diffuseHalftoneShape === 'square' ? 1 : 0);
+    gl.uniform1f(ctx.postprocessUniforms.u_diffuseHalftoneSize, postprocess.diffuseHalftoneSize ?? 0.82);
+    const [postDiffuseBackgroundR, postDiffuseBackgroundG, postDiffuseBackgroundB] = hexToRgb(
+      postprocess.diffuseBackgroundColor ?? DEFAULT_DIFFUSE_BACKGROUND_COLOR,
     );
+    gl.uniform3f(ctx.postprocessUniforms.u_diffuseBackgroundColor, postDiffuseBackgroundR, postDiffuseBackgroundG, postDiffuseBackgroundB);
+    gl.uniform1f(ctx.postprocessUniforms.u_diffuseAsciiCount, ctx.diffuseAsciiCount);
+    gl.uniform1f(ctx.postprocessUniforms.u_diffuseAsciiColumns, ASCII_ATLAS_COLUMNS);
+    gl.uniform1f(ctx.postprocessUniforms.u_diffuseAsciiRows, ctx.diffuseAsciiRows);
+    gl.uniform1f(ctx.postprocessUniforms.u_diffuseAsciiRotation, ((postprocess.diffuseAsciiRotation ?? 0) * Math.PI) / 180);
   }
-  setUniform1i(gl, ctx.postprocessUniforms.u_stackSlitAnimEnabled, stackSlitOffsetAnimationActive ? 1 : 0);
-  gl.uniform1f(ctx.postprocessUniforms.u_stackSlitAnimTime, stackSlitAnimationTime);
-  setUniform1i(gl, ctx.postprocessUniforms.u_stackSlitAnimMode, stackSlit.animMode === 'pingpong' ? 1 : 0);
-  setUniform1i(gl, ctx.postprocessUniforms.u_stackSlitPixelPerfect, stackSlitPixelPerfect ? 1 : 0);
+  if (!useNoiseDiffuseStackProgram) {
+    const stackSlitModeMap = { linear: 0, circular: 1, polygon: 2, wave: 3 } as const;
+    const stackSlit: SlitScanConfig = slitScan ?? {
+      enabled: false,
+      mode: 'linear' as const,
+      angle: 0,
+      waveType: 'sine',
+      waveHeight: 0,
+      polygonSides: 6,
+      slitWidth: 1,
+      offset: 0,
+      offsetSpeed: 0,
+      animEnabled: false,
+      animMode: 'off',
+      variance: 0,
+      seed: 0,
+      slitPhase: 0,
+      selectedSlitIdx: -1,
+      slitDeltas: {},
+      pixelPerfect: false,
+      offsetAngle: 90,
+    };
+    setUniform1i(gl, ctx.postprocessUniforms.u_stackSlitMode, stackSlitModeMap[stackSlit.mode]);
+    gl.uniform1f(ctx.postprocessUniforms.u_stackSlitAngle, (stackSlit.angle * Math.PI) / 180);
+    const stackSlitWaveTypeMap = { sine: 0, sawtooth: 1, semicircle: 2 } as const;
+    setUniform1i(gl, ctx.postprocessUniforms.u_stackSlitWaveType, stackSlitWaveTypeMap[stackSlit.waveType ?? 'sine']);
+    gl.uniform1f(ctx.postprocessUniforms.u_stackSlitWaveHeight, stackSlit.waveHeight ?? 0);
+    setUniform1i(gl, ctx.postprocessUniforms.u_stackSlitPolygonSides, Math.max(3, Math.min(32, Math.round(stackSlit.polygonSides ?? 6))));
+    gl.uniform1f(ctx.postprocessUniforms.u_stackSlitOffsetAngle, ((stackSlit.offsetAngle ?? 90) * Math.PI) / 180);
+    const stackSlitPixelPerfect = stackSlit.pixelPerfect ?? false;
+    const roundStackSlit = (value: number) => stackSlitPixelPerfect ? Math.round(value) : value;
+    const stackSlitWidth = Math.max(1, roundStackSlit(stackSlit.slitWidth));
+    gl.uniform1f(ctx.postprocessUniforms.u_stackSlitWidth, stackSlitWidth);
+    gl.uniform1f(ctx.postprocessUniforms.u_stackSlitOffset, stackSlit.offset);
+    gl.uniform1f(ctx.postprocessUniforms.u_stackSlitVariance, stackSlit.variance);
+    const stackSlitAnimationBaseTime = stackSlit.animEnabled
+      ? (slitAnimTimeOverride != null ? slitAnimTimeOverride : performance.now() / 1000)
+      : 0;
+    const stackSlitOffsetAnimationActive = stackSlit.animEnabled
+      && stackSlit.animMode !== 'off'
+      && stackSlit.offsetSpeed !== 0;
+    const stackSlitAnimationTime = stackSlitOffsetAnimationActive
+      ? getSlitAnimationPhase(stackSlitAnimationBaseTime, noiseLoopPeriod, stackSlit.offsetSpeed)
+      : 0;
+    gl.uniform2f(
+      ctx.postprocessUniforms.u_stackSlitParams,
+      roundStackSlit(stackSlit.slitPhase ?? 0),
+      stackSlit.seed,
+    );
+    const stackSlitDeltas: Array<[number, number]> = [];
+    for (const indexKey in stackSlit.slitDeltas ?? {}) {
+      if (!Object.prototype.hasOwnProperty.call(stackSlit.slitDeltas, indexKey)) continue;
+      const index = Number(indexKey);
+      const rawDelta = stackSlit.slitDeltas[index];
+      const delta = stackSlitPixelPerfect ? Math.round(rawDelta) : rawDelta;
+      if (!Number.isFinite(index) || !Number.isFinite(delta) || delta === 0) continue;
+      stackSlitDeltas.push([index, delta]);
+      if (stackSlitDeltas.length === 32) break;
+    }
+    stackSlitDeltas.sort((a, b) => a[0] - b[0]);
+    const stackSlitDeltaUniforms = [
+      'u_stackSlitDelta01', 'u_stackSlitDelta23', 'u_stackSlitDelta45', 'u_stackSlitDelta67',
+      'u_stackSlitDelta89', 'u_stackSlitDeltaAB', 'u_stackSlitDeltaCD', 'u_stackSlitDeltaEF',
+      'u_stackSlitDeltaGH', 'u_stackSlitDeltaIJ', 'u_stackSlitDeltaKL', 'u_stackSlitDeltaMN',
+      'u_stackSlitDeltaOP', 'u_stackSlitDeltaQR', 'u_stackSlitDeltaST', 'u_stackSlitDeltaUV',
+    ] as const;
+    for (let uniformIndex = 0; uniformIndex < stackSlitDeltaUniforms.length; uniformIndex++) {
+      const first = stackSlitDeltas[uniformIndex * 2] ?? [-9999, 0];
+      const second = stackSlitDeltas[uniformIndex * 2 + 1] ?? [-9999, 0];
+      gl.uniform4f(
+        ctx.postprocessUniforms[stackSlitDeltaUniforms[uniformIndex]],
+        first[0], first[1], second[0], second[1],
+      );
+    }
+    setUniform1i(gl, ctx.postprocessUniforms.u_stackSlitAnimEnabled, stackSlitOffsetAnimationActive ? 1 : 0);
+    gl.uniform1f(ctx.postprocessUniforms.u_stackSlitAnimTime, stackSlitAnimationTime);
+    setUniform1i(gl, ctx.postprocessUniforms.u_stackSlitAnimMode, stackSlit.animMode === 'pingpong' ? 1 : 0);
+    setUniform1i(gl, ctx.postprocessUniforms.u_stackSlitPixelPerfect, stackSlitPixelPerfect ? 1 : 0);
+  }
   if ((effectMode === 'glass' || effectMode === 'glassV2') && exportDiagnosticsEnabled()) {
     const destinationTexture = targetFramebuffer === ctx.postprocessFboA
       ? ctx.postprocessTextureA
@@ -2433,7 +2497,7 @@ function drawPostprocessPass(
       fallback: !glassProgram && glassFallbackActive,
     });
   }
-    drawArrays(ctx, effectMode, gl.TRIANGLES, 0, 6);
+    drawArrays(ctx, useNoiseDiffuseStackProgram ? 'Noise + Diffuse' : effectMode, gl.TRIANGLES, 0, 6);
     if (targetFramebuffer === null) ctx.hasPresentedFrame = true;
     return true;
   } catch (error) {
@@ -2497,7 +2561,12 @@ function drawPrismPostprocessPass(
 ): void {
   const { gl } = ctx;
   if (!(ctx.prismProgram || ctx.postprocessProgram) || !ctx.prismCompositeProgram) return;
-  drawPostprocessPass(ctx, sourceTexture, gradient, noiseDistortion, postprocess, 'prism', width, height, fullWidth, fullHeight, offsetX, offsetY, time, noiseLoopPeriod, animationSpeed, applyPostDiffuse, ctx.prismScratchFbo, null, 0, null, useV2Programs);
+  drawPostprocessPass(
+    ctx, sourceTexture, gradient, noiseDistortion, postprocess, 'prism',
+    width, height, fullWidth, fullHeight, offsetX, offsetY, time,
+    noiseLoopPeriod, animationSpeed, applyPostDiffuse,
+    { targetFramebuffer: ctx.prismScratchFbo, useV2Programs },
+  );
 
   const sigma = Math.max(postprocess.prismGlowRadius ?? 0, 0);
   if (sigma <= 0.01) {
@@ -2547,7 +2616,11 @@ function drawPostprocessLayerOutput(
   if (effectMode === 'prism') {
     drawPrismPostprocessPass(ctx, sourceTexture, gradient, noiseDistortion, postprocess, width, height, fullWidth, fullHeight, offsetX, offsetY, time, noiseLoopPeriod, animationSpeed, applyPostDiffuse, targetFramebuffer);
   } else {
-    drawPostprocessPass(ctx, sourceTexture, gradient, noiseDistortion, postprocess, effectMode, width, height, fullWidth, fullHeight, offsetX, offsetY, time, noiseLoopPeriod, animationSpeed, applyPostDiffuse, targetFramebuffer);
+    drawPostprocessPass(
+      ctx, sourceTexture, gradient, noiseDistortion, postprocess, effectMode,
+      width, height, fullWidth, fullHeight, offsetX, offsetY, time,
+      noiseLoopPeriod, animationSpeed, applyPostDiffuse, { targetFramebuffer },
+    );
   }
 }
 
@@ -3444,9 +3517,11 @@ export function render(
       && diffuse.mode === 'legacy'
       && diffuseLayerEnabled;
     const consumedAnalyticLayers = new Set<string>(renderPlan.analyticPrefix.consumedLayers);
-    const mainLayers = imageGradientProtected
-      ? (protectedStipple ? renderPlan.enabledLayers.filter(layer => layer.kind === 'diffuse') : [])
-      : renderPlan.enabledLayers.filter(layer => !consumedAnalyticLayers.has(layer.kind));
+    const mainLayerEntries = renderPlan.enabledLayers
+      .map((layer, index) => ({ layer, index }))
+      .filter(({ layer }) => imageGradientProtected
+        ? protectedStipple && layer.kind === 'diffuse'
+        : !consumedAnalyticLayers.has(layer.kind));
     const normalRequested = renderPlan.normalRequested;
     const normalNeedsBlur = renderPlan.normalNeedsBlur;
     const prismRequested = renderPlan.prismRequested;
@@ -3483,9 +3558,20 @@ export function render(
     // for the Legacy generator unless the analytic prefix explicitly needs
     // the full Generator output.
     const stackCoreReady = !stackCoreRequested || requestLazyProgram(ctx, 'stackCore');
-    const noiseStackReady = imageGradientProtected || !renderPlan.programs.noiseStack || (
+    const noiseDiffuseStackRequested = renderPlan.programs.noiseDiffuseStack;
+    const noiseDiffuseStackFailed = noiseDiffuseStackRequested
+      && (ctx.lazyProgramState.noiseDiffuseStack.failed || ctx.lazyProgramState.noiseDiffuseStack.fallback);
+    const noiseDiffuseStackReady = !noiseDiffuseStackRequested
+      || requestLazyProgram(ctx, 'noiseDiffuseStack');
+    const noiseStackFallbackRequested = !imageGradientProtected
+      && (renderPlan.programs.noiseStack || noiseDiffuseStackFailed);
+    let noiseStackReady = imageGradientProtected || !noiseStackFallbackRequested || (
       stackCoreReady && requestNoiseStackProgram(ctx)
     );
+    const noiseDiffuseStackUsable = noiseDiffuseStackReady && !noiseDiffuseStackFailed;
+    const noiseDiffuseCompositionReady = !noiseDiffuseStackRequested
+      || noiseDiffuseStackUsable
+      || (noiseDiffuseStackFailed && noiseStackReady);
     const glassV2Ready = imageGradientProtected || glassIdentity || !renderPlan.programs.glassV2 || (
       stackCoreReady && noiseStackReady && requestGlassProgram(ctx, 'glassV2')
     );
@@ -3504,7 +3590,7 @@ export function render(
 
     // Lazy programs compile asynchronously. Keep a usable base frame until every
     // requested V2 stage is available instead of presenting a partial stack.
-    if (!generatorReady || !stackCoreReady || !normalReady || !stretchReady || !prismReady || !particlesReady || !seamlessReady || !flowProgramsReady) {
+    if (!generatorReady || !stackCoreReady || !noiseDiffuseCompositionReady || !normalReady || !stretchReady || !prismReady || !particlesReady || !seamlessReady || !flowProgramsReady) {
       // Cloth is a Base generator and does not depend on the stack programs:
       // present the cloth frame even while they compile.
       const clothReady = clothGradient?.enabled
@@ -3629,9 +3715,52 @@ export function render(
     const disabledStackNoise = noiseDistortion.enabled
       ? { ...noiseDistortion, enabled: false }
       : noiseDistortion;
-    for (let layerIndex = 0; layerIndex < mainLayers.length; layerIndex++) {
-      const layer = mainLayers[layerIndex];
+    let presentedToScreen = false;
+    for (let layerIndex = 0; layerIndex < mainLayerEntries.length; layerIndex++) {
+      const { layer, index: planLayerIndex } = mainLayerEntries[layerIndex];
       if (layer.kind === 'diffuse') publishDiffuseTextureHistogram(ctx, currentTexture, vpW, vpH);
+      const useNoiseDiffusePair = renderPlan.programs.noiseDiffuseStack
+        && noiseDiffuseStackUsable
+        && planLayerIndex === renderPlan.noiseDiffuseComposition.noiseLayerIndex
+        && mainLayerEntries[layerIndex + 1]?.index === renderPlan.noiseDiffuseComposition.diffuseLayerIndex;
+      if (useNoiseDiffusePair) {
+        const canPresentNoiseDiffuseDirectly = layerIndex + 2 === mainLayerEntries.length
+          && !prismRequested
+          && !flowActive
+          && !seamlessRequested
+          && !particlesRequested;
+        const target = canPresentNoiseDiffuseDirectly ? null : choosePostprocessTarget(ctx, currentTexture);
+        const layerNoise = { ...noiseDistortion, enabled: true };
+        const passRendered = drawPostprocessPass(
+          ctx, currentTexture, gradient, layerNoise, v2Postprocess, 'noise',
+          vpW, vpH, width, height, tileOx, tileOy, time, noiseLoopPeriod,
+          animationSpeed, true,
+          {
+            targetFramebuffer: target?.fbo ?? null,
+            slitScan,
+            animDirectionDegrees: animDirection,
+            slitAnimTimeOverride,
+            useV2Programs: true,
+            useNoiseDiffuseStack: true,
+          },
+        );
+        if (passRendered) {
+          if (canPresentNoiseDiffuseDirectly) {
+            presentedToScreen = true;
+          } else {
+            currentTexture = target!.texture;
+          }
+          // The combined pass consumed both adjacent logical layers.
+          layerIndex += 1;
+          continue;
+        }
+        // A successful compile does not guarantee that every driver accepts
+        // the draw. Keep both logical layers visible by switching to the
+        // existing standalone Noise/general fallback before continuing.
+        markNoiseDiffuseStackFallback(ctx);
+        noiseStackReady = requestNoiseStackProgram(ctx);
+        if (!noiseStackReady) break;
+      }
       // Noise has its own heavy shader. Keep rendering the remaining V2
       // layers while that program compiles (or if this driver rejects it),
       // rather than pinning Slit/Distort/etc. to the Base-only fallback.
@@ -3641,9 +3770,9 @@ export function render(
       // space. This prevents the slit sampler from stretching the already
       // diffused grid into stripes while keeping the layer order visible.
       const deferDiffuseToSlit = layer.kind === 'diffuse'
-        && mainLayers[layerIndex + 1]?.kind === 'slit';
+        && mainLayerEntries[layerIndex + 1]?.layer.kind === 'slit';
       const diffuseAfterSlit = layer.kind === 'slit'
-        && mainLayers[layerIndex - 1]?.kind === 'diffuse';
+        && mainLayerEntries[layerIndex - 1]?.layer.kind === 'diffuse';
       const target = choosePostprocessTarget(ctx, currentTexture);
       let passRendered = false;
       if (layer.kind === 'stretch') {
@@ -3658,7 +3787,14 @@ export function render(
           vpW, vpH, width, height, tileOx, tileOy, time, noiseLoopPeriod,
           animationSpeed,
           (layer.kind === 'diffuse' && !deferDiffuseToSlit) || diffuseAfterSlit,
-          target.fbo, slitScan, animDirection, slitAnimTimeOverride, true, diffuseAfterSlit,
+          {
+            targetFramebuffer: target.fbo,
+            slitScan,
+            animDirectionDegrees: animDirection,
+            slitAnimTimeOverride,
+            useV2Programs: true,
+            diffuseAfterSlit,
+          },
         );
       }
       if (passRendered) currentTexture = target.texture;
@@ -3707,8 +3843,12 @@ export function render(
     }
     if (particlesRequested && !seamlessRequested) {
       drawParticleOverlay(ctx, currentTexture, gradient, postprocess, vpW, vpH, width, height, tileOx, tileOy, time);
-    } else if (!seamlessRequested) {
-      drawPostprocessPass(ctx, currentTexture, gradient, disabledStackNoise, v2Postprocess, 'diffuse', vpW, vpH, width, height, tileOx, tileOy, time, noiseLoopPeriod, animationSpeed, false, null, null, 0, null, true);
+    } else if (!seamlessRequested && !presentedToScreen) {
+      drawPostprocessPass(
+        ctx, currentTexture, gradient, disabledStackNoise, v2Postprocess, 'diffuse',
+        vpW, vpH, width, height, tileOx, tileOy, time, noiseLoopPeriod,
+        animationSpeed, false, { useV2Programs: true },
+      );
     }
     return;
   }

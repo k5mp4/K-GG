@@ -9,7 +9,17 @@ import webglSource from './webgl.ts?raw';
 function functionSource(name: string): string {
   const start = webglSource.indexOf(`function ${name}(`);
   if (start < 0) throw new Error(`Missing function: ${name}`);
-  const bodyStart = webglSource.indexOf('{', start);
+  let parameterDepth = 0;
+  let bodyStart = -1;
+  for (let index = start; index < webglSource.length; index++) {
+    if (webglSource[index] === '(') parameterDepth++;
+    if (webglSource[index] === ')') parameterDepth--;
+    if (parameterDepth === 0 && webglSource[index] === '{') {
+      bodyStart = index;
+      break;
+    }
+  }
+  if (bodyStart < 0) throw new Error(`Missing body: ${name}`);
   let depth = 0;
   for (let index = bodyStart; index < webglSource.length; index++) {
     if (webglSource[index] === '{') depth++;

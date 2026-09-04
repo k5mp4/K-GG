@@ -99,6 +99,18 @@ describe('webglShaderSources', () => {
     expect(noiseStack).toContain('vec2 noiseDisplaceRaw(');
     expect(noiseStack).toContain('vec2 causticsDistortion(');
     expect(noiseStack).toContain('void main()');
+
+    const noiseDiffuseStack = getProgramSource('noiseDiffuseStack').fragment;
+    expect(noiseDiffuseStack).toContain('#define KGG_STACK_NOISE_ONLY');
+    expect(noiseDiffuseStack).toContain('#define KGG_DIFFUSE_DISPLACEMENT_ONLY');
+    expect(noiseDiffuseStack).toContain('precision highp float;');
+    expect(noiseDiffuseStack).not.toContain('precision mediump float;');
+    expect(noiseDiffuseStack).toContain('vec2 stackNoiseUv(vec2 uv)');
+    expect(noiseDiffuseStack).toContain('vec2 diffusePanelDisplacement(vec2 globalCoord)');
+    expect(noiseDiffuseStack).toContain('Noise -> Diffuse order');
+    expect(noiseDiffuseStack).not.toContain('uniform sampler2D u_gradientRamp;');
+    expect(noiseDiffuseStack.match(/uniform sampler2D u_sourceTex;/g)).toHaveLength(1);
+    expect(noiseDiffuseStack.match(/uniform vec2 u_tileResolution;/g)).toHaveLength(1);
   });
 
   it('declares Caustics and Phasor uniforms once in generator and Noise Stack sources', () => {

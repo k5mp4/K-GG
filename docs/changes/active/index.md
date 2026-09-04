@@ -9,3 +9,4 @@ Active ChangeはDesigned ChangeのPR中だけに置きます。mainへマージ�
 | ID | 変更 | 状態 |
 | --- | --- | --- |
 | CHANGE-043 | [K-GG構造リファクタリング](./CHANGE-043-structural-refactor/proposal) | approved |
+| CHANGE-044 | [Noise→Diffuse旧Generator UV合成のV2フォールバック](./CHANGE-044-noise-diffuse-composition/proposal) | review |
