@@ -2,7 +2,7 @@
 type: change
 id: CHANGE-044
 title: Noise→Diffuse旧Generator UV合成のV2フォールバック
-status: review
+status: archived
 change_kind: B
 owners: [maintainer]
 created: 2026-09-04
@@ -11,7 +11,8 @@ current_specs: [CURRENT-EFFECT-STACK]
 related_adrs: [ADR-0004, ADR-0005, ADR-0017]
 related_code: [src/lib/effectPipeline.ts, src/lib/sceneRenderPlan.ts, src/lib/webgl.ts, src/lib/webglShaderSources.ts, src/shaders/postprocess/diffuse.glsl, src/shaders/postprocess/noise-diffuse-main.glsl]
 related_tests: [src/lib/effectPipeline.test.ts, src/lib/effectShaderParity.test.ts, src/lib/webglExportPrograms.test.ts, src/lib/webglShaderSources.test.ts]
-human_review: required
+human_review: completed
+outcome: merged
 ---
 
 # CHANGE-044 Noise→Diffuse旧Generator UV合成のV2フォールバック
@@ -67,3 +68,9 @@ human_review: required
 ## 未決定事項
 
 なし。Texture Stack fallbackは、既存のanalytic prefixを保持し、prefixで消費できない隣接`Noise → Diffuse`だけを専用1-passで補完する方針に確定した。
+
+## Finalization
+
+- Finalized: 2026-09-04
+- Outcome: `merged`
+- Mode: normal implementation finalization.

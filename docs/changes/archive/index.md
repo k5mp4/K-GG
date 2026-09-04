@@ -40,3 +40,5 @@ Archiveは過去の変更履歴です。現在の動作を確認するときは�
 | CHANGE-040 | [WebGL2 Capability Gate for SANDBOX 3D Fallback](./CHANGE-040-webgl2-capability-fallback/proposal) | archived |
 | CHANGE-041 | [Noise UI共通プロパティとタイプ順序](./CHANGE-041-noise-ui-order/proposal) | archived |
 | CHANGE-042 | [Request-first開発フローへの移行](./CHANGE-042-development-flow-redesign/proposal) | archived |
+| CHANGE-043 | [K-GG構造リファクタリング](./CHANGE-043-structural-refactor/proposal) | archived |
+| CHANGE-044 | [Noise→Diffuse旧Generator UV合成のV2フォールバック](./CHANGE-044-noise-diffuse-composition/proposal) | archived |
