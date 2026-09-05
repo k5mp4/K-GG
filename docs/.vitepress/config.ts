@@ -36,6 +36,7 @@ export default defineConfig({
             { text: 'アーキテクチャ', link: '/development/architecture' },
             { text: '開発・検証', link: '/development/development-guide' },
             { text: 'DocDD運用', link: '/development/docdd' },
+            { text: 'README用ビジュアル素材', link: '/development/readme-visual-assets' },
             { text: 'MCP Developer Interface', link: '/development/mcp' },
           ],
         },

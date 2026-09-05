@@ -1,136 +1,180 @@
 # K-GG
 
-K-GG is a gradient generator for KAGARIBI visual production. It supports still-image export, slit-scan style output, animation preview, PNG sequence export, and Tauri desktop video encoding.
+[英語版](README.en.md)
 
-K-GG は KAGARIBI 関連のビジュアル制作向けグラデーション生成ツールです。静止画書き出し、スリットスキャン風の出力、アニメーションプレビュー、PNG 連番書き出し、Tauri デスクトップ版での動画エンコードに対応しています。
+K-GGは、KAGARIBIのビジュアル制作向けのWebGLベースのグラデーションジェネレーターです。色とエフェクトを編集し、静止画・PNGシーケンスを書き出せます。公開中のWindowsデスクトップ版では、外部FFmpegを利用したMOV/MP4書き出しにも対応します。
 
-webアプリケーション版: https://kagaribi15-grad.ke-goworks.com/
+[Web版を開く](https://kagaribi15-grad.ke-goworks.com/)
 
-## Requirements / 必要環境
+[Windows x64版をダウンロード](https://github.com/k5mp4/K-GG/releases/latest) · [使い方を見る](docs/index.md)
 
-- Node.js 22.12.0 or later / Node.js 22.12.0 以上
-- npm 10.9.0 or later / npm 10.9.0 以上
-- Rust toolchain, only when building the Tauri desktop app / Tauri デスクトップ版をビルドする場合のみ Rust toolchain
-- FFmpeg, required for MOV/MP4 video export in the Tauri desktop app / Tauri デスクトップ版で MOV/MP4 動画を書き出す場合は FFmpeg
+## ビジュアルプレビュー
 
-FFmpeg must be available as the `ffmpeg` command in your PATH. PNG sequence ZIP export does not require FFmpeg.
+READMEのヒーロー画像は、プロジェクトオーナーから提供され承認された完成出力を待っている状態です。必要な素材の仕様・配置・承認条件は[README用ビジュアル素材仕様](docs/development/readme-visual-assets.md)にまとめています。生成画像やサンプル画像、存在しない画像へのリンクは配置していません。
 
-FFmpeg は `ffmpeg` コマンドとして PATH から実行できる状態にしてください。PNG 連番 ZIP 書き出しには FFmpeg は不要です。
+## 何が作れるか
 
-Example install commands / インストール例:
+- **グラデーション** — Linear、Radial、4-color、Diamond、Angle、Bezier、Mesh。Meshは、編集可能なコーナー色とBézierハンドルを持つ単一の2×2 Coons Patchです。
+- **エフェクトスタック** — Diffuse、Noise、Slit、Stretch、Distort、Mirror、Kaleidoscope、Voronoi、Glassなどを重ねられます。
+- **画像とモーション** — 画像をグラデーションソースやオーバーレイ・マスクとして使い、Static / Auto / Keysのアニメーションをプレビューして、静止画やPNGシーケンスを書き出せます。
+- **高度な表示** — SANDBOXのCloth、Cone、Normal Map、Prism、Particles、Flow Gradient、Seamlessで、3D表現や試験的な見た目を試せます。
+
+グラデーション、画像ソース、マスク、エフェクトスタック、アニメーション、プリセットを組み合わせて、静止画からモーション用の素材まで作成できます。
+
+## 機能の位置づけ
+
+以下は現在の製品画面と仕様に基づく位置づけです。すべてのモジュールが同じ実行環境やプラットフォーム対応範囲を持つことを保証するものではありません。
+
+| 位置づけ | 現在の範囲 |
+| --- | --- |
+| 標準利用 | グラデーション編集、Image Gradient Source、画像オーバーレイ・マスク、メインのEffect Stack、アニメーションプレビュー、プリセット管理、画像書き出し、PNGシーケンスZIP書き出し。 |
+| 試験運用 / Beta | SANDBOXの**Cloth**と**Normal Map**はBeta表示です。**After Effects Connect**もBetaです。 |
+| SANDBOX / 高度な機能 | SANDBOXは独立した高度な表示領域です。メインのEffect Stackとは別のモジュールであり、3D・GPU・Bridgeの動作は実行環境に依存する場合があります。 |
+| Windowsデスクトップ版 | 公開中のデスクトップ版はWindows x64です。MOV/MP4書き出しは、外部FFmpegを検出できる場合に利用できます。 |
+
+## Windowsデスクトップ版のクイックスタート
+
+1. [最新版のWindows x64版](https://github.com/k5mp4/K-GG/releases/latest)をダウンロードしてインストールします。
+2. プリセットを使うかエディターでグラデーションを作り、**Export**を開きます。
+3. PNGと画像シーケンスの書き出しにFFmpegは不要です。MOV/MP4には、[ユーザーガイド](docs/index.md)にある方法で外部の`ffmpeg.exe`を用意します。
+4. 公開中のインストーラーはAuthenticode署名がないため、初回インストール時にWindows SmartScreenの警告が表示される場合があります。続行する前に、公式の[GitHub Release](https://github.com/k5mp4/K-GG/releases/latest)から取得したファイルであることを確認してください。
+
+詳しい操作は[ユーザーガイド](docs/index.md)を参照してください。デスクトップ版の配布物・アップデート・FFmpegのRelease Gate確認事項は[リリースガイド](docs/development/releasing.md)にまとめています。
+
+## 必要環境
+
+### Windowsデスクトップ版を使う場合
+
+- 公開インストーラーはWindows x64向けです。
+- 外部FFmpegはMOV/MP4書き出しにのみ必要です。
+- GPUとドライバーの対応状況は、WebGL2とSANDBOX/3D表示の結果に影響する場合があります。
+
+### K-GGを開発する場合
+
+- Node.js `22.12.0`、npm `>=10.9.0`。
+- デスクトップ版をビルドする場合はRustとTauriの前提環境。
+- FFmpegはネイティブ動画の検証に必要ですが、ブラウザ開発サーバーには不要です。
+
+FFmpegは`ffmpeg`コマンドとしてPATHから実行できる状態にしてください。Windowsでは次のコマンドで導入できます。
 
 ```sh
-# Windows
 winget install Gyan.FFmpeg
-
-# macOS
-brew install ffmpeg
-
-# Ubuntu / Debian
-sudo apt install ffmpeg
 ```
 
-Verify FFmpeg / FFmpeg の確認:
+導入状態は次のコマンドで確認できます。
 
 ```sh
 ffmpeg -version
 ```
 
-## Development / 開発
+## 開発者向けクイックスタート
+
+依存関係をインストールします。
 
 ```sh
-npm install
-npm run dev
+npm ci
 ```
 
-For local-only Vite access / ローカルホスト限定で起動する場合:
+長時間実行されるため、次のどちらか一方を起動します。
 
 ```sh
-npm run dev:local
+npm run dev:local       # ブラウザ版
 ```
 
-## Build / ビルド
+```sh
+npm run tauri:dev       # Tauriデスクトップ版
+```
+
+開発サーバーを停止してから検証を実行します。
+
+```sh
+npm run check:fast      # 型検査、テスト、Lint、ビルド、Docsチェック
+npm run docs:check      # Docsの参照とindexを検証
+npm run docs:build      # VitePress Docsサイトをビルド
+```
+
+開発ワークフロー、検証ゲート、ネイティブ確認の全体像は[開発者向けガイド](docs/development/index.md)を参照してください。[DocsDD運用](docs/development/docdd.md)では、現行動作・設計判断・変更履歴の置き場所を説明しています。
+
+## ビルドとリリース検証
+
+フロントエンドの本番ビルド、Tauriデスクトップ版、Windows x64 NSISインストーラーは次のコマンドで個別に生成できます。
 
 ```sh
 npm run build
-```
-
-For the desktop app / デスクトップアプリをビルドする場合:
-
-```sh
 npm run tauri:build
-```
-
-For a signed Windows x64 NSIS installer / 署名付きWindows x64 NSISインストーラー:
-
-```sh
 npm run tauri:build:windows
 ```
 
-Run all branch checks / ブランチ検証を一括実行:
+リリース設定・高速検証・Rust検証をまとめて実行する場合は`npm run verify`を使います。`npm run verify:windows`はローカルのWindows環境専用で、`%USERPROFILE%\.tauri\k-gg.key`に更新署名秘密鍵を置き、署名鍵のパスワードを対話入力してからWindowsインストーラーを生成します。GitHub Actionsで公開リリースを作る場合は、`release` Environmentの`TAURI_SIGNING_PRIVATE_KEY`と`TAURI_SIGNING_PRIVATE_KEY_PASSWORD`を使う[リリースワークフロー](.github/workflows/release.yml)を参照してください。どちらも通常のプルリクエストでは実行しません。
 
 ```sh
 npm run verify
-```
-
-Run all checks and build the signed Windows installer / 検証と署名付きWindowsインストーラー生成を一括実行:
-
-```sh
 npm run verify:windows
 ```
 
-## Windows Releases and Updates / Windows版の配布と更新
+## アーキテクチャとリポジトリ構成
 
-Windows x64 desktop releases are distributed from [GitHub Releases](https://github.com/k5mp4/K-GG/releases). Production builds check the latest published release at startup and let the user choose when to download and install it. Updates are never downloaded or installed automatically.
+主要な処理経路は次のとおりです。
 
-Windows x64デスクトップ版は[GitHub Releases](https://github.com/k5mp4/K-GG/releases)から配布します。本番版は起動時に公開済みの最新版を確認し、利用者が選んだタイミングでダウンロード・インストールします。自動ダウンロードや強制更新は行いません。
+```text
+React UI → application commands → Zustand state → scene evaluation
+         → render plan/frame bridge → WebGL2 canvas
+         → export adapter
+```
 
-The initial installer is protected by the Tauri updater signature but does not yet use Windows Authenticode code signing. Microsoft Defender SmartScreen may therefore display a warning when installing it for the first time.
+```text
+src/                  React UI、state、evaluation、WebGL renderer、export adapters
+src-tauri/            Windows/Tauri shell、native export、updater連携
+docs/                 ユーザーガイド、開発Docs、現行仕様、ADR、履歴
+tools/                Docsと開発用のユーティリティ
+```
 
-初回インストーラーにはTauriの更新署名を使用しますが、Windows Authenticodeコード署名はまだ使用しません。そのため、初回インストール時にMicrosoft Defender SmartScreenの警告が表示される場合があります。
+維持管理している技術概要は[アーキテクチャガイド](docs/development/architecture.md)にあります。このREADMEでは入口として必要な情報に絞り、内部仕様の重複は避けています。
 
-Maintainers must complete the updater key and GitHub Environment setup before creating a release. See the [Windows release guide](docs/releasing.md).
+## ドキュメント
 
-管理者はリリース前に更新署名鍵とGitHub Environmentを設定する必要があります。詳しくは[Windows版リリース手順](docs/releasing.md)を参照してください。
-
-## Documentation / ドキュメント
+開発Docsサイトを起動する場合は次のコマンドを使います。
 
 ```sh
 npm run docs:dev
-npm run docs:check
-npm run docs:build
 ```
 
-Developer onboarding and the DocDD workflow start at the [developer documentation](docs/development/index.md). Feature intent is managed in [specifications](docs/specs/index.md), and long-term technical decisions are recorded in [ADRs](docs/adr/index.md).
+| 目的 | 入口 |
+| --- | --- |
+| 使い方 | [docs/index.md](docs/index.md) |
+| 開発者向け | [docs/development/index.md](docs/development/index.md) |
+| 現行仕様 | [docs/specs/current/](docs/specs/current/) |
+| アーキテクチャ | [docs/development/architecture.md](docs/development/architecture.md) |
+| 設計判断 / ADR | [docs/adr/](docs/adr/) |
+| Releaseとネイティブ確認 | [docs/development/releasing.md](docs/development/releasing.md) |
+| README用ビジュアル素材 | [docs/development/readme-visual-assets.md](docs/development/readme-visual-assets.md) |
 
-開発参加者は、最初に[開発者向けドキュメント](docs/development/index.md)を参照してください。機能の意図は[仕様書](docs/specs/index.md)、長期的な技術判断は[ADR](docs/adr/index.md)で管理します。変更前に仕様を合意し、コード・テスト・文書を同じPull Requestで同期するDocDDを採用しています。
+## コントリビュートとIssue
 
-See [CONTRIBUTING.md](CONTRIBUTING.md) for the contribution workflow.
+プルリクエストの前に[CONTRIBUTING.md](CONTRIBUTING.md)と[開発ワークフロー](docs/development/workflow.md)を確認してください。バグ、機能提案、Docs改善、再現条件の共有は、公開追跡が必要な場合は[GitHub Issues](https://github.com/k5mp4/K-GG/issues)を利用できます。直接のRequestやプルリクエストも有効な入口です。
 
-## Public Repository Notes / 公開リポジトリ向けメモ
+## リリース
 
-This repository intentionally excludes local AI/tooling settings, dependency folders, build outputs, logs, and VitePress caches through `.gitignore`.
+- [最新版](https://github.com/k5mp4/K-GG/releases/latest)
+- [リリース一覧](https://github.com/k5mp4/K-GG/releases)
+- [リリースガイド](docs/development/releasing.md)
 
-このリポジトリでは、ローカルの AI/ツール設定、依存関係フォルダ、ビルド成果物、ログ、VitePress キャッシュを `.gitignore` で除外しています。
+公開中のデスクトップ配布物はWindows x64インストーラーです。各バージョンの配布物とネイティブ環境の前提はリリースノートに記載されるため、固定バージョンのリンクではなくリリースページを利用してください。
 
-K-GG is distributed under the Apache License 2.0. See `LICENSE`.
+本番版は起動時に公開済みの最新版を確認し、利用者が選んだタイミングでダウンロード・インストールします。自動ダウンロードや強制更新は行いません。初回インストーラーにはTauri updaterの署名がありますが、Windows Authenticodeコード署名はないため、初回インストール時にWindows SmartScreenの警告が表示される場合があります。
 
-K-GG は Apache License 2.0 の下で配布されています。詳細は `LICENSE` を参照してください。
+管理者はリリース前に更新署名鍵とGitHub Environmentを設定してください。詳しくは[リリースガイド](docs/development/releasing.md)を参照してください。
 
-## License and Publishing Notes / ライセンスと公開時の注意
+## 公開リポジトリについて
 
-The source code for K-GG is licensed under Apache License 2.0. The app output generated by users, such as images, video, and PNG sequences, may be used for personal, non-commercial, or commercial purposes. Users are responsible for rights clearance for any third-party materials they import or overlay.
+このリポジトリでは、ローカルのAI・ツール設定、依存関係フォルダー、ビルド成果物、ログ、VitePressのキャッシュを`.gitignore`で除外しています。
 
-K-GG のソースコードは Apache License 2.0 です。K-GG で生成した画像、動画、PNG 連番などの成果物は、個人利用・非商用利用・商用利用を問わず利用できます。ただし、取り込んだ画像、ロゴ、キャラクター、商標、イベント素材など第三者素材の権利確認は利用者の責任で行ってください。
+## ライセンスと公開時の注意
 
-Third-party notices are summarized in `NOTICE`. Current npm and Cargo dependency review found permissive licenses as the majority, with MPL-2.0 components included through the Tauri/Rust dependency tree. MPL-2.0 applies to those third-party components and does not change K-GG's Apache-2.0 license.
+K-GGのソースコードは[Apache License 2.0](LICENSE)です。K-GGで生成した画像、動画、PNG連番などの成果物は、個人利用・非商用利用・商用利用を問わず利用できます。ただし、取り込んだ画像、ロゴ、キャラクター、商標、イベント素材など第三者素材の権利確認は利用者の責任で行ってください。
 
-第三者ライセンスの要点は `NOTICE` にまとめています。現在の npm / Cargo 依存関係では MIT、Apache-2.0、BSD、ISC 系が中心で、Tauri/Rust 依存ツリーに MPL-2.0 のコンポーネントが含まれます。MPL-2.0 は該当する第三者コンポーネントに適用され、K-GG 本体の Apache-2.0 ライセンスを変更するものではありません。
+第三者ライセンスの要点は[NOTICE](NOTICE)にまとめています。現在のnpm / Cargo依存関係ではMIT、Apache-2.0、BSD、ISC系が中心で、Tauri/Rust依存ツリーにMPL-2.0のコンポーネントが含まれます。MPL-2.0は該当する第三者コンポーネントに適用され、K-GG本体のApache-2.0ライセンスを変更するものではありません。
 
-K-GG does not bundle FFmpeg. The desktop app calls the user's externally installed `ffmpeg` command for MOV/MP4 export. FFmpeg licensing depends on the installed build; see the FFmpeg legal page before redistributing any FFmpeg binary with K-GG.
+K-GGはFFmpegを同梱・配布していません。デスクトップ版はMOV/MP4書き出し時に、利用者がK-GG専用のローカルデータ領域`<app_local_data_dir>/ffmpeg/ffmpeg.exe`へ配置したファイル、またはシステムのPATHにある`ffmpeg`コマンドを別プロセスで呼び出します。FFmpegのライセンスは利用するビルドに依存します。FFmpegをK-GGと一緒に再配布する場合は、[FFmpegのライセンス情報](https://ffmpeg.org/legal.html)と配布元の条件を確認してください。
 
-K-GG は FFmpeg を同梱していません。デスクトップ版は MOV/MP4 書き出し時に、利用者環境へ別途インストールされた `ffmpeg` コマンドを呼び出します。将来 FFmpeg バイナリを同梱して配布する場合は、配布する FFmpeg ビルドのライセンスを個別に確認してください。
-
-GSAP is used for UI animation and is licensed under the GSAP Standard License, not MIT. Commercial use is generally allowed under that license, but if K-GG is repositioned or sold as an animation-authoring service or a tool competing with Webflow-style visual animation builders, review the GSAP license or replace GSAP before publication.
-
-GSAP は UI アニメーション用途で使用しており、MIT ではなく GSAP Standard License です。商用利用は一般に許可されていますが、K-GG をアニメーション制作サービスや Webflow 系のビジュアルアニメーション制作ツールと競合する形で公開・販売する場合は、公開前に GSAP ライセンスを確認するか、GSAP 依存を外してください。
+GSAPはUIアニメーションに使用しており、MITではなくGSAP Standard Licenseが適用されます。一般的な商用利用は許可されますが、K-GGをアニメーション制作サービスやWebflow系のビジュアルアニメーション制作ツールと競合する形で公開・販売する場合は、公開前にGSAPライセンスを確認するか、GSAP依存を外してください。
