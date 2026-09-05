@@ -4,7 +4,7 @@ import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import { chromium } from '@playwright/test';
-import { writeJson } from './render-capture-lib.mjs';
+import { assertFixedGpuManifest, isSoftwareRenderer, writeJson } from './render-capture-lib.mjs';
 
 const execFile = promisify(execFileCallback);
 const root = process.cwd();
@@ -12,14 +12,11 @@ const port = Number(process.env.KGG_E2E_PORT ?? 4173);
 const outputDirectory = path.resolve(argumentValue('--output', process.env.KGG_CAPTURE_OUTPUT ?? path.join('test-results', `render-capture-${Date.now()}`)));
 const baseURL = `http://127.0.0.1:${port}`;
 const fixedGpu = process.env.KGG_E2E_GPU === '1';
+const runnerFingerprint = process.env.KGG_CAPTURE_RUNNER_FINGERPRINT ?? null;
 
 function argumentValue(name, fallback) {
   const index = process.argv.indexOf(name);
   return index >= 0 ? process.argv[index + 1] ?? fallback : fallback;
-}
-
-function isSoftwareRenderer(value) {
-  return /swiftshader|llvmpipe|warp|microsoft basic render|software renderer|software raster/i.test(String(value));
 }
 
 async function currentCommit() {
@@ -86,13 +83,30 @@ function bridgeEvaluation(page, callback, value) {
   return page.evaluate(callback, value);
 }
 
+async function readRunnerInventory() {
+  const inventoryPath = process.env.KGG_CAPTURE_RUNNER_INVENTORY;
+  if (!inventoryPath) return null;
+  try {
+    const inventory = JSON.parse(await readFile(path.resolve(root, inventoryPath), 'utf8'));
+    return {
+      condition: inventory.condition ?? null,
+      fingerprint: inventory.fingerprint ?? null,
+    };
+  } catch (error) {
+    throw new Error(`Unable to read fixed-GPU runner inventory: ${error instanceof Error ? error.message : String(error)}`);
+  }
+}
+
 async function main() {
   await mkdir(outputDirectory, { recursive: true });
   const errors = [];
   const server = startVite();
   let browser;
   let manifest;
+  let runnerInventory;
   try {
+    runnerInventory = await readRunnerInventory();
+    const captureFingerprint = runnerFingerprint ?? runnerInventory?.fingerprint ?? null;
     await waitForServer(`${baseURL}/`, server.child);
     browser = await chromium.launch({
       headless: process.env.KGG_CAPTURE_HEADLESS !== '0',
@@ -140,8 +154,14 @@ async function main() {
       return bridge.getRenderCondition();
     });
     const gpu = prepared.webgl.gpu;
-    if (fixedGpu && isSoftwareRenderer(JSON.stringify(gpu))) {
-      throw new Error(`Fixed-GPU capture resolved to a software renderer: ${JSON.stringify(gpu)}`);
+    if (fixedGpu) {
+      if (!captureFingerprint || !runnerInventory?.condition) {
+        throw new Error('Fixed-GPU capture requires a runner fingerprint and inventory from the runner inventory step');
+      }
+      const unmaskedRenderer = gpu?.webgl?.unmaskedRenderer;
+      if (!unmaskedRenderer || isSoftwareRenderer(unmaskedRenderer) || isSoftwareRenderer(gpu?.webgl?.renderer)) {
+        throw new Error(`Fixed-GPU capture resolved to an unknown or software renderer: ${JSON.stringify(gpu)}`);
+      }
     }
 
     const frames = [];
@@ -197,12 +217,16 @@ async function main() {
         id: process.env.KGG_CAPTURE_RUNNER_ID || process.env.GITHUB_RUNNER_NAME || process.env.COMPUTERNAME || os.hostname(),
         platform: process.platform,
         arch: process.arch,
+        ...(captureFingerprint ? { environmentFingerprint: captureFingerprint } : {}),
+        ...(runnerInventory ? { inventory: runnerInventory } : {}),
       },
       browser: {
         name: 'chromium',
         version: browser.version(),
         headless: process.env.KGG_CAPTURE_HEADLESS !== '0',
         gpuMode: fixedGpu ? 'fixed-gpu' : 'swiftshader',
+        binaryPath: chromium.executablePath(),
+        launchArgs: fixedGpu ? ['--enable-gpu'] : ['--use-angle=swiftshader'],
       },
       playwrightVersion: await playwrightVersion(),
       canvas: { ...contract.resolution },
@@ -214,6 +238,7 @@ async function main() {
       frames,
       errors,
     };
+    if (fixedGpu) assertFixedGpuManifest(manifest);
     await writeJson(path.join(outputDirectory, 'capture.json'), manifest);
     if (errors.length > 0) throw new Error(`Browser capture reported errors:\n${errors.join('\n')}`);
     console.log(JSON.stringify({ status: 'pass', manifest: path.join(outputDirectory, 'capture.json'), frames: frames.length, fixedGpu }, null, 2));
@@ -224,8 +249,20 @@ async function main() {
       kind: 'kgg-render-rgba-capture',
       capturedAt: new Date().toISOString(),
       commitSha: await currentCommit(),
-      runner: { id: process.env.KGG_CAPTURE_RUNNER_ID || process.env.GITHUB_RUNNER_NAME || process.env.COMPUTERNAME || os.hostname(), platform: process.platform, arch: process.arch },
-      browser: { name: 'chromium', version: 'unknown', gpuMode: fixedGpu ? 'fixed-gpu' : 'swiftshader' },
+      runner: {
+        id: process.env.KGG_CAPTURE_RUNNER_ID || process.env.GITHUB_RUNNER_NAME || process.env.COMPUTERNAME || os.hostname(),
+        platform: process.platform,
+        arch: process.arch,
+        ...(runnerFingerprint ? { environmentFingerprint: runnerFingerprint } : {}),
+        ...(runnerInventory ? { inventory: runnerInventory } : {}),
+      },
+      browser: {
+        name: 'chromium',
+        version: 'unknown',
+        gpuMode: fixedGpu ? 'fixed-gpu' : 'swiftshader',
+        binaryPath: chromium.executablePath(),
+        launchArgs: fixedGpu ? ['--enable-gpu'] : ['--use-angle=swiftshader'],
+      },
       playwrightVersion: await playwrightVersion(),
       canvas: { width: 1, height: 1 },
       renderContract: null,

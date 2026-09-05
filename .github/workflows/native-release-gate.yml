@@ -36,7 +36,30 @@ jobs:
       - name: Install frontend dependencies
         run: npm ci
 
-      - name: Run Rust and Adapter Merge Gate tests
+      - name: Record native runner identity
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          New-Item -ItemType Directory -Force -Path test-results | Out-Null
+          $details = [ordered]@{
+            schemaVersion = 1
+            kind = 'kgg-native-runner'
+            commitSha = (git rev-parse HEAD).Trim()
+            runnerName = $env:RUNNER_NAME
+            os = (Get-CimInstance Win32_OperatingSystem | Select-Object -ExpandProperty Caption)
+            osVersion = [System.Environment]::OSVersion.VersionString
+            node = (node --version).Trim()
+            rust = (rustc --version).Trim()
+            ffmpegSource = if ($env:KGG_FFMPEG_PATH) { 'KGG_FFMPEG_PATH' } else { 'PATH' }
+            ffprobeSource = if ($env:KGG_FFPROBE_PATH) { 'KGG_FFPROBE_PATH' } else { 'PATH' }
+            capturedAt = (Get-Date).ToUniversalTime().ToString('o')
+          }
+          $details | ConvertTo-Json -Depth 6 | Set-Content -Path test-results/native-runner.json -Encoding utf8
+
+      - name: Run Tauri adapter contract tests
+        run: npm test -- src/adapters/tauri
+
+      - name: Run Rust Merge Gate tests
         run: npm run check:native
 
       - name: Run real FFmpeg/ffprobe process smoke

@@ -34,9 +34,22 @@ function requireString(value, field) {
   return value;
 }
 
+function optionalString(value, field) {
+  if (value !== undefined && value !== null && (typeof value !== 'string' || value.length === 0)) {
+    fail(`${field} must be a non-empty string when present`);
+  }
+  return value ?? null;
+}
+
 function requirePositiveInteger(value, field) {
   if (!Number.isInteger(value) || value < 1) fail(`${field} must be a positive integer`);
   return value;
+}
+
+const SOFTWARE_RENDERER_PATTERN = /swiftshader|llvmpipe|warp|microsoft basic render|gdi generic|swrast|softpipe|software renderer|software raster/i;
+
+export function isSoftwareRenderer(value) {
+  return SOFTWARE_RENDERER_PATTERN.test(String(value ?? ''));
 }
 
 function validateManifest(manifest) {
@@ -49,14 +62,35 @@ function validateManifest(manifest) {
   requireString(manifest.runner.id, 'runner.id');
   requireString(manifest.runner.platform, 'runner.platform');
   requireString(manifest.runner.arch, 'runner.arch');
+  optionalString(manifest.runner.environmentFingerprint, 'runner.environmentFingerprint');
+  if (manifest.runner.inventory !== undefined) {
+    if (!isRecord(manifest.runner.inventory)) fail('runner.inventory must be an object when present');
+    if (manifest.runner.inventory.condition !== undefined && !isRecord(manifest.runner.inventory.condition)) {
+      fail('runner.inventory.condition must be an object when present');
+    }
+    optionalString(manifest.runner.inventory.fingerprint, 'runner.inventory.fingerprint');
+  }
   if (!isRecord(manifest.browser)) fail('browser is missing');
   requireString(manifest.browser.name, 'browser.name');
   requireString(manifest.browser.version, 'browser.version');
+  optionalString(manifest.browser.binaryPath, 'browser.binaryPath');
+  if (manifest.browser.launchArgs !== undefined) {
+    if (!Array.isArray(manifest.browser.launchArgs) || manifest.browser.launchArgs.some(value => typeof value !== 'string')) {
+      fail('browser.launchArgs must be an array of strings when present');
+    }
+  }
   requireString(manifest.playwrightVersion, 'playwrightVersion');
   if (!isRecord(manifest.canvas)) fail('canvas is missing');
   requirePositiveInteger(manifest.canvas.width, 'canvas.width');
   requirePositiveInteger(manifest.canvas.height, 'canvas.height');
   if (!isRecord(manifest.renderContract)) fail('renderContract is missing');
+  if (manifest.webgl !== undefined) {
+    if (!isRecord(manifest.webgl)) fail('webgl must be an object when present');
+    optionalString(manifest.webgl.executionMode, 'webgl.executionMode');
+    if (manifest.webgl.gpu !== undefined && manifest.webgl.gpu !== null && !isRecord(manifest.webgl.gpu)) {
+      fail('webgl.gpu must be an object when present');
+    }
+  }
   if (!Array.isArray(manifest.frames) || manifest.frames.length === 0) fail('frames must be non-empty');
   if (!Array.isArray(manifest.errors)) fail('errors must be an array');
   for (const [index, frame] of manifest.frames.entries()) {
@@ -78,6 +112,49 @@ function validateManifest(manifest) {
       fail(`frames[${index}].file must be a relative path inside the capture directory`);
     }
   }
+}
+
+/**
+ * A fixed-GPU capture is only useful when the runner identity and the actual
+ * WebGL renderer are both observable. Do not infer a hardware result from a
+ * Chromium launch flag alone: Chromium can silently fall back to SwiftShader.
+ */
+export function assertFixedGpuManifest(manifest) {
+  validateManifest(manifest);
+  if (manifest.browser.gpuMode !== 'fixed-gpu') {
+    throw new Error('Fixed GPU capture must use browser.gpuMode=fixed-gpu');
+  }
+  if (manifest.webgl?.executionMode !== 'fixed-gpu') {
+    throw new Error('Fixed GPU capture must use webgl.executionMode=fixed-gpu');
+  }
+  if (!/^[0-9a-f]{64}$/i.test(manifest.runner.environmentFingerprint ?? '')) {
+    throw new Error('Fixed GPU capture is missing runner.environmentFingerprint');
+  }
+  const inventory = manifest.runner.inventory;
+  const condition = inventory?.condition;
+  if (!isRecord(inventory) || !isRecord(condition) || !Array.isArray(condition.gpu) || condition.gpu.length === 0
+    || typeof condition.os !== 'string' || condition.os.length === 0
+    || typeof condition.osVersion !== 'string' || condition.osVersion.length === 0
+    || condition.gpu.some(adapter => !isRecord(adapter)
+      || typeof adapter.Name !== 'string' || adapter.Name.length === 0
+      || typeof adapter.DriverVersion !== 'string' || adapter.DriverVersion.length === 0)) {
+    throw new Error('Fixed GPU capture is missing the Windows GPU runner inventory');
+  }
+  if (inventory.fingerprint !== manifest.runner.environmentFingerprint) {
+    throw new Error('Fixed GPU runner inventory fingerprint does not match the capture fingerprint');
+  }
+  const webgl = manifest.webgl?.gpu?.webgl;
+  if (!isRecord(webgl)) throw new Error('Fixed GPU capture is missing WebGL GPU diagnostics');
+  if (typeof webgl.renderer !== 'string' || webgl.renderer.trim().length === 0) {
+    throw new Error('Fixed GPU capture is missing the WebGL renderer');
+  }
+  if (typeof webgl.unmaskedRenderer !== 'string' || webgl.unmaskedRenderer.trim().length === 0) {
+    throw new Error('Fixed GPU capture is missing the unmasked WebGL renderer');
+  }
+  if (isSoftwareRenderer(webgl.unmaskedRenderer) || isSoftwareRenderer(webgl.renderer)) {
+    throw new Error(`Fixed GPU capture resolved to a software renderer: ${webgl.unmaskedRenderer}`);
+  }
+  return manifest;
 }
 
 export async function readCaptureManifest(manifestPath) {
@@ -118,10 +195,13 @@ function environmentDifferences(first, second) {
     ['runner.id', first.runner.id, second.runner.id],
     ['runner.platform', first.runner.platform, second.runner.platform],
     ['runner.arch', first.runner.arch, second.runner.arch],
+    ['runner.environmentFingerprint', first.runner.environmentFingerprint ?? null, second.runner.environmentFingerprint ?? null],
     ['browser.name', first.browser.name, second.browser.name],
     ['browser.version', first.browser.version, second.browser.version],
     ['browser.headless', first.browser.headless ?? null, second.browser.headless ?? null],
     ['browser.gpuMode', first.browser.gpuMode ?? null, second.browser.gpuMode ?? null],
+    ['browser.binaryPath', first.browser.binaryPath ?? null, second.browser.binaryPath ?? null],
+    ['browser.launchArgs', stableJson(first.browser.launchArgs ?? null), stableJson(second.browser.launchArgs ?? null)],
     ['playwrightVersion', first.playwrightVersion, second.playwrightVersion],
     ['canvas', stableJson(first.canvas), stableJson(second.canvas)],
     ['renderContract', stableJson(first.renderContract ?? null), stableJson(second.renderContract ?? null)],
@@ -149,9 +229,21 @@ function eligibilityFor(first, second, mode, eligibilityReport) {
     ...captureErrors(second, 'second'),
     ...environmentDifferences(first.manifest, second.manifest),
   ];
+  if (first.manifest.browser.gpuMode === 'fixed-gpu' || second.manifest.browser.gpuMode === 'fixed-gpu') {
+    for (const [label, capture] of [['first', first.manifest], ['second', second.manifest]]) {
+      try {
+        assertFixedGpuManifest(capture);
+      } catch (error) {
+        reasons.push(`${label} fixed GPU environment is invalid: ${error instanceof Error ? error.message : String(error)}`);
+      }
+    }
+  }
   if (first.frames.length !== second.frames.length) reasons.push('frame count differs');
   if (mode === 'reproducibility' && first.manifest.commitSha !== second.manifest.commitSha) {
     reasons.push('commitSha differs for reproducibility comparison');
+  }
+  if (mode === 'base-head' && first.manifest.commitSha === second.manifest.commitSha) {
+    reasons.push('base/head commitSha must differ');
   }
   if (mode === 'base-head') {
     if (!eligibilityReport) {
@@ -173,6 +265,22 @@ function eligibilityFor(first, second, mode, eligibilityReport) {
       if (stableJson(priorFirst.browser ?? null) !== stableJson(first.manifest.browser)
         || stableJson(priorSecond.browser ?? null) !== stableJson(first.manifest.browser)) {
         reasons.push('The prior reproducibility report does not describe the current browser');
+      }
+      if (priorFirst.playwrightVersion !== first.manifest.playwrightVersion
+        || priorSecond.playwrightVersion !== first.manifest.playwrightVersion) {
+        reasons.push('The prior reproducibility report does not describe the current Playwright version');
+      }
+      if (stableJson(priorFirst.webgl ?? null) !== stableJson(first.manifest.webgl ?? null)
+        || stableJson(priorSecond.webgl ?? null) !== stableJson(first.manifest.webgl ?? null)) {
+        reasons.push('The prior reproducibility report does not describe the current WebGL environment');
+      }
+      if (stableJson(priorFirst.canvas ?? null) !== stableJson(first.manifest.canvas)
+        || stableJson(priorSecond.canvas ?? null) !== stableJson(first.manifest.canvas)) {
+        reasons.push('The prior reproducibility report does not describe the current Canvas');
+      }
+      if (stableJson(priorFirst.renderContract ?? null) !== stableJson(first.manifest.renderContract)
+        || stableJson(priorSecond.renderContract ?? null) !== stableJson(first.manifest.renderContract)) {
+        reasons.push('The prior reproducibility report does not describe the current render contract');
       }
     }
   }
@@ -231,12 +339,20 @@ export async function compareCaptureManifests(firstPath, secondPath, options = {
       commitSha: first.manifest.commitSha,
       runner: first.manifest.runner,
       browser: first.manifest.browser,
+      playwrightVersion: first.manifest.playwrightVersion,
+      webgl: first.manifest.webgl ?? null,
+      canvas: first.manifest.canvas,
+      renderContract: first.manifest.renderContract,
     },
     second: {
       manifest: second.path,
       commitSha: second.manifest.commitSha,
       runner: second.manifest.runner,
       browser: second.manifest.browser,
+      playwrightVersion: second.manifest.playwrightVersion,
+      webgl: second.manifest.webgl ?? null,
+      canvas: second.manifest.canvas,
+      renderContract: second.manifest.renderContract,
     },
     eligibility,
     frames,

@@ -35,6 +35,8 @@ manifestとraw frameを保存できる。
 ```powershell
 $env:KGG_CAPTURE_OUTPUT = 'test-results/render-capture-a'
 npm run capture:render:rgba
+$env:KGG_CAPTURE_OUTPUT = 'test-results/render-capture-b'
+npm run capture:render:rgba
 node tools/compare-render-captures.mjs --mode reproducibility `
   --first test-results/render-capture-a/capture.json `
   --second test-results/render-capture-b/capture.json `
@@ -45,3 +47,10 @@ node tools/compare-render-captures.mjs --mode reproducibility `
 `not-eligible`となり、base/head比較へ進めない。SwiftShader captureはBrowser Merge Gateの
 証拠であり、実GPUのbase/head比較は`.github/workflows/render-fixed-gpu.yml`を使うmanual
 Release Gateとする。未接続の固定GPU runnerで取得した結果をpassとして扱わない。
+
+固定GPU Release Gateでは、`test-results/fixed-gpu-runner.json`にWindowsのOS version、GPU adapter、
+driver version、runner名を保存し、その条件から`environmentFingerprint`を作る。各capture manifestにも
+このfingerprint、Playwrightが起動したChromium binary path/version、launch args、WebGLのvendor／renderer
+（可能ならunmasked renderer）、Canvas寸法、`renderContract`（Preset、seed、時刻、Effect Stack、commit SHA）を
+含める。Chromiumへ`--enable-gpu`を渡しただけではfixed GPUの証拠とせず、unmasked rendererが取得できない、
+software rendererへfallbackした、またはrunner条件が一致しない場合は`not-eligible`として比較を止める。

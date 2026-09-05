@@ -26,6 +26,7 @@ jobs:
       HEAD_SHA_INPUT: ${{ inputs.head_sha }}
       KGG_E2E_GPU: '1'
       KGG_CAPTURE_RUNNER_ID: ${{ runner.name }}
+      KGG_CAPTURE_RUNNER_INVENTORY: test-results/fixed-gpu-runner.json
 
     steps:
       - name: Check out workflow revision
@@ -66,26 +67,38 @@ jobs:
         run: |
           $ErrorActionPreference = 'Stop'
           New-Item -ItemType Directory -Force -Path test-results | Out-Null
-          $gpu = Get-CimInstance Win32_VideoController | Select-Object Name, DriverVersion, VideoProcessor, AdapterRAM
-          $details = [ordered]@{
+          $condition = [ordered]@{
             runnerName = $env:RUNNER_NAME
             os = (Get-CimInstance Win32_OperatingSystem | Select-Object -ExpandProperty Caption)
             osVersion = [System.Environment]::OSVersion.VersionString
-            gpu = @($gpu)
-            browser = (npx playwright --version | Out-String).Trim()
-            node = (node --version).Trim()
+            gpu = @(Get-CimInstance Win32_VideoController | Select-Object Name, DriverVersion, VideoProcessor, AdapterRAM, PNPDeviceID, Status)
+          }
+          $conditionJson = $condition | ConvertTo-Json -Depth 8 -Compress
+          $sha256 = [System.Security.Cryptography.SHA256]::Create()
+          try {
+            $fingerprint = ([BitConverter]::ToString($sha256.ComputeHash([System.Text.Encoding]::UTF8.GetBytes($conditionJson)))).Replace('-', '').ToLowerInvariant()
+          } finally {
+            $sha256.Dispose()
+          }
+          $details = [ordered]@{
+            schemaVersion = 1
+            kind = 'kgg-fixed-gpu-runner'
+            condition = $condition
+            fingerprint = $fingerprint
             capturedAt = (Get-Date).ToUniversalTime().ToString('o')
           }
-          $details | ConvertTo-Json -Depth 6 | Set-Content -Path test-results/fixed-gpu-runner.json -Encoding utf8
+          $details | ConvertTo-Json -Depth 8 | Set-Content -Path test-results/fixed-gpu-runner.json -Encoding utf8
+          "KGG_CAPTURE_RUNNER_FINGERPRINT=$fingerprint" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
 
-      - name: Install base dependencies and Playwright Chromium
+      - name: Snapshot fixed GPU gate tooling
         shell: pwsh
         run: |
           $ErrorActionPreference = 'Stop'
-          npm ci
-          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-          npx playwright install chromium
-          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          $toolDirectory = 'test-results/fixed-gpu-tooling'
+          New-Item -ItemType Directory -Force -Path $toolDirectory | Out-Null
+          Copy-Item -LiteralPath 'tools/capture-render-rgba.mjs' -Destination "$toolDirectory/capture-render-rgba.mjs" -Force
+          Copy-Item -LiteralPath 'tools/compare-render-captures.mjs' -Destination "$toolDirectory/compare-render-captures.mjs" -Force
+          Copy-Item -LiteralPath 'tools/render-capture-lib.mjs' -Destination "$toolDirectory/render-capture-lib.mjs" -Force
 
       - name: Capture base A
         shell: pwsh
@@ -95,9 +108,11 @@ jobs:
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           npm ci
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          npx playwright install chromium
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           $env:KGG_CAPTURE_COMMIT = $env:BASE_COMMIT
           $env:KGG_CAPTURE_OUTPUT = 'test-results/fixed-gpu/base-a'
-          node tools/capture-render-rgba.mjs
+          node test-results/fixed-gpu-tooling/capture-render-rgba.mjs
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
       - name: Capture base B on the same runner
@@ -106,14 +121,14 @@ jobs:
           $ErrorActionPreference = 'Stop'
           $env:KGG_CAPTURE_COMMIT = $env:BASE_COMMIT
           $env:KGG_CAPTURE_OUTPUT = 'test-results/fixed-gpu/base-b'
-          node tools/capture-render-rgba.mjs
+          node test-results/fixed-gpu-tooling/capture-render-rgba.mjs
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
       - name: Verify same-runner base reproducibility
         shell: pwsh
         run: |
           $ErrorActionPreference = 'Stop'
-          node tools/compare-render-captures.mjs --mode reproducibility --first test-results/fixed-gpu/base-a/capture.json --second test-results/fixed-gpu/base-b/capture.json --output test-results/fixed-gpu/reproducibility.json
+          node test-results/fixed-gpu-tooling/compare-render-captures.mjs --mode reproducibility --first test-results/fixed-gpu/base-a/capture.json --second test-results/fixed-gpu/base-b/capture.json --output test-results/fixed-gpu/reproducibility.json
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
       - name: Capture head on the same runner
@@ -124,16 +139,18 @@ jobs:
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           npm ci
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          npx playwright install chromium
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           $env:KGG_CAPTURE_COMMIT = $env:HEAD_COMMIT
           $env:KGG_CAPTURE_OUTPUT = 'test-results/fixed-gpu/head'
-          node tools/capture-render-rgba.mjs
+          node test-results/fixed-gpu-tooling/capture-render-rgba.mjs
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
       - name: Compare base/head RGBA captures
         shell: pwsh
         run: |
           $ErrorActionPreference = 'Stop'
-          node tools/compare-render-captures.mjs --mode base-head --first test-results/fixed-gpu/base-a/capture.json --second test-results/fixed-gpu/head/capture.json --eligibility test-results/fixed-gpu/reproducibility.json --output test-results/fixed-gpu/base-head-comparison.json
+          node test-results/fixed-gpu-tooling/compare-render-captures.mjs --mode base-head --first test-results/fixed-gpu/base-a/capture.json --second test-results/fixed-gpu/head/capture.json --eligibility test-results/fixed-gpu/reproducibility.json --output test-results/fixed-gpu/base-head-comparison.json
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
       - name: Upload fixed GPU evidence

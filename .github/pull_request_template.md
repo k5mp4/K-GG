@@ -37,7 +37,13 @@
 
 ### Release Gate / Observation
 
-<!-- 実GPU、Tauri、FFmpeg、After Effects、installer/updater、特殊環境など。未実施は未実施と書く。 -->
+<!--
+実GPU、Tauri、FFmpeg、After Effects、installer/updater、特殊環境などを記録する。
+固定GPUを実施した場合は runner/GPU adapter/driver/Windows、Chromium binary/version、Playwright、
+WebGL renderer、Canvas/Effect Stack、commit SHA の証跡を添付する。Tauri UI WebDriver、実FFmpeg、
+または固定GPUを実施していない場合は not-run / manual release gate と明記し、Browser/Rust/buildの
+成功からpassを推測しない。
+-->
 
 ## 実行したコマンドと結果
 
