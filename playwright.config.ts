@@ -17,6 +17,28 @@ export default defineConfig({
     timeout: 10_000,
   },
   reporter: 'list',
+  // Keep WebGL/download-heavy tests in separate workers so Chromium's
+  // renderer state cannot leak from one test into the next test.
+  projects: [
+    {
+      name: 'export-png',
+      testMatch: '**/export.spec.ts',
+      grep: /Save PNG downloads a structurally valid image/,
+    },
+    {
+      name: 'export-zip',
+      testMatch: '**/export.spec.ts',
+      grep: /PNG ZIP contains sequential valid frames and Preview recovers/,
+    },
+    {
+      name: 'lifecycle',
+      testMatch: '**/lifecycle.spec.ts',
+    },
+    {
+      name: 'smoke',
+      testMatch: '**/smoke.spec.ts',
+    },
+  ],
   use: {
     baseURL,
     acceptDownloads: true,
@@ -27,7 +49,10 @@ export default defineConfig({
     colorScheme: 'dark',
     trace: 'retain-on-failure',
     screenshot: 'only-on-failure',
-    video: 'retain-on-failure',
+    // WebGL context loss/restore can leave Chromium's video encoder waiting
+    // during context teardown. Traces and screenshots still preserve failure
+    // evidence in CI without keeping a recorder open for every test.
+    video: process.env.CI ? 'off' : 'retain-on-failure',
     launchOptions: {
       args: fixedGpu ? ['--enable-gpu'] : ['--use-angle=swiftshader'],
     },
