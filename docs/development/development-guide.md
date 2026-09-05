@@ -13,6 +13,10 @@ Requestの分類とライフサイクルは[開発ワークフロー](./workflow
 - デスクトップ版を扱う場合はRust stable toolchain
 - MOV/MP4出力を確認する場合はFFmpeg
 
+実機検証は、[`render-baselines.md`](./render-baselines.md)の固定GPU Release Gateと
+[`native-validation.md`](./native-validation.md)のFFmpeg/Tauri境界を参照します。固定GPU runnerや
+Tauri WebDriverが接続されていない環境では、未実施のRelease GateをMerge Gateのpassとして記録しません。
+
 ## セットアップ
 
 ```sh
@@ -80,7 +84,7 @@ K-GGは生成AIによる開発参加を歓迎するため、変更の一次情�
 | TypeScript/React | `npm run check:merge` |
 | 描画・GLSL | 上記に加えて`npm run check:render`、対象機能のプレビューと代表的なエクスポート |
 | プリセット形式 | 旧データ読込、新規保存、再読込、ブラウザ/Tauri差分 |
-| Rust/Tauri | `npm run check:native`、対象デスクトップ操作 |
+| Rust/Tauri | `npm run check:native`、対象デスクトップ操作。実FFmpegは`npm run check:ffmpeg`、Tauri UIは`native-validation.md`のWebDriver Release Gate |
 | リリース/更新 | `npm run check:release`に加えてリリース設定・更新ワークフローと配布環境でのWindows版起動・更新確認 |
 
 ## GitとPull Request

@@ -55,6 +55,8 @@ title: ValidationとCI
 
 Browser E2Eのpassは、再現可能なソフトウェアWebGLによるMerge Gateの証拠です。`capture:render:rgba`はCanvasのWebGL `readPixels`をtop-to-bottom RGBAとしてmanifest化し、同一commitのA/B再現性と、pass済みA/Bを前提としたbase/head比較を提供します。固定GPUの実行は`.github/workflows/render-fixed-gpu.yml`のmanual Release Gateであり、このコマンドのpassから固定GPU品質を推論しません。実FFmpeg MOV/MP4とTauri UIは[`native-validation.md`](./native-validation.md)のNative Release Gate/Observationです。
 
+固定GPU比較は、`--enable-gpu`の指定だけではeligibleになりません。manual workflowは同一runnerのGPU adapter、driver version、Windows versionをfingerprint化し、capture側でもChromium binary/version、Playwright、WebGL unmasked renderer、Canvas寸法、Effect Stack、commit SHAを保存します。fingerprint不一致、software rendererへのfallback、renderer情報欠落、同一commitのA/B再現性未確認は`not-eligible`であり、RGBA差分のpass/fail比較へ進みません。
+
 ## Path-aware CI
 
 Fast checkは全PRで実行します。次の変更がある場合だけ追加jobを実行します。
@@ -62,12 +64,12 @@ Fast checkは全PRで実行します。次の変更がある場合だけ追加jo
 | 変更パス | 追加検証 |
 | --- | --- |
 | `src/shaders/**`、`src/lib/webgl*`、`src/lib/effect*`、`src/lib/render*`、`src/lib/export*` | render-check |
-| `src-tauri/**`、`Cargo.toml`、`Cargo.lock`、Tauri設定 | native-check |
+| `src-tauri/**`、`Cargo.toml`、`Cargo.lock`、Tauri設定 | native-check。Release時は実FFmpeg/Tauri buildをNative Release Gate |
 | `src/App.tsx`、`src/components/**`、`src/features/workspace/**`、`src/adapters/**`、`src/hooks/useWebGL.ts`、Browser E2E、Playwright、render/export/webgl tooling、workflow | e2e-check |
 | `docs/**`、`AGENTS.md`、テンプレート、workflow | fast-check内のdocs check/build。`change:check`も実行 |
 | tag `v*.*.*` | release workflowのversion、署名、bundle |
 
-`e2e-check`は対象パス変更時にWindows runnerでPlaywright Chromiumをinstallして実行し、失敗時もtrace、screenshot、video、diagnosticsを14日間artifactとして保持します。CIで実行したことのないE2E結果をpassとして記録しません。実GPUは固定runnerが必要なmanual Release Gate、FFmpeg/TauriはNative Release GateまたはObservationの対象です。
+`e2e-check`は対象パス変更時にWindows runnerでPlaywright Chromiumをinstallして実行し、失敗時もtrace、screenshot、video、diagnosticsを14日間artifactとして保持します。CIで実行したことのないE2E結果をpassとして記録しません。実GPUは固定runnerが必要なmanual Release Gate、FFmpeg/TauriはNative Release GateまたはObservationの対象です。`native-release-gate.yml`はRust/Adapterの自動検証、実FFmpeg/ffprobe、unbundled Tauri buildを同じjobで証跡化しますが、Tauri UI WebDriver操作は別の未接続Release Gateであり、build成功からUI passを推測しません。
 
 ## 記録の境界
 
