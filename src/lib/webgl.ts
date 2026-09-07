@@ -1752,13 +1752,11 @@ export function applyMeshGradientUniforms(
   setPoint('u_meshTopCp1', mesh.handles.top[1]);
   setPoint('u_meshLeftCp0', mesh.handles.left[0]);
   setPoint('u_meshLeftCp1', mesh.handles.left[1]);
-  gl.uniform4f(
-    uniforms.u_meshColorPositions,
-    mesh.colorPositions[0],
-    mesh.colorPositions[1],
-    mesh.colorPositions[2],
-    mesh.colorPositions[3],
-  );
+  // Legacy corner ramp positions were removed from the data model. The mesh is
+  // colored either by the shared ramp (projected along v) or by per-point
+  // direct colors baked into the field texture, so these uniforms are unused
+  // by the shader. Send a neutral value to keep the legacy location valid.
+  gl.uniform4f(uniforms.u_meshColorPositions, 0, 1 / 3, 2 / 3, 1);
 }
 
 function buildGradientRampData(gradient: GradientConfig): Uint8Array {

@@ -40,7 +40,7 @@ Web 版は `index.html` で Google Fonts から Noto Sans JP、Open Sans を読�
 - **Image Overlay / Mask**: 折りたたみセクションから画像の重畳またはアルファマスクを設定します。
 - **Gradient type**
   -Linear/Radial/4-color/Diamond/Angle/Bezier/Mesh Gradationのグラデーションタイプを選択可能です。
-  - **Mesh Gradation** は単一の2×2 Coons Patchです。4つのコーナーと8つの三次Bezier制御ハンドルで境界を編集し、各コーナーの色は既存Gradient Ramp上の4位置から取得します。内部色はパッチ座標上で双線形補間され、画面UVからの逆写像にはNewton法を使います。previewとexportは同じWebGL shader経路を使います。複数セルには未対応で、自己交差した形状の結果は保証されません。
+  - **Mesh Gradation** はN×Mの格子点を持つCoons Patchグリッドです。外側とキャンバス内部の全格子点をドラッグして変形し、各セルの共有エッジをダイヤモンド型のハンドルで曲げられます。色は右サイドバーのMeshセクションで2モードを切り替えられます: **Ramp（既定）** はメッシュ全体を共有グラデーションランプで下→上に塗り、ランプ編集が全体へ追従します。**Direct** は点をクリック→色スウォッチ→カラーピッカーで各点のHexを個別編集できます。行・列の点数（2〜8）も同じ場所で変更できます。previewとexportは同じWebGLテクスチャ経路を使います。自己交差した形状の結果は保証されません。
   - Kagaribi-15-BGはKV背景に極力寄せたグラデになっています
 - **Image Gradient Source**: 折りたたみセクションから、画像の輝度またはRGBチャンネルを現在のGradient Rampで再配色します。画像はCoverで配置され、画像本体はプリセットへ保存されません。
     - **Sキー**: ハンドル・複数ポイントのスケール

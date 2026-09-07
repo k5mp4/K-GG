@@ -9,7 +9,12 @@ export type ApplicationCommands = Pick<GradientStore,
   | 'setGradient'
   | 'setMeshCorner'
   | 'setMeshHandle'
-  | 'setMeshColorPosition'
+  | 'setMeshColorMode'
+  | 'setMeshPointColor'
+  | 'setMeshGridPoint'
+  | 'setMeshEdgeHandle'
+  | 'setMeshGridSize'
+  | 'setBezierControl'
   | 'resetMeshGradient'
   | 'straightenMeshHandles'
   | 'setNoiseDistortion'
@@ -48,7 +53,12 @@ const APPLICATION_COMMAND_KEYS = [
   'setGradient',
   'setMeshCorner',
   'setMeshHandle',
-  'setMeshColorPosition',
+  'setMeshColorMode',
+  'setMeshPointColor',
+  'setMeshGridPoint',
+  'setMeshEdgeHandle',
+  'setMeshGridSize',
+  'setBezierControl',
   'resetMeshGradient',
   'straightenMeshHandles',
   'setNoiseDistortion',
@@ -98,7 +108,12 @@ export function createApplicationCommands(
     setGradient: value => getState().setGradient(value),
     setMeshCorner: (index, position) => getState().setMeshCorner(index, position),
     setMeshHandle: (edge, index, position) => getState().setMeshHandle(edge, index, position),
-    setMeshColorPosition: (index, value) => getState().setMeshColorPosition(index, value),
+    setMeshColorMode: mode => getState().setMeshColorMode(mode),
+    setMeshPointColor: (index, color) => getState().setMeshPointColor(index, color),
+    setMeshGridPoint: (index, position) => getState().setMeshGridPoint(index, position),
+    setMeshEdgeHandle: (orientation, row, col, handleIndex, position) => getState().setMeshEdgeHandle(orientation, row, col, handleIndex, position),
+    setMeshGridSize: (rows, columns) => getState().setMeshGridSize(rows, columns),
+    setBezierControl: (index, position) => getState().setBezierControl(index, position),
     resetMeshGradient: () => getState().resetMeshGradient(),
     straightenMeshHandles: () => getState().straightenMeshHandles(),
     setNoiseDistortion: value => getState().setNoiseDistortion(value),

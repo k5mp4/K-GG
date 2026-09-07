@@ -1,4 +1,9 @@
-import { normalizeMeshGradientConfig, type MeshGradientConfig, type Vec2Tuple } from '../types/gradient';
+import {
+  normalizeMeshGradientConfig,
+  straightEdgeHandles,
+  type MeshGradientConfig,
+  type Vec2Tuple,
+} from '../types/gradient';
 
 /** Resolution used by the GPU lookup texture for a Mesh Gradation field. */
 export const MESH_FIELD_SIZE = 256;
@@ -40,24 +45,6 @@ function cubicBezier(
   ];
 }
 
-/** Evaluate the same single Coons patch used by the reference renderers. */
-export function evaluateMeshPatch(mesh: MeshGradientConfig, u: number, v: number): Vec2Tuple {
-  const normalized = normalizeMeshGradientConfig(mesh);
-  const [bl, br, tl, tr] = normalized.corners;
-  const bottom = cubicBezier(bl, normalized.handles.bottom[0], normalized.handles.bottom[1], br, u);
-  const right = cubicBezier(br, normalized.handles.right[0], normalized.handles.right[1], tr, v);
-  const top = cubicBezier(tl, normalized.handles.top[1], normalized.handles.top[0], tr, u);
-  const left = cubicBezier(bl, normalized.handles.left[1], normalized.handles.left[0], tl, v);
-  const bilinear: Vec2Tuple = [
-    (1 - u) * (1 - v) * bl[0] + u * (1 - v) * br[0] + (1 - u) * v * tl[0] + u * v * tr[0],
-    (1 - u) * (1 - v) * bl[1] + u * (1 - v) * br[1] + (1 - u) * v * tl[1] + u * v * tr[1],
-  ];
-  return [
-    finiteOr((1 - v) * bottom[0] + v * top[0] + (1 - u) * left[0] + u * right[0] - bilinear[0], 0.5),
-    finiteOr((1 - v) * bottom[1] + v * top[1] + (1 - u) * left[1] + u * right[1] - bilinear[1], 0.5),
-  ];
-}
-
 function sampleRamp(rampData: Uint8Array, rampWidth: number, position: number): Rgba {
   const coordinate = clamp01(finiteOr(position, 0)) * Math.max(rampWidth - 1, 0);
   const left = Math.floor(coordinate);
@@ -73,11 +60,218 @@ function sampleRamp(rampData: Uint8Array, rampWidth: number, position: number): 
   ];
 }
 
-function meshVertexColor(mesh: MeshGradientConfig, rampData: Uint8Array, rampWidth: number, u: number, v: number): Rgba {
-  const [bl, br, tl, tr] = mesh.colorPositions.map((position) => sampleRamp(rampData, rampWidth, position)) as [Rgba, Rgba, Rgba, Rgba];
-  const bottom = bl.map((value, index) => lerp(value, br[index], u));
-  const top = tl.map((value, index) => lerp(value, tr[index], u));
+function hexToRgba(hex: string): Rgba | null {
+  if (hex.length !== 7 || hex[0] !== '#') return null;
+  const r = parseInt(hex.slice(1, 3), 16);
+  const g = parseInt(hex.slice(3, 5), 16);
+  const b = parseInt(hex.slice(5, 7), 16);
+  if (!Number.isFinite(r) || !Number.isFinite(g) || !Number.isFinite(b)) return null;
+  return [r, g, b, 255];
+}
+
+/**
+ * Resolve one grid point's color.
+ *
+ * - Direct mode: the point's own hex (`pointColors[index]`) is used verbatim.
+ * - Ramp mode (default): the shared gradient ramp is sampled at the point's
+ *   grid vertical position `v` (v = 0 bottom → v = 1 top), so ramp edits
+ *   update the whole mesh and the ramp flows along the grid's v axis.
+ */
+function gridPointColor(
+  mesh: MeshGradientConfig,
+  rampData: Uint8Array,
+  rampWidth: number,
+  row: number,
+  col: number,
+): Rgba {
+  const { rows, columns } = mesh;
+  const index = row * columns + col;
+  if (mesh.colorMode === 'direct' && mesh.pointColors) {
+    const direct = mesh.pointColors[index];
+    if (direct) {
+      const color = hexToRgba(direct);
+      if (color) return color;
+    }
+  }
+  const [, v] = gridToUV(row, col, rows, columns);
+  return sampleRamp(rampData, rampWidth, v);
+}
+
+/** Map grid coordinates (row/col indices) to a global 0..1 domain position. */
+export function gridToUV(row: number, col: number, rows: number, columns: number): Vec2Tuple {
+  return [
+    columns <= 1 ? 0 : col / (columns - 1),
+    rows <= 1 ? 0 : row / (rows - 1),
+  ];
+}
+
+/**
+ * Evaluate the cell at (cellRow, cellCol) in its own local (u, v) domain.
+ * Each cell is a Coons patch bounded by its four shared cubic Bezier edges.
+ * For the legacy 2×2 grid this matches the original single Coons patch.
+ */
+export function evaluateMeshCell(
+  mesh: MeshGradientConfig,
+  cellRow: number,
+  cellCol: number,
+  u: number,
+  v: number,
+): Vec2Tuple {
+  const { rows, columns, points, edgeHandles } = mesh;
+  const row0 = Math.max(0, Math.min(rows - 2, Math.floor(cellRow)));
+  const col0 = Math.max(0, Math.min(columns - 2, Math.floor(cellCol)));
+  const p00 = points[row0 * columns + col0];
+  const p10 = points[row0 * columns + col0 + 1];
+  const p01 = points[(row0 + 1) * columns + col0];
+  const p11 = points[(row0 + 1) * columns + col0 + 1];
+  const bottomH = edgeHandles.horizontal[row0]?.[col0] ?? straightEdgeHandles(p00, p10);
+  const topH = edgeHandles.horizontal[row0 + 1]?.[col0] ?? straightEdgeHandles(p01, p11);
+  const leftV = edgeHandles.vertical[row0]?.[col0] ?? straightEdgeHandles(p00, p01);
+  const rightV = edgeHandles.vertical[row0]?.[col0 + 1] ?? straightEdgeHandles(p10, p11);
+  const bottom = cubicBezier(p00, bottomH[0], bottomH[1], p10, u);
+  const right = cubicBezier(p10, rightV[0], rightV[1], p11, v);
+  const top = cubicBezier(p01, topH[0], topH[1], p11, u);
+  const left = cubicBezier(p00, leftV[0], leftV[1], p01, v);
+  const bilinear: Vec2Tuple = [
+    (1 - u) * (1 - v) * p00[0] + u * (1 - v) * p10[0] + (1 - u) * v * p01[0] + u * v * p11[0],
+    (1 - u) * (1 - v) * p00[1] + u * (1 - v) * p10[1] + (1 - u) * v * p01[1] + u * v * p11[1],
+  ];
+  return [
+    finiteOr((1 - v) * bottom[0] + v * top[0] + (1 - u) * left[0] + u * right[0] - bilinear[0], 0.5),
+    finiteOr((1 - v) * bottom[1] + v * top[1] + (1 - u) * left[1] + u * right[1] - bilinear[1], 0.5),
+  ];
+}
+
+function cubicBezierDerivative(
+  p0: Vec2Tuple,
+  p1: Vec2Tuple,
+  p2: Vec2Tuple,
+  p3: Vec2Tuple,
+  t: number,
+): Vec2Tuple {
+  const mt = 1 - t;
+  return [
+    3 * mt * mt * (p1[0] - p0[0]) + 6 * mt * t * (p2[0] - p1[0]) + 3 * t * t * (p3[0] - p2[0]),
+    3 * mt * mt * (p1[1] - p0[1]) + 6 * mt * t * (p2[1] - p1[1]) + 3 * t * t * (p3[1] - p2[1]),
+  ];
+}
+
+/**
+ * Partial derivatives of one cell's Coons evaluation with respect to its local
+ * (u, v). Used by inverse (canvas → grid domain) solves.
+ */
+export function evaluateMeshCellDerivatives(
+  mesh: MeshGradientConfig,
+  cellRow: number,
+  cellCol: number,
+  u: number,
+  v: number,
+): { du: Vec2Tuple; dv: Vec2Tuple } {
+  const { rows, columns, points, edgeHandles } = mesh;
+  const row0 = Math.max(0, Math.min(rows - 2, Math.floor(cellRow)));
+  const col0 = Math.max(0, Math.min(columns - 2, Math.floor(cellCol)));
+  const p00 = points[row0 * columns + col0];
+  const p10 = points[row0 * columns + col0 + 1];
+  const p01 = points[(row0 + 1) * columns + col0];
+  const p11 = points[(row0 + 1) * columns + col0 + 1];
+  const bottomH = edgeHandles.horizontal[row0]?.[col0] ?? straightEdgeHandles(p00, p10);
+  const topH = edgeHandles.horizontal[row0 + 1]?.[col0] ?? straightEdgeHandles(p01, p11);
+  const leftV = edgeHandles.vertical[row0]?.[col0] ?? straightEdgeHandles(p00, p01);
+  const rightV = edgeHandles.vertical[row0]?.[col0 + 1] ?? straightEdgeHandles(p10, p11);
+
+  const bottom = cubicBezier(p00, bottomH[0], bottomH[1], p10, u);
+  const right = cubicBezier(p10, rightV[0], rightV[1], p11, v);
+  const top = cubicBezier(p01, topH[0], topH[1], p11, u);
+  const left = cubicBezier(p00, leftV[0], leftV[1], p01, v);
+  const bottomD = cubicBezierDerivative(p00, bottomH[0], bottomH[1], p10, u);
+  const rightD = cubicBezierDerivative(p10, rightV[0], rightV[1], p11, v);
+  const topD = cubicBezierDerivative(p01, topH[0], topH[1], p11, u);
+  const leftD = cubicBezierDerivative(p00, leftV[0], leftV[1], p01, v);
+
+  // d/du of the bilinear term.
+  const dBilinU: Vec2Tuple = [
+    (1 - v) * (p10[0] - p00[0]) + v * (p11[0] - p01[0]),
+    (1 - v) * (p10[1] - p00[1]) + v * (p11[1] - p01[1]),
+  ];
+  // d/dv of the bilinear term.
+  const dBilinV: Vec2Tuple = [
+    (1 - u) * (p01[0] - p00[0]) + u * (p11[0] - p10[0]),
+    (1 - u) * (p01[1] - p00[1]) + u * (p11[1] - p10[1]),
+  ];
+
+  return {
+    du: [
+      finiteOr((1 - v) * bottomD[0] + v * topD[0] - left[0] + right[0] - dBilinU[0], 1),
+      finiteOr((1 - v) * bottomD[1] + v * topD[1] - left[1] + right[1] - dBilinU[1], 0),
+    ],
+    dv: [
+      finiteOr(-bottom[0] + top[0] + (1 - u) * leftD[0] + u * rightD[0] - dBilinV[0], 0),
+      finiteOr(-bottom[1] + top[1] + (1 - u) * leftD[1] + u * rightD[1] - dBilinV[1], 1),
+    ],
+  };
+}
+
+/**
+ * Evaluate the whole grid at a global 0..1 domain position by locating the
+ * containing cell. For the legacy 2×2 grid this matches the original single
+ * Coons patch evaluation.
+ */
+export function evaluateMeshPatch(mesh: MeshGradientConfig, u: number, v: number): Vec2Tuple {
+  const normalized = normalizeMeshGradientConfig(mesh);
+  const { rows, columns } = normalized;
+  const domainU = clamp01(u) * (columns - 1);
+  const domainV = clamp01(v) * (rows - 1);
+  const cellCol = Math.max(0, Math.min(columns - 2, Math.floor(domainU)));
+  const cellRow = Math.max(0, Math.min(rows - 2, Math.floor(domainV)));
+  return evaluateMeshCell(normalized, cellRow, cellCol, domainU - cellCol, domainV - cellRow);
+}
+
+/**
+ * Resolve one tessellation sample's color. Direct mode bilinearly interpolates
+ * the four grid-point colors that bound a cell. Ramp mode samples the shared
+ * ramp continuously along the global logical v axis, so intermediate stops are
+ * not lost between grid rows.
+ */
+function cellVertexColor(
+  mesh: MeshGradientConfig,
+  rampData: Uint8Array,
+  rampWidth: number,
+  cellRow: number,
+  cellCol: number,
+  u: number,
+  v: number,
+): Rgba {
+  if (mesh.colorMode === 'ramp') {
+    // Ramp mode is a continuous field over the mesh's logical v axis. The
+    // previous implementation sampled only the four cell corners and then
+    // bilinearly interpolated those colors, which skipped every ramp stop
+    // between two grid rows (especially obvious in the default 2x2 mesh).
+    // Sample the same ramp texture at each tessellated parametric position so
+    // the canvas uses the same color progression that the ramp displays.
+    const globalV = mesh.rows <= 1 ? 0 : (cellRow + clamp01(v)) / (mesh.rows - 1);
+    return sampleRamp(rampData, rampWidth, globalV);
+  }
+
+  const colors = cellCornerColors(mesh, rampData, rampWidth, cellRow, cellCol);
+  const bottom = colors[0].map((value, index) => lerp(value, colors[1][index], u));
+  const top = colors[2].map((value, index) => lerp(value, colors[3][index], u));
   return top.map((value, index) => lerp(bottom[index], value, v)) as Rgba;
+}
+
+/** Resolve the four corner grid-point colors of a cell (BL, BR, TL, TR). */
+function cellCornerColors(
+  mesh: MeshGradientConfig,
+  rampData: Uint8Array,
+  rampWidth: number,
+  cellRow: number,
+  cellCol: number,
+): [Rgba, Rgba, Rgba, Rgba] {
+  return [
+    gridPointColor(mesh, rampData, rampWidth, cellRow, cellCol),
+    gridPointColor(mesh, rampData, rampWidth, cellRow, cellCol + 1),
+    gridPointColor(mesh, rampData, rampWidth, cellRow + 1, cellCol),
+    gridPointColor(mesh, rampData, rampWidth, cellRow + 1, cellCol + 1),
+  ];
 }
 
 function writeColor(output: Uint8Array, offset: number, color: Rgba): void {
@@ -126,10 +320,18 @@ function rasterizeTriangle(
   }
 }
 
+/** Per-cell subdivision budget from the whole-grid reference subdivisions. */
+function perCellSubdivisions(mesh: MeshGradientConfig, requested?: number): number {
+  const budget = Math.max(1, Math.min(64, Math.floor(requested ?? MESH_FIELD_SUBDIVISIONS)));
+  const maxCells = Math.max(mesh.rows - 1, mesh.columns - 1, 1);
+  return Math.max(1, Math.ceil(budget / maxCells));
+}
+
 /**
- * Rasterize a forward-tessellated Coons patch into a bottom-left-origin RGBA
- * field. The fallback fill keeps the texture opaque even when a deliberately
- * self-intersecting patch leaves holes between forward triangles.
+ * Rasterize a forward-tessellated grid of Coons patches into a
+ * bottom-left-origin RGBA field. The fallback fill keeps the texture opaque
+ * even when a deliberately self-intersecting patch leaves holes between
+ * forward triangles.
  */
 export function buildMeshGradientField(
   inputMesh: MeshGradientConfig,
@@ -140,12 +342,17 @@ export function buildMeshGradientField(
   const mesh = normalizeMeshGradientConfig(inputMesh);
   const width = Math.max(1, Math.floor(options.width ?? MESH_FIELD_SIZE));
   const height = Math.max(1, Math.floor(options.height ?? width));
-  const subdivisions = Math.max(1, Math.min(64, Math.floor(options.subdivisions ?? MESH_FIELD_SUBDIVISIONS)));
+  const perCell = perCellSubdivisions(mesh, options.subdivisions);
   const output = new Uint8Array(width * height * 4);
 
   // Fill with a stable bilinear field first. This is also the deterministic
   // behavior for pixels outside an intentionally folded/degenerate patch.
-  const cornerColors = mesh.colorPositions.map((position) => sampleRamp(rampData, rampWidth, position)) as [Rgba, Rgba, Rgba, Rgba];
+  const cornerColors = [
+    gridPointColor(mesh, rampData, rampWidth, 0, 0),
+    gridPointColor(mesh, rampData, rampWidth, 0, mesh.columns - 1),
+    gridPointColor(mesh, rampData, rampWidth, mesh.rows - 1, 0),
+    gridPointColor(mesh, rampData, rampWidth, mesh.rows - 1, mesh.columns - 1),
+  ];
   for (let y = 0; y < height; y += 1) {
     const v = height === 1 ? 0 : y / (height - 1);
     for (let x = 0; x < width; x += 1) {
@@ -156,29 +363,33 @@ export function buildMeshGradientField(
     }
   }
 
-  const points: Vec2Tuple[][] = [];
-  const colors: Rgba[][] = [];
-  for (let y = 0; y <= subdivisions; y += 1) {
-    const v = y / subdivisions;
-    const pointRow: Vec2Tuple[] = [];
-    const colorRow: Rgba[] = [];
-    for (let x = 0; x <= subdivisions; x += 1) {
-      const u = x / subdivisions;
-      pointRow.push(evaluateMeshPatch(mesh, u, v));
-      colorRow.push(meshVertexColor(mesh, rampData, rampWidth, u, v));
-    }
-    points.push(pointRow);
-    colors.push(colorRow);
-  }
+  for (let cellRow = 0; cellRow < mesh.rows - 1; cellRow += 1) {
+    for (let cellCol = 0; cellCol < mesh.columns - 1; cellCol += 1) {
+      const points: Vec2Tuple[][] = [];
+      const colors: Rgba[][] = [];
+      for (let y = 0; y <= perCell; y += 1) {
+        const v = y / perCell;
+        const pointRow: Vec2Tuple[] = [];
+        const colorRow: Rgba[] = [];
+        for (let x = 0; x <= perCell; x += 1) {
+          const u = x / perCell;
+          pointRow.push(evaluateMeshCell(mesh, cellRow, cellCol, u, v));
+          colorRow.push(cellVertexColor(mesh, rampData, rampWidth, cellRow, cellCol, u, v));
+        }
+        points.push(pointRow);
+        colors.push(colorRow);
+      }
 
-  for (let y = 0; y < subdivisions; y += 1) {
-    for (let x = 0; x < subdivisions; x += 1) {
-      const p00 = points[y][x];
-      const p10 = points[y][x + 1];
-      const p01 = points[y + 1][x];
-      const p11 = points[y + 1][x + 1];
-      rasterizeTriangle(output, width, height, p00, p10, p11, colors[y][x], colors[y][x + 1], colors[y + 1][x + 1]);
-      rasterizeTriangle(output, width, height, p00, p11, p01, colors[y][x], colors[y + 1][x + 1], colors[y + 1][x]);
+      for (let y = 0; y < perCell; y += 1) {
+        for (let x = 0; x < perCell; x += 1) {
+          const p00 = points[y][x];
+          const p10 = points[y][x + 1];
+          const p01 = points[y + 1][x];
+          const p11 = points[y + 1][x + 1];
+          rasterizeTriangle(output, width, height, p00, p10, p11, colors[y][x], colors[y][x + 1], colors[y + 1][x + 1]);
+          rasterizeTriangle(output, width, height, p00, p11, p01, colors[y][x], colors[y + 1][x + 1], colors[y + 1][x]);
+        }
+      }
     }
   }
 

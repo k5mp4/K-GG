@@ -2,11 +2,12 @@ import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
 import { createPortal } from 'react-dom';
 import { gsap } from 'gsap';
 import { useGradientStore, GRADIENT_ANCHOR_DEFAULTS, defaultBezierControlsForAnchors } from '../store/gradientStore';
-import { gradientRampPresets, getColorAtPosition, getOpacityAtPosition, applyMirrorT, normalizeRampSettings } from '../lib/gradientRampUtils';
+import { gradientRampPresets, getColorAtPosition, getOpacityAtPosition, applyMirrorT, applyRampRepeatT, normalizeRampSettings } from '../lib/gradientRampUtils';
 import { buildGradientPreviewStyle } from '../lib/gradientPreview';
 import { moveStopsProportionally } from '../lib/proportionalRampEdit';
 import { RAMP_W, RAMP_BAR_H, RAMP_HANDLE_AREA, RAMP_HANDLE_HALF, RAMP_WHEEL_STEP } from '../lib/constants';
-import type { ColorStop, OpacityStop, RampColorMode, RampInterpolation } from '../types/gradient';
+import type { ColorStop, MeshGradientConfig, OpacityStop, RampColorMode, RampInterpolation } from '../types/gradient';
+import { normalizeMeshGradientConfig } from '../types/gradient';
 import { CustomSelect } from './CustomSelect';
 import { Icon } from './Icon';
 import { undo, redo } from '../lib/history'; // 追加
@@ -72,6 +73,147 @@ function formatStopPosition(position: number): string {
   return `${Math.round(Math.max(0, Math.min(1, position)) * 100)}%`;
 }
 
+function meshPointLabel(mesh: MeshGradientConfig, index: number): string {
+  const row = Math.floor(index / mesh.columns);
+  const col = index % mesh.columns;
+  if (row === 0 && col === 0) return 'BL';
+  if (row === 0 && col === mesh.columns - 1) return 'BR';
+  if (row === mesh.rows - 1 && col === 0) return 'TL';
+  if (row === mesh.rows - 1 && col === mesh.columns - 1) return 'TR';
+  return `P${index + 1}`;
+}
+
+function rampPositionForMeshV(v: number, repeat: number, mirror: boolean): number {
+  const repeated = applyRampRepeatT(v, repeat);
+  return mirror ? applyMirrorT(repeated) : repeated;
+}
+
+function buildRampTrackBackground(
+  stops: ColorStop[],
+  interpolation: RampInterpolation,
+  colorMode: RampColorMode,
+  variable: number,
+  repeat: number,
+  mirror: boolean,
+): string {
+  const samples = Array.from({ length: 24 }, (_, index) => {
+    const rawT = index / 23;
+    const rampT = rampPositionForMeshV(rawT, repeat, mirror);
+    const color = getColorAtPosition(stops, rampT, interpolation, colorMode, variable);
+    return `${color} ${(rawT * 100).toFixed(2)}%`;
+  });
+  return `linear-gradient(to right, ${samples.join(', ')})`;
+}
+
+function MeshRampMapping({
+  mesh,
+  stops,
+  interpolation,
+  colorMode,
+  variable,
+  repeat,
+  mirror,
+  selectedPointIndices,
+  onSelectPoint,
+}: {
+  mesh: MeshGradientConfig;
+  stops: ColorStop[];
+  interpolation: RampInterpolation;
+  colorMode: RampColorMode;
+  variable: number;
+  repeat: number;
+  mirror: boolean;
+  selectedPointIndices: number[];
+  onSelectPoint: (index: number) => void;
+}) {
+  const rows = Array.from({ length: mesh.rows }, (_, row) => {
+    const v = mesh.rows <= 1 ? 0 : row / (mesh.rows - 1);
+    const rampPosition = rampPositionForMeshV(v, repeat, mirror);
+    const rampT = rampPosition;
+    return {
+      row,
+      v,
+      rampPosition,
+      color: getColorAtPosition(stops, rampT, interpolation, colorMode, variable),
+      pointIndices: Array.from({ length: mesh.columns }, (_, col) => row * mesh.columns + col),
+    };
+  });
+  const background = buildRampTrackBackground(stops, interpolation, colorMode, variable, repeat, mirror);
+
+  return (
+    <div
+      role="note"
+      aria-label="Mesh point to gradient ramp mapping. Each mesh row samples the ramp at its v position."
+      style={{
+        position: 'relative',
+        padding: '7px 8px 6px',
+        border: '1px solid rgba(240,234,217,.2)',
+        borderRadius: 3,
+        background: 'rgba(20,20,28,.56)',
+        color: '#f0ead9',
+      }}
+    >
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: 8, marginBottom: 5, fontSize: 9, fontWeight: 700, letterSpacing: '.08em' }}>
+        <span>MESH POINTS → RAMP</span>
+        <span style={{ color: '#e7b27b', fontWeight: 600, letterSpacing: 0 }}>v → t</span>
+      </div>
+      <div style={{ position: 'relative', height: Math.min(86, 28 + Math.max(1, Math.ceil(mesh.columns / 4)) * 17) }}>
+        <div
+          aria-hidden="true"
+          style={{ position: 'absolute', left: RAMP_EDGE_PAD, right: RAMP_EDGE_PAD, top: 1, height: 8, border: '1px solid rgba(255,255,255,.4)', borderRadius: 2, background }}
+        />
+        {rows.map(({ row, v, rampPosition, color, pointIndices }) => {
+          const edge = rampPosition < 0.12 ? 'start' : rampPosition > 0.88 ? 'end' : 'middle';
+          const transform = edge === 'start' ? 'translateX(0)' : edge === 'end' ? 'translateX(-100%)' : 'translateX(-50%)';
+          return (
+            <div
+              key={`mesh-ramp-row-${row}`}
+              style={{
+                position: 'absolute',
+                left: `calc(${(rampPosition * 100).toFixed(4)}% + ${(1 - (2 * rampPosition)) * RAMP_EDGE_PAD}px)`,
+                top: 0,
+                transform,
+                display: 'flex',
+                flexDirection: 'column',
+                alignItems: edge === 'start' ? 'flex-start' : edge === 'end' ? 'flex-end' : 'center',
+                gap: 2,
+                maxWidth: 112,
+              }}
+            >
+              <span style={{ width: 2, height: 14, background: color, boxShadow: '0 0 0 1px rgba(0,0,0,.8)' }} />
+              <span style={{ fontSize: 8, lineHeight: 1, color: 'rgba(240,234,217,.68)', whiteSpace: 'nowrap' }}>
+                v{Math.round(v * 100)}% · t{Math.round(rampPosition * 100)}%
+              </span>
+              <span style={{ display: 'flex', flexWrap: 'wrap', justifyContent: edge === 'start' ? 'flex-start' : edge === 'end' ? 'flex-end' : 'center', gap: 2 }}>
+                {pointIndices.map(index => {
+                  const selected = selectedPointIndices.includes(index);
+                  return (
+                    <button
+                      key={`mesh-ramp-point-${index}`}
+                      type="button"
+                      onClick={() => onSelectPoint(index)}
+                      title={`Select mesh point ${meshPointLabel(mesh, index)} at v ${(v * 100).toFixed(0)}%`}
+                      aria-label={`Select mesh point ${meshPointLabel(mesh, index)}, v ${(v * 100).toFixed(0)} percent`}
+                      aria-pressed={selected}
+                      style={{ display: 'inline-flex', alignItems: 'center', gap: 3, minHeight: 16, padding: '1px 4px', border: `1px solid ${selected ? '#D11402' : 'rgba(240,234,217,.36)'}`, borderRadius: 3, background: selected ? 'rgba(209,20,2,.2)' : 'rgba(20,20,28,.88)', color: '#f0ead9', fontSize: 8, lineHeight: 1, cursor: 'pointer', boxShadow: selected ? '0 0 0 1px rgba(209,20,2,.25)' : 'none' }}
+                    >
+                      <span style={{ width: 6, height: 6, borderRadius: '50%', background: color, border: '1px solid rgba(255,255,255,.65)' }} />
+                      {meshPointLabel(mesh, index)}
+                    </button>
+                  );
+                })}
+              </span>
+            </div>
+          );
+        })}
+      </div>
+      <div style={{ marginTop: 4, color: 'rgba(240,234,217,.62)', fontSize: 8, lineHeight: 1.25 }}>
+        Mesh row points share one ramp position. Click a point label to select the matching canvas point.
+      </div>
+    </div>
+  );
+}
+
 const COLOR_MODE_OPTIONS: { value: RampColorMode; label: string }[] = [
   { value: 'rgb', label: 'RGB' },
   { value: 'linearrgb', label: 'Linear RGB' },
@@ -112,18 +254,22 @@ function RampOptionPreview({
   colorMode,
   interpolation,
   variable,
+  repeat,
+  mirror,
 }: {
   stops: ColorStop[];
   opacityStops?: OpacityStop[];
   colorMode: RampColorMode;
   interpolation: RampInterpolation;
   variable: number;
+  repeat: number;
+  mirror: boolean;
 }) {
   return (
     <span
       aria-hidden="true"
       className="block h-full w-full"
-      style={buildGradientPreviewStyle(stops, opacityStops, colorMode, interpolation, variable)}
+      style={buildGradientPreviewStyle(stops, opacityStops, colorMode, interpolation, variable, repeat, mirror)}
     />
   );
 }
@@ -140,6 +286,7 @@ function drawRamp(
   colorMode: RampColorMode,
   variable = 0,
   mirror = false,
+  repeat = 1,
 ) {
   const cH = bH + HANDLE_AREA + OPACITY_HANDLE_AREA;
   const dpr = window.devicePixelRatio || 1;
@@ -161,12 +308,12 @@ function drawRamp(
   const alphaTrackY = OPACITY_HANDLE_AREA - 10;
 
   const grad = ctx.createLinearGradient(rampX, alphaTrackY, rampX + rampW, alphaTrackY);
-  alphaStops
-    .slice()
-    .sort((a, b) => a.position - b.position)
-    .forEach(stop => {
-      grad.addColorStop(stop.position, `rgba(255,255,255,${Math.max(0, Math.min(1, stop.opacity))})`);
-    });
+  for (let index = 0; index <= 24; index += 1) {
+    const rawT = index / 24;
+    const repeatedT = applyRampRepeatT(rawT, repeat);
+    const t = mirror ? applyMirrorT(repeatedT) : repeatedT;
+    grad.addColorStop(rawT, `rgba(255,255,255,${Math.max(0, Math.min(1, getOpacityAtPosition(alphaStops, t)))})`);
+  }
   drawChecker(ctx, rampX, alphaTrackY, rampW, 8, 6);
   ctx.fillStyle = grad;
   ctx.fillRect(rampX, alphaTrackY, rampW, 8);
@@ -221,7 +368,8 @@ function drawRamp(
 
       RAMP_SUPERSAMPLE_OFFSETS.forEach(offset => {
         const rawT = Math.max(0, Math.min(1, (x + 0.5 + offset) / rampPixelW));
-        const t = mirror ? applyMirrorT(rawT) : rawT;
+        const repeatedT = applyRampRepeatT(rawT, repeat);
+        const t = mirror ? applyMirrorT(repeatedT) : repeatedT;
         const color = getColorAtPosition(stops, t, interpolation, colorMode, variable);
         const alpha = getOpacityAtPosition(opacityStops, t);
         rSum += parseInt(color.slice(1, 3), 16);
@@ -382,8 +530,8 @@ type GradientRampProps = {
 
 export function GradientRamp({ overlayImageElement = null, showHeader = true }: GradientRampProps = {}) {
   const { t, language } = useLanguage();
-  const { gradient, isSlitAdjusting, selectedStops, keyframeTracks, currentTime } = useGradientStore();
-  const { setGradient, resetMeshGradient, setSelectedStops, setKeyframeTracks, addKeyframe, setKeyframe } = applicationCommands;
+  const { gradient, isSlitAdjusting, selectedStops, selectedGradientAnchors, keyframeTracks, currentTime } = useGradientStore();
+  const { setGradient, resetMeshGradient, straightenMeshHandles, setMeshGridSize, setMeshColorMode, setSelectedStops, setSelectedGradientAnchors, setKeyframeTracks, addKeyframe, setKeyframe } = applicationCommands;
   const selectedIdxs = new Set(selectedStops);
   const [selectedOpacityStops, setSelectedOpacityStops] = useState<number[]>([]);
   const selectedOpacityIdxs = new Set(selectedOpacityStops);
@@ -497,6 +645,7 @@ export function GradientRamp({ overlayImageElement = null, showHeader = true }: 
   const interpolation = normalizedRamp.interpolation;
   const rampVariable = Math.max(-1, Math.min(1, gradient.rampVariable ?? 0));
   const rampRepeat = Math.max(1, Math.min(20, Math.round(gradient.rampRepeat ?? 1)));
+  const mesh = gradient.gradientType === 'mesh' ? normalizeMeshGradientConfig(gradient.mesh) : null;
   const usesHueInterpolation = colorMode === 'hsv' || colorMode === 'hsl' || colorMode === 'lch' || colorMode === 'oklch';
   const interpolationOptions = usesHueInterpolation ? HUE_INTERP_OPTIONS : RGB_INTERP_OPTIONS;
   const renderColorModePreview = (option: { value: string }) => (
@@ -506,6 +655,8 @@ export function GradientRamp({ overlayImageElement = null, showHeader = true }: 
       colorMode={option.value as RampColorMode}
       interpolation={defaultInterpolationForColorMode(option.value as RampColorMode)}
       variable={rampVariable}
+      repeat={rampRepeat}
+      mirror={gradient.rampMirror ?? false}
     />
   );
   const renderInterpolationPreview = (option: { value: string }) => (
@@ -515,6 +666,8 @@ export function GradientRamp({ overlayImageElement = null, showHeader = true }: 
       colorMode={colorMode}
       interpolation={option.value as RampInterpolation}
       variable={rampVariable}
+      repeat={rampRepeat}
+      mirror={gradient.rampMirror ?? false}
     />
   );
 
@@ -574,7 +727,7 @@ export function GradientRamp({ overlayImageElement = null, showHeader = true }: 
 
   const doDrawRef = useRef<() => void>(() => {});
   doDrawRef.current = () => {
-    if (canvasRef.current) drawRamp(canvasRef.current, BAR_H, gradient.stops, gradient.opacityStops, selectedIdxs, selectedOpacityIdxs, interpolation, colorMode, rampVariable, gradient.rampMirror ?? false);
+    if (canvasRef.current) drawRamp(canvasRef.current, BAR_H, gradient.stops, gradient.opacityStops, selectedIdxs, selectedOpacityIdxs, interpolation, colorMode, rampVariable, gradient.rampMirror ?? false, rampRepeat);
   };
 
   const canvasCallbackRef = (el: HTMLCanvasElement | null) => {
@@ -615,7 +768,7 @@ export function GradientRamp({ overlayImageElement = null, showHeader = true }: 
     roRef.current.observe(el);
   };
 
-  useEffect(() => { doDrawRef.current(); }, [gradient.stops, gradient.opacityStops, selectedIdxs, selectedOpacityIdxs, interpolation, colorMode, rampVariable, gradient.rampMirror]);
+  useEffect(() => { doDrawRef.current(); }, [gradient.stops, gradient.opacityStops, selectedIdxs, selectedOpacityIdxs, interpolation, colorMode, rampVariable, rampRepeat, gradient.rampMirror]);
 
   function sidebarPos(e: { clientX: number }): number {
     const rect = canvasRef.current!.getBoundingClientRect();
@@ -889,7 +1042,7 @@ export function GradientRamp({ overlayImageElement = null, showHeader = true }: 
 
   const doDrawModalRef = useRef<() => void>(() => {});
   doDrawModalRef.current = () => {
-    if (mCanvasRef.current) drawRamp(mCanvasRef.current, MODAL_BAR_H, gradient.stops, gradient.opacityStops, selectedIdxs, selectedOpacityIdxs, interpolation, colorMode, rampVariable, gradient.rampMirror ?? false);
+    if (mCanvasRef.current) drawRamp(mCanvasRef.current, MODAL_BAR_H, gradient.stops, gradient.opacityStops, selectedIdxs, selectedOpacityIdxs, interpolation, colorMode, rampVariable, gradient.rampMirror ?? false, rampRepeat);
   };
 
   const mCanvasCallbackRef = (el: HTMLCanvasElement | null) => {
@@ -930,7 +1083,7 @@ export function GradientRamp({ overlayImageElement = null, showHeader = true }: 
     mRoRef.current.observe(el);
   };
 
-  useEffect(() => { doDrawModalRef.current(); }, [gradient.stops, gradient.opacityStops, selectedIdxs, selectedOpacityIdxs, interpolation, colorMode, rampVariable, isModalOpen, gradient.rampMirror]);
+  useEffect(() => { doDrawModalRef.current(); }, [gradient.stops, gradient.opacityStops, selectedIdxs, selectedOpacityIdxs, interpolation, colorMode, rampVariable, rampRepeat, isModalOpen, gradient.rampMirror]);
 
   function modalPos(e: { clientX: number }): number {
     const rect = mCanvasRef.current!.getBoundingClientRect();
@@ -1639,6 +1792,90 @@ export function GradientRamp({ overlayImageElement = null, showHeader = true }: 
             />
           </div>
 
+          {/* Mesh Gradation: グリッド操作（Reset/Straighten/行・列） */}
+          {(gradient.gradientType ?? 'linear') === 'mesh' && (() => {
+            const mesh = normalizeMeshGradientConfig(gradient.mesh);
+            return (
+              <div className="space-y-1.5">
+                <div className="rounded-sm border border-panel-border/70 bg-k-surface/60 p-2 space-y-1.5">
+                  <div className="flex gap-1.5">
+                    <button type="button" onClick={resetMeshGradient} className="flex-1 rounded-xs border border-k-muted px-2 py-1 text-[10px] font-semibold text-k-text hover:border-k-text">
+                      Reset Mesh
+                    </button>
+                    <button type="button" onClick={straightenMeshHandles} className="flex-1 rounded-xs border border-k-muted px-2 py-1 text-[10px] font-semibold text-k-text hover:border-k-text">
+                      Straighten
+                    </button>
+                  </div>
+                  <div className="grid grid-cols-2 gap-1.5">
+                    <label className="flex items-center justify-between gap-1.5 text-[10px] text-tab-inactive">
+                      <span>Rows</span>
+                      <input
+                        type="number"
+                        min={2}
+                        max={8}
+                        value={mesh.rows}
+                        onChange={e => setMeshGridSize(Number(e.target.value) || mesh.rows, mesh.columns)}
+                        className="w-12 bg-k-bg/80 border border-k-muted px-1 py-0.5 text-right text-k-text"
+                      />
+                    </label>
+                    <label className="flex items-center justify-between gap-1.5 text-[10px] text-tab-inactive">
+                      <span>Cols</span>
+                      <input
+                        type="number"
+                        min={2}
+                        max={8}
+                        value={mesh.columns}
+                        onChange={e => setMeshGridSize(mesh.rows, Number(e.target.value) || mesh.columns)}
+                        className="w-12 bg-k-bg/80 border border-k-muted px-1 py-0.5 text-right text-k-text"
+                      />
+                    </label>
+                  </div>
+                </div>
+                {/* Mesh color mode: ramp-driven (default) or direct per-point hex. */}
+                <div className="rounded-sm border border-panel-border/70 bg-k-surface/60 px-2 py-1.5 space-y-1">
+                  <div className="flex items-center justify-between gap-1.5 text-[10px] text-tab-inactive">
+                    <span className="font-semibold">Color</span>
+                    <span className="text-right opacity-80">
+                      {mesh.colorMode === 'ramp' ? 'Ramp' : 'Direct'}
+                    </span>
+                  </div>
+                  <div className="grid grid-cols-2 gap-1">
+                    <button
+                      type="button"
+                      onClick={() => setMeshColorMode('ramp')}
+                      className={`rounded-xs border px-1 py-0.5 text-[10px] font-semibold transition-colors ${mesh.colorMode === 'ramp'
+                        ? 'border-fire bg-fire/15 text-fire'
+                        : 'border-k-muted text-tab-inactive hover:border-k-text hover:text-k-text'}`}
+                      title="Colors follow the gradient ramp (bottom to top)"
+                    >
+                      Ramp
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setMeshColorMode('direct')}
+                      className={`rounded-xs border px-1 py-0.5 text-[10px] font-semibold transition-colors ${mesh.colorMode === 'direct'
+                        ? 'border-fire bg-fire/15 text-fire'
+                        : 'border-k-muted text-tab-inactive hover:border-k-text hover:text-k-text'}`}
+                      title="Edit each point's color directly on the canvas"
+                    >
+                      Direct
+                    </button>
+                  </div>
+                  {mesh.colorMode === 'ramp' && (
+                    <p className="text-[9px] leading-snug text-tab-inactive/80">
+                      Mesh colors follow the ramp from bottom → top. Colored guide lines on the canvas map each stop; click a guide label to select it.
+                    </p>
+                  )}
+                  {mesh.colorMode === 'direct' && (
+                    <p className="text-[9px] leading-snug text-tab-inactive/80">
+                      Select a point on the canvas and use its color swatch to set a direct hex color.
+                    </p>
+                  )}
+                </div>
+              </div>
+            );
+          })()}
+
           {/* ストップ編集: 頻繁に操作するためグラデーションタイプの直下に固定 */}
           <p className="text-xs text-tab-inactive">
             {t('gradient.editInstructions')}
@@ -1661,6 +1898,30 @@ export function GradientRamp({ overlayImageElement = null, showHeader = true }: 
               className="w-full rounded-none cursor-crosshair touch-none"
               style={{ height: BAR_H + HANDLE_AREA + OPACITY_HANDLE_AREA, pointerEvents: isSlitAdjusting ? 'none' : 'auto', touchAction: 'none' }}
             />
+            {mesh && (
+              mesh.colorMode === 'ramp' ? (
+                <MeshRampMapping
+                  mesh={mesh}
+                  stops={gradient.stops}
+                  interpolation={interpolation}
+                  colorMode={colorMode}
+                  variable={rampVariable}
+                  repeat={rampRepeat}
+                  mirror={gradient.rampMirror ?? false}
+                  selectedPointIndices={selectedGradientAnchors}
+                  onSelectPoint={(index) => setSelectedGradientAnchors([index])}
+                />
+              ) : (
+                <div
+                  role="note"
+                  aria-label="Direct mesh colors are independent from the gradient ramp."
+                  style={{ padding: '7px 8px', border: '1px solid rgba(240,234,217,.2)', borderRadius: 3, background: 'rgba(20,20,28,.56)', color: 'rgba(240,234,217,.72)', fontSize: 8, lineHeight: 1.3 }}
+                >
+                  <strong style={{ color: '#f0ead9', fontSize: 9, letterSpacing: '.08em' }}>MESH POINT COLORS</strong>
+                  <div style={{ marginTop: 3 }}>Direct mode: each canvas point owns its color. This ramp does not drive the mesh.</div>
+                </div>
+              )
+            )}
             {renderRampHover('sidebar')}
           </div>
 
@@ -1954,6 +2215,30 @@ export function GradientRamp({ overlayImageElement = null, showHeader = true }: 
                 className="w-full rounded-none cursor-crosshair touch-none"
                 style={{ height: MODAL_BAR_H + HANDLE_AREA + OPACITY_HANDLE_AREA, touchAction: 'none' }}
               />
+              {mesh && (
+                mesh.colorMode === 'ramp' ? (
+                  <MeshRampMapping
+                    mesh={mesh}
+                    stops={gradient.stops}
+                    interpolation={interpolation}
+                    colorMode={colorMode}
+                    variable={rampVariable}
+                    repeat={rampRepeat}
+                    mirror={gradient.rampMirror ?? false}
+                    selectedPointIndices={selectedGradientAnchors}
+                    onSelectPoint={(index) => setSelectedGradientAnchors([index])}
+                  />
+                ) : (
+                  <div
+                    role="note"
+                    aria-label="Direct mesh colors are independent from the gradient ramp."
+                    style={{ padding: '7px 8px', border: '1px solid rgba(240,234,217,.2)', borderRadius: 3, background: 'rgba(20,20,28,.56)', color: 'rgba(240,234,217,.72)', fontSize: 8, lineHeight: 1.3 }}
+                  >
+                    <strong style={{ color: '#f0ead9', fontSize: 9, letterSpacing: '.08em' }}>MESH POINT COLORS</strong>
+                    <div style={{ marginTop: 3 }}>Direct mode: each canvas point owns its color. This ramp does not drive the mesh.</div>
+                  </div>
+                )
+              )}
               {renderRampHover('modal')}
             </div>
 

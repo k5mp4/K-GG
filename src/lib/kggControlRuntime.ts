@@ -32,6 +32,7 @@ import {
 import type { WebGLContext } from './webgl';
 import { renderBridge } from './renderBridge';
 import { getShaderErrors } from './shaderDiagnostics';
+import { normalizePresetRenderViewMode } from './presetModel';
 import type { ColorStop, GradientConfig, MeshEdge, OpacityStop, Vec2Tuple } from '../types/gradient';
 import type { AnimationMode, InterpolationType, Keyframe } from '../types/keyframe';
 
@@ -682,12 +683,48 @@ export class KggControlRuntime {
     return this.getControlState(['gradient']);
   }
 
-  private setMeshColorPositionInput(input: Record<string, unknown>): RuntimeResult<unknown> {
-    const index = normalizedIndex(input.index, 3);
-    if (index === null || typeof input.value !== 'number' || !Number.isFinite(input.value) || input.value < 0 || input.value > 1) {
-      return error('invalid_control_input', 'index must be 0..3 and value must be between 0 and 1');
+  private setMeshColorModeInput(input: Record<string, unknown>): RuntimeResult<unknown> {
+    const mode = input.mode;
+    if (mode !== 'ramp' && mode !== 'direct') {
+      return error('invalid_control_input', 'mode must be ramp or direct');
     }
-    applicationCommands.setMeshColorPosition(index, input.value);
+    applicationCommands.setMeshColorMode(mode);
+    return this.getControlState(['gradient']);
+  }
+
+  private setMeshGridPointColorInput(input: Record<string, unknown>): RuntimeResult<unknown> {
+    const index = normalizedIndex(input.index, 63);
+    const color = input.color;
+    if (index === null || typeof color !== 'string' || !/^#[0-9a-f]{6}$/i.test(color)) {
+      return error('invalid_control_input', 'index must be an integer and color must be a hex string like #0066FF');
+    }
+    applicationCommands.setMeshPointColor(index, color);
+    return this.getControlState(['gradient']);
+  }
+
+  private setBezierControlInput(input: Record<string, unknown>): RuntimeResult<unknown> {
+    const index = normalizedIndex(input.index, 1);
+    const position = tuple2(input.position);
+    if (index === null || !position) return error('invalid_control_input', 'index must be 0 or 1 and position must be a finite [x, y] tuple');
+    applicationCommands.setBezierControl(index as 0 | 1, position);
+    return this.getControlState(['gradient']);
+  }
+
+  private setMeshGridSizeInput(input: Record<string, unknown>): RuntimeResult<unknown> {
+    const rows = normalizedIndex(input.rows, 8);
+    const columns = normalizedIndex(input.columns, 8);
+    if (rows === null || columns === null || rows < 2 || columns < 2) {
+      return error('invalid_control_input', 'rows and columns must be integers between 2 and 8');
+    }
+    applicationCommands.setMeshGridSize(rows, columns);
+    return this.getControlState(['gradient']);
+  }
+
+  private setMeshGridPointInput(input: Record<string, unknown>): RuntimeResult<unknown> {
+    const index = normalizedIndex(input.index, 63);
+    const position = tuple2(input.position);
+    if (index === null || !position) return error('invalid_control_input', 'index must be an integer and position must be a finite [x, y] tuple');
+    applicationCommands.setMeshGridPoint(index, position);
     return this.getControlState(['gradient']);
   }
 
@@ -892,11 +929,13 @@ export class KggControlRuntime {
     try {
       const preset = await this.project.getPreset(presetIdResult.value);
       if (!isRecord(preset) || !isRecord(preset.state)) return error('preset_not_found', `Preset not found: ${presetIdResult.value}`);
+      const renderViewMode = normalizePresetRenderViewMode(preset.state.renderViewMode);
       this.applySnapshot({
         store: preset.state,
         currentTime: 0,
         presetName: typeof preset.name === 'string' ? preset.name : useGradientStore.getState().presetName,
       });
+      this.ui?.setState({ renderViewMode });
       return { ok: true, value: { presetId: presetIdResult.value, presetName: useGradientStore.getState().presetName } };
     } catch (cause) {
       return error('project_operation_failed', cause instanceof Error ? cause.message : 'Unable to apply preset');
@@ -918,7 +957,11 @@ export class KggControlRuntime {
     }
     try {
       const snapshot = makeSnapshot(useGradientStore.getState());
-      const saved = await this.project.savePreset(nameResult.value, snapshot.store, folderId, thumbnail);
+      const store = {
+        ...snapshot.store,
+        renderViewMode: normalizePresetRenderViewMode(this.ui?.getState().renderViewMode),
+      };
+      const saved = await this.project.savePreset(nameResult.value, store, folderId, thumbnail);
       return cloneResultValue(saved);
     } catch (cause) {
       return error('project_operation_failed', cause instanceof Error ? cause.message : 'Unable to save preset');
@@ -1031,7 +1074,11 @@ export class KggControlRuntime {
       case 'set_gradient_anchor': return this.setGradientAnchorInput(input);
       case 'set_mesh_corner': return this.setMeshCornerInput(input);
       case 'set_mesh_handle': return this.setMeshHandleInput(input);
-      case 'set_mesh_color_position': return this.setMeshColorPositionInput(input);
+      case 'set_mesh_color_mode': return this.setMeshColorModeInput(input);
+      case 'set_bezier_control': return this.setBezierControlInput(input);
+      case 'set_mesh_grid_size': return this.setMeshGridSizeInput(input);
+      case 'set_mesh_grid_point': return this.setMeshGridPointInput(input);
+      case 'set_mesh_grid_point_color': return this.setMeshGridPointColorInput(input);
       case 'reset_mesh_gradient':
         applicationCommands.resetMeshGradient();
         return this.getControlState(['gradient']);

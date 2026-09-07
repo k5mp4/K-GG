@@ -51,9 +51,20 @@ export type DocumentActions = {
   setGradient: (value: Partial<GradientConfig>) => void;
   setMeshCorner: (index: number, position: Vec2Tuple) => void;
   setMeshHandle: (edge: MeshEdge, index: 0 | 1, position: Vec2Tuple) => void;
-  setMeshColorPosition: (index: number, value: number) => void;
   resetMeshGradient: () => void;
   straightenMeshHandles: () => void;
+  /** Switch mesh color source between ramp-driven and per-point direct colors. */
+  setMeshColorMode: (mode: import('../types/gradient').MeshColorMode) => void;
+  /** Set one grid point's direct hex color (direct color mode only). */
+  setMeshPointColor: (index: number, color: string) => void;
+  /** Set one grid point position by row-major index. */
+  setMeshGridPoint: (index: number, position: Vec2Tuple) => void;
+  /** Set one shared edge handle: `orientation` 'h'|'v', `row`/`col` index into the edge table, handle 0 or 1. */
+  setMeshEdgeHandle: (orientation: 'h' | 'v', row: number, col: number, handleIndex: 0 | 1, position: Vec2Tuple) => void;
+  /** Resize the vertex grid; existing geometry is resampled onto the new lattice. */
+  setMeshGridSize: (rows: number, columns: number) => void;
+  /** Set a Bezier gradient control point (0 = A-side, 1 = B-side). */
+  setBezierControl: (index: 0 | 1, position: Vec2Tuple) => void;
   setNoiseDistortion: (value: Partial<NoiseDistortionConfig>) => void;
   setDiffuse: (value: Partial<DiffuseConfig>) => void;
   setImageGradient: (value: Partial<ImageGradientConfig>) => void;

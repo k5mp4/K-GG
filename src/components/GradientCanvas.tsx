@@ -181,7 +181,7 @@ export function GradientCanvas({ width = 800, height = 800, animLoopRef, seekVer
   }, [animation.enabled, animation.duration, animation.previewLoop, animation.speed, animation.fps, keyframeTracks, noiseDistortion.enabled, iridescence.enabled, radon.enabled, slitScan.enabled, stretch.enabled, diffuse.enabled, diffuse.seedAnimEnabled, postprocess.enabled, postprocess.effectMode, postprocess.effectStack, postprocess.glassMotion, effectPipeline, clothGradient, seamless, flowGradient, disableClothBase, isWebGLReady]); // eslint-disable-line react-hooks/exhaustive-deps
 
   return (
-    <div style={{ position: 'relative', width: '100%', height: '100%' }}>
+    <div style={{ position: 'relative', width: '100%', height: '100%', isolation: 'isolate' }}>
       {!isWebGLReady && (
         <canvas
           ref={fallbackCanvasRef}
@@ -192,7 +192,7 @@ export function GradientCanvas({ width = 800, height = 800, animLoopRef, seekVer
             display: 'block',
             width: '100%',
             height: '100%',
-            zIndex: 1,
+            zIndex: 0,
             pointerEvents: 'none',
           }}
         />

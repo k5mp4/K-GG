@@ -1,4 +1,15 @@
-import { DEFAULT_MESH_GRADIENT, normalizeMeshGradientConfig, type Vec2Tuple } from '../types/gradient';
+import {
+  DEFAULT_MESH_GRADIENT,
+  MESH_GRID_MAX,
+  MESH_GRID_MIN,
+  cloneEdgeHandles,
+  defaultEdgeHandles,
+  legacyProjection,
+  normalizeMeshGradientConfig,
+  type Vec2Tuple,
+} from '../types/gradient';
+import { evaluateMeshPatch } from '../lib/meshGradientField';
+import { applyMirrorT, applyRampRepeatT, getColorAtPosition } from '../lib/gradientRampUtils';
 import { stripSlitPhaseMotionFields, type NoiseDistortionConfig } from '../types/distortion';
 import { DEFAULT_DIFFUSE_ASCII_CHARSET, DEFAULT_DIFFUSE_BACKGROUND_COLOR } from '../types/distortion';
 import { normalizeClothGradientConfig } from '../types/clothGradient';
@@ -81,41 +92,137 @@ export function createDocumentActions(set: DocumentStoreSet, defaults: DocumentD
     };
   }),
   setMeshCorner: (index, position) => set((s) => {
+    // Legacy corner edit: delegate to the matching grid point (BL, BR, TL, TR).
     if (!Number.isInteger(index) || index < 0 || index > 3) return {};
     const mesh = normalizeMeshGradientConfig(s.gradient.mesh);
-    const corners = mesh.corners.map((corner, cornerIndex) => cornerIndex === index ? position : corner) as typeof mesh.corners;
-    return { gradient: { ...s.gradient, mesh: normalizeMeshGradientConfig({ ...mesh, corners }) } };
+    const rows = mesh.rows;
+    const columns = mesh.columns;
+    const cornerToPoint = (corner: number): number => {
+      if (corner === 0) return 0;
+      if (corner === 1) return columns - 1;
+      if (corner === 2) return (rows - 1) * columns;
+      return rows * columns - 1;
+    };
+    const pointIndex = cornerToPoint(index);
+    const points = mesh.points.map((point, pointI) => (pointI === pointIndex ? position : point));
+    const edgeHandles = mesh.edgeHandles;
+    const { corners, handles } = legacyProjection({ points, edgeHandles, rows, columns });
+    return { gradient: { ...s.gradient, mesh: normalizeMeshGradientConfig({ ...mesh, points, corners, handles }) } };
   }),
   setMeshHandle: (edge, index, position) => set((s) => {
+    // Legacy single-patch handle edit. Only meaningful for the 2×2 grid.
     if (!Object.prototype.hasOwnProperty.call(DEFAULT_MESH_GRADIENT.handles, edge)) return {};
     const mesh = normalizeMeshGradientConfig(s.gradient.mesh);
-    const handles = {
-      ...mesh.handles,
-      [edge]: mesh.handles[edge].map((handle, handleIndex) => handleIndex === index ? position : handle),
-    } as typeof mesh.handles;
-    return { gradient: { ...s.gradient, mesh: normalizeMeshGradientConfig({ ...mesh, handles }) } };
+    if (mesh.rows !== 2 || mesh.columns !== 2) return {};
+    const orientation = edge === 'bottom' || edge === 'top' ? 'h' : 'v';
+    const row = edge === 'top' || edge === 'left' ? 1 : 0;
+    const col = edge === 'right' ? 1 : 0;
+    const edgeHandles = cloneEdgeHandles(mesh.edgeHandles);
+    const table = orientation === 'h' ? edgeHandles.horizontal : edgeHandles.vertical;
+    const tableRow = orientation === 'h' ? row : row;
+    const edgeIndex = orientation === 'h' ? col : col;
+    if (!table[tableRow]?.[edgeIndex]) return {};
+    table[tableRow][edgeIndex][index] = position;
+    const points = mesh.points;
+    const { corners, handles } = legacyProjection({ points, edgeHandles, rows: mesh.rows, columns: mesh.columns });
+    return { gradient: { ...s.gradient, mesh: normalizeMeshGradientConfig({ ...mesh, edgeHandles, corners, handles }) } };
   }),
-  setMeshColorPosition: (index, value) => set((s) => {
-    if (!Number.isInteger(index) || index < 0 || index > 3) return {};
+  setMeshColorMode: (mode) => set((s) => {
     const mesh = normalizeMeshGradientConfig(s.gradient.mesh);
-    const colorPositions = mesh.colorPositions.map((position, colorIndex) => colorIndex === index ? value : position) as typeof mesh.colorPositions;
-    return { gradient: { ...s.gradient, mesh: normalizeMeshGradientConfig({ ...mesh, colorPositions }) } };
+    if (mode !== 'ramp' && mode !== 'direct') return {};
+    if (mesh.colorMode === mode) return {};
+    if (mode === 'ramp') {
+      // Back to ramp: drop per-point colors; the ramp drives the mesh again.
+      return { gradient: { ...s.gradient, mesh: normalizeMeshGradientConfig({ ...mesh, colorMode: 'ramp', pointColors: undefined }) } };
+    }
+    // Switch to direct: bake the current ramp colors (sampled along v) into
+    // per-point hex colors so the look is continuous before editing.
+    const rampColorAt = (t: number): string => {
+      const repeated = applyRampRepeatT(t, s.gradient.rampRepeat ?? 1);
+      const mapped = s.gradient.rampMirror ? applyMirrorT(repeated) : repeated;
+      return getColorAtPosition(s.gradient.stops, mapped, s.gradient.rampInterpolation, s.gradient.rampColorMode, s.gradient.rampVariable ?? 0);
+    };
+    const pointColors = mesh.points.map((_, index) => {
+      const row = Math.floor(index / mesh.columns);
+      const v = mesh.rows <= 1 ? 0 : row / (mesh.rows - 1);
+      return rampColorAt(v);
+    });
+    return { gradient: { ...s.gradient, mesh: normalizeMeshGradientConfig({ ...mesh, colorMode: 'direct', pointColors }) } };
+  }),
+  setMeshPointColor: (index, color) => set((s) => {
+    const mesh = normalizeMeshGradientConfig(s.gradient.mesh);
+    const count = mesh.rows * mesh.columns;
+    if (!Number.isInteger(index) || index < 0 || index >= count) return {};
+    if (typeof color !== 'string' || !/^#[0-9a-f]{6}$/i.test(color)) return {};
+    const existing = mesh.colorMode === 'direct' && mesh.pointColors
+      ? [...mesh.pointColors]
+      : undefined;
+    if (mesh.colorMode !== 'direct') return {};
+    const pointColors = existing ?? mesh.points.map((_, pointIndex) => {
+      const row = Math.floor(pointIndex / mesh.columns);
+      const v = mesh.rows <= 1 ? 0 : row / (mesh.rows - 1);
+      const repeated = applyRampRepeatT(v, s.gradient.rampRepeat ?? 1);
+      const mapped = s.gradient.rampMirror ? applyMirrorT(repeated) : repeated;
+      return getColorAtPosition(s.gradient.stops, mapped, s.gradient.rampInterpolation, s.gradient.rampColorMode, s.gradient.rampVariable ?? 0);
+    });
+    pointColors[index] = color.toUpperCase();
+    return { gradient: { ...s.gradient, mesh: normalizeMeshGradientConfig({ ...mesh, pointColors }) } };
+  }),
+  setMeshGridPoint: (index, position) => set((s) => {
+    const mesh = normalizeMeshGradientConfig(s.gradient.mesh);
+    const count = mesh.rows * mesh.columns;
+    if (!Number.isInteger(index) || index < 0 || index >= count) return {};
+    const points = mesh.points.map((point, pointIndex) => pointIndex === index ? position : point);
+    const { corners, handles } = legacyProjection({ points, edgeHandles: mesh.edgeHandles, rows: mesh.rows, columns: mesh.columns });
+    return { gradient: { ...s.gradient, mesh: normalizeMeshGradientConfig({ ...mesh, points, corners, handles }) } };
+  }),
+  setMeshEdgeHandle: (orientation, row, col, handleIndex, position) => set((s) => {
+    const mesh = normalizeMeshGradientConfig(s.gradient.mesh);
+    const edgeHandles = cloneEdgeHandles(mesh.edgeHandles);
+    const table = orientation === 'h' ? edgeHandles.horizontal : edgeHandles.vertical;
+    const maxRow = orientation === 'h' ? mesh.rows : mesh.rows - 1;
+    const maxCol = orientation === 'h' ? mesh.columns - 1 : mesh.columns;
+    if (!Number.isInteger(row) || row < 0 || row >= maxRow) return {};
+    if (!Number.isInteger(col) || col < 0 || col >= maxCol) return {};
+    if (!table[row]?.[col]) return {};
+    table[row][col][handleIndex] = position;
+    const { corners, handles } = legacyProjection({ points: mesh.points, edgeHandles, rows: mesh.rows, columns: mesh.columns });
+    return { gradient: { ...s.gradient, mesh: normalizeMeshGradientConfig({ ...mesh, edgeHandles, corners, handles }) } };
+  }),
+  setMeshGridSize: (rows, columns) => set((s) => {
+    const mesh = normalizeMeshGradientConfig(s.gradient.mesh);
+    const nextRows = Math.max(MESH_GRID_MIN, Math.min(MESH_GRID_MAX, Math.round(rows)));
+    const nextColumns = Math.max(MESH_GRID_MIN, Math.min(MESH_GRID_MAX, Math.round(columns)));
+    if (nextRows === mesh.rows && nextColumns === mesh.columns) return {};
+    // Resample point positions onto the new lattice by evaluating the current
+    // Coons grid at each new lattice node. Colors stay ramp-driven: the
+    // continuous mesh field samples the shared gradient ramp along logical v.
+    const pointAt = (r: number, c: number): Vec2Tuple => {
+      const u = nextColumns <= 1 ? 0 : c / (nextColumns - 1);
+      const v = nextRows <= 1 ? 0 : r / (nextRows - 1);
+      return evaluateMeshPatch(mesh, u, v);
+    };
+    const points: Vec2Tuple[] = [];
+    for (let r = 0; r < nextRows; r += 1) {
+      for (let c = 0; c < nextColumns; c += 1) {
+        points.push(pointAt(r, c));
+      }
+    }
+    const edgeHandles = defaultEdgeHandles(points, nextRows, nextColumns);
+    return { gradient: { ...s.gradient, mesh: normalizeMeshGradientConfig({ ...mesh, rows: nextRows, columns: nextColumns, points, edgeHandles }) } };
+  }),
+  setBezierControl: (index, position) => set((s) => {
+    if (index !== 0 && index !== 1) return {};
+    const current = s.gradient.bezierControls ?? defaultBezierControlsForAnchors(s.gradient.anchors ?? GRADIENT_ANCHOR_DEFAULTS.bezier);
+    const bezierControls = current.map((cp, cpIndex) => cpIndex === index ? position : cp) as [[number, number], [number, number]];
+    return { gradient: { ...s.gradient, bezierControls } };
   }),
   resetMeshGradient: () => set((s) => ({ gradient: { ...s.gradient, gradientType: 'mesh', mesh: normalizeMeshGradientConfig(DEFAULT_MESH_GRADIENT), anchors: GRADIENT_ANCHOR_DEFAULTS.mesh } })),
   straightenMeshHandles: () => set((s) => {
     const mesh = normalizeMeshGradientConfig(s.gradient.mesh);
-    const lerp = (a: Vec2Tuple, b: Vec2Tuple, t: number): Vec2Tuple => [
-      a[0] + (b[0] - a[0]) * t,
-      a[1] + (b[1] - a[1]) * t,
-    ];
-    const [bl, br, tl, tr] = mesh.corners;
-    const handles = {
-      bottom: [lerp(bl, br, 1 / 3), lerp(bl, br, 2 / 3)],
-      right: [lerp(br, tr, 1 / 3), lerp(br, tr, 2 / 3)],
-      top: [lerp(tr, tl, 1 / 3), lerp(tr, tl, 2 / 3)],
-      left: [lerp(tl, bl, 1 / 3), lerp(tl, bl, 2 / 3)],
-    } as typeof mesh.handles;
-    return { gradient: { ...s.gradient, mesh: normalizeMeshGradientConfig({ ...mesh, handles }) } };
+    const edgeHandles = defaultEdgeHandles(mesh.points, mesh.rows, mesh.columns);
+    const { corners, handles } = legacyProjection({ points: mesh.points, edgeHandles, rows: mesh.rows, columns: mesh.columns });
+    return { gradient: { ...s.gradient, mesh: normalizeMeshGradientConfig({ ...mesh, edgeHandles, corners, handles }) } };
   }),
   setNoiseDistortion: (v) => set((s) => {
     let nextNoiseDistortion: Partial<NoiseDistortionConfig>;

@@ -5,10 +5,10 @@ title: Gradient System
 status: current
 owners: [maintainer]
 created: 2026-07-27
-updated: 2026-08-31
-requirement_ids: [GRAD-001, GRAD-002, GRAD-003, GRAD-004, GRAD-005, GRAD-006, GRAD-007, GRAD-008, GRAD-009, GRAD-010, GRAD-011, GRAD-012, GRAD-013, GRAD-014, GRAD-015, GRAD-016, GRAD-017, GRAD-018, GRAD-019, GRAD-020, GRAD-021, GRAD-022, GRAD-023]
+updated: 2026-09-07
+requirement_ids: [GRAD-001, GRAD-002, GRAD-003, GRAD-004, GRAD-005, GRAD-006, GRAD-007, GRAD-008, GRAD-009, GRAD-010, GRAD-011, GRAD-012, GRAD-013, GRAD-014, GRAD-015, GRAD-016, GRAD-017, GRAD-018, GRAD-019, GRAD-020, GRAD-021, GRAD-022, GRAD-023, GRAD-024, GRAD-025]
 related_adrs: [ADR-0001, ADR-0003, ADR-0010, ADR-0013]
-related_changes: [CHANGE-001, CHANGE-010, CHANGE-024, CHANGE-025, CHANGE-030, CHANGE-031, CHANGE-032, CHANGE-037, CHANGE-039, CHANGE-040]
+related_changes: [CHANGE-001, CHANGE-010, CHANGE-024, CHANGE-025, CHANGE-030, CHANGE-031, CHANGE-032, CHANGE-037, CHANGE-039, CHANGE-040, CHANGE-045]
 related_code: [src/types/gradient.ts, src/types/flowGradient.ts, src/types/imageGradient.ts, src/types/renderView.ts, src/types/coneView.ts, src/store/gradientStore.ts, src/lib/gradientRampUtils.ts, src/lib/flowGradientRenderer.ts, src/lib/flowSimulation.ts, src/lib/gradientPreview.ts, src/lib/imageGradient.ts, src/lib/meshGradientField.ts, src/lib/sceneEvaluation.ts, src/lib/webgl.ts, src/lib/webglCapability.ts, src/lib/webglShaderSources.ts, src/lib/clothGradientRenderer.ts, src/lib/coneView.ts, src/lib/coneViewRenderer.ts, src/lib/coneSeam.ts, src/lib/processedCanvasClock.ts, src/lib/presetModel.ts, src/components/GradientRamp.tsx, src/components/CustomSelect.tsx, src/components/ColorPaletteGenerator.tsx, src/components/GradientCanvas.tsx, src/components/SandboxPanel.tsx, src/components/FlowGradientPanel.tsx, src/components/ClothGradientPanel.tsx, src/components/ClothCanvas.tsx, src/components/ConeCanvas.tsx, src/components/ConeViewPanel.tsx, src/components/ExportPanel.tsx, src/lib/videoExportFrames.ts, src/adapters/types.ts, src/lib/clothView.ts, src/lib/colorHarmony.ts, src/i18n/uiLabels.ts, src/i18n/messages.ts]
 related_tests: [src/types/gradient.test.ts, src/types/coneView.test.ts, src/lib/flowSimulation.test.ts, src/lib/flowGradientPreset.test.ts, src/lib/imageGradient.test.ts, src/lib/imageGradientProtected.test.ts, src/lib/meshGradient.test.ts, src/lib/proportionalRampEdit.test.ts, src/lib/sceneEvaluation.glass.test.ts, src/lib/colorHarmony.test.ts, src/lib/gradientPreview.test.ts, src/lib/videoExportFrames.test.ts, src/lib/clothView.test.ts, src/lib/coneView.test.ts, src/lib/coneSeam.test.ts, src/lib/webglCapability.test.ts, src/lib/processedCanvasClock.test.ts, src/components/ConeApexEditor.test.tsx, src/components/CustomSelect.test.tsx]
 ---
@@ -39,13 +39,26 @@ Image Gradient Sourceを有効にすると、画像の `luminance`、`red`、`gr
 
 ### GRAD-004 Mesh Gradation
 
-Mesh Gradationは単一の2×2 Coons Patchです。4つのコーナー、4辺それぞれの2つの制御点、4つの色位置、bilinear補間を `gradient.mesh` に保持します。MVPでは複数セルの編集や複数パッチは提供しません。
+Mesh GradationはN×Mセル（縦横 (rows-1)×(columns-1)）のCoons Patchグリッドです。`gradient.mesh` に頂点格子 `points`（rows×columns、row-major）、セル間で共有される辺ごとの2つの三次Bezier制御点 `edgeHandles`、色モード `colorMode` を保持します。既存の単一2×2パッチ（`corners`/`handles`）データは後方互換として同一形状へ導出され、保存時も旧フィールドへ同期されます。
 
-Meshのコーナーはキーフレーム対象ですが、辺の制御点と色位置は現在静的です。座標は有限値へ正規化され、描画の数値計算を不安定にする極端な値は制限されます。
+メッシュの色は2つのモードを持ちます。
+
+- **ランプ対応（`colorMode:'ramp'`・既定）**: メッシュ全体が共有グラデーションランプで塗られます。各頂点の色はグリッドの縦位置 v（下辺=0→上辺=1）でランプをサンプルし、セル内部も頂点色の単純補間ではなく、同じ論理v座標でランプを連続サンプルして決まります。これにより、2×2の初期状態でもランプ途中のstopが実際のメッシュ色へ反映されます。グラデーションランプのカラーストップを編集すると、メッシュ全体の色が即時追従します。コーナーごとのランプ位置指定（旧 `colorPositions`）はありません。
+- **直接色（`colorMode:'direct'`）**: 各頂点が直接Hex色 `pointColors` を持ち、キャンバス上の点をクリック→色スウォッチ→Tweeq ColorPickerで個別編集できます。directへ切り替えた瞬間は現在のランプ色（v軸）が各点へ初期化され、以後は点ごとのHexがランプと独立して使われます。1点の変更は他点に影響しません。
+
+ランプ対応モードでは、キャンバスに各カラーストップのv位置を示す色付きガイド線とラベルを表示します。ガイド線はメッシュの形状に沿って横断し、右サイドバーのランプで選択したstopと同じ番号・色を使います。キャンバス上のラベルをクリックすると、対応するstopをサイドバーでも選択できます。Rampのrepeatが多い場合は、視認性のため最初のサイクルを表示し、繰り返し回数をガイドに明示します。
+
+右サイドバーのGradient Rampには、Meshの各行の点をRamp上の対応位置へ表示します。初期2×2では`BL`/`BR`がv=0、`TL`/`TR`がv=1に並び、点ラベルをクリックするとキャンバス上の対応点が選択されます。repeat/mirror時は、実際にサンプルされるRamp位置（t）も表示します。directモードではRampとの対応を表示せず、点ごとの色がRampから独立していることを明示します。
+
+キャンバス上では外側と内部の全頂点をドラッグして変形し、セル共有エッジの制御点をドラッグして境界を曲げられます。行・列の点数（2〜8）は変更でき、変更時は現在のCoons形状上で頂点を再サンプルします（directモードでは点色も再サンプル）。色モード切替は、右サイドバーのグラデーション形式下にあるMeshセクションで行います。
+
+Meshの任意頂点の位置はキーフレーム対象です（`mesh.point.*.{x|y}`）。directモードでは頂点の色もキーフレーム対象です（`mesh.point.*.{r|g|b}`）。旧 `mesh.corner.*` は2×2グリッドの該当コーナー頂点として評価します。座標は有限値へ正規化され、描画の数値計算を不安定にする極端な値は制限されます。
 
 ### GRAD-005 アニメーションとキーフレーム
 
-アニメーション状態は、再生の有効化、ループ、速度、強度、継続時間、FPS、方向、イージング、機能別の影響範囲を持ちます。Rampの色・位置・透明度、通常アンカー、Meshコーナーは安定したプロパティIDを持つキーフレームで編集できます。
+アニメーション状態は、再生の有効化、ループ、速度、強度、継続時間、FPS、方向、イージング、機能別の影響範囲を持ちます。Rampの色・位置・透明度、通常アンカー、Bezier制御点（`bezierControl.*`）、Meshの全頂点位置は安定したプロパティIDを持つキーフレームで編集できます。
+
+Bezierでは、制御点を個別にキーフレーム記録でき、アニメーション中も補間された位置で表示・編集されます。Meshの頂点の色は、ランプ対応モードではランプの色ストップが駆動し、直接色モードでは点色キーフレーム（`mesh.point.*.{r|g|b}`）が駆動します。
 
 勾配固有の可変部分と、Noise・Diffuse・Slit・Stretch・Postprocessなど他領域の自動/キー制御は別のトラックとして扱います。機能が無効な場合、その機能に属するトラックは描画へ反映しません。
 
@@ -57,7 +70,7 @@ Gradientの状態はPresetの状態スナップショットに含まれます。
 
 ### GRAD-007 描画経路の一貫性
 
-通常プレビュー、静止画、連番、動画のシーン評価は共通の時間評価と描画経路を使用します。Presetサムネイルも保存時の正規化状態から1フレームを描画します。WebGLを利用できない場合の軽量プレビューは、互換性を保つためのフォールバックであり、同一の描画実装そのものではありません。
+通常プレビュー、静止画、連番、動画のシーン評価は共通の時間評価と描画経路を使用します。Presetサムネイルも保存時の正規化状態から1フレームを描画します。WebGLを利用できない場合の軽量プレビュー（2D Canvasフォールバック）は、互換性を保つためのフォールバックであり、同一の描画実装そのものではありません。フォールバック時はエフェクトスタック（Diffuse等）の効果は適用されず、グラデーション（Meshを含む）のベース表示のみとなり、キャンバス上部に「プレビュー／ベースのみ」バッジで明示されます。グラデーションのアンカー・制御線はフォールバック時も表示・編集できます。
 
 Image Gradient Sourceでは、画像本体の形状・アルファを固定し、色場だけに対象の変形を適用する保護経路を使用します。対象外となる形状変形系レイヤーの扱いはEffect Stackの現行仕様とADR-0010に従います。
 
@@ -124,6 +137,17 @@ Coneの`Gradient Reapply`は、現在時刻に評価済みの処理済みCanvas�
 ### GRAD-023 WebGL2能力不足時の3D viewフォールバック
 
 WebGL2コンテキストを作成できないブラウザ／WebViewでは、メインのGradient CanvasとSANDBOXのCloth／Cone表示を2D Canvasへフォールバックし、編集を継続できます。この状態は想定済みの能力不足として扱い、同一ページ内の再マウントでWebGL2やThree.jsのコンテキスト作成を繰り返しません。WebGL2が利用可能な場合は、作成済みコンテキストを使う既存のPreview／Export経路を維持し、context lost／restored時は能力状態を再評価します。
+
+### GRAD-024 Meshグリッドの色モード
+
+メッシュは「ランプ対応」と「直接色」の2つの色モードを持ち、右サイドバーのMeshセクションで切り替えます。
+
+- ランプ対応（既定）: グリッド縦位置 v に沿って共有ランプを連続サンプルし、頂点とセル内部の色へ反映する。ランプ編集がメッシュ全体へ追従する。Ramp上には各メッシュ行の点ラベルと対応位置を表示する。
+- 直接色: 各頂点が直接Hex色 `pointColors` を持つ。切替時は現在のランプ色（v軸）を初期化し、以後は点クリック→色スウォッチ→Tweeq InputColorで個別編集できる。1点の変更は他点に影響しない。
+
+### GRAD-025 Bezier制御点とMeshグリッドのMCP操作
+
+kgg-control/MCPには、Bezier制御点の移動（`set_bezier_control`）、Meshグリッド寸法（`set_mesh_grid_size`）、グリッド点位置（`set_mesh_grid_point`）、色モード切替（`set_mesh_color_mode`）、グリッド点色（`set_mesh_grid_point_color`）の操作があります。UIの編集操作とMCPの操作は同じデータを同じ範囲・検証で変更します。
 
 ## 他領域との関係
 
