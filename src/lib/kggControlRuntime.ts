@@ -32,7 +32,6 @@ import {
 import type { WebGLContext } from './webgl';
 import { renderBridge } from './renderBridge';
 import { getShaderErrors } from './shaderDiagnostics';
-import { normalizePresetRenderViewMode } from './presetModel';
 import type { ColorStop, GradientConfig, MeshEdge, OpacityStop, Vec2Tuple } from '../types/gradient';
 import type { AnimationMode, InterpolationType, Keyframe } from '../types/keyframe';
 
@@ -929,13 +928,11 @@ export class KggControlRuntime {
     try {
       const preset = await this.project.getPreset(presetIdResult.value);
       if (!isRecord(preset) || !isRecord(preset.state)) return error('preset_not_found', `Preset not found: ${presetIdResult.value}`);
-      const renderViewMode = normalizePresetRenderViewMode(preset.state.renderViewMode);
       this.applySnapshot({
         store: preset.state,
         currentTime: 0,
         presetName: typeof preset.name === 'string' ? preset.name : useGradientStore.getState().presetName,
       });
-      this.ui?.setState({ renderViewMode });
       return { ok: true, value: { presetId: presetIdResult.value, presetName: useGradientStore.getState().presetName } };
     } catch (cause) {
       return error('project_operation_failed', cause instanceof Error ? cause.message : 'Unable to apply preset');
@@ -957,11 +954,7 @@ export class KggControlRuntime {
     }
     try {
       const snapshot = makeSnapshot(useGradientStore.getState());
-      const store = {
-        ...snapshot.store,
-        renderViewMode: normalizePresetRenderViewMode(this.ui?.getState().renderViewMode),
-      };
-      const saved = await this.project.savePreset(nameResult.value, store, folderId, thumbnail);
+      const saved = await this.project.savePreset(nameResult.value, snapshot.store, folderId, thumbnail);
       return cloneResultValue(saved);
     } catch (cause) {
       return error('project_operation_failed', cause instanceof Error ? cause.message : 'Unable to save preset');
