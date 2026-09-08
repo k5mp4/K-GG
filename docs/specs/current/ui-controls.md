@@ -5,12 +5,12 @@ title: UI入力コントロール
 status: current
 owners: [maintainer]
 created: 2026-07-28
-updated: 2026-08-31
+updated: 2026-09-07
 requirement_ids: [UI-001, UI-002, UI-003, UI-004, UI-005, UI-006, UI-007, UI-008, UI-009, UI-010, UI-011, UI-012, UI-013, UI-014, UI-015, UI-019, UI-021, UI-022, UI-023]
 related_adrs: [ADR-0011, ADR-0012]
 related_changes: [CHANGE-010, CHANGE-012, CHANGE-013, CHANGE-014, CHANGE-015, CHANGE-018, CHANGE-019, CHANGE-024, CHANGE-025, CHANGE-026, CHANGE-027, CHANGE-030, CHANGE-031, CHANGE-032, CHANGE-034, CHANGE-037, CHANGE-038, CHANGE-039, CHANGE-041]
 related_code: [src/App.tsx, src/App.css, src/types/renderView.ts, src/types/coneView.ts, src/components/CustomSelect.tsx, src/components/GradientRamp.tsx, src/components/SliderField.tsx, src/components/NoiseDistortionPanel.tsx, src/components/BlockNoisePanel.tsx, src/components/DiffuseCurveEditor.tsx, src/components/SlitScanPanel.tsx, src/components/StretchPanel.tsx, src/components/TimelineBar.tsx, src/components/IridescencePanel.tsx, src/components/NormalMapPanel.tsx, src/components/SandboxPanel.tsx, src/components/FlowGradientPanel.tsx, src/components/ClothGradientPanel.tsx, src/components/ClothCanvas.tsx, src/components/ConeCanvas.tsx, src/components/ConeApexEditor.tsx, src/components/ConeViewPanel.tsx, src/components/RadonPanel.tsx, src/components/PostprocessPanel.tsx, src/components/PostprocessStackPanel.tsx, src/components/PresetPanel.tsx, src/components/Toggle.tsx, src/lib/effectPipeline.ts, src/lib/parameterLimits.ts, src/lib/noiseSeed.ts, src/types/flowGradient.ts, src/i18n/uiLabels.ts, src/i18n/messages.ts]
-related_tests: [src/lib/tweeqAngle.test.ts, src/lib/effectPipeline.test.ts, src/lib/parameterLimits.test.ts, src/lib/animationDirection.test.ts, src/lib/effectShaderParity.test.ts, src/lib/flowSimulation.test.ts, src/lib/flowGradientPreset.test.ts, src/lib/presetThumbnail.test.ts, src/types/coneView.test.ts, src/lib/coneView.test.ts, src/lib/coneSeam.test.ts, src/components/CustomSelect.test.tsx, src/components/ConeApexEditor.test.tsx, src/components/NoiseDistortionPanel.test.tsx, 'manual: SANDBOX Edit Layer and Flow Gradient controls browser check', 'manual: Cone background coverage and color check']
+related_tests: [src/lib/tweeqAngle.test.ts, src/lib/effectPipeline.test.ts, src/lib/parameterLimits.test.ts, src/lib/animationDirection.test.ts, src/lib/effectShaderParity.test.ts, src/lib/flowSimulation.test.ts, src/lib/flowGradientPreset.test.ts, src/lib/presetThumbnail.test.ts, src/types/coneView.test.ts, src/types/renderView.test.ts, src/lib/coneView.test.ts, src/lib/coneSeam.test.ts, src/components/CustomSelect.test.tsx, src/components/ConeApexEditor.test.tsx, src/components/NoiseDistortionPanel.test.tsx, 'manual: SANDBOX Edit Layer and Flow Gradient controls browser check', 'manual: Cone background coverage and color check']
 ---
 
 # UI入力コントロール
@@ -59,7 +59,7 @@ Effect Stackは常にワークスペース内のインライン表示のみで�
 
 ### UI-010 トップバーとSANDBOXのモジュール入口
 
-TOPバーは左から`Diffuse`、`Noise`、`Slit`、`Postprocess`、`SANDBOX`、`Export`、`Preset`の順に表示します。`Stretch`は独立項目として表示せず、Postprocessのプロパティモジュールにも表示しません。PostprocessのプロパティモジュールはON／OFFと`Edit Layer`を表示し、選択したEdit Layerの詳細プロパティをその下で操作できます。Stretch、Distort、Mirror、Kaleidoscopeなどの個別ON／OFFはプロパティモジュールに表示せず、いずれか一つ以上がEffect Stackで有効な場合にPostprocess全体をONとして表示します。SANDBOXの文字色はPostprocessと同じ通常色を使います。`Normal`と`Distort`も独立項目として表示しません。SANDBOXの左パネルにはPostprocessの`Edit Layer`と同じ選択要素を表示し、Normal、Prism、Particlesから一つを選択して既存の有効状態とパラメータを編集できます。モジュールのON／OFFと描画準備状態を確認でき、SANDBOXの選択状態はPresetへ保存しません。DistortはPostprocessの`Edit Layer`で選択し、Effect StackとPostprocessの主スタック編集UIにPrism／Particlesの重複入口を表示しません。
+TOPバーは左から`Diffuse`、`Noise`、`Slit`、`Postprocess`、`SANDBOX`、`Export`、`Preset`の順に表示します。`Stretch`は独立項目として表示せず、Postprocessのプロパティモジュールにも表示しません。PostprocessのプロパティモジュールはON／OFFと`Edit Layer`を表示し、選択したEdit Layerの詳細プロパティをその下で操作できます。Stretch、Distort、Mirror、Kaleidoscopeなどの個別ON／OFFはプロパティモジュールに表示せず、いずれか一つ以上がEffect Stackで有効な場合にPostprocess全体をONとして表示します。SANDBOXの文字色はPostprocessと同じ通常色を使います。`Normal`と`Distort`も独立項目として表示しません。SANDBOXの左パネルにはPostprocessの`Edit Layer`と同じ選択要素を表示し、Normal、Prism、Particlesから一つを選択して既存の有効状態とパラメータを編集できます。モジュールのON／OFFと描画準備状態を確認でき、SANDBOXのEdit Layer選択状態はPresetへ保存しません。Cloth／Coneの表示面は`renderViewMode`としてPresetへ保存・復元します。DistortはPostprocessの`Edit Layer`で選択し、Effect StackとPostprocessの主スタック編集UIにPrism／Particlesの重複入口を表示しません。
 ### UI-011 Diffuseのモードと適応カーブ
 
 DiffuseのモードはTweeqのInputDrumでBlock、Smooth、Dither、Halftone、ASCII、Stippleから選択できます。Halftoneの形状はInputRadio、ASCII文字セットはInputString、Halftone／ASCIIの背景色はInputColorで編集します。適応ソースと粒度適応の2本のBezierはTweeq InputCubicBezierを中心としたコンパクトな行で表示し、大きなSVGプレビューやヒストグラムは表示しません。

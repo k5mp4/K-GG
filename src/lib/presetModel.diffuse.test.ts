@@ -1,7 +1,12 @@
 import { describe, expect, it } from 'vitest';
 import { STORE_DEFAULTS } from '../store/gradientStore';
 import type { StoreSnapshot } from './presetModel';
-import { createPresetSaveState, isPreset, makePreset } from './presetModel';
+import {
+  createPresetSaveState,
+  isPreset,
+  makePreset,
+  normalizePresetRenderViewMode,
+} from './presetModel';
 
 describe('legacy Diffuse preset migration', () => {
   it('saves a legacy luminance curve as Bezier only and reloads the JSON', () => {
@@ -71,7 +76,7 @@ describe('legacy Diffuse preset migration', () => {
       ...STORE_DEFAULTS,
       clothGradient,
       coneView,
-    }, [], { width: 800, height: 600 });
+    }, [], { width: 800, height: 600 }, 'cone');
 
     expect(state.clothGradient).toEqual(clothGradient);
     expect(state.coneView).toEqual(coneView);
@@ -79,10 +84,18 @@ describe('legacy Diffuse preset migration', () => {
     expect(state.seamless).toEqual(STORE_DEFAULTS.seamless);
     expect(state.flowGradient).toEqual(STORE_DEFAULTS.flowGradient);
     expect(state.effectPipeline).toEqual(STORE_DEFAULTS.effectPipeline);
-    expect('renderViewMode' in state).toBe(false);
+    expect(state.renderViewMode).toBe('cone');
 
     const saved = makePreset('SANDBOX', state);
     expect(saved.state.clothGradient).toMatchObject({ enabled: true, warpStrength: 1.15 });
     expect(saved.state.coneView).toEqual(coneView);
+    expect(saved.state.renderViewMode).toBe('cone');
+  });
+
+  it('normalizes the persisted sandbox display mode for legacy and invalid values', () => {
+    expect(normalizePresetRenderViewMode(undefined)).toBe('canvas');
+    expect(normalizePresetRenderViewMode('cloth')).toBe('cloth');
+    expect(normalizePresetRenderViewMode('cone')).toBe('cone');
+    expect(normalizePresetRenderViewMode('unsupported')).toBe('canvas');
   });
 });

@@ -125,6 +125,35 @@ describe('KggControlRuntime', () => {
     expect(deleted).toBe(true);
   });
 
+  it('round-trips the sandbox preview surface through project operations', async () => {
+    let renderViewMode: unknown = 'cone';
+    let savedState: Record<string, unknown> = {};
+    let loadedMode: unknown = 'cloth';
+    const runtime = new KggControlRuntime({
+      canvas,
+      getWebGLContext: () => null,
+      ui: {
+        getState: () => ({ renderViewMode }),
+        setState: patch => { renderViewMode = patch.renderViewMode; },
+      },
+      project: {
+        savePreset: (_name, state) => {
+          savedState = state;
+          return { ok: true };
+        },
+        getPreset: async () => ({ id: 'sandbox-preset', name: 'Sandbox', state: { ...savedState, renderViewMode: loadedMode } }),
+      },
+    });
+
+    await expect(runtime.executeControl('save_preset', { name: 'Sandbox' })).resolves.toMatchObject({ ok: true });
+    expect(savedState?.renderViewMode).toBe('cone');
+    await expect(runtime.executeControl('apply_preset', { presetId: 'sandbox-preset' })).resolves.toMatchObject({ ok: true });
+    expect(renderViewMode).toBe('cloth');
+    loadedMode = 'unsupported';
+    await expect(runtime.executeControl('apply_preset', { presetId: 'sandbox-preset' })).resolves.toMatchObject({ ok: true });
+    expect(renderViewMode).toBe('canvas');
+  });
+
   it('fails closed for non-serializable adapter results and oversized previews', async () => {
     const adapterRuntime = new KggControlRuntime({
       canvas,

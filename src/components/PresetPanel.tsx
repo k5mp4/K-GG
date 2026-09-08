@@ -8,7 +8,7 @@ import { normalizeFlowGradientConfig } from '../types/flowGradient';
 import { normalizeImageGradientConfig } from '../types/imageGradient';
 import { stripSlitPhaseMotionFields } from '../types/distortion';
 import { resolveDiffuseBezier } from '../lib/diffuseCurve';
-import { createPresetSaveState } from '../lib/presetModel';
+import { createPresetSaveState, normalizePresetRenderViewMode } from '../lib/presetModel';
 import {
   createFolder,
   deleteFolder,
@@ -32,6 +32,7 @@ import defaultPresets from '../assets/gradPreset_kg_defaultPresets.json';
 import { useLanguage } from '../i18n/LanguageProvider';
 import { IconButton } from './IconButton';
 import { applicationCommands } from '../application/commands';
+import type { RenderViewMode } from '../types/renderView';
 
 type PresetPanelProps = {
   canvasW: number;
@@ -39,7 +40,8 @@ type PresetPanelProps = {
   setCanvasW: (w: number) => void;
   setCanvasH: (h: number) => void;
   aspectRatioRef: MutableRefObject<number>;
-  onPresetLoad: () => void;
+  renderViewMode: RenderViewMode;
+  onPresetLoad: (renderViewMode: RenderViewMode) => void;
 };
 
 type ViewMode = 'grid' | 'list';
@@ -262,7 +264,7 @@ function FolderCard({ folder, library, onOpen, onDropPreset }: { folder: PresetF
   );
 }
 
-export function PresetPanel({ canvasW, canvasH, setCanvasW, setCanvasH, aspectRatioRef, onPresetLoad }: PresetPanelProps) {
+export function PresetPanel({ canvasW, canvasH, setCanvasW, setCanvasH, aspectRatioRef, renderViewMode, onPresetLoad }: PresetPanelProps) {
   const { t } = useLanguage();
   const store = useGradientStore();
   const [library, setLibrary] = useState<PresetLibrary>({ format: 'kgg-preset-library', version: 2, folders: [], presets: [] });
@@ -368,7 +370,7 @@ export function PresetPanel({ canvasW, canvasH, setCanvasW, setCanvasH, aspectRa
     }
     applicationCommands.setPresetName(preset.name);
     setSelectedPresetId(preset.id);
-    onPresetLoad();
+    onPresetLoad(normalizePresetRenderViewMode(s.renderViewMode));
   }
 
   async function handleSave() {
@@ -380,7 +382,7 @@ export function PresetPanel({ canvasW, canvasH, setCanvasW, setCanvasH, aspectRa
       animation, normalMap, clothGradient, coneView, seamless, flowGradient,
       radon, iridescence, manualDistort, postprocess, effectPipeline, matcap,
       keyframeTracks,
-    }, loadUserColorPalettes(), { width: canvasW, height: canvasH });
+    }, loadUserColorPalettes(), { width: canvasW, height: canvasH }, renderViewMode);
     setSaving(true);
     try {
       const thumbnail = await capturePresetThumbnail(state);

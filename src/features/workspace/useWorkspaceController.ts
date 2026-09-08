@@ -14,7 +14,7 @@ import type { StoreSnapshot as PresetStoreSnapshot } from '../../lib/presetModel
 import type { KggControlProjectAdapter, KggControlUiAdapter } from '../../lib/kggControlRuntime';
 import { hasEnabledPostprocessEffectStack } from '../../lib/effectPipeline';
 import type { EffectStackKind } from '../../types/distortion';
-import type { RenderViewMode } from '../../types/renderView';
+import { shouldResetRenderViewReadiness, type RenderViewMode } from '../../types/renderView';
 import type { OverlayImageMode } from '../../types/workspace';
 import type { MessageKey } from '../../i18n/messages';
 import type { Replacements } from '../../i18n/language';
@@ -450,7 +450,7 @@ export function useWorkspaceController({ translate }: WorkspaceControllerOptions
     if (typeof patch.canvasH === 'number') { nextH = patch.canvasH; setCanvasH(nextH); setHDraft(String(nextH)); }
     if (patch.canvasW !== undefined || patch.canvasH !== undefined) aspectRatioRef.current = nextW / nextH;
     if (typeof patch.lockAspect === 'boolean') setLockAspect(patch.lockAspect);
-    if (patch.renderViewMode === 'canvas' || patch.renderViewMode === 'cloth' || patch.renderViewMode === 'cone') setRenderViewMode(patch.renderViewMode);
+    if (patch.renderViewMode === 'canvas' || patch.renderViewMode === 'cloth' || patch.renderViewMode === 'cone') handleRenderViewModeChange(patch.renderViewMode);
     if (typeof patch.leftTab === 'string') { activeLeftTabRef.current = patch.leftTab as LeftTab; setLeftTab(patch.leftTab as LeftTab); }
     if (typeof patch.tabHoverSwitchEnabled === 'boolean') setTabHoverSwitchMode(patch.tabHoverSwitchEnabled);
     if (typeof patch.isHoverLocked === 'boolean') setIsHoverLocked(patch.isHoverLocked);
@@ -509,18 +509,16 @@ export function useWorkspaceController({ translate }: WorkspaceControllerOptions
   kggProjectAdapter.deletePalette = paletteId => adapters.colorPaletteRepository.deleteUserColorPalette(paletteId);
 
   const handleRenderViewModeChange = (mode: RenderViewMode) => {
-    setClothUnavailable(false);
-    setClothReady(false);
-    setConeUnavailable(false);
-    setConeReady(false);
+    if (shouldResetRenderViewReadiness(renderViewMode, mode)) {
+      setClothUnavailable(false);
+      setClothReady(false);
+      setConeUnavailable(false);
+      setConeReady(false);
+    }
     setRenderViewMode(mode);
   };
-  const handlePresetLoad = () => {
-    setClothReady(false);
-    setConeReady(false);
-    setClothUnavailable(false);
-    setConeUnavailable(false);
-    setRenderViewMode('canvas');
+  const handlePresetLoad = (mode: RenderViewMode = 'canvas') => {
+    handleRenderViewModeChange(mode);
   };
   const handleCanvasResize = (width: number, height: number) => {
     setCanvasW(width);

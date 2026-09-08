@@ -243,6 +243,7 @@ export default function App() {
                         setCanvasW={setCanvasW}
                         setCanvasH={setCanvasH}
                         aspectRatioRef={aspectRatioRef}
+                        renderViewMode={renderViewMode}
                         onPresetLoad={handlePresetLoad}
                       />
                     )}
