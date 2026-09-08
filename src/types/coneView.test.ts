@@ -67,6 +67,6 @@ describe('cone view configuration', () => {
 
     const preset = makePreset('Cone', useGradientStore.getState());
     expect(preset.state.coneView).toEqual(coneView);
-    expect(preset.state.renderViewMode).toBe('canvas');
+    expect('renderViewMode' in preset.state).toBe(false);
   });
 });

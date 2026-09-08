@@ -19,7 +19,6 @@ import type { ImageGradientConfig } from '../types/imageGradient';
 import { normalizeMeshGradientConfig, type GradientConfig } from '../types/gradient';
 import type { PropertyTrack } from '../types/keyframe';
 import type { UserColorPalette } from './colorPalettes';
-import type { RenderViewMode } from '../types/renderView';
 
 import type { ClothGradientConfig } from '../types/clothGradient';
 import { normalizeClothGradientConfig } from '../types/clothGradient';
@@ -56,8 +55,6 @@ export type StoreSnapshot = {
   selectedStops?: number[];
   colorPalettes?: UserColorPalette[];
   resolution?: { width: number; height: number };
-  /** Preview surface to restore for SANDBOX presets. Omitted by legacy presets. */
-  renderViewMode?: RenderViewMode;
 };
 
 /**
@@ -70,19 +67,13 @@ type PresetSaveStateSource = Omit<StoreSnapshot,
   | 'resolution'
   | 'selectedStops'
   | 'postprocessDistort'
-  | 'renderViewMode'
 >;
-
-export function normalizePresetRenderViewMode(value: unknown): RenderViewMode {
-  return value === 'cloth' || value === 'cone' ? value : 'canvas';
-}
 
 /** Builds the serializable state passed from the live store to preset storage. */
 export function createPresetSaveState(
   state: PresetSaveStateSource,
   colorPalettes: UserColorPalette[],
   resolution: { width: number; height: number },
-  renderViewMode: RenderViewMode,
 ): StoreSnapshot {
   return {
     ...state,
@@ -92,7 +83,6 @@ export function createPresetSaveState(
       : state.manualDistort,
     colorPalettes,
     resolution,
-    renderViewMode: normalizePresetRenderViewMode(renderViewMode),
   };
 }
 
@@ -128,7 +118,6 @@ export function makePreset(
   const gradient = state.gradient?.gradientType === 'mesh'
     ? { ...state.gradient, mesh: normalizeMeshGradientConfig(state.gradient.mesh) }
     : state.gradient;
-  const renderViewMode = normalizePresetRenderViewMode(state.renderViewMode);
   return {
     id: Math.random().toString(36).slice(2),
     name,
@@ -146,7 +135,6 @@ export function makePreset(
       coneView: normalizeConeViewConfig(state.coneView),
       seamless: normalizeSeamlessConfig(state.seamless),
       flowGradient: normalizeFlowGradientConfig(state.flowGradient),
-      renderViewMode,
       effectPipeline: state.effectPipeline
         ? normalizeEffectPipelineConfig(state.effectPipeline)
         : createDefaultEffectPipeline(),

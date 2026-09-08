@@ -5,12 +5,12 @@ title: Preset System
 status: current
 owners: [maintainer]
 created: 2026-07-27
-updated: 2026-09-07
+updated: 2026-08-31
 requirement_ids: [PRESET-001, PRESET-002, PRESET-003, PRESET-004, PRESET-005, PRESET-006, PRESET-007, PRESET-008, PRESET-009, PRESET-011, PRESET-012, PRESET-013, PRESET-014, PRESET-016, PRESET-017]
 related_adrs: [ADR-0007, ADR-0008]
 related_changes: [CHANGE-001, CHANGE-012, CHANGE-013, CHANGE-018, CHANGE-024, CHANGE-025, CHANGE-026, CHANGE-027, CHANGE-030, CHANGE-031, CHANGE-032, CHANGE-034, CHANGE-037, CHANGE-039]
-related_code: [src/lib/presetModel.ts, src/lib/presetLibrary.ts, src/lib/presets.ts, src/lib/presetPreview.ts, src/lib/presetThumbnail.ts, src/lib/flowGradientRenderer.ts, src/types/flowGradient.ts, src/lib/effectPipeline.ts, src/lib/glass.ts, src/lib/postprocessStack.ts, src/store/gradientStore.ts, src/components/PresetPanel.tsx, src/features/workspace/useWorkspaceController.ts, src/App.tsx, src/lib/kggControlRuntime.ts, src/components/FlowGradientPanel.tsx, src/components/PresetPreview.tsx, src/components/ClothCanvas.tsx, src/components/ConeCanvas.tsx, src/types/renderView.ts, src/types/coneView.ts, src/adapters/types.ts, src/adapters/browser/presetRepository.ts, src/adapters/tauri/presetRepository.ts, src-tauri/src/lib.rs]
-related_tests: [src/lib/presetLibrary.test.ts, src/lib/presetModel.diffuse.test.ts, src/lib/presetModel.slit.test.ts, src/lib/flowGradientPreset.test.ts, src/lib/presetPreview.test.ts, src/lib/presetThumbnail.test.ts, src/lib/glass.test.ts, src/lib/postprocessStack.test.ts, src/store/gradientStore.glass.test.ts, src/store/gradientStore.postprocessStack.test.ts, src/store/gradientStore.animation.test.ts, src/lib/clothView.test.ts, src/lib/kggControlRuntime.test.ts, src/types/coneView.test.ts, src/types/renderView.test.ts]
+related_code: [src/lib/presetModel.ts, src/lib/presetLibrary.ts, src/lib/presets.ts, src/lib/presetPreview.ts, src/lib/presetThumbnail.ts, src/lib/flowGradientRenderer.ts, src/types/flowGradient.ts, src/lib/effectPipeline.ts, src/lib/glass.ts, src/lib/postprocessStack.ts, src/store/gradientStore.ts, src/components/PresetPanel.tsx, src/components/FlowGradientPanel.tsx, src/components/PresetPreview.tsx, src/components/ClothCanvas.tsx, src/components/ConeCanvas.tsx, src/types/renderView.ts, src/types/coneView.ts, src/adapters/types.ts, src/adapters/browser/presetRepository.ts, src/adapters/tauri/presetRepository.ts, src-tauri/src/lib.rs]
+related_tests: [src/lib/presetLibrary.test.ts, src/lib/presetModel.diffuse.test.ts, src/lib/presetModel.slit.test.ts, src/lib/flowGradientPreset.test.ts, src/lib/presetPreview.test.ts, src/lib/presetThumbnail.test.ts, src/lib/glass.test.ts, src/lib/postprocessStack.test.ts, src/store/gradientStore.glass.test.ts, src/store/gradientStore.postprocessStack.test.ts, src/store/gradientStore.animation.test.ts, src/lib/clothView.test.ts, src/types/coneView.test.ts]
 ---
 
 # Preset System
@@ -73,13 +73,13 @@ PresetはGLASS V2のChromatic Hue、Chromatic Saturation、Transmission Tint、H
 
 旧PresetのPostprocess設定にある`effectMode: glass`およびstackの`kind: glass`は、読込時に`glassV2`へ写像します。`glass`と`glassV2`が重複する場合は最初の位置を維持し、有効状態を論理和で統合します。正規化後のPostprocess設定と新規保存値には旧`glass`を残しません。
 
-### PRESET-012 Preview表示モードの永続性
+### PRESET-012 Preview表示モードの非永続性
 
-SANDBOXの表示面（Canvas／Cloth／Cone）は`state.renderViewMode`としてPresetへ保存し、読込時に同じ表示面を復元します。旧Presetや欠落・未知の値はCanvasへフォールバックします。Three.js Renderer、メッシュ、カメラはPresetの保存対象に含めません。Thumbnailは既存の2D契約を使用し、Exportは読込後に復元された現在Previewの表示面を使用します。
+Canvas／Cloth／Coneの選択状態、Three.js Renderer、メッシュ、カメラはPresetの保存対象に含めません。Presetの読込後は2D Canvas表示を維持し、Thumbnailは既存の2D契約を使用します。ExportはPresetへ保存されたモードではなく、現在Previewで選択されている表示面を使用します。
 
 ### PRESET-013 Cone設定の永続化
 
-ConeのDepth、Rotation、Apex X、Apex Y、Texture Repeat、Seam Blend、Seam Mode、Flow Cycles、MappingはPresetへ保存します。Depthは2..30、Apex X／Apex Yは-2..2、Flow Cyclesは-30..30へ正規化します。Perspectiveは保存対象ではなく、旧Presetに残っていても無視します。Seam ModeはMirror Repeat、Edge Weld、Gradient Reapplyを受け付け、欠落、削除済みのWrapped Smooth、未知・非有限・範囲外の値はMirror Repeatへ戻します。明示的に保存された有効な方式はそのまま復元し、保存形式のキーは変更しません。Coneの表示選択は`state.renderViewMode: "cone"`として保存・復元します。
+ConeのDepth、Rotation、Apex X、Apex Y、Texture Repeat、Seam Blend、Seam Mode、Flow Cycles、MappingはPresetへ保存します。Depthは2..30、Apex X／Apex Yは-2..2、Flow Cyclesは-30..30へ正規化します。Perspectiveは保存対象ではなく、旧Presetに残っていても無視します。Seam ModeはMirror Repeat、Edge Weld、Gradient Reapplyを受け付け、欠落、削除済みのWrapped Smooth、未知・非有限・範囲外の値はMirror Repeatへ戻します。明示的に保存された有効な方式はそのまま復元し、保存形式のキーは変更しません。Coneの表示選択はPRESET-012に従い保存しません。
 
 ### PRESET-014 Stippleの保存互換
 
@@ -91,7 +91,7 @@ Presetは`effectPipeline.flowGradientEnabled`と`flowGradient`のFlow設定を�
 
 ### PRESET-017 SANDBOX設定の完全保存
 
-Preset保存時のスナップショットには、Cloth、Cone、Normal、Prism、Particles、Flow Gradient、Seamlessの永続化対象設定を含めます。Clothは`clothGradient`、Coneは`coneView`、Normal／Prism／Particlesは`normalMap`と`effectPipeline`、Flow Gradientは`flowGradient`と`effectPipeline.flowGradientEnabled`、Seamlessは`seamless`として保存・復元します。SANDBOXの表示面は`renderViewMode`として保存・復元し、旧Presetで欠落している値はCanvasへフォールバックします。その他のSANDBOXの選択中Edit Layer、Rendererやカメラは保存しません。
+Preset保存時のスナップショットには、Cloth、Cone、Normal、Prism、Particles、Flow Gradient、Seamlessの永続化対象設定を含めます。Clothは`clothGradient`、Coneは`coneView`、Normal／Prism／Particlesは`normalMap`と`effectPipeline`、Flow Gradientは`flowGradient`と`effectPipeline.flowGradientEnabled`、Seamlessは`seamless`として保存・復元します。旧Presetで欠落している任意設定は各normalizerの既定値へ補完します。Canvas／Cloth／Coneの表示面、SANDBOXの選択中Edit Layer、Rendererやカメラは保存しません。
 
 ## 他領域との関係
 
