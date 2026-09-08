@@ -62,7 +62,12 @@ import type { PerformanceSnapshot } from '../types/webglPerformance';
 import { createWebGL2Context, WebGL2UnavailableError } from './webglCapability';
 import type { TileRenderOptions } from '../types/rendering';
 import { createWebGLFramebufferWithTexture, createWebGLTexture2D, ensureWebGLTargetStorage, recordWebGLTargetStorage } from './webglResources';
-import { CORE_RENDER_TARGETS, FULL_RENDER_TARGETS, type RenderTargetKey } from './effectPipeline';
+import {
+  CORE_RENDER_TARGETS,
+  FULL_RENDER_TARGETS,
+  type RenderPlanFallbackProgram,
+  type RenderTargetKey,
+} from './effectPipeline';
 import { installWebGLResourceLedger, type WebGLResourceLedger } from './webglResourceLedger';
 
 export type { TileRenderOptions } from '../types/rendering';
@@ -1325,7 +1330,7 @@ function requestLazyProgram(ctx: WebGLContext, key: LazyProgramKey): boolean {
   return false;
 }
 
-function requestNoiseStackProgram(ctx: WebGLContext): boolean {
+function requestNoiseStackProgram(ctx: WebGLContext, fallbackProgram: 'postprocess' = 'postprocess'): boolean {
   if (lazyProgramReady(ctx, 'noiseStack')) return true;
 
   const noiseState = ctx.lazyProgramState.noiseStack;
@@ -1334,7 +1339,7 @@ function requestNoiseStackProgram(ctx: WebGLContext): boolean {
   // stack shader was rejected by a driver or a transient WebGL instrumentation
   // wrapper, keep the Effect Stack usable by switching to that implementation
   // instead of leaving the row permanently in an unavailable state.
-  const fallbackReady = requestLazyProgram(ctx, 'postprocess');
+  const fallbackReady = requestLazyProgram(ctx, fallbackProgram);
   if (!fallbackReady) return false;
   if (!noiseState.fallback) {
     noiseState.fallback = true;
@@ -1343,6 +1348,16 @@ function requestNoiseStackProgram(ctx: WebGLContext): boolean {
     }));
   }
   return true;
+}
+
+function requestPlanFallbackProgram(
+  ctx: WebGLContext,
+  target: RenderPlanFallbackProgram,
+  noiseStackFallback: 'postprocess',
+): boolean {
+  return target === 'noiseStack'
+    ? requestNoiseStackProgram(ctx, noiseStackFallback)
+    : requestLazyProgram(ctx, target);
 }
 
 function markNoiseDiffuseStackFallback(ctx: WebGLContext): void {
@@ -1434,7 +1449,11 @@ export { getRequiredSceneProgramKeys as getRequiredExportProgramKeys } from './s
  * The fallback is still lazy, so the rest of the stack remains usable while
  * it is compiling.
  */
-function requestGlassProgram(ctx: WebGLContext, key: 'glass' | 'glassV2'): boolean {
+function requestGlassProgram(
+  ctx: WebGLContext,
+  key: 'glass' | 'glassV2',
+  fallbackProgram: 'postprocess' = 'postprocess',
+): boolean {
   const dedicatedProgram = key === 'glass' ? ctx.glassProgram : ctx.glassV2Program;
   if (dedicatedProgram) return true;
 
@@ -1444,7 +1463,7 @@ function requestGlassProgram(ctx: WebGLContext, key: 'glass' | 'glassV2'): boole
   // immediately requesting the larger fallback can reproduce the same stall.
   if (glassState.timedOut) return false;
 
-  const fallbackReady = requestLazyProgram(ctx, 'postprocess');
+  const fallbackReady = requestLazyProgram(ctx, fallbackProgram);
   if (!fallbackReady) return false;
 
   const fallbackActive = key === 'glass' ? ctx.glassFallbackActive : ctx.glassV2FallbackActive;
@@ -3526,14 +3545,14 @@ export function render(
     const noiseStackFallbackRequested = !imageGradientProtected
       && (renderPlan.programs.noiseStack || noiseDiffuseStackFailed);
     let noiseStackReady = imageGradientProtected || !noiseStackFallbackRequested || (
-      stackCoreReady && requestNoiseStackProgram(ctx)
+      stackCoreReady && requestNoiseStackProgram(ctx, renderPlan.fallbacks.noiseStack)
     );
     const noiseDiffuseStackUsable = noiseDiffuseStackReady && !noiseDiffuseStackFailed;
     const noiseDiffuseCompositionReady = !noiseDiffuseStackRequested
       || noiseDiffuseStackUsable
       || (noiseDiffuseStackFailed && noiseStackReady);
     const glassV2Ready = imageGradientProtected || glassIdentity || !renderPlan.programs.glassV2 || (
-      stackCoreReady && noiseStackReady && requestGlassProgram(ctx, 'glassV2')
+      stackCoreReady && noiseStackReady && requestGlassProgram(ctx, 'glassV2', renderPlan.fallbacks.glassV2)
     );
     const normalReady = !normalRequested || (
       requestLazyProgram(ctx, 'normalMap') &&
@@ -3714,7 +3733,11 @@ export function render(
         // the draw. Keep both logical layers visible by switching to the
         // existing standalone Noise/general fallback before continuing.
         markNoiseDiffuseStackFallback(ctx);
-        noiseStackReady = requestNoiseStackProgram(ctx);
+        noiseStackReady = requestPlanFallbackProgram(
+          ctx,
+          renderPlan.fallbacks.noiseDiffuseStack,
+          renderPlan.fallbacks.noiseStack,
+        );
         if (!noiseStackReady) break;
       }
       // Noise has its own heavy shader. Keep rendering the remaining V2

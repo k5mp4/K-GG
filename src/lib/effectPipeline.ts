@@ -381,6 +381,27 @@ export const FULL_RENDER_TARGETS: readonly RenderTargetKey[] = [
   ...CORE_RENDER_TARGETS, 'normal', 'horizontalBlur', 'prismScratch', 'prismBlur', 'prismGlow',
 ];
 
+export type RenderPlanCapability = 'webgl2' | 'rgba8-framebuffer';
+
+export type RenderPlanCapabilities = {
+  required: readonly RenderPlanCapability[];
+  unavailableFallback: 'canvas2d';
+};
+
+export type RenderPlanFallbackProgram = 'postprocess' | 'noiseStack';
+
+export type RenderPlanFallbacks = {
+  noiseStack: 'postprocess';
+  noiseDiffuseStack: 'noiseStack';
+  glassV2: 'postprocess';
+};
+
+const V2_RENDER_PLAN_FALLBACKS: RenderPlanFallbacks = {
+  noiseStack: 'postprocess',
+  noiseDiffuseStack: 'noiseStack',
+  glassV2: 'postprocess',
+};
+
 export type V2RenderPlan = {
   normalizedStack: EffectStackLayer[];
   enabledLayers: EffectStackLayer[];
@@ -395,6 +416,8 @@ export type V2RenderPlan = {
   framebufferAllocationMode: 'direct' | 'core' | 'full';
   /** Storage requirements, independent of GPU handles and output format. */
   framebufferTargets: readonly RenderTargetKey[];
+  capabilities: RenderPlanCapabilities;
+  fallbacks: RenderPlanFallbacks;
   programs: {
     generator: boolean;
     stackCore: boolean;
@@ -601,6 +624,11 @@ export function getV2RenderPlan(
   if (prismRequested) framebufferTargets.push('prismScratch');
   if (prismNeedsBlur) framebufferTargets.push('prismBlur', 'prismGlow');
 
+  const capabilities: RenderPlanCapabilities = {
+    required: framebufferTargets.length > 0 ? ['webgl2', 'rgba8-framebuffer'] : ['webgl2'],
+    unavailableFallback: 'canvas2d',
+  };
+
   return {
     normalizedStack,
     enabledLayers,
@@ -614,6 +642,8 @@ export function getV2RenderPlan(
     particlesRequested,
     framebufferAllocationMode,
     framebufferTargets,
+    capabilities,
+    fallbacks: V2_RENDER_PLAN_FALLBACKS,
     programs: {
       generator: Boolean(options.imageGradientEnabled) || analyticPrefix.enabled,
       stackCore: framebufferAllocationMode !== 'direct' && requiresV2StackCore(

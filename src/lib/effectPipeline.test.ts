@@ -426,6 +426,15 @@ describe('effectPipeline', () => {
         prismComposite: true,
         particles: true,
       });
+      expect(plan.capabilities).toEqual({
+        required: ['webgl2', 'rgba8-framebuffer'],
+        unavailableFallback: 'canvas2d',
+      });
+      expect(plan.fallbacks).toEqual({
+        noiseStack: 'postprocess',
+        noiseDiffuseStack: 'noiseStack',
+        glassV2: 'postprocess',
+      });
     });
   });
 

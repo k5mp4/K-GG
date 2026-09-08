@@ -28,9 +28,9 @@ flowchart TD
 
 `getSceneRenderPlanInput`が評価済み状態を純粋な入力へ写像し、`getSceneRenderPlan`が既存の`getV2RenderPlan`を呼ぶ。Legacyは`null`で従来の実行経路を選ぶ。これは別系統のV2 planではない。
 
-V2 Planが決定するものは、正規化したEffect順序、有効レイヤー、analytic prefixの消費範囲と最初のtexture境界、既存Noise→Diffuse composition、Normal／Prism／Particles固定段、Generatorを含む必要program、Direct／Core／Full、必要なFramebufferの名前である。Flow／Seamless条件も同じ入力へ渡す。描画結果に使う時刻・seedの生成をGPU backendへ移さない。
+V2 Planが決定するものは、正規化したEffect順序、有効レイヤー、analytic prefixの消費範囲と最初のtexture境界、既存Noise→Diffuse composition、Normal／Prism／Particles固定段、Generatorを含む必要program、Direct／Core／Full、必要なFramebufferの名前である。さらにWebGL2／RGBA8 framebufferのrequired capability、WebGL2不在時のCanvas2D fallback、Noise／Noise-Diffuse／Glass V2のprogram failure時に使うfallback先も同じPlanへ記録する。Flow／Seamless条件も同じ入力へ渡す。描画結果に使う時刻・seedの生成をGPU backendへ移さない。
 
-`getRequiredSceneProgramKeys`はPreviewのreadinessとExportのprogram準備が共有する純粋な選択処理である。Image Gradient保護、Stipple、Glass identity、Legacy、Flow、Seamlessの既存条件を維持する。`webgl.getRequiredExportProgramKeys`は既存呼び出し用の再exportである。実行時のcompile完了・失敗・fallbackはcontextの状態であり、純粋なPlanへWebGLProgramを格納しない。
+`getRequiredSceneProgramKeys`はPreviewのreadinessとExportのprogram準備が共有する純粋な選択処理である。Image Gradient保護、Stipple、Glass identity、Legacy、Flow、Seamlessの既存条件を維持する。`webgl.getRequiredExportProgramKeys`は既存呼び出し用の再exportである。実行時のcompile完了・失敗はcontextの状態だが、失敗時にどのprogramへ退避するかはPlanのfallback policyを参照する。純粋なPlanへWebGLProgramやcontext stateを格納しない。
 
 Render targetの寸法とtile offsetは名前付きframe入力の`width`／`height`／`tile`に属する。TileでもPlanは同じ関数で決定し、shaderやEffect順序を再実装しない。既存のSeamless、padding、full-resolutionとviewportの座標差は維持する。
 
