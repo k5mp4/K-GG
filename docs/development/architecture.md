@@ -107,6 +107,8 @@ TauriコマンドはRendererからの入力を信頼しません。FFmpeg実行�
 
 ## 既知の設計上の注意
 
+RenderingのPlan、GPU所有権、Shader／Capability、Context復旧、出力経路の詳細は[Rendering Architecture](./rendering-architecture.md)を参照する。
+
 - `App.tsx`は画面統合とproviderの責務を残す。新規ロジックを追加する際は、Workspace、feature、hook、ドメイン関数へ分離できるか検討する。
 - `gradientStore.ts`は既存互換APIを持つcomposition facadeであり、まだ全機能sliceへ分割していない。次の分割ではsetterのnormalization、Effect Stackとの同期、historyの保存対象を先にcharacterizationする。
 - `StoreSnapshot`は引き続き`src/lib/presetModel.ts`の永続境界である。Application command、transport DTO、rendererの内部型と混ぜない。

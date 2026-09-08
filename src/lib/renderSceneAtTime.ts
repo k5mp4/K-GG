@@ -70,6 +70,7 @@ export function renderSceneAtTime(
   normalizedTime: number,
   options: RenderSceneOptions,
 ): void {
+  if (ctx.disposed || ctx.gl.isContextLost()) return;
   ctx.performanceProfiler?.beginFrame();
   try {
     const transition = options.allowEffectStackTransition === false || options.tile

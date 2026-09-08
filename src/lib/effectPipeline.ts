@@ -373,6 +373,14 @@ export type NoiseDiffuseCompositionPlan = {
   reason: NoiseDiffuseCompositionReason;
 };
 
+export type RenderTargetKey = 'gradient' | 'postprocessA' | 'postprocessB'
+  | 'normal' | 'horizontalBlur' | 'prismScratch' | 'prismBlur' | 'prismGlow';
+
+export const CORE_RENDER_TARGETS: readonly RenderTargetKey[] = ['gradient', 'postprocessA', 'postprocessB'];
+export const FULL_RENDER_TARGETS: readonly RenderTargetKey[] = [
+  ...CORE_RENDER_TARGETS, 'normal', 'horizontalBlur', 'prismScratch', 'prismBlur', 'prismGlow',
+];
+
 export type V2RenderPlan = {
   normalizedStack: EffectStackLayer[];
   enabledLayers: EffectStackLayer[];
@@ -385,7 +393,10 @@ export type V2RenderPlan = {
   prismNeedsBlur: boolean;
   particlesRequested: boolean;
   framebufferAllocationMode: 'direct' | 'core' | 'full';
+  /** Storage requirements, independent of GPU handles and output format. */
+  framebufferTargets: readonly RenderTargetKey[];
   programs: {
+    generator: boolean;
     stackCore: boolean;
     noiseStack: boolean;
     noiseDiffuseStack: boolean;
@@ -584,6 +595,12 @@ export function getV2RenderPlan(
       flowGradientEnabled,
     );
 
+  const framebufferTargets: RenderTargetKey[] = framebufferAllocationMode === 'direct' ? [] : [...CORE_RENDER_TARGETS];
+  if (normalRequested) framebufferTargets.push('normal');
+  if (normalNeedsBlur) framebufferTargets.push('horizontalBlur');
+  if (prismRequested) framebufferTargets.push('prismScratch');
+  if (prismNeedsBlur) framebufferTargets.push('prismBlur', 'prismGlow');
+
   return {
     normalizedStack,
     enabledLayers,
@@ -596,7 +613,9 @@ export function getV2RenderPlan(
     prismNeedsBlur,
     particlesRequested,
     framebufferAllocationMode,
+    framebufferTargets,
     programs: {
+      generator: Boolean(options.imageGradientEnabled) || analyticPrefix.enabled,
       stackCore: framebufferAllocationMode !== 'direct' && requiresV2StackCore(
         pipeline,
         normalRequested,

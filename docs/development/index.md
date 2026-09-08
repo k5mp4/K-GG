@@ -26,6 +26,7 @@ K-GGの開発は、入力元を限定しないDevelopment Requestから始めま
 | Release Gate、実機確認、GitHub設定 | [Releaseと環境検証](./releasing.md) |
 | ローカル起動、テスト、構造 | [開発・検証ガイド](./development-guide.md) |
 | アプリ構造 | [アーキテクチャ](./architecture.md) |
+| 描画計画、GPU資源、出力経路 | [Rendering Architecture](./rendering-architecture.md) |
 | プロジェクトの目的と制約 | [プロジェクト概要](./project-overview.md) |
 | MCP開発インターフェース | [MCP開発ガイド](./mcp.md) |
 

@@ -414,6 +414,7 @@ describe('effectPipeline', () => {
       expect(plan.diffuseEnabled).toBe(false);
       expect(plan.framebufferAllocationMode).toBe('full');
       expect(plan.programs).toEqual({
+        generator: false,
         stackCore: true,
         noiseStack: false,
         noiseDiffuseStack: false,

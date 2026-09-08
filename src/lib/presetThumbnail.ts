@@ -98,6 +98,14 @@ let captureQueue: Promise<void> = Promise.resolve();
 
 async function getRenderer(): Promise<{ canvas: HTMLCanvasElement; context: WebGLContext }> {
   if (typeof document === 'undefined') throw new Error('Document is not available');
+  if (rendererPromise) {
+    const cached = await rendererPromise;
+    if (cached.context.disposed || cached.context.gl.isContextLost()) {
+      disposeWebGL(cached.context);
+      cached.canvas.remove();
+      rendererPromise = null;
+    }
+  }
   if (!rendererPromise) {
     const canvas = document.createElement('canvas');
     canvas.width = PRESET_THUMBNAIL_WIDTH;

@@ -5,6 +5,7 @@ import {
   selectShaderCompileExtensionForSnapshot,
 } from './webgl';
 import webglSource from './webgl.ts?raw';
+import scenePlanSource from './sceneRenderPlan.ts?raw';
 
 function functionSource(name: string): string {
   const start = webglSource.indexOf(`function ${name}(`);
@@ -139,7 +140,7 @@ describe('WebGL lazy compile policy', () => {
 
   it('prepares required Glass programs before export starts', () => {
     const prepareSource = functionSource('prepareExportPrograms');
-    const planSource = functionSource('getRequiredExportProgramKeys');
+    const planSource = scenePlanSource;
 
     expect(planSource).toContain("add('glassV2',");
     expect(prepareSource).toContain('for (const key of required) await waitForLazyProgram');

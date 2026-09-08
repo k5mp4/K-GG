@@ -415,6 +415,14 @@ export class ClothGradientRenderer {
     if (!rampData || rampData.length < 4 || rampData.length % 4 !== 0) return;
     const width = rampData.length / 4;
     if (!Number.isInteger(width) || width < 1) return;
+    const image = this.rampTexture.image;
+    if (image.width === width && image.data instanceof Uint8Array) {
+      const current = image.data;
+      if (current.every((value, index) => value === rampData[index])) return;
+      current.set(rampData);
+      this.rampTexture.needsUpdate = true;
+      return;
+    }
     this.rampTexture.dispose();
     this.rampTexture = new THREE.DataTexture(new Uint8Array(rampData), width, 1, THREE.RGBAFormat);
     this.rampTexture.minFilter = THREE.LinearFilter;
