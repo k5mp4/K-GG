@@ -243,7 +243,19 @@ type EffectStackTransitionResources = {
 };
 
 const effectStackTransitionResources = new WeakMap<WebGLContext, EffectStackTransitionResources>();
-const gradientRampCache = new WeakMap<WebGLContext, { signature: string; data: Uint8Array }>();
+type GradientRampStopSnapshot = { position: number; color: string };
+type GradientRampOpacityStopSnapshot = { position: number; opacity: number };
+type GradientRampCache = {
+  data: Uint8Array;
+  stops: readonly GradientRampStopSnapshot[];
+  opacityStops: readonly GradientRampOpacityStopSnapshot[];
+  rampInterpolation: GradientConfig['rampInterpolation'];
+  rampMirror: boolean;
+  rampColorMode: GradientConfig['rampColorMode'];
+  rampVariable: number;
+  rampRepeat: number;
+};
+const gradientRampCache = new WeakMap<WebGLContext, GradientRampCache>();
 const registeredWebGLContexts = new WeakMap<HTMLCanvasElement, WebGL2RenderingContext>();
 const webglLifecycleHandlers = new WeakMap<HTMLCanvasElement, {
   lost: (event: Event) => void;
@@ -1713,19 +1725,51 @@ function buildGradientRampData(gradient: GradientConfig): Uint8Array {
   );
 }
 
+function gradientRampCacheMatches(cache: GradientRampCache, gradient: GradientConfig): boolean {
+  if (
+    cache.rampInterpolation !== gradient.rampInterpolation
+    || cache.rampMirror !== (gradient.rampMirror ?? false)
+    || cache.rampColorMode !== gradient.rampColorMode
+    || cache.rampVariable !== (gradient.rampVariable ?? 0)
+    || cache.rampRepeat !== (gradient.rampRepeat ?? 1)
+    || cache.stops.length !== gradient.stops.length
+    || cache.opacityStops.length !== (gradient.opacityStops?.length ?? 0)
+  ) return false;
+
+  for (let index = 0; index < gradient.stops.length; index += 1) {
+    const current = gradient.stops[index];
+    const previous = cache.stops[index];
+    if (current.position !== previous.position || current.color !== previous.color) return false;
+  }
+  for (let index = 0; index < (gradient.opacityStops?.length ?? 0); index += 1) {
+    const current = gradient.opacityStops?.[index];
+    const previous = cache.opacityStops[index];
+    if (!current || current.position !== previous.position || current.opacity !== previous.opacity) return false;
+  }
+  return true;
+}
+
+function createGradientRampCache(gradient: GradientConfig, data: Uint8Array): GradientRampCache {
+  return {
+    data,
+    stops: gradient.stops.map(stop => ({ position: stop.position, color: stop.color })),
+    opacityStops: gradient.opacityStops?.map(stop => ({ position: stop.position, opacity: stop.opacity })) ?? [],
+    rampInterpolation: gradient.rampInterpolation,
+    rampMirror: gradient.rampMirror ?? false,
+    rampColorMode: gradient.rampColorMode,
+    rampVariable: gradient.rampVariable ?? 0,
+    rampRepeat: gradient.rampRepeat ?? 1,
+  };
+}
+
 /** The renderer owns uploads; equal evaluated values reuse the last ramp. */
 export function updateGradientRampTexture(ctx: WebGLContext, gradient: GradientConfig): Uint8Array {
   if (ctx.disposed || ctx.gl.isContextLost()) throw new Error('Cannot update a lost or disposed renderer');
-  const signature = JSON.stringify([
-    gradient.stops, gradient.rampInterpolation, gradient.rampMirror ?? false,
-    gradient.opacityStops, gradient.rampColorMode, gradient.rampVariable ?? 0,
-    gradient.rampRepeat ?? 1,
-  ]);
   const cached = gradientRampCache.get(ctx);
-  if (cached?.signature === signature) return cached.data;
+  if (cached && gradientRampCacheMatches(cached, gradient)) return cached.data;
   const data = buildGradientRampData(gradient);
   uploadGradientRampTexture(ctx, data);
-  gradientRampCache.set(ctx, { signature, data });
+  gradientRampCache.set(ctx, createGradientRampCache(gradient, data));
   return data;
 }
 

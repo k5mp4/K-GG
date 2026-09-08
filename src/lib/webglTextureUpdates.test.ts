@@ -29,6 +29,15 @@ describe('context-owned gradient ramp uploads', () => {
     expect(ctx.gl.texSubImage2D).toHaveBeenCalledTimes(2);
   });
 
+  it('does not serialize ramp inputs on a cache hit', () => {
+    const ctx = context();
+    const gradient = structuredClone(STORE_DEFAULTS.gradient);
+    updateGradientRampTexture(ctx, gradient);
+    const stringify = vi.spyOn(JSON, 'stringify');
+    updateGradientRampTexture(ctx, { ...gradient, angle: 90 });
+    expect(stringify).not.toHaveBeenCalled();
+  });
+
   it('uploads independently in a restored context and tracks all ramp inputs', () => {
     const ctx = context();
     let gradient = structuredClone(STORE_DEFAULTS.gradient);
