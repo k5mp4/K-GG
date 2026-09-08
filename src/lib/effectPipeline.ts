@@ -390,17 +390,17 @@ export type RenderPlanCapabilities = {
 
 export type RenderPlanFallbackProgram = 'postprocess' | 'noiseStack';
 
-export type RenderPlanFallbacks = {
+export type RenderPlanFallbacks = Readonly<{
   noiseStack: 'postprocess';
   noiseDiffuseStack: 'noiseStack';
   glassV2: 'postprocess';
-};
+}>;
 
-const V2_RENDER_PLAN_FALLBACKS: RenderPlanFallbacks = {
+const V2_RENDER_PLAN_FALLBACKS: RenderPlanFallbacks = Object.freeze({
   noiseStack: 'postprocess',
   noiseDiffuseStack: 'noiseStack',
   glassV2: 'postprocess',
-};
+});
 
 export type V2RenderPlan = {
   normalizedStack: EffectStackLayer[];
