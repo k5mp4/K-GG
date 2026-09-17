@@ -19,6 +19,7 @@ export const EFFECT_STACK_KINDS = [
   'kaleidoscope',
   'voronoi',
   'glass',
+  'glassTile',
   'diffuse',
 ] as const satisfies readonly EffectStackKind[];
 
@@ -30,6 +31,7 @@ export const POSTPROCESS_EFFECT_STACK_KINDS = [
   'kaleidoscope',
   'voronoi',
   'glass',
+  'glassTile',
 ] as const satisfies readonly EffectStackKind[];
 
 const EFFECT_STACK_KIND_SET = new Set<string>(EFFECT_STACK_KINDS);
@@ -394,12 +396,14 @@ export type RenderPlanFallbacks = Readonly<{
   noiseStack: 'postprocess';
   noiseDiffuseStack: 'noiseStack';
   glassV2: 'postprocess';
+  glassTile: 'postprocess';
 }>;
 
 const V2_RENDER_PLAN_FALLBACKS: RenderPlanFallbacks = Object.freeze({
   noiseStack: 'postprocess',
   noiseDiffuseStack: 'noiseStack',
   glassV2: 'postprocess',
+  glassTile: 'postprocess',
 });
 
 export type V2RenderPlan = {
@@ -424,6 +428,7 @@ export type V2RenderPlan = {
     noiseStack: boolean;
     noiseDiffuseStack: boolean;
     glassV2: boolean;
+    glassTile: boolean;
     normalMap: boolean;
     blur: boolean;
     stretch: boolean;
@@ -599,6 +604,7 @@ export function getV2RenderPlan(
     && options.prismGlowRadius > 0.01;
   const particlesRequested = pipeline.particlesEnabled;
   const glassV2Requested = enabledLayers.some(layer => layer.kind === 'glass');
+  const glassTileRequested = enabledLayers.some(layer => layer.kind === 'glassTile');
   const noiseRequested = enabledLayers.some(layer => layer.kind === 'noise');
   const stretchRequested = enabledLayers.some(layer => layer.kind === 'stretch');
   const flowGradientEnabled = Boolean(options.flowGradientEnabled);
@@ -659,6 +665,7 @@ export function getV2RenderPlan(
         && !noiseDiffuseComposition.enabled,
       noiseDiffuseStack: noiseDiffuseComposition.enabled,
       glassV2: glassV2Requested,
+      glassTile: glassTileRequested,
       normalMap: normalRequested,
       blur: normalNeedsBlur || prismNeedsBlur,
       stretch: stretchRequested,
@@ -674,5 +681,5 @@ export function requiresHeavyV2Postprocess(
   prismEnabled: boolean,
 ): boolean {
   if (prismEnabled) return true;
-  return effectStack.some(layer => layer.enabled && layer.kind === 'glass');
+  return effectStack.some(layer => layer.enabled && (layer.kind === 'glass' || layer.kind === 'glassTile'));
 }

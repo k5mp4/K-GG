@@ -63,7 +63,7 @@ UIは状態の編集と利用者操作に集中させ、時間評価やファイ
 
 WebGLの所有権はcontextごとに管理します。`disposeWebGL`はcontext listener、program、texture、framebuffer、buffer、VAO、Flow資源、Three.js Cloth rendererをまとめて解放します。Three.jsのCloth/ConeとOGLのIridescenceはそれぞれの既存ownerを維持し、共通化によって実行順や描画結果を変えません。
 
-Postprocessのフラグメントシェーダーは`src/shaders/postprocess/`でuniform、共通処理、Prism、主スタック、Diffuse、Glass高さ場、Glass光学合成、エントリポイントに分割する。`src/lib/webglShaderSources.ts`がこの依存順に連結し、Glass専用、Prism専用、軽量主スタック、Legacyの各プログラムへ同じ構成元を供給する。分割ファイルを単独の完結したシェーダーとして扱わず、連結順とプリプロセッサ定義をコンパイル契約として維持する。
+Postprocessのフラグメントシェーダーは`src/shaders/postprocess/`でuniform、共通処理、Prism、主スタック、Diffuse、Glass高さ場、Glass光学合成、GlassTile、エントリポイントに分割する。`src/lib/webglShaderSources.ts`がこの依存順に連結し、Glass専用、GlassTile専用、Prism専用、軽量主スタック、Legacyの各プログラムへ同じ構成元を供給する。分割ファイルを単独の完結したシェーダーとして扱わず、連結順とプリプロセッサ定義をコンパイル契約として維持する。
 
 描画機能を追加するときは、型、既定値、UI、時刻評価、uniform、シェーダー、プリセット、エクスポート時の一致を確認します。
 

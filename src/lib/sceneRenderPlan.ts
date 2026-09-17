@@ -1,5 +1,6 @@
 import type { EffectPipelineConfig } from '../types/distortion';
 import { isGlassOpticallyIdentity } from './glass';
+import { isGlassTileOpticallyIdentity } from './glassTile';
 import { getActivePostprocessStackLayers } from './postprocessStack';
 import type { LazyProgramKey } from './webglShaderSources';
 import type { LatestState } from '../types/latestState';
@@ -90,6 +91,7 @@ export function getRequiredSceneProgramKeys(state: LatestState): LazyProgramKey[
     add('noiseStack', !imageGradientProtected && plan.programs.noiseStack);
     add('noiseDiffuseStack', !imageGradientProtected && plan.programs.noiseDiffuseStack);
     add('glassV2', !imageGradientProtected && plan.programs.glassV2 && !isGlassOpticallyIdentity(state.postprocess));
+    add('glassTile', !imageGradientProtected && plan.programs.glassTile && !isGlassTileOpticallyIdentity(state.postprocess));
     add('normalMap', plan.programs.normalMap);
     add('blur', plan.programs.blur);
     add('stretch', !imageGradientProtected && plan.programs.stretch);
@@ -98,7 +100,8 @@ export function getRequiredSceneProgramKeys(state: LatestState): LazyProgramKey[
     add('particles', plan.programs.particles);
   } else {
     const layers = getActivePostprocessStackLayers(state.postprocess).filter(layer => (
-      (layer.kind !== 'glass' && layer.kind !== 'glassV2') || !isGlassOpticallyIdentity(state.postprocess)
+      (layer.kind !== 'glass' && layer.kind !== 'glassV2' && layer.kind !== 'glassTile')
+        || (layer.kind === 'glassTile' ? !isGlassTileOpticallyIdentity(state.postprocess) : !isGlassOpticallyIdentity(state.postprocess))
     ));
     const postprocessRequested = state.postprocess.enabled && layers.length > 0;
     const prismRequested = postprocessRequested && layers.some(layer => layer.kind === 'prism');

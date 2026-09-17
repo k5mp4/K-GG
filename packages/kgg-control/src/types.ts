@@ -30,6 +30,7 @@ export type EffectKind =
   | 'kaleidoscope'
   | 'voronoi'
   | 'glass'
+  | 'glassTile'
   | 'diffuse';
 
 export type EffectState = {

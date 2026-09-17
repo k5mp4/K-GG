@@ -419,6 +419,7 @@ describe('effectPipeline', () => {
         noiseStack: false,
         noiseDiffuseStack: false,
         glassV2: true,
+        glassTile: false,
         normalMap: true,
         blur: true,
         stretch: false,
@@ -434,6 +435,7 @@ describe('effectPipeline', () => {
         noiseStack: 'postprocess',
         noiseDiffuseStack: 'noiseStack',
         glassV2: 'postprocess',
+        glassTile: 'postprocess',
       });
     });
   });
@@ -450,6 +452,7 @@ describe('effectPipeline', () => {
         { kind: 'kaleidoscope', enabled: false },
         { kind: 'voronoi', enabled: false },
         { kind: 'glass', enabled: false },
+        { kind: 'glassTile', enabled: false },
         { kind: 'diffuse', enabled: true },
       ],
       selectedKind: 'diffuse',
@@ -474,6 +477,7 @@ describe('effectPipeline', () => {
       { kind: 'distort', enabled: false },
       { kind: 'kaleidoscope', enabled: false },
       { kind: 'voronoi', enabled: false },
+      { kind: 'glassTile', enabled: false },
       { kind: 'diffuse', enabled: false },
     ]);
   });
@@ -528,6 +532,7 @@ describe('effectPipeline', () => {
       'mirror',
       'kaleidoscope',
       'voronoi',
+      'glassTile',
     ]);
     expect(Object.fromEntries(normalized.map(layer => [layer.kind, layer.enabled]))).toEqual({
       diffuse: false,
@@ -539,6 +544,7 @@ describe('effectPipeline', () => {
       mirror: true,
       kaleidoscope: false,
       voronoi: true,
+      glassTile: false,
     });
   });
 
@@ -566,6 +572,7 @@ describe('effectPipeline', () => {
       'mirror',
       'kaleidoscope',
       'voronoi',
+      'glassTile',
       'diffuse',
     ]);
 
@@ -600,6 +607,7 @@ describe('effectPipeline', () => {
       'kaleidoscope',
       'voronoi',
       'glass',
+      'glassTile',
       'diffuse',
       'noise',
     ]);
@@ -617,7 +625,7 @@ describe('effectPipeline', () => {
     let seed = 0;
     const randomized = randomizeEffectStackOrder(stack, () => (seed += 0.17) % 1);
 
-    expect(randomized).toHaveLength(9);
+    expect(randomized).toHaveLength(10);
     expect(new Set(randomized.map(layer => layer.kind))).toEqual(new Set(stack.map(layer => layer.kind)));
     expect(Object.fromEntries(randomized.map(layer => [layer.kind, layer.enabled]))).toEqual(enabledByKind);
     expect(randomized).not.toBe(stack);

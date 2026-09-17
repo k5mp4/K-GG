@@ -14,6 +14,7 @@ import { createDefaultEffectPipeline } from '../lib/effectPipeline';
 import { IDENTITY_DIFFUSE_BEZIER } from '../lib/diffuseCurve';
 import { clampParameter, getParameterLimit, normalizeTrackValue } from '../lib/parameterLimits';
 import { GLASS_V2_COLOR_DEFAULTS, normalizeGlassV2ColorParameters } from '../lib/glass';
+import { GLASS_TILE_DEFAULTS, normalizeGlassTileRenderParameters } from '../lib/glassTile';
 import { FLOW_GRADIENT_DEFAULTS } from '../types/flowGradient';
 import type { DocumentState } from './documentSlice';
 
@@ -316,6 +317,19 @@ export const STORE_DEFAULTS = {
     glassV2ChromaticSaturation: GLASS_V2_COLOR_DEFAULTS.chromaticSaturation,
     glassV2TransmissionTint: GLASS_V2_COLOR_DEFAULTS.transmissionTint,
     glassV2HighlightTint: GLASS_V2_COLOR_DEFAULTS.highlightTint,
+    glassTilePattern: GLASS_TILE_DEFAULTS.pattern,
+    glassTileSize: GLASS_TILE_DEFAULTS.tileSize,
+    glassTileBevel: GLASS_TILE_DEFAULTS.bevel,
+    glassTileSurfaceHeight: GLASS_TILE_DEFAULTS.surfaceHeight,
+    glassTileCurvature: GLASS_TILE_DEFAULTS.curvature,
+    glassTileRefraction: GLASS_TILE_DEFAULTS.refraction,
+    glassTileDispersion: GLASS_TILE_DEFAULTS.dispersion,
+    glassTileRoughness: GLASS_TILE_DEFAULTS.roughness,
+    glassTileDetailScale: GLASS_TILE_DEFAULTS.detailScale,
+    glassTileRotation: GLASS_TILE_DEFAULTS.rotation,
+    glassTileMix: GLASS_TILE_DEFAULTS.mix,
+    glassTileEdgeMode: GLASS_TILE_DEFAULTS.edgeMode,
+    glassTileSeed: GLASS_TILE_DEFAULTS.seed,
     particleCount: 180000,
     particleEmitterType: 'field' as const,
     particleEmitterPoint: [0.5, 0.5] as [number, number],
@@ -480,6 +494,20 @@ export function normalizePostprocessConfig(
   normalized.glassV2ChromaticSaturation = glassV2Color.chromaticSaturation;
   normalized.glassV2TransmissionTint = glassV2Color.transmissionTint;
   normalized.glassV2HighlightTint = glassV2Color.highlightTint;
+  const glassTile = normalizeGlassTileRenderParameters(normalized);
+  normalized.glassTilePattern = glassTile.pattern;
+  normalized.glassTileSize = glassTile.tileSize;
+  normalized.glassTileBevel = glassTile.bevel;
+  normalized.glassTileSurfaceHeight = glassTile.surfaceHeight;
+  normalized.glassTileCurvature = glassTile.curvature;
+  normalized.glassTileRefraction = glassTile.refraction;
+  normalized.glassTileDispersion = glassTile.dispersion;
+  normalized.glassTileRoughness = glassTile.roughness;
+  normalized.glassTileDetailScale = glassTile.detailScale;
+  normalized.glassTileRotation = glassTile.rotationRadians * 180 / Math.PI;
+  normalized.glassTileMix = glassTile.mix;
+  normalized.glassTileEdgeMode = glassTile.edgeMode;
+  normalized.glassTileSeed = glassTile.seed;
   normalized.diffuseBackgroundColor = normalizeDiffuseBackgroundColor(
     normalized.diffuseBackgroundColor,
     STORE_DEFAULTS.postprocess.diffuseBackgroundColor,
@@ -545,4 +573,3 @@ export function migratePropertyTracks(
     }),
   );
 }
-

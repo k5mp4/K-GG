@@ -317,6 +317,7 @@ function serializableDiagnostics(ctx: WebGLContext | null, canvas: HTMLCanvasEle
     ctx.noiseStackUniforms,
     ctx.glassUniforms,
     ctx.glassV2Uniforms,
+    ctx.glassTileUniforms,
     ctx.prismUniforms,
     ctx.prismCompositeUniforms,
     ctx.particleUniforms,

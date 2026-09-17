@@ -223,6 +223,7 @@ export function useWebGL(
           readyPrograms: requiredPrograms,
           glassFallback: !ctx.glassProgram && ctx.glassFallbackActive,
           glassV2Fallback: !ctx.glassV2Program && ctx.glassV2FallbackActive,
+          glassTileFallback: !ctx.glassTileProgram && ctx.glassTileFallbackActive,
           canvasSize: [snapshot.width, snapshot.height],
           tilePadding,
         },

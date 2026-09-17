@@ -36,6 +36,7 @@ import {
   normalizeGlassRenderParameters,
   normalizeGlassV2ColorParameters,
 } from './glass';
+import { isGlassTileOpticallyIdentity, normalizeGlassTileRenderParameters } from './glassTile';
 import { getActivePostprocessStackLayers } from './postprocessStack';
 import { getSceneRenderPlan, getSceneRenderPlanInput, getRequiredSceneProgramKeys } from './sceneRenderPlan';
 import { buildDiffuseBezierLut, normalizeDiffuseBezier } from './diffuseCurve';
@@ -195,6 +196,9 @@ export type WebGLContext = {
   glassV2Program: WebGLProgram | null;
   glassV2Uniforms: Record<string, WebGLUniformLocation | null>;
   glassV2FallbackActive: boolean;
+  glassTileProgram: WebGLProgram | null;
+  glassTileUniforms: Record<string, WebGLUniformLocation | null>;
+  glassTileFallbackActive: boolean;
   prismProgram: WebGLProgram | null;
   prismUniforms: Record<string, WebGLUniformLocation | null>;
   prismCompositeProgram: WebGLProgram | null;
@@ -743,7 +747,7 @@ export async function initWebGL(canvas: HTMLCanvasElement): Promise<WebGLContext
   ownedFlowGradient = flowGradient;
   const transitionTextureFrom = ownTexture(createTexture(gl));
   const transitionTextureTo = ownTexture(createTexture(gl));
-  const ctx: WebGLContext = { gl, performanceProfiler, gpuDiagnostics, renderOptimization, program, uniforms, geometryBuffer, transitionGeometryBuffer, generatorProgram: null, generatorUniforms: {}, gradientRampTexture, meshGradientTexture, meshGradientTextureSignature: '', diffuseCurveTexture, diffuseCurveSignature: '', diffuseAsciiTexture, diffuseAsciiSignature: '', diffuseAsciiCount: 1, diffuseAsciiRows: ASCII_ATLAS_MAX_ROWS, diffuseHistogramAt: 0, manualDistortTexture, manualDistortDisplacement: null, manualDistortSmoothMask: null, manualDistortMapResolution: 0, sourceImageTexture, sourceImageCanvas: null, imageGradientTexture, imageGradientSource: null, imageMaskTexture, imageMaskSource: null, normalMapProgram: null, normalMapUniforms: {}, gradFbo, gradTexture, blurProgram: null, blurUniforms: {}, stretchProgram: null, stretchUniforms: {}, seamlessProgram: null, seamlessUniforms: {}, stackCoreProgram: null, stackCoreUniforms: {}, noiseStackProgram: null, noiseStackUniforms: {}, noiseDiffuseStackProgram: null, noiseDiffuseStackUniforms: {}, glassProgram: null, glassUniforms: {}, glassFallbackActive: false, glassV2Program: null, glassV2Uniforms: {}, glassV2FallbackActive: false, prismProgram: null, prismUniforms: {}, postprocessProgram: null, postprocessUniforms: {}, prismCompositeProgram: null, prismCompositeUniforms: {}, particleProgram: null, particleUniforms: {}, particleVao: null, particleQuadBuffer: null, particleInstanceBuffer: null, particleInstanceCount: 0, particleInstanceSeed: Number.NaN, flowGradient, normalFbo, normalTexture, hBlurFbo, hBlurTexture, postprocessFboA, postprocessTextureA, postprocessFboB, postprocessTextureB, prismScratchFbo, prismScratchTexture, prismBlurFbo, prismBlurTexture, prismGlowFbo, prismGlowTexture, shaderCompileExt, lazyProgramState: createLazyProgramState(), lazyProgramCompileQueue: createSerialAsyncQueue(), resourceLedger, hasPresentedFrame: false, disposed: false };
+  const ctx: WebGLContext = { gl, performanceProfiler, gpuDiagnostics, renderOptimization, program, uniforms, geometryBuffer, transitionGeometryBuffer, generatorProgram: null, generatorUniforms: {}, gradientRampTexture, meshGradientTexture, meshGradientTextureSignature: '', diffuseCurveTexture, diffuseCurveSignature: '', diffuseAsciiTexture, diffuseAsciiSignature: '', diffuseAsciiCount: 1, diffuseAsciiRows: ASCII_ATLAS_MAX_ROWS, diffuseHistogramAt: 0, manualDistortTexture, manualDistortDisplacement: null, manualDistortSmoothMask: null, manualDistortMapResolution: 0, sourceImageTexture, sourceImageCanvas: null, imageGradientTexture, imageGradientSource: null, imageMaskTexture, imageMaskSource: null, normalMapProgram: null, normalMapUniforms: {}, gradFbo, gradTexture, blurProgram: null, blurUniforms: {}, stretchProgram: null, stretchUniforms: {}, seamlessProgram: null, seamlessUniforms: {}, stackCoreProgram: null, stackCoreUniforms: {}, noiseStackProgram: null, noiseStackUniforms: {}, noiseDiffuseStackProgram: null, noiseDiffuseStackUniforms: {}, glassProgram: null, glassUniforms: {}, glassFallbackActive: false, glassV2Program: null, glassV2Uniforms: {}, glassV2FallbackActive: false, glassTileProgram: null, glassTileUniforms: {}, glassTileFallbackActive: false, prismProgram: null, prismUniforms: {}, postprocessProgram: null, postprocessUniforms: {}, prismCompositeProgram: null, prismCompositeUniforms: {}, particleProgram: null, particleUniforms: {}, particleVao: null, particleQuadBuffer: null, particleInstanceBuffer: null, particleInstanceCount: 0, particleInstanceSeed: Number.NaN, flowGradient, normalFbo, normalTexture, hBlurFbo, hBlurTexture, postprocessFboA, postprocessTextureA, postprocessFboB, postprocessTextureB, prismScratchFbo, prismScratchTexture, prismBlurFbo, prismBlurTexture, prismGlowFbo, prismGlowTexture, shaderCompileExt, lazyProgramState: createLazyProgramState(), lazyProgramCompileQueue: createSerialAsyncQueue(), resourceLedger, hasPresentedFrame: false, disposed: false };
   initializedContext = ctx;
   effectStackTransitionResources.set(ctx, {
     program: transitionProgram,
@@ -807,6 +811,7 @@ export function disposeWebGL(ctx: WebGLContext): void {
     ctx.noiseDiffuseStackProgram,
     ctx.glassProgram,
     ctx.glassV2Program,
+    ctx.glassTileProgram,
     ctx.prismProgram,
     ctx.prismCompositeProgram,
     ctx.particleProgram,
@@ -985,6 +990,7 @@ function createLazyProgramState(): Record<LazyProgramKey, LazyProgramState> {
     noiseDiffuseStack: { promise: null, failed: false, timedOut: false, fallback: false },
     glass: { promise: null, failed: false, timedOut: false, fallback: false },
     glassV2: { promise: null, failed: false, timedOut: false, fallback: false },
+    glassTile: { promise: null, failed: false, timedOut: false, fallback: false },
     prism: { promise: null, failed: false, timedOut: false, fallback: false },
     postprocess: { promise: null, failed: false, timedOut: false, fallback: false },
     prismComposite: { promise: null, failed: false, timedOut: false, fallback: false },
@@ -1209,7 +1215,7 @@ async function compileLazyProgram(ctx: WebGLContext, key: LazyProgramKey): Promi
       shaderCompileExt,
       source.vertex,
       key,
-      key === 'glass' || key === 'glassV2'
+      key === 'glass' || key === 'glassV2' || key === 'glassTile'
         ? GLASS_PARALLEL_SHADER_COMPILE_TIMEOUT_MS
         : PARALLEL_SHADER_COMPILE_TIMEOUT_MS,
       () => ctx.disposed,
@@ -1283,6 +1289,10 @@ function installLazyProgram(ctx: WebGLContext, key: LazyProgramKey, program: Web
     const uniforms = getPostprocessUniforms(gl, program);
     ctx.glassV2Program = program;
     ctx.glassV2Uniforms = uniforms;
+  } else if (key === 'glassTile') {
+    const uniforms = getPostprocessUniforms(gl, program);
+    ctx.glassTileProgram = program;
+    ctx.glassTileUniforms = uniforms;
   } else if (key === 'prism') {
     const uniforms = getPostprocessUniforms(gl, program);
     ctx.prismProgram = program;
@@ -1393,6 +1403,7 @@ function lazyProgramReady(ctx: WebGLContext, key: LazyProgramKey): boolean {
     noiseDiffuseStack: [ctx.noiseDiffuseStackProgram, ctx.noiseDiffuseStackUniforms],
     glass: [ctx.glassProgram, ctx.glassUniforms],
     glassV2: [ctx.glassV2Program, ctx.glassV2Uniforms],
+    glassTile: [ctx.glassTileProgram, ctx.glassTileUniforms],
     prism: [ctx.prismProgram, ctx.prismUniforms],
     postprocess: [ctx.postprocessProgram, ctx.postprocessUniforms],
     prismComposite: [ctx.prismCompositeProgram, ctx.prismCompositeUniforms],
@@ -1463,10 +1474,14 @@ export { getRequiredSceneProgramKeys as getRequiredExportProgramKeys } from './s
  */
 function requestGlassProgram(
   ctx: WebGLContext,
-  key: 'glass' | 'glassV2',
+  key: 'glass' | 'glassV2' | 'glassTile',
   fallbackProgram: 'postprocess' = 'postprocess',
 ): boolean {
-  const dedicatedProgram = key === 'glass' ? ctx.glassProgram : ctx.glassV2Program;
+  const dedicatedProgram = key === 'glass'
+    ? ctx.glassProgram
+    : key === 'glassV2'
+      ? ctx.glassV2Program
+      : ctx.glassTileProgram;
   if (dedicatedProgram) return true;
 
   const glassState = ctx.lazyProgramState[key];
@@ -1478,10 +1493,15 @@ function requestGlassProgram(
   const fallbackReady = requestLazyProgram(ctx, fallbackProgram);
   if (!fallbackReady) return false;
 
-  const fallbackActive = key === 'glass' ? ctx.glassFallbackActive : ctx.glassV2FallbackActive;
+  const fallbackActive = key === 'glass'
+    ? ctx.glassFallbackActive
+    : key === 'glassV2'
+      ? ctx.glassV2FallbackActive
+      : ctx.glassTileFallbackActive;
   if (!fallbackActive) {
     if (key === 'glass') ctx.glassFallbackActive = true;
-    else ctx.glassV2FallbackActive = true;
+    else if (key === 'glassV2') ctx.glassV2FallbackActive = true;
+    else ctx.glassTileFallbackActive = true;
     window.dispatchEvent(new CustomEvent('kgg:webgl-lazy-program-state', {
       detail: { key, state: 'fallback' as const, fallback: true },
     }));
@@ -2180,11 +2200,23 @@ function drawPostprocessPass(
     || effectMode === 'voronoi'
     || effectMode === 'diffuse'
   );
-  const glassProgram = effectMode === 'glassV2' ? ctx.glassV2Program : ctx.glassProgram;
-  const glassUniforms = effectMode === 'glassV2' ? ctx.glassV2Uniforms : ctx.glassUniforms;
-  const glassFallbackActive = effectMode === 'glassV2' ? ctx.glassV2FallbackActive : ctx.glassFallbackActive;
+  const glassProgram = effectMode === 'glassV2'
+    ? ctx.glassV2Program
+    : effectMode === 'glassTile'
+      ? ctx.glassTileProgram
+      : ctx.glassProgram;
+  const glassUniforms = effectMode === 'glassV2'
+    ? ctx.glassV2Uniforms
+    : effectMode === 'glassTile'
+      ? ctx.glassTileUniforms
+      : ctx.glassUniforms;
+  const glassFallbackActive = effectMode === 'glassV2'
+    ? ctx.glassV2FallbackActive
+    : effectMode === 'glassTile'
+      ? ctx.glassTileFallbackActive
+      : ctx.glassFallbackActive;
   const useGlassProgram = useV2Programs
-    && (effectMode === 'glass' || effectMode === 'glassV2')
+    && (effectMode === 'glass' || effectMode === 'glassV2' || effectMode === 'glassTile')
     && Boolean(glassProgram || glassFallbackActive);
   const usePrismProgram = useV2Programs && effectMode === 'prism' && Boolean(ctx.prismProgram);
   const selectedProgram = useNoiseDiffuseStackProgram
@@ -2268,7 +2300,7 @@ function drawPostprocessPass(
       gl.uniform2f(ctx.postprocessUniforms.u_gradAnchor1, anchors[1][0], anchors[1][1]);
       gl.uniform1f(ctx.postprocessUniforms.u_maxDisplacement, postprocess.maxDisplacement);
       setUniform1i(gl, ctx.postprocessUniforms.u_effectEnabled, 1);
-      const effectModeMap = { distort: 0, mirror: 1, kaleidoscope: 2, prism: 3, voronoi: 4, glass: 5, diffuse: 6, noise: 7, slit: 8, glassV2: 9, particles: 0 } as const;
+      const effectModeMap = { distort: 0, mirror: 1, kaleidoscope: 2, prism: 3, voronoi: 4, glass: 5, diffuse: 6, noise: 7, slit: 8, glassV2: 9, glassTile: 10, particles: 0 } as const;
       setUniform1i(gl, ctx.postprocessUniforms.u_effectMode, effectModeMap[effectMode]);
       setUniform1i(gl, ctx.postprocessUniforms.u_stackSlitDiffuseAfter, diffuseAfterSlit ? 1 : 0);
     }
@@ -2401,6 +2433,20 @@ function drawPostprocessPass(
       glassV2HighlightG,
       glassV2HighlightB,
     );
+    const glassTile = normalizeGlassTileRenderParameters(postprocess);
+    setUniform1i(gl, ctx.postprocessUniforms.u_glassTilePattern, glassTile.patternIndex);
+    gl.uniform1f(ctx.postprocessUniforms.u_glassTileSize, glassTile.tileSize);
+    gl.uniform1f(ctx.postprocessUniforms.u_glassTileBevel, glassTile.bevel);
+    gl.uniform1f(ctx.postprocessUniforms.u_glassTileSurfaceHeight, glassTile.surfaceHeight);
+    gl.uniform1f(ctx.postprocessUniforms.u_glassTileCurvature, glassTile.curvature);
+    gl.uniform1f(ctx.postprocessUniforms.u_glassTileRefraction, glassTile.refraction);
+    gl.uniform1f(ctx.postprocessUniforms.u_glassTileDispersion, glassTile.dispersion);
+    gl.uniform1f(ctx.postprocessUniforms.u_glassTileRoughness, glassTile.roughness);
+    gl.uniform1f(ctx.postprocessUniforms.u_glassTileDetailScale, glassTile.detailScale);
+    gl.uniform1f(ctx.postprocessUniforms.u_glassTileRotation, glassTile.rotationRadians);
+    gl.uniform1f(ctx.postprocessUniforms.u_glassTileMix, glassTile.mix);
+    setUniform1i(gl, ctx.postprocessUniforms.u_glassTileEdgeMode, glassTile.edgeModeIndex);
+    gl.uniform1f(ctx.postprocessUniforms.u_glassTileSeed, glassTile.seed);
   }
   const diffuseScale = diffuseResolutionScale(fullWidth, fullHeight);
   setUniform1i(gl, ctx.postprocessUniforms.u_diffuseEnabled, applyPostDiffuse && postprocess.diffuseEnabled ? 1 : 0);
@@ -2507,7 +2553,7 @@ function drawPostprocessPass(
     setUniform1i(gl, ctx.postprocessUniforms.u_stackSlitAnimMode, stackSlit.animMode === 'pingpong' ? 1 : 0);
     setUniform1i(gl, ctx.postprocessUniforms.u_stackSlitPixelPerfect, stackSlitPixelPerfect ? 1 : 0);
   }
-  if ((effectMode === 'glass' || effectMode === 'glassV2') && exportDiagnosticsEnabled()) {
+  if ((effectMode === 'glass' || effectMode === 'glassV2' || effectMode === 'glassTile') && exportDiagnosticsEnabled()) {
     const destinationTexture = targetFramebuffer === ctx.postprocessFboA
       ? ctx.postprocessTextureA
       : targetFramebuffer === ctx.postprocessFboB
@@ -2804,7 +2850,8 @@ function drawPostprocessStackOutput(
   outputToTexture: boolean,
 ): WebGLTexture | null {
   const layers = getActivePostprocessStackLayers(postprocess).filter(layer => (
-    (layer.kind !== 'glass' && layer.kind !== 'glassV2') || !isGlassOpticallyIdentity(postprocess)
+    (layer.kind !== 'glass' && layer.kind !== 'glassV2' && layer.kind !== 'glassTile')
+      || (layer.kind === 'glassTile' ? !isGlassTileOpticallyIdentity(postprocess) : !isGlassOpticallyIdentity(postprocess))
   ));
   if (layers.length === 0) return null;
 
@@ -3551,6 +3598,7 @@ export function render(
     const prismNeedsBlur = renderPlan.prismNeedsBlur;
     const particlesRequested = renderPlan.particlesRequested;
     const glassIdentity = isGlassOpticallyIdentity(postprocess);
+    const glassTileIdentity = isGlassTileOpticallyIdentity(postprocess);
 
     // The V2 default is Diffuse-only. Analytic Block/Smooth prefixes stay in
     // the Generator, while Stipple and other legacy modes remain texture
@@ -3597,6 +3645,9 @@ export function render(
       || (noiseDiffuseStackFailed && noiseStackReady);
     const glassV2Ready = imageGradientProtected || glassIdentity || !renderPlan.programs.glassV2 || (
       stackCoreReady && noiseStackReady && requestGlassProgram(ctx, 'glassV2', renderPlan.fallbacks.glassV2)
+    );
+    const glassTileReady = imageGradientProtected || glassTileIdentity || !renderPlan.programs.glassTile || (
+      stackCoreReady && noiseStackReady && requestGlassProgram(ctx, 'glassTile', renderPlan.fallbacks.glassTile)
     );
     const normalReady = !normalRequested || (
       requestLazyProgram(ctx, 'normalMap') &&
@@ -3789,6 +3840,7 @@ export function render(
       // rather than pinning Slit/Distort/etc. to the Base-only fallback.
       if (layer.kind === 'noise' && !noiseStackReady) continue;
       if (layer.kind === 'glass' && (glassIdentity || !glassV2Ready)) continue;
+      if (layer.kind === 'glassTile' && (glassTileIdentity || !glassTileReady)) continue;
       // A Diffuse immediately before Slit is evaluated in Slit's destination
       // space. This prevents the slit sampler from stretching the already
       // diffused grid into stripes while keeping the layer order visible.
@@ -3804,7 +3856,11 @@ export function render(
         const layerNoise = layer.kind === 'noise'
           ? { ...noiseDistortion, enabled: true }
           : disabledStackNoise;
-        const renderKind = layer.kind === 'glass' ? 'glassV2' : layer.kind;
+        const renderKind = layer.kind === 'glass'
+          ? 'glassV2'
+          : layer.kind === 'glassTile'
+            ? 'glassTile'
+            : layer.kind;
         passRendered = drawPostprocessPass(
           ctx, currentTexture, gradient, layerNoise, v2Postprocess, renderKind,
           vpW, vpH, width, height, tileOx, tileOy, time, noiseLoopPeriod,
@@ -3886,7 +3942,8 @@ export function render(
   const particleRequested = postprocess.enabled && postprocess.effectMode === 'particles';
   const particleActive = particleRequested && requestLazyProgram(ctx, 'particles');
   const postprocessLayers = getActivePostprocessStackLayers(postprocess).filter(layer => (
-    (layer.kind !== 'glass' && layer.kind !== 'glassV2') || !isGlassOpticallyIdentity(postprocess)
+    (layer.kind !== 'glass' && layer.kind !== 'glassV2' && layer.kind !== 'glassTile')
+      || (layer.kind === 'glassTile' ? !isGlassTileOpticallyIdentity(postprocess) : !isGlassOpticallyIdentity(postprocess))
   ));
   const postprocessRequested = postprocess.enabled && postprocessLayers.length > 0;
   const prismPostprocess = postprocessRequested && postprocessLayers.some(layer => layer.kind === 'prism');

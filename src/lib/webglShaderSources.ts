@@ -12,6 +12,7 @@ import postprocessDiffuseGLSL from '../shaders/postprocess/diffuse.glsl?raw';
 import postprocessGlassFieldGLSL from '../shaders/postprocess/glass-field.glsl?raw';
 import postprocessGlassOpticsGLSL from '../shaders/postprocess/glass-optics.glsl?raw';
 import postprocessGlassCompactGLSL from '../shaders/postprocess/glass-compact.glsl?raw';
+import postprocessGlassTileGLSL from '../shaders/postprocess/glass-tile.glsl?raw';
 import postprocessMainGLSL from '../shaders/postprocess/main.glsl?raw';
 import postprocessNoiseMainGLSL from '../shaders/postprocess/noise-main.glsl?raw';
 import postprocessNoiseDiffuseMainGLSL from '../shaders/postprocess/noise-diffuse-main.glsl?raw';
@@ -32,6 +33,7 @@ const postprocessGLSL = [
   postprocessDiffuseGLSL,
   postprocessGlassFieldGLSL,
   postprocessGlassOpticsGLSL,
+  postprocessGlassTileGLSL,
   postprocessMainGLSL,
 ].join('');
 
@@ -45,6 +47,7 @@ export type LazyProgramKey =
   | 'noiseDiffuseStack'
   | 'glass'
   | 'glassV2'
+  | 'glassTile'
   | 'prism'
   | 'postprocess'
   | 'prismComposite'
@@ -146,6 +149,7 @@ export const SHADER_VERSION = (
   + stretchGLSL.length * 313
   + postprocessGLSL.length * 191
   + postprocessGlassCompactGLSL.length * 173
+  + postprocessGlassTileGLSL.length * 187
   + postprocessNoiseMainGLSL.length * 179
   + postprocessNoiseDiffuseMainGLSL.length * 181
   + NOISE_STACK_UNIFORMS.length * 167
@@ -185,15 +189,17 @@ vec2 diffuseHash(vec2 p) {
 `;
 
 function createSpecializedPostprocessSource(
-  define: 'KGG_LEGACY_GLASS_ONLY' | 'KGG_GLASS_V2_ONLY' | 'KGG_PRISM_ONLY',
+  define: 'KGG_LEGACY_GLASS_ONLY' | 'KGG_GLASS_V2_ONLY' | 'KGG_GLASS_TILE_ONLY' | 'KGG_PRISM_ONLY',
 ): string {
-  const glassOnly = define === 'KGG_LEGACY_GLASS_ONLY' || define === 'KGG_GLASS_V2_ONLY';
+  const glassOnly = define === 'KGG_LEGACY_GLASS_ONLY'
+    || define === 'KGG_GLASS_V2_ONLY'
+    || define === 'KGG_GLASS_TILE_ONLY';
   const specializedSource = glassOnly
     ? [
         postprocessUniformsGLSL,
         postprocessSharedGLSL,
         GLASS_DIFFUSE_STUBS_GLSL,
-        postprocessGlassCompactGLSL,
+        define === 'KGG_GLASS_TILE_ONLY' ? postprocessGlassTileGLSL : postprocessGlassCompactGLSL,
         postprocessMainGLSL,
       ].join('')
     : [
@@ -288,6 +294,7 @@ export function getProgramSource(key: LazyProgramKey): ProgramSource {
   if (key === 'noiseDiffuseStack') return { vertex: vertexGLSL, fragment: createNoiseDiffuseStackSource() };
   if (key === 'glass') return { vertex: vertexGLSL, fragment: createSpecializedPostprocessSource('KGG_LEGACY_GLASS_ONLY') };
   if (key === 'glassV2') return { vertex: vertexGLSL, fragment: createSpecializedPostprocessSource('KGG_GLASS_V2_ONLY') };
+  if (key === 'glassTile') return { vertex: vertexGLSL, fragment: createSpecializedPostprocessSource('KGG_GLASS_TILE_ONLY') };
   if (key === 'prism') return { vertex: vertexGLSL, fragment: createSpecializedPostprocessSource('KGG_PRISM_ONLY') };
   if (key === 'postprocess') return { vertex: vertexGLSL, fragment: createGeneralPostprocessSource() };
   if (key === 'prismComposite') return { vertex: vertexGLSL, fragment: prismCompositeGLSL };

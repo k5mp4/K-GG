@@ -22,6 +22,7 @@ import { createAnimationTrack, getAnimationDefinition, isRemovedAnimationPropert
 import { clampKeyframeTime } from '../lib/loopKeyframes';
 import { isPostprocessTimeAnimationActive } from '../lib/postprocessAnimation';
 import { normalizePostprocessEffectMode, normalizePostprocessEffectStack } from '../lib/postprocessStack';
+import { normalizeGlassTileRenderParameters } from '../lib/glassTile';
 import {
   getPostprocessEffectStackEnabledSignature,
   hasEnabledPostprocessEffectStack,
@@ -413,6 +414,20 @@ export function createDocumentActions(set: DocumentStoreSet, defaults: DocumentD
     next.kaleidoscopeRotation = clampParameter(next.kaleidoscopeRotation, s.postprocess.kaleidoscopeRotation, getParameterLimit('postprocess.kaleidoscopeRotation'));
     next.voronoiAngle = clampParameter(next.voronoiAngle, s.postprocess.voronoiAngle, getParameterLimit('postprocess.voronoiAngle'));
     next.glassRotation = clampParameter(next.glassRotation, s.postprocess.glassRotation, getParameterLimit('postprocess.glassRotation'));
+    const glassTile = normalizeGlassTileRenderParameters(next);
+    next.glassTilePattern = glassTile.pattern;
+    next.glassTileSize = glassTile.tileSize;
+    next.glassTileBevel = glassTile.bevel;
+    next.glassTileSurfaceHeight = glassTile.surfaceHeight;
+    next.glassTileCurvature = glassTile.curvature;
+    next.glassTileRefraction = glassTile.refraction;
+    next.glassTileDispersion = glassTile.dispersion;
+    next.glassTileRoughness = glassTile.roughness;
+    next.glassTileDetailScale = glassTile.detailScale;
+    next.glassTileRotation = glassTile.rotationRadians * 180 / Math.PI;
+    next.glassTileMix = glassTile.mix;
+    next.glassTileEdgeMode = glassTile.edgeMode;
+    next.glassTileSeed = glassTile.seed;
     next.particleDirection = clampParameter(next.particleDirection, s.postprocess.particleDirection, getParameterLimit('postprocess.particleDirection'));
     if ((next.particleEmitterType as string) === 'nexus') next.particleEmitterType = 'point';
     if (!next.particleEmitterPoint) next.particleEmitterPoint = [...defaults.postprocess.particleEmitterPoint] as [number, number];
