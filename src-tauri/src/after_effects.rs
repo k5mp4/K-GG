@@ -1320,13 +1320,9 @@ mod tests {
 
     #[test]
     fn reap_returns_ok_when_the_child_exits_promptly() {
-        let mut child = Command::new(if cfg!(windows) {
-            "powershell.exe"
-        } else {
-            "true"
-        });
+        let mut child = Command::new(if cfg!(windows) { "cmd.exe" } else { "true" });
         #[cfg(windows)]
-        child.args(["-NoProfile", "-NonInteractive", "-Command", "exit 0"]);
+        child.args(["/D", "/C", "exit 0"]);
         child
             .stdin(Stdio::null())
             .stdout(Stdio::null())
@@ -1339,13 +1335,9 @@ mod tests {
 
     #[test]
     fn reap_reports_a_child_that_exits_with_failure() {
-        let mut child = Command::new(if cfg!(windows) {
-            "powershell.exe"
-        } else {
-            "sh"
-        });
+        let mut child = Command::new(if cfg!(windows) { "cmd.exe" } else { "sh" });
         #[cfg(windows)]
-        child.args(["-NoProfile", "-NonInteractive", "-Command", "exit 1"]);
+        child.args(["/D", "/C", "exit 1"]);
         #[cfg(not(windows))]
         child.args(["-c", "exit 1"]);
         child
