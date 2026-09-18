@@ -11,6 +11,15 @@ import {
   type RGB,
 } from '../lib/colorExtractor';
 import { generateHarmonyPalette, type HarmonyType } from '../lib/colorHarmony';
+import { buildGradientPreviewStyle } from '../lib/gradientPreview';
+import {
+  generateGradientFromUi,
+  type GradientGeneratorAlgorithm,
+  type GradientGeneratorUiParams,
+} from '../lib/gradientGenerator';
+import { mapOklchToSrgb } from '../lib/colorSpace';
+import { PERCEPTUAL_GRADIENT_FAMILIES, type PerceptualGradientFamily } from '../lib/perceptualGradient';
+import type { MessageKey } from '../i18n/messages';
 import { InputColor } from 'tweeq';
 
 const HARMONY_OPTIONS: { value: HarmonyType; label: string }[] = [
@@ -23,6 +32,21 @@ const HARMONY_OPTIONS: { value: HarmonyType; label: string }[] = [
   { value: 'shades', label: 'Shades' },
   { value: 'monochromatic', label: 'Monochromatic' },
 ];
+
+const FALLBACK_FAMILY: PerceptualGradientFamily = 'sweep';
+const FAMILY_MESSAGE_KEYS: Record<PerceptualGradientFamily, MessageKey> = {
+  sweep: 'gradient.generatorFamily.sweep',
+  soft: 'gradient.generatorFamily.soft',
+  pastel: 'gradient.generatorFamily.pastel',
+  deep: 'gradient.generatorFamily.deep',
+  accent: 'gradient.generatorFamily.accent',
+};
+const GENERATED_RAMP_SETTINGS = {
+  rampColorMode: 'rgb',
+  rampInterpolation: 'linear',
+  rampRepeat: 1,
+  rampMirror: false,
+} as const;
 
 interface ColorPaletteGeneratorProps {
   overlayImageElement: HTMLImageElement | null;
@@ -49,9 +73,66 @@ export function ColorPaletteGenerator({ overlayImageElement, embedded = false }:
   const [harmonyType, setHarmonyType] = useState<HarmonyType>('complementary');
   const [showHarmonyPreviews, setShowHarmonyPreviews] = useState(false);
   const [copiedHarmonyIndex, setCopiedHarmonyIndex] = useState<number | null>(null);
+  const [generatorAlgorithm, setGeneratorAlgorithm] = useState<GradientGeneratorAlgorithm>('cubehelix');
+  const [generatorBaseColor, setGeneratorBaseColor] = useState('#6377A6');
+  const [generatorHueTravel, setGeneratorHueTravel] = useState(0.5);
+  const [generatorColorIntensity, setGeneratorColorIntensity] = useState(0.62);
+  const [generatorBrightness, setGeneratorBrightness] = useState(0.55);
+  const [generatorContrast, setGeneratorContrast] = useState(0.58);
+  const [generatorFamily, setGeneratorFamily] = useState<PerceptualGradientFamily>(FALLBACK_FAMILY);
+  const [generatorAccentPosition, setGeneratorAccentPosition] = useState(0.58);
+  const [generatorAccentWidth, setGeneratorAccentWidth] = useState(0.18);
+  const [generatorStopCount, setGeneratorStopCount] = useState(5);
   const harmonyPalette = useMemo(
     () => generateHarmonyPalette(harmonyBaseColor, harmonyType),
     [harmonyBaseColor, harmonyType],
+  );
+  const algorithmOptions = useMemo(() => [
+    { value: 'cubehelix', label: t('gradient.generatorCubehelix') },
+    { value: 'perceptual', label: t('gradient.generatorPerceptual') },
+  ], [t]);
+  const familyOptions = useMemo(() => PERCEPTUAL_GRADIENT_FAMILIES.map((family) => ({
+    value: family,
+    label: t(FAMILY_MESSAGE_KEYS[family]),
+  })), [t]);
+  const generatorParams = useMemo<GradientGeneratorUiParams>(() => ({
+    algorithm: generatorAlgorithm,
+    baseColor: generatorBaseColor,
+    hueTravel: generatorHueTravel,
+    colorIntensity: generatorColorIntensity,
+    brightness: generatorBrightness,
+    contrast: generatorContrast,
+    family: generatorFamily,
+    accentPosition: generatorAccentPosition,
+    accentWidth: generatorAccentWidth,
+    stopCount: generatorStopCount,
+  }), [
+    generatorAccentPosition,
+    generatorAccentWidth,
+    generatorAlgorithm,
+    generatorBaseColor,
+    generatorBrightness,
+    generatorColorIntensity,
+    generatorContrast,
+    generatorFamily,
+    generatorHueTravel,
+    generatorStopCount,
+  ]);
+  const generatedGradientStops = useMemo(
+    () => generateGradientFromUi(generatorParams),
+    [generatorParams],
+  );
+  const generatorPreviewStyle = useMemo(
+    () => buildGradientPreviewStyle(
+      generatedGradientStops,
+      undefined,
+      GENERATED_RAMP_SETTINGS.rampColorMode,
+      GENERATED_RAMP_SETTINGS.rampInterpolation,
+      0,
+      GENERATED_RAMP_SETTINGS.rampRepeat,
+      GENERATED_RAMP_SETTINGS.rampMirror,
+    ),
+    [generatedGradientStops],
   );
   const renderHarmonyPreview = (option: { value: string }) => (
     <span className="flex h-full w-full" aria-hidden="true">
@@ -183,6 +264,35 @@ export function ColorPaletteGenerator({ overlayImageElement, embedded = false }:
     setGradient({ stops });
   };
 
+  const handleApplyGeneratedGradient = () => {
+    if (generatedGradientStops.length === 0) return;
+    setGradient({
+      stops: generatedGradientStops,
+      // The preview samples the generated sRGB stop chain with the same
+      // settings. Resetting repeat/mirror avoids an old ramp mode changing
+      // the result after Apply.
+      ...GENERATED_RAMP_SETTINGS,
+    });
+  };
+
+  const handleShuffleGenerator = () => {
+    const hue = Math.random() * 360;
+    const baseColor = mapOklchToSrgb({
+      L: 0.5 + Math.random() * 0.2,
+      C: 0.08 + Math.random() * 0.12,
+      H: hue,
+    }).hex;
+    setGeneratorBaseColor(baseColor);
+    setGeneratorHueTravel(-0.85 + Math.random() * 1.7);
+    setGeneratorColorIntensity(0.2 + Math.random() * 0.7);
+    setGeneratorBrightness(0.2 + Math.random() * 0.6);
+    setGeneratorContrast(0.2 + Math.random() * 0.7);
+    setGeneratorFamily(PERCEPTUAL_GRADIENT_FAMILIES[Math.floor(Math.random() * PERCEPTUAL_GRADIENT_FAMILIES.length)] ?? FALLBACK_FAMILY);
+    setGeneratorAccentPosition(0.3 + Math.random() * 0.4);
+    setGeneratorAccentWidth(0.1 + Math.random() * 0.25);
+    setGeneratorStopCount(3 + Math.floor(Math.random() * 8));
+  };
+
   const overlayImportButton = overlayImageElement ? (
     <button
       type="button"
@@ -206,6 +316,161 @@ export function ColorPaletteGenerator({ overlayImageElement, embedded = false }:
           {overlayImportButton}
         </div>
       )}
+
+      <section className="space-y-3 border border-fire/35 bg-k-surface/55 p-3" aria-labelledby="gradient-generator-title">
+        <div>
+          <h3 id="gradient-generator-title" className="text-[10px] font-display font-semibold uppercase tracking-[0.18em] text-cream">
+            {t('gradient.generatorTitle')}
+          </h3>
+          <p className="mt-1 text-[9px] leading-relaxed text-cream/80">{t('gradient.generatorDescription')}</p>
+        </div>
+
+        <div className="grid grid-cols-1 gap-2">
+          <CustomSelect
+            label={t('gradient.generatorAlgorithm')}
+            value={generatorAlgorithm}
+            options={algorithmOptions}
+            localizeLabel={false}
+            localizeOptions={false}
+            onChange={(value) => setGeneratorAlgorithm(value as GradientGeneratorAlgorithm)}
+          />
+          <div className="min-w-0">
+            <label className="mb-1 block text-[9px] font-display uppercase tracking-wider text-cream/80">
+              {t('gradient.generatorBaseColor')}
+            </label>
+            <div className="tq-color-input min-w-0 border border-panel-border bg-k-bg/50">
+              <InputColor
+                value={generatorBaseColor}
+                onChange={setGeneratorBaseColor}
+                alpha={false}
+                aria-label={t('gradient.generatorBaseColor')}
+              />
+            </div>
+          </div>
+          {generatorAlgorithm === 'perceptual' && (
+            <CustomSelect
+              label={t('gradient.generatorFamily')}
+              value={generatorFamily}
+              options={familyOptions}
+              localizeLabel={false}
+              localizeOptions={false}
+              onChange={(value) => setGeneratorFamily(value as PerceptualGradientFamily)}
+            />
+          )}
+        </div>
+
+        <div className="grid grid-cols-1 gap-2">
+          <SliderField
+            label={t('gradient.generatorHueTravel')}
+            min={-1}
+            max={1}
+            step={0.01}
+            value={generatorHueTravel}
+            onChange={setGeneratorHueTravel}
+            format={(value) => `${Math.round(value * 100)}%`}
+            defaultValue={0.5}
+          />
+          <SliderField
+            label={t('gradient.generatorColorIntensity')}
+            min={0}
+            max={1}
+            step={0.01}
+            value={generatorColorIntensity}
+            onChange={setGeneratorColorIntensity}
+            format={(value) => `${Math.round(value * 100)}%`}
+            defaultValue={0.62}
+          />
+          <SliderField
+            label={t('gradient.generatorBrightness')}
+            min={0}
+            max={1}
+            step={0.01}
+            value={generatorBrightness}
+            onChange={setGeneratorBrightness}
+            format={(value) => `${Math.round(value * 100)}%`}
+            defaultValue={0.55}
+          />
+          <SliderField
+            label={t('gradient.generatorContrast')}
+            min={0}
+            max={1}
+            step={0.01}
+            value={generatorContrast}
+            onChange={setGeneratorContrast}
+            format={(value) => `${Math.round(value * 100)}%`}
+            defaultValue={0.58}
+          />
+          <SliderField
+            label={t('gradient.generatorStops')}
+            min={3}
+            max={10}
+            step={1}
+            value={generatorStopCount}
+            onChange={(value) => setGeneratorStopCount(Math.round(value))}
+            format={(value) => `${Math.round(value)}`}
+            defaultValue={5}
+          />
+        </div>
+
+        {generatorAlgorithm === 'perceptual' && generatorFamily === 'accent' && (
+          <div className="grid grid-cols-1 gap-2">
+            <SliderField
+              label={t('gradient.generatorAccentPosition')}
+              min={0.1}
+              max={0.9}
+              step={0.01}
+              value={generatorAccentPosition}
+              onChange={setGeneratorAccentPosition}
+              format={(value) => `${Math.round(value * 100)}%`}
+              defaultValue={0.58}
+            />
+            <SliderField
+              label={t('gradient.generatorAccentWidth')}
+              min={0.04}
+              max={0.5}
+              step={0.01}
+              value={generatorAccentWidth}
+              onChange={setGeneratorAccentWidth}
+              format={(value) => `${Math.round(value * 100)}%`}
+              defaultValue={0.18}
+            />
+          </div>
+        )}
+
+        <div className="space-y-1.5">
+          <label className="block text-[10px] font-display font-semibold uppercase tracking-wider text-k-muted">
+            {t('gradient.generatorPreview')}
+          </label>
+          <div
+            className="h-12 w-full border border-panel-border bg-k-bg"
+            style={generatorPreviewStyle}
+            role="img"
+            aria-label={t('gradient.generatorPreview')}
+          />
+          <div className="flex h-3 w-full overflow-hidden border border-panel-border/60">
+            {generatedGradientStops.map((stop) => (
+              <span key={`${stop.position}-${stop.color}`} className="min-w-0 flex-1" style={{ backgroundColor: stop.color }} />
+            ))}
+          </div>
+        </div>
+
+        <div className="grid grid-cols-2 gap-2">
+          <button
+            type="button"
+            onClick={handleShuffleGenerator}
+            className="border border-panel-border bg-k-bg/40 py-2 text-[10px] font-display font-bold uppercase tracking-wider text-cream transition-colors hover:border-cream/50 hover:bg-cream/10"
+          >
+            {t('common.shuffle')}
+          </button>
+          <button
+            type="button"
+            onClick={handleApplyGeneratedGradient}
+            className="bg-cream py-2 text-[10px] font-display font-bold uppercase tracking-wider text-k-bg transition-colors hover:bg-white active:scale-[0.98]"
+          >
+            {t('gradient.generatorApply')}
+          </button>
+        </div>
+      </section>
 
       <section className="space-y-3 border border-cream/20 bg-k-surface/45 p-3" aria-labelledby="harmony-title">
         <div className="flex min-w-0 items-center justify-between gap-3">
