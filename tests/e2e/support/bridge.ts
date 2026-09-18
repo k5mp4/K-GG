@@ -9,12 +9,27 @@ import type {
   KggE2EResourceLifecycleResult,
 } from '../../../src/types/e2eBridge';
 
+function getE2EBridgeTimeoutMs(): number {
+  const configured = Number(process.env.KGG_E2E_BOOT_TIMEOUT_MS);
+  if (Number.isFinite(configured) && configured > 0) return configured;
+  return process.env.CI ? 120_000 : 30_000;
+}
+
+export async function waitForE2EBridge(page: Page): Promise<void> {
+  await page.waitForFunction(
+    () => Boolean(window.__KGG_E2E__),
+    undefined,
+    { timeout: getE2EBridgeTimeoutMs() },
+  );
+}
+
 export async function waitForWebGLReady(page: Page): Promise<KggE2EDiagnostics> {
-  return page.evaluate(async () => {
+  const timeoutMs = getE2EBridgeTimeoutMs();
+  return page.evaluate(async timeout => {
     const bridge = window.__KGG_E2E__;
     if (!bridge) throw new Error('K-GG E2E bridge is not available; start the app with VITE_KGG_E2E=1');
-    return bridge.waitForWebGLReady();
-  });
+    return bridge.waitForWebGLReady({ timeoutMs: timeout });
+  }, timeoutMs);
 }
 
 export async function setNormalizedTime(page: Page, normalizedTime: number): Promise<KggE2ECapture> {

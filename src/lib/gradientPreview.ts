@@ -1,5 +1,5 @@
 import type { ColorStop, OpacityStop, RampColorMode, RampInterpolation } from '../types/gradient';
-import { getColorAtPosition, getOpacityAtPosition } from './gradientRampUtils';
+import { applyMirrorT, applyRampRepeatT, getColorAtPosition, getOpacityAtPosition } from './gradientRampUtils';
 
 export type GradientPreviewStyle = {
   backgroundImage: string;
@@ -27,6 +27,8 @@ export function buildGradientPreviewStyle(
   colorMode: RampColorMode,
   interpolation: RampInterpolation,
   variable: number,
+  repeat = 1,
+  mirror = false,
 ): GradientPreviewStyle {
   if (stops.length === 0) {
     return {
@@ -38,7 +40,9 @@ export function buildGradientPreviewStyle(
   }
 
   const colors = Array.from({ length: 18 }, (_, index) => {
-    const t = index / 17;
+    const rawT = index / 17;
+    const repeatedT = applyRampRepeatT(rawT, repeat);
+    const t = mirror ? applyMirrorT(repeatedT) : repeatedT;
     return hexToRgba(
       getColorAtPosition(stops, t, interpolation, colorMode, variable),
       getOpacityAtPosition(opacityStops, t),

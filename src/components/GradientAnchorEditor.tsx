@@ -73,7 +73,7 @@ function computeAnchorColors(
 
 export function GradientAnchorEditor({ width, height, visible = true }: Props) {
   const { gradient, keyframeTracks, currentTime, animation, selectedGradientAnchors } = useGradientStore();
-  const { setKeyframeTracks, addKeyframe, setKeyframe, setGradient, setSelectedGradientAnchors, setIsGradientAnchorDragging } = applicationCommands;
+  const { setKeyframeTracks, addKeyframe, setKeyframe, setGradient, setSelectedGradientAnchors, setIsGradientAnchorDragging, setBezierControl } = applicationCommands;
   const containerRef = useRef<HTMLDivElement>(null);
   const draggingRef = useRef<number | null>(null);
   const draggingBezierControlRef = useRef<0 | 1 | null>(null);
@@ -94,6 +94,19 @@ export function GradientAnchorEditor({ width, height, visible = true }: Props) {
   const fallbackBezierControls = defaultBezierControlsForAnchors(anchors);
   const bezierControls = gradient.bezierControls ?? fallbackBezierControls;
   const showBezierControls = gradientType === 'bezier' && numAnchors === 2;
+
+  /** Bezier control points with keyframe interpolation applied (mirrors effectiveAnchors). */
+  const effectiveBezierControls = (bezierControls.map((control, idx) => {
+    const xTrack = keyframeTracks[`bezierControl.${idx}.x`];
+    const yTrack = keyframeTracks[`bezierControl.${idx}.y`];
+    const x = xTrack && getTrackMode(xTrack) === 'keys' && xTrack.keyframes.length > 0
+      ? interpolateKeyframesWithLoop(currentTime, xTrack.keyframes, animation.previewLoop ?? true)
+      : control[0];
+    const y = yTrack && getTrackMode(yTrack) === 'keys' && yTrack.keyframes.length > 0
+      ? interpolateKeyframesWithLoop(currentTime, yTrack.keyframes, animation.previewLoop ?? true)
+      : control[1];
+    return [x, y] as [number, number];
+  }) as typeof bezierControls);
 
   // UV空間(y=0が底辺) → CSS座標(y=0が上辺)
   const uvToCss = (uv: [number, number]) => ({
@@ -231,8 +244,9 @@ export function GradientAnchorEditor({ width, height, visible = true }: Props) {
     e.stopPropagation();
     draggingBezierControlRef.current = index;
     const rect = containerRef.current?.getBoundingClientRect();
-    const grabOffsetX = rect ? (e.clientX - rect.left) - bezierControls[index][0] * rect.width : 0;
-    const grabOffsetY = rect ? (e.clientY - rect.top) - (1 - bezierControls[index][1]) * rect.height : 0;
+    const startPoint = effectiveBezierControls[index];
+    const grabOffsetX = rect ? (e.clientX - rect.left) - startPoint[0] * rect.width : 0;
+    const grabOffsetY = rect ? (e.clientY - rect.top) - (1 - startPoint[1]) * rect.height : 0;
 
     const onMove = (ev: PointerEvent) => {
       if (draggingBezierControlRef.current !== index) return;
@@ -243,22 +257,45 @@ export function GradientAnchorEditor({ width, height, visible = true }: Props) {
         1 - (ev.clientY - r.top - grabOffsetY) / r.height,
       ];
       const state = useGradientStore.getState();
-      const controls = state.gradient.bezierControls ?? fallbackBezierControls;
-      setGradient({
-        bezierControls: controls.map((cp, j) => (
-          j === index ? uvPos : cp
-        )) as [[number, number], [number, number]],
-      });
+      const nt = getKeyframeEditTime(state.currentTime, state.animation.previewLoop ?? true);
+      const xTrackId = `bezierControl.${index}.x`;
+      const yTrackId = `bezierControl.${index}.y`;
+      const xTrack = state.keyframeTracks[xTrackId];
+      const yTrack = state.keyframeTracks[yTrackId];
+      const xActive = Boolean(xTrack && getTrackMode(xTrack) === 'keys' && xTrack.keyframes.length > 0);
+      const yActive = Boolean(yTrack && getTrackMode(yTrack) === 'keys' && yTrack.keyframes.length > 0);
+
+      if (xActive || yActive) {
+        const upsertKf = (trackId: string, track: typeof xTrack, val: number) => {
+          const nearKf = track!.keyframes.find(k => Math.abs(k.time - nt) < 1e-4);
+          if (nearKf) setKeyframe(trackId, { id: nearKf.id, value: val });
+          else addKeyframe(trackId, { time: nt, value: val, interpolation: 'linear' });
+        };
+        if (xActive) upsertKf(xTrackId, xTrack, uvPos[0]);
+        if (yActive) upsertKf(yTrackId, yTrack, uvPos[1]);
+        if (!xActive || !yActive) {
+          setBezierControl(index, [
+            xActive ? startPoint[0] : uvPos[0],
+            yActive ? startPoint[1] : uvPos[1],
+          ]);
+        }
+      } else {
+        setBezierControl(index, uvPos);
+      }
     };
 
     const onUp = () => {
       draggingBezierControlRef.current = null;
       window.removeEventListener('pointermove', onMove);
       window.removeEventListener('pointerup', onUp);
+      window.removeEventListener('pointercancel', onUp);
+      window.removeEventListener('blur', onUp);
     };
 
     window.addEventListener('pointermove', onMove);
     window.addEventListener('pointerup', onUp);
+    window.addEventListener('pointercancel', onUp);
+    window.addEventListener('blur', onUp);
   };
 
   function recordAnchorKeyframe(index: number) {
@@ -290,6 +327,38 @@ export function GradientAnchorEditor({ width, height, visible = true }: Props) {
     });
   }
 
+  function recordBezierControlKeyframe(index: 0 | 1) {
+    const state = useGradientStore.getState();
+    const nt = getKeyframeEditTime(state.currentTime, state.animation.previewLoop ?? true);
+    const control = (state.gradient.bezierControls ?? fallbackBezierControls)[index];
+    const label = `${index === 0 ? 'A' : 'B'} Control`;
+    const fields: Array<{ field: 'x' | 'y'; value: number }> = [
+      { field: 'x', value: control[0] },
+      { field: 'y', value: control[1] },
+    ];
+    fields.forEach(({ field, value }) => {
+      const trackId = `bezierControl.${index}.${field}`;
+      const existing = keyframeTracks[trackId];
+      if (existing) {
+        const nearKf = existing.keyframes.find(k => Math.abs(k.time - nt) < 1e-4);
+        if (nearKf) setKeyframe(trackId, { id: nearKf.id, value });
+        else addKeyframe(trackId, { time: nt, value, interpolation: 'linear' });
+      } else {
+        setKeyframeTracks(prev => ({
+          ...prev,
+          [trackId]: {
+            propertyId: trackId,
+            label: `${label}.${field.toUpperCase()}`,
+            group: 'Bezier Controls',
+            enabled: true,
+            mode: 'keys' as const,
+            keyframes: [{ id: crypto.randomUUID(), time: nt, value, interpolation: 'linear' as const }],
+          },
+        }));
+      }
+    });
+  }
+
   const showKfButton = animation.enabled;
 
   if (!visible) return null;
@@ -309,7 +378,7 @@ export function GradientAnchorEditor({ width, height, visible = true }: Props) {
       }) as typeof anchors;
 
   const positions = effectiveAnchors.slice(0, numAnchors).map(uvToCss);
-  const bezierControlPositions = bezierControls.map(uvToCss) as [{ x: number; y: number }, { x: number; y: number }];
+  const bezierControlPositions = effectiveBezierControls.map(uvToCss) as [{ x: number; y: number }, { x: number; y: number }];
 
   // fourcolor用の接続線ペア
   const fourColorLines: [number, number][] = [[0, 1], [0, 2], [1, 3], [2, 3]];
@@ -379,27 +448,29 @@ export function GradientAnchorEditor({ width, height, visible = true }: Props) {
         {gradientType !== 'fourcolor' ? (
           showBezierControls ? (
             <>
-              {/* ベジェ制御点へのガイド線 */}
-              <line x1={positions[0].x} y1={positions[0].y} x2={bezierControlPositions[0].x} y2={bezierControlPositions[0].y} stroke="rgba(255,255,255,0.12)" strokeWidth="1.5" strokeDasharray="3,3" />
-              <line x1={positions[0].x} y1={positions[0].y} x2={bezierControlPositions[0].x} y2={bezierControlPositions[0].y} stroke={anchorColors[0]?.fill ?? 'rgba(236,219,190,0.4)'} strokeWidth="0.75" strokeDasharray="3,3" strokeOpacity={0.45} />
-              <line x1={positions[1].x} y1={positions[1].y} x2={bezierControlPositions[1].x} y2={bezierControlPositions[1].y} stroke="rgba(255,255,255,0.12)" strokeWidth="1.5" strokeDasharray="3,3" />
-              <line x1={positions[1].x} y1={positions[1].y} x2={bezierControlPositions[1].x} y2={bezierControlPositions[1].y} stroke={anchorColors[1]?.fill ?? 'rgba(236,219,190,0.4)'} strokeWidth="0.75" strokeDasharray="3,3" strokeOpacity={0.45} />
-              {/* ベジェ曲線本体: アウトライン白 + 色付き本線 */}
-              <path d={`M ${positions[0].x} ${positions[0].y} C ${bezierControlPositions[0].x} ${bezierControlPositions[0].y}, ${bezierControlPositions[1].x} ${bezierControlPositions[1].y}, ${positions[1].x} ${positions[1].y}`} fill="none" stroke="rgba(255,255,255,0.15)" strokeWidth={snapLineColor ? 3 : 2.5} strokeDasharray="5,3" />
-              <path d={`M ${positions[0].x} ${positions[0].y} C ${bezierControlPositions[0].x} ${bezierControlPositions[0].y}, ${bezierControlPositions[1].x} ${bezierControlPositions[1].y}, ${positions[1].x} ${positions[1].y}`} fill="none" stroke={snapLineColor ?? 'url(#anchorLineGrad)'} strokeWidth="1.2" strokeDasharray="5,3" />
+              {/* ベジェ制御点へのガイド線（コントラスト付き二重線） */}
+              {[0, 1].map(side => (
+                <g key={`bezier-guide-${side}`}>
+                  <line x1={positions[side].x} y1={positions[side].y} x2={bezierControlPositions[side].x} y2={bezierControlPositions[side].y} stroke="rgba(0,0,0,.55)" strokeWidth="3.5" strokeDasharray="3,3" />
+                  <line x1={positions[side].x} y1={positions[side].y} x2={bezierControlPositions[side].x} y2={bezierControlPositions[side].y} stroke="rgba(255,255,255,.8)" strokeWidth="1.2" strokeDasharray="3,3" />
+                </g>
+              ))}
+              {/* ベジェ曲線本体: 黒アウトライン + 色付き本線 */}
+              <path d={`M ${positions[0].x} ${positions[0].y} C ${bezierControlPositions[0].x} ${bezierControlPositions[0].y}, ${bezierControlPositions[1].x} ${bezierControlPositions[1].y}, ${positions[1].x} ${positions[1].y}`} fill="none" stroke="rgba(0,0,0,.6)" strokeWidth={snapLineColor ? 5 : 4.5} strokeDasharray="5,3" strokeLinecap="round" />
+              <path d={`M ${positions[0].x} ${positions[0].y} C ${bezierControlPositions[0].x} ${bezierControlPositions[0].y}, ${bezierControlPositions[1].x} ${bezierControlPositions[1].y}, ${positions[1].x} ${positions[1].y}`} fill="none" stroke={snapLineColor ?? 'url(#anchorLineGrad)'} strokeWidth="2.4" strokeDasharray="5,3" strokeLinecap="round" />
             </>
           ) : (
             <>
-              {/* 直線: アウトライン白 + 色付き本線 */}
-              <line x1={positions[0].x} y1={positions[0].y} x2={positions[1].x} y2={positions[1].y} stroke="rgba(255,255,255,0.15)" strokeWidth={snapLineColor ? 3 : 2.5} strokeDasharray="5,3" />
-              <line x1={positions[0].x} y1={positions[0].y} x2={positions[1].x} y2={positions[1].y} stroke={snapLineColor ?? 'url(#anchorLineGrad)'} strokeWidth="1.2" strokeDasharray="5,3" />
+              {/* 直線: 黒アウトライン + 色付き本線 */}
+              <line x1={positions[0].x} y1={positions[0].y} x2={positions[1].x} y2={positions[1].y} stroke="rgba(0,0,0,.6)" strokeWidth={snapLineColor ? 5 : 4.5} strokeDasharray="5,3" strokeLinecap="round" />
+              <line x1={positions[0].x} y1={positions[0].y} x2={positions[1].x} y2={positions[1].y} stroke={snapLineColor ?? 'url(#anchorLineGrad)'} strokeWidth="2.4" strokeDasharray="5,3" strokeLinecap="round" />
             </>
           )
         ) : (
           fourColorLines.map(([a, b]) => (
             <g key={`${a}-${b}`}>
-              <line x1={positions[a].x} y1={positions[a].y} x2={positions[b].x} y2={positions[b].y} stroke="rgba(255,255,255,0.12)" strokeWidth="2" strokeDasharray="3,4" />
-              <line x1={positions[a].x} y1={positions[a].y} x2={positions[b].x} y2={positions[b].y} stroke={`url(#anchorLineGrad-${a}-${b})`} strokeWidth="1" strokeDasharray="3,4" />
+              <line x1={positions[a].x} y1={positions[a].y} x2={positions[b].x} y2={positions[b].y} stroke="rgba(0,0,0,.55)" strokeWidth="4" strokeDasharray="3,4" strokeLinecap="round" />
+              <line x1={positions[a].x} y1={positions[a].y} x2={positions[b].x} y2={positions[b].y} stroke={`url(#anchorLineGrad-${a}-${b})`} strokeWidth="2" strokeDasharray="3,4" strokeLinecap="round" />
             </g>
           ))
         )}
@@ -425,12 +496,40 @@ export function GradientAnchorEditor({ width, height, visible = true }: Props) {
               height: 14,
               background: i === 0 ? 'rgba(236,219,190,0.96)' : 'rgba(20,20,35,0.92)',
               border: `2px solid ${i === 0 ? '#F0EAD9' : '#94a3b8'}`,
-              boxShadow: '0 1px 5px rgba(0,0,0,0.55)',
+              boxShadow: '0 0 0 1.5px rgba(0,0,0,.7), 0 0 0 3px rgba(255,255,255,.2), 0 1px 5px rgba(0,0,0,0.55)',
               cursor: 'grab',
               transform: 'rotate(45deg)',
               userSelect: 'none',
             }}
           />
+          {showKfButton && (
+            <button
+              onPointerDown={e => e.stopPropagation()}
+              onClick={e => { e.stopPropagation(); recordBezierControlKeyframe(i as 0 | 1); }}
+              title={`${i === 0 ? 'A' : 'B'} Bezier Control のキーフレームを記録`}
+              style={{
+                position: 'absolute',
+                top: -12,
+                left: '50%',
+                transform: 'translateX(-50%)',
+                pointerEvents: 'auto',
+                background: 'rgba(20,20,35,0.9)',
+                border: '1px solid transparent',
+                padding: 0,
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                width: 16,
+                height: 16,
+                borderRadius: 0,
+                lineHeight: 1,
+                color: '#D11402',
+              }}
+            >
+              <Icon name="timer" style={{ fontSize: 10 }} />
+            </button>
+          )}
         </div>
       ))}
 
@@ -445,10 +544,10 @@ export function GradientAnchorEditor({ width, height, visible = true }: Props) {
           gradient.rampColorMode,
           gradient.rampMirror,
         );
-        // 選択時: 赤グロー二重リング / 非選択時: 薄いコントラスト二重アウトライン
+        // 選択時: 赤グロー二重リング / 非選択時: 黒＋輝度アウトライン
         const boxShadow = isSelected
-          ? `0 0 0 1.5px #D11402, 0 0 0 3px rgba(209,20,2,0.3), 0 0 7px rgba(209,20,2,0.45)`
-          : `0 0 0 1px ${innerBorder}55, 0 0 0 2.5px ${outerGlow}28, 0 1px 4px rgba(0,0,0,0.45)`;
+          ? `0 0 0 1px rgba(0,0,0,.75), 0 0 0 2px #D11402, 0 0 0 3.5px rgba(209,20,2,0.35), 0 0 8px rgba(209,20,2,0.5)`
+          : `0 0 0 1px rgba(0,0,0,.75), 0 0 0 2px ${innerBorder}66, 0 0 0 3.5px ${outerGlow}2E, 0 2px 5px rgba(0,0,0,0.5)`;
         const label = ['A', 'B', 'C', 'D'][i] ?? String(i);
         return (
           <div key={i} style={{ position: 'absolute', left: pos.x, top: pos.y, transform: 'translate(-50%, -50%)', zIndex: 20 }}>

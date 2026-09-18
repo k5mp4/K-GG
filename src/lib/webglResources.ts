@@ -6,6 +6,28 @@
  * remain responsible for registering successful resources and for disposing
  * their complete graph.
  */
+const targetSizes = new WeakMap<WebGLTexture, readonly [number, number]>();
+
+/** Record storage replaced by an external image upload (e.g. the Cloth canvas). */
+export function recordWebGLTargetStorage(texture: WebGLTexture, width: number, height: number): void {
+  targetSizes.set(texture, [width, height]);
+}
+
+/** Reuse storage, including its contents, until dimensions actually change. */
+export function ensureWebGLTargetStorage(
+  gl: WebGL2RenderingContext,
+  texture: WebGLTexture,
+  width: number,
+  height: number,
+): boolean {
+  const size = targetSizes.get(texture);
+  if (size?.[0] === width && size[1] === height) return false;
+  gl.bindTexture(gl.TEXTURE_2D, texture);
+  gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, width, height, 0, gl.RGBA, gl.UNSIGNED_BYTE, null);
+  recordWebGLTargetStorage(texture, width, height);
+  return true;
+}
+
 export function createWebGLTexture2D(
   gl: WebGL2RenderingContext,
   errorMessage: string,

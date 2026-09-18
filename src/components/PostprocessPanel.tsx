@@ -35,6 +35,19 @@ const KALEIDOSCOPE_TYPE_OPTIONS = [
   { value: 'flower', label: 'Flower' },
   { value: 'starlish', label: 'Starlish' },
 ];
+const GLASS_TILE_PATTERN_OPTIONS = [
+  { value: 'square', label: 'Square' },
+  { value: 'diamond', label: 'Diamond' },
+  { value: 'hexagon', label: 'Hexagon' },
+  { value: 'triangle', label: 'Triangle' },
+  { value: 'brick', label: 'Brick' },
+];
+const GLASS_TILE_EDGE_OPTIONS = [
+  { value: 'clamp', label: 'Clamp' },
+  { value: 'tile', label: 'Tile' },
+  { value: 'mirror', label: 'Mirror' },
+  { value: 'transparent', label: 'Transparent' },
+];
 const PARTICLE_EMITTER_TYPE_OPTIONS = [
   { value: 'field', label: 'Full Field' },
   { value: 'line', label: 'A-B Line' },
@@ -398,6 +411,7 @@ export function PostprocessPanel({ sandboxMode, embedded = false }: PostprocessP
             { value: 'kaleidoscope', label: 'Kaleidoscope' },
             { value: 'voronoi', label: 'Voronoi' },
             { value: 'glassV2', label: 'Glass' },
+            { value: 'glassTile', label: 'GlassTile' },
           ]}
           onChange={(value) => setEffectMode(value as typeof postprocess.effectMode)}
         />
@@ -676,6 +690,140 @@ export function PostprocessPanel({ sandboxMode, embedded = false }: PostprocessP
                 onChange={(v) => setPostprocess({ voronoiSeed: Math.round(v) })}
                 defaultValue={STORE_DEFAULTS.postprocess.voronoiSeed}
               />
+            </div>
+          ) : activeEffectMode === 'glassTile' ? (
+            <div className="space-y-4">
+              <p className="text-[10px] leading-relaxed text-tab-inactive">
+                KG_Glassのタイル表面モデルを、Effect Stack用の独立したGlassTileとして適用します。タイル輸出でも模様の位相を維持します。
+              </p>
+              <PostprocessControlGroup title="Pattern">
+                <CustomSelect
+                  label="Pattern"
+                  value={postprocess.glassTilePattern}
+                  options={GLASS_TILE_PATTERN_OPTIONS}
+                  onChange={(value) => setPostprocess({ glassTilePattern: value as typeof postprocess.glassTilePattern })}
+                />
+                <SliderField
+                  label="Tile Size"
+                  min={4}
+                  max={4096}
+                  step={1}
+                  value={postprocess.glassTileSize}
+                  onChange={(v) => setPostprocess({ glassTileSize: Math.round(v) })}
+                  format={(v) => `${Math.round(v)}px`}
+                  defaultValue={STORE_DEFAULTS.postprocess.glassTileSize}
+                />
+                <SliderField
+                  label="Bevel"
+                  min={0.01}
+                  max={0.5}
+                  step={0.01}
+                  value={postprocess.glassTileBevel}
+                  onChange={(v) => setPostprocess({ glassTileBevel: v })}
+                  format={(v) => `${Math.round(v * 100)}%`}
+                  defaultValue={STORE_DEFAULTS.postprocess.glassTileBevel}
+                />
+                <SliderField
+                  label="Surface Height"
+                  min={0}
+                  max={1}
+                  step={0.01}
+                  value={postprocess.glassTileSurfaceHeight}
+                  onChange={(v) => setPostprocess({ glassTileSurfaceHeight: v })}
+                  format={(v) => `${Math.round(v * 100)}%`}
+                  defaultValue={STORE_DEFAULTS.postprocess.glassTileSurfaceHeight}
+                />
+                <SliderField
+                  label="Curvature"
+                  min={0}
+                  max={1}
+                  step={0.01}
+                  value={postprocess.glassTileCurvature}
+                  onChange={(v) => setPostprocess({ glassTileCurvature: v })}
+                  format={(v) => `${Math.round(v * 100)}%`}
+                  defaultValue={STORE_DEFAULTS.postprocess.glassTileCurvature}
+                />
+                <SliderField
+                  label="Detail Scale"
+                  min={0.1}
+                  max={16}
+                  step={0.1}
+                  value={postprocess.glassTileDetailScale}
+                  onChange={(v) => setPostprocess({ glassTileDetailScale: v })}
+                  format={(v) => v.toFixed(1)}
+                  defaultValue={STORE_DEFAULTS.postprocess.glassTileDetailScale}
+                />
+                <SliderField
+                  label="Rotation"
+                  min={-180}
+                  max={180}
+                  step={1}
+                  value={postprocess.glassTileRotation}
+                  onChange={(v) => setPostprocess({ glassTileRotation: v })}
+                  format={(v) => `${Math.round(v)}°`}
+                  defaultValue={STORE_DEFAULTS.postprocess.glassTileRotation}
+                  control="angle"
+                />
+              </PostprocessControlGroup>
+
+              <PostprocessControlGroup title="Optics">
+                <SliderField
+                  label="Refraction"
+                  min={0}
+                  max={256}
+                  step={0.5}
+                  value={postprocess.glassTileRefraction}
+                  onChange={(v) => setPostprocess({ glassTileRefraction: v })}
+                  format={(v) => `${v.toFixed(1)}px`}
+                  defaultValue={STORE_DEFAULTS.postprocess.glassTileRefraction}
+                />
+                <SliderField
+                  label="Dispersion"
+                  min={0}
+                  max={1}
+                  step={0.01}
+                  value={postprocess.glassTileDispersion}
+                  onChange={(v) => setPostprocess({ glassTileDispersion: v })}
+                  format={(v) => `${Math.round(v * 100)}%`}
+                  defaultValue={STORE_DEFAULTS.postprocess.glassTileDispersion}
+                />
+                <SliderField
+                  label="Roughness"
+                  min={0}
+                  max={1}
+                  step={0.01}
+                  value={postprocess.glassTileRoughness}
+                  onChange={(v) => setPostprocess({ glassTileRoughness: v })}
+                  format={(v) => `${Math.round(v * 100)}%`}
+                  defaultValue={STORE_DEFAULTS.postprocess.glassTileRoughness}
+                />
+                <SliderField
+                  label="Mix"
+                  min={0}
+                  max={1}
+                  step={0.01}
+                  value={postprocess.glassTileMix}
+                  onChange={(v) => setPostprocess({ glassTileMix: v })}
+                  format={(v) => `${Math.round(v * 100)}%`}
+                  defaultValue={STORE_DEFAULTS.postprocess.glassTileMix}
+                />
+                <CustomSelect
+                  label="Edge Mode"
+                  value={postprocess.glassTileEdgeMode}
+                  options={GLASS_TILE_EDGE_OPTIONS}
+                  onChange={(value) => setPostprocess({ glassTileEdgeMode: value as typeof postprocess.glassTileEdgeMode })}
+                />
+                <SliderField
+                  label="Seed"
+                  min={0}
+                  max={1000000}
+                  step={1}
+                  value={postprocess.glassTileSeed}
+                  onChange={(v) => setPostprocess({ glassTileSeed: Math.round(v) })}
+                  format={(v) => `${Math.round(v).toLocaleString()}`}
+                  defaultValue={STORE_DEFAULTS.postprocess.glassTileSeed}
+                />
+              </PostprocessControlGroup>
             </div>
           ) : activeEffectMode === 'glassV2' ? (
             <div className="space-y-4">

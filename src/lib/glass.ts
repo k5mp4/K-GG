@@ -1,6 +1,7 @@
 import type { EffectPipelineConfig, PostprocessConfig } from '../types/distortion';
 import { isPostprocessLayerEnabled } from './postprocessStack';
 import { isEffectStackLayerEnabled } from './effectPipeline';
+import { getGlassTileSamplePadding } from './glassTile';
 
 export const GLASS_LIMITS = {
   refraction: 120,
@@ -177,18 +178,18 @@ export function getPostprocessStackSamplePadding(
     : postprocess?.enabled && postprocess
       ? Number(isPostprocessLayerEnabled(postprocess, 'glassV2'))
       : 0;
-  if (activeGlassLayerCount === 0 || !postprocess || isGlassOpticallyIdentity(postprocess)) {
-    return 0;
-  }
-
-  const params = normalizeGlassRenderParameters(postprocess);
-  const perLayerPadding = Math.ceil(
-    params.refraction + params.chromaticAberration + params.roughness,
-  ) + 2;
-  // Consecutive sampling layers expand the source dependency radius. Reserve
-  // The normalized Effect Stack contains one V2-backed Glass layer, so its
-  // dependency radius is reserved exactly once.
-  return perLayerPadding * activeGlassLayerCount;
+  const glassPadding = activeGlassLayerCount === 0 || !postprocess || isGlassOpticallyIdentity(postprocess)
+    ? 0
+    : (() => {
+        const params = normalizeGlassRenderParameters(postprocess);
+        const perLayerPadding = Math.ceil(
+          params.refraction + params.chromaticAberration + params.roughness,
+        ) + 2;
+        // The normalized Effect Stack contains one V2-backed Glass layer, so
+        // its dependency radius is reserved exactly once.
+        return perLayerPadding * activeGlassLayerCount;
+      })();
+  return glassPadding + getGlassTileSamplePadding(postprocess, effectPipeline);
 }
 
 export const getGlassSamplePadding = getPostprocessStackSamplePadding;

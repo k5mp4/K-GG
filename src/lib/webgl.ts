@@ -36,8 +36,9 @@ import {
   normalizeGlassRenderParameters,
   normalizeGlassV2ColorParameters,
 } from './glass';
+import { isGlassTileOpticallyIdentity, normalizeGlassTileRenderParameters } from './glassTile';
 import { getActivePostprocessStackLayers } from './postprocessStack';
-import { getSceneRenderPlan, getSceneRenderPlanInput } from './sceneRenderPlan';
+import { getSceneRenderPlan, getSceneRenderPlanInput, getRequiredSceneProgramKeys } from './sceneRenderPlan';
 import { buildDiffuseBezierLut, normalizeDiffuseBezier } from './diffuseCurve';
 import { buildMeshGradientField, MESH_FIELD_SIZE, MESH_FIELD_SUBDIVISIONS } from './meshGradientField';
 import { noiseAngleDegreesForShader, noiseAngleRadiansForShader } from './noiseAngle';
@@ -61,7 +62,13 @@ import {
 import type { PerformanceSnapshot } from '../types/webglPerformance';
 import { createWebGL2Context, WebGL2UnavailableError } from './webglCapability';
 import type { TileRenderOptions } from '../types/rendering';
-import { createWebGLFramebufferWithTexture, createWebGLTexture2D } from './webglResources';
+import { createWebGLFramebufferWithTexture, createWebGLTexture2D, ensureWebGLTargetStorage, recordWebGLTargetStorage } from './webglResources';
+import {
+  CORE_RENDER_TARGETS,
+  FULL_RENDER_TARGETS,
+  type RenderPlanFallbackProgram,
+  type RenderTargetKey,
+} from './effectPipeline';
 import { installWebGLResourceLedger, type WebGLResourceLedger } from './webglResourceLedger';
 
 export type { TileRenderOptions } from '../types/rendering';
@@ -189,6 +196,9 @@ export type WebGLContext = {
   glassV2Program: WebGLProgram | null;
   glassV2Uniforms: Record<string, WebGLUniformLocation | null>;
   glassV2FallbackActive: boolean;
+  glassTileProgram: WebGLProgram | null;
+  glassTileUniforms: Record<string, WebGLUniformLocation | null>;
+  glassTileFallbackActive: boolean;
   prismProgram: WebGLProgram | null;
   prismUniforms: Record<string, WebGLUniformLocation | null>;
   prismCompositeProgram: WebGLProgram | null;
@@ -215,8 +225,6 @@ export type WebGLContext = {
   prismBlurTexture: WebGLTexture;
   prismGlowFbo: WebGLFramebuffer;
   prismGlowTexture: WebGLTexture;
-  fboSize: [number, number];        // 現在の FBO テクスチャサイズ
-  v2CoreFboSize: [number, number];
   shaderCompileExt: ShaderCompileExt;
   lazyProgramState: Record<LazyProgramKey, LazyProgramState>;
   lazyProgramCompileQueue: SerialAsyncQueue;
@@ -239,6 +247,19 @@ type EffectStackTransitionResources = {
 };
 
 const effectStackTransitionResources = new WeakMap<WebGLContext, EffectStackTransitionResources>();
+type GradientRampStopSnapshot = { position: number; color: string };
+type GradientRampOpacityStopSnapshot = { position: number; opacity: number };
+type GradientRampCache = {
+  data: Uint8Array;
+  stops: readonly GradientRampStopSnapshot[];
+  opacityStops: readonly GradientRampOpacityStopSnapshot[];
+  rampInterpolation: GradientConfig['rampInterpolation'];
+  rampMirror: boolean;
+  rampColorMode: GradientConfig['rampColorMode'];
+  rampVariable: number;
+  rampRepeat: number;
+};
+const gradientRampCache = new WeakMap<WebGLContext, GradientRampCache>();
 const registeredWebGLContexts = new WeakMap<HTMLCanvasElement, WebGL2RenderingContext>();
 const webglLifecycleHandlers = new WeakMap<HTMLCanvasElement, {
   lost: (event: Event) => void;
@@ -346,6 +367,7 @@ export async function initWebGL(canvas: HTMLCanvasElement): Promise<WebGLContext
   registeredWebGLContexts.set(canvas, gl);
   const performanceProfiler = createWebGLPerformanceProfiler(gl, developmentTools);
   const previousLifecycleHandlers = webglLifecycleHandlers.get(canvas);
+  let initializedContext: WebGLContext | null = null;
   if (previousLifecycleHandlers) {
     canvas.removeEventListener('webglcontextlost', previousLifecycleHandlers.lost);
     canvas.removeEventListener('webglcontextrestored', previousLifecycleHandlers.restored);
@@ -356,6 +378,9 @@ export async function initWebGL(canvas: HTMLCanvasElement): Promise<WebGLContext
     if (resourceLedger) recordWebGLResourceLifecycleEvent('context-lost', resourceLedger);
     const contextEvent = event as WebGLContextEvent;
     console.warn('[WebGL context] lost', { statusMessage: contextEvent.statusMessage });
+    // Applies to every raw-WebGL owner, including the hidden thumbnail.
+    // UI coordinators may also dispose; disposal is deliberately idempotent.
+    if (initializedContext) disposeWebGL(initializedContext);
   };
   const handleContextRestored = () => {
     resourceLedger?.markContextRestored();
@@ -421,15 +446,13 @@ export async function initWebGL(canvas: HTMLCanvasElement): Promise<WebGLContext
   try {
 
   // WebGL テクスチャサイズ制限を確認（デバッグ用）
-  const maxTextureSize = gl.getParameter(gl.MAX_TEXTURE_SIZE);
-  const maxRenderbufferSize = gl.getParameter(gl.MAX_RENDERBUFFER_SIZE);
-  const maxViewportDims = gl.getParameter(gl.MAX_VIEWPORT_DIMS);
   const canvasWidth = canvas.width;
   const canvasHeight = canvas.height;
   const dbW = gl.drawingBufferWidth;
   const dbH = gl.drawingBufferHeight;
   const clamped = dbW !== canvasWidth || dbH !== canvasHeight;
   const gpuDiagnostics = await collectGpuDiagnostics(gl);
+  const { maxTextureSize, maxRenderbufferSize, maxViewportDims } = gpuDiagnostics.webgl;
   if (gl.isContextLost()) throw new Error('WebGL context was lost during initialization');
   const renderOptimization = gpuDiagnostics.optimization;
 
@@ -466,8 +489,6 @@ export async function initWebGL(canvas: HTMLCanvasElement): Promise<WebGLContext
     ext,
     performanceProfiler?.getSnapshot(),
   );
-  // 浮動小数点テクスチャのリニアフィルタリング用拡張 (RGBA32F distortion map)
-  getSafeWebGLExtension(gl, 'OES_texture_float_linear');
   // 初期表示はメインのグラデーションプログラムだけを待つ。
   // 補助プログラムは init 完了後に順次コンパイルし、最初のグラデーション表示を早める。
   const initialSource = getInitialProgramSource();
@@ -726,7 +747,8 @@ export async function initWebGL(canvas: HTMLCanvasElement): Promise<WebGLContext
   ownedFlowGradient = flowGradient;
   const transitionTextureFrom = ownTexture(createTexture(gl));
   const transitionTextureTo = ownTexture(createTexture(gl));
-  const ctx: WebGLContext = { gl, performanceProfiler, gpuDiagnostics, renderOptimization, program, uniforms, geometryBuffer, transitionGeometryBuffer, generatorProgram: null, generatorUniforms: {}, gradientRampTexture, meshGradientTexture, meshGradientTextureSignature: '', diffuseCurveTexture, diffuseCurveSignature: '', diffuseAsciiTexture, diffuseAsciiSignature: '', diffuseAsciiCount: 1, diffuseAsciiRows: ASCII_ATLAS_MAX_ROWS, diffuseHistogramAt: 0, manualDistortTexture, manualDistortDisplacement: null, manualDistortSmoothMask: null, manualDistortMapResolution: 0, sourceImageTexture, sourceImageCanvas: null, imageGradientTexture, imageGradientSource: null, imageMaskTexture, imageMaskSource: null, normalMapProgram: null, normalMapUniforms: {}, gradFbo, gradTexture, blurProgram: null, blurUniforms: {}, stretchProgram: null, stretchUniforms: {}, seamlessProgram: null, seamlessUniforms: {}, stackCoreProgram: null, stackCoreUniforms: {}, noiseStackProgram: null, noiseStackUniforms: {}, noiseDiffuseStackProgram: null, noiseDiffuseStackUniforms: {}, glassProgram: null, glassUniforms: {}, glassFallbackActive: false, glassV2Program: null, glassV2Uniforms: {}, glassV2FallbackActive: false, prismProgram: null, prismUniforms: {}, postprocessProgram: null, postprocessUniforms: {}, prismCompositeProgram: null, prismCompositeUniforms: {}, particleProgram: null, particleUniforms: {}, particleVao: null, particleQuadBuffer: null, particleInstanceBuffer: null, particleInstanceCount: 0, particleInstanceSeed: Number.NaN, flowGradient, normalFbo, normalTexture, hBlurFbo, hBlurTexture, postprocessFboA, postprocessTextureA, postprocessFboB, postprocessTextureB, prismScratchFbo, prismScratchTexture, prismBlurFbo, prismBlurTexture, prismGlowFbo, prismGlowTexture, fboSize: [0, 0], v2CoreFboSize: [0, 0], shaderCompileExt, lazyProgramState: createLazyProgramState(), lazyProgramCompileQueue: createSerialAsyncQueue(), resourceLedger, hasPresentedFrame: false, disposed: false };
+  const ctx: WebGLContext = { gl, performanceProfiler, gpuDiagnostics, renderOptimization, program, uniforms, geometryBuffer, transitionGeometryBuffer, generatorProgram: null, generatorUniforms: {}, gradientRampTexture, meshGradientTexture, meshGradientTextureSignature: '', diffuseCurveTexture, diffuseCurveSignature: '', diffuseAsciiTexture, diffuseAsciiSignature: '', diffuseAsciiCount: 1, diffuseAsciiRows: ASCII_ATLAS_MAX_ROWS, diffuseHistogramAt: 0, manualDistortTexture, manualDistortDisplacement: null, manualDistortSmoothMask: null, manualDistortMapResolution: 0, sourceImageTexture, sourceImageCanvas: null, imageGradientTexture, imageGradientSource: null, imageMaskTexture, imageMaskSource: null, normalMapProgram: null, normalMapUniforms: {}, gradFbo, gradTexture, blurProgram: null, blurUniforms: {}, stretchProgram: null, stretchUniforms: {}, seamlessProgram: null, seamlessUniforms: {}, stackCoreProgram: null, stackCoreUniforms: {}, noiseStackProgram: null, noiseStackUniforms: {}, noiseDiffuseStackProgram: null, noiseDiffuseStackUniforms: {}, glassProgram: null, glassUniforms: {}, glassFallbackActive: false, glassV2Program: null, glassV2Uniforms: {}, glassV2FallbackActive: false, glassTileProgram: null, glassTileUniforms: {}, glassTileFallbackActive: false, prismProgram: null, prismUniforms: {}, postprocessProgram: null, postprocessUniforms: {}, prismCompositeProgram: null, prismCompositeUniforms: {}, particleProgram: null, particleUniforms: {}, particleVao: null, particleQuadBuffer: null, particleInstanceBuffer: null, particleInstanceCount: 0, particleInstanceSeed: Number.NaN, flowGradient, normalFbo, normalTexture, hBlurFbo, hBlurTexture, postprocessFboA, postprocessTextureA, postprocessFboB, postprocessTextureB, prismScratchFbo, prismScratchTexture, prismBlurFbo, prismBlurTexture, prismGlowFbo, prismGlowTexture, shaderCompileExt, lazyProgramState: createLazyProgramState(), lazyProgramCompileQueue: createSerialAsyncQueue(), resourceLedger, hasPresentedFrame: false, disposed: false };
+  initializedContext = ctx;
   effectStackTransitionResources.set(ctx, {
     program: transitionProgram,
     from: gl.getUniformLocation(transitionProgram, 'u_transitionFrom'),
@@ -766,6 +788,7 @@ export function disposeWebGL(ctx: WebGLContext): void {
   }
 
   ctx.performanceProfiler?.dispose();
+  gradientRampCache.delete(ctx);
 
   const transition = effectStackTransitionResources.get(ctx);
   if (transition) {
@@ -788,6 +811,7 @@ export function disposeWebGL(ctx: WebGLContext): void {
     ctx.noiseDiffuseStackProgram,
     ctx.glassProgram,
     ctx.glassV2Program,
+    ctx.glassTileProgram,
     ctx.prismProgram,
     ctx.prismCompositeProgram,
     ctx.particleProgram,
@@ -966,6 +990,7 @@ function createLazyProgramState(): Record<LazyProgramKey, LazyProgramState> {
     noiseDiffuseStack: { promise: null, failed: false, timedOut: false, fallback: false },
     glass: { promise: null, failed: false, timedOut: false, fallback: false },
     glassV2: { promise: null, failed: false, timedOut: false, fallback: false },
+    glassTile: { promise: null, failed: false, timedOut: false, fallback: false },
     prism: { promise: null, failed: false, timedOut: false, fallback: false },
     postprocess: { promise: null, failed: false, timedOut: false, fallback: false },
     prismComposite: { promise: null, failed: false, timedOut: false, fallback: false },
@@ -1190,7 +1215,7 @@ async function compileLazyProgram(ctx: WebGLContext, key: LazyProgramKey): Promi
       shaderCompileExt,
       source.vertex,
       key,
-      key === 'glass' || key === 'glassV2'
+      key === 'glass' || key === 'glassV2' || key === 'glassTile'
         ? GLASS_PARALLEL_SHADER_COMPILE_TIMEOUT_MS
         : PARALLEL_SHADER_COMPILE_TIMEOUT_MS,
       () => ctx.disposed,
@@ -1264,6 +1289,10 @@ function installLazyProgram(ctx: WebGLContext, key: LazyProgramKey, program: Web
     const uniforms = getPostprocessUniforms(gl, program);
     ctx.glassV2Program = program;
     ctx.glassV2Uniforms = uniforms;
+  } else if (key === 'glassTile') {
+    const uniforms = getPostprocessUniforms(gl, program);
+    ctx.glassTileProgram = program;
+    ctx.glassTileUniforms = uniforms;
   } else if (key === 'prism') {
     const uniforms = getPostprocessUniforms(gl, program);
     ctx.prismProgram = program;
@@ -1323,7 +1352,7 @@ function requestLazyProgram(ctx: WebGLContext, key: LazyProgramKey): boolean {
   return false;
 }
 
-function requestNoiseStackProgram(ctx: WebGLContext): boolean {
+function requestNoiseStackProgram(ctx: WebGLContext, fallbackProgram: 'postprocess' = 'postprocess'): boolean {
   if (lazyProgramReady(ctx, 'noiseStack')) return true;
 
   const noiseState = ctx.lazyProgramState.noiseStack;
@@ -1332,7 +1361,7 @@ function requestNoiseStackProgram(ctx: WebGLContext): boolean {
   // stack shader was rejected by a driver or a transient WebGL instrumentation
   // wrapper, keep the Effect Stack usable by switching to that implementation
   // instead of leaving the row permanently in an unavailable state.
-  const fallbackReady = requestLazyProgram(ctx, 'postprocess');
+  const fallbackReady = requestLazyProgram(ctx, fallbackProgram);
   if (!fallbackReady) return false;
   if (!noiseState.fallback) {
     noiseState.fallback = true;
@@ -1341,6 +1370,16 @@ function requestNoiseStackProgram(ctx: WebGLContext): boolean {
     }));
   }
   return true;
+}
+
+function requestPlanFallbackProgram(
+  ctx: WebGLContext,
+  target: RenderPlanFallbackProgram,
+  noiseStackFallback: 'postprocess',
+): boolean {
+  return target === 'noiseStack'
+    ? requestNoiseStackProgram(ctx, noiseStackFallback)
+    : requestLazyProgram(ctx, target);
 }
 
 function markNoiseDiffuseStackFallback(ctx: WebGLContext): void {
@@ -1364,6 +1403,7 @@ function lazyProgramReady(ctx: WebGLContext, key: LazyProgramKey): boolean {
     noiseDiffuseStack: [ctx.noiseDiffuseStackProgram, ctx.noiseDiffuseStackUniforms],
     glass: [ctx.glassProgram, ctx.glassUniforms],
     glassV2: [ctx.glassV2Program, ctx.glassV2Uniforms],
+    glassTile: [ctx.glassTileProgram, ctx.glassTileUniforms],
     prism: [ctx.prismProgram, ctx.prismUniforms],
     postprocess: [ctx.postprocessProgram, ctx.postprocessUniforms],
     prismComposite: [ctx.prismCompositeProgram, ctx.prismCompositeUniforms],
@@ -1419,61 +1459,12 @@ export async function prepareExportPrograms(
   state: LatestState,
   signal?: AbortSignal,
 ): Promise<void> {
-  const required = getRequiredExportProgramKeys(state);
+  const required = getRequiredSceneProgramKeys(state);
   for (const key of required) await waitForLazyProgram(ctx, key, signal);
 }
 
-export function getRequiredExportProgramKeys(state: LatestState): LazyProgramKey[] {
-  const required: LazyProgramKey[] = [];
-  const add = (key: LazyProgramKey, needed: boolean) => {
-    if (needed && !required.includes(key)) required.push(key);
-  };
-  const imageGradientProtected = state.imageGradient.enabled && Boolean(state.imageGradientSource);
-
-  if (state.effectPipeline.version === 'stack-v2') {
-    const plan = getSceneRenderPlan(getSceneRenderPlanInput(state, {
-      imageGradientEnabled: imageGradientProtected,
-    }));
-    if (!plan) return required;
-    const protectedStipple = imageGradientProtected
-      && state.diffuse.mode === 'legacy'
-      && plan.diffuseEnabled;
-    add('generator', imageGradientProtected || plan.analyticPrefix.enabled);
-    add('stackCore', (!imageGradientProtected || protectedStipple) && plan.programs.stackCore);
-    add('noiseStack', !imageGradientProtected && plan.programs.noiseStack);
-    add('noiseDiffuseStack', !imageGradientProtected && plan.programs.noiseDiffuseStack);
-    add('glassV2', !imageGradientProtected && plan.programs.glassV2 && !isGlassOpticallyIdentity(state.postprocess));
-    add('normalMap', plan.programs.normalMap);
-    add('blur', plan.programs.blur);
-    add('stretch', !imageGradientProtected && plan.programs.stretch);
-    add('prism', plan.programs.prism);
-    add('prismComposite', plan.programs.prismComposite);
-    add('particles', plan.programs.particles);
-  } else {
-    const layers = getActivePostprocessStackLayers(state.postprocess).filter(layer => (
-      (layer.kind !== 'glass' && layer.kind !== 'glassV2') || !isGlassOpticallyIdentity(state.postprocess)
-    ));
-    const postprocessRequested = state.postprocess.enabled && layers.length > 0;
-    const prismRequested = postprocessRequested && layers.some(layer => layer.kind === 'prism');
-    const normalRequested = state.normalMap.enabled && !state.diffuse.enabled;
-    add('generator', true);
-    add('normalMap', normalRequested);
-    add('blur', (normalRequested && state.normalMap.blur >= 0.5)
-      || (prismRequested && (state.postprocess.prismGlowRadius ?? 0) > 0.01));
-    add('stretch', state.stretch.enabled);
-    add('postprocess', postprocessRequested);
-    add('prismComposite', prismRequested);
-    add('particles', state.postprocess.enabled && state.postprocess.effectMode === 'particles');
-  }
-
-  add('seamless', state.seamless?.enabled ?? false);
-  const flowGradientEnabled = state.effectPipeline.flowGradientEnabled === true;
-  add('flowSplat', flowGradientEnabled);
-  add('flowTrail', flowGradientEnabled);
-  add('flowComposite', flowGradientEnabled);
-
-  return required;
-}
+// Compatibility export: program selection belongs to the pure scene plan.
+export { getRequiredSceneProgramKeys as getRequiredExportProgramKeys } from './sceneRenderPlan';
 
 /**
  * GLASS is allowed to fall back to the general postprocess program when the
@@ -1481,8 +1472,16 @@ export function getRequiredExportProgramKeys(state: LatestState): LazyProgramKey
  * The fallback is still lazy, so the rest of the stack remains usable while
  * it is compiling.
  */
-function requestGlassProgram(ctx: WebGLContext, key: 'glass' | 'glassV2'): boolean {
-  const dedicatedProgram = key === 'glass' ? ctx.glassProgram : ctx.glassV2Program;
+function requestGlassProgram(
+  ctx: WebGLContext,
+  key: 'glass' | 'glassV2' | 'glassTile',
+  fallbackProgram: 'postprocess' = 'postprocess',
+): boolean {
+  const dedicatedProgram = key === 'glass'
+    ? ctx.glassProgram
+    : key === 'glassV2'
+      ? ctx.glassV2Program
+      : ctx.glassTileProgram;
   if (dedicatedProgram) return true;
 
   const glassState = ctx.lazyProgramState[key];
@@ -1491,13 +1490,18 @@ function requestGlassProgram(ctx: WebGLContext, key: 'glass' | 'glassV2'): boole
   // immediately requesting the larger fallback can reproduce the same stall.
   if (glassState.timedOut) return false;
 
-  const fallbackReady = requestLazyProgram(ctx, 'postprocess');
+  const fallbackReady = requestLazyProgram(ctx, fallbackProgram);
   if (!fallbackReady) return false;
 
-  const fallbackActive = key === 'glass' ? ctx.glassFallbackActive : ctx.glassV2FallbackActive;
+  const fallbackActive = key === 'glass'
+    ? ctx.glassFallbackActive
+    : key === 'glassV2'
+      ? ctx.glassV2FallbackActive
+      : ctx.glassTileFallbackActive;
   if (!fallbackActive) {
     if (key === 'glass') ctx.glassFallbackActive = true;
-    else ctx.glassV2FallbackActive = true;
+    else if (key === 'glassV2') ctx.glassV2FallbackActive = true;
+    else ctx.glassTileFallbackActive = true;
     window.dispatchEvent(new CustomEvent('kgg:webgl-lazy-program-state', {
       detail: { key, state: 'fallback' as const, fallback: true },
     }));
@@ -1656,58 +1660,28 @@ function reportIncompleteFramebuffer(
   }
 }
 
-function reportFramebufferSet(ctx: WebGLContext, includeFullSet: boolean): void {
+const RENDER_TARGET_FIELDS = {
+  gradient: ['gradTexture', 'gradFbo'],
+  postprocessA: ['postprocessTextureA', 'postprocessFboA'],
+  postprocessB: ['postprocessTextureB', 'postprocessFboB'],
+  normal: ['normalTexture', 'normalFbo'],
+  horizontalBlur: ['hBlurTexture', 'hBlurFbo'],
+  prismScratch: ['prismScratchTexture', 'prismScratchFbo'],
+  prismBlur: ['prismBlurTexture', 'prismBlurFbo'],
+  prismGlow: ['prismGlowTexture', 'prismGlowFbo'],
+} as const satisfies Record<RenderTargetKey, readonly [keyof WebGLContext, keyof WebGLContext]>;
+
+function ensureRenderTargets(ctx: WebGLContext, targets: readonly RenderTargetKey[], width: number, height: number): void {
   const { gl } = ctx;
-  const entries: Array<[string, WebGLFramebuffer]> = [
-    ['gradient', ctx.gradFbo],
-    ['postprocess-a', ctx.postprocessFboA],
-    ['postprocess-b', ctx.postprocessFboB],
-  ];
-  if (includeFullSet) {
-    entries.push(
-      ['normal', ctx.normalFbo],
-      ['horizontal-blur', ctx.hBlurFbo],
-      ['prism-scratch', ctx.prismScratchFbo],
-      ['prism-blur', ctx.prismBlurFbo],
-      ['prism-glow', ctx.prismGlowFbo],
-    );
+  let resized = false;
+  for (const key of targets) {
+    const [texture, framebuffer] = RENDER_TARGET_FIELDS[key];
+    if (ensureWebGLTargetStorage(gl, ctx[texture], width, height)) {
+      resized = true;
+      reportIncompleteFramebuffer(gl, key, ctx[framebuffer]);
+    }
   }
-  for (const [label, framebuffer] of entries) {
-    reportIncompleteFramebuffer(gl, label, framebuffer);
-  }
-}
-
-function resizeFboTextures(gl: WebGL2RenderingContext, ctx: WebGLContext, width: number, height: number): void {
-  gl.bindTexture(gl.TEXTURE_2D, ctx.gradTexture);
-  gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, width, height, 0, gl.RGBA, gl.UNSIGNED_BYTE, null);
-  gl.bindTexture(gl.TEXTURE_2D, ctx.normalTexture);
-  gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, width, height, 0, gl.RGBA, gl.UNSIGNED_BYTE, null);
-  gl.bindTexture(gl.TEXTURE_2D, ctx.hBlurTexture);
-  gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, width, height, 0, gl.RGBA, gl.UNSIGNED_BYTE, null);
-  gl.bindTexture(gl.TEXTURE_2D, ctx.postprocessTextureA);
-  gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, width, height, 0, gl.RGBA, gl.UNSIGNED_BYTE, null);
-  gl.bindTexture(gl.TEXTURE_2D, ctx.postprocessTextureB);
-  gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, width, height, 0, gl.RGBA, gl.UNSIGNED_BYTE, null);
-  gl.bindTexture(gl.TEXTURE_2D, ctx.prismScratchTexture);
-  gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, width, height, 0, gl.RGBA, gl.UNSIGNED_BYTE, null);
-  gl.bindTexture(gl.TEXTURE_2D, ctx.prismBlurTexture);
-  gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, width, height, 0, gl.RGBA, gl.UNSIGNED_BYTE, null);
-  gl.bindTexture(gl.TEXTURE_2D, ctx.prismGlowTexture);
-  gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, width, height, 0, gl.RGBA, gl.UNSIGNED_BYTE, null);
-  gl.bindTexture(gl.TEXTURE_2D, null);
-  ctx.fboSize = [width, height];
-  ctx.v2CoreFboSize = [width, height];
-  reportFramebufferSet(ctx, true);
-}
-
-function resizeV2CoreFboTextures(gl: WebGL2RenderingContext, ctx: WebGLContext, width: number, height: number): void {
-  for (const texture of [ctx.gradTexture, ctx.postprocessTextureA, ctx.postprocessTextureB]) {
-    gl.bindTexture(gl.TEXTURE_2D, texture);
-    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, width, height, 0, gl.RGBA, gl.UNSIGNED_BYTE, null);
-  }
-  gl.bindTexture(gl.TEXTURE_2D, null);
-  ctx.v2CoreFboSize = [width, height];
-  reportFramebufferSet(ctx, false);
+  if (resized) gl.bindTexture(gl.TEXTURE_2D, null);
 }
 
 export function hexToRgb(hex: string): [number, number, number] {
@@ -1752,13 +1726,11 @@ export function applyMeshGradientUniforms(
   setPoint('u_meshTopCp1', mesh.handles.top[1]);
   setPoint('u_meshLeftCp0', mesh.handles.left[0]);
   setPoint('u_meshLeftCp1', mesh.handles.left[1]);
-  gl.uniform4f(
-    uniforms.u_meshColorPositions,
-    mesh.colorPositions[0],
-    mesh.colorPositions[1],
-    mesh.colorPositions[2],
-    mesh.colorPositions[3],
-  );
+  // Legacy corner ramp positions were removed from the data model. The mesh is
+  // colored either by the shared ramp (projected along v) or by per-point
+  // direct colors baked into the field texture, so these uniforms are unused
+  // by the shader. Send a neutral value to keep the legacy location valid.
+  gl.uniform4f(uniforms.u_meshColorPositions, 0, 1 / 3, 2 / 3, 1);
 }
 
 function buildGradientRampData(gradient: GradientConfig): Uint8Array {
@@ -1771,6 +1743,54 @@ function buildGradientRampData(gradient: GradientConfig): Uint8Array {
     gradient.rampVariable ?? 0,
     gradient.rampRepeat ?? 1,
   );
+}
+
+function gradientRampCacheMatches(cache: GradientRampCache, gradient: GradientConfig): boolean {
+  if (
+    cache.rampInterpolation !== gradient.rampInterpolation
+    || cache.rampMirror !== (gradient.rampMirror ?? false)
+    || cache.rampColorMode !== gradient.rampColorMode
+    || cache.rampVariable !== (gradient.rampVariable ?? 0)
+    || cache.rampRepeat !== (gradient.rampRepeat ?? 1)
+    || cache.stops.length !== gradient.stops.length
+    || cache.opacityStops.length !== (gradient.opacityStops?.length ?? 0)
+  ) return false;
+
+  for (let index = 0; index < gradient.stops.length; index += 1) {
+    const current = gradient.stops[index];
+    const previous = cache.stops[index];
+    if (current.position !== previous.position || current.color !== previous.color) return false;
+  }
+  for (let index = 0; index < (gradient.opacityStops?.length ?? 0); index += 1) {
+    const current = gradient.opacityStops?.[index];
+    const previous = cache.opacityStops[index];
+    if (!current || current.position !== previous.position || current.opacity !== previous.opacity) return false;
+  }
+  return true;
+}
+
+function createGradientRampCache(gradient: GradientConfig, data: Uint8Array): GradientRampCache {
+  return {
+    data,
+    stops: gradient.stops.map(stop => ({ position: stop.position, color: stop.color })),
+    opacityStops: gradient.opacityStops?.map(stop => ({ position: stop.position, opacity: stop.opacity })) ?? [],
+    rampInterpolation: gradient.rampInterpolation,
+    rampMirror: gradient.rampMirror ?? false,
+    rampColorMode: gradient.rampColorMode,
+    rampVariable: gradient.rampVariable ?? 0,
+    rampRepeat: gradient.rampRepeat ?? 1,
+  };
+}
+
+/** The renderer owns uploads; equal evaluated values reuse the last ramp. */
+export function updateGradientRampTexture(ctx: WebGLContext, gradient: GradientConfig): Uint8Array {
+  if (ctx.disposed || ctx.gl.isContextLost()) throw new Error('Cannot update a lost or disposed renderer');
+  const cached = gradientRampCache.get(ctx);
+  if (cached && gradientRampCacheMatches(cached, gradient)) return cached.data;
+  const data = buildGradientRampData(gradient);
+  uploadGradientRampTexture(ctx, data);
+  gradientRampCache.set(ctx, createGradientRampCache(gradient, data));
+  return data;
 }
 
 function uploadGradientRampTexture(ctx: WebGLContext, data: Uint8Array): void {
@@ -2180,11 +2200,23 @@ function drawPostprocessPass(
     || effectMode === 'voronoi'
     || effectMode === 'diffuse'
   );
-  const glassProgram = effectMode === 'glassV2' ? ctx.glassV2Program : ctx.glassProgram;
-  const glassUniforms = effectMode === 'glassV2' ? ctx.glassV2Uniforms : ctx.glassUniforms;
-  const glassFallbackActive = effectMode === 'glassV2' ? ctx.glassV2FallbackActive : ctx.glassFallbackActive;
+  const glassProgram = effectMode === 'glassV2'
+    ? ctx.glassV2Program
+    : effectMode === 'glassTile'
+      ? ctx.glassTileProgram
+      : ctx.glassProgram;
+  const glassUniforms = effectMode === 'glassV2'
+    ? ctx.glassV2Uniforms
+    : effectMode === 'glassTile'
+      ? ctx.glassTileUniforms
+      : ctx.glassUniforms;
+  const glassFallbackActive = effectMode === 'glassV2'
+    ? ctx.glassV2FallbackActive
+    : effectMode === 'glassTile'
+      ? ctx.glassTileFallbackActive
+      : ctx.glassFallbackActive;
   const useGlassProgram = useV2Programs
-    && (effectMode === 'glass' || effectMode === 'glassV2')
+    && (effectMode === 'glass' || effectMode === 'glassV2' || effectMode === 'glassTile')
     && Boolean(glassProgram || glassFallbackActive);
   const usePrismProgram = useV2Programs && effectMode === 'prism' && Boolean(ctx.prismProgram);
   const selectedProgram = useNoiseDiffuseStackProgram
@@ -2268,7 +2300,7 @@ function drawPostprocessPass(
       gl.uniform2f(ctx.postprocessUniforms.u_gradAnchor1, anchors[1][0], anchors[1][1]);
       gl.uniform1f(ctx.postprocessUniforms.u_maxDisplacement, postprocess.maxDisplacement);
       setUniform1i(gl, ctx.postprocessUniforms.u_effectEnabled, 1);
-      const effectModeMap = { distort: 0, mirror: 1, kaleidoscope: 2, prism: 3, voronoi: 4, glass: 5, diffuse: 6, noise: 7, slit: 8, glassV2: 9, particles: 0 } as const;
+      const effectModeMap = { distort: 0, mirror: 1, kaleidoscope: 2, prism: 3, voronoi: 4, glass: 5, diffuse: 6, noise: 7, slit: 8, glassV2: 9, glassTile: 10, particles: 0 } as const;
       setUniform1i(gl, ctx.postprocessUniforms.u_effectMode, effectModeMap[effectMode]);
       setUniform1i(gl, ctx.postprocessUniforms.u_stackSlitDiffuseAfter, diffuseAfterSlit ? 1 : 0);
     }
@@ -2401,6 +2433,20 @@ function drawPostprocessPass(
       glassV2HighlightG,
       glassV2HighlightB,
     );
+    const glassTile = normalizeGlassTileRenderParameters(postprocess);
+    setUniform1i(gl, ctx.postprocessUniforms.u_glassTilePattern, glassTile.patternIndex);
+    gl.uniform1f(ctx.postprocessUniforms.u_glassTileSize, glassTile.tileSize);
+    gl.uniform1f(ctx.postprocessUniforms.u_glassTileBevel, glassTile.bevel);
+    gl.uniform1f(ctx.postprocessUniforms.u_glassTileSurfaceHeight, glassTile.surfaceHeight);
+    gl.uniform1f(ctx.postprocessUniforms.u_glassTileCurvature, glassTile.curvature);
+    gl.uniform1f(ctx.postprocessUniforms.u_glassTileRefraction, glassTile.refraction);
+    gl.uniform1f(ctx.postprocessUniforms.u_glassTileDispersion, glassTile.dispersion);
+    gl.uniform1f(ctx.postprocessUniforms.u_glassTileRoughness, glassTile.roughness);
+    gl.uniform1f(ctx.postprocessUniforms.u_glassTileDetailScale, glassTile.detailScale);
+    gl.uniform1f(ctx.postprocessUniforms.u_glassTileRotation, glassTile.rotationRadians);
+    gl.uniform1f(ctx.postprocessUniforms.u_glassTileMix, glassTile.mix);
+    setUniform1i(gl, ctx.postprocessUniforms.u_glassTileEdgeMode, glassTile.edgeModeIndex);
+    gl.uniform1f(ctx.postprocessUniforms.u_glassTileSeed, glassTile.seed);
   }
   const diffuseScale = diffuseResolutionScale(fullWidth, fullHeight);
   setUniform1i(gl, ctx.postprocessUniforms.u_diffuseEnabled, applyPostDiffuse && postprocess.diffuseEnabled ? 1 : 0);
@@ -2507,7 +2553,7 @@ function drawPostprocessPass(
     setUniform1i(gl, ctx.postprocessUniforms.u_stackSlitAnimMode, stackSlit.animMode === 'pingpong' ? 1 : 0);
     setUniform1i(gl, ctx.postprocessUniforms.u_stackSlitPixelPerfect, stackSlitPixelPerfect ? 1 : 0);
   }
-  if ((effectMode === 'glass' || effectMode === 'glassV2') && exportDiagnosticsEnabled()) {
+  if ((effectMode === 'glass' || effectMode === 'glassV2' || effectMode === 'glassTile') && exportDiagnosticsEnabled()) {
     const destinationTexture = targetFramebuffer === ctx.postprocessFboA
       ? ctx.postprocessTextureA
       : targetFramebuffer === ctx.postprocessFboB
@@ -2804,7 +2850,8 @@ function drawPostprocessStackOutput(
   outputToTexture: boolean,
 ): WebGLTexture | null {
   const layers = getActivePostprocessStackLayers(postprocess).filter(layer => (
-    (layer.kind !== 'glass' && layer.kind !== 'glassV2') || !isGlassOpticallyIdentity(postprocess)
+    (layer.kind !== 'glass' && layer.kind !== 'glassV2' && layer.kind !== 'glassTile')
+      || (layer.kind === 'glassTile' ? !isGlassTileOpticallyIdentity(postprocess) : !isGlassOpticallyIdentity(postprocess))
   ));
   if (layers.length === 0) return null;
 
@@ -3028,15 +3075,7 @@ function renderClothIntoGradTexture(
     if (!ctx.clothRenderer) {
       ctx.clothRenderer = new ClothGradientRenderer();
     }
-    const rampData = buildRampTextureData(
-      gradient.stops,
-      gradient.rampInterpolation,
-      gradient.rampMirror ?? false,
-      gradient.opacityStops,
-      gradient.rampColorMode,
-      gradient.rampVariable,
-      gradient.rampRepeat,
-    );
+    const rampData = updateGradientRampTexture(ctx, gradient);
     ctx.clothRenderer.updateRampData(rampData);
     // Cloth はアニメーションON時のみ動く専用の時間 clothTime を使う。
     // 共有の renderTime (time) は noise 等の Auto 有効時以外は進まず、
@@ -3047,6 +3086,7 @@ function renderClothIntoGradTexture(
     gl.bindTexture(gl.TEXTURE_2D, ctx.gradTexture);
     gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, true);
     gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, clothCanvas);
+    recordWebGLTargetStorage(ctx.gradTexture, clothCanvas.width, clothCanvas.height);
     gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, false);
     ctx.clothStatus = 'ready';
     window.dispatchEvent(new CustomEvent('kgg:webgl-lazy-program-state', { detail: { key: 'cloth', state: 'ready' } }));
@@ -3132,6 +3172,7 @@ export function render(
   flowSessionId = 'preview',
 ): void {
   seamless = normalizeSeamlessConfig(seamless);
+  if (ctx.disposed || ctx.gl.isContextLost()) return;
   const isV2Pipeline = effectPipeline?.version === 'stack-v2';
   const imageGradientProtected = imageGradient.enabled && !!imageGradientSource;
   const flowRequested = effectPipeline?.flowGradientEnabled === true && flowGradient != null;
@@ -3232,7 +3273,7 @@ export function render(
   // Legacy and protected Image Gradient rendering still use the full
   // generator. V2 requests it only when the Render Plan can safely consume a
   // leading Noise/Diffuse prefix in one analytic pass.
-  if (!isV2Pipeline || imageGradientProtected || analyticPrefixEnabled) requestLazyProgram(ctx, 'generator');
+  if (!renderPlan || renderPlan.programs.generator) requestLazyProgram(ctx, 'generator');
   if (flowActive) {
     resizeFlowGradientResources(
       gl,
@@ -3244,7 +3285,7 @@ export function render(
   }
 
   // キャンバスサイズをチェック（readPixels や toBlob が失敗する可能性がある）
-  const maxTexSize = gl.getParameter(gl.MAX_TEXTURE_SIZE) as number;
+  const maxTexSize = ctx.gpuDiagnostics.webgl.maxTextureSize;
   if (vpW > maxTexSize || vpH > maxTexSize) {
     console.error(
       `[WebGL render] Viewport size (${vpW}×${vpH}) exceeds MAX_TEXTURE_SIZE (${maxTexSize}). ` +
@@ -3385,8 +3426,7 @@ export function render(
   gl.uniform1f(uniforms.u_diffuseAsciiColumns, ASCII_ATLAS_COLUMNS);
   gl.uniform1f(uniforms.u_diffuseAsciiRows, ctx.diffuseAsciiRows);
   gl.uniform1f(uniforms.u_diffuseAsciiRotation, ((diffuse.asciiRotation ?? 0) * Math.PI) / 180);
-  const rampData = buildGradientRampData(gradient);
-  uploadGradientRampTexture(ctx, rampData);
+  const rampData = updateGradientRampTexture(ctx, gradient);
   if ((gradient.gradientType ?? 'linear') === 'mesh') uploadMeshGradientTexture(ctx, gradient, rampData);
   if (diffuse.enabled && !isV2Pipeline) publishDiffuseInputHistogram(ctx, gradient, imageGradientSource ?? sourceImageCanvas);
   gl.activeTexture(gl.TEXTURE1);
@@ -3558,6 +3598,7 @@ export function render(
     const prismNeedsBlur = renderPlan.prismNeedsBlur;
     const particlesRequested = renderPlan.particlesRequested;
     const glassIdentity = isGlassOpticallyIdentity(postprocess);
+    const glassTileIdentity = isGlassTileOpticallyIdentity(postprocess);
 
     // The V2 default is Diffuse-only. Analytic Block/Smooth prefixes stay in
     // the Generator, while Stipple and other legacy modes remain texture
@@ -3596,14 +3637,17 @@ export function render(
     const noiseStackFallbackRequested = !imageGradientProtected
       && (renderPlan.programs.noiseStack || noiseDiffuseStackFailed);
     let noiseStackReady = imageGradientProtected || !noiseStackFallbackRequested || (
-      stackCoreReady && requestNoiseStackProgram(ctx)
+      stackCoreReady && requestNoiseStackProgram(ctx, renderPlan.fallbacks.noiseStack)
     );
     const noiseDiffuseStackUsable = noiseDiffuseStackReady && !noiseDiffuseStackFailed;
     const noiseDiffuseCompositionReady = !noiseDiffuseStackRequested
       || noiseDiffuseStackUsable
       || (noiseDiffuseStackFailed && noiseStackReady);
     const glassV2Ready = imageGradientProtected || glassIdentity || !renderPlan.programs.glassV2 || (
-      stackCoreReady && noiseStackReady && requestGlassProgram(ctx, 'glassV2')
+      stackCoreReady && noiseStackReady && requestGlassProgram(ctx, 'glassV2', renderPlan.fallbacks.glassV2)
+    );
+    const glassTileReady = imageGradientProtected || glassTileIdentity || !renderPlan.programs.glassTile || (
+      stackCoreReady && noiseStackReady && requestGlassProgram(ctx, 'glassTile', renderPlan.fallbacks.glassTile)
     );
     const normalReady = !normalRequested || (
       requestLazyProgram(ctx, 'normalMap') &&
@@ -3657,14 +3701,10 @@ export function render(
       drawArrays(ctx, 'Base', gl.TRIANGLES, 0, 6);
       return;
     }
-    const framebufferAllocationMode = flowActive && renderPlan.framebufferAllocationMode === 'direct'
-      ? 'core'
-      : renderPlan.framebufferAllocationMode;
-    if (framebufferAllocationMode === 'full') {
-      if (ctx.fboSize[0] !== vpW || ctx.fboSize[1] !== vpH) resizeFboTextures(gl, ctx, vpW, vpH);
-    } else if (framebufferAllocationMode === 'core' && (ctx.v2CoreFboSize[0] !== vpW || ctx.v2CoreFboSize[1] !== vpH)) {
-      resizeV2CoreFboTextures(gl, ctx, vpW, vpH);
-    }
+    const targets = flowActive && renderPlan.framebufferAllocationMode === 'direct'
+      ? CORE_RENDER_TARGETS
+      : renderPlan.framebufferTargets;
+    ensureRenderTargets(ctx, targets, vpW, vpH);
 
     // Base -> Surface. When the analytic prefix is enabled, the Generator
     // evaluates its consumed Noise/Diffuse layers here once; otherwise the
@@ -3788,7 +3828,11 @@ export function render(
         // the draw. Keep both logical layers visible by switching to the
         // existing standalone Noise/general fallback before continuing.
         markNoiseDiffuseStackFallback(ctx);
-        noiseStackReady = requestNoiseStackProgram(ctx);
+        noiseStackReady = requestPlanFallbackProgram(
+          ctx,
+          renderPlan.fallbacks.noiseDiffuseStack,
+          renderPlan.fallbacks.noiseStack,
+        );
         if (!noiseStackReady) break;
       }
       // Noise has its own heavy shader. Keep rendering the remaining V2
@@ -3796,6 +3840,7 @@ export function render(
       // rather than pinning Slit/Distort/etc. to the Base-only fallback.
       if (layer.kind === 'noise' && !noiseStackReady) continue;
       if (layer.kind === 'glass' && (glassIdentity || !glassV2Ready)) continue;
+      if (layer.kind === 'glassTile' && (glassTileIdentity || !glassTileReady)) continue;
       // A Diffuse immediately before Slit is evaluated in Slit's destination
       // space. This prevents the slit sampler from stretching the already
       // diffused grid into stripes while keeping the layer order visible.
@@ -3811,7 +3856,11 @@ export function render(
         const layerNoise = layer.kind === 'noise'
           ? { ...noiseDistortion, enabled: true }
           : disabledStackNoise;
-        const renderKind = layer.kind === 'glass' ? 'glassV2' : layer.kind;
+        const renderKind = layer.kind === 'glass'
+          ? 'glassV2'
+          : layer.kind === 'glassTile'
+            ? 'glassTile'
+            : layer.kind;
         passRendered = drawPostprocessPass(
           ctx, currentTexture, gradient, layerNoise, v2Postprocess, renderKind,
           vpW, vpH, width, height, tileOx, tileOy, time, noiseLoopPeriod,
@@ -3893,7 +3942,8 @@ export function render(
   const particleRequested = postprocess.enabled && postprocess.effectMode === 'particles';
   const particleActive = particleRequested && requestLazyProgram(ctx, 'particles');
   const postprocessLayers = getActivePostprocessStackLayers(postprocess).filter(layer => (
-    (layer.kind !== 'glass' && layer.kind !== 'glassV2') || !isGlassOpticallyIdentity(postprocess)
+    (layer.kind !== 'glass' && layer.kind !== 'glassV2' && layer.kind !== 'glassTile')
+      || (layer.kind === 'glassTile' ? !isGlassTileOpticallyIdentity(postprocess) : !isGlassOpticallyIdentity(postprocess))
   ));
   const postprocessRequested = postprocess.enabled && postprocessLayers.length > 0;
   const prismPostprocess = postprocessRequested && postprocessLayers.some(layer => layer.kind === 'prism');
@@ -3913,8 +3963,8 @@ export function render(
   const stretchSeed = stretchScanOverride != null
     ? stretch.seed + (1 - Math.cos(stretchScan * Math.PI * 2)) * 0.5
     : stretch.seed;
-  if ((stretchActive || postprocessActive || particleActive || seamlessActive || flowActive) && (ctx.fboSize[0] !== vpW || ctx.fboSize[1] !== vpH)) {
-    resizeFboTextures(gl, ctx, vpW, vpH);
+  if (stretchActive || postprocessActive || particleActive || seamlessActive || flowActive) {
+    ensureRenderTargets(ctx, FULL_RENDER_TARGETS, vpW, vpH);
   }
   let particleSourceTexture: WebGLTexture | null = null;
   let seamlessSourceTexture: WebGLTexture | null = null;
@@ -3948,7 +3998,7 @@ export function render(
     const fboW = vpW;
     const fboH = vpH;
     // Pass 1: グラデーションを gradFbo にレンダリング（matcapなし、ノーマル計算のため）
-    if (ctx.fboSize[0] !== fboW || ctx.fboSize[1] !== fboH) resizeFboTextures(gl, ctx, fboW, fboH);
+    ensureRenderTargets(ctx, FULL_RENDER_TARGETS, fboW, fboH);
     setUniform1i(gl, uniforms.u_matcapEnabled, 0);
     gl.bindFramebuffer(gl.FRAMEBUFFER, ctx.gradFbo);
     drawArrays(ctx, 'Base', gl.TRIANGLES, 0, 6);

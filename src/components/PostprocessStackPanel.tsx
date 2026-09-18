@@ -44,12 +44,13 @@ const LABELS: Record<EffectStackKind, string> = {
   kaleidoscope: 'Kaleidoscope',
   voronoi: 'Voronoi',
   glass: 'Glass',
+  glassTile: 'GlassTile',
 };
 
 const CATEGORY: Record<EffectStackKind, MessageKey> = {
   diffuse: 'stack.category.texture', noise: 'stack.category.texture',
   slit: 'stack.category.transform', stretch: 'stack.category.transform', distort: 'stack.category.transform', mirror: 'stack.category.transform', kaleidoscope: 'stack.category.transform',
-  voronoi: 'stack.category.structure', glass: 'stack.category.structure',
+  voronoi: 'stack.category.structure', glass: 'stack.category.structure', glassTile: 'stack.category.structure',
 };
 
 type DragState = Omit<EffectStackDragState, 'kind'> & {
@@ -63,14 +64,14 @@ type SoloSnapshot = {
   enabledState: ReturnType<typeof captureEffectStackEnabledState>;
 };
 
-type LazyProgramKey = 'stackCore' | 'noiseStack' | 'glassV2' | 'stretch' | 'prism' | 'prismComposite' | 'normalMap' | 'blur' | 'particles';
+type LazyProgramKey = 'stackCore' | 'noiseStack' | 'glassV2' | 'glassTile' | 'stretch' | 'prism' | 'prismComposite' | 'normalMap' | 'blur' | 'particles';
 type LazyProgramStatus = 'loading' | 'ready' | 'failed' | 'fallback';
 
 const CORE_EFFECTS = new Set<EffectStackKind>([
   'diffuse', 'noise', 'slit', 'distort', 'mirror', 'kaleidoscope', 'voronoi',
 ]);
 const IMAGE_GRADIENT_PROTECTED_EFFECTS = new Set<EffectStackKind>([
-  'stretch', 'distort', 'mirror', 'kaleidoscope', 'voronoi', 'glass',
+  'stretch', 'distort', 'mirror', 'kaleidoscope', 'voronoi', 'glass', 'glassTile',
 ]);
 
 type Props = {
@@ -82,6 +83,7 @@ function programKeyForEffect(kind: EffectStackKind): LazyProgramKey {
   if (kind === 'noise') return 'noiseStack';
   if (CORE_EFFECTS.has(kind)) return 'stackCore';
   if (kind === 'glass') return 'glassV2';
+  if (kind === 'glassTile') return 'glassTile';
   return 'stretch';
 }
 
@@ -206,7 +208,7 @@ export function PostprocessStackPanel({ onSwapWorkspace, onSelectEffectStack }: 
       selectedKind: kind,
       ...(effectStack ? { effectStack } : {}),
     });
-    if (kind === 'distort' || kind === 'mirror' || kind === 'kaleidoscope' || kind === 'voronoi' || kind === 'glass') {
+    if (kind === 'distort' || kind === 'mirror' || kind === 'kaleidoscope' || kind === 'voronoi' || kind === 'glass' || kind === 'glassTile') {
       setPostprocess({ effectMode: kind === 'glass' ? 'glassV2' : kind as PostprocessStackKind });
     }
   };

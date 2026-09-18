@@ -32,6 +32,7 @@ export type {
   AeRuntime,
   AeSaveDirStatus,
   AeStatus,
+  AeVideoImportOptions,
   AfterEffectsService,
   ColorPaletteRepository,
   ExportDirectoryHandle,

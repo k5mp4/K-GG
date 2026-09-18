@@ -75,7 +75,17 @@ void main() {
     return;
   }
 #endif
-#if !defined(KGG_LIGHTWEIGHT) && !defined(KGG_PRISM_ONLY)
+#if !defined(KGG_LIGHTWEIGHT) && (defined(KGG_GLASS_TILE_ONLY) || (!defined(KGG_GLASS_ONLY) && !defined(KGG_PRISM_ONLY)))
+  if (u_effectEnabled && u_effectMode == 10) {
+    if (glassTileIsIdentity()) {
+      gl_FragColor = sampleGlassTileSource(globalCoord);
+    } else {
+      gl_FragColor = glassTile(globalUv, globalCoord);
+    }
+    return;
+  }
+#endif
+#if !defined(KGG_LIGHTWEIGHT) && !defined(KGG_PRISM_ONLY) && !defined(KGG_GLASS_TILE_ONLY)
 #if defined(KGG_LEGACY_GLASS_ONLY)
   if (u_effectEnabled && u_effectMode == 5) {
 #elif defined(KGG_GLASS_V2_ONLY)

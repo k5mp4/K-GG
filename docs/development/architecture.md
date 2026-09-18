@@ -63,7 +63,7 @@ UIは状態の編集と利用者操作に集中させ、時間評価やファイ
 
 WebGLの所有権はcontextごとに管理します。`disposeWebGL`はcontext listener、program、texture、framebuffer、buffer、VAO、Flow資源、Three.js Cloth rendererをまとめて解放します。Three.jsのCloth/ConeとOGLのIridescenceはそれぞれの既存ownerを維持し、共通化によって実行順や描画結果を変えません。
 
-Postprocessのフラグメントシェーダーは`src/shaders/postprocess/`でuniform、共通処理、Prism、主スタック、Diffuse、Glass高さ場、Glass光学合成、エントリポイントに分割する。`src/lib/webglShaderSources.ts`がこの依存順に連結し、Glass専用、Prism専用、軽量主スタック、Legacyの各プログラムへ同じ構成元を供給する。分割ファイルを単独の完結したシェーダーとして扱わず、連結順とプリプロセッサ定義をコンパイル契約として維持する。
+Postprocessのフラグメントシェーダーは`src/shaders/postprocess/`でuniform、共通処理、Prism、主スタック、Diffuse、Glass高さ場、Glass光学合成、GlassTile、エントリポイントに分割する。`src/lib/webglShaderSources.ts`がこの依存順に連結し、Glass専用、GlassTile専用、Prism専用、軽量主スタック、Legacyの各プログラムへ同じ構成元を供給する。分割ファイルを単独の完結したシェーダーとして扱わず、連結順とプリプロセッサ定義をコンパイル契約として維持する。
 
 描画機能を追加するときは、型、既定値、UI、時刻評価、uniform、シェーダー、プリセット、エクスポート時の一致を確認します。
 
@@ -106,6 +106,8 @@ TauriコマンドはRendererからの入力を信頼しません。FFmpeg実行�
 4. ブラウザではダウンロードまたはZIP化し、Tauriでは必要に応じてRust側でFFmpegを呼ぶ。
 
 ## 既知の設計上の注意
+
+RenderingのPlan、GPU所有権、Shader／Capability、Context復旧、出力経路の詳細は[Rendering Architecture](./rendering-architecture.md)を参照する。
 
 - `App.tsx`は画面統合とproviderの責務を残す。新規ロジックを追加する際は、Workspace、feature、hook、ドメイン関数へ分離できるか検討する。
 - `gradientStore.ts`は既存互換APIを持つcomposition facadeであり、まだ全機能sliceへ分割していない。次の分割ではsetterのnormalization、Effect Stackとの同期、historyの保存対象を先にcharacterizationする。

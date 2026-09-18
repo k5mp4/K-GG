@@ -9,7 +9,8 @@ import type {
   NoiseDistortionConfig,
   NormalMapConfig,
 } from '../types/distortion';
-import { normalizeMeshGradientConfig, type GradientConfig } from '../types/gradient';
+import { normalizeMeshGradientConfig, type GradientConfig, type Vec2Tuple } from '../types/gradient';
+import { defaultBezierControlsForAnchors } from '../store/documentModel';
 import type { PropertyTrack } from '../types/keyframe';
 import { getTrackMode } from '../types/keyframe';
 import { interpolateKeyframesWithLoop } from './loopKeyframes';
@@ -56,12 +57,31 @@ function applyGradientTracks(
   const stopOverrides = new Map<string, { position?: number; r?: number; g?: number; b?: number }>();
   const opacityOverrides = new Map<string, { position?: number; opacity?: number }>();
   const anchorOverrides = new Map<number, { x?: number; y?: number }>();
+  const meshPointOverrides = new Map<number, { x?: number; y?: number; r?: number; g?: number; b?: number }>();
   const meshCornerOverrides = new Map<number, { x?: number; y?: number }>();
+  const bezierControlOverrides = new Map<0 | 1, { x?: number; y?: number }>();
 
   for (const track of Object.values(tracks)) {
     if (!isKeysTrack(track)) continue;
     const value = interpolateKeyframesWithLoop(time, track.keyframes, loopEnabled);
     const parts = track.propertyId.split('.');
+
+    // Grid point position tracks: mesh.point.{index}.{x|y}
+    // Grid point color tracks (direct mode): mesh.point.{index}.{r|g|b}
+    if (parts[0] === 'mesh' && parts[1] === 'point' && parts.length === 4) {
+      const index = Number(parts[2]);
+      if (!Number.isInteger(index) || index < 0) continue;
+      const current = meshPointOverrides.get(index) ?? {};
+      if (parts[3] === 'x') current.x = value;
+      if (parts[3] === 'y') current.y = value;
+      if (parts[3] === 'r') current.r = value;
+      if (parts[3] === 'g') current.g = value;
+      if (parts[3] === 'b') current.b = value;
+      meshPointOverrides.set(index, current);
+      continue;
+    }
+
+    // Legacy single-patch corner tracks: mesh.corner.{0..3}.{x|y}
     if (parts[0] === 'mesh' && parts[1] === 'corner' && parts.length === 4) {
       const index = Number(parts[2]);
       if (!Number.isInteger(index) || index < 0 || index > 3) continue;
@@ -71,6 +91,18 @@ function applyGradientTracks(
       meshCornerOverrides.set(index, current);
       continue;
     }
+
+    // Bezier control point tracks: bezierControl.{0|1}.{x|y}
+    if (parts[0] === 'bezierControl' && parts.length === 3) {
+      const index = Number(parts[1]);
+      if (index !== 0 && index !== 1) continue;
+      const current = bezierControlOverrides.get(index) ?? {};
+      if (parts[2] === 'x') current.x = value;
+      if (parts[2] === 'y') current.y = value;
+      bezierControlOverrides.set(index, current);
+      continue;
+    }
+
     if (parts.length !== 3) continue;
 
     if (parts[0] === 'gradientStop') {
@@ -144,22 +176,62 @@ function applyGradientTracks(
       }) as typeof result.anchors,
     };
   }
-  if (meshCornerOverrides.size > 0 && result.mesh) {
+  if ((meshPointOverrides.size > 0 || meshCornerOverrides.size > 0) && result.mesh) {
     const mesh = normalizeMeshGradientConfig(result.mesh);
-    result = {
-      ...result,
-      mesh: {
-        ...mesh,
-        corners: mesh.corners.map((corner, index) => {
-          const override = meshCornerOverrides.get(index);
-          if (!override) return corner;
-          return [
-            override.x === undefined ? corner[0] : override.x,
-            override.y === undefined ? corner[1] : override.y,
-          ] as [number, number];
-        }) as typeof mesh.corners,
-      },
-    };
+    const columns = mesh.columns;
+    const rows = mesh.rows;
+    const points = mesh.points.map((point, index) => {
+      const pointOverride = meshPointOverrides.get(index);
+      const cornerNumber = [0, columns - 1, (rows - 1) * columns, rows * columns - 1].indexOf(index);
+      const cornerOverride = cornerNumber >= 0 ? meshCornerOverrides.get(cornerNumber) : undefined;
+      const override = pointOverride ?? cornerOverride;
+      if (!override) return point;
+      return [
+        override.x === undefined ? point[0] : override.x,
+        override.y === undefined ? point[1] : override.y,
+      ] as Vec2Tuple;
+    }) as typeof mesh.points;
+
+    // Direct-mode point color tracks (r/g/b are 0..1 keyframe values) update
+    // the per-point hex colors. Ramp mode ignores color tracks because the
+    // ramp drives every point.
+    let updatedMesh: import('../types/gradient').MeshGradientConfig = { ...mesh, points };
+    if (mesh.colorMode === 'direct' && mesh.pointColors) {
+      const hasColorOverride = [...meshPointOverrides.values()].some(override => (
+        override.r !== undefined || override.g !== undefined || override.b !== undefined
+      ));
+      if (hasColorOverride) {
+        const pointColors = mesh.pointColors.map((hex, index) => {
+          const override = meshPointOverrides.get(index);
+          if (!override || (override.r === undefined && override.g === undefined && override.b === undefined)) return hex;
+          const [r, g, b] = hexToRgb255(hex);
+          return rgb255ToHex(
+            Math.max(0, Math.min(255, Math.round((override.r ?? r / 255) * 255))),
+            Math.max(0, Math.min(255, Math.round((override.g ?? g / 255) * 255))),
+            Math.max(0, Math.min(255, Math.round((override.b ?? b / 255) * 255))),
+          );
+        });
+        updatedMesh = { ...updatedMesh, pointColors };
+      }
+    }
+
+    const normalized = normalizeMeshGradientConfig(updatedMesh);
+    result = { ...result, mesh: normalized };
+  }
+  if (bezierControlOverrides.size > 0) {
+    const current = result.bezierControls
+      ?? (result.anchors
+        ? defaultBezierControlsForAnchors(result.anchors)
+        : [[0.5, 0], [0.5, 1]]);
+    const bezierControls = current.map((control, index) => {
+      const override = bezierControlOverrides.get(index as 0 | 1);
+      if (!override) return control;
+      return [
+        override.x === undefined ? control[0] : override.x,
+        override.y === undefined ? control[1] : override.y,
+      ] as Vec2Tuple;
+    }) as [[number, number], [number, number]];
+    result = { ...result, bezierControls };
   }
   return result;
 }
@@ -197,7 +269,7 @@ function trackMode(
 }
 
 function propertyOwnerEnabled(state: LatestState, propertyId: string): boolean {
-  if (propertyId.startsWith('gradientStop.') || propertyId.startsWith('opacityStop.') || propertyId.startsWith('gradientAnchor.') || propertyId.startsWith('mesh.corner.')) return true;
+  if (propertyId.startsWith('gradientStop.') || propertyId.startsWith('opacityStop.') || propertyId.startsWith('gradientAnchor.') || propertyId.startsWith('mesh.corner.') || propertyId.startsWith('mesh.point.') || propertyId.startsWith('bezierControl.')) return true;
   if (propertyId.startsWith('noiseDistortion.')) return state.noiseDistortion.enabled;
   if (propertyId.startsWith('diffuse.')) return state.diffuse.enabled;
   if (propertyId.startsWith('slitScan.')) return state.slitScan.enabled;

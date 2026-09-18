@@ -32,7 +32,7 @@ The web build loads Noto Sans JP and Open Sans from Google Fonts in `index.html`
 - **Canvas Size** sets the output resolution. Choose Full HD, HD, 400×400, or 800×800, or enter W and H directly. Mouse wheel changes by 1; Shift+wheel changes by 10. Use the lock icon to preserve the aspect ratio.
 - **Gradient Ramp** is the main editing area below the resolution controls. Adjust color, position, and opacity for each stop. Color Palette Generator extracts colors from an image and applies them as gradient stops.
 - **Image Overlay / Mask** overlays an image or uses it as an alpha mask.
-- **Gradient Type** provides Linear, Radial, 4-color, Diamond, Angle, Bezier, and **Mesh Gradation** layouts. Mesh Gradation is one 2×2 Coons Patch: drag its four corners and eight cubic-Bezier handles, then choose the four corner positions from the existing Gradient Ramp. The shader uses Newton inversion to map pixels back to patch coordinates and bilinearly interpolates the four Ramp colors. Preview and export use the same WebGL path. Multiple cells are not supported yet, and self-intersecting patches are not guaranteed.
+- **Gradient Type** provides Linear, Radial, 4-color, Diamond, Angle, Bezier, and **Mesh Gradation** layouts. Mesh Gradation is an N×M grid of Coons patches: drag every exterior and interior grid point to reshape and bend each cell's shared edges with the diamond handles. Two color modes are switched in the right sidebar's Mesh section: **Ramp** (default) paints the whole mesh with the shared gradient ramp bottom→top so ramp edits update the mesh, and **Direct** lets you click a point, use its color swatch, and pick a hex color per point. The row/column point count (2–8) is set in the same section. Preview and export use the same WebGL path. Self-intersecting patches are not guaranteed.
 - **Image Gradient Source** recolors the luminance or RGB channels of an image with the current Gradient Ramp. The image is placed using Cover and the source image itself is not stored in presets.
   - **S** scales handles or multiple points.
   - **A** selects all points.
@@ -50,9 +50,9 @@ Distorts the gradient with multiple noise algorithms. Strength controls the amou
 
 ### Postprocess Effect Stack
 
-Use the Effect Stack panel at the upper-left of the canvas to reorder Noise, Slit, Stretch, Distort, Mirror, Kaleidoscope, Voronoi, Glass, and Diffuse. Drag a row by its grip and toggle it with the switch. Postprocess is shown as enabled whenever one of Stretch, Distort, Mirror, Kaleidoscope, Voronoi, or Glass is enabled in the Effect Stack. Edit hand-drawn `Distort` from Postprocess's `Edit Layer`; old `manualDistort` preset data is migrated there on load. The fixed stages are `Surface → Main Stack → Prism → Particles`; edit Normal, Prism, and Particles from the `SANDBOX` tab in the top bar.
+Use the Effect Stack panel at the upper-left of the canvas to reorder Noise, Slit, Stretch, Distort, Mirror, Kaleidoscope, Voronoi, Glass, GlassTile, and Diffuse. Drag a row by its grip and toggle it with the switch. Postprocess is shown as enabled whenever one of Stretch, Distort, Mirror, Kaleidoscope, Voronoi, Glass, or GlassTile is enabled in the Effect Stack. Edit hand-drawn `Distort` from Postprocess's `Edit Layer`; old `manualDistort` preset data is migrated there on load. The fixed stages are `Surface → Main Stack → Prism → Particles`; edit Normal, Prism, and Particles from the `SANDBOX` tab in the top bar.
 
-Glass uses the GLASS V2 screen-space optical approximation with smooth gradient noise and separate RGB refraction. The Postprocess properties show one Glass entry; Chromatic Aberration reaches 80px, and Transmission Tint / Highlight Tint use color inputs.
+Glass uses the GLASS V2 screen-space optical approximation with smooth gradient noise and separate RGB refraction. The Postprocess properties show one Glass entry; Chromatic Aberration reaches 80px, and Transmission Tint / Highlight Tint use color inputs. GlassTile is a separate effect based on the KG_Glass tiled-surface model, with pattern, tile shape, refraction, dispersion, roughness, mix, edge mode, and seed controls.
 
 Use the shuffle button in the Effect Stack header to randomize the main-stack order. The preview transitions smoothly from the current result to the new order, and rows move from their current positions. Alt-click a layer row or its on/off toggle to solo that layer; layers temporarily hidden by solo are marked with a yellow `STAY` status. Alt-click the same target again to restore the previous enabled state. The Effect Stack can also be opened in another window; closing it restores the inline panel.
 
@@ -85,7 +85,7 @@ Each property can be Static, Auto, or Keys. Switching from Auto to Keys records 
 - **Image** exports the current result as PNG, JPG, or WebP.
 - **Slit PNGs** exports one PNG for each slit.
 - **MOV** uses external FFmpeg in the Tauri desktop app to create QuickTime Animation (qtrle) MOV.
-- **MP4 (H.264 RGB)** uses external FFmpeg and offers High (CRF 18), Balanced (CRF 22), and Small (CRF 27). High is the default.
+- **MP4 (H.264)** uses external FFmpeg with standard YUV 4:2:0 / BT.709 output and offers High (CRF 18), Balanced (CRF 22), and Small (CRF 27). High is the default.
 - **ZIP PNG** exports a numbered PNG sequence in both web and Tauri builds without FFmpeg.
 
 For MOV or MP4, place `ffmpeg.exe` in the K-GG FFmpeg folder or make the `ffmpeg` command available on PATH. Open the preferred folder with **Open K-GG FFmpeg folder** in Export. K-GG does not download FFmpeg.

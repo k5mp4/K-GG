@@ -5,6 +5,7 @@ import {
   selectShaderCompileExtensionForSnapshot,
 } from './webgl';
 import webglSource from './webgl.ts?raw';
+import scenePlanSource from './sceneRenderPlan.ts?raw';
 
 function functionSource(name: string): string {
   const start = webglSource.indexOf(`function ${name}(`);
@@ -121,7 +122,7 @@ describe('WebGL lazy compile policy', () => {
   it('does not chain the larger general fallback after a Glass timeout', () => {
     const source = functionSource('requestGlassProgram');
     const timeoutGuard = source.indexOf('if (glassState.timedOut) return false;');
-    const fallbackRequest = source.indexOf("requestLazyProgram(ctx, 'postprocess')");
+    const fallbackRequest = source.indexOf('requestLazyProgram(ctx, fallbackProgram)');
 
     expect(timeoutGuard).toBeGreaterThanOrEqual(0);
     expect(fallbackRequest).toBeGreaterThan(timeoutGuard);
@@ -130,8 +131,9 @@ describe('WebGL lazy compile policy', () => {
   it('queues the V2-backed Glass program without gating other ready stages', () => {
     const source = functionSource('render');
 
-    expect(source).toContain("stackCoreReady && noiseStackReady && requestGlassProgram(ctx, 'glassV2')");
+    expect(source).toContain("stackCoreReady && noiseStackReady && requestGlassProgram(ctx, 'glassV2', renderPlan.fallbacks.glassV2)");
     expect(source).not.toContain("requestGlassProgram(ctx, 'glass')");
+    expect(source).toContain('renderPlan.fallbacks.noiseStack');
     const readinessGate = source.match(/if \(!stackCoreReady \|\|[^\n]+\) \{/)?.[0] ?? '';
     expect(readinessGate).not.toContain('glassReady');
     expect(readinessGate).not.toContain('glassV2Ready');
@@ -139,7 +141,7 @@ describe('WebGL lazy compile policy', () => {
 
   it('prepares required Glass programs before export starts', () => {
     const prepareSource = functionSource('prepareExportPrograms');
-    const planSource = functionSource('getRequiredExportProgramKeys');
+    const planSource = scenePlanSource;
 
     expect(planSource).toContain("add('glassV2',");
     expect(prepareSource).toContain('for (const key of required) await waitForLazyProgram');
@@ -182,7 +184,7 @@ describe('WebGL lazy compile policy', () => {
     const compileSource = functionSource('compileLazyProgram');
 
     expect(source).toContain("if (!noiseState.failed) return requestLazyProgram(ctx, 'noiseStack');");
-    expect(source).toContain("const fallbackReady = requestLazyProgram(ctx, 'postprocess');");
+    expect(source).toContain('const fallbackReady = requestLazyProgram(ctx, fallbackProgram);');
     expect(source).toContain("state: 'fallback' as const");
     expect(compileSource).not.toContain("key === 'glass' || key === 'glassV2' || key === 'noiseStack'");
   });

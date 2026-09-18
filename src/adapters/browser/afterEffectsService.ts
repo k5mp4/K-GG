@@ -1,6 +1,7 @@
 import type {
   AeSaveDirStatus,
   AeStatus,
+  AeVideoImportOptions,
   AfterEffectsService,
   NativeVideoArtifact,
 } from '../types';
@@ -80,7 +81,12 @@ export const browserAfterEffectsService: AfterEffectsService = {
     }
   },
 
-  async importVideo(source: Blob | NativeVideoArtifact, ext: 'mov' | 'mp4' = 'mov', name = 'kagaribi'): Promise<AeStatus> {
+  async importVideo(
+    source: Blob | NativeVideoArtifact,
+    ext: 'mov' | 'mp4' = 'mov',
+    name = 'kagaribi',
+    _options?: AeVideoImportOptions,
+  ): Promise<AeStatus> {
     if (!(source instanceof Blob)) return 'unsupported';
     try {
       const params = new URLSearchParams({ ext, name });

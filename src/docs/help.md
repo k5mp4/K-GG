@@ -40,7 +40,7 @@ Web 版は `index.html` で Google Fonts から Noto Sans JP、Open Sans を読�
 - **Image Overlay / Mask**: 折りたたみセクションから画像の重畳またはアルファマスクを設定します。
 - **Gradient type**
   -Linear/Radial/4-color/Diamond/Angle/Bezier/Mesh Gradationのグラデーションタイプを選択可能です。
-  - **Mesh Gradation** は単一の2×2 Coons Patchです。4つのコーナーと8つの三次Bezier制御ハンドルで境界を編集し、各コーナーの色は既存Gradient Ramp上の4位置から取得します。内部色はパッチ座標上で双線形補間され、画面UVからの逆写像にはNewton法を使います。previewとexportは同じWebGL shader経路を使います。複数セルには未対応で、自己交差した形状の結果は保証されません。
+  - **Mesh Gradation** はN×Mの格子点を持つCoons Patchグリッドです。外側とキャンバス内部の全格子点をドラッグして変形し、各セルの共有エッジをダイヤモンド型のハンドルで曲げられます。色は右サイドバーのMeshセクションで2モードを切り替えられます: **Ramp（既定）** はメッシュ全体を共有グラデーションランプで下→上に塗り、ランプ編集が全体へ追従します。**Direct** は点をクリック→色スウォッチ→カラーピッカーで各点のHexを個別編集できます。行・列の点数（2〜8）も同じ場所で変更できます。previewとexportは同じWebGLテクスチャ経路を使います。自己交差した形状の結果は保証されません。
   - Kagaribi-15-BGはKV背景に極力寄せたグラデになっています
 - **Image Gradient Source**: 折りたたみセクションから、画像の輝度またはRGBチャンネルを現在のGradient Rampで再配色します。画像はCoverで配置され、画像本体はプリセットへ保存されません。
     - **Sキー**: ハンドル・複数ポイントのスケール
@@ -62,11 +62,12 @@ Web 版は `index.html` で Google Fonts から Noto Sans JP、Open Sans を読�
   - Radial(Expand)は中央から外側に広がる形でオススメ
 
 ### Postprocess Effect Stack
-- キャンバス左上の `Effect Stack` パネルで、Noise / Slit / Stretch / Distort / Mirror / Kaleidoscope / Voronoi / Glass / Diffuse の順序を変更できます。Diffuseは初期状態では最後尾です。
+- キャンバス左上の `Effect Stack` パネルで、Noise / Slit / Stretch / Distort / Mirror / Kaleidoscope / Voronoi / Glass / GlassTile / Diffuse の順序を変更できます。Diffuseは初期状態では最後尾です。
 - GlassはGLASS V2による滑らかな勾配ノイズとRGB別屈折率を使う画面空間の光学近似です。PostprocessのプロパティにはGlassを一つだけ表示し、色収差は最大80px、Transmission TintとHighlight Tintはカラー入力から調整できます。
+- GlassTileはGlassとは別のエフェクトで、KG_Glassのタイル表面モデルを使います。Pattern、タイルサイズ、表面形状、屈折・分散、粗さ、Mix、Edge Mode、Seedを調整できます。
 - 行のグリップをドラッグすると、行が目的位置へ収束してから描画順序が確定します。各行のスイッチでレイヤーをON/OFFできます。
 - 手描きの`Distort`はPostprocessの`Edit Layer`から編集します。旧Presetの`manualDistort`は読み込み時にPostprocessへ移行されます。
-- Postprocessの全体ON／OFFは、Effect Stack内のStretch／Distort／Mirror／Kaleidoscope／Voronoi／Glassの有効状態を反映します。各レイヤーの個別ON／OFFはEffect Stackで操作し、Postprocessプロパティでは選択レイヤーの詳細を編集します。
+- Postprocessの全体ON／OFFは、Effect Stack内のStretch／Distort／Mirror／Kaleidoscope／Voronoi／Glass／GlassTileの有効状態を反映します。各レイヤーの個別ON／OFFはEffect Stackで操作し、Postprocessプロパティでは選択レイヤーの詳細を編集します。
 - Effect Stackヘッダーのシャッフル操作で主スタックの順序をランダム化できます。現在の見た目から新しい順序へ滑らかに遷移します。行またはオンオフToggleをAltクリックすると、そのレイヤーだけを有効にするソロ操作になり、ソロ化で一時的に非表示になったレイヤーは黄色の`STAY`で示されます。同じ対象をもう一度Altクリックすると元の有効状態へ戻ります。
 - Effect Stackは別ウィンドウへ切り離せます。別ウィンドウを閉じるとインライン表示へ戻ります。
 - 固定順は `Surface → Main Stack → Prism → Particles` です。Normal、Prism、Particlesはトップバーの`SANDBOX`から編集し、DiffuseはMain Stack内の位置で一度だけ適用されます。
@@ -105,7 +106,7 @@ Web 版は `index.html` で Google Fonts から Noto Sans JP、Open Sans を読�
 - **Image**: 現在の表示内容を PNG / JPG / WebP 画像として書き出します。
 - **Slit PNGs**: スリットごとに個別 PNG を書き出します。
 - **MOV**: Tauri デスクトップ版で、外部 FFmpeg を使って QuickTime Animation(qtrle) の MOV を生成します。
-- **MP4 (H.264 RGB)**: Tauri デスクトップ版で、外部 FFmpeg を使ってRGB色空間を維持したMP4を生成します。High（CRF 18）、Balanced（CRF 22）、Small（CRF 27）を選択でき、Highが既定値です。
+- **MP4 (H.264)**: Tauri デスクトップ版で、外部 FFmpeg を使って標準的なYUV 4:2:0 / BT.709のMP4を生成します。High（CRF 18）、Balanced（CRF 22）、Small（CRF 27）を選択でき、Highが既定値です。
 - **ZIP PNG**: Web 版 / Tauri 版の両方で利用できる連番 PNG ZIP 書き出しです。FFmpeg は不要です。
 - MOV / MP4書き出しには、K-GG専用FFmpegフォルダへ`ffmpeg.exe`を配置するか、`ffmpeg`コマンドをPATHから実行できる状態にする必要があります。
 - K-GG専用フォルダはExportタブの`Open K-GG FFmpeg folder`から開けます。専用フォルダが優先され、利用できない場合はPATH上のFFmpegを確認します。

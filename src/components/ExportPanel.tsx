@@ -30,6 +30,11 @@ import type {
   VideoExportFrameRenderer,
 } from '../adapters';
 import type { AeSaveDirStatus, AeStatus } from '../lib/aftereffectsExport';
+import {
+  shouldRetryAeVideoFromNativeArtifact,
+  shouldReuseExportVideoPath,
+  type AeVideoSendMode,
+} from '../lib/afterEffectsVideoDestination';
 import { renderBridge } from '../lib/renderBridge';
 import { exportDisplayProgress, exportProgressPercent, exportStageLabel } from '../lib/exportProgress';
 import { completeVideoExport } from '../lib/videoExportLifecycle';
@@ -106,6 +111,7 @@ export function ExportPanel({
   // After Effects 連携
   const [aeStatus, setAeStatus] = useState<AeStatus | 'idle' | 'sending'>('idle');
   const [sendToAe, setSendToAe] = useState(false);
+  const [aeVideoSendMode, setAeVideoSendMode] = useState<AeVideoSendMode>('export');
   const [pendingAeVideoSends, setPendingAeVideoSends] = useState(0);
   const [aeSaveDirStatus, setAeSaveDirStatus] = useState<AeSaveDirStatus>({ mode: 'auto', path: null, name: null });
   const [bridgeAvailable, setBridgeAvailable] = useState(false);
@@ -133,7 +139,11 @@ export function ExportPanel({
   }, [bridgeAvailable]);
 
   // 動画エクスポート完了時に AE 送信できるよう最後のネイティブ成果物を保持
-  const lastVideoRef = useRef<{ artifact: NativeVideoArtifact; ext: VideoExt } | null>(null);
+  const lastVideoRef = useRef<{
+    artifact: NativeVideoArtifact;
+    ext: VideoExt;
+    exportPath: string | null;
+  } | null>(null);
   const videoSendPromisesRef = useRef(new Map<NativeVideoArtifact, Promise<void>>());
   const videoSendQueueRef = useRef<Promise<void>>(Promise.resolve());
 
@@ -215,13 +225,37 @@ export function ExportPanel({
     abortControllerRef.current?.abort();
   }
 
-  async function sendVideoToAe(artifact: NativeVideoArtifact, ext: VideoExt) {
+  async function sendVideoToAe(
+    artifact: NativeVideoArtifact,
+    ext: VideoExt,
+    exportPath: string | null = null,
+    sendMode: AeVideoSendMode = aeVideoSendMode,
+    aeSaveDir: string | null = aeSaveDirStatus.path,
+  ) {
     const requestId = aeStatusController.begin();
     if (mountedRef.current) setPendingAeVideoSends(count => count + 1);
 
+    const reuseExportPath = shouldReuseExportVideoPath(sendMode, exportPath, aeSaveDir);
     const send = videoSendQueueRef.current
       .catch(() => undefined)
-      .then(() => aeImportVideo(artifact, ext, stem));
+      .then(async () => {
+        const status = await aeImportVideo(
+          artifact,
+          ext,
+          stem,
+          reuseExportPath
+            ? { inputPath: exportPath ?? undefined, reuseSource: true }
+            : undefined,
+        );
+        if (!shouldRetryAeVideoFromNativeArtifact(status, reuseExportPath)) {
+          return status;
+        }
+
+        // 保存済みExportの許可登録がプロセス再起動などで失われた場合でも、
+        // 保持中の一時成果物はRust側で検証済みなので、AE送信自体は継続する。
+        console.warn('After Effects direct Export reuse was rejected; retrying from the retained native artifact.');
+        return await aeImportVideo(artifact, ext, stem);
+      });
     const sendSettled = send.then(() => undefined, () => undefined);
     videoSendQueueRef.current = sendSettled;
 
@@ -271,8 +305,8 @@ export function ExportPanel({
 
   async function handleAeSendVideo() {
     if (!lastVideoRef.current) return;
-    const { artifact, ext } = lastVideoRef.current;
-    await sendVideoToAe(artifact, ext);
+    const { artifact, ext, exportPath } = lastVideoRef.current;
+    await sendVideoToAe(artifact, ext, exportPath);
   }
 
   // 書き出し先フォルダハンドル（セッション中保持）
@@ -340,6 +374,7 @@ export function ExportPanel({
     let artifact: NativeVideoArtifact | null = null;
     let retained = false;
     let exportFinished = false;
+    let savedExportPath: string | null = null;
     try {
       artifact = await exportLosslessMOV({
         canvas,
@@ -357,13 +392,17 @@ export function ExportPanel({
       const completedArtifact = artifact;
       const saved = await completeVideoExport({
         save: async () => {
-          const saved = await saveNativeVideoArtifact(completedArtifact, `${stem}.mov`, dirHandleRef.current);
-          return saved && !controller.signal.aborted && mountedRef.current;
+          savedExportPath = await saveNativeVideoArtifact(completedArtifact, `${stem}.mov`, dirHandleRef.current);
+          return savedExportPath !== null && !controller.signal.aborted && mountedRef.current;
         },
         onSaved: () => {
           reportProgress(1);
           const previous = lastVideoRef.current;
-          lastVideoRef.current = { artifact: completedArtifact, ext: 'mov' };
+          lastVideoRef.current = {
+            artifact: completedArtifact,
+            ext: 'mov',
+            exportPath: savedExportPath,
+          };
           retained = true;
           if (previous) void releaseVideoWhenIdle(previous.artifact).catch(() => undefined);
           flashSaved('mov');
@@ -372,7 +411,15 @@ export function ExportPanel({
           finishExport(controller);
           exportFinished = true;
         },
-        sendToAe: sendToAe ? () => sendVideoToAe(completedArtifact, 'mov') : undefined,
+        sendToAe: sendToAe
+          ? () => sendVideoToAe(
+            completedArtifact,
+            'mov',
+            savedExportPath,
+            aeVideoSendMode,
+            aeSaveDirStatus.path,
+          )
+          : undefined,
       });
       if (!saved) return;
     } catch (e) {
@@ -407,6 +454,7 @@ export function ExportPanel({
     let artifact: NativeVideoArtifact | null = null;
     let retained = false;
     let exportFinished = false;
+    let savedExportPath: string | null = null;
     try {
       artifact = await exportHighQualityMP4({
         canvas,
@@ -425,13 +473,17 @@ export function ExportPanel({
       const completedArtifact = artifact;
       const saved = await completeVideoExport({
         save: async () => {
-          const saved = await saveNativeVideoArtifact(completedArtifact, `${stem}_h264rgb.mp4`, dirHandleRef.current);
-          return saved && !controller.signal.aborted && mountedRef.current;
+          savedExportPath = await saveNativeVideoArtifact(completedArtifact, `${stem}_h264rgb.mp4`, dirHandleRef.current);
+          return savedExportPath !== null && !controller.signal.aborted && mountedRef.current;
         },
         onSaved: () => {
           reportProgress(1);
           const previous = lastVideoRef.current;
-          lastVideoRef.current = { artifact: completedArtifact, ext: 'mp4' };
+          lastVideoRef.current = {
+            artifact: completedArtifact,
+            ext: 'mp4',
+            exportPath: savedExportPath,
+          };
           retained = true;
           if (previous) void releaseVideoWhenIdle(previous.artifact).catch(() => undefined);
           flashSaved('mp4');
@@ -440,7 +492,15 @@ export function ExportPanel({
           finishExport(controller);
           exportFinished = true;
         },
-        sendToAe: sendToAe ? () => sendVideoToAe(completedArtifact, 'mp4') : undefined,
+        sendToAe: sendToAe
+          ? () => sendVideoToAe(
+            completedArtifact,
+            'mp4',
+            savedExportPath,
+            aeVideoSendMode,
+            aeSaveDirStatus.path,
+          )
+          : undefined,
       });
       if (!saved) return;
     } catch (e) {
@@ -728,7 +788,7 @@ export function ExportPanel({
               ))}
             </select>
             <p className="text-[10px] leading-relaxed text-tab-inactive">
-              RGB色空間を維持したまま圧縮します。Highを既定値として、従来の完全無劣化出力より小さいファイルを生成します。
+              標準的なYUV 4:2:0（BT.709）で圧縮します。Highを既定値として、従来の完全無劣化出力より小さいファイルを生成します。
             </p>
           </div>
         )}
@@ -830,6 +890,39 @@ export function ExportPanel({
         {bridgeAvailable ? (
           <>
             <div className="space-y-1.5">
+              <p className="text-xs text-tab-inactive">{t('export.aeVideoDestination')}</p>
+              <label className="flex items-start gap-2 cursor-pointer select-none">
+                <input
+                  type="radio"
+                  name="ae-video-destination"
+                  value="export"
+                  checked={aeVideoSendMode === 'export'}
+                  onChange={() => setAeVideoSendMode('export')}
+                  className="mt-0.5 accent-fire"
+                />
+                <span className="text-xs text-k-text/80">
+                  {t('export.aeVideoDestinationExport')}
+                  {aeVideoSendMode === 'export' && (
+                    <span className="block text-[10px] text-tab-inactive">
+                      {t('export.aeVideoDestinationExportDescription')}
+                    </span>
+                  )}
+                </span>
+              </label>
+              <label className="flex items-start gap-2 cursor-pointer select-none">
+                <input
+                  type="radio"
+                  name="ae-video-destination"
+                  value="custom"
+                  checked={aeVideoSendMode === 'custom'}
+                  onChange={() => setAeVideoSendMode('custom')}
+                  className="mt-0.5 accent-fire"
+                />
+                <span className="text-xs text-k-text/80">{t('export.aeVideoDestinationCustom')}</span>
+              </label>
+            </div>
+
+            <div className="space-y-1.5">
               <p className="text-xs text-tab-inactive">{t('export.aeSaveDirectory')}</p>
               {aeSaveDirStatus.mode === 'custom' ? (
                 <div className="flex items-center gap-2">
@@ -855,7 +948,11 @@ export function ExportPanel({
                 </button>
               )}
               <p className="text-xs text-tab-inactive">
-                {t('export.aeSaveDirectoryDescription')}
+                {t(
+                  aeVideoSendMode === 'export'
+                    ? 'export.aeSaveDirectoryExportDescription'
+                    : 'export.aeSaveDirectoryDescription',
+                )}
               </p>
             </div>
 

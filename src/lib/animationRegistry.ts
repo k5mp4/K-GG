@@ -79,6 +79,8 @@ export function getAnimationGroup(propertyId: string, fallback = 'Properties'): 
   if (registered) return registered.group;
   if (propertyId.startsWith('gradientStop.') || propertyId.startsWith('opacityStop.')) return 'Gradient Ramp';
   if (propertyId.startsWith('gradientAnchor.')) return 'Gradient Anchors';
+  if (propertyId.startsWith('bezierControl.')) return 'Bezier Controls';
+  if (propertyId.startsWith('mesh.point.')) return 'Mesh Grid';
   const category = propertyId.split('.')[0];
   const labels: Record<string, string> = {
     noiseDistortion: 'Noise Distortion',

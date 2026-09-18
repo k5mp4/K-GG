@@ -5,11 +5,11 @@ title: 動画・連番フレーム出力
 status: current
 owners: [maintainer]
 created: 2026-07-31
-updated: 2026-09-02
+updated: 2026-09-18
 requirement_ids: [EXPORT-001, EXPORT-002, EXPORT-003, EXPORT-004, EXPORT-005, EXPORT-006, EXPORT-007, EXPORT-008, EXPORT-009, EXPORT-021]
 related_adrs: [ADR-0004, ADR-0005, ADR-0018]
 related_changes: [CHANGE-011, CHANGE-024, CHANGE-025, CHANGE-027, CHANGE-030, CHANGE-031, CHANGE-032, CHANGE-037, CHANGE-038]
-related_code: [src/adapters/browser/videoExportService.ts, src/adapters/tauri/videoExportService.ts, src/adapters/browser/exportService.ts, src/adapters/tauri/exportService.ts, src/adapters/tauri/afterEffectsService.ts, src/adapters/types.ts, src/lib/export.ts, src/lib/exportSlits.ts, src/lib/exportVideo.ts, src/lib/aftereffectsExport.ts, src/lib/aeStatusController.ts, src/lib/videoExportLifecycle.ts, src/lib/renderBridge.ts, src/lib/renderSceneAtTime.ts, src/lib/flowGradientRenderer.ts, src/lib/flowSimulation.ts, src/lib/videoExportFrames.ts, src/lib/tileRender.ts, src/lib/webgl.ts, src/lib/coneViewRenderer.ts, src/lib/clothGradientRenderer.ts, src/lib/coneSeam.ts, src/components/GradientCanvas.tsx, src/components/ClothCanvas.tsx, src/components/ConeCanvas.tsx, src/components/ExportPanel.tsx]
+related_code: [src/adapters/browser/videoExportService.ts, src/adapters/tauri/videoExportService.ts, src/adapters/browser/exportService.ts, src/adapters/tauri/exportService.ts, src/adapters/tauri/afterEffectsService.ts, src/adapters/types.ts, src/lib/export.ts, src/lib/exportSlits.ts, src/lib/exportVideo.ts, src/lib/aftereffectsExport.ts, src/lib/aeStatusController.ts, src/lib/videoExportLifecycle.ts, src/lib/renderBridge.ts, src/lib/renderSceneAtTime.ts, src/lib/flowGradientRenderer.ts, src/lib/flowSimulation.ts, src/lib/videoExportFrames.ts, src/lib/tileRender.ts, src/lib/webgl.ts, src/lib/coneViewRenderer.ts, src/lib/clothGradientRenderer.ts, src/lib/coneSeam.ts, src/components/GradientCanvas.tsx, src/components/ClothCanvas.tsx, src/components/ConeCanvas.tsx, src/components/ExportPanel.tsx, src-tauri/src/lib.rs, tools/ffmpeg-native-smoke.mjs]
 related_tests: [src/lib/renderBridge.test.ts, src/lib/effectPipeline.test.ts, src/lib/flowSimulation.test.ts, src/lib/flowGradientPreset.test.ts, src/lib/webglExportPrograms.test.ts, src/lib/webglShaderSources.test.ts, src/lib/glass.test.ts, src/lib/videoExportFrames.test.ts, src/lib/coneView.test.ts, src/lib/coneSeam.test.ts, src/lib/coneViewRenderer.test.ts, src/lib/webglPerformance.test.ts, src/lib/aftereffectsExport.test.ts, src/lib/aeStatusController.test.ts, src/lib/videoExportLifecycle.test.ts, src/adapters/tauri/exportService.test.ts, src/adapters/tauri/videoExportService.native-artifact.test.ts, src/adapters/tauri/exportService.native-artifact.test.ts, src/adapters/tauri/afterEffectsService.native-artifact.test.ts]
 ---
 
@@ -58,6 +58,8 @@ Coneモードではexport sessionのnormalizedTimeをFlow Mappingへ使用しま
 ### EXPORT-009 Tauri動画成果物の保存・解放
 
 Tauri版のMOV・MP4は、FFmpegが生成した最終動画をWebViewの`Blob`へ読み戻さず、K-GG一時領域のネイティブ動画成果物として扱います。利用者が選択した保存先へはネイティブファイルコピーで保存し、After Effects送信時は同じ成果物パスを検証済みのTauri/Rust連携境界へ渡します。
+
+Tauri版MP4は標準互換のH.264（`libx264`）／`yuv420p`で生成し、動画系サービスで解釈されるBT.709の色メタデータ、video range、正方画素（SAR `1:1`）を付与します。YUV 4:2:0で表現できない奇数寸法は、右端・下端を1px以内でpaddingして偶数寸法にします。既存連携との互換性のため、保存ファイル名に含まれる`_h264rgb`は維持しますが、実際のRGBエンコードを意味しません。
 
 保存キャンセル、失敗、書き出しcancel、画面のunmountでは未保持の成果物を解放します。最後に保存した成果物は、次の動画へ置換されるか画面がunmountされるまで保持し、After Effects送信中の場合は送信完了後に解放します。一時領域の削除に一時的な失敗があった場合は、上限付きで再試行します。
 

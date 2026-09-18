@@ -1,5 +1,9 @@
 import { buildRampTextureData, RAMP_TEX_WIDTH } from './gradientRampUtils';
-import { buildMeshGradientField } from './meshGradientField';
+import {
+  buildMeshGradientField,
+  evaluateMeshCell,
+  evaluateMeshCellDerivatives,
+} from './meshGradientField';
 import { normalizeMeshGradientConfig, type GradientConfig, type MeshGradientConfig, type Vec2Tuple } from '../types/gradient';
 
 const PREVIEW_MAX_WIDTH = 360;
@@ -69,66 +73,40 @@ function normalize2(x: number, y: number, fallbackX: number, fallbackY: number):
   return fallbackLength < 1e-5 ? [0, 1] : [fallbackX / fallbackLength, fallbackY / fallbackLength];
 }
 
-function meshBezier(p0: Vec2Tuple, p1: Vec2Tuple, p2: Vec2Tuple, p3: Vec2Tuple, t: number): Vec2Tuple {
-  const mt = 1 - t;
-  return [
-    mt * mt * mt * p0[0] + 3 * mt * mt * t * p1[0] + 3 * mt * t * t * p2[0] + t * t * t * p3[0],
-    mt * mt * mt * p0[1] + 3 * mt * mt * t * p1[1] + 3 * mt * t * t * p2[1] + t * t * t * p3[1],
-  ];
-}
-
-function meshBezierDerivative(p0: Vec2Tuple, p1: Vec2Tuple, p2: Vec2Tuple, p3: Vec2Tuple, t: number): Vec2Tuple {
-  const mt = 1 - t;
-  return [
-    3 * mt * mt * (p1[0] - p0[0]) + 6 * mt * t * (p2[0] - p1[0]) + 3 * t * t * (p3[0] - p2[0]),
-    3 * mt * mt * (p1[1] - p0[1]) + 6 * mt * t * (p2[1] - p1[1]) + 3 * t * t * (p3[1] - p2[1]),
-  ];
-}
-
-function meshPatchPoint(mesh: MeshGradientConfig, u: number, v: number): Vec2Tuple {
-  const [bl, br, tl, tr] = mesh.corners;
-  const bottom = meshBezier(bl, mesh.handles.bottom[0], mesh.handles.bottom[1], br, u);
-  const right = meshBezier(br, mesh.handles.right[0], mesh.handles.right[1], tr, v);
-  const top = meshBezier(tl, mesh.handles.top[1], mesh.handles.top[0], tr, u);
-  const left = meshBezier(bl, mesh.handles.left[1], mesh.handles.left[0], tl, v);
-  const bilinear: Vec2Tuple = [
-    (1 - u) * (1 - v) * bl[0] + u * (1 - v) * br[0] + (1 - u) * v * tl[0] + u * v * tr[0],
-    (1 - u) * (1 - v) * bl[1] + u * (1 - v) * br[1] + (1 - u) * v * tl[1] + u * v * tr[1],
-  ];
-  return [
-    (1 - v) * bottom[0] + v * top[0] + (1 - u) * left[0] + u * right[0] - bilinear[0],
-    (1 - v) * bottom[1] + v * top[1] + (1 - u) * left[1] + u * right[1] - bilinear[1],
-  ];
-}
-
-function meshPatchDerivatives(mesh: MeshGradientConfig, u: number, v: number): { du: Vec2Tuple; dv: Vec2Tuple } {
-  const [bl, br, tl, tr] = mesh.corners;
-  const bottom = meshBezier(bl, mesh.handles.bottom[0], mesh.handles.bottom[1], br, u);
-  const right = meshBezier(br, mesh.handles.right[0], mesh.handles.right[1], tr, v);
-  const top = meshBezier(tl, mesh.handles.top[1], mesh.handles.top[0], tr, u);
-  const left = meshBezier(bl, mesh.handles.left[1], mesh.handles.left[0], tl, v);
-  const bottomD = meshBezierDerivative(bl, mesh.handles.bottom[0], mesh.handles.bottom[1], br, u);
-  const rightD = meshBezierDerivative(br, mesh.handles.right[0], mesh.handles.right[1], tr, v);
-  const topD = meshBezierDerivative(tl, mesh.handles.top[1], mesh.handles.top[0], tr, u);
-  const leftD = meshBezierDerivative(bl, mesh.handles.left[1], mesh.handles.left[0], tl, v);
-  return {
-    du: [
-      (1 - v) * bottomD[0] + v * topD[0] - left[0] + right[0] - (-(1 - v) * bl[0] + (1 - v) * br[0] - v * tl[0] + v * tr[0]),
-      (1 - v) * bottomD[1] + v * topD[1] - left[1] + right[1] - (-(1 - v) * bl[1] + (1 - v) * br[1] - v * tl[1] + v * tr[1]),
-    ],
-    dv: [
-      -bottom[0] + top[0] + (1 - u) * leftD[0] + u * rightD[0] - (-(1 - u) * bl[0] - u * br[0] + (1 - u) * tl[0] + u * tr[0]),
-      -bottom[1] + top[1] + (1 - u) * leftD[1] + u * rightD[1] - (-(1 - u) * bl[1] - u * br[1] + (1 - u) * tl[1] + u * tr[1]),
-    ],
-  };
-}
-
+/**
+ * Inverse canvas → grid-domain solve. Locates the containing cell by sampling
+ * cell centers, then runs Newton inside that cell. Falls back to the closest
+ * cell center when the Jacobian degenerates.
+ */
 function inversePreviewMeshUV(mesh: MeshGradientConfig, x: number, y: number): Vec2Tuple {
-  let u = clamp01(x);
-  let v = clamp01(y);
-  for (let iteration = 0; iteration < 6; iteration += 1) {
-    const point = meshPatchPoint(mesh, u, v);
-    const derivatives = meshPatchDerivatives(mesh, u, v);
+  const rows = mesh.rows;
+  const columns = mesh.columns;
+  const cellRows = rows - 1;
+  const cellCols = columns - 1;
+
+  // Find the nearest cell center in canvas space.
+  let bestRow = 0;
+  let bestCol = 0;
+  let bestDistance = Number.POSITIVE_INFINITY;
+  for (let cellRow = 0; cellRow < cellRows; cellRow += 1) {
+    for (let cellCol = 0; cellCol < cellCols; cellCol += 1) {
+      const center = evaluateMeshCell(mesh, cellRow, cellCol, 0.5, 0.5);
+      const dx = center[0] - x;
+      const dy = center[1] - y;
+      const distance = dx * dx + dy * dy;
+      if (distance < bestDistance) {
+        bestDistance = distance;
+        bestRow = cellRow;
+        bestCol = cellCol;
+      }
+    }
+  }
+
+  let u = 0.5;
+  let v = 0.5;
+  for (let iteration = 0; iteration < 8; iteration += 1) {
+    const point = evaluateMeshCell(mesh, bestRow, bestCol, u, v);
+    const derivatives = evaluateMeshCellDerivatives(mesh, bestRow, bestCol, u, v);
     const errorX = point[0] - x;
     const errorY = point[1] - y;
     const determinant = derivatives.du[0] * derivatives.dv[1] - derivatives.du[1] * derivatives.dv[0];
@@ -136,10 +114,17 @@ function inversePreviewMeshUV(mesh: MeshGradientConfig, x: number, y: number): V
     const deltaU = (derivatives.dv[1] * errorX - derivatives.dv[0] * errorY) / determinant;
     const deltaV = (-derivatives.du[1] * errorX + derivatives.du[0] * errorY) / determinant;
     if (!Number.isFinite(deltaU) || !Number.isFinite(deltaV)) break;
-    u = Math.max(-0.25, Math.min(1.25, u - deltaU));
-    v = Math.max(-0.25, Math.min(1.25, v - deltaV));
+    const nextU = u - deltaU;
+    const nextV = v - deltaV;
+    // If Newton leaves the cell, snap back inside the local domain.
+    if (nextU < -0.2 || nextU > 1.2 || nextV < -0.2 || nextV > 1.2) break;
+    u = Math.max(0, Math.min(1, nextU));
+    v = Math.max(0, Math.min(1, nextV));
   }
-  return [clamp01(Number.isFinite(u) ? u : x), clamp01(Number.isFinite(v) ? v : y)];
+
+  const domainU = (bestCol + u) / Math.max(cellCols, 1);
+  const domainV = (bestRow + v) / Math.max(cellRows, 1);
+  return [clamp01(Number.isFinite(domainU) ? domainU : x), clamp01(Number.isFinite(domainV) ? domainV : y)];
 }
 
 export function samplePreviewMeshUV(gradient: GradientConfig, x: number, y: number): Vec2Tuple {

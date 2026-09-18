@@ -548,7 +548,8 @@ describe('V2 effect shader parity', () => {
     expect(webglSource).toContain('const useNoiseDiffusePair = renderPlan.programs.noiseDiffuseStack');
     expect(webglSource).toContain('// The combined pass consumed both adjacent logical layers.');
     expect(webglSource).toContain('markNoiseDiffuseStackFallback(ctx);');
-    expect(webglSource).toContain('noiseStackReady = requestNoiseStackProgram(ctx);');
+    expect(webglSource).toContain('noiseStackReady = requestPlanFallbackProgram(');
+    expect(webglSource).toContain('renderPlan.fallbacks.noiseDiffuseStack');
     expect(webglSource).toContain('useNoiseDiffuseStack: true');
 
     const fusedMain = getProgramSource('noiseDiffuseStack').fragment.slice(

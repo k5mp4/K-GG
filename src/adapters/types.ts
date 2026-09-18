@@ -23,6 +23,13 @@ export type AeSaveDirStatus = {
   name: string | null;
 };
 
+export type AeVideoImportOptions = {
+  /** 保存済みExportをAEが直接参照する場合に使う検証済み入力パス。 */
+  inputPath?: string;
+  /** inputPathをAE用フォルダーへ再コピーせず、そのまま読み込む。 */
+  reuseSource?: boolean;
+};
+
 export type AeRuntime = 'browser-bridge' | 'tauri-native';
 
 export type NativeVideoArtifact = {
@@ -40,7 +47,12 @@ export interface AfterEffectsService {
   chooseSaveDir(): Promise<AeSaveDirStatus>;
   clearSaveDir(): Promise<AeSaveDirStatus>;
   importImage(blob: Blob, name?: string): Promise<AeStatus>;
-  importVideo(source: Blob | NativeVideoArtifact, ext?: 'mov' | 'mp4', name?: string): Promise<AeStatus>;
+  importVideo(
+    source: Blob | NativeVideoArtifact,
+    ext?: 'mov' | 'mp4',
+    name?: string,
+    options?: AeVideoImportOptions,
+  ): Promise<AeStatus>;
 }
 export const MP4_QUALITY_PRESETS = [
   { value: 'high', label: 'High', crf: 18, description: '画質優先' },
@@ -99,7 +111,7 @@ export interface ExportService {
     artifact: NativeVideoArtifact,
     filename: string,
     dirHandle: ExportDirectoryHandle | null,
-  ): Promise<boolean>;
+  ): Promise<string | null>;
   canvasToPngBlob(canvas: HTMLCanvasElement): Promise<Blob>;
   savePNG(
     canvas: HTMLCanvasElement,

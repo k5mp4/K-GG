@@ -45,6 +45,7 @@ pub fn run() {
             list_system_fonts,
             after_effects::get_after_effects_status,
             after_effects::ping_after_effects,
+            after_effects::save_native_video_artifact,
             after_effects::send_after_effects_asset
         ])
         .run(tauri::generate_context!())
@@ -292,8 +293,8 @@ fn validate_ffmpeg(path: &Path) -> Result<ValidatedFfmpeg, String> {
     if !encoder_list_has(&encoders, "qtrle") {
         missing.push("qtrle");
     }
-    if !encoder_list_has(&encoders, "libx264rgb") {
-        missing.push("libx264rgb");
+    if !encoder_list_has(&encoders, "libx264") {
+        missing.push("libx264");
     }
     if !missing.is_empty() {
         return Err(format!(
@@ -552,7 +553,12 @@ fn font_directories() -> Vec<PathBuf> {
         }
         // User-installed fonts (including per-user installs, Adobe, Morisawa, etc.).
         if let Some(local) = std::env::var_os("LOCALAPPDATA") {
-            dirs.push(PathBuf::from(local).join("Microsoft").join("Windows").join("Fonts"));
+            dirs.push(
+                PathBuf::from(local)
+                    .join("Microsoft")
+                    .join("Windows")
+                    .join("Fonts"),
+            );
         }
         if let Some(program_files) = std::env::var_os("ProgramFiles") {
             dirs.push(PathBuf::from(&program_files).join("Fonts"));
@@ -588,7 +594,12 @@ fn font_directories() -> Vec<PathBuf> {
         dirs.push(PathBuf::from("/usr/local/share/fonts"));
         if let Some(home) = std::env::var_os("HOME") {
             dirs.push(PathBuf::from(home).join(".fonts"));
-            dirs.push(PathBuf::from(home).join(".local").join("share").join("fonts"));
+            dirs.push(
+                PathBuf::from(home)
+                    .join(".local")
+                    .join("share")
+                    .join("fonts"),
+            );
         }
     }
     dirs
@@ -605,12 +616,7 @@ fn parse_registry_font_output(output: &str) -> Vec<String> {
             // "(TrueType)" / "(OpenType)" suffix stripped.
             let type_start = line.find("REG_SZ")?;
             let raw = line[..type_start].trim();
-            let family = raw
-                .split(" (")
-                .next()
-                .unwrap_or(raw)
-                .trim()
-                .to_string();
+            let family = raw.split(" (").next().unwrap_or(raw).trim().to_string();
             (!family.is_empty()).then_some(family)
         })
         .collect()
@@ -968,13 +974,25 @@ fn h264_rgb_ffmpeg_args(
         "-i".to_string(),
         input_pattern.to_string_lossy().into_owned(),
         "-c:v".to_string(),
-        "libx264rgb".to_string(),
+        "libx264".to_string(),
         "-crf".to_string(),
         mp4_crf_for_quality(quality)?.to_string(),
         "-preset".to_string(),
         "slow".to_string(),
+        "-vf".to_string(),
+        "pad=ceil(iw/2)*2:ceil(ih/2)*2:0:0,format=yuv420p,setsar=1".to_string(),
         "-pix_fmt".to_string(),
-        "rgb24".to_string(),
+        "yuv420p".to_string(),
+        "-color_range".to_string(),
+        "tv".to_string(),
+        "-colorspace".to_string(),
+        "bt709".to_string(),
+        "-x264-params".to_string(),
+        "colorprim=bt709:transfer=bt709:colormatrix=bt709".to_string(),
+        "-color_primaries".to_string(),
+        "bt709".to_string(),
+        "-color_trc".to_string(),
+        "bt709".to_string(),
         "-movflags".to_string(),
         "+faststart".to_string(),
         output_path.to_string_lossy().into_owned(),
@@ -1026,7 +1044,12 @@ fn encode_h264_rgb_mp4_blocking(
         validate_video_export_path(&input_pattern, "frame_%04d.png", "入力パターン")?;
     let output_path = validate_video_export_path(&output_path, "output.mp4", "出力ファイル")?;
     let mut command = Command::new(&ffmpeg_path);
-    command.args(h264_rgb_ffmpeg_args(&input_pattern, &output_path, fps, &quality)?);
+    command.args(h264_rgb_ffmpeg_args(
+        &input_pattern,
+        &output_path,
+        fps,
+        &quality,
+    )?);
     configure_hidden_command(&mut command);
     let output = command
         .output()
@@ -1078,8 +1101,8 @@ mod tests {
     use super::{
         append_ffmpeg_candidates_from_path_value, backup_path, choose_candidate, encoder_list_has,
         h264_rgb_ffmpeg_args, migrate_legacy_presets, mp4_crf_for_quality, qtrle_ffmpeg_args,
-        recover_interrupted_write,
-        replace_presets_file, validate_video_export_path, VIDEO_EXPORT_TEMP_DIR,
+        recover_interrupted_write, replace_presets_file, validate_video_export_path,
+        VIDEO_EXPORT_TEMP_DIR,
     };
     use std::path::{Path, PathBuf};
     use std::time::{SystemTime, UNIX_EPOCH};
@@ -1093,7 +1116,8 @@ mod tests {
     }
 
     fn has_pair(args: &[String], first: &str, second: &str) -> bool {
-        args.windows(2).any(|pair| pair[0] == first && pair[1] == second)
+        args.windows(2)
+            .any(|pair| pair[0] == first && pair[1] == second)
     }
 
     #[test]
@@ -1118,10 +1142,10 @@ mod tests {
 
     #[test]
     fn matches_required_encoder_names_as_tokens() {
-        let output = " V....D qtrle               QuickTime Animation\n V....D libx264rgb           libx264 RGB";
+        let output = " V....D qtrle               QuickTime Animation\n V....D libx264              libx264 H.264";
         assert!(encoder_list_has(output, "qtrle"));
-        assert!(encoder_list_has(output, "libx264rgb"));
-        assert!(!encoder_list_has(output, "libx264"));
+        assert!(encoder_list_has(output, "libx264"));
+        assert!(!encoder_list_has(output, "libx264rgb"));
     }
 
     #[test]
@@ -1134,7 +1158,11 @@ mod tests {
 
     #[test]
     fn builds_qtrle_arguments_with_rgb24_and_sequence_numbering() {
-        let args = qtrle_ffmpeg_args(Path::new("C:\\kgg\\frame_%04d.png"), Path::new("C:\\kgg\\output.mov"), 24);
+        let args = qtrle_ffmpeg_args(
+            Path::new("C:\\kgg\\frame_%04d.png"),
+            Path::new("C:\\kgg\\output.mov"),
+            24,
+        );
 
         assert_eq!(args[0], "-y");
         assert!(has_pair(&args, "-framerate", "24"));
@@ -1145,7 +1173,7 @@ mod tests {
     }
 
     #[test]
-    fn builds_h264_rgb_arguments_with_quality_and_faststart() {
+    fn builds_h264_compatible_arguments_with_quality_and_color_metadata() {
         let args = h264_rgb_ffmpeg_args(
             Path::new("C:\\kgg\\frame_%04d.png"),
             Path::new("C:\\kgg\\output.mp4"),
@@ -1154,10 +1182,24 @@ mod tests {
         )
         .expect("balanced quality should be accepted");
 
-        assert!(has_pair(&args, "-c:v", "libx264rgb"));
+        assert!(has_pair(&args, "-c:v", "libx264"));
         assert!(has_pair(&args, "-crf", "22"));
         assert!(has_pair(&args, "-preset", "slow"));
-        assert!(has_pair(&args, "-pix_fmt", "rgb24"));
+        assert!(has_pair(
+            &args,
+            "-vf",
+            "pad=ceil(iw/2)*2:ceil(ih/2)*2:0:0,format=yuv420p,setsar=1"
+        ));
+        assert!(has_pair(&args, "-pix_fmt", "yuv420p"));
+        assert!(has_pair(&args, "-color_range", "tv"));
+        assert!(has_pair(&args, "-colorspace", "bt709"));
+        assert!(has_pair(
+            &args,
+            "-x264-params",
+            "colorprim=bt709:transfer=bt709:colormatrix=bt709"
+        ));
+        assert!(has_pair(&args, "-color_primaries", "bt709"));
+        assert!(has_pair(&args, "-color_trc", "bt709"));
         assert!(has_pair(&args, "-movflags", "+faststart"));
         assert_eq!(args.last().map(String::as_str), Some("C:\\kgg\\output.mp4"));
         assert!(h264_rgb_ffmpeg_args(Path::new("in"), Path::new("out"), 24, "invalid").is_err());
@@ -1341,8 +1383,14 @@ HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Windows NT\CurrentVersion\Fonts
         use super::font_name_from_file_name;
 
         assert_eq!(font_name_from_file_name("arial"), "Arial");
-        assert_eq!(font_name_from_file_name("times_new_roman"), "Times New Roman");
-        assert_eq!(font_name_from_file_name("courier-new-bold"), "Courier New Bold");
+        assert_eq!(
+            font_name_from_file_name("times_new_roman"),
+            "Times New Roman"
+        );
+        assert_eq!(
+            font_name_from_file_name("courier-new-bold"),
+            "Courier New Bold"
+        );
         assert_eq!(font_name_from_file_name("NotoSansJP"), "NotoSansJP");
         assert_eq!(font_name_from_file_name("a"), "");
     }
@@ -1356,7 +1404,8 @@ HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Windows NT\CurrentVersion\Fonts
         std::fs::create_dir_all(fonts_dir.join("sub")).expect("create fonts dirs");
         std::fs::write(fonts_dir.join("arial.ttf"), b"fixture").expect("write arial");
         std::fs::write(fonts_dir.join("ARIAL.ttf"), b"fixture").expect("write arial dup");
-        std::fs::write(fonts_dir.join("sub").join("georgia.otf"), b"fixture").expect("write georgia");
+        std::fs::write(fonts_dir.join("sub").join("georgia.otf"), b"fixture")
+            .expect("write georgia");
         std::fs::write(fonts_dir.join("readme.txt"), b"not a font").expect("write txt");
 
         let mut fonts = Vec::new();

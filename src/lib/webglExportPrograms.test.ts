@@ -24,12 +24,37 @@ function stateWithGlass(enabled: boolean): LatestState {
   } as LatestState;
 }
 
+function stateWithGlassTile(enabled: boolean): LatestState {
+  const pipeline = createDefaultEffectPipeline();
+  pipeline.effectStack = updateEffectStackLayer(pipeline.effectStack, 'glassTile', { enabled });
+  return {
+    effectPipeline: pipeline,
+    imageGradient: { enabled: false },
+    normalMap: { enabled: false, blur: 0 },
+    postprocess: {
+      glassTileMix: 1,
+      glassTileSurfaceHeight: 0.45,
+      glassTileRefraction: 28,
+      glassTileDispersion: 0.06,
+    },
+    stretch: { enabled: false },
+    diffuse: { enabled: false },
+  } as LatestState;
+}
+
 describe('export WebGL program plan', () => {
   it.each([
     ['Glass disabled', false, []],
     ['Glass enabled', true, ['stackCore', 'glassV2']],
   ])('requires the dedicated programs for %s', (_label, enabled, expected) => {
     expect(getRequiredExportProgramKeys(stateWithGlass(enabled))).toEqual(expected);
+  });
+
+  it.each([
+    ['GlassTile disabled', false, []],
+    ['GlassTile enabled', true, ['stackCore', 'glassTile']],
+  ])('requires the dedicated GlassTile program for %s', (_label, enabled, expected) => {
+    expect(getRequiredExportProgramKeys(stateWithGlassTile(enabled))).toEqual(expected);
   });
 
   it('requests Stack Core for Stipple over a protected Image Gradient', () => {

@@ -19,6 +19,7 @@ export const EFFECT_STACK_KINDS = [
   'kaleidoscope',
   'voronoi',
   'glass',
+  'glassTile',
   'diffuse',
 ] as const satisfies readonly EffectStackKind[];
 
@@ -30,6 +31,7 @@ export const POSTPROCESS_EFFECT_STACK_KINDS = [
   'kaleidoscope',
   'voronoi',
   'glass',
+  'glassTile',
 ] as const satisfies readonly EffectStackKind[];
 
 const EFFECT_STACK_KIND_SET = new Set<string>(EFFECT_STACK_KINDS);
@@ -373,6 +375,37 @@ export type NoiseDiffuseCompositionPlan = {
   reason: NoiseDiffuseCompositionReason;
 };
 
+export type RenderTargetKey = 'gradient' | 'postprocessA' | 'postprocessB'
+  | 'normal' | 'horizontalBlur' | 'prismScratch' | 'prismBlur' | 'prismGlow';
+
+export const CORE_RENDER_TARGETS: readonly RenderTargetKey[] = ['gradient', 'postprocessA', 'postprocessB'];
+export const FULL_RENDER_TARGETS: readonly RenderTargetKey[] = [
+  ...CORE_RENDER_TARGETS, 'normal', 'horizontalBlur', 'prismScratch', 'prismBlur', 'prismGlow',
+];
+
+export type RenderPlanCapability = 'webgl2' | 'rgba8-framebuffer';
+
+export type RenderPlanCapabilities = {
+  required: readonly RenderPlanCapability[];
+  unavailableFallback: 'canvas2d';
+};
+
+export type RenderPlanFallbackProgram = 'postprocess' | 'noiseStack';
+
+export type RenderPlanFallbacks = Readonly<{
+  noiseStack: 'postprocess';
+  noiseDiffuseStack: 'noiseStack';
+  glassV2: 'postprocess';
+  glassTile: 'postprocess';
+}>;
+
+const V2_RENDER_PLAN_FALLBACKS: RenderPlanFallbacks = Object.freeze({
+  noiseStack: 'postprocess',
+  noiseDiffuseStack: 'noiseStack',
+  glassV2: 'postprocess',
+  glassTile: 'postprocess',
+});
+
 export type V2RenderPlan = {
   normalizedStack: EffectStackLayer[];
   enabledLayers: EffectStackLayer[];
@@ -385,11 +418,17 @@ export type V2RenderPlan = {
   prismNeedsBlur: boolean;
   particlesRequested: boolean;
   framebufferAllocationMode: 'direct' | 'core' | 'full';
+  /** Storage requirements, independent of GPU handles and output format. */
+  framebufferTargets: readonly RenderTargetKey[];
+  capabilities: RenderPlanCapabilities;
+  fallbacks: RenderPlanFallbacks;
   programs: {
+    generator: boolean;
     stackCore: boolean;
     noiseStack: boolean;
     noiseDiffuseStack: boolean;
     glassV2: boolean;
+    glassTile: boolean;
     normalMap: boolean;
     blur: boolean;
     stretch: boolean;
@@ -565,6 +604,7 @@ export function getV2RenderPlan(
     && options.prismGlowRadius > 0.01;
   const particlesRequested = pipeline.particlesEnabled;
   const glassV2Requested = enabledLayers.some(layer => layer.kind === 'glass');
+  const glassTileRequested = enabledLayers.some(layer => layer.kind === 'glassTile');
   const noiseRequested = enabledLayers.some(layer => layer.kind === 'noise');
   const stretchRequested = enabledLayers.some(layer => layer.kind === 'stretch');
   const flowGradientEnabled = Boolean(options.flowGradientEnabled);
@@ -584,6 +624,17 @@ export function getV2RenderPlan(
       flowGradientEnabled,
     );
 
+  const framebufferTargets: RenderTargetKey[] = framebufferAllocationMode === 'direct' ? [] : [...CORE_RENDER_TARGETS];
+  if (normalRequested) framebufferTargets.push('normal');
+  if (normalNeedsBlur) framebufferTargets.push('horizontalBlur');
+  if (prismRequested) framebufferTargets.push('prismScratch');
+  if (prismNeedsBlur) framebufferTargets.push('prismBlur', 'prismGlow');
+
+  const capabilities: RenderPlanCapabilities = {
+    required: framebufferTargets.length > 0 ? ['webgl2', 'rgba8-framebuffer'] : ['webgl2'],
+    unavailableFallback: 'canvas2d',
+  };
+
   return {
     normalizedStack,
     enabledLayers,
@@ -596,7 +647,11 @@ export function getV2RenderPlan(
     prismNeedsBlur,
     particlesRequested,
     framebufferAllocationMode,
+    framebufferTargets,
+    capabilities,
+    fallbacks: V2_RENDER_PLAN_FALLBACKS,
     programs: {
+      generator: Boolean(options.imageGradientEnabled) || analyticPrefix.enabled,
       stackCore: framebufferAllocationMode !== 'direct' && requiresV2StackCore(
         pipeline,
         normalRequested,
@@ -610,6 +665,7 @@ export function getV2RenderPlan(
         && !noiseDiffuseComposition.enabled,
       noiseDiffuseStack: noiseDiffuseComposition.enabled,
       glassV2: glassV2Requested,
+      glassTile: glassTileRequested,
       normalMap: normalRequested,
       blur: normalNeedsBlur || prismNeedsBlur,
       stretch: stretchRequested,
@@ -625,5 +681,5 @@ export function requiresHeavyV2Postprocess(
   prismEnabled: boolean,
 ): boolean {
   if (prismEnabled) return true;
-  return effectStack.some(layer => layer.enabled && layer.kind === 'glass');
+  return effectStack.some(layer => layer.enabled && (layer.kind === 'glass' || layer.kind === 'glassTile'));
 }

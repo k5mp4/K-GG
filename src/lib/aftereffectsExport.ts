@@ -6,7 +6,12 @@
  */
 
 import { adapters } from '../adapters';
-import type { AeSaveDirStatus, AeStatus, NativeVideoArtifact } from '../adapters';
+import type {
+  AeSaveDirStatus,
+  AeStatus,
+  AeVideoImportOptions,
+  NativeVideoArtifact,
+} from '../adapters';
 
 export type { AeSaveDirStatus, AeStatus } from '../adapters';
 
@@ -44,6 +49,7 @@ export async function aeImportVideo(
   source: Blob | NativeVideoArtifact,
   ext: 'mov' | 'mp4' = 'mov',
   name = 'kagaribi',
+  options?: AeVideoImportOptions,
 ): Promise<AeStatus> {
-  return adapters.afterEffectsService.importVideo(source, ext, name);
+  return adapters.afterEffectsService.importVideo(source, ext, name, options);
 }

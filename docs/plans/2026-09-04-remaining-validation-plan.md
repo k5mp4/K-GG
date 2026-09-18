@@ -16,7 +16,7 @@ Issue #46 の残りの子Issue #49〜#53を、通常のMerge Gateで実行でき
 - #50: WebGLリソースの作成・解放をK-GG側で追跡し、context loss/restoreと解放後のactive countをE2E診断できる。外部拡張は補助Observationに留める。
 - #51: 変更パスに応じてBrowser E2EをCI Merge Gateとして実行し、失敗時のtrace/screenshot/video/diagnosticsを保存する。
 - #52: 固定GPU・同一runnerでの再現性とbase/head比較を手動Release Gateとして実行できる。固定GPU未接続時は未実行と記録する。
-- #53: Rust/Adapterの自動テストに加え、実FFmpegのqtrle/libx264rgb smokeとメタデータ検証を実行できる。Tauri UI自動化の方式・範囲・未導入理由を明文化する。
+- #53: Rust/Adapterの自動テストに加え、実FFmpegのqtrle/libx264 smokeとcodec、pixel format、SAR、BT.709 metadataの検証を実行できる。Tauri UI自動化の方式・範囲・未導入理由を明文化する。
 
 ## 実装単位
 
@@ -86,7 +86,7 @@ Issue #46 の残りの子Issue #49〜#53を、通常のMerge Gateで実行でき
 - `npm run check:fast`: 成功（Docs、単体1,004件、lintエラー0、production build、E2E bridge除去確認）。既存lint warningと既存Vite sourcemap/chunk warningは残る。
 - `npm run check:e2e`: 成功（4/4）。PNG、PNG ZIP/Preview復帰、resource ledger/context restore、Preview checkpointを確認。
 - `npm run check:native`: 成功（Rust 23 tests、`cargo check`）。
-- `npm run check:ffmpeg`: 成功（qtrle/rgb24 MOV、libx264rgb/gbrp MP4、各16×16・4 frames、非空、cleanup）。
+- `npm run check:ffmpeg`: 成功（qtrle/rgb24 MOV、libx264/yuv420p MP4、各16×16・4 frames、SAR 1:1、BT.709 metadata、非空、cleanup）。
 - SwiftShaderで代表条件を2回captureし、t=0/0.5/1のraw RGBAを完全一致比較: 成功。これは固定GPUの証拠ではない。
 
 固定GPU、Tauri UI、実機の長時間・driver差は、対応runner未接続のため未実行（not-run）として扱う。

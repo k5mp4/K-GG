@@ -180,10 +180,10 @@ Diceボタンを押すことでランダムなノイズを生成することが�
   - 初期設定ではアルファ付き・キャンバス解像度で書き出されます。
   - トリムモードを指定することで、各スリットの解像度に合わせて書き出しが行われます。
 - **Export MOV**: Tauri デスクトップ版で、外部 FFmpeg を使って QuickTime Animation(qtrle) の MOV を生成します。
-- **Export MP4 (H.264 RGB)**: Tauri デスクトップ版で、外部 FFmpeg を使ってRGB色空間を維持したH.264 MP4を生成します。High／Balanced／Smallの品質設定を選択でき、既定値はHigh（CRF 18）です。
+- **Export MP4 (H.264)**: Tauri デスクトップ版で、外部 FFmpeg を使って標準的なYUV 4:2:0 / BT.709のH.264 MP4を生成します。High／Balanced／Smallの品質設定を選択でき、既定値はHigh（CRF 18）です。
 - **Export ZIP PNG**: Web 版 / Tauri 版の両方で利用できる連番 PNG ZIP 書き出しです。FFmpeg は不要です。
 - デスクトップ版の起動時にK-GG専用FFmpegフォルダが作成されます。Exportタブの`Open K-GG FFmpeg folder`から開き、Windows x64版の`ffmpeg.exe`を直接配置できます。
-- K-GGは専用フォルダを先に確認し、利用できない場合はPATH上の`ffmpeg`を確認します。MOVには`qtrle`、MP4には`libx264rgb`エンコーダーが必要です。MP4は完全無劣化ではなく、品質設定に応じて圧縮されます。
+- K-GGは専用フォルダを先に確認し、利用できない場合はPATH上の`ffmpeg`を確認します。MOVには`qtrle`、MP4には`libx264`エンコーダーが必要です。MP4は完全無劣化ではなく、品質設定に応じて圧縮されます。
 - どちらにも利用可能なFFmpegがない場合、Exportタブに導入案内が表示されます。[gyan.devのFFmpeg Builds](https://www.gyan.dev/ffmpeg/builds/#release-builds)から`release essentials` ZIPを取得して展開してください。
 - K-GGはFFmpegのダウンロード、コピー、削除、PATH変更を行いません。
 

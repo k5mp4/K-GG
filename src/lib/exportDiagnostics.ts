@@ -4,6 +4,7 @@ export type ExportPlanDiagnostics = {
   readyPrograms: string[];
   glassFallback: boolean;
   glassV2Fallback: boolean;
+  glassTileFallback: boolean;
   canvasSize: [number, number];
   tilePadding: number;
 };
@@ -71,7 +72,7 @@ export function recordExportCaptureDiagnostics(phase: 'begin' | 'end'): void {
 }
 
 export function recordGlassPassDiagnostics(options: {
-  effectMode: 'glass' | 'glassV2';
+  effectMode: 'glass' | 'glassV2' | 'glassTile';
   program: WebGLProgram | null;
   sourceTexture: WebGLTexture;
   destinationFramebuffer: WebGLFramebuffer | null;

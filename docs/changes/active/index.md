@@ -8,4 +8,4 @@ Active ChangeはDesigned ChangeのPR中だけに置きます。mainへマージ�
 
 | ID | 変更 | 状態 |
 | --- | --- | --- |
-| なし | Active Changeはありません | - |
+| CHANGE-045 | [Mesh Gradationのグリッド化・直接編集UI・ベジエ操作修正](./CHANGE-045-mesh-grid-editor/proposal) | draft |

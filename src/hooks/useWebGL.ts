@@ -6,11 +6,10 @@ import {
   disposeWebGL,
   recordWebGLResourceLifecycleEvent,
   SHADER_VERSION,
+  updateGradientRampTexture,
 } from '../lib/webgl';
-import { buildRampTextureData } from '../lib/gradientRampUtils';
 import { renderBridge } from '../lib/renderBridge';
 import { AnimationLoop } from '../lib/animation';
-import { RAMP_TEX_WIDTH } from '../lib/constants';
 import { renderSceneAtTime } from '../lib/renderSceneAtTime';
 import { publishProcessedCanvasFrame } from '../lib/processedCanvasClock';
 import { getPostprocessStackSamplePadding } from '../lib/glass';
@@ -224,6 +223,7 @@ export function useWebGL(
           readyPrograms: requiredPrograms,
           glassFallback: !ctx.glassProgram && ctx.glassFallbackActive,
           glassV2Fallback: !ctx.glassV2Program && ctx.glassV2FallbackActive,
+          glassTileFallback: !ctx.glassTileProgram && ctx.glassTileFallbackActive,
           canvasSize: [snapshot.width, snapshot.height],
           tilePadding,
         },
@@ -347,12 +347,8 @@ export function useWebGL(
   useEffect(() => {
     const ctx = webglRef.current;
     if (!ctx) return;
-    const data = buildRampTextureData(gradient.stops, gradient.rampInterpolation, gradient.rampMirror ?? false, gradient.opacityStops, gradient.rampColorMode, gradient.rampVariable);
-    const { gl, gradientRampTexture } = ctx;
-    gl.activeTexture(gl.TEXTURE1);
-    gl.bindTexture(gl.TEXTURE_2D, gradientRampTexture);
-    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, RAMP_TEX_WIDTH, 1, 0, gl.RGBA, gl.UNSIGNED_BYTE, data);
-  }, [gradient.stops, gradient.opacityStops, gradient.rampColorMode, gradient.rampInterpolation, gradient.rampVariable, gradient.rampMirror, isWebGLReady]); // isWebGLReady: WebGL 初期化完了時に初回アップロードを確実に行う
+    updateGradientRampTexture(ctx, gradient);
+  }, [gradient, isWebGLReady]);
 
   return { webglRef, latestRef, isWebGLReady };
 }

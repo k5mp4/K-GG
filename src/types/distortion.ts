@@ -195,7 +195,9 @@ export type ManualDistortConfig = {
   maxDisplacement: number; // max UV displacement represented by +/-1 in the map
 };
 
-export type PostprocessEffectMode = 'distort' | 'mirror' | 'kaleidoscope' | 'prism' | 'voronoi' | 'glass' | 'glassV2' | 'particles';
+export type GlassTilePattern = 'square' | 'diamond' | 'hexagon' | 'triangle' | 'brick';
+export type GlassTileEdgeMode = 'clamp' | 'tile' | 'mirror' | 'transparent';
+export type PostprocessEffectMode = 'distort' | 'mirror' | 'kaleidoscope' | 'prism' | 'voronoi' | 'glass' | 'glassV2' | 'glassTile' | 'particles';
 export type PostprocessMirrorMode = 'horizontal' | 'vertical' | 'quad';
 export type PostprocessKaleidoscopeType = 'unfold' | 'flower' | 'starlish';
 export type PostprocessParticleBlendMode = 'alpha' | 'add';
@@ -222,7 +224,8 @@ export type EffectStackKind =
   | 'mirror'
   | 'kaleidoscope'
   | 'voronoi'
-  | 'glass';
+  | 'glass'
+  | 'glassTile';
 
 export type EffectStackLayer = {
   kind: EffectStackKind;
@@ -303,6 +306,19 @@ export type PostprocessConfig = ManualDistortConfig & {
   glassV2ChromaticSaturation: number;
   glassV2TransmissionTint: string;
   glassV2HighlightTint: string;
+  glassTilePattern: GlassTilePattern;
+  glassTileSize: number;
+  glassTileBevel: number;
+  glassTileSurfaceHeight: number;
+  glassTileCurvature: number;
+  glassTileRefraction: number;
+  glassTileDispersion: number;
+  glassTileRoughness: number;
+  glassTileDetailScale: number;
+  glassTileRotation: number;
+  glassTileMix: number;
+  glassTileEdgeMode: GlassTileEdgeMode;
+  glassTileSeed: number;
   particleCount: number;
   particleEmitterType: PostprocessParticleEmitterType;
   particleEmitterPoint: [number, number];
