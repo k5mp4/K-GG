@@ -102,7 +102,7 @@ async function probeVideo(output, expectedCodec, expectedPixFmts) {
     '-v', 'error',
     '-count_frames',
     '-select_streams', 'v:0',
-    '-show_entries', 'stream=codec_name,pix_fmt,width,height,nb_read_frames',
+    '-show_entries', 'stream=codec_name,pix_fmt,width,height,nb_read_frames,sample_aspect_ratio,color_range,color_space,color_transfer,color_primaries',
     '-of', 'json',
     output,
   ]);
@@ -121,6 +121,11 @@ async function probeVideo(output, expectedCodec, expectedPixFmts) {
     width: Number(stream.width),
     height: Number(stream.height),
     frameCount: Number(stream.nb_read_frames),
+    sampleAspectRatio: stream.sample_aspect_ratio,
+    colorRange: stream.color_range,
+    colorSpace: stream.color_space,
+    colorTransfer: stream.color_transfer,
+    colorPrimaries: stream.color_primaries,
   };
   if (actual.codecName !== expectedCodec) throw new Error(`${output} codec is ${actual.codecName}, expected ${expectedCodec}`);
   if (!expectedPixFmts.includes(actual.pixFmt)) throw new Error(`${output} pixel format is ${actual.pixFmt}, expected one of ${expectedPixFmts.join(', ')}`);
@@ -140,7 +145,7 @@ async function main() {
     schemaVersion: 1,
     kind: 'kgg-ffmpeg-native-smoke',
     status: 'not-run',
-    ffmpeg: { executable: ffmpegPath, version: null, encoders: { qtrle: false, libx264rgb: false } },
+    ffmpeg: { executable: ffmpegPath, version: null, encoders: { qtrle: false, libx264: false } },
     ffprobe: { executable: ffprobePath },
     input: { width, height, frameCount, fps },
     outputs: {},
@@ -158,9 +163,9 @@ async function main() {
     if (encoderResult.code !== 0) throw new Error(`FFmpeg encoder listing failed: ${encoderResult.stderr.trim()}`);
     const encoderText = `${encoderResult.stdout}\n${encoderResult.stderr}`;
     report.ffmpeg.encoders.qtrle = encoderAvailable(encoderText, 'qtrle');
-    report.ffmpeg.encoders.libx264rgb = encoderAvailable(encoderText, 'libx264rgb');
-    if (!report.ffmpeg.encoders.qtrle || !report.ffmpeg.encoders.libx264rgb) {
-      throw new NotRunError(`Required encoders are unavailable (qtrle=${report.ffmpeg.encoders.qtrle}, libx264rgb=${report.ffmpeg.encoders.libx264rgb})`);
+    report.ffmpeg.encoders.libx264 = encoderAvailable(encoderText, 'libx264');
+    if (!report.ffmpeg.encoders.qtrle || !report.ffmpeg.encoders.libx264) {
+      throw new NotRunError(`Required encoders are unavailable (qtrle=${report.ffmpeg.encoders.qtrle}, libx264=${report.ffmpeg.encoders.libx264})`);
     }
 
     tempDirectory = await mkdtemp(path.join(os.tmpdir(), 'kgg-ffmpeg-smoke-'));
@@ -182,10 +187,28 @@ async function main() {
     const mp4Result = await runCommand(ffmpegPath, [
       '-y', '-hide_banner', '-loglevel', 'error',
       '-framerate', String(fps), '-start_number', '0', '-i', inputPattern,
-      '-c:v', 'libx264rgb', '-crf', '22', '-preset', 'slow', '-pix_fmt', 'rgb24', '-movflags', '+faststart', mp4,
+      '-c:v', 'libx264', '-crf', '22', '-preset', 'slow',
+      '-vf', 'pad=ceil(iw/2)*2:ceil(ih/2)*2:0:0,format=yuv420p,setsar=1',
+      '-pix_fmt', 'yuv420p', '-color_range', 'tv', '-colorspace', 'bt709',
+      '-x264-params', 'colorprim=bt709:transfer=bt709:colormatrix=bt709',
+      '-color_primaries', 'bt709', '-color_trc', 'bt709', '-movflags', '+faststart', mp4,
     ]);
-    if (mp4Result.code !== 0) throw new Error(`libx264rgb encode failed: ${mp4Result.stderr.trim()}`);
-    report.outputs.mp4 = await probeVideo(mp4, 'h264', ['gbrp', 'rgb24']);
+    if (mp4Result.code !== 0) throw new Error(`libx264 encode failed: ${mp4Result.stderr.trim()}`);
+    report.outputs.mp4 = await probeVideo(mp4, 'h264', ['yuv420p']);
+    if (report.outputs.mp4.sampleAspectRatio !== '1:1') {
+      throw new Error(`MP4 sample aspect ratio is ${report.outputs.mp4.sampleAspectRatio}, expected 1:1`);
+    }
+    if (report.outputs.mp4.colorRange !== 'tv'
+      || report.outputs.mp4.colorSpace !== 'bt709'
+      || report.outputs.mp4.colorTransfer !== 'bt709'
+      || report.outputs.mp4.colorPrimaries !== 'bt709') {
+      throw new Error(`MP4 color metadata is ${JSON.stringify({
+        colorRange: report.outputs.mp4.colorRange,
+        colorSpace: report.outputs.mp4.colorSpace,
+        colorTransfer: report.outputs.mp4.colorTransfer,
+        colorPrimaries: report.outputs.mp4.colorPrimaries,
+      })}, expected BT.709/video-range`);
+    }
     report.status = 'pass';
   } catch (error) {
     report.status = error instanceof NotRunError ? 'not-run' : 'fail';

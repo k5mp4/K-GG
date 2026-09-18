@@ -32,7 +32,7 @@ export async function saveNativeVideoArtifact(
   artifact: NativeVideoArtifact,
   filename: string,
   dirHandle: ExportDirectoryHandle | null,
-): Promise<boolean> {
+): Promise<string | null> {
   const save = adapters.exportService.saveNativeVideoArtifact;
   if (!save) throw new Error('この環境ではネイティブ動画ファイルを保存できません。');
   return await save(artifact, filename, dirHandle);

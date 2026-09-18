@@ -78,6 +78,30 @@ describe('tauriAfterEffectsService native video artifact contract', () => {
     },
   );
 
+  it('passes the saved Export path through without asking Rust to copy it', async () => {
+    const artifact = {
+      kind: 'native-path',
+      path: 'C:/Temp/kagaribi-grad/export/output.mov',
+      mimeType: 'video/quicktime',
+      release: vi.fn().mockResolvedValue(undefined),
+    } as NativeVideoArtifact;
+    const exportedPath = 'C:/Exports/gradient.mov';
+
+    await expect(
+      tauriAfterEffectsService.importVideo(artifact, 'mov', 'gradient', {
+        inputPath: exportedPath,
+        reuseSource: true,
+      }),
+    ).resolves.toBe('ok');
+
+    expect(mocks.invoke).toHaveBeenCalledWith('send_after_effects_asset', {
+      request: expect.objectContaining({
+        inputPath: exportedPath,
+        reuseSource: true,
+      }),
+    });
+  });
+
   it('keeps the legacy Blob fallback for non-export callers', async () => {
     const blob = new Blob(['video'], { type: 'video/quicktime' });
 

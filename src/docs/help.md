@@ -106,7 +106,7 @@ Web 版は `index.html` で Google Fonts から Noto Sans JP、Open Sans を読�
 - **Image**: 現在の表示内容を PNG / JPG / WebP 画像として書き出します。
 - **Slit PNGs**: スリットごとに個別 PNG を書き出します。
 - **MOV**: Tauri デスクトップ版で、外部 FFmpeg を使って QuickTime Animation(qtrle) の MOV を生成します。
-- **MP4 (H.264 RGB)**: Tauri デスクトップ版で、外部 FFmpeg を使ってRGB色空間を維持したMP4を生成します。High（CRF 18）、Balanced（CRF 22）、Small（CRF 27）を選択でき、Highが既定値です。
+- **MP4 (H.264)**: Tauri デスクトップ版で、外部 FFmpeg を使って標準的なYUV 4:2:0 / BT.709のMP4を生成します。High（CRF 18）、Balanced（CRF 22）、Small（CRF 27）を選択でき、Highが既定値です。
 - **ZIP PNG**: Web 版 / Tauri 版の両方で利用できる連番 PNG ZIP 書き出しです。FFmpeg は不要です。
 - MOV / MP4書き出しには、K-GG専用FFmpegフォルダへ`ffmpeg.exe`を配置するか、`ffmpeg`コマンドをPATHから実行できる状態にする必要があります。
 - K-GG専用フォルダはExportタブの`Open K-GG FFmpeg folder`から開けます。専用フォルダが優先され、利用できない場合はPATH上のFFmpegを確認します。

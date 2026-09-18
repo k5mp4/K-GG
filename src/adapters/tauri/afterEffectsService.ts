@@ -6,6 +6,7 @@ import { isTauriRuntime } from './exportService';
 import type {
   AeSaveDirStatus,
   AeStatus,
+  AeVideoImportOptions,
   AfterEffectsService,
   NativeVideoArtifact,
 } from '../types';
@@ -19,7 +20,7 @@ type NativeStatus = {
 
 type NativeTransferResult = {
   status: AeStatus;
-  destinationKind: 'custom' | 'project' | 'temp' | null;
+  destinationKind: 'custom' | 'project' | 'temp' | 'export' | null;
   message: string | null;
 };
 
@@ -63,6 +64,7 @@ async function invokeTransfer(
   inputPath: string,
   extension: 'png' | 'mov' | 'mp4',
   name: string,
+  options?: AeVideoImportOptions,
 ): Promise<AeStatus> {
   try {
     const result = await invoke<NativeTransferResult>('send_after_effects_asset', {
@@ -71,6 +73,7 @@ async function invokeTransfer(
         extension,
         name,
         saveDir: customSaveDir,
+        reuseSource: options?.reuseSource ?? false,
       },
     });
     return result.status;
@@ -138,12 +141,21 @@ export const tauriAfterEffectsService: AfterEffectsService = {
     }
   },
 
-  async importVideo(source: Blob | NativeVideoArtifact, ext: 'mov' | 'mp4' = 'mov', name = 'kagaribi'): Promise<AeStatus> {
+  async importVideo(
+    source: Blob | NativeVideoArtifact,
+    ext: 'mov' | 'mp4' = 'mov',
+    name = 'kagaribi',
+    options?: AeVideoImportOptions,
+  ): Promise<AeStatus> {
     try {
       if (source instanceof Blob) {
-        return await withTemporaryInput(source, ext, inputPath => invokeTransfer(inputPath, ext, name));
+        return await withTemporaryInput(
+          source,
+          ext,
+          inputPath => invokeTransfer(inputPath, ext, name),
+        );
       }
-      return await invokeTransfer(source.path, ext, name);
+      return await invokeTransfer(options?.inputPath ?? source.path, ext, name, options);
     } catch {
       return 'save-failed';
     }

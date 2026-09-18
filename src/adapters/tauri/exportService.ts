@@ -1,6 +1,7 @@
+import { invoke } from '@tauri-apps/api/core';
 import { join } from '@tauri-apps/api/path';
 import { open as openDialog, save as saveDialog } from '@tauri-apps/plugin-dialog';
-import { copyFile, mkdir, writeFile } from '@tauri-apps/plugin-fs';
+import { mkdir, writeFile } from '@tauri-apps/plugin-fs';
 import {
   canvasToJpgBlob,
   canvasToPngBlob as canvasToTauriPngBlob,
@@ -80,7 +81,7 @@ export const tauriExportService: ExportService = {
     await writeFile(target, bytes);
     return true;
   },
-  async saveNativeVideoArtifact(artifact, filename, dirHandle): Promise<boolean> {
+  async saveNativeVideoArtifact(artifact, filename, dirHandle): Promise<string | null> {
     let target: string | null = null;
     if (typeof dirHandle === 'string') {
       target = await join(dirHandle, filename);
@@ -95,9 +96,13 @@ export const tauriExportService: ExportService = {
       });
     }
 
-    if (!target) return false;
-    await copyFile(artifact.path, target);
-    return true;
+    if (!target) return null;
+    return await invoke<string>('save_native_video_artifact', {
+      request: {
+        inputPath: artifact.path,
+        outputPath: target,
+      },
+    });
   },
   canvasToPngBlob: canvasToTauriPngBlob,
   async savePNG(canvas, stem, dirHandle = null) {

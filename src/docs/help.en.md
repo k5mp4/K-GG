@@ -85,7 +85,7 @@ Each property can be Static, Auto, or Keys. Switching from Auto to Keys records 
 - **Image** exports the current result as PNG, JPG, or WebP.
 - **Slit PNGs** exports one PNG for each slit.
 - **MOV** uses external FFmpeg in the Tauri desktop app to create QuickTime Animation (qtrle) MOV.
-- **MP4 (H.264 RGB)** uses external FFmpeg and offers High (CRF 18), Balanced (CRF 22), and Small (CRF 27). High is the default.
+- **MP4 (H.264)** uses external FFmpeg with standard YUV 4:2:0 / BT.709 output and offers High (CRF 18), Balanced (CRF 22), and Small (CRF 27). High is the default.
 - **ZIP PNG** exports a numbered PNG sequence in both web and Tauri builds without FFmpeg.
 
 For MOV or MP4, place `ffmpeg.exe` in the K-GG FFmpeg folder or make the `ffmpeg` command available on PATH. Open the preferred folder with **Open K-GG FFmpeg folder** in Export. K-GG does not download FFmpeg.

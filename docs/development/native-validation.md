@@ -12,7 +12,7 @@ title: Native / FFmpeg / Tauri validation
 | --- | --- | --- | --- |
 | Rust command/path/encoder contract | `npm run check:native` | Merge Gate（対象変更時） | Rust unit testと`cargo check`の結果 |
 | Browser/Tauri adapter contract | `npm run check:fast`、またはnative gateの`npm test -- src/adapters/tauri` | Merge Gate | fake/native adapter testの結果 |
-| 実FFmpeg + ffprobe | `npm run check:ffmpeg` | Native Release Gate | qtrle MOVとlibx264rgb MP4のcodec、pix_fmt、サイズ、フレーム数、非空、temp cleanup |
+| 実FFmpeg + ffprobe | `npm run check:ffmpeg` | Native Release Gate | qtrle MOVとlibx264 MP4のcodec、pix_fmt、SAR、BT.709 metadata、サイズ、フレーム数、非空、temp cleanup |
 | Tauri binary | `npx tauri build --debug --no-bundle` | Native Release Gate | 実行環境でのbuild結果 |
 | Tauri UI | WebDriver手動Release Gate | Release Gate | 起動、Preset、Preview、PNG/ZIP、native FFmpeg statusのUI証跡 |
 
@@ -23,8 +23,8 @@ title: Native / FFmpeg / Tauri validation
 `tools/ffmpeg-native-smoke.mjs`は16×16・4フレームのPNG sequenceを一時フォルダに生成し、アプリのRust commandと同じ引数で次を実行します。これは実FFmpeg processの証拠であり、Rust引数テストやmock adapter testだけでは代替できません。
 
 - qtrle / `rgb24` のMOV
-- libx264rgb / `rgb24`入力のMP4（ffprobe上の出力は通常`gbrp`）
-- `codec_name`、`pix_fmt`、width、height、frame count、file size、SHA-256
+- libx264 / `yuv420p` のMP4（BT.709、video range、SAR `1:1`）
+- `codec_name`、`pix_fmt`、width、height、frame count、SAR、color metadata、file size、SHA-256
 - smoke終了後の一時フォルダ削除
 
 Rust側の引数は`src-tauri/src/lib.rs`のunit testでcodec、pixel format、sequence numbering、CRF、faststartを固定しています。これらは実FFmpegの結果を代替しないため、Release Gateでは両方を実行します。
