@@ -5,12 +5,12 @@ title: Gradient System
 status: current
 owners: [maintainer]
 created: 2026-07-27
-updated: 2026-09-07
-requirement_ids: [GRAD-001, GRAD-002, GRAD-003, GRAD-004, GRAD-005, GRAD-006, GRAD-007, GRAD-008, GRAD-009, GRAD-010, GRAD-011, GRAD-012, GRAD-013, GRAD-014, GRAD-015, GRAD-016, GRAD-017, GRAD-018, GRAD-019, GRAD-020, GRAD-021, GRAD-022, GRAD-023, GRAD-024, GRAD-025]
+updated: 2026-09-18
+requirement_ids: [GRAD-001, GRAD-002, GRAD-003, GRAD-004, GRAD-005, GRAD-006, GRAD-007, GRAD-008, GRAD-009, GRAD-010, GRAD-011, GRAD-012, GRAD-013, GRAD-014, GRAD-015, GRAD-016, GRAD-017, GRAD-018, GRAD-019, GRAD-020, GRAD-021, GRAD-022, GRAD-023, GRAD-024, GRAD-025, GRAD-026]
 related_adrs: [ADR-0001, ADR-0003, ADR-0010, ADR-0013]
 related_changes: [CHANGE-001, CHANGE-010, CHANGE-024, CHANGE-025, CHANGE-030, CHANGE-031, CHANGE-032, CHANGE-037, CHANGE-039, CHANGE-040, CHANGE-045]
-related_code: [src/types/gradient.ts, src/types/flowGradient.ts, src/types/imageGradient.ts, src/types/renderView.ts, src/types/coneView.ts, src/store/gradientStore.ts, src/lib/gradientRampUtils.ts, src/lib/flowGradientRenderer.ts, src/lib/flowSimulation.ts, src/lib/gradientPreview.ts, src/lib/imageGradient.ts, src/lib/meshGradientField.ts, src/lib/sceneEvaluation.ts, src/lib/webgl.ts, src/lib/webglCapability.ts, src/lib/webglShaderSources.ts, src/lib/clothGradientRenderer.ts, src/lib/coneView.ts, src/lib/coneViewRenderer.ts, src/lib/coneSeam.ts, src/lib/processedCanvasClock.ts, src/lib/presetModel.ts, src/components/GradientRamp.tsx, src/components/CustomSelect.tsx, src/components/ColorPaletteGenerator.tsx, src/components/GradientCanvas.tsx, src/components/SandboxPanel.tsx, src/components/FlowGradientPanel.tsx, src/components/ClothGradientPanel.tsx, src/components/ClothCanvas.tsx, src/components/ConeCanvas.tsx, src/components/ConeViewPanel.tsx, src/components/ExportPanel.tsx, src/lib/videoExportFrames.ts, src/adapters/types.ts, src/lib/clothView.ts, src/lib/colorHarmony.ts, src/i18n/uiLabels.ts, src/i18n/messages.ts]
-related_tests: [src/types/gradient.test.ts, src/types/coneView.test.ts, src/lib/flowSimulation.test.ts, src/lib/flowGradientPreset.test.ts, src/lib/imageGradient.test.ts, src/lib/imageGradientProtected.test.ts, src/lib/meshGradient.test.ts, src/lib/proportionalRampEdit.test.ts, src/lib/sceneEvaluation.glass.test.ts, src/lib/colorHarmony.test.ts, src/lib/gradientPreview.test.ts, src/lib/videoExportFrames.test.ts, src/lib/clothView.test.ts, src/lib/coneView.test.ts, src/lib/coneSeam.test.ts, src/lib/webglCapability.test.ts, src/lib/processedCanvasClock.test.ts, src/components/ConeApexEditor.test.tsx, src/components/CustomSelect.test.tsx]
+related_code: [src/types/gradient.ts, src/types/flowGradient.ts, src/types/imageGradient.ts, src/types/renderView.ts, src/types/coneView.ts, src/store/gradientStore.ts, src/lib/gradientRampUtils.ts, src/lib/flowGradientRenderer.ts, src/lib/flowSimulation.ts, src/lib/gradientPreview.ts, src/lib/imageGradient.ts, src/lib/meshGradientField.ts, src/lib/sceneEvaluation.ts, src/lib/webgl.ts, src/lib/webglCapability.ts, src/lib/webglShaderSources.ts, src/lib/clothGradientRenderer.ts, src/lib/coneView.ts, src/lib/coneViewRenderer.ts, src/lib/coneSeam.ts, src/lib/processedCanvasClock.ts, src/lib/presetModel.ts, src/components/GradientRamp.tsx, src/components/CustomSelect.tsx, src/components/ColorPaletteGenerator.tsx, src/components/GradientCanvas.tsx, src/components/SandboxPanel.tsx, src/components/FlowGradientPanel.tsx, src/components/ClothGradientPanel.tsx, src/components/ClothCanvas.tsx, src/components/ConeCanvas.tsx, src/components/ConeViewPanel.tsx, src/components/ExportPanel.tsx, src/lib/videoExportFrames.ts, src/adapters/types.ts, src/lib/clothView.ts, src/lib/colorHarmony.ts, src/lib/colorSpace.ts, src/lib/cubehelix.ts, src/lib/perceptualGradient.ts, src/lib/gradientGenerator.ts, src/i18n/uiLabels.ts, src/i18n/messages.ts]
+related_tests: [src/types/gradient.test.ts, src/types/coneView.test.ts, src/lib/flowSimulation.test.ts, src/lib/flowGradientPreset.test.ts, src/lib/imageGradient.test.ts, src/lib/imageGradientProtected.test.ts, src/lib/meshGradient.test.ts, src/lib/proportionalRampEdit.test.ts, src/lib/sceneEvaluation.glass.test.ts, src/lib/colorHarmony.test.ts, src/lib/gradientPreview.test.ts, src/lib/videoExportFrames.test.ts, src/lib/clothView.test.ts, src/lib/coneView.test.ts, src/lib/coneSeam.test.ts, src/lib/webglCapability.test.ts, src/lib/processedCanvasClock.test.ts, src/components/ConeApexEditor.test.tsx, src/components/CustomSelect.test.tsx, src/lib/cubehelix.test.ts, src/lib/perceptualGradient.test.ts, src/lib/gradientGenerator.test.ts]
 ---
 
 # Gradient System
@@ -102,6 +102,17 @@ GradientRampは、グラデーション形式／タイプの直後に色・不�
 
 GradientRampのColor Mode／Interp候補プレビューとColor Palette GeneratorのHarmonyルール候補プレビューは、それぞれ独立した表示切替を持ちます。一方を展開・収納しても、もう一方の表示状態は変更しません。どちらの表示stateもGradientやPresetへ保存しません。
 
+### GRAD-026 連続軌道にもとづくGradient Generator
+
+Color Palette Generatorには、離散的な色同士の関係を作るColor Harmony、画像から代表色を抽出するImage Paletteとは別に、連続した色軌道からGradient stopを生成するGradient Generatorを持ちます。Generatorの既定stop数は5で、適用可能なstop数は3〜10です。内部の軌道評価・知覚的再サンプリングはユーザー向けstop数と分離し、通常128サンプルを使います。
+
+Algorithmは次の2方式を切り替えられます。
+
+- **Cubehelix**: Dave GreenのCubehelix原式（start hue、符号付きrotation、hue amplitude、gamma、lightness start/end）を使い、OKLCH trajectoryやΔE補正を自動的には加えません。RGB値は有限値・sRGB範囲へ安全に収めます。原式の参照実装は[Dave GreenのFortran reference implementation](https://people.phy.cam.ac.uk/dag9/CUBEHELIX/cubhlx.f)です。
+- **Perceptual**: OKLCH上でLightness・Chroma・Hueを1本の滑らかなtrajectoryとして評価します。Sweep、Soft、Pastel、Deep、Accentのfamilyごとにcurveとsafe rangeを変え、各位置のsRGB最大Chromaを二分探索してから変換します。範囲外の色はRGBを単純clampせず、LightnessとHueを保ちながらChromaを下げます。OKLab距離の累積arc lengthによる再サンプリングは、元のparameterizationとblendしてAccentなどの局所的な変化を保持します。
+
+UIのHue Travel、Color Intensity、Brightness、Contrast、Family、Accent位置／幅はアルゴリズム固有値へ直接渡さず、安全範囲へremapします。ShuffleはランダムなHex色列を作らず、各方式の有効なパラメータだけを変えます。Gradient Previewは生成stop列を既存の`buildGradientPreviewStyle`で表示し、Apply時は同じsRGB linear stop chain（repeat 1、mirror off）を`applicationCommands.setGradient()`へ渡すため、Generator previewとGradient Rampの表示条件を一致させます。既存のHarmony Palette、Image Palette、Preset形式、Gradient Rampの既存補間処理は変更しません。
+
 ### GRAD-015 Preview表示アダプター
 
 Previewは2D Canvasを既定とし、SANDBOXのEdit LayerでClothまたはConeモジュールをONにすると該当する3D表示アダプターへ切り替わります。専用のPreview Surface／プレビュー表示モードUIは表示しません。ClothまたはConeをOFFにすると2D Canvasへ戻り、表示状態は一時的でPresetへ保存しません。
@@ -158,6 +169,8 @@ kgg-control/MCPには、Bezier制御点の移動（`set_bezier_control`）、Mes
 ## 変更履歴
 
 この現行仕様の初期整理に参照したLegacy Change Specificationは次のとおりです。
+
+- 2026-09-18: Color Palette GeneratorへCubehelix／Perceptual Gradient Generatorを追加し、GRAD-026として連続軌道・gamut mapping・適用条件を現行仕様化。
 
 - [SPEC-009 Image Gradient Source](../SPEC-009-image-gradient-source)
 - [SPEC-019 Gradient Rampストップ編集](../SPEC-019-proportional-gradient-stop-editing)
