@@ -58,7 +58,11 @@ export default defineConfig({
     },
   },
   webServer: {
-    command: `npx vite --host 127.0.0.1 --port ${port} --strictPort`,
+    // Complete Vite's dependency optimizer before Playwright opens a page.
+    // Otherwise the first browser request can trigger a late re-optimization
+    // and leave dynamic WebGL tooling imports pending for longer than the
+    // bridge's startup timeout.
+    command: `npx vite optimize --config vite.config.ts && npx vite --host 127.0.0.1 --port ${port} --strictPort`,
     url: `${baseURL}/`,
     reuseExistingServer: !process.env.CI,
     timeout: 120_000,

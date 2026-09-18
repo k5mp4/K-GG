@@ -199,6 +199,13 @@ export async function loadDevelopmentWebGLTools(): Promise<DevelopmentTools> {
   if (!import.meta.env.DEV) {
     return { statsModule: null, memoryLoaded: false, lintLoaded: false };
   }
+  // Browser E2E checks exercise rendering and resource lifecycle behavior,
+  // not the optional developer overlays. Loading these three large modules
+  // before the first WebGL context is created makes a cold Vite server wait
+  // on multiple dynamic imports and can exceed the browser boot budget.
+  if (import.meta.env.VITE_KGG_E2E === '1') {
+    return { statsModule: null, memoryLoaded: false, lintLoaded: false };
+  }
   if (!developmentToolsPromise) {
     developmentToolsPromise = Promise.allSettled([
       import('stats-gl'),

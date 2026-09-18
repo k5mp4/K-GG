@@ -34,6 +34,24 @@ async function readBridgeDiagnostics(page: Page): Promise<unknown> {
   });
 }
 
+async function readBootDiagnostics(page: Page): Promise<unknown> {
+  return page.evaluate(() => {
+    const root = window as Window & { __KGG_E2E__?: E2EPageBridge };
+    const canvas = document.querySelector<HTMLCanvasElement>('#kgg-preview-canvas');
+    const resourceUrls = performance.getEntriesByType('resource')
+      .map(entry => entry.name)
+      .filter(name => /(?:\/src\/|\/vendor\/tweeq\/|\/@vite\/|\/@react-refresh|\/node_modules\/)/.test(name))
+      .slice(-50);
+    return {
+      readyState: document.readyState,
+      rootChildCount: document.querySelector('#root')?.childElementCount ?? null,
+      canvas: canvas ? { width: canvas.width, height: canvas.height } : null,
+      bridgeAvailable: Boolean(root.__KGG_E2E__),
+      resourceUrls,
+    };
+  });
+}
+
 async function attachDiagnostics(
   page: Page,
   testInfo: TestInfo,
@@ -60,6 +78,10 @@ async function attachDiagnostics(
     test: testInfo.title,
     errors: capture.errors,
     unhandledRejections,
+    boot: await readBootDiagnostics(page).catch(error => ({
+      available: false,
+      error: error instanceof Error ? error.message : String(error),
+    })),
     bridge: await readBridgeDiagnostics(page).catch(error => ({
       available: false,
       error: error instanceof Error ? error.message : String(error),
@@ -115,7 +137,32 @@ export const test = base.extend<{ browserErrors: BrowserErrorCapture }>({
       capture.errors.push({ kind: 'pageerror', message: error.message, location: error.stack });
     });
 
-    await runFixture(capture);
+    let fixtureFailed = false;
+    let fixtureError: unknown;
+    try {
+      await runFixture(capture);
+    } catch (error) {
+      fixtureFailed = true;
+      fixtureError = error;
+    }
+
+    // A failed page.evaluate (especially during WebGL startup) can leave the
+    // renderer unresponsive. Do not issue more evaluations during teardown;
+    // Playwright's trace, screenshot, and the original fixture error already
+    // provide failure evidence without extending a 30s failure into minutes.
+    if (fixtureFailed) {
+      const errorMessage = fixtureError instanceof Error ? fixtureError.message : String(fixtureError);
+      await testInfo.attach('kgg-e2e-diagnostics.json', {
+        body: Buffer.from(JSON.stringify({
+          browser: { project: testInfo.project.name },
+          test: testInfo.title,
+          failure: errorMessage,
+          errors: capture.errors,
+        }, null, 2), 'utf8'),
+        contentType: 'application/json',
+      }).catch(() => undefined);
+      throw fixtureError;
+    }
 
     const unhandledRejections = await readUnhandledRejections(page).catch(() => []);
     const allowContextLifecycleDiagnostics = await page.evaluate(() => {
@@ -130,7 +177,7 @@ export const test = base.extend<{ browserErrors: BrowserErrorCapture }>({
       || unhandledRejections.length > 0
       || testInfo.status !== testInfo.expectedStatus
     ) {
-      await attachDiagnostics(page, testInfo, capture, unhandledRejections);
+      await attachDiagnostics(page, testInfo, capture, unhandledRejections).catch(() => undefined);
     }
 
     if (actionableErrors.length > 0 || unhandledRejections.length > 0) {

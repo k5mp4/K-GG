@@ -2,6 +2,7 @@ import { test, expect } from './fixtures';
 import {
   exerciseResourceLifecycle,
   loseAndRestoreContext,
+  waitForE2EBridge,
   waitForWebGLReady,
 } from './support/bridge';
 
@@ -11,7 +12,7 @@ test('WebGL resource ledger survives effect/resize churn and context restore', a
     root.__KGG_E2E_EXPECT_CONTEXT_LIFECYCLE__ = true;
   });
   await page.goto('/', { waitUntil: 'domcontentloaded' });
-  await page.waitForFunction(() => Boolean(window.__KGG_E2E__), undefined, { timeout: 30_000 });
+  await waitForE2EBridge(page);
   const initial = await waitForWebGLReady(page);
 
   const lifecycle = await exerciseResourceLifecycle(page);

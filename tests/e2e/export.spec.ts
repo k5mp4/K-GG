@@ -6,6 +6,7 @@ import {
   dataUrlToBytes,
   prepareZipSmoke,
   setNormalizedTime,
+  waitForE2EBridge,
   waitForExportComplete,
   waitForWebGLReady,
 } from './support/bridge';
@@ -13,7 +14,7 @@ import { decodePngRgba, parsePngMetadata, validateFrameZip } from './support/art
 
 async function openExportPanel(page: Parameters<typeof waitForWebGLReady>[0]) {
   await page.goto('/', { waitUntil: 'domcontentloaded' });
-  await page.waitForFunction(() => Boolean(window.__KGG_E2E__), undefined, { timeout: 30_000 });
+  await waitForE2EBridge(page);
   const diagnostics = await waitForWebGLReady(page);
   const canvas = page.locator('#kgg-preview-canvas');
   await expect(canvas).toBeVisible();

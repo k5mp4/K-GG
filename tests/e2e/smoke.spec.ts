@@ -1,10 +1,10 @@
 import { test, expect } from './fixtures';
-import { dataUrlToBytes, setNormalizedTime, waitForWebGLReady } from './support/bridge';
+import { dataUrlToBytes, setNormalizedTime, waitForE2EBridge, waitForWebGLReady } from './support/bridge';
 import { decodePngRgba, parsePngMetadata } from './support/artifacts';
 
 test('Preview renders deterministic checkpoints in a real browser Canvas', async ({ page, browserErrors: _browserErrors }) => {
   await page.goto('/', { waitUntil: 'domcontentloaded' });
-  await page.waitForFunction(() => Boolean(window.__KGG_E2E__), undefined, { timeout: 30_000 });
+  await waitForE2EBridge(page);
 
   const diagnostics = await waitForWebGLReady(page);
   const canvas = page.locator('#kgg-preview-canvas');
