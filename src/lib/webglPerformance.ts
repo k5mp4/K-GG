@@ -195,15 +195,26 @@ export function resolveSpectorConstructor(module: unknown): SpectorConstructor |
 
 let developmentToolsPromise: Promise<DevelopmentTools> | null = null;
 
+export type DevelopmentWebGLToolEnvironment = {
+  dev: boolean;
+  e2e?: string;
+  debugTools?: string;
+};
+
+export function shouldLoadDevelopmentWebGLTools(environment: DevelopmentWebGLToolEnvironment): boolean {
+  return environment.dev && environment.e2e !== '1' && environment.debugTools === '1';
+}
+
 export async function loadDevelopmentWebGLTools(): Promise<DevelopmentTools> {
-  if (!import.meta.env.DEV) {
-    return { statsModule: null, memoryLoaded: false, lintLoaded: false };
-  }
-  // Browser E2E checks exercise rendering and resource lifecycle behavior,
-  // not the optional developer overlays. Loading these three large modules
-  // before the first WebGL context is created makes a cold Vite server wait
-  // on multiple dynamic imports and can exceed the browser boot budget.
-  if (import.meta.env.VITE_KGG_E2E === '1') {
+  // webgl-lint and webgl-memory wrap every WebGL call, even when their
+  // validation checks are configured off. Keep the timer-query profiler
+  // available by default, and opt into those heavyweight wrappers only when
+  // debugging WebGL API correctness itself.
+  if (!shouldLoadDevelopmentWebGLTools({
+    dev: import.meta.env.DEV,
+    e2e: import.meta.env.VITE_KGG_E2E,
+    debugTools: import.meta.env.VITE_KGG_WEBGL_DEBUG_TOOLS,
+  })) {
     return { statsModule: null, memoryLoaded: false, lintLoaded: false };
   }
   if (!developmentToolsPromise) {

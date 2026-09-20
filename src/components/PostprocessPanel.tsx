@@ -14,6 +14,7 @@ import { InputColor, InputDrum, InputRadio, InputString } from 'tweeq';
 import { hasEnabledPostprocessEffectStack } from '../lib/effectPipeline';
 import { getDiffuseGrainParameterLimitKey } from '../lib/parameterLimits';
 import { VORONOI_FEATURES, VORONOI_METRICS } from '../lib/voronoi';
+import { VideoMotionPanel } from './VideoMotionPanel';
 
 const D = STORE_DEFAULTS.manualDistort;
 const GLASS_COLOR_INPUT_CLASS = 'tq-color-input w-[132px] min-w-0 flex-none border border-panel-border bg-k-bg/50';
@@ -348,9 +349,14 @@ type PostprocessPanelProps = {
 export function PostprocessPanel({ sandboxMode, embedded = false }: PostprocessPanelProps = {}) {
   const { t } = useLanguage();
   const { gradient, postprocess, effectPipeline } = useGradientStore();
-  const { setGradient, setPostprocess } = applicationCommands;
+  const { setGradient, setPostprocess, setEffectPipeline } = applicationCommands;
+  const selectedVideoMotion = !sandboxMode
+    && effectPipeline.version === 'stack-v2'
+    && effectPipeline.selectedKind === 'videoMotion';
   const activeEffectMode = sandboxMode ?? (
-    postprocess.effectMode === 'prism' || postprocess.effectMode === 'particles'
+    selectedVideoMotion
+      ? 'videoMotion'
+      : postprocess.effectMode === 'prism' || postprocess.effectMode === 'particles'
       ? 'distort'
       : postprocess.effectMode
   );
@@ -403,13 +409,25 @@ export function PostprocessPanel({ sandboxMode, embedded = false }: PostprocessP
             { value: 'voronoi', label: 'Voronoi' },
             { value: 'glassV2', label: 'Glass' },
             { value: 'glassTile', label: 'GlassTile' },
+            { value: 'videoMotion', label: 'Video Motion' },
           ]}
-          onChange={(value) => setEffectMode(value as typeof postprocess.effectMode)}
+          onChange={(value) => {
+            if (value === 'videoMotion') {
+              setEffectPipeline({ selectedKind: 'videoMotion' });
+            } else {
+              setEffectMode(value as typeof postprocess.effectMode);
+            }
+          }}
         />
       )}
 
       <Collapsible isOpen>
         <div className="space-y-4 pt-2">
+          <div hidden={activeEffectMode !== 'videoMotion'}>
+            <VideoMotionPanel />
+          </div>
+          {activeEffectMode !== 'videoMotion' && (
+          <>
           {isDistort ? (
             <ManualDistortControls
               title="Distort"
@@ -1264,6 +1282,8 @@ export function PostprocessPanel({ sandboxMode, embedded = false }: PostprocessP
               </div>
             </Collapsible>
           </div>
+          )}
+          </>
           )}
         </div>
       </Collapsible>

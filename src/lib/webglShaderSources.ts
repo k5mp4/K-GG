@@ -24,6 +24,7 @@ import flowSplatVertexGLSL from '../shaders/flow-splat.vert.glsl?raw';
 import flowSplatFragmentGLSL from '../shaders/flow-splat.frag.glsl?raw';
 import flowTrailFragmentGLSL from '../shaders/flow-trail.frag.glsl?raw';
 import flowGradientFragmentGLSL from '../shaders/flow-gradient.frag.glsl?raw';
+import videoMotionGLSL from '../shaders/video-motion.frag.glsl?raw';
 
 const postprocessGLSL = [
   postprocessUniformsGLSL,
@@ -55,7 +56,8 @@ export type LazyProgramKey =
   | 'seamless'
   | 'flowSplat'
   | 'flowTrail'
-  | 'flowComposite';
+  | 'flowComposite'
+  | 'videoMotion';
 
 export type ProgramSource = {
   vertex: string;
@@ -162,6 +164,7 @@ export const SHADER_VERSION = (
   + flowSplatFragmentGLSL.length * 61
   + flowTrailFragmentGLSL.length * 59
   + flowGradientFragmentGLSL.length * 53
+  + videoMotionGLSL.length * 47
 ) | 0;
 
 // Keep these symbols in the dedicated Glass sources explicitly instead of
@@ -302,6 +305,7 @@ export function getProgramSource(key: LazyProgramKey): ProgramSource {
   if (key === 'flowSplat') return { vertex: flowSplatVertexGLSL, fragment: flowSplatFragmentGLSL };
   if (key === 'flowTrail') return { vertex: vertexGLSL, fragment: flowTrailFragmentGLSL };
   if (key === 'flowComposite') return { vertex: vertexGLSL, fragment: flowGradientFragmentGLSL };
+  if (key === 'videoMotion') return { vertex: vertexGLSL, fragment: videoMotionGLSL };
   return { vertex: particlesVertexGLSL, fragment: particlesFragmentGLSL };
 }
 

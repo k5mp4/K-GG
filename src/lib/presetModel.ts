@@ -29,6 +29,8 @@ import { normalizeSeamlessConfig } from '../types/seamless';
 import type { FlowGradientConfig } from '../types/flowGradient';
 import { normalizeFlowGradientConfig } from '../types/flowGradient';
 import { isRemovedAnimationProperty } from './animationRegistry';
+import type { VideoMotionConfig } from '../types/videoMotion';
+import { normalizeVideoMotionConfig } from '../types/videoMotion';
 
 export type StoreSnapshot = {
   gradient: GradientConfig;
@@ -43,6 +45,7 @@ export type StoreSnapshot = {
   coneView?: ConeViewConfig;
   seamless?: SeamlessConfig;
   flowGradient?: FlowGradientConfig;
+  videoMotion?: VideoMotionConfig;
   radon: RadonConfig;
   iridescence?: IridescenceConfig;
   manualDistort?: ManualDistortConfig;
@@ -135,6 +138,7 @@ export function makePreset(
       coneView: normalizeConeViewConfig(state.coneView),
       seamless: normalizeSeamlessConfig(state.seamless),
       flowGradient: normalizeFlowGradientConfig(state.flowGradient),
+      videoMotion: normalizeVideoMotionConfig(state.videoMotion),
       effectPipeline: state.effectPipeline
         ? normalizeEffectPipelineConfig(state.effectPipeline)
         : createDefaultEffectPipeline(),

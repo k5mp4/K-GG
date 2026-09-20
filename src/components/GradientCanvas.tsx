@@ -12,9 +12,12 @@ import { renderSceneAtTime } from '../lib/renderSceneAtTime';
 import { renderBridge } from '../lib/renderBridge';
 import { LatestFrameScheduler } from '../lib/latestFrameScheduler';
 import { publishProcessedCanvasFrame } from '../lib/processedCanvasClock';
+import { syncVideoMotionToTimeline } from '../lib/videoMotionRuntime';
+import { isEffectStackLayerEnabled } from '../lib/effectPipeline';
 import { useLanguage } from '../i18n/LanguageProvider';
 import { WebGLPerformancePanel } from './WebGLPerformancePanel';
 import type { KggControlProjectAdapter, KggControlUiAdapter } from '../lib/kggControlRuntime';
+import type { LatestState } from '../types/latestState';
 
 
 type Props = {
@@ -42,7 +45,7 @@ export function GradientCanvas({ width = 800, height = 800, animLoopRef, seekVer
     staticRenderSchedulerRef.current = new LatestFrameScheduler();
   }
 
-  const { gradient, noiseDistortion, diffuse, imageGradient, slitScan, stretch, animation, normalMap, radon, iridescence, manualDistort, postprocess, effectPipeline, matcap, keyframeTracks, currentTime, clothGradient, seamless, flowGradient } = useGradientStore(useShallow(selectRenderState));
+  const { gradient, noiseDistortion, diffuse, imageGradient, slitScan, stretch, animation, normalMap, radon, iridescence, manualDistort, postprocess, effectPipeline, matcap, keyframeTracks, currentTime, clothGradient, seamless, flowGradient, videoMotion } = useGradientStore(useShallow(selectRenderState));
   const clothGradientForCanvas = disableClothBase
     ? { ...clothGradient, enabled: false }
     : clothGradient;
@@ -50,6 +53,19 @@ export function GradientCanvas({ width = 800, height = 800, animLoopRef, seekVer
   const { webglRef, latestRef, isWebGLReady } = useWebGL(canvasRef, animLoopRef, gradient, { ui: controlUi, project: controlProject });
 
   const [lazyProgramReadyCount, setLazyProgramReadyCount] = useState(0);
+
+  const syncVideoMotionFrame = (frameState: LatestState, normalizedTime: number, timelinePlaying: boolean) => {
+    const enabled = frameState.effectPipeline.version === 'stack-v2'
+      ? isEffectStackLayerEnabled(frameState.effectPipeline, 'videoMotion')
+      : frameState.videoMotion?.enabled === true;
+    if (!enabled || !frameState.videoMotion) return;
+    syncVideoMotionToTimeline(
+      normalizedTime,
+      frameState.animation.duration,
+      frameState.videoMotion,
+      { timelinePlaying, timelineControlled: frameState.animation.enabled },
+    );
+  };
 
   useEffect(() => {
     if (isWebGLReady) return;
@@ -72,13 +88,31 @@ export function GradientCanvas({ width = 800, height = 800, animLoopRef, seekVer
     return () => window.removeEventListener('kgg:webgl-lazy-program-state', handleProgramState);
   }, []);
 
+  useEffect(() => {
+    const handleVideoMotionFrame = () => {
+      const ctx = webglRef.current;
+      const frameState = latestRef.current;
+      if (!ctx || !frameState) return;
+      renderBridge.renderPreview(() => {
+        const normalizedTime = frameState.animation.enabled
+          ? (animLoopRef.current?.currentNormalizedTime ?? useGradientStore.getState().currentTime)
+          : 0;
+        syncVideoMotionFrame(frameState, normalizedTime, Boolean(frameState.animation.enabled && !(animLoopRef.current?.isPaused ?? true)));
+        renderSceneAtTime(ctx, frameState, normalizedTime, {});
+        publishProcessedCanvasFrame(normalizedTime);
+      });
+    };
+    window.addEventListener('kgg:video-motion-frame', handleVideoMotionFrame);
+    return () => window.removeEventListener('kgg:video-motion-frame', handleVideoMotionFrame);
+  }, [animLoopRef, latestRef, webglRef]);
+
   useEffect(() => () => {
     staticRenderSchedulerRef.current?.cancel();
   }, []);
 
   // latestRef を毎レンダー更新（ブラウザ描画前に同期更新し、RAFループが即座に最新値を参照できるようにする）
   useLayoutEffect(() => {
-    latestRef.current = { gradient, noiseDistortion, diffuse, imageGradient, slitScan, stretch, normalMap, radon, iridescence, manualDistort, postprocess, effectPipeline, matcap, animation, keyframeTracks, width, height, animDirection: animation.direction, sourceImageCanvas, imageGradientSource, imageMaskSource, imageMaskEnabled, clothGradient: clothGradientForCanvas, seamless, flowGradient };
+    latestRef.current = { gradient, noiseDistortion, diffuse, imageGradient, slitScan, stretch, normalMap, radon, iridescence, manualDistort, postprocess, effectPipeline, matcap, animation, keyframeTracks, width, height, animDirection: animation.direction, sourceImageCanvas, imageGradientSource, imageMaskSource, imageMaskEnabled, clothGradient: clothGradientForCanvas, seamless, flowGradient, videoMotion };
   });
 
   // 静止レンダリング（アニメーション停止中の状態変化に反応）
@@ -97,11 +131,12 @@ export function GradientCanvas({ width = 800, height = 800, animLoopRef, seekVer
         ? (animLoopRef.current?.currentNormalizedTime ?? useGradientStore.getState().currentTime)
         : 0;
       renderBridge.renderPreview(() => {
+        syncVideoMotionFrame(frameState, normalizedTime, Boolean(frameState.animation.enabled && !(animLoopRef.current?.isPaused ?? true)));
         renderSceneAtTime(ctx, frameState, normalizedTime, {});
         publishProcessedCanvasFrame(normalizedTime);
       });
     });
-  }, [gradient, noiseDistortion, diffuse, imageGradient, slitScan, stretch, normalMap, radon, iridescence, manualDistort, postprocess, effectPipeline, clothGradient, seamless, flowGradient, disableClothBase, width, height, animation.enabled, animation.speed, animation.direction, animation.easing, animation.affectNoise, animation.affectSlit, animation.affectRamp, animation.affectStretch, keyframeTracks, currentTime, lazyProgramReadyCount, seekVersion, isWebGLReady, sourceImageCanvas, imageGradientSource, imageMaskSource, imageMaskEnabled]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [gradient, noiseDistortion, diffuse, imageGradient, slitScan, stretch, normalMap, radon, iridescence, manualDistort, postprocess, effectPipeline, clothGradient, seamless, flowGradient, videoMotion, disableClothBase, width, height, animation.enabled, animation.speed, animation.direction, animation.easing, animation.affectNoise, animation.affectSlit, animation.affectRamp, animation.affectStretch, keyframeTracks, currentTime, lazyProgramReadyCount, seekVersion, isWebGLReady, sourceImageCanvas, imageGradientSource, imageMaskSource, imageMaskEnabled]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // アニメーションループの管理
   useEffect(() => {
@@ -131,6 +166,7 @@ export function GradientCanvas({ width = 800, height = 800, animLoopRef, seekVer
           const frameState = latestRef.current;
           if (!ctx || !frameState) return;
           renderBridge.renderPreview(() => {
+            syncVideoMotionFrame(frameState, normalizedTime, Boolean(frameState.animation.enabled && !(animLoopRef.current?.isPaused ?? true)));
             renderSceneAtTime(ctx, frameState, normalizedTime, {});
             publishProcessedCanvasFrame(normalizedTime);
           });
@@ -159,12 +195,12 @@ export function GradientCanvas({ width = 800, height = 800, animLoopRef, seekVer
         const frameState = latestRef.current;
         if (!ctx || !frameState || hasActiveAnimation(frameState)) return;
         renderBridge.renderPreview(() => {
-          renderSceneAtTime(ctx, frameState, frameState.animation.enabled
+          const normalizedTime = frameState.animation.enabled
             ? useGradientStore.getState().currentTime
-            : 0, {});
-          publishProcessedCanvasFrame(frameState.animation.enabled
-            ? useGradientStore.getState().currentTime
-            : 0);
+            : 0;
+          syncVideoMotionFrame(frameState, normalizedTime, Boolean(frameState.animation.enabled && !(animLoopRef.current?.isPaused ?? true)));
+          renderSceneAtTime(ctx, frameState, normalizedTime, {});
+          publishProcessedCanvasFrame(normalizedTime);
         });
       });
     }
@@ -258,9 +294,11 @@ export function GradientCanvas({ width = 800, height = 800, animLoopRef, seekVer
           const ctx = webglRef.current;
           const frameState = latestRef.current;
           if (!ctx || !frameState) return;
-          renderSceneAtTime(ctx, frameState, frameState.animation.enabled
+          const normalizedTime = frameState.animation.enabled
             ? (animLoopRef.current?.currentNormalizedTime ?? useGradientStore.getState().currentTime)
-            : 0, { allowEffectStackTransition: false });
+            : 0;
+          syncVideoMotionFrame(frameState, normalizedTime, Boolean(frameState.animation.enabled && !(animLoopRef.current?.isPaused ?? true)));
+          renderSceneAtTime(ctx, frameState, normalizedTime, { allowEffectStackTransition: false });
         }}
       />
     </div>

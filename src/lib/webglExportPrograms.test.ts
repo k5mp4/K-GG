@@ -121,6 +121,17 @@ describe('export WebGL program plan', () => {
     expect(getRequiredExportProgramKeys(state)).toEqual(['stackCore', 'flowSplat', 'flowTrail', 'flowComposite']);
   });
 
+  it('requests Video Motion from the enabled Effect Stack layer', () => {
+    const state = stateWithGlass(false);
+    state.effectPipeline.effectStack = [
+      ...state.effectPipeline.effectStack,
+      { kind: 'videoMotion', enabled: true },
+    ];
+    state.videoMotion = { ...(state.videoMotion ?? {}), enabled: false } as LatestState['videoMotion'];
+
+    expect(getRequiredExportProgramKeys(state)).toEqual(['stackCore', 'videoMotion']);
+  });
+
   it('exposes the standalone Seamless shader uniforms', () => {
     const source = getProgramSource('seamless');
 

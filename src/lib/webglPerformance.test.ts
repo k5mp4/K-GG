@@ -12,10 +12,18 @@ import {
   onePercentLowFrameMs,
   resolveSpectorConstructor,
   scheduleSpectorCaptureKickoff,
+  shouldLoadDevelopmentWebGLTools,
   WebGLPerformanceProfiler,
 } from './webglPerformance';
 
 describe('webglPerformance aggregates', () => {
+  it('keeps heavyweight WebGL debug wrappers opt-in', () => {
+    expect(shouldLoadDevelopmentWebGLTools({ dev: true })).toBe(false);
+    expect(shouldLoadDevelopmentWebGLTools({ dev: true, debugTools: '1' })).toBe(true);
+    expect(shouldLoadDevelopmentWebGLTools({ dev: true, e2e: '1', debugTools: '1' })).toBe(false);
+    expect(shouldLoadDevelopmentWebGLTools({ dev: false, debugTools: '1' })).toBe(false);
+  });
+
   it('fully disables secondary validation wrappers used by Three.js adapters', () => {
     let disableCalls = 0;
     const configurations: Array<Record<string, unknown>> = [];
