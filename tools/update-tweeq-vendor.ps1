@@ -62,9 +62,10 @@ try {
   if ($LASTEXITCODE -ne 0) { throw 'K-GG Tweeq safety patch no longer applies.' }
   & git -c "safe.directory=$safeWorktree" -C $worktree apply $patchFile
   if ($LASTEXITCODE -ne 0) { throw 'Unable to apply the K-GG Tweeq safety patch.' }
-  & git -c "safe.directory=$safeWorktree" -C $worktree apply --check $inputColorPatchFile
+  # This zero-context patch is guarded by the pinned upstream commit above.
+  & git -c "safe.directory=$safeWorktree" -C $worktree apply --unidiff-zero --check $inputColorPatchFile
   if ($LASTEXITCODE -ne 0) { throw 'K-GG InputColor hue-wheel patch no longer applies.' }
-  & git -c "safe.directory=$safeWorktree" -C $worktree apply $inputColorPatchFile
+  & git -c "safe.directory=$safeWorktree" -C $worktree apply --unidiff-zero $inputColorPatchFile
   if ($LASTEXITCODE -ne 0) { throw 'Unable to apply the K-GG InputColor hue-wheel patch.' }
 
   $reactPackage = Join-Path $worktree 'packages/react'
