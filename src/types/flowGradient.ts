@@ -1,4 +1,4 @@
-import { clampParameter, getParameterLimit } from '../lib/parameterLimits';
+import { clampParameter, getParameterDefault, getParameterLimit } from '../lib/parameterLimits';
 
 export type FlowGradientConfig = {
   seed: number;
@@ -17,19 +17,19 @@ export type FlowGradientConfig = {
 };
 
 export const FLOW_GRADIENT_DEFAULTS: FlowGradientConfig = {
-  seed: 42,
-  particleCount: 100000,
-  curlScale: 2.5,
-  curlStrength: 1,
-  speed: 0.6,
-  ribbonWidth: 8,
-  stretch: 1.5,
-  density: 1,
-  trail: 0.85,
-  contrast: 1.2,
-  flowOpacity: 1,
-  particleOpacity: 0.82,
-  particleSize: 1,
+  seed: getParameterDefault('flow.seed'),
+  particleCount: getParameterDefault('flow.particleCount'),
+  curlScale: getParameterDefault('flow.curlScale'),
+  curlStrength: getParameterDefault('flow.curlStrength'),
+  speed: getParameterDefault('flow.speed'),
+  ribbonWidth: getParameterDefault('flow.ribbonWidth'),
+  stretch: getParameterDefault('flow.stretch'),
+  density: getParameterDefault('flow.density'),
+  trail: getParameterDefault('flow.trail'),
+  contrast: getParameterDefault('flow.contrast'),
+  flowOpacity: getParameterDefault('flow.flowOpacity'),
+  particleOpacity: getParameterDefault('flow.particleOpacity'),
+  particleSize: getParameterDefault('flow.particleSize'),
 };
 
 export function normalizeFlowGradientConfig(value: unknown): FlowGradientConfig {

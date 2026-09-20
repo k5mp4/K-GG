@@ -10,6 +10,7 @@ import { Icon } from './Icon';
 import { InputShuffle, fromNumber } from 'tweeq';
 import { useLanguage } from '../i18n/LanguageProvider';
 import { getNoiseSeedField } from '../lib/noiseSeed';
+import { VORONOI_FEATURES, VORONOI_METRICS } from '../lib/voronoi';
 
 const D = STORE_DEFAULTS.noiseDistortion;
 
@@ -49,13 +50,6 @@ const SEAMLESS_BASE_TYPES = [
 const SEAMLESS_ANIM_TYPES = [
   { value: 'drift', label: 'Drift (Sideways)' },
   { value: 'radial', label: 'Radial (Expand)' },
-];
-
-const VORONOI_METRICS = [
-  { value: 'euclidean', label: 'Euclidean' },
-  { value: 'manhattan', label: 'Manhattan' },
-  { value: 'chebyshev', label: 'Chebyshev' },
-  { value: 'minkowski', label: 'Minkowski' },
 ];
 
 const NOISE_LOOP_MODES = [
@@ -125,34 +119,31 @@ export function NoiseDistortionPanel() {
 
           <SliderField
             label="Amount"
-            min={0} max={0.5} step={0.01}
             value={noiseDistortion.amount}
             onChange={(v) => setNoiseDistortion({ amount: v })}
             format={(v) => v.toFixed(2)}
-            defaultValue={D.amount}
             trackId="noiseDistortion.amount"
+            limitKey="noise.amount"
           />
 
           <SliderField
             label="Scale"
-            min={isCaustics ? 0 : 0.01} max={isCaustics ? 3 : 10} step={0.01}
             value={noiseDistortion.scale}
             onChange={(v) => setNoiseDistortion({ scale: v })}
             format={(v) => v.toFixed(isCaustics ? 2 : 1)}
-            defaultValue={D.scale}
             trackId="noiseDistortion.scale"
+            limitKey={isCaustics ? 'noise.causticsScale' : 'noise.scale'}
           />
 
           <div className="flex items-end gap-2">
             <div className="flex-1">
               <SliderField
                 label="Seed"
-                min={0} max={100} step={0.1}
                 value={seed}
                 onChange={(v) => setNoiseDistortion({ [seedField]: v })}
                 format={(v) => v.toFixed(1)}
-                defaultValue={D[seedField] ?? 0}
                 trackId={`noiseDistortion.${seedField}`}
+                limitKey="noise.seed"
               />
             </div>
             <InputShuffle
@@ -186,12 +177,11 @@ export function NoiseDistortionPanel() {
           {isSeamless && (
             <SliderField
               label="Spiral Twist"
-              min={-20} max={20} step={0.1}
               value={noiseDistortion.seamlessTwist}
               onChange={(v) => setNoiseDistortion({ seamlessTwist: v })}
               format={(v) => v.toFixed(1)}
-              defaultValue={D.seamlessTwist}
               trackId="noiseDistortion.seamlessTwist"
+              limitKey="noise.seamlessTwist"
             />
           )}
 
@@ -206,18 +196,17 @@ export function NoiseDistortionPanel() {
               {noiseDistortion.voronoiDistMetric === 'minkowski' && (
                 <SliderField
                   label="Exponent"
-                  min={0.5} max={8} step={0.1}
                   value={noiseDistortion.voronoiMinkowskiExp}
                   onChange={(v) => setNoiseDistortion({ voronoiMinkowskiExp: v })}
                   format={(v) => v.toFixed(1)}
-                  defaultValue={D.voronoiMinkowskiExp}
                   trackId="noiseDistortion.voronoiMinkowskiExp"
+                  limitKey="noise.voronoiMinkowskiExp"
                 />
               )}
               <div>
                 <label className="block text-xs mb-1 text-deep">Feature</label>
                 <div className="flex gap-1">
-                  {([['f1', 'F1'], ['f2', 'F2'], ['distance_to_edge', 'Edge']] as const).map(([val, label]) => (
+                  {VORONOI_FEATURES.map(([val, label]) => (
                     <button
                       key={val}
                       onClick={() => setNoiseDistortion({ voronoiFeature: val })}
@@ -230,12 +219,11 @@ export function NoiseDistortionPanel() {
               </div>
               <SliderField
                 label="Randomness"
-                min={0} max={1} step={0.01}
                 value={noiseDistortion.voronoiRandomness}
                 onChange={(v) => setNoiseDistortion({ voronoiRandomness: v })}
                 format={(v) => v.toFixed(2)}
-                defaultValue={D.voronoiRandomness}
                 trackId="noiseDistortion.voronoiRandomness"
+                limitKey="noise.voronoiRandomness"
               />
             </>
           )}
@@ -244,51 +232,41 @@ export function NoiseDistortionPanel() {
             <>
               <SliderField
                 label="Depth"
-                min={0.05} max={3} step={0.01}
                 value={noiseDistortion.causticsDepth ?? D.causticsDepth}
                 onChange={(v) => setNoiseDistortion({ causticsDepth: v })}
                 format={(v) => v.toFixed(2)}
-                defaultValue={D.causticsDepth}
                 trackId="noiseDistortion.causticsDepth"
                 limitKey="noise.causticsDepth"
               />
               <SliderField
                 label="Boundary Width"
-                min={0.05} max={1} step={0.01}
                 value={noiseDistortion.causticsBoundaryWidth ?? D.causticsBoundaryWidth}
                 onChange={(v) => setNoiseDistortion({ causticsBoundaryWidth: v })}
                 format={(v) => v.toFixed(2)}
-                defaultValue={D.causticsBoundaryWidth}
                 trackId="noiseDistortion.causticsBoundaryWidth"
                 limitKey="noise.causticsBoundaryWidth"
               />
               <SliderField
                 label="Sharpness"
-                min={0.5} max={8} step={0.05}
                 value={noiseDistortion.causticsSharpness ?? D.causticsSharpness}
                 onChange={(v) => setNoiseDistortion({ causticsSharpness: v })}
                 format={(v) => v.toFixed(2)}
-                defaultValue={D.causticsSharpness}
                 trackId="noiseDistortion.causticsSharpness"
                 limitKey="noise.causticsSharpness"
               />
               <SliderField
                 label="Complexity"
-                min={2} max={8} step={1}
                 value={noiseDistortion.causticsComplexity ?? D.causticsComplexity}
                 onChange={(v) => setNoiseDistortion({ causticsComplexity: v })}
                 format={(v) => `${Math.round(v)}`}
-                defaultValue={D.causticsComplexity}
                 trackId="noiseDistortion.causticsComplexity"
                 limitKey="noise.causticsComplexity"
               />
               <SliderField
                 label="Wave Spread"
-                min={0} max={1} step={0.01}
                 value={noiseDistortion.causticsWaveSpread ?? D.causticsWaveSpread}
                 onChange={(v) => setNoiseDistortion({ causticsWaveSpread: v })}
                 format={(v) => v.toFixed(2)}
-                defaultValue={D.causticsWaveSpread}
                 trackId="noiseDistortion.causticsWaveSpread"
                 limitKey="noise.causticsWaveSpread"
               />
@@ -305,82 +283,66 @@ export function NoiseDistortionPanel() {
               />
               <SliderField
                 label="Frequency"
-                min={0.5} max={20} step={0.05}
                 value={noiseDistortion.phasorFrequency ?? D.phasorFrequency}
                 onChange={(v) => setNoiseDistortion({ phasorFrequency: v })}
                 format={(v) => v.toFixed(2)}
-                defaultValue={D.phasorFrequency}
                 trackId="noiseDistortion.phasorFrequency"
                 limitKey="noise.phasorFrequency"
               />
               <SliderField
                 label="Direction"
-                min={0} max={360} step={1}
                 value={noiseDistortion.phasorDirection ?? D.phasorDirection}
                 onChange={(v) => setNoiseDistortion({ phasorDirection: v })}
                 format={(v) => `${Math.round(v)}°`}
-                defaultValue={D.phasorDirection}
                 trackId="noiseDistortion.phasorDirection"
                 control="angle"
                 limitKey="noise.phasorDirection"
               />
               <SliderField
                 label="Direction Spread"
-                min={0} max={1} step={0.01}
                 value={noiseDistortion.phasorDirectionSpread ?? D.phasorDirectionSpread}
                 onChange={(v) => setNoiseDistortion({ phasorDirectionSpread: v })}
                 format={(v) => v.toFixed(2)}
-                defaultValue={D.phasorDirectionSpread}
                 trackId="noiseDistortion.phasorDirectionSpread"
                 limitKey="noise.phasorDirectionSpread"
               />
               <SliderField
                 label="Sharpness"
-                min={0.5} max={10} step={0.05}
                 value={noiseDistortion.phasorSharpness ?? D.phasorSharpness}
                 onChange={(v) => setNoiseDistortion({ phasorSharpness: v })}
                 format={(v) => v.toFixed(2)}
-                defaultValue={D.phasorSharpness}
                 trackId="noiseDistortion.phasorSharpness"
                 limitKey="noise.phasorSharpness"
               />
               <SliderField
                 label="Warp Strength"
-                min={0} max={1} step={0.01}
                 value={noiseDistortion.phasorWarpStrength ?? D.phasorWarpStrength}
                 onChange={(v) => setNoiseDistortion({ phasorWarpStrength: v })}
                 format={(v) => v.toFixed(2)}
-                defaultValue={D.phasorWarpStrength}
                 trackId="noiseDistortion.phasorWarpStrength"
                 limitKey="noise.phasorWarpStrength"
               />
               <SliderField
                 label="Tangent Mix"
-                min={0} max={1} step={0.01}
                 value={noiseDistortion.phasorTangentMix ?? D.phasorTangentMix}
                 onChange={(v) => setNoiseDistortion({ phasorTangentMix: v })}
                 format={(v) => v.toFixed(2)}
-                defaultValue={D.phasorTangentMix}
                 trackId="noiseDistortion.phasorTangentMix"
                 limitKey="noise.phasorTangentMix"
               />
               <SliderField
                 label="Bandwidth"
-                min={0.1} max={2} step={0.01}
                 value={noiseDistortion.phasorBandwidth ?? D.phasorBandwidth}
                 onChange={(v) => setNoiseDistortion({ phasorBandwidth: v })}
                 format={(v) => v.toFixed(2)}
-                defaultValue={D.phasorBandwidth}
                 trackId="noiseDistortion.phasorBandwidth"
                 limitKey="noise.phasorBandwidth"
               />
               <SliderField
                 label="Kernel Density"
-                min={0.25} max={2} step={0.01}
                 value={noiseDistortion.phasorKernelDensity ?? D.phasorKernelDensity}
                 onChange={(v) => setNoiseDistortion({ phasorKernelDensity: v })}
                 format={(v) => v.toFixed(2)}
-                defaultValue={D.phasorKernelDensity}
                 trackId="noiseDistortion.phasorKernelDensity"
                 limitKey="noise.phasorKernelDensity"
               />
@@ -397,50 +359,44 @@ export function NoiseDistortionPanel() {
               />
               <SliderField
                 label="Sub Rotation"
-                min={0} max={360} step={1}
                 value={noiseDistortion.aeSubRotation ?? 45}
                 onChange={(v) => setNoiseDistortion({ aeSubRotation: v })}
                 format={(v) => `${v}°`}
-                defaultValue={D.aeSubRotation}
                 trackId="noiseDistortion.aeSubRotation"
                 control="angle"
                 limitKey="noise.aeSubRotation"
               />
               <SliderField
                 label="Sub Influence"
-                min={0.01} max={1} step={0.01}
                 value={noiseDistortion.aeSubInfluence ?? 0.7}
                 onChange={(v) => setNoiseDistortion({ aeSubInfluence: v })}
                 format={(v) => v.toFixed(2)}
-                defaultValue={D.aeSubInfluence}
                 trackId="noiseDistortion.aeSubInfluence"
+                limitKey="noise.aeSubInfluence"
               />
               <SliderField
                 label="Sub Scaling"
-                min={1.01} max={4} step={0.01}
                 value={noiseDistortion.aeSubScaling ?? 1.78}
                 onChange={(v) => setNoiseDistortion({ aeSubScaling: v })}
                 format={(v) => v.toFixed(2)}
-                defaultValue={D.aeSubScaling}
                 trackId="noiseDistortion.aeSubScaling"
+                limitKey="noise.aeSubScaling"
               />
               <SliderField
                 label="Contrast"
-                min={0.5} max={4} step={0.05}
                 value={noiseDistortion.aeContrast ?? 1.0}
                 onChange={(v) => setNoiseDistortion({ aeContrast: v })}
                 format={(v) => v.toFixed(2)}
-                defaultValue={D.aeContrast}
                 trackId="noiseDistortion.aeContrast"
+                limitKey="noise.aeContrast"
               />
               <SliderField
                 label="Brightness"
-                min={-1} max={1} step={0.01}
                 value={noiseDistortion.aeBrightness ?? 0.0}
                 onChange={(v) => setNoiseDistortion({ aeBrightness: v })}
                 format={(v) => v.toFixed(2)}
-                defaultValue={D.aeBrightness}
                 trackId="noiseDistortion.aeBrightness"
+                limitKey="noise.aeBrightness"
               />
             </>
           )}
@@ -449,57 +405,51 @@ export function NoiseDistortionPanel() {
             <>
               <SliderField
                 label="Warp"
-                min={0} max={4} step={0.05}
                 value={noiseDistortion.ridgeWarp ?? 1.0}
                 onChange={(v) => setNoiseDistortion({ ridgeWarp: v })}
                 format={(v) => v.toFixed(2)}
-                defaultValue={D.ridgeWarp}
                 trackId="noiseDistortion.ridgeWarp"
+                limitKey="noise.ridgeWarp"
               />
               <SliderField
                 label="Sharpness"
-                min={0.5} max={6} step={0.1}
                 value={noiseDistortion.ridgeSharpness ?? 2.0}
                 onChange={(v) => setNoiseDistortion({ ridgeSharpness: v })}
                 format={(v) => v.toFixed(1)}
-                defaultValue={D.ridgeSharpness}
                 trackId="noiseDistortion.ridgeSharpness"
+                limitKey="noise.ridgeSharpness"
               />
               <SliderField
                 label="Offset"
-                min={0} max={2} step={0.05}
                 value={noiseDistortion.ridgeOffset ?? 1.0}
                 onChange={(v) => setNoiseDistortion({ ridgeOffset: v })}
                 format={(v) => v.toFixed(2)}
-                defaultValue={D.ridgeOffset}
                 trackId="noiseDistortion.ridgeOffset"
+                limitKey="noise.ridgeOffset"
               />
               <SliderField
                 label="Lacunarity"
-                min={1.1} max={4} step={0.05}
                 value={noiseDistortion.ridgeLacunarity ?? 2.0}
                 onChange={(v) => setNoiseDistortion({ ridgeLacunarity: v })}
                 format={(v) => v.toFixed(2)}
-                defaultValue={D.ridgeLacunarity}
                 trackId="noiseDistortion.ridgeLacunarity"
+                limitKey="noise.ridgeLacunarity"
               />
               <SliderField
                 label="Persistence"
-                min={0.1} max={1} step={0.01}
                 value={noiseDistortion.ridgePersistence ?? 0.5}
                 onChange={(v) => setNoiseDistortion({ ridgePersistence: v })}
                 format={(v) => v.toFixed(2)}
-                defaultValue={D.ridgePersistence}
                 trackId="noiseDistortion.ridgePersistence"
+                limitKey="noise.ridgePersistence"
               />
               <SliderField
                 label="Cascade Gain"
-                min={0} max={1} step={0.01}
                 value={noiseDistortion.ridgeGain ?? 0.0}
                 onChange={(v) => setNoiseDistortion({ ridgeGain: v })}
                 format={(v) => v.toFixed(2)}
-                defaultValue={D.ridgeGain}
                 trackId="noiseDistortion.ridgeGain"
+                limitKey="noise.ridgeGain"
               />
             </>
           )}
@@ -507,11 +457,10 @@ export function NoiseDistortionPanel() {
           {hasOctaves && (
             <SliderField
               label="Octaves"
-              min={1} max={8} step={1}
               value={noiseDistortion.octaves}
               onChange={(v) => setNoiseDistortion({ octaves: v })}
-              defaultValue={D.octaves}
               trackId="noiseDistortion.octaves"
+              limitKey="noise.octaves"
             />
           )}
 
@@ -519,12 +468,11 @@ export function NoiseDistortionPanel() {
             <>
               <SliderField
                 label="Speed"
-                min={0} max={2} step={0.01}
                 value={noiseDistortion.speed ?? D.speed}
                 onChange={(v) => setNoiseDistortion({ speed: v })}
                 format={(v) => v.toFixed(2)}
-                defaultValue={D.speed}
                 trackId="noiseDistortion.speed"
+                limitKey="noise.speed"
               />
               <CustomSelect
                 label="Loop Mode"
@@ -539,30 +487,27 @@ export function NoiseDistortionPanel() {
             <>
               <SliderField
                 label="Flow Steps"
-                min={1} max={8} step={1}
                 value={noiseDistortion.curlSteps}
                 onChange={(v) => setNoiseDistortion({ curlSteps: v })}
                 format={(v) => `${v}x`}
-                defaultValue={D.curlSteps}
                 trackId="noiseDistortion.curlSteps"
+                limitKey="noise.curlSteps"
               />
               <SliderField
                 label={isFastCurl ? 'Flow Strength' : 'Flow Speed'}
-                min={0} max={2.0} step={0.01}
                 value={noiseDistortion.curlSpeed ?? 0.5}
                 onChange={(v) => setNoiseDistortion({ curlSpeed: v })}
                 format={(v) => v.toFixed(2)}
-                defaultValue={D.curlSpeed ?? 0.5}
                 trackId="noiseDistortion.curlSpeed"
+                limitKey="noise.curlSpeed"
               />
               {isCurl && <SliderField
                 label="Curl Eps"
-                min={0.001} max={0.2} step={0.001}
                 value={noiseDistortion.curlEps ?? 0.01}
                 onChange={(v) => setNoiseDistortion({ curlEps: v })}
                 format={(v) => v.toFixed(3)}
-                defaultValue={D.curlEps ?? 0.01}
                 trackId="noiseDistortion.curlEps"
+                limitKey="noise.curlEps"
               />}
             </>
           )}
@@ -570,12 +515,11 @@ export function NoiseDistortionPanel() {
           {!isDWAnim && (
             <SliderField
               label="Evolution"
-              min={0} max={10} step={0.01}
               value={noiseDistortion.evolution}
               onChange={(v) => setNoiseDistortion({ evolution: v })}
               format={(v) => v.toFixed(2)}
-              defaultValue={D.evolution}
               trackId="noiseDistortion.evolution"
+              limitKey="noise.evolution"
             />
           )}
 
@@ -586,83 +530,70 @@ export function NoiseDistortionPanel() {
 
                 <SliderField
                   label="Warp Strength"
-                  min={0.1} max={8} step={0.05}
                   value={noiseDistortion.dwInitAmp}
                   onChange={(v) => setNoiseDistortion({ dwInitAmp: v })}
                   format={(v) => v.toFixed(2)}
-                  defaultValue={D.dwInitAmp}
                   trackId="noiseDistortion.dwInitAmp"
+                  limitKey="noise.dwInitAmp"
                 />
                 <SliderField
                   label="Final Mix"
-                  min={0.01} max={2} step={0.01}
                   value={noiseDistortion.dwInitVal}
                   onChange={(v) => setNoiseDistortion({ dwInitVal: v })}
                   format={(v) => v.toFixed(2)}
-                  defaultValue={D.dwInitVal}
                   trackId="noiseDistortion.dwInitVal"
+                  limitKey="noise.dwInitVal"
                 />
                 <SliderField
                   label="Rot Angle 1"
-                  min={0} max={Math.PI * 2} step={Math.PI / 180}
                   value={noiseDistortion.dwRotAngle1}
                   onChange={(v) => setNoiseDistortion({ dwRotAngle1: v })}
                   format={(v) => `${Math.round(v * 180 / Math.PI)}°`}
-                  defaultValue={D.dwRotAngle1}
                   trackId="noiseDistortion.dwRotAngle1"
                   control="angle"
-                  angleUnit="radians"
                   limitKey="noise.dwRotAngle1"
                 />
                 <SliderField
                   label="Rot Angle 2"
-                  min={0} max={Math.PI * 2} step={Math.PI / 180}
                   value={noiseDistortion.dwRotAngle2}
                   onChange={(v) => setNoiseDistortion({ dwRotAngle2: v })}
                   format={(v) => `${Math.round(v * 180 / Math.PI)}°`}
-                  defaultValue={D.dwRotAngle2}
                   trackId="noiseDistortion.dwRotAngle2"
                   control="angle"
-                  angleUnit="radians"
                   limitKey="noise.dwRotAngle2"
                 />
                 <SliderField
                   label="Drift Angle"
-                  min={0} max={360} step={1}
                   value={noiseDistortion.dwDriftAngle}
                   onChange={(v) => setNoiseDistortion({ dwDriftAngle: v })}
                   format={(v) => v + '°'}
-                  defaultValue={D.dwDriftAngle}
                   trackId="noiseDistortion.dwDriftAngle"
                   control="angle"
                   limitKey="noise.dwDriftAngle"
                 />
                 <SliderField
                   label="Drift Speed"
-                  min={0} max={0.001} step={0.00001}
                   value={noiseDistortion.dwDist1}
                   onChange={(v) => setNoiseDistortion({ dwDist1: v })}
                   format={(v) => v.toFixed(5)}
-                  defaultValue={D.dwDist1}
                   trackId="noiseDistortion.dwDist1"
+                  limitKey="noise.dwDist1"
                 />
                 <SliderField
                   label="Mid Speed"
-                  min={0} max={0.1} step={0.001}
                   value={noiseDistortion.dwDist2}
                   onChange={(v) => setNoiseDistortion({ dwDist2: v })}
                   format={(v) => v.toFixed(4)}
-                  defaultValue={D.dwDist2}
                   trackId="noiseDistortion.dwDist2"
+                  limitKey="noise.dwDist2"
                 />
                 <SliderField
                   label="Outer Speed"
-                  min={0} max={0.5} step={0.005}
                   value={noiseDistortion.dwDist3}
                   onChange={(v) => setNoiseDistortion({ dwDist3: v })}
                   format={(v) => v.toFixed(3)}
-                  defaultValue={D.dwDist3}
                   trackId="noiseDistortion.dwDist3"
+                  limitKey="noise.dwDist3"
                 />
               </div>
             </>

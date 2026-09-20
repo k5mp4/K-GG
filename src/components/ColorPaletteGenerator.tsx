@@ -21,6 +21,7 @@ import { mapOklchToSrgb } from '../lib/colorSpace';
 import { PERCEPTUAL_GRADIENT_FAMILIES, type PerceptualGradientFamily } from '../lib/perceptualGradient';
 import type { MessageKey } from '../i18n/messages';
 import { InputColor } from 'tweeq';
+import { getParameterDefault } from '../lib/parameterLimits';
 
 const HARMONY_OPTIONS: { value: HarmonyType; label: string }[] = [
   { value: 'analogous', label: 'Analogous' },
@@ -57,7 +58,7 @@ export function ColorPaletteGenerator({ overlayImageElement, embedded = false }:
   const { t } = useLanguage();
   const { setGradient } = applicationCommands;
 
-  const [colorCount, setColorCount] = useState<number>(5);
+  const [colorCount, setColorCount] = useState<number>(() => getParameterDefault('paletteGenerator.colorCount'));
   const [sortBy, setSortBy] = useState<'dominance' | 'luminance' | 'hue'>('dominance');
   const [pixels, setPixels] = useState<RGB[]>([]);
   const [palette, setPalette] = useState<{ color: RGB; count: number }[]>([]);
@@ -75,14 +76,14 @@ export function ColorPaletteGenerator({ overlayImageElement, embedded = false }:
   const [copiedHarmonyIndex, setCopiedHarmonyIndex] = useState<number | null>(null);
   const [generatorAlgorithm, setGeneratorAlgorithm] = useState<GradientGeneratorAlgorithm>('cubehelix');
   const [generatorBaseColor, setGeneratorBaseColor] = useState('#6377A6');
-  const [generatorHueTravel, setGeneratorHueTravel] = useState(0.5);
-  const [generatorColorIntensity, setGeneratorColorIntensity] = useState(0.62);
-  const [generatorBrightness, setGeneratorBrightness] = useState(0.55);
-  const [generatorContrast, setGeneratorContrast] = useState(0.58);
+  const [generatorHueTravel, setGeneratorHueTravel] = useState(() => getParameterDefault('paletteGenerator.hueTravel'));
+  const [generatorColorIntensity, setGeneratorColorIntensity] = useState(() => getParameterDefault('paletteGenerator.colorIntensity'));
+  const [generatorBrightness, setGeneratorBrightness] = useState(() => getParameterDefault('paletteGenerator.brightness'));
+  const [generatorContrast, setGeneratorContrast] = useState(() => getParameterDefault('paletteGenerator.contrast'));
   const [generatorFamily, setGeneratorFamily] = useState<PerceptualGradientFamily>(FALLBACK_FAMILY);
-  const [generatorAccentPosition, setGeneratorAccentPosition] = useState(0.58);
-  const [generatorAccentWidth, setGeneratorAccentWidth] = useState(0.18);
-  const [generatorStopCount, setGeneratorStopCount] = useState(5);
+  const [generatorAccentPosition, setGeneratorAccentPosition] = useState(() => getParameterDefault('paletteGenerator.accentPosition'));
+  const [generatorAccentWidth, setGeneratorAccentWidth] = useState(() => getParameterDefault('paletteGenerator.accentWidth'));
+  const [generatorStopCount, setGeneratorStopCount] = useState(() => getParameterDefault('paletteGenerator.stopCount'));
   const harmonyPalette = useMemo(
     () => generateHarmonyPalette(harmonyBaseColor, harmonyType),
     [harmonyBaseColor, harmonyType],
@@ -362,53 +363,38 @@ export function ColorPaletteGenerator({ overlayImageElement, embedded = false }:
         <div className="grid grid-cols-1 gap-2">
           <SliderField
             label={t('gradient.generatorHueTravel')}
-            min={-1}
-            max={1}
-            step={0.01}
             value={generatorHueTravel}
             onChange={setGeneratorHueTravel}
             format={(value) => `${Math.round(value * 100)}%`}
-            defaultValue={0.5}
+            limitKey="paletteGenerator.hueTravel"
           />
           <SliderField
             label={t('gradient.generatorColorIntensity')}
-            min={0}
-            max={1}
-            step={0.01}
             value={generatorColorIntensity}
             onChange={setGeneratorColorIntensity}
             format={(value) => `${Math.round(value * 100)}%`}
-            defaultValue={0.62}
+            limitKey="paletteGenerator.colorIntensity"
           />
           <SliderField
             label={t('gradient.generatorBrightness')}
-            min={0}
-            max={1}
-            step={0.01}
             value={generatorBrightness}
             onChange={setGeneratorBrightness}
             format={(value) => `${Math.round(value * 100)}%`}
-            defaultValue={0.55}
+            limitKey="paletteGenerator.brightness"
           />
           <SliderField
             label={t('gradient.generatorContrast')}
-            min={0}
-            max={1}
-            step={0.01}
             value={generatorContrast}
             onChange={setGeneratorContrast}
             format={(value) => `${Math.round(value * 100)}%`}
-            defaultValue={0.58}
+            limitKey="paletteGenerator.contrast"
           />
           <SliderField
             label={t('gradient.generatorStops')}
-            min={3}
-            max={10}
-            step={1}
             value={generatorStopCount}
             onChange={(value) => setGeneratorStopCount(Math.round(value))}
             format={(value) => `${Math.round(value)}`}
-            defaultValue={5}
+            limitKey="paletteGenerator.stopCount"
           />
         </div>
 
@@ -416,23 +402,17 @@ export function ColorPaletteGenerator({ overlayImageElement, embedded = false }:
           <div className="grid grid-cols-1 gap-2">
             <SliderField
               label={t('gradient.generatorAccentPosition')}
-              min={0.1}
-              max={0.9}
-              step={0.01}
               value={generatorAccentPosition}
               onChange={setGeneratorAccentPosition}
               format={(value) => `${Math.round(value * 100)}%`}
-              defaultValue={0.58}
+              limitKey="paletteGenerator.accentPosition"
             />
             <SliderField
               label={t('gradient.generatorAccentWidth')}
-              min={0.04}
-              max={0.5}
-              step={0.01}
               value={generatorAccentWidth}
               onChange={setGeneratorAccentWidth}
               format={(value) => `${Math.round(value * 100)}%`}
-              defaultValue={0.18}
+              limitKey="paletteGenerator.accentWidth"
             />
           </div>
         )}
@@ -637,13 +617,10 @@ export function ColorPaletteGenerator({ overlayImageElement, embedded = false }:
           <div className="space-y-3">
             <SliderField
               label="色数"
-              min={2}
-              max={10}
-              step={1}
               value={colorCount}
               onChange={setColorCount}
               format={(v) => `${v}色`}
-              defaultValue={5}
+              limitKey="paletteGenerator.colorCount"
             />
 
             <CustomSelect

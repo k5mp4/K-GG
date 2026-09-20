@@ -1,3 +1,5 @@
+import { clampParameter, getParameterDefault, getParameterLimit } from '../lib/parameterLimits';
+
 export type ConeMappingMode = 'flow' | 'projection';
 export type ConeSeamMode = 'mirror' | 'weld' | 'reapply';
 
@@ -28,31 +30,25 @@ export type ConeViewConfig = {
 };
 
 /** Normalized apex movement limit; ±2 reaches 50% of the canvas outside its edge. */
-export const CONE_APEX_LIMIT = 2;
+export const CONE_APEX_LIMIT = Math.max(
+  Math.abs(getParameterLimit('cone.apexX').min),
+  Math.abs(getParameterLimit('cone.apexX').max),
+);
 export const CONE_SEAM_BLEND_MIN = 0;
 // A half-tile is the widest blend that keeps each seam local to its own side.
-export const CONE_SEAM_BLEND_MAX = 0.5;
+export const CONE_SEAM_BLEND_MAX = getParameterLimit('cone.seamBlend').max;
 
 export const DEFAULT_CONE_VIEW: ConeViewConfig = {
-  depth: 6,
-  rotation: 0,
-  textureRepeat: 1,
-  flowCycles: 1,
+  depth: getParameterDefault('cone.depth'),
+  rotation: getParameterDefault('cone.rotation'),
+  textureRepeat: getParameterDefault('cone.textureRepeat'),
+  flowCycles: getParameterDefault('cone.flowCycles'),
   apexX: 0,
   apexY: 0,
-  seamBlend: 0.25,
+  seamBlend: getParameterDefault('cone.seamBlend'),
   seamMode: DEFAULT_CONE_SEAM_MODE,
   mappingMode: 'flow',
 };
-
-function boundedNumber(value: unknown, fallback: number, min: number, max: number): number {
-  if (typeof value !== 'number' || !Number.isFinite(value)) return fallback;
-  return Math.max(min, Math.min(max, value));
-}
-
-function boundedInteger(value: unknown, fallback: number, min: number, max: number): number {
-  return Math.round(boundedNumber(value, fallback, min, max));
-}
 
 function normalizeSeamMode(value: unknown): ConeSeamMode {
   return typeof value === 'string' && CONE_SEAM_MODES.includes(value as ConeSeamMode)
@@ -64,13 +60,13 @@ export function normalizeConeViewConfig(value: unknown): ConeViewConfig {
   if (typeof value !== 'object' || value === null) return { ...DEFAULT_CONE_VIEW };
   const raw = value as Partial<ConeViewConfig>;
   return {
-    depth: boundedNumber(raw.depth, DEFAULT_CONE_VIEW.depth, 2, 30),
-    rotation: boundedNumber(raw.rotation, DEFAULT_CONE_VIEW.rotation, -180, 180),
-    textureRepeat: boundedInteger(raw.textureRepeat, DEFAULT_CONE_VIEW.textureRepeat, 1, 8),
-    flowCycles: boundedInteger(raw.flowCycles, DEFAULT_CONE_VIEW.flowCycles, -30, 30),
-    apexX: boundedNumber(raw.apexX, DEFAULT_CONE_VIEW.apexX, -CONE_APEX_LIMIT, CONE_APEX_LIMIT),
-    apexY: boundedNumber(raw.apexY, DEFAULT_CONE_VIEW.apexY, -CONE_APEX_LIMIT, CONE_APEX_LIMIT),
-    seamBlend: boundedNumber(raw.seamBlend, DEFAULT_CONE_VIEW.seamBlend, CONE_SEAM_BLEND_MIN, CONE_SEAM_BLEND_MAX),
+    depth: clampParameter(raw.depth, DEFAULT_CONE_VIEW.depth, getParameterLimit('cone.depth')),
+    rotation: clampParameter(raw.rotation, DEFAULT_CONE_VIEW.rotation, getParameterLimit('cone.rotation')),
+    textureRepeat: clampParameter(raw.textureRepeat, DEFAULT_CONE_VIEW.textureRepeat, getParameterLimit('cone.textureRepeat')),
+    flowCycles: clampParameter(raw.flowCycles, DEFAULT_CONE_VIEW.flowCycles, getParameterLimit('cone.flowCycles')),
+    apexX: clampParameter(raw.apexX, DEFAULT_CONE_VIEW.apexX, getParameterLimit('cone.apexX')),
+    apexY: clampParameter(raw.apexY, DEFAULT_CONE_VIEW.apexY, getParameterLimit('cone.apexY')),
+    seamBlend: clampParameter(raw.seamBlend, DEFAULT_CONE_VIEW.seamBlend, getParameterLimit('cone.seamBlend')),
     seamMode: normalizeSeamMode(raw.seamMode),
     mappingMode: raw.mappingMode === 'projection' ? 'projection' : DEFAULT_CONE_VIEW.mappingMode,
   };

@@ -1,5 +1,7 @@
 // Phase 2 で実装。Phase 1 では型定義のみ。
 export type PhasorDirectionMode = 'directional' | 'radial' | 'swirl';
+export type VoronoiDistanceMetric = 'euclidean' | 'manhattan' | 'chebyshev' | 'minkowski';
+export type VoronoiFeature = 'f1' | 'f2' | 'distance_to_edge';
 
 export type NoiseDistortionConfig = {
   enabled: boolean;
@@ -29,9 +31,9 @@ export type NoiseDistortionConfig = {
   seamlessAnimation: 'drift' | 'radial';
   seamlessTwist: number; // 渦巻きの強さ
   // Voronoi 専用パラメータ
-  voronoiDistMetric: 'euclidean' | 'manhattan' | 'chebyshev' | 'minkowski';
+  voronoiDistMetric: VoronoiDistanceMetric;
   voronoiRandomness: number;    // 0.0–1.0: 特徴点のランダム性（0=規則格子, 1=完全ランダム）
-  voronoiFeature: 'f1' | 'f2' | 'distance_to_edge'; // 出力する特徴量
+  voronoiFeature: VoronoiFeature; // 出力する特徴量
   voronoiMinkowskiExp: number;  // 0.5–8.0: Minkowski 指数
   // Ridged fBm 専用パラメータ
   ridgeSharpness: number;    // 0.5–6.0: 稜線の鋭さ（大きいほど細く明るい筋に）
@@ -284,6 +286,9 @@ export type PostprocessConfig = ManualDistortConfig & {
   prismInnerRadius: number;
   voronoiScale: number;
   voronoiRandomness: number;
+  voronoiDistMetric: VoronoiDistanceMetric;
+  voronoiFeature: VoronoiFeature;
+  voronoiMinkowskiExp: number;
   voronoiAngle: number;
   voronoiGradientScale: number;
   voronoiEdgeWidth: number;

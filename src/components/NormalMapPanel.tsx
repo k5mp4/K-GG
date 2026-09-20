@@ -87,40 +87,35 @@ export function NormalMapPanel({ embedded = false }: NormalMapPanelProps = {}) {
         <div className="space-y-4 pt-2">
           <SliderField
             label="Strength"
-            min={0.01} max={3.0} step={0.01}
             value={normalMap.strength}
             onChange={(v) => setNormalMap({ strength: v })}
             format={(v) => v.toFixed(2)}
-            defaultValue={D.strength}
+            limitKey="normalMap.strength"
           />
 
           <SliderField
             label="Blur"
-            min={0} max={20} step={0.5}
             value={normalMap.blur}
             onChange={(v) => setNormalMap({ blur: v })}
             format={(v) => v < 0.5 ? 'Off' : v.toFixed(1) + 'px σ'}
-            defaultValue={D.blur}
+            limitKey="normalMap.blur"
           />
 
           <SliderField
             label="Angle"
-            min={0} max={360} step={1}
             value={normalMap.angle}
             onChange={(v) => setNormalMap({ angle: v })}
             format={(v) => v.toFixed(0) + '°'}
-            defaultValue={D.angle}
             control="angle"
             limitKey="normalMap.angle"
           />
 
           <SliderField
             label="Bevel Size"
-            min={0.0} max={100.0} step={0.01}
             value={normalMap.bevelSize}
             onChange={(v) => setNormalMap({ bevelSize: v })}
             format={(v) => v.toFixed(2)}
-            defaultValue={D.bevelSize}
+            limitKey="normalMap.bevelSize"
           />
 
           <div className="flex items-center justify-between">

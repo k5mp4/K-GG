@@ -12,6 +12,7 @@ import { IDENTITY_DIFFUSE_BEZIER } from '../lib/diffuseCurve';
 import { fromTweeqAngle, toTweeqAngle } from '../lib/tweeqAngle';
 import { useLanguage } from '../i18n/LanguageProvider';
 import { InputAngle, InputColor, InputDropdown, InputDrum, InputRadio, InputString } from 'tweeq';
+import type { ParameterLimitKey } from '../lib/parameterLimits';
 
 const D = STORE_DEFAULTS.diffuse;
 const isDiffuseDirty = (value: DiffuseConfig) =>
@@ -35,6 +36,14 @@ const ADAPTIVE_CHANNEL_LABELS = ['Luminance', 'Hue', 'Saturation'] as const;
 const HALFTONE_SHAPES = ['circle', 'square'] as const;
 const HALFTONE_SHAPE_LABELS = ['Circle', 'Square'] as const;
 const GENERIC_FONT_OPTIONS = ['monospace', 'serif', 'sans-serif', 'cursive', 'fantasy'];
+const DIFFUSE_GRAIN_LIMIT_KEYS = {
+  block: 'diffuse.grain',
+  smooth: 'diffuse.grain',
+  dither: 'diffuse.ditherGrain',
+  halftone: 'diffuse.halftoneGrain',
+  ascii: 'diffuse.asciiGrain',
+  legacy: 'diffuse.grain',
+} as const satisfies Record<DiffuseConfig['mode'], ParameterLimitKey>;
 
 async function loadSystemFonts(): Promise<string[]> {
   try {
@@ -53,6 +62,7 @@ export function DiffusePanel() {
   const { t } = useLanguage();
   const { diffuse } = useGradientStore();
   const { setDiffuse } = applicationCommands;
+  const grainLimitKey = DIFFUSE_GRAIN_LIMIT_KEYS[diffuse.mode];
   const canReset = isDiffuseDirty(diffuse);
   const [systemFonts, setSystemFonts] = useState<string[] | null>(null);
 
@@ -105,25 +115,19 @@ export function DiffusePanel() {
             {diffuse.mode !== 'dither' && diffuse.mode !== 'halftone' && diffuse.mode !== 'ascii' && (
               <SliderField
                 label="Scatter"
-                min={0} max={300} step={1}
                 value={diffuse.scatter}
                 onChange={(v) => setDiffuse({ scatter: v })}
                 format={(v) => v + 'px'}
-                defaultValue={D.scatter}
                 limitKey="diffuse.scatter"
               />
             )}
 
             <SliderField
               label={diffuse.mode === 'dither' ? 'Dot Size' : diffuse.mode === 'halftone' || diffuse.mode === 'ascii' ? 'Cell Size' : 'Grain'}
-              min={diffuse.mode === 'halftone' ? 2 : diffuse.mode === 'ascii' ? 4 : 0.01}
-              max={diffuse.mode === 'dither' ? 12 : diffuse.mode === 'halftone' || diffuse.mode === 'ascii' ? 64 : 5}
-              step={diffuse.mode === 'halftone' || diffuse.mode === 'ascii' ? 1 : 0.01}
               value={diffuse.grain}
               onChange={(v) => setDiffuse({ grain: v })}
               format={(v) => (diffuse.mode === 'halftone' || diffuse.mode === 'ascii' ? `${Math.round(v)}px` : v.toFixed(2) + 'px')}
-              defaultValue={D.grain}
-              limitKey={diffuse.mode === 'dither' ? 'diffuse.ditherGrain' : diffuse.mode === 'halftone' ? 'diffuse.halftoneGrain' : diffuse.mode === 'ascii' ? 'diffuse.asciiGrain' : 'diffuse.grain'}
+              limitKey={grainLimitKey}
             />
 
             {diffuse.mode === 'halftone' && (
@@ -141,13 +145,9 @@ export function DiffusePanel() {
                 </div>
                 <SliderField
                   label="Shape Size"
-                  min={0.05}
-                  max={1}
-                  step={0.01}
                   value={diffuse.halftoneSize}
                   onChange={(v) => setDiffuse({ halftoneSize: v })}
                   format={(v) => `${Math.round(v * 100)}%`}
-                  defaultValue={D.halftoneSize}
                   limitKey="diffuse.halftoneSize"
                 />
               </>
@@ -177,13 +177,9 @@ export function DiffusePanel() {
                 </div>
                 <SliderField
                   label="Font Size"
-                  min={8}
-                  max={128}
-                  step={1}
                   value={diffuse.asciiFontSize}
                   onChange={(v) => setDiffuse({ asciiFontSize: v })}
                   format={(v) => `${Math.round(v)}px`}
-                  defaultValue={D.asciiFontSize}
                   limitKey="diffuse.asciiFontSize"
                 />
                 <div className="flex items-center justify-between gap-3">
@@ -219,11 +215,9 @@ export function DiffusePanel() {
             {diffuse.mode === 'dither' && (
               <SliderField
                 label="Threshold"
-                min={0} max={1} step={0.01}
                 value={diffuse.ditherThreshold ?? D.ditherThreshold}
                 onChange={(v) => setDiffuse({ ditherThreshold: v })}
                 format={(v) => Math.round(v * 100) + '%'}
-                defaultValue={D.ditherThreshold}
                 limitKey="diffuse.ditherThreshold"
               />
             )}
@@ -275,13 +269,9 @@ export function DiffusePanel() {
                 </div>
                 <SliderField
                   label="Grain Curve Amount"
-                  min={0}
-                  max={1}
-                  step={0.01}
                   value={diffuse.grainAdaptiveAmount}
                   onChange={(v) => setDiffuse({ grainAdaptiveAmount: v })}
                   format={(v) => `${Math.round(v * 100)}%`}
-                  defaultValue={D.grainAdaptiveAmount}
                   limitKey="diffuse.grainAdaptiveAmount"
                 />
                 <DiffuseCurveEditor
@@ -296,10 +286,8 @@ export function DiffusePanel() {
 
             <SliderField
               label="Seed"
-              min={0} max={99} step={1}
               value={diffuse.seed}
               onChange={(v) => setDiffuse({ seed: v })}
-              defaultValue={D.seed}
               trackId="diffuse.seed"
               limitKey="diffuse.seed"
             />

@@ -28,6 +28,7 @@ import { useLanguage } from '../i18n/LanguageProvider';
 import { localizeUiLabel } from '../i18n/uiLabels';
 import { InputNumber, InputShuffle } from 'tweeq';
 import { applicationCommands } from '../application/commands';
+import { clampParameter, getParameterLimit } from '../lib/parameterLimits';
 
 const BAR_H = RAMP_BAR_H;
 const HANDLE_AREA = RAMP_HANDLE_AREA;
@@ -1992,9 +1993,9 @@ export function GradientRamp({ overlayImageElement = null, showHeader = true }: 
                 <InputNumber
                 className="tq-input-number w-full"
                 value={rampVariable}
-                min={-1}
-                max={1}
-                step={0.001}
+                min={getParameterLimit('gradient.rampVariable').min}
+                max={getParameterLimit('gradient.rampVariable').max}
+                step={getParameterLimit('gradient.rampVariable').step}
                 precision={3}
                 bar={0}
                 clampMin
@@ -2002,7 +2003,13 @@ export function GradientRamp({ overlayImageElement = null, showHeader = true }: 
                 aria-label={`${localizeUiLabel('Variable', language)}: ${rampVariable.toFixed(3)}`}
                 onChange={(value) => {
                   if (Number.isFinite(value)) {
-                    setGradient({ rampVariable: Math.max(-1, Math.min(1, value)) });
+                    setGradient({
+                      rampVariable: clampParameter(
+                        value,
+                        0,
+                        getParameterLimit('gradient.rampVariable'),
+                      ),
+                    });
                   }
                 }}
                 />
@@ -2012,13 +2019,10 @@ export function GradientRamp({ overlayImageElement = null, showHeader = true }: 
 
           <SliderField
             label={t('gradient.repeat')}
-            min={1}
-            max={20}
-            step={1}
             value={rampRepeat}
             onChange={(value) => setGradient({ rampRepeat: Math.round(value) })}
             format={(value) => `${Math.round(value)}x`}
-            defaultValue={1}
+            limitKey="gradient.rampRepeat"
           />
 
           {/* Mirror モード */}
@@ -2262,13 +2266,10 @@ export function GradientRamp({ overlayImageElement = null, showHeader = true }: 
             <div className="max-w-md">
               <SliderField
                 label={t('gradient.repeat')}
-                min={1}
-                max={20}
-                step={1}
                 value={rampRepeat}
                 onChange={(value) => setGradient({ rampRepeat: Math.round(value) })}
                 format={(value) => `${Math.round(value)}x`}
-                defaultValue={1}
+                limitKey="gradient.rampRepeat"
               />
             </div>
 

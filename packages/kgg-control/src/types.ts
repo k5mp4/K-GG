@@ -14,6 +14,7 @@ export type ParameterDefinition = {
   min?: number;
   max?: number;
   step?: number;
+  defaultValue?: number | string;
   integer?: boolean;
   angleUnit?: 'degrees' | 'radians';
   wrapAngle?: boolean;

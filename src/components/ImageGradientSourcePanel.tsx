@@ -6,6 +6,7 @@ import type { ImageGradientChannel } from '../types/imageGradient';
 import { Toggle } from './Toggle';
 import { CustomSelect } from './CustomSelect';
 import { SliderField } from './SliderField';
+import { getParameterDefault } from '../lib/parameterLimits';
 
 type Props = {
   sourceImageCanvas: HTMLCanvasElement | null;
@@ -31,7 +32,7 @@ export function ImageGradientSourcePanel({ sourceImageCanvas, sourceImageName, o
     try {
       const canvas = await imageFileToCanvas(file);
       onSourceImageLoad(canvas, file.name);
-      setImageGradient({ enabled: true, anchorInfluence: 0.5 });
+      setImageGradient({ enabled: true, anchorInfluence: getParameterDefault('imageGradient.anchorInfluence') });
     } catch (cause) {
       console.error('Image gradient source load failed:', cause);
       setError('画像の読み込みに失敗しました。');
@@ -92,13 +93,10 @@ export function ImageGradientSourcePanel({ sourceImageCanvas, sourceImageName, o
       />
       <SliderField
         label="Anchor Influence"
-        min={0}
-        max={100}
-        step={1}
-        value={imageGradient.anchorInfluence * 100}
-        onChange={(value) => setImageGradient({ anchorInfluence: value / 100 })}
-        format={(value) => `${value}%`}
-        defaultValue={50}
+        value={imageGradient.anchorInfluence}
+        onChange={(value) => setImageGradient({ anchorInfluence: value })}
+        format={(value) => `${Math.round(value * 100)}%`}
+        limitKey="imageGradient.anchorInfluence"
       />
       <p className="text-[10px] text-tab-inactive">画像は固定し、アンカー配色のみを歪ませます。中央基準のCoverで配置されます。</p>
       {error && <p className="text-[10px] text-red-400">{error}</p>}

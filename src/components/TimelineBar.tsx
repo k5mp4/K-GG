@@ -3,10 +3,6 @@ import { InputAngle } from 'tweeq';
 import {
   useGradientStore,
   STORE_DEFAULTS,
-  ANIMATION_DURATION_MIN,
-  ANIMATION_DURATION_MAX,
-  ANIMATION_SPEED_MIN,
-  ANIMATION_SPEED_MAX,
 } from '../store/gradientStore';
 import { applicationCommands } from '../application/commands';
 import { AnimationLoop } from '../lib/animation';
@@ -718,13 +714,10 @@ export function TimelineBar({ animLoopRef, onSeek, exportProgress = null, export
           <SliderField
             label={t('animation.duration')}
             labelClassName="text-[8px] text-tab-inactive uppercase tracking-wider"
-            min={ANIMATION_DURATION_MIN}
-            max={ANIMATION_DURATION_MAX}
-            step={0.1}
             value={animation.duration}
             onChange={value => setAnimation({ duration: value })}
             format={value => `${value.toFixed(2)}s`}
-            defaultValue={STORE_DEFAULTS.animation.duration}
+            limitKey="animation.duration"
             compact
             disabled={beatSyncEnabled}
             className="hidden w-[182px] items-center sm:flex"
@@ -745,13 +738,10 @@ export function TimelineBar({ animLoopRef, onSeek, exportProgress = null, export
           <SliderField
             label={t('animation.speed')}
             labelClassName="text-[8px] text-tab-inactive uppercase tracking-wider"
-            min={ANIMATION_SPEED_MIN}
-            max={ANIMATION_SPEED_MAX}
-            step={0.01}
             value={animation.speed}
             onChange={value => setAnimation({ speed: value })}
             format={value => `${value.toFixed(2)}×`}
-            defaultValue={STORE_DEFAULTS.animation.speed}
+            limitKey="animation.speed"
             compact
             className="hidden w-[166px] items-center lg:flex"
           />

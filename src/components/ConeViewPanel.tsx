@@ -1,7 +1,7 @@
 import { useLanguage } from '../i18n/LanguageProvider';
 import { useGradientStore } from '../store/gradientStore';
 import { applicationCommands } from '../application/commands';
-import { CONE_SEAM_BLEND_MAX, CONE_SEAM_MODE_OPTIONS, DEFAULT_CONE_VIEW, type ConeSeamMode } from '../types/coneView';
+import { CONE_SEAM_MODE_OPTIONS, DEFAULT_CONE_VIEW, type ConeSeamMode } from '../types/coneView';
 import { CustomSelect } from './CustomSelect';
 import { SliderField } from './SliderField';
 
@@ -38,19 +38,13 @@ export function ConeViewPanel() {
         <SliderField
           label="Depth"
           value={coneView.depth}
-          min={2}
-          max={30}
-          step={0.1}
-          defaultValue={DEFAULT_CONE_VIEW.depth}
+          limitKey="cone.depth"
           onChange={(depth) => setConeView({ depth })}
         />
         <SliderField
           label="Rotation"
           value={coneView.rotation}
-          min={-180}
-          max={180}
-          step={1}
-          defaultValue={DEFAULT_CONE_VIEW.rotation}
+          limitKey="cone.rotation"
           format={(value) => `${Math.round(value)}°`}
           onChange={(rotation) => setConeView({ rotation })}
         />
@@ -70,10 +64,7 @@ export function ConeViewPanel() {
         <SliderField
           label="Texture Repeat"
           value={coneView.textureRepeat}
-          min={1}
-          max={8}
-          step={1}
-          defaultValue={DEFAULT_CONE_VIEW.textureRepeat}
+          limitKey="cone.textureRepeat"
           onChange={(textureRepeat) => setConeView({ textureRepeat })}
         />
         <CustomSelect
@@ -87,20 +78,14 @@ export function ConeViewPanel() {
         <SliderField
           label="Seam Blend"
           value={coneView.seamBlend}
-          min={0}
-          max={CONE_SEAM_BLEND_MAX}
-          step={0.01}
-          defaultValue={DEFAULT_CONE_VIEW.seamBlend}
+          limitKey="cone.seamBlend"
           format={(value) => `${Math.round(value * 100)}%`}
           onChange={(seamBlend) => setConeView({ seamBlend })}
         />
         <SliderField
           label="Flow Cycles"
           value={coneView.flowCycles}
-          min={-30}
-          max={30}
-          step={1}
-          defaultValue={DEFAULT_CONE_VIEW.flowCycles}
+          limitKey="cone.flowCycles"
           disabled={coneView.mappingMode === 'projection'}
           onChange={(flowCycles) => setConeView({ flowCycles })}
         />

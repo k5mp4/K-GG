@@ -2,33 +2,34 @@ import type { EffectPipelineConfig, PostprocessConfig } from '../types/distortio
 import { isPostprocessLayerEnabled } from './postprocessStack';
 import { isEffectStackLayerEnabled } from './effectPipeline';
 import { getGlassTileSamplePadding } from './glassTile';
+import { clampParameter, getParameterDefault, getParameterLimit } from './parameterLimits';
 
 export const GLASS_LIMITS = {
-  refraction: 120,
-  chromaticAberration: 80,
-  roughness: 12,
+  refraction: getParameterLimit('postprocess.glassRefraction').max,
+  chromaticAberration: getParameterLimit('postprocess.glassChromaticAberration').max,
+  roughness: getParameterLimit('postprocess.glassRoughness').max,
 } as const;
 
 export const GLASS_DEFAULTS = {
-  scale: 3.2,
-  stretch: 4,
-  rotation: 12,
-  complexity: 4,
-  warp: 0.55,
-  seed: 0,
-  noiseInfluence: 0,
-  refraction: 32,
-  chromaticAberration: 4,
-  roughness: 1.5,
-  highlight: 0.45,
-  mix: 1,
-  evolution: 0,
-  motion: 0.35,
+  scale: getParameterDefault('postprocess.glassScale'),
+  stretch: getParameterDefault('postprocess.glassStretch'),
+  rotation: getParameterDefault('postprocess.glassRotation'),
+  complexity: getParameterDefault('postprocess.glassComplexity'),
+  warp: getParameterDefault('postprocess.glassWarp'),
+  seed: getParameterDefault('postprocess.glassSeed'),
+  noiseInfluence: getParameterDefault('postprocess.glassNoiseInfluence'),
+  refraction: getParameterDefault('postprocess.glassRefraction'),
+  chromaticAberration: getParameterDefault('postprocess.glassChromaticAberration'),
+  roughness: getParameterDefault('postprocess.glassRoughness'),
+  highlight: getParameterDefault('postprocess.glassHighlight'),
+  mix: getParameterDefault('postprocess.glassMix'),
+  evolution: getParameterDefault('postprocess.glassEvolution'),
+  motion: getParameterDefault('postprocess.glassMotion'),
 } as const;
 
 export const GLASS_V2_COLOR_DEFAULTS = {
-  chromaticHue: 0,
-  chromaticSaturation: 1,
+  chromaticHue: getParameterDefault('postprocess.glassV2ChromaticHue'),
+  chromaticSaturation: getParameterDefault('postprocess.glassV2ChromaticSaturation'),
   transmissionTint: '#FFFFFF',
   highlightTint: '#FFFFFF',
 } as const;
@@ -63,10 +64,6 @@ function clamp(value: number, min: number, max: number): number {
   return Math.max(min, Math.min(max, value));
 }
 
-function finiteClamped(value: number | undefined, fallback: number, min: number, max: number): number {
-  return clamp(Number.isFinite(value) ? value as number : fallback, min, max);
-}
-
 function normalizedHexColor(value: unknown, fallback: string): string {
   return typeof value === 'string' && /^#[0-9a-f]{6}$/i.test(value)
     ? value.toUpperCase()
@@ -93,20 +90,20 @@ export function normalizeGlassRenderParameters(
   >> = {},
 ): GlassRenderParameters {
   return {
-    scale: finiteClamped(config.glassScale, GLASS_DEFAULTS.scale, 0.5, 12),
-    stretch: finiteClamped(config.glassStretch, GLASS_DEFAULTS.stretch, 0.25, 8),
-    rotationRadians: finiteClamped(config.glassRotation, GLASS_DEFAULTS.rotation, 0, 360) * Math.PI / 180,
-    complexity: Math.round(finiteClamped(config.glassComplexity, GLASS_DEFAULTS.complexity, 1, 5)),
-    warp: finiteClamped(config.glassWarp, GLASS_DEFAULTS.warp, 0, 1),
-    seed: Math.round(finiteClamped(config.glassSeed, GLASS_DEFAULTS.seed, 0, 99)),
-    noiseInfluence: smoothGlassNoiseBlend(finiteClamped(config.glassNoiseInfluence, GLASS_DEFAULTS.noiseInfluence, 0, 1)),
-    refraction: finiteClamped(config.glassRefraction, GLASS_DEFAULTS.refraction, 0, GLASS_LIMITS.refraction),
-    chromaticAberration: finiteClamped(config.glassChromaticAberration, GLASS_DEFAULTS.chromaticAberration, 0, GLASS_LIMITS.chromaticAberration),
-    roughness: finiteClamped(config.glassRoughness, GLASS_DEFAULTS.roughness, 0, GLASS_LIMITS.roughness),
-    highlight: finiteClamped(config.glassHighlight, GLASS_DEFAULTS.highlight, 0, 2),
-    mix: finiteClamped(config.glassMix, GLASS_DEFAULTS.mix, 0, 1),
-    evolution: finiteClamped(config.glassEvolution, GLASS_DEFAULTS.evolution, 0, 1),
-    motion: finiteClamped(config.glassMotion, GLASS_DEFAULTS.motion, 0, 1),
+    scale: clampParameter(config.glassScale, GLASS_DEFAULTS.scale, getParameterLimit('postprocess.glassScale')),
+    stretch: clampParameter(config.glassStretch, GLASS_DEFAULTS.stretch, getParameterLimit('postprocess.glassStretch')),
+    rotationRadians: clampParameter(config.glassRotation, GLASS_DEFAULTS.rotation, getParameterLimit('postprocess.glassRotation')) * Math.PI / 180,
+    complexity: clampParameter(config.glassComplexity, GLASS_DEFAULTS.complexity, getParameterLimit('postprocess.glassComplexity')),
+    warp: clampParameter(config.glassWarp, GLASS_DEFAULTS.warp, getParameterLimit('postprocess.glassWarp')),
+    seed: clampParameter(config.glassSeed, GLASS_DEFAULTS.seed, getParameterLimit('postprocess.glassSeed')),
+    noiseInfluence: smoothGlassNoiseBlend(clampParameter(config.glassNoiseInfluence, GLASS_DEFAULTS.noiseInfluence, getParameterLimit('postprocess.glassNoiseInfluence'))),
+    refraction: clampParameter(config.glassRefraction, GLASS_DEFAULTS.refraction, getParameterLimit('postprocess.glassRefraction')),
+    chromaticAberration: clampParameter(config.glassChromaticAberration, GLASS_DEFAULTS.chromaticAberration, getParameterLimit('postprocess.glassChromaticAberration')),
+    roughness: clampParameter(config.glassRoughness, GLASS_DEFAULTS.roughness, getParameterLimit('postprocess.glassRoughness')),
+    highlight: clampParameter(config.glassHighlight, GLASS_DEFAULTS.highlight, getParameterLimit('postprocess.glassHighlight')),
+    mix: clampParameter(config.glassMix, GLASS_DEFAULTS.mix, getParameterLimit('postprocess.glassMix')),
+    evolution: clampParameter(config.glassEvolution, GLASS_DEFAULTS.evolution, getParameterLimit('postprocess.glassEvolution')),
+    motion: clampParameter(config.glassMotion, GLASS_DEFAULTS.motion, getParameterLimit('postprocess.glassMotion')),
   };
 }
 
@@ -119,20 +116,18 @@ export function normalizeGlassV2ColorParameters(
     | 'glassV2HighlightTint'
   >> = {},
 ): GlassV2ColorParameters {
-  const chromaticHueDegrees = finiteClamped(
+  const chromaticHueDegrees = clampParameter(
     config.glassV2ChromaticHue,
     GLASS_V2_COLOR_DEFAULTS.chromaticHue,
-    -180,
-    180,
+    getParameterLimit('postprocess.glassV2ChromaticHue'),
   );
   return {
     chromaticHueDegrees,
     chromaticHueRadians: chromaticHueDegrees * Math.PI / 180,
-    chromaticSaturation: finiteClamped(
+    chromaticSaturation: clampParameter(
       config.glassV2ChromaticSaturation,
       GLASS_V2_COLOR_DEFAULTS.chromaticSaturation,
-      0,
-      2,
+      getParameterLimit('postprocess.glassV2ChromaticSaturation'),
     ),
     transmissionTint: normalizedHexColor(
       config.glassV2TransmissionTint,

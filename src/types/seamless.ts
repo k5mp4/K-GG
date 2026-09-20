@@ -1,5 +1,7 @@
-export const SEAMLESS_MIN_BLEND_WIDTH = 0.02;
-export const SEAMLESS_MAX_BLEND_WIDTH = 0.5;
+import { clampParameter, getParameterDefault, getParameterLimit } from '../lib/parameterLimits';
+
+export const SEAMLESS_MIN_BLEND_WIDTH = getParameterLimit('seamless.blendWidth').min;
+export const SEAMLESS_MAX_BLEND_WIDTH = getParameterLimit('seamless.blendWidth').max;
 
 export type SeamlessConfig = {
   enabled: boolean;
@@ -9,16 +11,18 @@ export type SeamlessConfig = {
 
 export const DEFAULT_SEAMLESS: SeamlessConfig = {
   enabled: false,
-  blendWidth: 0.25,
+  blendWidth: getParameterDefault('seamless.blendWidth'),
 };
 
 export function normalizeSeamlessConfig(value: unknown): SeamlessConfig {
   const raw = typeof value === 'object' && value !== null
     ? value as Partial<SeamlessConfig>
     : {};
-  const blendWidth = typeof raw.blendWidth === 'number' && Number.isFinite(raw.blendWidth)
-    ? Math.max(SEAMLESS_MIN_BLEND_WIDTH, Math.min(SEAMLESS_MAX_BLEND_WIDTH, raw.blendWidth))
-    : DEFAULT_SEAMLESS.blendWidth;
+  const blendWidth = clampParameter(
+    raw.blendWidth,
+    DEFAULT_SEAMLESS.blendWidth,
+    getParameterLimit('seamless.blendWidth'),
+  );
   return {
     enabled: typeof raw.enabled === 'boolean' ? raw.enabled : DEFAULT_SEAMLESS.enabled,
     blendWidth,

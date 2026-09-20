@@ -15,11 +15,8 @@ import { clampSliderValue, isSliderValueOutOfRange } from '../lib/sliderValue';
 import { useLanguage } from '../i18n/LanguageProvider';
 import { localizeUiLabel } from '../i18n/uiLabels';
 
-type Props = {
+type SharedProps = {
   label: string;
-  min: number;
-  max: number;
-  step: number;
   value: number;
   onChange: (v: number) => void;
   format?: (v: number) => string;
@@ -33,6 +30,11 @@ type Props = {
   disabled?: boolean;
   className?: string;
 };
+
+type Props = SharedProps & (
+  | { limitKey: ParameterLimitKey; min?: number; max?: number; step?: number }
+  | { limitKey?: undefined; min: number; max: number; step: number }
+);
 
 function decimalPlaces(value: number): number {
   const text = String(value);
@@ -54,7 +56,7 @@ export function SliderField({
   defaultValue,
   trackId,
   control = 'number',
-  angleUnit = 'degrees',
+  angleUnit: angleUnitProp,
   limitKey,
   compact = false,
   disabled = false,
@@ -74,9 +76,11 @@ export function SliderField({
   );
   const timelineTime = getTimelineTime(currentTime);
   const configuredLimit = limitKey ? getParameterLimit(limitKey) : null;
-  const effectiveMin = configuredLimit?.min ?? min;
-  const effectiveMax = configuredLimit?.max ?? max;
-  const effectiveStep = configuredLimit?.step ?? step;
+  const effectiveMin = configuredLimit?.min ?? min!;
+  const effectiveMax = configuredLimit?.max ?? max!;
+  const effectiveStep = configuredLimit?.step ?? step!;
+  const effectiveDefault = defaultValue ?? configuredLimit?.defaultValue;
+  const angleUnit = configuredLimit?.angleUnit ?? angleUnitProp ?? 'degrees';
   const [inputRevision, setInputRevision] = useState(0);
   const inputOutOfRangeRef = useRef(false);
   const formatInfo = useMemo(
@@ -111,7 +115,7 @@ export function SliderField({
   const displayed = format
     ? format(control === 'angle' ? angleDegrees : inputValue)
     : String(control === 'angle' ? angleDegrees : inputValue);
-  const isDirty = defaultValue !== undefined && Math.abs(boundedValue - defaultValue) > 1e-9;
+  const isDirty = effectiveDefault !== undefined && Math.abs(boundedValue - effectiveDefault) > 1e-9;
 
   // Auto-keyframing remains at the K-GG adapter boundary; Tweeq only owns the input gesture.
   const handleValueChange = (displayValue: number) => {
@@ -157,11 +161,11 @@ export function SliderField({
   const displayMin = toDisplay(effectiveMin);
   const displayMax = toDisplay(effectiveMax);
   const displayStep = Math.abs((formatInfo?.scale ?? 1) * effectiveStep) || effectiveStep;
-  const displayDefault = defaultValue === undefined
+  const displayDefault = effectiveDefault === undefined
     ? undefined
     : control === 'angle'
-      ? toTweeqAngle(angleUnit === 'radians' ? defaultValue * 180 / Math.PI : defaultValue)
-      : toDisplay(defaultValue);
+      ? toTweeqAngle(angleUnit === 'radians' ? effectiveDefault * 180 / Math.PI : effectiveDefault)
+      : toDisplay(effectiveDefault);
   const displayBar = formatInfo ? toDisplay(0) : 0;
   const valuePosition = getTweeqValuePosition(
     displayValue,
@@ -184,15 +188,15 @@ export function SliderField({
             <AnimationPropertyControls trackId={trackId} label={localizedLabel} value={value} compact />
           )}
         </div>
-        {defaultValue !== undefined && (
+        {effectiveDefault !== undefined && (
           <button
             type="button"
             onClick={() => isDirty && handleValueChange(
               control === 'angle'
-                ? toTweeqAngle(angleUnit === 'radians' ? defaultValue * 180 / Math.PI : defaultValue)
-                : toDisplay(defaultValue),
+                ? toTweeqAngle(angleUnit === 'radians' ? effectiveDefault * 180 / Math.PI : effectiveDefault)
+                : toDisplay(effectiveDefault),
             )}
-            title={t('input.resetDefault', { value: defaultValue })}
+            title={t('input.resetDefault', { value: effectiveDefault })}
             style={{ width: 40, height: 20, padding: 0, background: 'none' }}
             className={`inline-flex items-center justify-center shrink-0 rounded text-sm transition-opacity ${
               isDirty && !disabled
