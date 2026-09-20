@@ -3916,7 +3916,6 @@ export function render(
         && noiseDiffuseStackUsable
         && planLayerIndex === renderPlan.noiseDiffuseComposition.noiseLayerIndex
         && mainLayerEntries[layerIndex + 1]?.index === renderPlan.noiseDiffuseComposition.diffuseLayerIndex;
-      if (layer.kind === 'diffuse') publishDiffuseTextureHistogram(ctx, currentTexture, vpW, vpH);
       if (useNoiseDiffusePair) {
         const canPresentNoiseDiffuseDirectly = layerIndex + 2 === mainLayerEntries.length
           && !prismRequested
