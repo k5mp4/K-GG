@@ -1,0 +1,68 @@
+diff --git a/packages/react/src/components/InputColor/InputColor.tsx b/packages/react/src/components/InputColor/InputColor.tsx
+index e782a66..cb8797c 100644
+--- a/packages/react/src/components/InputColor/InputColor.tsx
++++ b/packages/react/src/components/InputColor/InputColor.tsx
+@@ -24,6 +24,7 @@ export interface InputColorProps
+ 	alpha?: boolean
+ 	pickers?: readonly ColorPickerComponent[]
+ 	presets?: readonly string[]
++	hueWheelSensitivity?: number
+ }
+ 
+ export function InputColor({
+@@ -32,6 +33,7 @@ export function InputColor({
+ 	alpha: alphaEnabled = true,
+ 	pickers,
+ 	presets,
++	hueWheelSensitivity,
+ 	disabled,
+ 	invalid,
+ 	inlinePosition,
+@@ -70,6 +72,7 @@ export function InputColor({
+ 				alpha={alphaEnabled}
+ 				pickers={pickers}
+ 				presets={presets}
++				hueWheelSensitivity={hueWheelSensitivity}
+ 				disabled={disabled}
+ 				invalid={invalid}
+ 				onChangeTweaking={setPadTweaking}
+diff --git a/packages/react/src/components/InputColor/InputColorPad.tsx b/packages/react/src/components/InputColor/InputColorPad.tsx
+index 5c762d7..7cd8d92 100644
+--- a/packages/react/src/components/InputColor/InputColorPad.tsx
++++ b/packages/react/src/components/InputColor/InputColorPad.tsx
+@@ -63,6 +63,10 @@ const COLOR_KEYS = [
+ // identity prevents an expensive WebGL readback on every pointer move.
+ const WHEEL_UNIFORMS = {}
+ 
++// A typical mouse-wheel notch is about 100 deltaY pixels; 25 degrees per notch
++// keeps hue selection precise while retaining the full 360-degree range.
++const DEFAULT_HUE_WHEEL_SENSITIVITY = 0.25
++
+ export interface InputColorPadProps
+ 	extends InputBoxProps,
+ 		InputEvents,
+@@ -75,6 +79,7 @@ export interface InputColorPadProps
+ 	alpha?: boolean
+ 	pickers?: readonly ColorPickerComponent[]
+ 	presets?: readonly string[]
++	hueWheelSensitivity?: number
+ 	onChangeTweaking?: (value: boolean) => void
+ 	children?: ReactNode
+ }
+@@ -95,6 +100,7 @@ export function InputColorPad({
+ 	invalid,
+ 	children,
+ 	className,
++	hueWheelSensitivity = DEFAULT_HUE_WHEEL_SENSITIVITY,
+ 	...props
+ }: InputColorPadProps) {
+ 	const {themeStore} = useTweeqRuntime()
+@@ -248,7 +254,7 @@ export function InputColorPad({
+ 				const next = tweakHSVAChannel(
+ 					localRef.current,
+ 					'h',
+-					(event.deltaY / 360) * 0.5
++					(event.deltaY / 360) * hueWheelSensitivity
+ 				)
+ 				localRef.current = next
+ 				setLocal(next)

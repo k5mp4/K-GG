@@ -5,7 +5,7 @@ title: UI入力コントロール
 status: current
 owners: [maintainer]
 created: 2026-07-28
-updated: 2026-09-11
+updated: 2026-09-20
 requirement_ids: [UI-001, UI-002, UI-003, UI-004, UI-005, UI-006, UI-007, UI-008, UI-009, UI-010, UI-011, UI-012, UI-013, UI-014, UI-015, UI-019, UI-021, UI-022, UI-023, UI-024]
 related_adrs: [ADR-0011, ADR-0012]
 related_changes: [CHANGE-010, CHANGE-012, CHANGE-013, CHANGE-014, CHANGE-015, CHANGE-018, CHANGE-019, CHANGE-024, CHANGE-025, CHANGE-026, CHANGE-027, CHANGE-030, CHANGE-031, CHANGE-032, CHANGE-034, CHANGE-037, CHANGE-038, CHANGE-039, CHANGE-041]
@@ -78,7 +78,7 @@ SlitのMotionにはLoop／PingPongのInputRadioとOffset Speedだけを表示し
 
 ### UI-013 共通Tweeq入力への統一
 
-StretchのGlow TintはTweeq InputColor、Postprocess DistortのBrush ModeはTweeq InputRadioで編集します。保存値と描画上の意味は変更しません。
+StretchのGlow TintはTweeq InputColor、Postprocess DistortのBrush ModeはTweeq InputRadioで編集します。InputColorの色相Wheel回転は既定感度を0.25とし、必要な利用箇所では`hueWheelSensitivity`で上書きできます。保存値と描画上の意味は変更しません。
 
 ### UI-014 SANDBOX Clothの表示設定
 

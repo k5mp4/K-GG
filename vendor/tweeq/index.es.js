@@ -23217,12 +23217,14 @@ const hD = [
   "g",
   "b"
 ], mD = {};
+const DEFAULT_HUE_WHEEL_SENSITIVITY = 0.25;
 function yD({
   value: e,
   onChange: t,
   alpha: r = !0,
   pickers: n,
   presets: o,
+  hueWheelSensitivity: hueWheelSensitivity = DEFAULT_HUE_WHEEL_SENSITIVITY,
   onChangeTweaking: a,
   onFocus: i,
   onBlur: s,
@@ -23331,7 +23333,7 @@ function yD({
         const b = Xn(
           we.current,
           "h",
-          _e.deltaY / 360 * 0.5
+          _e.deltaY / 360 * hueWheelSensitivity
         );
         we.current = b, G(b), (kt = (ut = wt.current).onChange) == null || kt.call(ut, Ea(b));
         const R = b.h - st.current.h;
@@ -23530,6 +23532,7 @@ function OD({
   alpha: r = !0,
   pickers: n,
   presets: o,
+  hueWheelSensitivity,
   disabled: a,
   invalid: i,
   inlinePosition: s,
@@ -23562,6 +23565,7 @@ function OD({
             alpha: r,
             pickers: n,
             presets: o,
+            hueWheelSensitivity,
             disabled: a,
             invalid: i,
             onChangeTweaking: N,
