@@ -3,7 +3,7 @@ import { createDefaultEffectStack, updateEffectStackLayer } from '../lib/effectP
 import { optimizeNoiseDistortion, type RenderOptimization } from '../lib/gpuDiagnostics';
 import { normalizeNoiseDistortionConfig, normalizePostprocessConfig, STORE_DEFAULTS, useGradientStore } from './gradientStore';
 
-function layerEnabled(kind: 'diffuse' | 'noise' | 'slit' | 'distort'): boolean {
+function layerEnabled(kind: 'diffuse' | 'noise' | 'slit' | 'distort' | 'videoMotion'): boolean {
   return useGradientStore.getState().effectPipeline.effectStack
     .find(layer => layer.kind === kind)?.enabled ?? false;
 }
@@ -37,6 +37,22 @@ describe('Gradient store Effect Pipeline V2 synchronization', () => {
     expect(layerEnabled('diffuse')).toBe(false);
     expect(layerEnabled('noise')).toBe(true);
     expect(layerEnabled('slit')).toBe(true);
+  });
+
+  it('keeps Video Motion config and the canonical stack layer synchronized', () => {
+    const store = useGradientStore.getState();
+
+    store.setVideoMotion({ enabled: true });
+    expect(layerEnabled('videoMotion')).toBe(true);
+
+    store.setEffectPipeline({
+      effectStack: updateEffectStackLayer(
+        useGradientStore.getState().effectPipeline.effectStack,
+        'videoMotion',
+        { enabled: false },
+      ),
+    });
+    expect(useGradientStore.getState().videoMotion.enabled).toBe(false);
   });
 
   it('normalizes Diffuse Halftone and ASCII background colors for both config boundaries', () => {

@@ -426,6 +426,7 @@ describe('effectPipeline', () => {
         prism: true,
         prismComposite: true,
         particles: true,
+        videoMotion: false,
       });
       expect(plan.capabilities).toEqual({
         required: ['webgl2', 'rgba8-framebuffer'],
@@ -454,6 +455,7 @@ describe('effectPipeline', () => {
         { kind: 'glass', enabled: false },
         { kind: 'glassTile', enabled: false },
         { kind: 'diffuse', enabled: true },
+        { kind: 'videoMotion', enabled: false },
       ],
       selectedKind: 'diffuse',
       prismEnabled: false,
@@ -479,6 +481,7 @@ describe('effectPipeline', () => {
       { kind: 'voronoi', enabled: false },
       { kind: 'glassTile', enabled: false },
       { kind: 'diffuse', enabled: false },
+      { kind: 'videoMotion', enabled: false },
     ]);
   });
 
@@ -533,6 +536,7 @@ describe('effectPipeline', () => {
       'kaleidoscope',
       'voronoi',
       'glassTile',
+      'videoMotion',
     ]);
     expect(Object.fromEntries(normalized.map(layer => [layer.kind, layer.enabled]))).toEqual({
       diffuse: false,
@@ -545,6 +549,7 @@ describe('effectPipeline', () => {
       kaleidoscope: false,
       voronoi: true,
       glassTile: false,
+      videoMotion: false,
     });
   });
 
@@ -574,6 +579,7 @@ describe('effectPipeline', () => {
       'voronoi',
       'glassTile',
       'diffuse',
+      'videoMotion',
     ]);
 
     expect(moveEffectStackLayer(toggled, 'diffuse', 0).at(0)).toEqual({ kind: 'diffuse', enabled: true });
@@ -609,9 +615,11 @@ describe('effectPipeline', () => {
       'glass',
       'glassTile',
       'diffuse',
+      'videoMotion',
       'noise',
     ]);
-    expect(movedPastDiffuse.at(-2)).toEqual({ kind: 'diffuse', enabled: true });
+    expect(movedPastDiffuse.at(-3)).toEqual({ kind: 'diffuse', enabled: true });
+    expect(movedPastDiffuse.at(-2)).toEqual({ kind: 'videoMotion', enabled: false });
     expect(movedPastDiffuse.at(-1)).toEqual({ kind: 'noise', enabled: true });
   });
 
@@ -625,7 +633,7 @@ describe('effectPipeline', () => {
     let seed = 0;
     const randomized = randomizeEffectStackOrder(stack, () => (seed += 0.17) % 1);
 
-    expect(randomized).toHaveLength(10);
+    expect(randomized).toHaveLength(11);
     expect(new Set(randomized.map(layer => layer.kind))).toEqual(new Set(stack.map(layer => layer.kind)));
     expect(Object.fromEntries(randomized.map(layer => [layer.kind, layer.enabled]))).toEqual(enabledByKind);
     expect(randomized).not.toBe(stack);
@@ -662,5 +670,25 @@ describe('effectPipeline', () => {
     expect(isEffectStackLayerTemporarilyHidden('noise', solo.find(layer => layer.kind === 'noise')!.enabled, 'glass', previousEnabledState)).toBe(true);
     expect(isEffectStackLayerTemporarilyHidden('slit', solo.find(layer => layer.kind === 'slit')!.enabled, 'glass', previousEnabledState)).toBe(false);
     expect(isEffectStackLayerTemporarilyHidden('glass', true, 'glass', previousEnabledState)).toBe(false);
+  });
+
+  it('keeps Video Motion as a first-class V2 stack layer and render program', () => {
+    const stack = createDefaultEffectStack();
+    expect(stack.map(layer => layer.kind)).toContain('videoMotion');
+
+    const normalized = normalizeEffectStack([
+      { kind: 'videoMotion', enabled: true },
+    ]);
+    expect(normalized.find(layer => layer.kind === 'videoMotion')).toEqual({
+      kind: 'videoMotion',
+      enabled: true,
+    });
+
+    const pipeline = createDefaultEffectPipeline();
+    pipeline.effectStack = pipeline.effectStack.map(layer => (
+      layer.kind === 'videoMotion' ? { ...layer, enabled: true } : layer
+    ));
+    const plan = getV2RenderPlan(pipeline, analyticPlanOptions());
+    expect((plan.programs as unknown as Record<string, unknown>).videoMotion).toBe(true);
   });
 });

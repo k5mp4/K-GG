@@ -66,10 +66,14 @@ import { createWebGLFramebufferWithTexture, createWebGLTexture2D, ensureWebGLTar
 import {
   CORE_RENDER_TARGETS,
   FULL_RENDER_TARGETS,
+  isEffectStackLayerEnabled,
   type RenderPlanFallbackProgram,
   type RenderTargetKey,
 } from './effectPipeline';
 import { installWebGLResourceLedger, type WebGLResourceLedger } from './webglResourceLedger';
+import { normalizeVideoMotionConfig, type VideoMotionConfig } from '../types/videoMotion';
+import { getVideoMotionRuntime } from './videoMotionRuntime';
+import { VIDEO_MOTION_FIELD_HEIGHT, VIDEO_MOTION_FIELD_WIDTH } from './videoMotionSource';
 
 export type { TileRenderOptions } from '../types/rendering';
 
@@ -210,6 +214,13 @@ export type WebGLContext = {
   particleInstanceBuffer: WebGLBuffer | null;
   particleInstanceCount: number;
   particleInstanceSeed: number;
+  videoMotionProgram: WebGLProgram | null;
+  videoMotionUniforms: Record<string, WebGLUniformLocation | null>;
+  videoMotionFieldTexture: WebGLTexture;
+  videoMotionFeedbackTexture: WebGLTexture;
+  videoMotionFeedbackSize: [number, number];
+  videoMotionFeedbackPrimed: boolean;
+  videoMotionFeedbackResetVersion: number;
   flowGradient: FlowGradientResources;
   normalFbo: WebGLFramebuffer;      // ノーマルマップ出力 (ブラー前)
   normalTexture: WebGLTexture;
@@ -734,6 +745,26 @@ export async function initWebGL(canvas: HTMLCanvasElement): Promise<WebGLContext
   gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
   gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
   gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+  const videoMotionFieldTexture = createOwnedTexture();
+  const initialMotionField = new Uint8Array(VIDEO_MOTION_FIELD_WIDTH * VIDEO_MOTION_FIELD_HEIGHT * 4);
+  for (let index = 0; index < initialMotionField.length; index += 4) {
+    initialMotionField[index] = 128;
+    initialMotionField[index + 1] = 128;
+    initialMotionField[index + 3] = 0;
+  }
+  gl.bindTexture(gl.TEXTURE_2D, videoMotionFieldTexture);
+  gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, VIDEO_MOTION_FIELD_WIDTH, VIDEO_MOTION_FIELD_HEIGHT, 0, gl.RGBA, gl.UNSIGNED_BYTE, initialMotionField);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+  const videoMotionFeedbackTexture = createOwnedTexture();
+  gl.bindTexture(gl.TEXTURE_2D, videoMotionFeedbackTexture);
+  gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, 1, 1, 0, gl.RGBA, gl.UNSIGNED_BYTE, new Uint8Array([0, 0, 0, 255]));
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
   gl.useProgram(program);
   const { fbo: normalFbo, tex: normalTexture } = ownFramebufferPair();
   const { fbo: hBlurFbo, tex: hBlurTexture } = ownFramebufferPair();
@@ -747,7 +778,7 @@ export async function initWebGL(canvas: HTMLCanvasElement): Promise<WebGLContext
   ownedFlowGradient = flowGradient;
   const transitionTextureFrom = ownTexture(createTexture(gl));
   const transitionTextureTo = ownTexture(createTexture(gl));
-  const ctx: WebGLContext = { gl, performanceProfiler, gpuDiagnostics, renderOptimization, program, uniforms, geometryBuffer, transitionGeometryBuffer, generatorProgram: null, generatorUniforms: {}, gradientRampTexture, meshGradientTexture, meshGradientTextureSignature: '', diffuseCurveTexture, diffuseCurveSignature: '', diffuseAsciiTexture, diffuseAsciiSignature: '', diffuseAsciiCount: 1, diffuseAsciiRows: ASCII_ATLAS_MAX_ROWS, diffuseHistogramAt: 0, manualDistortTexture, manualDistortDisplacement: null, manualDistortSmoothMask: null, manualDistortMapResolution: 0, sourceImageTexture, sourceImageCanvas: null, imageGradientTexture, imageGradientSource: null, imageMaskTexture, imageMaskSource: null, normalMapProgram: null, normalMapUniforms: {}, gradFbo, gradTexture, blurProgram: null, blurUniforms: {}, stretchProgram: null, stretchUniforms: {}, seamlessProgram: null, seamlessUniforms: {}, stackCoreProgram: null, stackCoreUniforms: {}, noiseStackProgram: null, noiseStackUniforms: {}, noiseDiffuseStackProgram: null, noiseDiffuseStackUniforms: {}, glassProgram: null, glassUniforms: {}, glassFallbackActive: false, glassV2Program: null, glassV2Uniforms: {}, glassV2FallbackActive: false, glassTileProgram: null, glassTileUniforms: {}, glassTileFallbackActive: false, prismProgram: null, prismUniforms: {}, postprocessProgram: null, postprocessUniforms: {}, prismCompositeProgram: null, prismCompositeUniforms: {}, particleProgram: null, particleUniforms: {}, particleVao: null, particleQuadBuffer: null, particleInstanceBuffer: null, particleInstanceCount: 0, particleInstanceSeed: Number.NaN, flowGradient, normalFbo, normalTexture, hBlurFbo, hBlurTexture, postprocessFboA, postprocessTextureA, postprocessFboB, postprocessTextureB, prismScratchFbo, prismScratchTexture, prismBlurFbo, prismBlurTexture, prismGlowFbo, prismGlowTexture, shaderCompileExt, lazyProgramState: createLazyProgramState(), lazyProgramCompileQueue: createSerialAsyncQueue(), resourceLedger, hasPresentedFrame: false, disposed: false };
+  const ctx: WebGLContext = { gl, performanceProfiler, gpuDiagnostics, renderOptimization, program, uniforms, geometryBuffer, transitionGeometryBuffer, generatorProgram: null, generatorUniforms: {}, gradientRampTexture, meshGradientTexture, meshGradientTextureSignature: '', diffuseCurveTexture, diffuseCurveSignature: '', diffuseAsciiTexture, diffuseAsciiSignature: '', diffuseAsciiCount: 1, diffuseAsciiRows: ASCII_ATLAS_MAX_ROWS, diffuseHistogramAt: 0, manualDistortTexture, manualDistortDisplacement: null, manualDistortSmoothMask: null, manualDistortMapResolution: 0, sourceImageTexture, sourceImageCanvas: null, imageGradientTexture, imageGradientSource: null, imageMaskTexture, imageMaskSource: null, normalMapProgram: null, normalMapUniforms: {}, videoMotionProgram: null, videoMotionUniforms: {}, videoMotionFieldTexture, videoMotionFeedbackTexture, videoMotionFeedbackSize: [0, 0], videoMotionFeedbackPrimed: false, videoMotionFeedbackResetVersion: 0, gradFbo, gradTexture, blurProgram: null, blurUniforms: {}, stretchProgram: null, stretchUniforms: {}, seamlessProgram: null, seamlessUniforms: {}, postprocessProgram: null, postprocessUniforms: {}, stackCoreProgram: null, stackCoreUniforms: {}, noiseStackProgram: null, noiseStackUniforms: {}, noiseDiffuseStackProgram: null, noiseDiffuseStackUniforms: {}, glassProgram: null, glassUniforms: {}, glassFallbackActive: false, glassV2Program: null, glassV2Uniforms: {}, glassV2FallbackActive: false, glassTileProgram: null, glassTileUniforms: {}, glassTileFallbackActive: false, prismProgram: null, prismUniforms: {}, prismCompositeProgram: null, prismCompositeUniforms: {}, particleProgram: null, particleUniforms: {}, particleVao: null, particleQuadBuffer: null, particleInstanceBuffer: null, particleInstanceCount: 0, particleInstanceSeed: Number.NaN, flowGradient, normalFbo, normalTexture, hBlurFbo, hBlurTexture, postprocessFboA, postprocessTextureA, postprocessFboB, postprocessTextureB, prismScratchFbo, prismScratchTexture, prismBlurFbo, prismBlurTexture, prismGlowFbo, prismGlowTexture, shaderCompileExt, lazyProgramState: createLazyProgramState(), lazyProgramCompileQueue: createSerialAsyncQueue(), resourceLedger, hasPresentedFrame: false, disposed: false };
   initializedContext = ctx;
   effectStackTransitionResources.set(ctx, {
     program: transitionProgram,
@@ -815,6 +846,7 @@ export function disposeWebGL(ctx: WebGLContext): void {
     ctx.prismProgram,
     ctx.prismCompositeProgram,
     ctx.particleProgram,
+    ctx.videoMotionProgram,
   ];
   const uniquePrograms = new Set(programs.filter((program): program is WebGLProgram => Boolean(program)));
   for (const program of uniquePrograms) gl.deleteProgram(program);
@@ -828,6 +860,8 @@ export function disposeWebGL(ctx: WebGLContext): void {
     ctx.sourceImageTexture,
     ctx.imageGradientTexture,
     ctx.imageMaskTexture,
+    ctx.videoMotionFieldTexture,
+    ctx.videoMotionFeedbackTexture,
     ctx.gradTexture,
     ctx.normalTexture,
     ctx.hBlurTexture,
@@ -999,6 +1033,7 @@ function createLazyProgramState(): Record<LazyProgramKey, LazyProgramState> {
     flowSplat: { promise: null, failed: false, timedOut: false, fallback: false },
     flowTrail: { promise: null, failed: false, timedOut: false, fallback: false },
     flowComposite: { promise: null, failed: false, timedOut: false, fallback: false },
+    videoMotion: { promise: null, failed: false, timedOut: false, fallback: false },
   };
 }
 
@@ -1173,6 +1208,23 @@ function getFlowCompositeUniforms(gl: WebGL2RenderingContext, program: WebGLProg
   };
 }
 
+function getVideoMotionUniforms(gl: WebGL2RenderingContext, program: WebGLProgram): Record<string, WebGLUniformLocation | null> {
+  return {
+    u_sourceTex: gl.getUniformLocation(program, 'u_sourceTex'),
+    u_motionField: gl.getUniformLocation(program, 'u_motionField'),
+    u_feedbackTex: gl.getUniformLocation(program, 'u_feedbackTex'),
+    u_gradientRamp: gl.getUniformLocation(program, 'u_gradientRamp'),
+    u_resolution: gl.getUniformLocation(program, 'u_resolution'),
+    u_effectStrength: gl.getUniformLocation(program, 'u_effectStrength'),
+    u_blendAmount: gl.getUniformLocation(program, 'u_blendAmount'),
+    u_feedbackAmount: gl.getUniformLocation(program, 'u_feedbackAmount'),
+    u_decay: gl.getUniformLocation(program, 'u_decay'),
+    u_smearLength: gl.getUniformLocation(program, 'u_smearLength'),
+    u_stabilization: gl.getUniformLocation(program, 'u_stabilization'),
+    u_feedbackPrimed: gl.getUniformLocation(program, 'u_feedbackPrimed'),
+  };
+}
+
 /**
  * The full generator is compiled after the lightweight bootstrap
  * program. Reflect its active uniforms so program switching cannot leave a
@@ -1314,6 +1366,9 @@ function installLazyProgram(ctx: WebGLContext, key: LazyProgramKey, program: Web
   } else if (key === 'flowComposite') {
     ctx.flowGradient.compositeProgram = program;
     ctx.flowGradient.compositeUniforms = getFlowCompositeUniforms(gl, program);
+  } else if (key === 'videoMotion') {
+    ctx.videoMotionProgram = program;
+    ctx.videoMotionUniforms = getVideoMotionUniforms(gl, program);
   } else {
     const uniforms = getParticleUniforms(gl, program);
     ctx.particleProgram = program;
@@ -1396,6 +1451,7 @@ function lazyProgramReady(ctx: WebGLContext, key: LazyProgramKey): boolean {
     generator: [ctx.generatorProgram, ctx.generatorUniforms],
     blur: [ctx.blurProgram, ctx.blurUniforms],
     normalMap: [ctx.normalMapProgram, ctx.normalMapUniforms],
+    videoMotion: [ctx.videoMotionProgram, ctx.videoMotionUniforms],
     stretch: [ctx.stretchProgram, ctx.stretchUniforms],
     seamless: [ctx.seamlessProgram, ctx.seamlessUniforms],
     stackCore: [ctx.stackCoreProgram, ctx.stackCoreUniforms],
@@ -3021,6 +3077,90 @@ function drawParticleOverlay(
   gl.bindVertexArray(null);
 }
 
+function ensureVideoMotionFeedbackStorage(ctx: WebGLContext, width: number, height: number): void {
+  if (ctx.videoMotionFeedbackSize[0] === width && ctx.videoMotionFeedbackSize[1] === height) return;
+  const { gl } = ctx;
+  gl.bindTexture(gl.TEXTURE_2D, ctx.videoMotionFeedbackTexture);
+  gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, width, height, 0, gl.RGBA, gl.UNSIGNED_BYTE, null);
+  ctx.videoMotionFeedbackSize = [width, height];
+  ctx.videoMotionFeedbackPrimed = false;
+}
+
+function uploadVideoMotionField(ctx: WebGLContext): void {
+  const { gl } = ctx;
+  const field = getVideoMotionRuntime().source.field;
+  gl.activeTexture(gl.TEXTURE10);
+  gl.bindTexture(gl.TEXTURE_2D, ctx.videoMotionFieldTexture);
+  gl.texSubImage2D(gl.TEXTURE_2D, 0, 0, 0, field.width, field.height, gl.RGBA, gl.UNSIGNED_BYTE, field.data);
+}
+
+function drawVideoMotionPass(
+  ctx: WebGLContext,
+  sourceTexture: WebGLTexture,
+  config: VideoMotionConfig,
+  width: number,
+  height: number,
+  targetFramebuffer: WebGLFramebuffer | null,
+): boolean {
+  if (!ctx.videoMotionProgram) return false;
+  const { gl } = ctx;
+  const normalized = normalizeVideoMotionConfig(config);
+  const runtime = getVideoMotionRuntime();
+  ensureVideoMotionFeedbackStorage(ctx, width, height);
+  uploadVideoMotionField(ctx);
+  if (!runtime.source.field.hasFrame || ctx.videoMotionFeedbackResetVersion !== runtime.feedbackResetVersion) {
+    ctx.videoMotionFeedbackPrimed = false;
+    ctx.videoMotionFeedbackResetVersion = runtime.feedbackResetVersion;
+  }
+
+  gl.useProgram(ctx.videoMotionProgram);
+  gl.viewport(0, 0, width, height);
+  gl.bindFramebuffer(gl.FRAMEBUFFER, targetFramebuffer);
+  gl.activeTexture(gl.TEXTURE3);
+  gl.bindTexture(gl.TEXTURE_2D, sourceTexture);
+  setUniform1i(gl, ctx.videoMotionUniforms.u_sourceTex, 3);
+  gl.activeTexture(gl.TEXTURE10);
+  gl.bindTexture(gl.TEXTURE_2D, ctx.videoMotionFieldTexture);
+  setUniform1i(gl, ctx.videoMotionUniforms.u_motionField, 10);
+  gl.activeTexture(gl.TEXTURE11);
+  gl.bindTexture(gl.TEXTURE_2D, ctx.videoMotionFeedbackTexture);
+  setUniform1i(gl, ctx.videoMotionUniforms.u_feedbackTex, 11);
+  gl.activeTexture(gl.TEXTURE1);
+  gl.bindTexture(gl.TEXTURE_2D, ctx.gradientRampTexture);
+  setUniform1i(gl, ctx.videoMotionUniforms.u_gradientRamp, 1);
+  gl.uniform2f(ctx.videoMotionUniforms.u_resolution, width, height);
+  gl.uniform1f(ctx.videoMotionUniforms.u_effectStrength, normalized.effectStrength);
+  gl.uniform1f(ctx.videoMotionUniforms.u_blendAmount, normalized.blendAmount);
+  gl.uniform1f(ctx.videoMotionUniforms.u_feedbackAmount, normalized.feedbackAmount);
+  gl.uniform1f(ctx.videoMotionUniforms.u_decay, normalized.decay);
+  gl.uniform1f(ctx.videoMotionUniforms.u_smearLength, normalized.smearLength);
+  gl.uniform1f(ctx.videoMotionUniforms.u_stabilization, normalized.stabilization);
+  setUniform1i(gl, ctx.videoMotionUniforms.u_feedbackPrimed, ctx.videoMotionFeedbackPrimed ? 1 : 0);
+  drawArrays(ctx, 'Video Motion', gl.TRIANGLES, 0, 6);
+  if (targetFramebuffer === null) ctx.hasPresentedFrame = true;
+  return true;
+}
+
+function copyVideoMotionFeedback(ctx: WebGLContext, sourceTexture: WebGLTexture, width: number, height: number): void {
+  const sourceFramebuffer = getFramebufferForTexture(ctx, sourceTexture);
+  if (!sourceFramebuffer) return;
+  const { gl } = ctx;
+  gl.bindFramebuffer(gl.READ_FRAMEBUFFER, sourceFramebuffer);
+  gl.bindTexture(gl.TEXTURE_2D, ctx.videoMotionFeedbackTexture);
+  gl.copyTexSubImage2D(gl.TEXTURE_2D, 0, 0, 0, 0, 0, width, height);
+  gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+  ctx.videoMotionFeedbackPrimed = true;
+}
+
+function copyScreenToVideoMotionFeedback(ctx: WebGLContext, width: number, height: number): void {
+  const { gl } = ctx;
+  gl.bindFramebuffer(gl.READ_FRAMEBUFFER, null);
+  gl.bindTexture(gl.TEXTURE_2D, ctx.videoMotionFeedbackTexture);
+  gl.copyTexSubImage2D(gl.TEXTURE_2D, 0, 0, 0, 0, 0, width, height);
+  gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+  ctx.videoMotionFeedbackPrimed = true;
+}
+
 function drawFlowGradientPass(
   ctx: WebGLContext,
   sourceTexture: WebGLTexture,
@@ -3170,6 +3310,7 @@ export function render(
   flowNormalizedTime = 0,
   flowLoopEnabled = true,
   flowSessionId = 'preview',
+  videoMotion: VideoMotionConfig = normalizeVideoMotionConfig(undefined),
 ): void {
   seamless = normalizeSeamlessConfig(seamless);
   if (ctx.disposed || ctx.gl.isContextLost()) return;
@@ -3184,6 +3325,12 @@ export function render(
     requestLazyProgram(ctx, 'flowComposite')
   );
   let flowActive = flowRequested && flowProgramsReady && normalizedFlowGradient != null;
+  videoMotion = normalizeVideoMotionConfig(videoMotion);
+  const videoMotionStackEnabled = isV2Pipeline && effectPipeline
+    ? isEffectStackLayerEnabled(effectPipeline, 'videoMotion')
+    : false;
+  const videoMotionRequested = (isV2Pipeline ? videoMotionStackEnabled : videoMotion.enabled) && !tile;
+  const videoMotionActive = videoMotionRequested && requestLazyProgram(ctx, 'videoMotion');
   const { gl, program, uniforms, gradientRampTexture, meshGradientTexture, sourceImageTexture, imageGradientTexture, imageMaskTexture } = ctx;
   gradient = { ...gradient, angle: clampParameter(gradient.angle, 0, getParameterLimit('gradient.angle')) };
   noiseDistortion = {
@@ -3608,9 +3755,10 @@ export function render(
       && !normalRequested
       && !renderPlan.prismRequested
       && !renderPlan.particlesRequested
-      && !seamlessRequested;
+      && !seamlessRequested
+      && !videoMotionActive;
     const generatorReady = !analyticPrefixEnabled || requestLazyProgram(ctx, 'generator');
-    if ((renderPlan.framebufferAllocationMode === 'direct' || protectedDirect) && !flowActive && generatorReady) {
+    if ((renderPlan.framebufferAllocationMode === 'direct' || protectedDirect) && !flowActive && !videoMotionActive && generatorReady) {
       if (imageGradientProtected) {
         setUniform1i(gl, uniforms.u_noiseEnabled, protectedLayerEnabled('noise') && noiseDistortion.enabled ? 1 : 0);
         setUniform1i(gl, uniforms.u_slitEnabled, protectedLayerEnabled('slit') && slitScan.enabled ? 1 : 0);
@@ -3664,7 +3812,7 @@ export function render(
 
     // Lazy programs compile asynchronously. Keep a usable base frame until every
     // requested V2 stage is available instead of presenting a partial stack.
-    if (!generatorReady || !stackCoreReady || !noiseDiffuseCompositionReady || !normalReady || !stretchReady || !prismReady || !particlesReady || !seamlessReady || !flowProgramsReady) {
+    if (!generatorReady || !stackCoreReady || !noiseDiffuseCompositionReady || !normalReady || !stretchReady || !prismReady || !particlesReady || !seamlessReady || !flowProgramsReady || (videoMotionRequested && !videoMotionActive)) {
       // Cloth is a Base generator and does not depend on the stack programs:
       // present the cloth frame even while they compile.
       const clothReady = clothGradient?.enabled
@@ -3701,7 +3849,9 @@ export function render(
       drawArrays(ctx, 'Base', gl.TRIANGLES, 0, 6);
       return;
     }
-    const targets = flowActive && renderPlan.framebufferAllocationMode === 'direct'
+    const targets = videoMotionActive
+      ? FULL_RENDER_TARGETS
+      : flowActive && renderPlan.framebufferAllocationMode === 'direct'
       ? CORE_RENDER_TARGETS
       : renderPlan.framebufferTargets;
     ensureRenderTargets(ctx, targets, vpW, vpH);
@@ -3788,17 +3938,18 @@ export function render(
     let presentedToScreen = false;
     for (let layerIndex = 0; layerIndex < mainLayerEntries.length; layerIndex++) {
       const { layer, index: planLayerIndex } = mainLayerEntries[layerIndex];
-      if (layer.kind === 'diffuse') publishDiffuseTextureHistogram(ctx, currentTexture, vpW, vpH);
       const useNoiseDiffusePair = renderPlan.programs.noiseDiffuseStack
         && noiseDiffuseStackUsable
         && planLayerIndex === renderPlan.noiseDiffuseComposition.noiseLayerIndex
         && mainLayerEntries[layerIndex + 1]?.index === renderPlan.noiseDiffuseComposition.diffuseLayerIndex;
+      if (layer.kind === 'diffuse') publishDiffuseTextureHistogram(ctx, currentTexture, vpW, vpH);
       if (useNoiseDiffusePair) {
         const canPresentNoiseDiffuseDirectly = layerIndex + 2 === mainLayerEntries.length
           && !prismRequested
           && !flowActive
           && !seamlessRequested
-          && !particlesRequested;
+          && !particlesRequested
+          && !videoMotionActive;
         const target = canPresentNoiseDiffuseDirectly ? null : choosePostprocessTarget(ctx, currentTexture);
         const layerNoise = { ...noiseDistortion, enabled: true };
         const passRendered = drawPostprocessPass(
@@ -3841,6 +3992,18 @@ export function render(
       if (layer.kind === 'noise' && !noiseStackReady) continue;
       if (layer.kind === 'glass' && (glassIdentity || !glassV2Ready)) continue;
       if (layer.kind === 'glassTile' && (glassTileIdentity || !glassTileReady)) continue;
+      if (layer.kind === 'videoMotion') {
+        // Video Motion is a normal reorderable texture layer. Always render
+        // into the ping-pong target so a following layer samples its output;
+        // this also keeps feedback at this layer's position in the stack.
+        if (!videoMotionActive) continue;
+        const target = choosePostprocessTarget(ctx, currentTexture);
+        if (drawVideoMotionPass(ctx, currentTexture, videoMotion, vpW, vpH, target.fbo)) {
+          currentTexture = target.texture;
+          copyVideoMotionFeedback(ctx, currentTexture, vpW, vpH);
+        }
+        continue;
+      }
       // A Diffuse immediately before Slit is evaluated in Slit's destination
       // space. This prevents the slit sampler from stretching the already
       // diffused grid into stripes while keeping the layer order visible.
@@ -3963,12 +4126,13 @@ export function render(
   const stretchSeed = stretchScanOverride != null
     ? stretch.seed + (1 - Math.cos(stretchScan * Math.PI * 2)) * 0.5
     : stretch.seed;
-  if (stretchActive || postprocessActive || particleActive || seamlessActive || flowActive) {
+  if (stretchActive || postprocessActive || particleActive || seamlessActive || flowActive || videoMotionActive) {
     ensureRenderTargets(ctx, FULL_RENDER_TARGETS, vpW, vpH);
   }
   let particleSourceTexture: WebGLTexture | null = null;
   let seamlessSourceTexture: WebGLTexture | null = null;
   let flowSourceTexture: WebGLTexture | null = null;
+  let legacyCurrentTexture: WebGLTexture = ctx.gradTexture;
   const applyPostprocessStack = (sourceTexture: WebGLTexture, renderWidth: number, renderHeight: number) => {
     const stackTexture = drawPostprocessStackOutput(
       ctx,
@@ -3985,8 +4149,9 @@ export function render(
       time,
       noiseLoopPeriod,
       animationSpeed,
-      particleActive || seamlessActive || flowActive,
+      particleActive || seamlessActive || flowActive || videoMotionActive,
     );
+    if (stackTexture) legacyCurrentTexture = stackTexture;
     if (particleActive) particleSourceTexture = stackTexture ?? sourceTexture;
     if (seamlessActive) seamlessSourceTexture = stackTexture ?? sourceTexture;
     if (flowActive) flowSourceTexture = stackTexture ?? sourceTexture;
@@ -4036,19 +4201,22 @@ export function render(
       drawArrays(ctx, 'Normal Blur', gl.TRIANGLES, 0, 6);
       gl.bindTexture(gl.TEXTURE_2D, ctx.hBlurTexture);
       gl.uniform2f(ctx.blurUniforms.u_blurDir, 0.0, 1.0);
-      gl.bindFramebuffer(gl.FRAMEBUFFER, (stretchActive || postprocessActive || particleActive || seamlessActive || flowActive) ? ctx.gradFbo : null);
+      gl.bindFramebuffer(gl.FRAMEBUFFER, (stretchActive || postprocessActive || particleActive || seamlessActive || flowActive || videoMotionActive) ? ctx.gradFbo : null);
       drawArrays(ctx, 'Normal Blur', gl.TRIANGLES, 0, 6);
       if (stretchActive) {
         drawStretchPass(ctx, ctx.gradTexture, stretch, stretchScan, stretchSeed, fboW, fboH, (postprocessActive || particleActive || seamlessActive || flowActive) ? ctx.normalFbo : null);
         if (postprocessActive) applyPostprocessStack(ctx.normalTexture, fboW, fboH);
         else if (particleActive) particleSourceTexture = ctx.normalTexture;
         else if (seamlessActive) seamlessSourceTexture = ctx.normalTexture;
+        else if (videoMotionActive) legacyCurrentTexture = ctx.normalTexture;
       } else if (postprocessActive) {
         applyPostprocessStack(ctx.gradTexture, fboW, fboH);
       } else if (particleActive) {
         particleSourceTexture = ctx.gradTexture;
       } else if (seamlessActive) {
         seamlessSourceTexture = ctx.gradTexture;
+      } else if (videoMotionActive) {
+        legacyCurrentTexture = ctx.gradTexture;
       }
     } else {
       // ブラーなし: stretch有効時はノーマル結果をテクスチャ化してからポスト処理
@@ -4075,19 +4243,22 @@ export function render(
   } else {
     // ノーマルマップ無効: stretch有効時は一度FBOへ描いて、その画素を参照する
     setUniform1i(gl, uniforms.u_matcapEnabled, matcap.enabled ? 1 : 0);
-    gl.bindFramebuffer(gl.FRAMEBUFFER, (stretchActive || postprocessActive || particleActive || seamlessActive || flowActive) ? ctx.gradFbo : null);
+    gl.bindFramebuffer(gl.FRAMEBUFFER, (stretchActive || postprocessActive || particleActive || seamlessActive || flowActive || videoMotionActive) ? ctx.gradFbo : null);
     drawArrays(ctx, 'Base', gl.TRIANGLES, 0, 6);
     if (stretchActive) {
       drawStretchPass(ctx, ctx.gradTexture, stretch, stretchScan, stretchSeed, vpW, vpH, (postprocessActive || particleActive || seamlessActive || flowActive) ? ctx.normalFbo : null);
       if (postprocessActive) applyPostprocessStack(ctx.normalTexture, vpW, vpH);
       else if (particleActive) particleSourceTexture = ctx.normalTexture;
       else if (seamlessActive) seamlessSourceTexture = ctx.normalTexture;
+      else if (videoMotionActive) legacyCurrentTexture = ctx.normalTexture;
     } else if (postprocessActive) {
       applyPostprocessStack(ctx.gradTexture, vpW, vpH);
     } else if (particleActive) {
       particleSourceTexture = ctx.gradTexture;
     } else if (seamlessActive) {
       seamlessSourceTexture = ctx.gradTexture;
+    } else if (videoMotionActive) {
+      legacyCurrentTexture = ctx.gradTexture;
     }
     if (flowActive && flowSourceTexture == null) {
       flowSourceTexture = stretchActive ? ctx.normalTexture : ctx.gradTexture;
@@ -4099,7 +4270,7 @@ export function render(
       ?? seamlessSourceTexture
       ?? particleSourceTexture
       ?? ctx.gradTexture;
-    const flowNeedsTexture = particleActive || seamlessActive;
+    const flowNeedsTexture = particleActive || seamlessActive || videoMotionActive;
     const target = flowNeedsTexture ? choosePostprocessTarget(ctx, sourceTexture) : null;
     const rendered = drawFlowGradientPass(
       ctx,
@@ -4119,6 +4290,22 @@ export function render(
     if (rendered && target) {
       if (particleActive) particleSourceTexture = target.texture;
       if (seamlessActive) seamlessSourceTexture = target.texture;
+      if (videoMotionActive) legacyCurrentTexture = target.texture;
+    }
+  }
+
+  if (videoMotionActive) {
+    const needsTexture = seamlessActive || particleActive;
+    const target = needsTexture ? choosePostprocessTarget(ctx, legacyCurrentTexture) : null;
+    if (drawVideoMotionPass(ctx, legacyCurrentTexture, videoMotion, vpW, vpH, target?.fbo ?? null)) {
+      if (target) {
+        legacyCurrentTexture = target.texture;
+        if (seamlessActive) seamlessSourceTexture = target.texture;
+        if (particleActive) particleSourceTexture = target.texture;
+        copyVideoMotionFeedback(ctx, legacyCurrentTexture, vpW, vpH);
+      } else {
+        copyScreenToVideoMotionFeedback(ctx, vpW, vpH);
+      }
     }
   }
 

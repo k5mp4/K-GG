@@ -20,7 +20,7 @@ function boundedString(value: unknown, maxLength: number): value is string {
 function isEffectKind(value: unknown): boolean {
   return typeof value === 'string' && [
     'noise', 'slit', 'stretch', 'distort', 'mirror', 'kaleidoscope',
-    'voronoi', 'glass', 'glassTile', 'diffuse',
+    'voronoi', 'glass', 'glassTile', 'diffuse', 'videoMotion',
   ].includes(value);
 }
 

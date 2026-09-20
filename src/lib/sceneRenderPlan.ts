@@ -31,6 +31,7 @@ export type SceneRenderPlanState = Pick<LatestState,
   | 'flowGradient'
   | 'sourceImageCanvas'
   | 'imageGradientSource'
+  | 'videoMotion'
 >;
 
 /**
@@ -98,6 +99,7 @@ export function getRequiredSceneProgramKeys(state: LatestState): LazyProgramKey[
     add('prism', plan.programs.prism);
     add('prismComposite', plan.programs.prismComposite);
     add('particles', plan.programs.particles);
+    add('videoMotion', plan.programs.videoMotion);
   } else {
     const layers = getActivePostprocessStackLayers(state.postprocess).filter(layer => (
       (layer.kind !== 'glass' && layer.kind !== 'glassV2' && layer.kind !== 'glassTile')
@@ -121,6 +123,9 @@ export function getRequiredSceneProgramKeys(state: LatestState): LazyProgramKey[
   add('flowSplat', flowGradientEnabled);
   add('flowTrail', flowGradientEnabled);
   add('flowComposite', flowGradientEnabled);
+  if (state.effectPipeline.version !== 'stack-v2') {
+    add('videoMotion', state.videoMotion?.enabled === true);
+  }
 
   return required;
 }
