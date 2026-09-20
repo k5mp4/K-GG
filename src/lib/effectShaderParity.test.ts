@@ -561,6 +561,10 @@ describe('V2 effect shader parity', () => {
     expect(getProgramSource('noiseDiffuseStack').fragment).toContain('diffuseScatter > 0.0');
   });
 
+  it('keeps V2 Diffuse GPU-only instead of reading back a full-resolution texture', () => {
+    expect(webglSource).not.toContain('publishDiffuseTextureHistogram(ctx, currentTexture, vpW, vpH)');
+  });
+
   it('uses only the preceding stack texture as Voronoi color input', () => {
     const voronoi = extractFunction(postprocessShader, 'voronoiGradient');
     expect(voronoi).toContain('vec2 tiledUv = fract(rotatedLocal + 0.5 + vec2(cellPhase, cellPhase * 0.731));');
