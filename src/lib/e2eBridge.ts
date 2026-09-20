@@ -26,6 +26,7 @@ const DEFAULT_TIMEOUT_MS = 30_000;
 const ZIP_SMOKE_BPM = 960;
 const ZIP_SMOKE_FPS = 24 as const;
 const ZIP_SMOKE_DURATION_SECONDS = getBeatSyncDurationSeconds(ZIP_SMOKE_BPM);
+const ZIP_SMOKE_RESOLUTION = { width: 256, height: 256 } as const;
 
 function sleep(milliseconds: number): Promise<void> {
   return new Promise(resolve => window.setTimeout(resolve, milliseconds));
@@ -284,6 +285,41 @@ export function mountKggE2EBridge({ canvas, getWebGLContext, runtime }: KggE2EBr
       throw new Error(`Timed out waiting for export completion after ${timeoutMs}ms`);
     },
     async prepareZipSmoke() {
+      const resolutionResult = await runtime.runScenario([{
+        type: 'control',
+        operationId: 'set_ui_state',
+        input: {
+          patch: {
+            canvasW: ZIP_SMOKE_RESOLUTION.width,
+            canvasH: ZIP_SMOKE_RESOLUTION.height,
+          },
+        },
+      }], false);
+      if (!resolutionResult.ok) throw new Error(resolutionResult.error.message);
+
+      const resolutionDeadline = performance.now() + DEFAULT_TIMEOUT_MS;
+      let resolutionReady = false;
+      while (performance.now() < resolutionDeadline) {
+        const context = getWebGLContext();
+        if (
+          context
+          && !context.disposed
+          && !context.gl.isContextLost()
+          && context.hasPresentedFrame
+          && context.gl.drawingBufferWidth === ZIP_SMOKE_RESOLUTION.width
+          && context.gl.drawingBufferHeight === ZIP_SMOKE_RESOLUTION.height
+          && canvas.width === ZIP_SMOKE_RESOLUTION.width
+          && canvas.height === ZIP_SMOKE_RESOLUTION.height
+        ) {
+          resolutionReady = true;
+          break;
+        }
+        await sleep(16);
+      }
+      if (!resolutionReady) {
+        throw new Error(`Timed out preparing ZIP smoke canvas ${ZIP_SMOKE_RESOLUTION.width}×${ZIP_SMOKE_RESOLUTION.height}`);
+      }
+
       const currentAnimation = useGradientStore.getState().animation;
       // The normal duration control has a one-second minimum. Use the
       // existing beat-sync path to make this E2E-only animation short without
@@ -306,6 +342,7 @@ export function mountKggE2EBridge({ canvas, getWebGLContext, runtime }: KggE2EBr
         duration: ZIP_SMOKE_DURATION_SECONDS,
         fps: ZIP_SMOKE_FPS,
         frameCount: Math.ceil(ZIP_SMOKE_FPS * ZIP_SMOKE_DURATION_SECONDS),
+        resolution: { ...ZIP_SMOKE_RESOLUTION },
       };
     },
     async exerciseResourceLifecycle(): Promise<KggE2EResourceLifecycleResult> {
