@@ -84,7 +84,7 @@ SlitのMotionにはLoop／PingPongのInputRadioとOffset Speedだけを表示し
 
 ### UI-013 共通Tweeq入力への統一
 
-StretchのGlow TintはTweeq InputColor、Postprocess DistortのBrush ModeはTweeq InputRadioで編集します。保存値と描画上の意味は変更しません。
+StretchのGlow TintはTweeq InputColor、Postprocess DistortのBrush ModeはTweeq InputRadioで編集します。InputColorの色相Wheel回転は既定感度を0.25とし、必要な利用箇所では`hueWheelSensitivity`で上書きできます。保存値と描画上の意味は変更しません。
 
 ### UI-014 SANDBOX Clothの表示設定
 

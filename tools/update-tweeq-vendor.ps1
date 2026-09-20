@@ -50,6 +50,7 @@ $worktree = Join-Path $temporaryRoot ("tq-build-" + $temporaryId)
 $stage = Join-Path $temporaryRoot ("tq-stage-" + $temporaryId)
 $vendorTarget = Join-Path $repositoryRoot 'vendor/tweeq'
 $patchFile = Join-Path $PSScriptRoot 'tweeq-vendor/kgg-safety.patch'
+$inputColorPatchFile = Join-Path $PSScriptRoot 'tweeq-vendor/kgg-input-color.patch'
 $utf8NoBom = New-Object System.Text.UTF8Encoding($false)
 
 try {
@@ -61,6 +62,11 @@ try {
   if ($LASTEXITCODE -ne 0) { throw 'K-GG Tweeq safety patch no longer applies.' }
   & git -c "safe.directory=$safeWorktree" -C $worktree apply $patchFile
   if ($LASTEXITCODE -ne 0) { throw 'Unable to apply the K-GG Tweeq safety patch.' }
+  # This zero-context patch is guarded by the pinned upstream commit above.
+  & git -c "safe.directory=$safeWorktree" -C $worktree apply --unidiff-zero --check $inputColorPatchFile
+  if ($LASTEXITCODE -ne 0) { throw 'K-GG InputColor hue-wheel patch no longer applies.' }
+  & git -c "safe.directory=$safeWorktree" -C $worktree apply --unidiff-zero $inputColorPatchFile
+  if ($LASTEXITCODE -ne 0) { throw 'Unable to apply the K-GG InputColor hue-wheel patch.' }
 
   $reactPackage = Join-Path $worktree 'packages/react'
   Copy-Item (Join-Path $PSScriptRoot 'tweeq-vendor/kgg-entry.ts') (Join-Path $reactPackage 'src/kgg-entry.ts')

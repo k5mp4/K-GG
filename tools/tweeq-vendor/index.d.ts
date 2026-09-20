@@ -66,6 +66,8 @@ export interface InputColorProps
   alpha?: boolean
   pickers?: readonly ColorPickerComponent[]
   presets?: readonly string[]
+  /** Normalized hue change per 360px of mouse-wheel delta while tweaking the hue wheel. */
+  hueWheelSensitivity?: number
 }
 
 export declare function InputColor(props: InputColorProps): ReactElement

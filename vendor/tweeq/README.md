@@ -13,8 +13,9 @@ K-GGはnpm版Tweeqを使用せず、`file:vendor/tweeq`だけを参照します�
 - `InputShuffle`、`fromNumber`、`fromEnum`、`fromString`
 
 ReactとReact DOMはpeer dependencyです。それ以外の実行時依存は`index.es.js`と`index.cjs`へ内包しています。
-K-GG用安全化パッチにより、上流の動的式評価は有限数または不活性な文字列の解析へ置換し、
-Iconifyの外部APIローダーはローカルSVGへ置換しています。
+K-GG用パッチにより、上流の動的式評価は有限数または不活性な文字列の解析へ置換し、
+Iconifyの外部APIローダーはローカルSVGへ置換しています。InputColorの色相Wheelは
+K-GG向けの感度（既定0.25）を使い、必要に応じて`hueWheelSensitivity`で上書きできます。
 
 ## 再生成
 
@@ -23,7 +24,7 @@ Iconifyの外部APIローダーはローカルSVGへ置換しています。
 3. `npm install`でローカル`file:`依存を更新し、`npm run build`で確認する。
 
 スクリプトはcheckoutのHEAD、tracked差分、staged差分を検査し、固定コミットからclean worktreeを作成します。
-その中で固定lockfileによるfresh installを行い、安全化パッチを適用してから生成します。成果物は一時領域で
+その中で固定lockfileによるfresh installを行い、安全化パッチとInputColor調整パッチを適用してから生成します。成果物は一時領域で
 外部依存、公開export、危険な実行時コード、ライセンスを検査した後に置換します。エントリ、ビルド設定、
 安全化パッチは`tools/tweeq-vendor/`が一次情報です。
 

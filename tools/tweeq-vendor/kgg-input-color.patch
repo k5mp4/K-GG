@@ -1,0 +1,26 @@
+diff --git a/packages/react/src/components/InputColor/InputColor.tsx b/packages/react/src/components/InputColor/InputColor.tsx
+index e782a66..cb8797c 100644
+--- a/packages/react/src/components/InputColor/InputColor.tsx
++++ b/packages/react/src/components/InputColor/InputColor.tsx
+@@ -26,0 +27 @@ export interface InputColorProps
++	hueWheelSensitivity?: number
+@@ -34,0 +36 @@ export function InputColor({
++	hueWheelSensitivity,
+@@ -72,0 +75 @@ export function InputColor({
++				hueWheelSensitivity={hueWheelSensitivity}
+diff --git a/packages/react/src/components/InputColor/InputColorPad.tsx b/packages/react/src/components/InputColor/InputColorPad.tsx
+index 5c762d7..7cd8d92 100644
+--- a/packages/react/src/components/InputColor/InputColorPad.tsx
++++ b/packages/react/src/components/InputColor/InputColorPad.tsx
+@@ -65,0 +66,4 @@ const WHEEL_UNIFORMS = {}
++// A typical mouse-wheel notch is about 100 deltaY pixels; 25 degrees per notch
++// keeps hue selection precise while retaining the full 360-degree range.
++const DEFAULT_HUE_WHEEL_SENSITIVITY = 0.25
++
+@@ -77,0 +82 @@ export interface InputColorPadProps
++	hueWheelSensitivity?: number
+@@ -97,0 +103 @@ export function InputColorPad({
++	hueWheelSensitivity = DEFAULT_HUE_WHEEL_SENSITIVITY,
+@@ -251 +257 @@ export function InputColorPad({
+-					(event.deltaY / 360) * 0.5
++					(event.deltaY / 360) * hueWheelSensitivity
