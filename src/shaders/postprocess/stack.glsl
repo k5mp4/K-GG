@@ -1,4 +1,38 @@
+#if !defined(KGG_STACK_NOISE_ONLY)
+vec2 sourceUvFromGlobal(vec2 globalUv) {
+  return clamp((globalUv * u_fullResolution - u_tileOffset) / u_tileResolution, 0.0, 1.0);
+}
+#endif
+
 #if !defined(KGG_STACK_NOISE_ONLY) && !defined(KGG_GLASS_ONLY) && !defined(KGG_PRISM_ONLY)
+float postVoronoiDistance(vec2 diff) {
+  if (u_postVoronoiDistMetric == 1) {
+    return abs(diff.x) + abs(diff.y);
+  }
+  if (u_postVoronoiDistMetric == 2) {
+    return max(abs(diff.x), abs(diff.y));
+  }
+  if (u_postVoronoiDistMetric == 3) {
+    float exponent = max(u_postVoronoiMinkowskiExp, 0.5);
+    return pow(pow(abs(diff.x), exponent) + pow(abs(diff.y), exponent), 1.0 / exponent);
+  }
+  return length(diff);
+}
+
+float postVoronoiFeatureValue(float f1, float f2) {
+  float value = u_postVoronoiFeature == 1
+    ? f2
+    : (u_postVoronoiFeature == 2 ? f2 - f1 : f1);
+  if (u_postVoronoiDistMetric == 1) {
+    value /= 1.5;
+  } else if (u_postVoronoiDistMetric == 2) {
+    value /= 0.5;
+  } else {
+    value /= 0.7;
+  }
+  return clamp(value, 0.0, 1.0);
+}
+
 vec4 voronoiGradient(vec2 uv) {
   float aspect = u_fullResolution.x / max(u_fullResolution.y, 1.0);
   vec2 p = uv * vec2(aspect, 1.0) * max(u_postVoronoiScale, 0.001);
@@ -13,7 +47,7 @@ vec4 voronoiGradient(vec2 uv) {
       vec2 cell = base + vec2(float(x), float(y));
       vec2 jitter = mix(vec2(0.5), hash22(cell, u_postVoronoiSeed), clamp(u_postVoronoiRandomness, 0.0, 1.0));
       vec2 point = cell + jitter;
-      float d = length(p - point);
+      float d = postVoronoiDistance(p - point);
       if (d < f1) {
         f2 = f1;
         f1 = d;
@@ -26,11 +60,17 @@ vec4 voronoiGradient(vec2 uv) {
   }
 
   float cellPhase = hashWithSeed(dot(nearestCell, vec2(17.0, 59.0)), u_postVoronoiSeed);
-  float cellAngle = u_postVoronoiAngle + (cellPhase - 0.5) * PI * clamp(u_postVoronoiRandomness, 0.0, 1.0);
+  float featureValue = postVoronoiFeatureValue(f1, f2);
+  float cellAngle = u_postVoronoiAngle
+    + (cellPhase - 0.5) * PI * clamp(u_postVoronoiRandomness, 0.0, 1.0)
+    + (featureValue - 0.5) * 0.35;
   // Tile the preceding stack texture into each Voronoi cell. Voronoi must
   // reshape the already-processed image instead of overlaying a second copy
   // of the original gradient ramp.
-  vec2 cellLocal = p - nearestCell - 0.5;
+  float textureScale = u_postVoronoiFeature == 2
+    ? mix(1.35, 0.72, featureValue)
+    : mix(0.88, 1.18, featureValue);
+  vec2 cellLocal = (p - nearestCell - 0.5) * textureScale;
   float cosAngle = cos(-cellAngle);
   float sinAngle = sin(-cellAngle);
   vec2 rotatedLocal = vec2(
@@ -38,17 +78,8 @@ vec4 voronoiGradient(vec2 uv) {
     cellLocal.x * sinAngle + cellLocal.y * cosAngle
   );
   vec2 tiledUv = fract(rotatedLocal + 0.5 + vec2(cellPhase, cellPhase * 0.731));
-  vec4 sourceColor = texture2D(u_sourceTex, tiledUv);
-  vec4 color = sourceColor;
-
-  float edgeWidth = clamp(u_postVoronoiEdgeWidth, 0.0, 0.2);
-  if (edgeWidth > 0.0) {
-    float edge = smoothstep(0.0, edgeWidth, f2 - f1);
-    vec3 edgeColor = sourceColor.rgb * 0.58;
-    color.rgb = mix(edgeColor, color.rgb, edge);
-  }
-
-  return color;
+  vec4 sourceColor = texture2D(u_sourceTex, sourceUvFromGlobal(tiledUv));
+  return sourceColor;
 }
 #endif
 
@@ -134,10 +165,6 @@ vec2 legacyPostNoiseWarpUv(vec2 uv) {
 #endif
 
 #if !defined(KGG_STACK_NOISE_ONLY)
-vec2 sourceUvFromGlobal(vec2 globalUv) {
-  return clamp((globalUv * u_fullResolution - u_tileOffset) / u_tileResolution, 0.0, 1.0);
-}
-
 float stackSlitHash(float value) {
   return fract(sin(value * 127.1 + 311.7) * 43758.5453);
 }

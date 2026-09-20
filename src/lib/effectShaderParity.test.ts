@@ -564,8 +564,8 @@ describe('V2 effect shader parity', () => {
   it('uses only the preceding stack texture as Voronoi color input', () => {
     const voronoi = extractFunction(postprocessShader, 'voronoiGradient');
     expect(voronoi).toContain('vec2 tiledUv = fract(rotatedLocal + 0.5 + vec2(cellPhase, cellPhase * 0.731));');
-    expect(voronoi).toContain('texture2D(u_sourceTex, tiledUv)');
-    expect(voronoi).toContain('vec4 color = sourceColor;');
+    expect(voronoi).toContain('texture2D(u_sourceTex, sourceUvFromGlobal(tiledUv))');
+    expect(voronoi).toContain('return sourceColor;');
     expect(voronoi).not.toContain('texture2D(u_gradientRamp');
     expect(voronoi).not.toContain('cellPattern');
     expect(voronoi).not.toContain('edgePattern');
