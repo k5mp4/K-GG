@@ -2015,32 +2015,6 @@ function publishDiffuseInputHistogram(ctx: WebGLContext, gradient: GradientConfi
   }
 }
 
-function publishDiffuseTextureHistogram(ctx: WebGLContext, texture: WebGLTexture, width: number, height: number): void {
-  if (typeof window === 'undefined') return;
-  const now = performance.now();
-  if (now - ctx.diffuseHistogramAt < 250) return;
-  ctx.diffuseHistogramAt = now;
-  const { gl } = ctx;
-  const framebuffer = gl.createFramebuffer();
-  if (!framebuffer) return;
-  try {
-    gl.bindFramebuffer(gl.FRAMEBUFFER, framebuffer);
-    gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, texture, 0);
-    const pixels = new Uint8Array(Math.max(1, width * height * 4));
-    gl.readPixels(0, 0, width, height, gl.RGBA, gl.UNSIGNED_BYTE, pixels);
-    const histogram = new Uint32Array(256);
-    for (let index = 0; index < pixels.length; index += 4) {
-      histogram[Math.max(0, Math.min(255, Math.round(
-        pixels[index] * 0.299 + pixels[index + 1] * 0.587 + pixels[index + 2] * 0.114,
-      )))]++;
-    }
-    window.dispatchEvent(new CustomEvent('kgg:diffuse-histogram', { detail: { histogram: Array.from(histogram) } }));
-  } finally {
-    gl.bindFramebuffer(gl.FRAMEBUFFER, null);
-    gl.deleteFramebuffer(framebuffer);
-  }
-}
-
 function uploadManualDistortMap(ctx: WebGLContext, manualDistort: ManualDistortConfig): void {
   const { gl } = ctx;
   const resolution = Math.max(1, Math.floor(manualDistort.mapResolution) || 1);

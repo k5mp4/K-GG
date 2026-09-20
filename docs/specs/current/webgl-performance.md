@@ -5,7 +5,7 @@ title: WebGL Performance Debug / Profiler
 status: current
 owners: [maintainer]
 created: 2026-08-12
-updated: 2026-09-02
+updated: 2026-09-20
 requirement_ids: [PERF-001, PERF-002, PERF-003, PERF-004, PERF-005, PERF-006, PERF-007, PERF-008, PERF-009, PERF-010]
 related_adrs: [ADR-0005, ADR-0015]
 related_changes: [CHANGE-028, CHANGE-038]
@@ -24,6 +24,8 @@ Developmentビルドでのみ、既存WebGL2 Canvasの描画負荷を定量化�
 ### PERF-001 開発専用Profilerモード
 
 Debug UIはPerformance、GPU Profiler、Resources、WebGL Validation、Capture Frame、Benchmarkを持つ。ProductionではUIとdebug依存をロードしない。
+
+通常のDevelopment起動では、描画への影響が小さいK-GG固有のCPU/GPU timer-query Profilerだけを有効にする。`stats-gl`、`webgl-memory`、`webgl-lint`のWebGLラッパーを使うAPI検証モードは、Tauri／Vite起動時に`VITE_KGG_WEBGL_DEBUG_TOOLS=1`を指定した場合だけロードする。これらのラッパーはValidationをOFFにしてもWebGL呼び出しを包むため、FPS・CPU比較はフラグなしで行う。
 
 ### PERF-002 フレーム指標
 
