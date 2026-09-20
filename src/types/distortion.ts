@@ -225,7 +225,8 @@ export type EffectStackKind =
   | 'kaleidoscope'
   | 'voronoi'
   | 'glass'
-  | 'glassTile';
+  | 'glassTile'
+  | 'videoMotion';
 
 export type EffectStackLayer = {
   kind: EffectStackKind;

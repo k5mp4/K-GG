@@ -21,6 +21,7 @@ export const EFFECT_STACK_KINDS = [
   'glass',
   'glassTile',
   'diffuse',
+  'videoMotion',
 ] as const satisfies readonly EffectStackKind[];
 
 /** Postprocessの全体ON/OFFへ反映する、主スタック内のレイヤー。 */
@@ -32,6 +33,7 @@ export const POSTPROCESS_EFFECT_STACK_KINDS = [
   'voronoi',
   'glass',
   'glassTile',
+  'videoMotion',
 ] as const satisfies readonly EffectStackKind[];
 
 const EFFECT_STACK_KIND_SET = new Set<string>(EFFECT_STACK_KINDS);
@@ -435,6 +437,7 @@ export type V2RenderPlan = {
     prism: boolean;
     prismComposite: boolean;
     particles: boolean;
+    videoMotion: boolean;
   };
 };
 
@@ -672,6 +675,7 @@ export function getV2RenderPlan(
       prism: prismRequested,
       prismComposite: prismRequested,
       particles: particlesRequested,
+      videoMotion: enabledLayers.some(layer => layer.kind === 'videoMotion'),
     },
   };
 }

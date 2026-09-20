@@ -19,6 +19,7 @@ import type { ClothGradientConfig } from './clothGradient';
 import type { ConeViewConfig } from './coneView';
 import type { SeamlessConfig } from './seamless';
 import type { FlowGradientConfig } from './flowGradient';
+import type { VideoMotionConfig } from './videoMotion';
 
 export type LatestState = {
   gradient: GradientConfig;
@@ -32,6 +33,7 @@ export type LatestState = {
   coneView?: ConeViewConfig;
   seamless?: SeamlessConfig;
   flowGradient?: FlowGradientConfig;
+  videoMotion?: VideoMotionConfig;
   radon: RadonConfig;
   iridescence: IridescenceConfig;
   manualDistort: ManualDistortConfig;

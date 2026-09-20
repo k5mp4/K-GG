@@ -31,7 +31,8 @@ export type EffectKind =
   | 'voronoi'
   | 'glass'
   | 'glassTile'
-  | 'diffuse';
+  | 'diffuse'
+  | 'videoMotion';
 
 export type EffectState = {
   kind: EffectKind;
