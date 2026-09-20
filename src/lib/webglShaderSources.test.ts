@@ -65,6 +65,22 @@ describe('webglShaderSources', () => {
     }
   });
 
+  it('keeps Video Motion feedback palette-bound while preserving current animation', () => {
+    const source = getProgramSource('videoMotion');
+    expect(source.vertex).toContain('a_position');
+    expect(source.fragment).toContain('uniform sampler2D u_motionField;');
+    expect(source.fragment).toContain('uniform sampler2D u_feedbackTex;');
+    expect(source.fragment).toContain('uniform sampler2D u_gradientRamp;');
+    expect(source.fragment).toContain('vec3 projectToGradientRamp(vec3 color)');
+    expect(source.fragment).toContain('const float MAX_HISTORY_WEIGHT = 0.82;');
+    expect(source.fragment).toContain('u_feedbackPrimed ? texture2D(u_feedbackTex');
+    expect(source.fragment).toContain('if (!u_feedbackPrimed)');
+    expect(source.fragment).toContain('gl_FragColor = base;');
+    expect(source.fragment).not.toContain('u_mode');
+    expect(source.fragment).not.toContain('u_glitchAmount');
+    expect(source.fragment).not.toContain('vec3(motion, 0.0)');
+  });
+
   it('uploads ridged noise using the declared lacunarity uniform location', () => {
     expect(webglSource).toContain('gl.uniform1f(uniforms.u_ridgeLacunarity, noiseDistortion.ridgeLacunarity ?? 2.0);');
     expect(webglSource).not.toContain('gl.uniform1f(uniforms.ridgeLacunarity, noiseDistortion.ridgeLacunarity ?? 2.0);');

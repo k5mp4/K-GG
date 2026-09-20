@@ -12,6 +12,11 @@ import {
   beginExportFrameDiagnostics,
   recordExportCaptureDiagnostics,
 } from './exportDiagnostics';
+import {
+  beginVideoMotionExport,
+  prepareVideoMotionExportFrame,
+} from './videoMotionRuntime';
+import { isEffectStackLayerEnabled } from './effectPipeline';
 
 export type ExportFrameResult = {
   blob: Blob;
@@ -59,11 +64,16 @@ export async function withExportSession<T>(
   signal: AbortSignal | undefined,
   work: (session: ExportSessionToken) => Promise<T>,
 ): Promise<T> {
-  const session = await renderBridge.beginExportSession(signal);
+  const restoreVideoMotion = beginVideoMotionExport();
   try {
-    return await work(session);
+    const session = await renderBridge.beginExportSession(signal);
+    try {
+      return await work(session);
+    } finally {
+      renderBridge.endExportSession(session);
+    }
   } finally {
-    renderBridge.endExportSession(session);
+    restoreVideoMotion();
   }
 }
 
@@ -101,6 +111,19 @@ export async function renderAndCaptureExportFrame(
 
   const normalizedTime = calcExportNormalizedTime(frameIndex, totalFrames);
   const renderTime = calcExportRenderTime(normalizedTime, speed, duration, easing);
+  const state = useGradientStore.getState();
+  const videoMotion = state.videoMotion;
+  const videoMotionEnabled = state.effectPipeline.version === 'stack-v2'
+    ? isEffectStackLayerEnabled(state.effectPipeline, 'videoMotion')
+    : videoMotion?.enabled === true;
+  if (videoMotionEnabled) {
+    await prepareVideoMotionExportFrame(
+      normalizedTime,
+      duration,
+      videoMotion,
+      signal,
+    );
+  }
   beginExportFrameDiagnostics(frameIndex, normalizedTime, renderTime);
   let blob: Blob;
 

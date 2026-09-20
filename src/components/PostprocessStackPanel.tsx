@@ -45,12 +45,14 @@ const LABELS: Record<EffectStackKind, string> = {
   voronoi: 'Voronoi',
   glass: 'Glass',
   glassTile: 'GlassTile',
+  videoMotion: 'Video Motion',
 };
 
 const CATEGORY: Record<EffectStackKind, MessageKey> = {
   diffuse: 'stack.category.texture', noise: 'stack.category.texture',
   slit: 'stack.category.transform', stretch: 'stack.category.transform', distort: 'stack.category.transform', mirror: 'stack.category.transform', kaleidoscope: 'stack.category.transform',
   voronoi: 'stack.category.structure', glass: 'stack.category.structure', glassTile: 'stack.category.structure',
+  videoMotion: 'stack.category.structure',
 };
 
 type DragState = Omit<EffectStackDragState, 'kind'> & {
@@ -64,7 +66,7 @@ type SoloSnapshot = {
   enabledState: ReturnType<typeof captureEffectStackEnabledState>;
 };
 
-type LazyProgramKey = 'stackCore' | 'noiseStack' | 'glassV2' | 'glassTile' | 'stretch' | 'prism' | 'prismComposite' | 'normalMap' | 'blur' | 'particles';
+type LazyProgramKey = 'stackCore' | 'noiseStack' | 'glassV2' | 'glassTile' | 'videoMotion' | 'stretch' | 'prism' | 'prismComposite' | 'normalMap' | 'blur' | 'particles';
 type LazyProgramStatus = 'loading' | 'ready' | 'failed' | 'fallback';
 
 const CORE_EFFECTS = new Set<EffectStackKind>([
@@ -84,6 +86,7 @@ function programKeyForEffect(kind: EffectStackKind): LazyProgramKey {
   if (CORE_EFFECTS.has(kind)) return 'stackCore';
   if (kind === 'glass') return 'glassV2';
   if (kind === 'glassTile') return 'glassTile';
+  if (kind === 'videoMotion') return 'videoMotion';
   return 'stretch';
 }
 
