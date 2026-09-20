@@ -569,6 +569,9 @@ describe('V2 effect shader parity', () => {
     expect(voronoi).not.toContain('texture2D(u_gradientRamp');
     expect(voronoi).not.toContain('cellPattern');
     expect(voronoi).not.toContain('edgePattern');
+    expect(voronoi).not.toContain('edgeColor');
+    expect(voronoi).not.toContain('sourceColor.rgb');
+    expect(voronoi).not.toContain('u_postVoronoiEdgeWidth');
   });
 
   it('keeps Slit hashing and pixel-perfect snapping equivalent to Legacy', () => {

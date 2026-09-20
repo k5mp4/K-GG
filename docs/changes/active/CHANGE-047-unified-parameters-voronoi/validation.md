@@ -2,19 +2,19 @@
 
 | AC | 検証方法 | テスト・確認場所 | 結果 |
 | --- | --- | --- | --- |
-| AC-001 共通レジストリ整合 | typecheckと静的差分確認 | packages/kgg-control/src/parameterLimits.ts、SliderField、documentModel | PASS（typecheck、正規化経路を確認） |
-| AC-002 Voronoi設定と保存互換 | typecheck、シェーダーソース・正規化の確認 | src/lib/webgl.ts、src/shaders/postprocess、PostprocessPanel | PASS（typecheck、シェーダー・保存経路を確認。GPU描画は未確認） |
-| AC-003 コミット分割とmain起点 | origin/mainとのGit履歴確認 | codex/unified-parameters-voronoi | PASS（d36ce92起点、独立コミット2件） |
+| AC-001 共通レジストリ整合 | check:fast、パラメータ契約テスト | packages/kgg-control/src/parameterLimits.ts、SliderField、documentModel | PASS（全体581テスト、共通範囲と既定値のテストを確認） |
+| AC-002 Voronoi設定と保存互換 | check:fastとcheck:render、シェーダーソース・正規化テスト | src/lib/postprocessVoronoi.test.ts、src/lib/effectShaderParity.test.ts、src/shaders/postprocess | PASS（描画関連127テスト、保存互換を確認。実GPUの目視は未確認） |
+| AC-003 コミット分割とmain起点 | origin/mainとのGit履歴確認 | codex/unified-parameters-voronoi | PASS（main起点。パラメータ統合とVoronoi改善を別コミットに分割） |
 
 ## Merge Gate
 
 | Check | Command | Status |
 | --- | --- | --- |
-| Documentation structure | npm run change:check | PASS |
-| Documentation build | npm run docs:check と npm run docs:build | PASS |
-| Static code checks | npm run typecheck と npm run lint | PASS（Lintはエラー0、未変更行に警告21件） |
-| Production build | npm run build | PASS（ViteのTauri import/chunk size警告あり。エラーではない） |
-| Render checks | npm run check:render | 未実行。テストは依頼範囲外のため実行しない |
+| Documentation structure/build | npm run change:check、npm run check:fast | PASS |
+| Automated tests | npm run check:fast | PASS（107ファイル、581テスト） |
+| Static code checks | npm run check:fast | PASS（型チェック成功、Lintはエラー0・警告21件） |
+| Production build | npm run check:fast | PASS（Tauri import/chunk sizeの警告あり。エラーではない） |
+| Render checks | npm run check:render | PASS（7ファイル、127テスト） |
 
 ## Release Gate
 
@@ -29,9 +29,9 @@
 - npm run change:check
 - npm run docs:check
 - npm run docs:build
-- npm run typecheck
-- npm run lint
-- npm run build
+- npm run check:fast
+- npm run check:render
+- npm test -- packages/kgg-control/src/parameters.test.ts src/lib/parameterLimits.test.ts src/lib/glassTile.test.ts src/lib/postprocessVoronoi.test.ts src/lib/effectShaderParity.test.ts
 - git diff --check HEAD
 
-`npm ci` は成功しました。依存監査は中9件・高7件の脆弱性を報告しましたが、package.json／lockfileに変更はありません。`npm run check:merge` は`npm test`を含むため未実行です。`npm test`、`npm run check:render`、GPU／手動描画確認も実行していません。
+`npm ci` は成功しました。依存監査は中9件・高7件の脆弱性を報告しましたが、package.json／lockfileに変更はありません。VitestはTweeqのsource map欠落をログに出しますが、テストは成功しています。GPU／手動描画確認は未実施です。
