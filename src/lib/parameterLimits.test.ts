@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   clampParameter,
+  getParameterDefault,
   getParameterLimit,
   normalizeTrackValue,
   wrapAngleDegrees,
@@ -13,6 +14,17 @@ describe('central parameter limits', () => {
     expect(clampParameter(9999, 12, limit)).toBe(300);
     expect(clampParameter(Number.NaN, 12, limit)).toBe(12);
     expect(clampParameter('bad', 12, limit)).toBe(12);
+  });
+
+  it('keeps the reset/default value beside the UI range', () => {
+    expect(getParameterDefault('postprocess.glassRefraction')).toBe(32);
+    expect(getParameterLimit('postprocess.glassRefraction')).toMatchObject({
+      min: 0,
+      max: 120,
+      step: 0.5,
+      defaultValue: 32,
+    });
+    expect(getParameterDefault('animation.duration')).toBe(5);
   });
 
   it('wraps degree and radian angles while preserving their storage units', () => {

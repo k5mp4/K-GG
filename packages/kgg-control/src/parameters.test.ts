@@ -4,6 +4,7 @@ import {
   listParameterDefinitions,
   validateParameterValue,
 } from './parameters.js';
+import { getEnumParameterDefault, getEnumParameterLimit } from './parameterLimits.js';
 
 describe('K-GG control parameter registry', () => {
   it('exposes stable paths with metadata', () => {
@@ -15,6 +16,7 @@ describe('K-GG control parameter registry', () => {
       min: 0,
       max: 360,
       wrapAngle: true,
+      defaultValue: 180,
     });
   });
 
@@ -22,6 +24,16 @@ describe('K-GG control parameter registry', () => {
     const parameters = listParameterDefinitions('noise');
     expect(parameters.length).toBeGreaterThan(5);
     expect(parameters.every(parameter => parameter.path.startsWith('noise.'))).toBe(true);
+  });
+
+  it('sources GlassTile edge mode options and default from the enum limits registry', () => {
+    const definition = getParameterDefinition('postprocess.glassTileEdgeMode');
+    expect(definition).toMatchObject({
+      path: 'postprocess.glassTileEdgeMode',
+      type: 'enum',
+      enumValues: getEnumParameterLimit('postprocess.glassTileEdgeMode').values,
+      defaultValue: getEnumParameterDefault('postprocess.glassTileEdgeMode'),
+    });
   });
 
   it('normalizes angles but rejects invalid types', () => {
@@ -41,6 +53,7 @@ describe('K-GG control parameter registry', () => {
       min: 0,
       max: 1,
       step: 0.01,
+      defaultValue: 1,
     });
     expect(getParameterDefinition('flow.particleOpacity')).toMatchObject({
       path: 'flow.particleOpacity',
