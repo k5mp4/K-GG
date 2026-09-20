@@ -525,11 +525,10 @@ function AnimatedOpacityControls({ visible, children }: { visible: boolean; chil
 }
 
 type GradientRampProps = {
-  overlayImageElement?: HTMLImageElement | null;
   showHeader?: boolean;
 };
 
-export function GradientRamp({ overlayImageElement = null, showHeader = true }: GradientRampProps = {}) {
+export function GradientRamp({ showHeader = true }: GradientRampProps = {}) {
   const { t, language } = useLanguage();
   const { gradient, isSlitAdjusting, selectedStops, selectedGradientAnchors, keyframeTracks, currentTime } = useGradientStore();
   const { setGradient, resetMeshGradient, straightenMeshHandles, setMeshGridSize, setMeshColorMode, setSelectedStops, setSelectedGradientAnchors, setKeyframeTracks, addKeyframe, setKeyframe } = applicationCommands;
@@ -2050,10 +2049,7 @@ export function GradientRamp({ overlayImageElement = null, showHeader = true }: 
             onToggle={() => setShowPaletteGenerator(value => !value)}
             nested
           >
-          <ColorPaletteGenerator
-              overlayImageElement={overlayImageElement}
-              embedded
-            />
+            <ColorPaletteGenerator />
           </SidebarSection>
 
           {/* プリセット */}

@@ -4,7 +4,6 @@ import { generateGradientFromUi, type GradientGeneratorUiParams } from './gradie
 const BASE_PARAMS: GradientGeneratorUiParams = {
   algorithm: 'perceptual',
   baseColor: '#808080',
-  hueTravel: 0.5,
   colorIntensity: 0.5,
   brightness: 0.5,
   contrast: 0.5,
