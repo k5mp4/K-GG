@@ -22,7 +22,7 @@ describe('animation store constraints', () => {
     expect(useGradientStore.getState().animation.duration).toBe(ANIMATION_DURATION_MIN);
     expect(useGradientStore.getState().animation.speed).toBe(ANIMATION_SPEED_MAX);
 
-    useGradientStore.getState().setAnimation({ duration: 99, speed: 0.1 });
+    useGradientStore.getState().setAnimation({ duration: 99, speed: 0.001 });
     expect(useGradientStore.getState().animation.duration).toBe(ANIMATION_DURATION_MAX);
     expect(useGradientStore.getState().animation.speed).toBe(ANIMATION_SPEED_MIN);
   });
