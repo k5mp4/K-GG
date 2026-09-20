@@ -53,40 +53,36 @@ export function StretchPanel() {
           </div>
           <SliderField
             label="Band Height"
-            min={1} max={600} step={1}
             value={stretch.bandHeight}
             onChange={(v) => setStretch({ bandHeight: v })}
             format={(v) => `${v}px`}
-            defaultValue={D.bandHeight}
             trackId="stretch.bandHeight"
+            limitKey="stretch.bandHeight"
           />
           <SliderField
             label="Height Variance"
-            min={0} max={1} step={0.01}
             value={stretch.bandHeightVariance ?? D.bandHeightVariance}
             onChange={(v) => setStretch({ bandHeightVariance: v })}
             format={(v) => v.toFixed(2)}
-            defaultValue={D.bandHeightVariance}
             trackId="stretch.bandHeightVariance"
+            limitKey="stretch.bandHeightVariance"
           />
           <SliderField
             label="Variation"
-            min={0} max={1} step={0.01}
             value={stretch.variation}
             onChange={(v) => setStretch({ variation: v })}
             format={(v) => v.toFixed(2)}
-            defaultValue={D.variation}
             trackId="stretch.variation"
+            limitKey="stretch.variation"
           />
           <div className="flex items-end gap-2">
             <div className="flex-1">
               <SliderField
                 label="Seed"
-                min={0} max={99} step={1}
                 value={stretch.seed}
                 onChange={(v) => setStretch({ seed: v })}
-                defaultValue={D.seed}
                 trackId="stretch.seed"
+                limitKey="stretch.seed"
               />
             </div>
             <InputShuffle
@@ -116,30 +112,27 @@ export function StretchPanel() {
             </div>
             <SliderField
               label="Glow Intensity"
-              min={0} max={3} step={0.01}
               value={stretch.glowIntensity ?? D.glowIntensity}
               onChange={(v) => setStretch({ glowIntensity: v })}
               format={(v) => v.toFixed(2)}
-              defaultValue={D.glowIntensity}
               trackId="stretch.glowIntensity"
+              limitKey="stretch.glowIntensity"
             />
             <SliderField
               label="Glow Radius"
-              min={1} max={80} step={1}
               value={stretch.glowRadius ?? D.glowRadius}
               onChange={(v) => setStretch({ glowRadius: v })}
               format={(v) => `${Math.round(v)}px`}
-              defaultValue={D.glowRadius}
               trackId="stretch.glowRadius"
+              limitKey="stretch.glowRadius"
             />
             <SliderField
               label="Glow Threshold"
-              min={0} max={1} step={0.01}
               value={stretch.glowThreshold ?? D.glowThreshold}
               onChange={(v) => setStretch({ glowThreshold: v })}
               format={(v) => v.toFixed(2)}
-              defaultValue={D.glowThreshold}
               trackId="stretch.glowThreshold"
+              limitKey="stretch.glowThreshold"
             />
           </div>
         </div>

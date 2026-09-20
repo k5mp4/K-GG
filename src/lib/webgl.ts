@@ -46,6 +46,7 @@ import { clampParameter, getParameterLimit } from './parameterLimits';
 import { getAnimationDirectionVector } from './animationDirection';
 import { getSlitAnimationPhase } from './slitAnimation';
 import { shouldRenderNormalMap } from './normalMap';
+import { VORONOI_DISTANCE_MAP, VORONOI_FEATURE_MAP } from './voronoi';
 import type { LatestState } from '../types/latestState';
 import { DEFAULT_SEAMLESS, normalizeSeamlessConfig, type SeamlessConfig } from '../types/seamless';
 import {
@@ -2363,11 +2364,11 @@ function drawPostprocessPass(
   setUniform1i(gl, ctx.postprocessUniforms.u_noiseSeamlessType, seamlessTypeMap[noiseDistortion.seamlessType] ?? 0);
   setUniform1i(gl, ctx.postprocessUniforms.u_seamlessAnimation, noiseDistortion.seamlessAnimation === 'radial' ? 1 : 0);
   gl.uniform1f(ctx.postprocessUniforms.u_seamlessTwist, noiseDistortion.seamlessTwist);
-  const voronoiDistanceMap = { euclidean: 0, manhattan: 1, chebyshev: 2, minkowski: 3 } as const;
-  const voronoiFeatureMap = { f1: 0, f2: 1, distance_to_edge: 2 } as const;
-  setUniform1i(gl, ctx.postprocessUniforms.u_voronoiDistMetric, voronoiDistanceMap[noiseDistortion.voronoiDistMetric] ?? 0);
+
+
+  setUniform1i(gl, ctx.postprocessUniforms.u_voronoiDistMetric, VORONOI_DISTANCE_MAP[noiseDistortion.voronoiDistMetric] ?? 0);
   gl.uniform1f(ctx.postprocessUniforms.u_voronoiRandomness, noiseDistortion.voronoiRandomness ?? 1);
-  setUniform1i(gl, ctx.postprocessUniforms.u_voronoiFeature, voronoiFeatureMap[noiseDistortion.voronoiFeature] ?? 0);
+  setUniform1i(gl, ctx.postprocessUniforms.u_voronoiFeature, VORONOI_FEATURE_MAP[noiseDistortion.voronoiFeature] ?? 0);
   gl.uniform1f(ctx.postprocessUniforms.u_voronoiMinkowskiExp, noiseDistortion.voronoiMinkowskiExp ?? 2);
   gl.uniform1f(ctx.postprocessUniforms.u_ridgeSharpness, noiseDistortion.ridgeSharpness ?? 2);
   gl.uniform1f(ctx.postprocessUniforms.u_ridgeGain, noiseDistortion.ridgeGain ?? 0);
@@ -2423,9 +2424,12 @@ function drawPostprocessPass(
     gl.uniform1f(ctx.postprocessUniforms.u_prismInnerRadius, postprocess.prismInnerRadius ?? 0.16);
     gl.uniform1f(ctx.postprocessUniforms.u_postVoronoiScale, postprocess.voronoiScale ?? 8);
     gl.uniform1f(ctx.postprocessUniforms.u_postVoronoiRandomness, postprocess.voronoiRandomness ?? 0.85);
+    setUniform1i(gl, ctx.postprocessUniforms.u_postVoronoiDistMetric, VORONOI_DISTANCE_MAP[postprocess.voronoiDistMetric ?? 'euclidean']);
+    setUniform1i(gl, ctx.postprocessUniforms.u_postVoronoiFeature, VORONOI_FEATURE_MAP[postprocess.voronoiFeature ?? 'f1']);
+    gl.uniform1f(ctx.postprocessUniforms.u_postVoronoiMinkowskiExp, postprocess.voronoiMinkowskiExp ?? 2);
     gl.uniform1f(ctx.postprocessUniforms.u_postVoronoiAngle, ((postprocess.voronoiAngle ?? 35) * Math.PI) / 180);
-    gl.uniform1f(ctx.postprocessUniforms.u_postVoronoiGradientScale, postprocess.voronoiGradientScale ?? 1.15);
-    gl.uniform1f(ctx.postprocessUniforms.u_postVoronoiEdgeWidth, postprocess.voronoiEdgeWidth ?? 0.025);
+
+
     gl.uniform1f(ctx.postprocessUniforms.u_postVoronoiSeed, postprocess.voronoiSeed ?? 0);
     const glass = normalizeGlassRenderParameters(postprocess);
     const glassV2Color = normalizeGlassV2ColorParameters(postprocess);
@@ -3476,11 +3480,11 @@ export function render(
   gl.uniform1f(uniforms.u_curlEps, noiseDistortion.curlEps ?? 0.01);
   gl.uniform1f(uniforms.u_curlSeed, noiseDistortion.curlSeed ?? 0.0);
   gl.uniform1f(uniforms.u_noiseSeed, noiseDistortion.noiseSeed ?? 0.0);
-  const VORONOI_DIST_MAP = { euclidean: 0, manhattan: 1, chebyshev: 2, minkowski: 3 } as const;
-  const VORONOI_FEAT_MAP = { f1: 0, f2: 1, distance_to_edge: 2 } as const;
-  setUniform1i(gl, uniforms.u_voronoiDistMetric, VORONOI_DIST_MAP[noiseDistortion.voronoiDistMetric] ?? 0);
+
+
+  setUniform1i(gl, uniforms.u_voronoiDistMetric, VORONOI_DISTANCE_MAP[noiseDistortion.voronoiDistMetric] ?? 0);
   gl.uniform1f(uniforms.u_voronoiRandomness, noiseDistortion.voronoiRandomness ?? 1.0);
-  setUniform1i(gl, uniforms.u_voronoiFeature, VORONOI_FEAT_MAP[noiseDistortion.voronoiFeature] ?? 0);
+  setUniform1i(gl, uniforms.u_voronoiFeature, VORONOI_FEATURE_MAP[noiseDistortion.voronoiFeature] ?? 0);
   gl.uniform1f(uniforms.u_voronoiMinkowskiExp, noiseDistortion.voronoiMinkowskiExp ?? 2.0);
   gl.uniform1f(uniforms.u_ridgeSharpness, noiseDistortion.ridgeSharpness ?? 2.0);
   gl.uniform1f(uniforms.u_ridgeGain, noiseDistortion.ridgeGain ?? 0.0);
@@ -3916,7 +3920,6 @@ export function render(
         && noiseDiffuseStackUsable
         && planLayerIndex === renderPlan.noiseDiffuseComposition.noiseLayerIndex
         && mainLayerEntries[layerIndex + 1]?.index === renderPlan.noiseDiffuseComposition.diffuseLayerIndex;
-      if (layer.kind === 'diffuse') publishDiffuseTextureHistogram(ctx, currentTexture, vpW, vpH);
       if (useNoiseDiffusePair) {
         const canPresentNoiseDiffuseDirectly = layerIndex + 2 === mainLayerEntries.length
           && !prismRequested

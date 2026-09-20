@@ -6,35 +6,45 @@ import type {
 } from '../types/distortion';
 import { isEffectStackLayerEnabled } from './effectPipeline';
 import { isPostprocessLayerEnabled } from './postprocessStack';
+import {
+  clampParameter,
+  getEnumParameterDefault,
+  getParameterDefault,
+  getParameterLimit,
+  normalizeEnumParameter,
+} from './parameterLimits';
 
 export const GLASS_TILE_LIMITS = {
-  tileSize: 4096,
-  bevel: 0.5,
-  surfaceHeight: 1,
-  curvature: 1,
-  refraction: 256,
-  dispersion: 1,
-  roughness: 1,
-  detailScale: 16,
-  rotation: 180,
-  mix: 1,
-  seed: 1_000_000,
+  tileSize: getParameterLimit('postprocess.glassTileSize').max,
+  bevel: getParameterLimit('postprocess.glassTileBevel').max,
+  surfaceHeight: getParameterLimit('postprocess.glassTileSurfaceHeight').max,
+  curvature: getParameterLimit('postprocess.glassTileCurvature').max,
+  refraction: getParameterLimit('postprocess.glassTileRefraction').max,
+  dispersion: getParameterLimit('postprocess.glassTileDispersion').max,
+  roughness: getParameterLimit('postprocess.glassTileRoughness').max,
+  detailScale: getParameterLimit('postprocess.glassTileDetailScale').max,
+  rotation: Math.max(
+    Math.abs(getParameterLimit('postprocess.glassTileRotation').min),
+    Math.abs(getParameterLimit('postprocess.glassTileRotation').max),
+  ),
+  mix: getParameterLimit('postprocess.glassTileMix').max,
+  seed: getParameterLimit('postprocess.glassTileSeed').max,
 } as const;
 
 export const GLASS_TILE_DEFAULTS = {
   pattern: 'square' as GlassTilePattern,
-  tileSize: 96,
-  bevel: 0.18,
-  surfaceHeight: 0.45,
-  curvature: 0.75,
-  refraction: 28,
-  dispersion: 0.06,
-  roughness: 0.12,
-  detailScale: 2,
-  rotation: 0,
-  mix: 1,
-  edgeMode: 'tile' as GlassTileEdgeMode,
-  seed: 17,
+  tileSize: getParameterDefault('postprocess.glassTileSize'),
+  bevel: getParameterDefault('postprocess.glassTileBevel'),
+  surfaceHeight: getParameterDefault('postprocess.glassTileSurfaceHeight'),
+  curvature: getParameterDefault('postprocess.glassTileCurvature'),
+  refraction: getParameterDefault('postprocess.glassTileRefraction'),
+  dispersion: getParameterDefault('postprocess.glassTileDispersion'),
+  roughness: getParameterDefault('postprocess.glassTileRoughness'),
+  detailScale: getParameterDefault('postprocess.glassTileDetailScale'),
+  rotation: getParameterDefault('postprocess.glassTileRotation'),
+  mix: getParameterDefault('postprocess.glassTileMix'),
+  edgeMode: getEnumParameterDefault('postprocess.glassTileEdgeMode') as GlassTileEdgeMode,
+  seed: getParameterDefault('postprocess.glassTileSeed'),
 } as const;
 
 export type GlassTileRenderParameters = {
@@ -71,23 +81,11 @@ const EDGE_MODE_INDEX: Record<GlassTileEdgeMode, number> = {
 };
 
 const PATTERNS = new Set<GlassTilePattern>(Object.keys(PATTERN_INDEX) as GlassTilePattern[]);
-const EDGE_MODES = new Set<GlassTileEdgeMode>(Object.keys(EDGE_MODE_INDEX) as GlassTileEdgeMode[]);
-
-function finiteClamped(value: unknown, fallback: number, minimum: number, maximum: number): number {
-  const numeric = typeof value === 'number' && Number.isFinite(value) ? value : fallback;
-  return Math.max(minimum, Math.min(maximum, numeric));
-}
 
 function normalizePattern(value: unknown): GlassTilePattern {
   return typeof value === 'string' && PATTERNS.has(value as GlassTilePattern)
     ? value as GlassTilePattern
     : GLASS_TILE_DEFAULTS.pattern;
-}
-
-function normalizeEdgeMode(value: unknown): GlassTileEdgeMode {
-  return typeof value === 'string' && EDGE_MODES.has(value as GlassTileEdgeMode)
-    ? value as GlassTileEdgeMode
-    : GLASS_TILE_DEFAULTS.edgeMode;
 }
 
 export function normalizeGlassTileRenderParameters(
@@ -109,24 +107,24 @@ export function normalizeGlassTileRenderParameters(
   >> = {},
 ): GlassTileRenderParameters {
   const pattern = normalizePattern(config.glassTilePattern);
-  const edgeMode = normalizeEdgeMode(config.glassTileEdgeMode);
-  const rotation = finiteClamped(config.glassTileRotation, GLASS_TILE_DEFAULTS.rotation, -GLASS_TILE_LIMITS.rotation, GLASS_TILE_LIMITS.rotation);
+  const edgeMode = normalizeEnumParameter('postprocess.glassTileEdgeMode', config.glassTileEdgeMode);
+  const rotation = clampParameter(config.glassTileRotation, GLASS_TILE_DEFAULTS.rotation, getParameterLimit('postprocess.glassTileRotation'));
   return {
     pattern,
     patternIndex: PATTERN_INDEX[pattern],
-    tileSize: finiteClamped(config.glassTileSize, GLASS_TILE_DEFAULTS.tileSize, 4, GLASS_TILE_LIMITS.tileSize),
-    bevel: finiteClamped(config.glassTileBevel, GLASS_TILE_DEFAULTS.bevel, 0.01, GLASS_TILE_LIMITS.bevel),
-    surfaceHeight: finiteClamped(config.glassTileSurfaceHeight, GLASS_TILE_DEFAULTS.surfaceHeight, 0, GLASS_TILE_LIMITS.surfaceHeight),
-    curvature: finiteClamped(config.glassTileCurvature, GLASS_TILE_DEFAULTS.curvature, 0, GLASS_TILE_LIMITS.curvature),
-    refraction: finiteClamped(config.glassTileRefraction, GLASS_TILE_DEFAULTS.refraction, 0, GLASS_TILE_LIMITS.refraction),
-    dispersion: finiteClamped(config.glassTileDispersion, GLASS_TILE_DEFAULTS.dispersion, 0, GLASS_TILE_LIMITS.dispersion),
-    roughness: finiteClamped(config.glassTileRoughness, GLASS_TILE_DEFAULTS.roughness, 0, GLASS_TILE_LIMITS.roughness),
-    detailScale: finiteClamped(config.glassTileDetailScale, GLASS_TILE_DEFAULTS.detailScale, 0.1, GLASS_TILE_LIMITS.detailScale),
+    tileSize: clampParameter(config.glassTileSize, GLASS_TILE_DEFAULTS.tileSize, getParameterLimit('postprocess.glassTileSize')),
+    bevel: clampParameter(config.glassTileBevel, GLASS_TILE_DEFAULTS.bevel, getParameterLimit('postprocess.glassTileBevel')),
+    surfaceHeight: clampParameter(config.glassTileSurfaceHeight, GLASS_TILE_DEFAULTS.surfaceHeight, getParameterLimit('postprocess.glassTileSurfaceHeight')),
+    curvature: clampParameter(config.glassTileCurvature, GLASS_TILE_DEFAULTS.curvature, getParameterLimit('postprocess.glassTileCurvature')),
+    refraction: clampParameter(config.glassTileRefraction, GLASS_TILE_DEFAULTS.refraction, getParameterLimit('postprocess.glassTileRefraction')),
+    dispersion: clampParameter(config.glassTileDispersion, GLASS_TILE_DEFAULTS.dispersion, getParameterLimit('postprocess.glassTileDispersion')),
+    roughness: clampParameter(config.glassTileRoughness, GLASS_TILE_DEFAULTS.roughness, getParameterLimit('postprocess.glassTileRoughness')),
+    detailScale: clampParameter(config.glassTileDetailScale, GLASS_TILE_DEFAULTS.detailScale, getParameterLimit('postprocess.glassTileDetailScale')),
     rotationRadians: rotation * Math.PI / 180,
-    mix: finiteClamped(config.glassTileMix, GLASS_TILE_DEFAULTS.mix, 0, GLASS_TILE_LIMITS.mix),
+    mix: clampParameter(config.glassTileMix, GLASS_TILE_DEFAULTS.mix, getParameterLimit('postprocess.glassTileMix')),
     edgeMode,
     edgeModeIndex: EDGE_MODE_INDEX[edgeMode],
-    seed: Math.round(finiteClamped(config.glassTileSeed, GLASS_TILE_DEFAULTS.seed, 0, GLASS_TILE_LIMITS.seed)),
+    seed: clampParameter(config.glassTileSeed, GLASS_TILE_DEFAULTS.seed, getParameterLimit('postprocess.glassTileSeed')),
   };
 }
 

@@ -1,11 +1,8 @@
 import { useGradientStore } from '../store/gradientStore';
 import { applicationCommands } from '../application/commands';
-import { STORE_DEFAULTS } from '../store/gradientStore';
 import { SliderField } from './SliderField';
 import { Collapsible } from './Collapsible';
 import { Toggle } from './Toggle';
-
-const D = STORE_DEFAULTS.radon;
 
 export function RadonPanel() {
   const { radon } = useGradientStore();
@@ -34,68 +31,60 @@ export function RadonPanel() {
 
           <SliderField
             label="Strength"
-            min={0} max={1} step={0.01}
             value={radon.strength}
             onChange={(v) => setRadon({ strength: v })}
             format={(v) => v.toFixed(2)}
-            defaultValue={D.strength}
+            limitKey="radon.strength"
           />
 
           <SliderField
             label="Frequency"
-            min={0.25} max={4} step={0.05}
             value={radon.freq}
             onChange={(v) => setRadon({ freq: v })}
             format={(v) => v.toFixed(2)}
-            defaultValue={D.freq}
+            limitKey="radon.freq"
           />
 
           <SliderField
             label="Radius"
-            min={0.1} max={3} step={0.05}
             value={radon.radius}
             onChange={(v) => setRadon({ radius: v })}
             format={(v) => v.toFixed(2)}
-            defaultValue={D.radius}
+            limitKey="radon.radius"
           />
 
           <SliderField
             label="Blur"
-            min={0} max={2} step={0.05}
             value={radon.blur}
             onChange={(v) => setRadon({ blur: v })}
             format={(v) => v.toFixed(2)}
-            defaultValue={D.blur}
+            limitKey="radon.blur"
           />
 
           <SliderField
             label="Angle"
-            min={0} max={360} step={1}
             value={radon.angle}
             onChange={(v) => setRadon({ angle: v })}
             format={(v) => v + '°'}
-            defaultValue={D.angle}
             control="angle"
             limitKey="radon.angle"
           />
 
           <SliderField
             label="Evolution"
-            min={0} max={10} step={0.01}
             value={radon.evolution}
             onChange={(v) => setRadon({ evolution: v })}
             format={(v) => v.toFixed(2)}
-            defaultValue={D.evolution}
             trackId="radon.evolution"
+            limitKey="radon.evolution"
           />
 
           <SliderField
             label="Speed"
-            min={0} max={2} step={0.01}
             value={radon.speed}
             onChange={(v) => setRadon({ speed: v })}
             format={(v) => v.toFixed(2)}
-            defaultValue={D.speed}
+            limitKey="radon.speed"
           />
         </div>
       </Collapsible>

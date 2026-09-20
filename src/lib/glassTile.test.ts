@@ -9,6 +9,7 @@ import {
 } from './glassTile';
 import { getPostprocessStackSamplePadding } from './glass';
 import { createDefaultEffectPipeline, updateEffectStackLayer } from './effectPipeline';
+import { getEnumParameterDefault, getEnumParameterLimit } from './parameterLimits';
 
 function tileConfig(overrides: Partial<PostprocessConfig> = {}): PostprocessConfig {
   return {
@@ -36,7 +37,7 @@ describe('GlassTile parameter contract', () => {
       detailScale: GLASS_TILE_DEFAULTS.detailScale,
       rotationRadians: 0,
       mix: GLASS_TILE_DEFAULTS.mix,
-      edgeMode: 'tile',
+      edgeMode: getEnumParameterDefault('postprocess.glassTileEdgeMode'),
       edgeModeIndex: 1,
       seed: GLASS_TILE_DEFAULTS.seed,
     });
@@ -69,7 +70,10 @@ describe('GlassTile parameter contract', () => {
     expect(params.detailScale).toBe(GLASS_TILE_DEFAULTS.detailScale);
     expect(params.rotationRadians).toBe(0);
     expect(params.mix).toBe(GLASS_TILE_DEFAULTS.mix);
-    expect(params.edgeMode).toBe('tile');
+    expect(params.edgeMode).toBe(getEnumParameterDefault('postprocess.glassTileEdgeMode'));
+    expect(getEnumParameterLimit('postprocess.glassTileEdgeMode').values).toEqual([
+      'clamp', 'tile', 'mirror', 'transparent',
+    ]);
     expect(params.seed).toBe(GLASS_TILE_DEFAULTS.seed);
     expect(GLASS_TILE_LIMITS.refraction).toBe(256);
   });

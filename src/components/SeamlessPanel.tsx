@@ -1,6 +1,5 @@
-import { useGradientStore, STORE_DEFAULTS } from '../store/gradientStore';
+import { useGradientStore } from '../store/gradientStore';
 import { applicationCommands } from '../application/commands';
-import { SEAMLESS_MAX_BLEND_WIDTH, SEAMLESS_MIN_BLEND_WIDTH } from '../types/seamless';
 import { useLanguage } from '../i18n/LanguageProvider';
 import { SliderField } from './SliderField';
 
@@ -24,10 +23,7 @@ export function SeamlessPanel() {
         <SliderField
           label="Blend Width"
           value={seamless.blendWidth}
-          min={SEAMLESS_MIN_BLEND_WIDTH}
-          max={SEAMLESS_MAX_BLEND_WIDTH}
-          step={0.01}
-          defaultValue={STORE_DEFAULTS.seamless.blendWidth}
+          limitKey="seamless.blendWidth"
           format={(value) => `${Math.round(value * 100)}%`}
           disabled={!seamless.enabled}
           onChange={(blendWidth) => setSeamless({ blendWidth })}

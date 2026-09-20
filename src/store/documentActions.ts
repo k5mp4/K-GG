@@ -34,10 +34,6 @@ import { clampParameter, getParameterLimit, normalizeTrackValue } from '../lib/p
 import { normalizeFlowGradientConfig } from '../types/flowGradient';
 import { normalizeVideoMotionConfig } from '../types/videoMotion';
 import {
-  ANIMATION_DURATION_MAX,
-  ANIMATION_DURATION_MIN,
-  ANIMATION_SPEED_MAX,
-  ANIMATION_SPEED_MIN,
   getBeatSyncDurationSeconds,
 } from '../lib/animationConfig';
 import type { DocumentActions, DocumentDefaults, DocumentStoreSet } from './documentSlice';
@@ -302,6 +298,13 @@ export function createDocumentActions(set: DocumentStoreSet, defaults: DocumentD
     const slitScan = stripSlitPhaseMotionFields({ ...s.slitScan, ...v });
     slitScan.angle = clampParameter(slitScan.angle, s.slitScan.angle, getParameterLimit('slit.angle'));
     slitScan.offsetAngle = clampParameter(slitScan.offsetAngle, s.slitScan.offsetAngle ?? 0, getParameterLimit('slit.offsetAngle'));
+    slitScan.offset = clampParameter(slitScan.offset, s.slitScan.offset, getParameterLimit('slit.offset'));
+    slitScan.waveHeight = clampParameter(slitScan.waveHeight, s.slitScan.waveHeight, getParameterLimit('slit.waveHeight'));
+    slitScan.polygonSides = clampParameter(slitScan.polygonSides, s.slitScan.polygonSides, getParameterLimit('slit.polygonSides'));
+    slitScan.slitWidth = clampParameter(slitScan.slitWidth, s.slitScan.slitWidth, getParameterLimit('slit.slitWidth'));
+    slitScan.offsetSpeed = clampParameter(slitScan.offsetSpeed, s.slitScan.offsetSpeed, getParameterLimit('slit.offsetSpeed'));
+    slitScan.variance = clampParameter(slitScan.variance, s.slitScan.variance, getParameterLimit('slit.variance'));
+    slitScan.seed = clampParameter(slitScan.seed, s.slitScan.seed, getParameterLimit('slit.seed'));
     let keyframeTracks = s.keyframeTracks;
     if (s.animation.enabled && slitScan.enabled && s.animation.affectSlit) {
       keyframeTracks = ensureAutoTrack(keyframeTracks, 'slitScan.offset');
@@ -313,6 +316,13 @@ export function createDocumentActions(set: DocumentStoreSet, defaults: DocumentD
   }),
   setStretch: (v) => set((s) => {
     const stretch = { ...s.stretch, ...v };
+    stretch.bandHeight = clampParameter(stretch.bandHeight, s.stretch.bandHeight, getParameterLimit('stretch.bandHeight'));
+    stretch.bandHeightVariance = clampParameter(stretch.bandHeightVariance, s.stretch.bandHeightVariance, getParameterLimit('stretch.bandHeightVariance'));
+    stretch.variation = clampParameter(stretch.variation, s.stretch.variation, getParameterLimit('stretch.variation'));
+    stretch.seed = clampParameter(stretch.seed, s.stretch.seed, getParameterLimit('stretch.seed'));
+    stretch.glowIntensity = clampParameter(stretch.glowIntensity, s.stretch.glowIntensity, getParameterLimit('stretch.glowIntensity'));
+    stretch.glowRadius = clampParameter(stretch.glowRadius, s.stretch.glowRadius, getParameterLimit('stretch.glowRadius'));
+    stretch.glowThreshold = clampParameter(stretch.glowThreshold, s.stretch.glowThreshold, getParameterLimit('stretch.glowThreshold'));
     const keyframeTracks = s.animation.enabled && stretch.enabled
       ? ensureAutoTrack(s.keyframeTracks, 'stretch.__scan')
       : s.keyframeTracks;
@@ -337,11 +347,12 @@ export function createDocumentActions(set: DocumentStoreSet, defaults: DocumentD
     const animation = {
       ...nextAnimation,
       previewLoop: nextAnimation.previewLoop ?? true,
-      speed: Math.max(ANIMATION_SPEED_MIN, Math.min(ANIMATION_SPEED_MAX, Number.isFinite(nextAnimation.speed) ? nextAnimation.speed : ANIMATION_SPEED_MIN)),
+      speed: clampParameter(nextAnimation.speed, s.animation.speed, getParameterLimit('animation.speed')),
       duration: beatSyncEnabled
         ? getBeatSyncDurationSeconds(beatSync?.bpm ?? 120)
-        : Math.max(ANIMATION_DURATION_MIN, Math.min(ANIMATION_DURATION_MAX, Number.isFinite(nextAnimation.duration) ? nextAnimation.duration : ANIMATION_DURATION_MIN)),
+        : clampParameter(nextAnimation.duration, s.animation.duration, getParameterLimit('animation.duration')),
     };
+    animation.intensity = clampParameter(animation.intensity, s.animation.intensity, getParameterLimit('animation.intensity'));
     animation.direction = clampParameter(animation.direction, s.animation.direction, getParameterLimit('animation.direction'));
     return {
       animation,
@@ -350,7 +361,14 @@ export function createDocumentActions(set: DocumentStoreSet, defaults: DocumentD
         : s.keyframeTracks,
     };
   }),
-  setNormalMap: (v) => set((s) => ({ normalMap: { ...s.normalMap, ...v, angle: clampParameter(v.angle ?? s.normalMap.angle, s.normalMap.angle, getParameterLimit('normalMap.angle')) } })),
+  setNormalMap: (v) => set((s) => {
+    const normalMap = { ...s.normalMap, ...v };
+    normalMap.strength = clampParameter(normalMap.strength, s.normalMap.strength, getParameterLimit('normalMap.strength'));
+    normalMap.blur = clampParameter(normalMap.blur, s.normalMap.blur, getParameterLimit('normalMap.blur'));
+    normalMap.angle = clampParameter(normalMap.angle, s.normalMap.angle, getParameterLimit('normalMap.angle'));
+    normalMap.bevelSize = clampParameter(normalMap.bevelSize, s.normalMap.bevelSize, getParameterLimit('normalMap.bevelSize'));
+    return { normalMap };
+  }),
   setClothGradient: (v) => set((s) => ({ clothGradient: normalizeClothGradientConfig({ ...s.clothGradient, ...v }) })),
   setConeView: (v) => set((s) => ({ coneView: normalizeConeViewConfig({ ...s.coneView, ...v }) })),
   setSeamless: (v) => set((s) => ({ seamless: normalizeSeamlessConfig({ ...s.seamless, ...v }) })),
@@ -369,7 +387,13 @@ export function createDocumentActions(set: DocumentStoreSet, defaults: DocumentD
   }),
   setRadon: (v) => set((s) => {
     const radon = { ...s.radon, ...v };
+    radon.strength = clampParameter(radon.strength, s.radon.strength, getParameterLimit('radon.strength'));
+    radon.freq = clampParameter(radon.freq, s.radon.freq, getParameterLimit('radon.freq'));
+    radon.radius = clampParameter(radon.radius, s.radon.radius, getParameterLimit('radon.radius'));
+    radon.blur = clampParameter(radon.blur, s.radon.blur, getParameterLimit('radon.blur'));
     radon.angle = clampParameter(radon.angle, s.radon.angle, getParameterLimit('radon.angle'));
+    radon.evolution = clampParameter(radon.evolution, s.radon.evolution, getParameterLimit('radon.evolution'));
+    radon.speed = clampParameter(radon.speed, s.radon.speed, getParameterLimit('radon.speed'));
     const keyframeTracks = s.animation.enabled && radon.enabled
       ? ensureAutoTrack(s.keyframeTracks, 'radon.evolution')
       : s.keyframeTracks;
@@ -377,6 +401,9 @@ export function createDocumentActions(set: DocumentStoreSet, defaults: DocumentD
   }),
   setIridescence: (v) => set((s) => {
     const iridescence = { ...s.iridescence, ...v };
+    iridescence.strength = clampParameter(iridescence.strength, s.iridescence.strength, getParameterLimit('iridescence.strength'));
+    iridescence.frequency = clampParameter(iridescence.frequency, s.iridescence.frequency, getParameterLimit('iridescence.frequency'));
+    iridescence.speed = clampParameter(iridescence.speed, s.iridescence.speed, getParameterLimit('iridescence.speed'));
     iridescence.angle = clampParameter(iridescence.angle, s.iridescence.angle, getParameterLimit('iridescence.angle'));
     const keyframeTracks = s.animation.enabled && iridescence.enabled
       ? ensureAutoTrack(s.keyframeTracks, 'iridescence.__time')
@@ -395,7 +422,12 @@ export function createDocumentActions(set: DocumentStoreSet, defaults: DocumentD
       : v.mapResolution && v.mapResolution !== s.manualDistort.mapResolution
         ? createEmptyManualSmoothMask(resolution)
         : s.manualDistort.smoothMask ?? createEmptyManualSmoothMask(resolution);
-    return { manualDistort: { ...s.manualDistort, ...v, displacement, smoothMask } };
+    const manualDistort = { ...s.manualDistort, ...v, displacement, smoothMask };
+    manualDistort.brushSize = clampParameter(manualDistort.brushSize, s.manualDistort.brushSize, getParameterLimit('manualDistort.brushSize'));
+    manualDistort.strength = clampParameter(manualDistort.strength, s.manualDistort.strength, getParameterLimit('manualDistort.strength'));
+    manualDistort.falloff = clampParameter(manualDistort.falloff, s.manualDistort.falloff, getParameterLimit('manualDistort.falloff'));
+    manualDistort.maxDisplacement = clampParameter(manualDistort.maxDisplacement, s.manualDistort.maxDisplacement, getParameterLimit('manualDistort.maxDisplacement'));
+    return { manualDistort };
   }),
   setPostprocess: (v) => set((s) => {
     const resolution = v.mapResolution ?? s.postprocess.mapResolution;

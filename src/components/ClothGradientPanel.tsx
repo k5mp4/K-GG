@@ -71,57 +71,43 @@ export function ClothGradientPanel() {
           <SliderField
             label="Amplitude 1"
             value={clothGradient.amplitude1}
-            min={0}
-            max={2}
-            step={0.01}
+            limitKey="cloth.amplitude1"
             onChange={(v) => setClothGradient({ amplitude1: v })}
           />
           <SliderField
             label="Amplitude 2"
             value={clothGradient.amplitude2}
-            min={0}
-            max={2}
-            step={0.01}
+            limitKey="cloth.amplitude2"
             onChange={(v) => setClothGradient({ amplitude2: v })}
           />
           <SliderField
             label="Frequency 1"
             value={clothGradient.frequency1}
-            min={0.1}
-            max={10}
-            step={0.1}
+            limitKey="cloth.frequency1"
             onChange={(v) => setClothGradient({ frequency1: v })}
           />
           <SliderField
             label="Frequency 2"
             value={clothGradient.frequency2}
-            min={0.1}
-            max={10}
-            step={0.1}
+            limitKey="cloth.frequency2"
             onChange={(v) => setClothGradient({ frequency2: v })}
           />
           <SliderField
             label="Speed 1"
             value={clothGradient.speed1}
-            min={-5}
-            max={5}
-            step={0.1}
+            limitKey="cloth.speed1"
             onChange={(v) => setClothGradient({ speed1: v })}
           />
           <SliderField
             label="Speed 2"
             value={clothGradient.speed2}
-            min={-5}
-            max={5}
-            step={0.1}
+            limitKey="cloth.speed2"
             onChange={(v) => setClothGradient({ speed2: v })}
           />
           <SliderField
             label="Normal Strength"
             value={clothGradient.normalStrength}
-            min={0}
-            max={3}
-            step={0.05}
+            limitKey="cloth.normalStrength"
             onChange={(v) => setClothGradient({ normalStrength: v })}
           />
         </div>
@@ -133,33 +119,25 @@ export function ClothGradientPanel() {
           <SliderField
             label="Warp Strength"
             value={clothGradient.warpStrength}
-            min={0}
-            max={2}
-            step={0.05}
+            limitKey="cloth.warpStrength"
             onChange={(v) => setClothGradient({ warpStrength: v })}
           />
           <SliderField
             label="Noise Scale"
             value={clothGradient.noiseScale}
-            min={0.1}
-            max={10}
-            step={0.1}
+            limitKey="cloth.noiseScale"
             onChange={(v) => setClothGradient({ noiseScale: v })}
           />
           <SliderField
             label="Noise Amplitude"
             value={clothGradient.noiseAmplitude}
-            min={0}
-            max={1.5}
-            step={0.01}
+            limitKey="cloth.noiseAmplitude"
             onChange={(v) => setClothGradient({ noiseAmplitude: v })}
           />
           <SliderField
             label="Noise Speed"
             value={clothGradient.noiseSpeed}
-            min={-5}
-            max={5}
-            step={0.1}
+            limitKey="cloth.noiseSpeed"
             onChange={(v) => setClothGradient({ noiseSpeed: v })}
           />
         </div>
@@ -171,33 +149,25 @@ export function ClothGradientPanel() {
           <SliderField
             label="Ambient Intensity"
             value={clothGradient.ambientIntensity}
-            min={0}
-            max={2}
-            step={0.05}
+            limitKey="cloth.ambientIntensity"
             onChange={(v) => setClothGradient({ ambientIntensity: v })}
           />
           <SliderField
             label="Light Intensity"
             value={clothGradient.lightIntensity}
-            min={0}
-            max={5}
-            step={0.1}
+            limitKey="cloth.lightIntensity"
             onChange={(v) => setClothGradient({ lightIntensity: v })}
           />
           <SliderField
             label="Light Azimuth (°)"
             value={clothGradient.lightAzimuth}
-            min={-180}
-            max={180}
-            step={1}
+            limitKey="cloth.lightAzimuth"
             onChange={(v) => setClothGradient({ lightAzimuth: v })}
           />
           <SliderField
             label="Light Elevation (°)"
             value={clothGradient.lightElevation}
-            min={-90}
-            max={90}
-            step={1}
+            limitKey="cloth.lightElevation"
             onChange={(v) => setClothGradient({ lightElevation: v })}
           />
           <div className="grid grid-cols-2 gap-2">
@@ -233,17 +203,13 @@ export function ClothGradientPanel() {
           <SliderField
             label="Specular Strength"
             value={clothGradient.specularStrength}
-            min={0}
-            max={3}
-            step={0.05}
+            limitKey="cloth.specularStrength"
             onChange={(v) => setClothGradient({ specularStrength: v })}
           />
           <SliderField
             label="Specular Power"
             value={clothGradient.specularPower}
-            min={1}
-            max={128}
-            step={1}
+            limitKey="cloth.specularPower"
             onChange={(v) => setClothGradient({ specularPower: v })}
           />
           <div>
@@ -266,17 +232,13 @@ export function ClothGradientPanel() {
           <SliderField
             label="Fresnel Power"
             value={clothGradient.fresnelPower}
-            min={0.5}
-            max={10}
-            step={0.1}
+            limitKey="cloth.fresnelPower"
             onChange={(v) => setClothGradient({ fresnelPower: v })}
           />
           <SliderField
             label="Color Strength"
             value={clothGradient.fresnelColorStrength}
-            min={0}
-            max={2}
-            step={0.05}
+            limitKey="cloth.fresnelColorStrength"
             onChange={(v) => setClothGradient({ fresnelColorStrength: v })}
           />
           <div>
@@ -299,9 +261,7 @@ export function ClothGradientPanel() {
           <SliderField
             label="Ramp Offset"
             value={clothGradient.rampOffset}
-            min={-1}
-            max={1}
-            step={0.01}
+            limitKey="cloth.rampOffset"
             onChange={(v) => setClothGradient({ rampOffset: v })}
           />
         </div>

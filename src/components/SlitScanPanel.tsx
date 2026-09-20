@@ -129,12 +129,11 @@ export function SlitScanPanel({ sourceImageName, hasSourceImage, onSourceImageLo
 
           <SliderField
             label="Offset"
-            min={0} max={1.0} step={0.001}
             value={slitScan.offset}
             onChange={(v) => setSlitScan({ offset: v })}
             format={(v) => v.toFixed(3)}
-            defaultValue={D.offset}
             trackId="slitScan.offset"
+            limitKey="slit.offset"
           />
 
           {/* Mode toggle */}
@@ -157,7 +156,6 @@ export function SlitScanPanel({ sourceImageName, hasSourceImage, onSourceImageLo
           {/* Angle / Twist */}
           <SliderField
             label={slitScan.mode === 'linear' ? 'Angle' : slitScan.mode === 'polygon' ? 'Rotation / Twist' : slitScan.mode === 'wave' ? 'Direction' : 'Twist'}
-            min={0} max={360} step={1}
             value={slitScan.angle}
             onChange={(v) => setSlitScan({ angle: v })}
             format={(v) => v + '°'}
@@ -170,12 +168,11 @@ export function SlitScanPanel({ sourceImageName, hasSourceImage, onSourceImageLo
           {slitScan.mode === 'polygon' && (
             <SliderField
               label="Sides"
-              min={3} max={32} step={1}
               value={slitScan.polygonSides ?? D.polygonSides}
               onChange={(v) => setSlitScan({ polygonSides: Math.round(v) })}
               format={(v) => `${Math.round(v)}`}
-              defaultValue={D.polygonSides}
               trackId="slitScan.polygonSides"
+              limitKey="slit.polygonSides"
             />
           )}
 
@@ -189,12 +186,11 @@ export function SlitScanPanel({ sourceImageName, hasSourceImage, onSourceImageLo
               />
               <SliderField
                 label="Wave Height"
-                min={-500} max={500} step={1}
                 value={slitScan.waveHeight ?? D.waveHeight}
                 onChange={(v) => setSlitScan({ waveHeight: v })}
                 format={(v) => `${Math.round(v)}px`}
-                defaultValue={D.waveHeight}
                 trackId="slitScan.waveHeight"
+                limitKey="slit.waveHeight"
               />
             </>
           )}
@@ -202,11 +198,9 @@ export function SlitScanPanel({ sourceImageName, hasSourceImage, onSourceImageLo
           {slitScan.mode === 'linear' && (
             <SliderField
               label="Offset Angle"
-              min={0} max={360} step={1}
               value={slitScan.offsetAngle ?? 90}
               onChange={(v) => setSlitScan({ offsetAngle: v })}
               format={(v) => v + '°'}
-              defaultValue={D.offsetAngle ?? 90}
               trackId="slitScan.offsetAngle"
               control="angle"
               limitKey="slit.offsetAngle"
@@ -215,12 +209,12 @@ export function SlitScanPanel({ sourceImageName, hasSourceImage, onSourceImageLo
 
           <SliderField
             label={slitScan.mode === 'wave' ? 'Wave Width' : 'Width'}
-            min={1} max={500} step={1}
             value={slitScan.slitWidth}
             onChange={(v) => setSlitScan({ slitWidth: v })}
             format={(v) => v + 'px'}
             defaultValue={slitScan.mode === 'wave' ? WAVE_DEFAULT_WIDTH : D.slitWidth}
             trackId="slitScan.slitWidth"
+            limitKey="slit.slitWidth"
           />
 
           {/* Slit motion settings. The speed values are also used by export. */}
@@ -236,24 +230,22 @@ export function SlitScanPanel({ sourceImageName, hasSourceImage, onSourceImageLo
             />
             <SliderField
               label="Offset Speed"
-              min={-2} max={2} step={0.01}
               value={slitScan.offsetSpeed}
               onChange={(v) => setSlitScan({ offsetSpeed: v })}
               format={(v) => v.toFixed(2)}
-              defaultValue={D.offsetSpeed}
               trackId="slitScan.offsetSpeed"
+              limitKey="slit.offsetSpeed"
             />
           </div>
 
           {slitScan.mode === 'linear' && (
             <SliderField
               label="Variance"
-              min={0} max={1} step={0.01}
               value={slitScan.variance}
               onChange={(v) => setSlitScan({ variance: v })}
               format={(v) => v.toFixed(2)}
-              defaultValue={D.variance}
               trackId="slitScan.variance"
+              limitKey="slit.variance"
             />
           )}
 
@@ -261,11 +253,10 @@ export function SlitScanPanel({ sourceImageName, hasSourceImage, onSourceImageLo
             <div className="flex-1">
               <SliderField
                 label="Seed"
-                min={0} max={99} step={1}
                 value={slitScan.seed}
                 onChange={(v) => setSlitScan({ seed: v })}
-                defaultValue={D.seed}
                 trackId="slitScan.seed"
+                limitKey="slit.seed"
               />
             </div>
             <InputShuffle

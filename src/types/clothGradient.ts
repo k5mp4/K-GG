@@ -1,3 +1,5 @@
+import { clampParameter, getParameterDefault, getParameterLimit } from '../lib/parameterLimits';
+
 export type ClothGradientQuality = 'low' | 'medium' | 'high';
 
 export type ClothGradientConfig = {
@@ -44,37 +46,37 @@ export const DEFAULT_CLOTH_GRADIENT: ClothGradientConfig = {
   enabled: false,
   loopEnabled: false,
 
-  amplitude1: 0.4,
-  amplitude2: 0.25,
-  frequency1: 1.5,
-  frequency2: 2.2,
-  speed1: 0.8,
-  speed2: 1.2,
+  amplitude1: getParameterDefault('cloth.amplitude1'),
+  amplitude2: getParameterDefault('cloth.amplitude2'),
+  frequency1: getParameterDefault('cloth.frequency1'),
+  frequency2: getParameterDefault('cloth.frequency2'),
+  speed1: getParameterDefault('cloth.speed1'),
+  speed2: getParameterDefault('cloth.speed2'),
   direction1: [1.0, 0.5],
   direction2: [-0.6, 0.8],
-  normalStrength: 1.2,
+  normalStrength: getParameterDefault('cloth.normalStrength'),
 
-  warpStrength: 0.35,
-  noiseScale: 2.5,
-  noiseAmplitude: 0.15,
-  noiseSpeed: 0.5,
+  warpStrength: getParameterDefault('cloth.warpStrength'),
+  noiseScale: getParameterDefault('cloth.noiseScale'),
+  noiseAmplitude: getParameterDefault('cloth.noiseAmplitude'),
+  noiseSpeed: getParameterDefault('cloth.noiseSpeed'),
 
-  ambientIntensity: 0.25,
-  lightIntensity: 1.8,
-  lightAzimuth: 45,
-  lightElevation: 60,
+  ambientIntensity: getParameterDefault('cloth.ambientIntensity'),
+  lightIntensity: getParameterDefault('cloth.lightIntensity'),
+  lightAzimuth: getParameterDefault('cloth.lightAzimuth'),
+  lightElevation: getParameterDefault('cloth.lightElevation'),
   skyLightColor: '#e0e7ff',
   groundLightColor: '#1e1b4b',
 
-  specularStrength: 0.8,
-  specularPower: 32.0,
+  specularStrength: getParameterDefault('cloth.specularStrength'),
+  specularPower: getParameterDefault('cloth.specularPower'),
   specularColor: '#ffffff',
 
-  fresnelPower: 3.0,
+  fresnelPower: getParameterDefault('cloth.fresnelPower'),
   fresnelColor: '#ffffff',
-  fresnelColorStrength: 0.4,
+  fresnelColorStrength: getParameterDefault('cloth.fresnelColorStrength'),
 
-  rampOffset: 0.0,
+  rampOffset: getParameterDefault('cloth.rampOffset'),
 
   quality: 'medium',
 };
@@ -122,37 +124,37 @@ export function normalizeClothGradientConfig(value: unknown): ClothGradientConfi
     enabled: Boolean(raw.enabled),
     loopEnabled: Boolean(raw.loopEnabled),
 
-    amplitude1: sanitizeNumber(raw.amplitude1, DEFAULT_CLOTH_GRADIENT.amplitude1, 0, 3),
-    amplitude2: sanitizeNumber(raw.amplitude2, DEFAULT_CLOTH_GRADIENT.amplitude2, 0, 3),
-    frequency1: sanitizeNumber(raw.frequency1, DEFAULT_CLOTH_GRADIENT.frequency1, 0.01, 20),
-    frequency2: sanitizeNumber(raw.frequency2, DEFAULT_CLOTH_GRADIENT.frequency2, 0.01, 20),
-    speed1: sanitizeNumber(raw.speed1, DEFAULT_CLOTH_GRADIENT.speed1, -10, 10),
-    speed2: sanitizeNumber(raw.speed2, DEFAULT_CLOTH_GRADIENT.speed2, -10, 10),
+    amplitude1: clampParameter(raw.amplitude1, DEFAULT_CLOTH_GRADIENT.amplitude1, getParameterLimit('cloth.amplitude1')),
+    amplitude2: clampParameter(raw.amplitude2, DEFAULT_CLOTH_GRADIENT.amplitude2, getParameterLimit('cloth.amplitude2')),
+    frequency1: clampParameter(raw.frequency1, DEFAULT_CLOTH_GRADIENT.frequency1, getParameterLimit('cloth.frequency1')),
+    frequency2: clampParameter(raw.frequency2, DEFAULT_CLOTH_GRADIENT.frequency2, getParameterLimit('cloth.frequency2')),
+    speed1: clampParameter(raw.speed1, DEFAULT_CLOTH_GRADIENT.speed1, getParameterLimit('cloth.speed1')),
+    speed2: clampParameter(raw.speed2, DEFAULT_CLOTH_GRADIENT.speed2, getParameterLimit('cloth.speed2')),
     direction1: sanitizeDirection(raw.direction1, DEFAULT_CLOTH_GRADIENT.direction1),
     direction2: sanitizeDirection(raw.direction2, DEFAULT_CLOTH_GRADIENT.direction2),
-    normalStrength: sanitizeNumber(raw.normalStrength, DEFAULT_CLOTH_GRADIENT.normalStrength, 0, 5),
+    normalStrength: clampParameter(raw.normalStrength, DEFAULT_CLOTH_GRADIENT.normalStrength, getParameterLimit('cloth.normalStrength')),
 
-    warpStrength: sanitizeNumber(raw.warpStrength, DEFAULT_CLOTH_GRADIENT.warpStrength, 0, 3),
-    noiseScale: sanitizeNumber(raw.noiseScale, DEFAULT_CLOTH_GRADIENT.noiseScale, 0.01, 20),
-    noiseAmplitude: sanitizeNumber(raw.noiseAmplitude, DEFAULT_CLOTH_GRADIENT.noiseAmplitude, 0, 3),
-    noiseSpeed: sanitizeNumber(raw.noiseSpeed, DEFAULT_CLOTH_GRADIENT.noiseSpeed, -10, 10),
+    warpStrength: clampParameter(raw.warpStrength, DEFAULT_CLOTH_GRADIENT.warpStrength, getParameterLimit('cloth.warpStrength')),
+    noiseScale: clampParameter(raw.noiseScale, DEFAULT_CLOTH_GRADIENT.noiseScale, getParameterLimit('cloth.noiseScale')),
+    noiseAmplitude: clampParameter(raw.noiseAmplitude, DEFAULT_CLOTH_GRADIENT.noiseAmplitude, getParameterLimit('cloth.noiseAmplitude')),
+    noiseSpeed: clampParameter(raw.noiseSpeed, DEFAULT_CLOTH_GRADIENT.noiseSpeed, getParameterLimit('cloth.noiseSpeed')),
 
-    ambientIntensity: sanitizeNumber(raw.ambientIntensity, DEFAULT_CLOTH_GRADIENT.ambientIntensity, 0, 5),
-    lightIntensity: sanitizeNumber(raw.lightIntensity, DEFAULT_CLOTH_GRADIENT.lightIntensity, 0, 10),
-    lightAzimuth: sanitizeNumber(raw.lightAzimuth, DEFAULT_CLOTH_GRADIENT.lightAzimuth, -360, 360),
-    lightElevation: sanitizeNumber(raw.lightElevation, DEFAULT_CLOTH_GRADIENT.lightElevation, -90, 90),
+    ambientIntensity: clampParameter(raw.ambientIntensity, DEFAULT_CLOTH_GRADIENT.ambientIntensity, getParameterLimit('cloth.ambientIntensity')),
+    lightIntensity: clampParameter(raw.lightIntensity, DEFAULT_CLOTH_GRADIENT.lightIntensity, getParameterLimit('cloth.lightIntensity')),
+    lightAzimuth: clampParameter(raw.lightAzimuth, DEFAULT_CLOTH_GRADIENT.lightAzimuth, getParameterLimit('cloth.lightAzimuth')),
+    lightElevation: clampParameter(raw.lightElevation, DEFAULT_CLOTH_GRADIENT.lightElevation, getParameterLimit('cloth.lightElevation')),
     skyLightColor: sanitizeHexColor(raw.skyLightColor, DEFAULT_CLOTH_GRADIENT.skyLightColor),
     groundLightColor: sanitizeHexColor(raw.groundLightColor, DEFAULT_CLOTH_GRADIENT.groundLightColor),
 
-    specularStrength: sanitizeNumber(raw.specularStrength, DEFAULT_CLOTH_GRADIENT.specularStrength, 0, 5),
-    specularPower: sanitizeNumber(raw.specularPower, DEFAULT_CLOTH_GRADIENT.specularPower, 1, 256),
+    specularStrength: clampParameter(raw.specularStrength, DEFAULT_CLOTH_GRADIENT.specularStrength, getParameterLimit('cloth.specularStrength')),
+    specularPower: clampParameter(raw.specularPower, DEFAULT_CLOTH_GRADIENT.specularPower, getParameterLimit('cloth.specularPower')),
     specularColor: sanitizeHexColor(raw.specularColor, DEFAULT_CLOTH_GRADIENT.specularColor),
 
-    fresnelPower: sanitizeNumber(raw.fresnelPower, DEFAULT_CLOTH_GRADIENT.fresnelPower, 0.1, 32),
+    fresnelPower: clampParameter(raw.fresnelPower, DEFAULT_CLOTH_GRADIENT.fresnelPower, getParameterLimit('cloth.fresnelPower')),
     fresnelColor: sanitizeHexColor(raw.fresnelColor, DEFAULT_CLOTH_GRADIENT.fresnelColor),
-    fresnelColorStrength: sanitizeNumber(raw.fresnelColorStrength, DEFAULT_CLOTH_GRADIENT.fresnelColorStrength, 0, 5),
+    fresnelColorStrength: clampParameter(raw.fresnelColorStrength, DEFAULT_CLOTH_GRADIENT.fresnelColorStrength, getParameterLimit('cloth.fresnelColorStrength')),
 
-    rampOffset: sanitizeNumber(raw.rampOffset, DEFAULT_CLOTH_GRADIENT.rampOffset, -2, 2),
+    rampOffset: clampParameter(raw.rampOffset, DEFAULT_CLOTH_GRADIENT.rampOffset, getParameterLimit('cloth.rampOffset')),
 
     quality,
   };

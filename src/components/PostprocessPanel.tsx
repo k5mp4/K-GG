@@ -12,6 +12,8 @@ import { Toggle } from './Toggle';
 import { useLanguage } from '../i18n/LanguageProvider';
 import { InputColor, InputDrum, InputRadio, InputString } from 'tweeq';
 import { hasEnabledPostprocessEffectStack } from '../lib/effectPipeline';
+import { getDiffuseGrainParameterLimitKey } from '../lib/parameterLimits';
+import { VORONOI_FEATURES, VORONOI_METRICS } from '../lib/voronoi';
 import { VideoMotionPanel } from './VideoMotionPanel';
 
 const D = STORE_DEFAULTS.manualDistort;
@@ -286,43 +288,31 @@ export function ManualDistortControls({ title, value: manualDistort, defaults = 
             </div>
             <SliderField
               label="Brush Size"
-              min={8}
-              max={640}
-              step={1}
               value={manualDistort.brushSize}
               onChange={(v) => setManualDistort({ brushSize: v })}
               format={(v) => `${Math.round(v)}px`}
-              defaultValue={defaults.brushSize}
+              limitKey="manualDistort.brushSize"
             />
             <SliderField
               label="Strength"
-              min={0.05}
-              max={4}
-              step={0.01}
               value={manualDistort.strength}
               onChange={(v) => setManualDistort({ strength: v })}
               format={(v) => v.toFixed(2)}
-              defaultValue={defaults.strength}
+              limitKey="manualDistort.strength"
             />
             <SliderField
               label="Falloff"
-              min={0.25}
-              max={5}
-              step={0.05}
               value={manualDistort.falloff}
               onChange={(v) => setManualDistort({ falloff: v })}
               format={(v) => v.toFixed(2)}
-              defaultValue={defaults.falloff}
+              limitKey="manualDistort.falloff"
             />
             <SliderField
               label="Max Displacement"
-              min={0.02}
-              max={2}
-              step={0.01}
               value={manualDistort.maxDisplacement}
               onChange={(v) => setManualDistort({ maxDisplacement: v })}
               format={(v) => `${Math.round(v * 100)}%`}
-              defaultValue={defaults.maxDisplacement}
+              limitKey="manualDistort.maxDisplacement"
             />
             <div className="flex items-center justify-between border-t border-cream/40 pt-3">
               <span className="text-xs text-deep font-display uppercase tracking-wider">Overlay</span>
@@ -375,6 +365,7 @@ export function PostprocessPanel({ sandboxMode, embedded = false }: PostprocessP
     ? 'point'
     : postprocess.particleEmitterType) as PostprocessParticleEmitterType;
   const particleEmitterPoint = postprocess.particleEmitterPoint ?? STORE_DEFAULTS.postprocess.particleEmitterPoint;
+  const postprocessDiffuseGrainLimitKey = getDiffuseGrainParameterLimitKey(postprocess.diffuseMode);
   const particleRampStops = gradient.stops ?? STORE_DEFAULTS.gradient.stops;
   const particleRampInterpolation = gradient.rampInterpolation ?? STORE_DEFAULTS.gradient.rampInterpolation;
   const postprocessEnabled = postprocess.enabled || hasEnabledPostprocessEffectStack(effectPipeline);
@@ -473,35 +464,25 @@ export function PostprocessPanel({ sandboxMode, embedded = false }: PostprocessP
               />
               <SliderField
                 label="Slices"
-                min={2}
-                max={24}
-                step={1}
                 value={postprocess.kaleidoscopeSlices}
                 onChange={(v) => setPostprocess({ kaleidoscopeSlices: Math.round(v) })}
                 format={(v) => `${Math.round(v)}`}
-                defaultValue={STORE_DEFAULTS.postprocess.kaleidoscopeSlices}
+                limitKey="postprocess.kaleidoscopeSlices"
               />
               <SliderField
                 label="Rotation"
-                min={0}
-                max={360}
-                step={1}
                 value={postprocess.kaleidoscopeRotation}
                 onChange={(v) => setPostprocess({ kaleidoscopeRotation: v })}
                 format={(v) => `${Math.round(v)}°`}
-                defaultValue={STORE_DEFAULTS.postprocess.kaleidoscopeRotation}
                 control="angle"
                 limitKey="postprocess.kaleidoscopeRotation"
               />
               <SliderField
                 label="Zoom"
-                min={0.25}
-                max={4}
-                step={0.01}
                 value={postprocess.kaleidoscopeZoom}
                 onChange={(v) => setPostprocess({ kaleidoscopeZoom: v })}
                 format={(v) => v.toFixed(2)}
-                defaultValue={STORE_DEFAULTS.postprocess.kaleidoscopeZoom}
+                limitKey="postprocess.kaleidoscopeZoom"
               />
               <div className="flex items-center justify-between border-t border-cream/40 pt-3">
                 <span className="text-xs text-deep font-display uppercase tracking-wider">Overlay</span>
@@ -517,196 +498,153 @@ export function PostprocessPanel({ sandboxMode, embedded = false }: PostprocessP
             <div className="space-y-4">
               <SliderField
                 label="Ray Count"
-                min={1}
-                max={96}
-                step={1}
                 value={postprocess.prismRayCount}
                 onChange={(v) => setPostprocess({ prismRayCount: Math.round(v) })}
                 format={(v) => `${Math.round(v)}`}
-                defaultValue={STORE_DEFAULTS.postprocess.prismRayCount}
+                limitKey="postprocess.prismRayCount"
               />
               <SliderField
                 label="Length"
-                min={0.05}
-                max={1.5}
-                step={0.01}
                 value={postprocess.prismLength}
                 onChange={(v) => setPostprocess({ prismLength: v })}
                 format={(v) => v.toFixed(2)}
-                defaultValue={STORE_DEFAULTS.postprocess.prismLength}
+                limitKey="postprocess.prismLength"
               />
               <SliderField
                 label="Length Randomness"
-                min={0}
-                max={1}
-                step={0.01}
                 value={postprocess.prismLengthRandomness}
                 onChange={(v) => setPostprocess({ prismLengthRandomness: v })}
                 format={(v) => `${Math.round(v * 100)}%`}
-                defaultValue={STORE_DEFAULTS.postprocess.prismLengthRandomness}
+                limitKey="postprocess.prismLengthRandomness"
               />
               <SliderField
                 label="Width"
-                min={0.001}
-                max={0.08}
-                step={0.001}
                 value={postprocess.prismWidth}
                 onChange={(v) => setPostprocess({ prismWidth: v })}
                 format={(v) => v.toFixed(3)}
-                defaultValue={STORE_DEFAULTS.postprocess.prismWidth}
+                limitKey="postprocess.prismWidth"
               />
               <SliderField
                 label="Randomness"
-                min={0}
-                max={1}
-                step={0.01}
                 value={postprocess.prismRandomness}
                 onChange={(v) => setPostprocess({ prismRandomness: v })}
                 format={(v) => `${Math.round(v * 100)}%`}
-                defaultValue={STORE_DEFAULTS.postprocess.prismRandomness}
+                limitKey="postprocess.prismRandomness"
               />
               <SliderField
                 label="Blur"
-                min={0}
-                max={1}
-                step={0.01}
                 value={postprocess.prismBlur}
                 onChange={(v) => setPostprocess({ prismBlur: v })}
                 format={(v) => `${Math.round(v * 100)}%`}
-                defaultValue={STORE_DEFAULTS.postprocess.prismBlur}
+                limitKey="postprocess.prismBlur"
               />
               <SliderField
                 label="Intensity"
-                min={0}
-                max={3}
-                step={0.01}
                 value={postprocess.prismIntensity}
                 onChange={(v) => setPostprocess({ prismIntensity: v })}
                 format={(v) => v.toFixed(2)}
-                defaultValue={STORE_DEFAULTS.postprocess.prismIntensity}
+                limitKey="postprocess.prismIntensity"
               />
               <SliderField
                 label="Glow Radius"
-                min={0}
-                max={80}
-                step={1}
                 value={postprocess.prismGlowRadius}
                 onChange={(v) => setPostprocess({ prismGlowRadius: v })}
                 format={(v) => `${Math.round(v)}px`}
-                defaultValue={STORE_DEFAULTS.postprocess.prismGlowRadius}
+                limitKey="postprocess.prismGlowRadius"
               />
               <SliderField
                 label="Chromatic Aberration"
-                min={0}
-                max={40}
-                step={0.1}
                 value={postprocess.prismChromaticAberration}
                 onChange={(v) => setPostprocess({ prismChromaticAberration: v })}
                 format={(v) => `${v.toFixed(1)}px`}
-                defaultValue={STORE_DEFAULTS.postprocess.prismChromaticAberration}
+                limitKey="postprocess.prismChromaticAberration"
               />
               <SliderField
                 label="Inner Radius"
-                min={0}
-                max={0.8}
-                step={0.01}
                 value={postprocess.prismInnerRadius}
                 onChange={(v) => setPostprocess({ prismInnerRadius: v })}
                 format={(v) => v.toFixed(2)}
-                defaultValue={STORE_DEFAULTS.postprocess.prismInnerRadius}
+                limitKey="postprocess.prismInnerRadius"
               />
               <SliderField
                 label="Center X"
-                min={0}
-                max={1}
-                step={0.01}
                 value={postprocess.prismCenter[0]}
                 onChange={(v) => setPostprocess({ prismCenter: [v, postprocess.prismCenter[1]] })}
                 format={(v) => `${Math.round(v * 100)}%`}
-                defaultValue={STORE_DEFAULTS.postprocess.prismCenter[0]}
+                limitKey="postprocess.prismCenterX"
               />
               <SliderField
                 label="Center Y"
-                min={0}
-                max={1}
-                step={0.01}
                 value={postprocess.prismCenter[1]}
                 onChange={(v) => setPostprocess({ prismCenter: [postprocess.prismCenter[0], v] })}
                 format={(v) => `${Math.round(v * 100)}%`}
-                defaultValue={STORE_DEFAULTS.postprocess.prismCenter[1]}
+                limitKey="postprocess.prismCenterY"
               />
               <SliderField
                 label="Seed"
-                min={0}
-                max={99}
-                step={1}
                 value={postprocess.prismSeed}
                 onChange={(v) => setPostprocess({ prismSeed: Math.round(v) })}
-                defaultValue={STORE_DEFAULTS.postprocess.prismSeed}
+                limitKey="postprocess.prismSeed"
               />
             </div>
           ) : activeEffectMode === 'voronoi' ? (
             <div className="space-y-4">
               <SliderField
                 label="Cell Scale"
-                min={1}
-                max={48}
-                step={0.1}
                 value={postprocess.voronoiScale}
                 onChange={(v) => setPostprocess({ voronoiScale: v })}
                 format={(v) => v.toFixed(1)}
-                defaultValue={STORE_DEFAULTS.postprocess.voronoiScale}
+                limitKey="postprocess.voronoiScale"
               />
               <SliderField
                 label="Randomness"
-                min={0}
-                max={1}
-                step={0.01}
                 value={postprocess.voronoiRandomness}
                 onChange={(v) => setPostprocess({ voronoiRandomness: v })}
                 format={(v) => `${Math.round(v * 100)}%`}
-                defaultValue={STORE_DEFAULTS.postprocess.voronoiRandomness}
+                limitKey="postprocess.voronoiRandomness"
               />
+              <CustomSelect
+                label="Distance Metric"
+                value={postprocess.voronoiDistMetric}
+                options={VORONOI_METRICS}
+                onChange={(value) => setPostprocess({ voronoiDistMetric: value as typeof postprocess.voronoiDistMetric })}
+              />
+              {postprocess.voronoiDistMetric === 'minkowski' && (
+                <SliderField
+                  label="Exponent"
+                  value={postprocess.voronoiMinkowskiExp}
+                  onChange={(v) => setPostprocess({ voronoiMinkowskiExp: v })}
+                  format={(v) => v.toFixed(1)}
+                  limitKey="postprocess.voronoiMinkowskiExp"
+                />
+              )}
+              <div>
+                <label className="block text-xs mb-1 text-deep">Feature</label>
+                <div className="flex gap-1">
+                  {VORONOI_FEATURES.map(([value, label]) => (
+                    <button
+                      key={value}
+                      onClick={() => setPostprocess({ voronoiFeature: value })}
+                      className={`flex-1 text-xs py-1 rounded-none ${postprocess.voronoiFeature === value ? 'bg-fire text-k-text' : 'bg-k-muted hover:bg-k-muted/70 text-k-text'}`}
+                    >
+                      {label}
+                    </button>
+                  ))}
+                </div>
+              </div>
               <SliderField
                 label="Angle"
-                min={0}
-                max={360}
-                step={1}
                 value={postprocess.voronoiAngle}
                 onChange={(v) => setPostprocess({ voronoiAngle: v })}
                 format={(v) => `${Math.round(v)}°`}
-                defaultValue={STORE_DEFAULTS.postprocess.voronoiAngle}
                 control="angle"
                 limitKey="postprocess.voronoiAngle"
               />
               <SliderField
-                label="Gradient Scale"
-                min={0.25}
-                max={4}
-                step={0.01}
-                value={postprocess.voronoiGradientScale}
-                onChange={(v) => setPostprocess({ voronoiGradientScale: v })}
-                format={(v) => v.toFixed(2)}
-                defaultValue={STORE_DEFAULTS.postprocess.voronoiGradientScale}
-              />
-              <SliderField
-                label="Edge"
-                min={0}
-                max={0.2}
-                step={0.001}
-                value={postprocess.voronoiEdgeWidth}
-                onChange={(v) => setPostprocess({ voronoiEdgeWidth: v })}
-                format={(v) => `${Math.round(v * 1000) / 10}%`}
-                defaultValue={STORE_DEFAULTS.postprocess.voronoiEdgeWidth}
-              />
-              <SliderField
                 label="Seed"
-                min={0}
-                max={99}
-                step={1}
                 value={postprocess.voronoiSeed}
                 onChange={(v) => setPostprocess({ voronoiSeed: Math.round(v) })}
-                defaultValue={STORE_DEFAULTS.postprocess.voronoiSeed}
+                limitKey="postprocess.voronoiSeed"
               />
             </div>
           ) : activeEffectMode === 'glassTile' ? (
@@ -723,107 +661,76 @@ export function PostprocessPanel({ sandboxMode, embedded = false }: PostprocessP
                 />
                 <SliderField
                   label="Tile Size"
-                  min={4}
-                  max={4096}
-                  step={1}
                   value={postprocess.glassTileSize}
                   onChange={(v) => setPostprocess({ glassTileSize: Math.round(v) })}
                   format={(v) => `${Math.round(v)}px`}
-                  defaultValue={STORE_DEFAULTS.postprocess.glassTileSize}
+                  limitKey="postprocess.glassTileSize"
                 />
                 <SliderField
                   label="Bevel"
-                  min={0.01}
-                  max={0.5}
-                  step={0.01}
                   value={postprocess.glassTileBevel}
                   onChange={(v) => setPostprocess({ glassTileBevel: v })}
                   format={(v) => `${Math.round(v * 100)}%`}
-                  defaultValue={STORE_DEFAULTS.postprocess.glassTileBevel}
+                  limitKey="postprocess.glassTileBevel"
                 />
                 <SliderField
                   label="Surface Height"
-                  min={0}
-                  max={1}
-                  step={0.01}
                   value={postprocess.glassTileSurfaceHeight}
                   onChange={(v) => setPostprocess({ glassTileSurfaceHeight: v })}
                   format={(v) => `${Math.round(v * 100)}%`}
-                  defaultValue={STORE_DEFAULTS.postprocess.glassTileSurfaceHeight}
+                  limitKey="postprocess.glassTileSurfaceHeight"
                 />
                 <SliderField
                   label="Curvature"
-                  min={0}
-                  max={1}
-                  step={0.01}
                   value={postprocess.glassTileCurvature}
                   onChange={(v) => setPostprocess({ glassTileCurvature: v })}
                   format={(v) => `${Math.round(v * 100)}%`}
-                  defaultValue={STORE_DEFAULTS.postprocess.glassTileCurvature}
+                  limitKey="postprocess.glassTileCurvature"
                 />
                 <SliderField
                   label="Detail Scale"
-                  min={0.1}
-                  max={16}
-                  step={0.1}
                   value={postprocess.glassTileDetailScale}
                   onChange={(v) => setPostprocess({ glassTileDetailScale: v })}
                   format={(v) => v.toFixed(1)}
-                  defaultValue={STORE_DEFAULTS.postprocess.glassTileDetailScale}
+                  limitKey="postprocess.glassTileDetailScale"
                 />
                 <SliderField
                   label="Rotation"
-                  min={-180}
-                  max={180}
-                  step={1}
                   value={postprocess.glassTileRotation}
                   onChange={(v) => setPostprocess({ glassTileRotation: v })}
                   format={(v) => `${Math.round(v)}°`}
-                  defaultValue={STORE_DEFAULTS.postprocess.glassTileRotation}
-                  control="angle"
+                  limitKey="postprocess.glassTileRotation"
                 />
               </PostprocessControlGroup>
 
               <PostprocessControlGroup title="Optics">
                 <SliderField
                   label="Refraction"
-                  min={0}
-                  max={256}
-                  step={0.5}
                   value={postprocess.glassTileRefraction}
                   onChange={(v) => setPostprocess({ glassTileRefraction: v })}
                   format={(v) => `${v.toFixed(1)}px`}
-                  defaultValue={STORE_DEFAULTS.postprocess.glassTileRefraction}
+                  limitKey="postprocess.glassTileRefraction"
                 />
                 <SliderField
                   label="Dispersion"
-                  min={0}
-                  max={1}
-                  step={0.01}
                   value={postprocess.glassTileDispersion}
                   onChange={(v) => setPostprocess({ glassTileDispersion: v })}
                   format={(v) => `${Math.round(v * 100)}%`}
-                  defaultValue={STORE_DEFAULTS.postprocess.glassTileDispersion}
+                  limitKey="postprocess.glassTileDispersion"
                 />
                 <SliderField
                   label="Roughness"
-                  min={0}
-                  max={1}
-                  step={0.01}
                   value={postprocess.glassTileRoughness}
                   onChange={(v) => setPostprocess({ glassTileRoughness: v })}
                   format={(v) => `${Math.round(v * 100)}%`}
-                  defaultValue={STORE_DEFAULTS.postprocess.glassTileRoughness}
+                  limitKey="postprocess.glassTileRoughness"
                 />
                 <SliderField
                   label="Mix"
-                  min={0}
-                  max={1}
-                  step={0.01}
                   value={postprocess.glassTileMix}
                   onChange={(v) => setPostprocess({ glassTileMix: v })}
                   format={(v) => `${Math.round(v * 100)}%`}
-                  defaultValue={STORE_DEFAULTS.postprocess.glassTileMix}
+                  limitKey="postprocess.glassTileMix"
                 />
                 <CustomSelect
                   label="Edge Mode"
@@ -833,13 +740,10 @@ export function PostprocessPanel({ sandboxMode, embedded = false }: PostprocessP
                 />
                 <SliderField
                   label="Seed"
-                  min={0}
-                  max={1000000}
-                  step={1}
                   value={postprocess.glassTileSeed}
                   onChange={(v) => setPostprocess({ glassTileSeed: Math.round(v) })}
                   format={(v) => `${Math.round(v).toLocaleString()}`}
-                  defaultValue={STORE_DEFAULTS.postprocess.glassTileSeed}
+                  limitKey="postprocess.glassTileSeed"
                 />
               </PostprocessControlGroup>
             </div>
@@ -851,79 +755,57 @@ export function PostprocessPanel({ sandboxMode, embedded = false }: PostprocessP
               <PostprocessControlGroup title="Surface">
                 <SliderField
                   label="Scale"
-                  min={0.5}
-                  max={12}
-                  step={0.1}
                   value={postprocess.glassScale}
                   onChange={(v) => setPostprocess({ glassScale: v })}
                   format={(v) => v.toFixed(1)}
-                  defaultValue={STORE_DEFAULTS.postprocess.glassScale}
                   trackId="postprocess.glassScale"
+                  limitKey="postprocess.glassScale"
                 />
                 <SliderField
                   label="Stretch"
-                  min={0.25}
-                  max={8}
-                  step={0.05}
                   value={postprocess.glassStretch}
                   onChange={(v) => setPostprocess({ glassStretch: v })}
                   format={(v) => v.toFixed(2)}
-                  defaultValue={STORE_DEFAULTS.postprocess.glassStretch}
                   trackId="postprocess.glassStretch"
+                  limitKey="postprocess.glassStretch"
                 />
                 <SliderField
                   label="Rotation"
-                  min={0}
-                  max={360}
-                  step={1}
                   value={postprocess.glassRotation}
                   onChange={(v) => setPostprocess({ glassRotation: v })}
                   format={(v) => `${Math.round(v)}°`}
-                  defaultValue={STORE_DEFAULTS.postprocess.glassRotation}
                   trackId="postprocess.glassRotation"
                   control="angle"
                   limitKey="postprocess.glassRotation"
                 />
                 <SliderField
                   label="Complexity"
-                  min={1}
-                  max={5}
-                  step={1}
                   value={postprocess.glassComplexity}
                   onChange={(v) => setPostprocess({ glassComplexity: Math.round(v) })}
                   format={(v) => `${Math.round(v)}`}
-                  defaultValue={STORE_DEFAULTS.postprocess.glassComplexity}
+                  limitKey="postprocess.glassComplexity"
                 />
                 <SliderField
                   label="Warp"
-                  min={0}
-                  max={1}
-                  step={0.01}
                   value={postprocess.glassWarp}
                   onChange={(v) => setPostprocess({ glassWarp: v })}
                   format={(v) => `${Math.round(v * 100)}%`}
-                  defaultValue={STORE_DEFAULTS.postprocess.glassWarp}
                   trackId="postprocess.glassWarp"
+                  limitKey="postprocess.glassWarp"
                 />
                 <SliderField
                   label="Seed"
-                  min={0}
-                  max={99}
-                  step={1}
                   value={postprocess.glassSeed}
                   onChange={(v) => setPostprocess({ glassSeed: Math.round(v) })}
-                  defaultValue={STORE_DEFAULTS.postprocess.glassSeed}
+                  limitKey="postprocess.glassSeed"
                 />
                 <SliderField
                   label="Noise Distortion"
-                  min={0}
-                  max={1}
-                  step={0.01}
                   value={postprocess.glassNoiseInfluence}
                   onChange={(v) => setPostprocess({ glassNoiseInfluence: v })}
                   format={(v) => `${Math.round(v * 100)}%`}
-                  defaultValue={STORE_DEFAULTS.postprocess.glassNoiseInfluence}
                   trackId="postprocess.glassNoiseInfluence"
+                  limitKey="postprocess.glassNoiseInfluence"
                 />
                 <p className="text-[10px] leading-relaxed text-tab-inactive">
                   Noise Distortion パネルの模様とパラメータをガラス表面へブレンドします。
@@ -933,81 +815,60 @@ export function PostprocessPanel({ sandboxMode, embedded = false }: PostprocessP
               <PostprocessControlGroup title="Optics">
                 <SliderField
                   label="Refraction"
-                  min={0}
-                  max={120}
-                  step={0.5}
                   value={postprocess.glassRefraction}
                   onChange={(v) => setPostprocess({ glassRefraction: v })}
                   format={(v) => `${v.toFixed(1)}px`}
-                  defaultValue={STORE_DEFAULTS.postprocess.glassRefraction}
                   trackId="postprocess.glassRefraction"
+                  limitKey="postprocess.glassRefraction"
                 />
                 <SliderField
                   label="Chromatic Aberration"
-                  min={0}
-                  max={80}
-                  step={0.1}
                   value={postprocess.glassChromaticAberration}
                   onChange={(v) => setPostprocess({ glassChromaticAberration: v })}
                   format={(v) => `${v.toFixed(1)}px`}
-                  defaultValue={STORE_DEFAULTS.postprocess.glassChromaticAberration}
                   trackId="postprocess.glassChromaticAberration"
+                  limitKey="postprocess.glassChromaticAberration"
                 />
                 <SliderField
                   label="Roughness"
-                  min={0}
-                  max={12}
-                  step={0.1}
                   value={postprocess.glassRoughness}
                   onChange={(v) => setPostprocess({ glassRoughness: v })}
                   format={(v) => `${v.toFixed(1)}px`}
-                  defaultValue={STORE_DEFAULTS.postprocess.glassRoughness}
                   trackId="postprocess.glassRoughness"
+                  limitKey="postprocess.glassRoughness"
                 />
                 <SliderField
                   label="Highlight"
-                  min={0}
-                  max={2}
-                  step={0.01}
                   value={postprocess.glassHighlight}
                   onChange={(v) => setPostprocess({ glassHighlight: v })}
                   format={(v) => v.toFixed(2)}
-                  defaultValue={STORE_DEFAULTS.postprocess.glassHighlight}
                   trackId="postprocess.glassHighlight"
+                  limitKey="postprocess.glassHighlight"
                 />
                 <SliderField
                   label="Mix"
-                  min={0}
-                  max={1}
-                  step={0.01}
                   value={postprocess.glassMix}
                   onChange={(v) => setPostprocess({ glassMix: v })}
                   format={(v) => `${Math.round(v * 100)}%`}
-                  defaultValue={STORE_DEFAULTS.postprocess.glassMix}
                   trackId="postprocess.glassMix"
+                  limitKey="postprocess.glassMix"
                 />
               </PostprocessControlGroup>
 
               <PostprocessControlGroup title="Color">
                 <SliderField
                   label="Chromatic Hue"
-                  min={-180}
-                  max={180}
-                  step={1}
                   value={postprocess.glassV2ChromaticHue}
                   onChange={(v) => setPostprocess({ glassV2ChromaticHue: v })}
                   format={(v) => `${Math.round(v)}°`}
-                  defaultValue={STORE_DEFAULTS.postprocess.glassV2ChromaticHue}
+                  limitKey="postprocess.glassV2ChromaticHue"
                 />
                 <SliderField
                   label="Chromatic Saturation"
-                  min={0}
-                  max={2}
-                  step={0.01}
                   value={postprocess.glassV2ChromaticSaturation}
                   onChange={(v) => setPostprocess({ glassV2ChromaticSaturation: v })}
                   format={(v) => `${Math.round(v * 100)}%`}
-                  defaultValue={STORE_DEFAULTS.postprocess.glassV2ChromaticSaturation}
+                  limitKey="postprocess.glassV2ChromaticSaturation"
                 />
                 <div className="flex items-center justify-between gap-3">
                   <span className="text-xs text-deep font-display uppercase tracking-wider">
@@ -1044,25 +905,19 @@ export function PostprocessPanel({ sandboxMode, embedded = false }: PostprocessP
               <PostprocessControlGroup title="Motion" defaultOpen={false}>
                 <SliderField
                   label="Evolution"
-                  min={0}
-                  max={1}
-                  step={0.001}
                   value={postprocess.glassEvolution}
                   onChange={(v) => setPostprocess({ glassEvolution: v })}
                   format={(v) => v.toFixed(3)}
-                  defaultValue={STORE_DEFAULTS.postprocess.glassEvolution}
                   trackId="postprocess.glassEvolution"
+                  limitKey="postprocess.glassEvolution"
                 />
                 <SliderField
                   label="Motion"
-                  min={0}
-                  max={1}
-                  step={0.01}
                   value={postprocess.glassMotion}
                   onChange={(v) => setPostprocess({ glassMotion: v })}
                   format={(v) => `${Math.round(v * 100)}%`}
-                  defaultValue={STORE_DEFAULTS.postprocess.glassMotion}
                   trackId="postprocess.glassMotion"
+                  limitKey="postprocess.glassMotion"
                 />
               </PostprocessControlGroup>
             </div>
@@ -1079,44 +934,32 @@ export function PostprocessPanel({ sandboxMode, embedded = false }: PostprocessP
                   <>
                     <SliderField
                       label="Point X"
-                      min={0}
-                      max={1}
-                      step={0.01}
                       value={particleEmitterPoint[0]}
                       onChange={(v) => setPostprocess({ particleEmitterPoint: [v, particleEmitterPoint[1]] })}
                       format={(v) => `${Math.round(v * 100)}%`}
-                      defaultValue={STORE_DEFAULTS.postprocess.particleEmitterPoint[0]}
+                      limitKey="postprocess.particleEmitterPointX"
                     />
                     <SliderField
                       label="Point Y"
-                      min={0}
-                      max={1}
-                      step={0.01}
                       value={particleEmitterPoint[1]}
                       onChange={(v) => setPostprocess({ particleEmitterPoint: [particleEmitterPoint[0], v] })}
                       format={(v) => `${Math.round(v * 100)}%`}
-                      defaultValue={STORE_DEFAULTS.postprocess.particleEmitterPoint[1]}
+                      limitKey="postprocess.particleEmitterPointY"
                     />
                   </>
                 )}
                 <SliderField
                   label="Count"
-                  min={1000}
-                  max={500000}
-                  step={1000}
                   value={postprocess.particleCount}
                   onChange={(v) => setPostprocess({ particleCount: Math.round(v / 1000) * 1000 })}
                   format={(v) => `${Math.round(v).toLocaleString()}`}
-                  defaultValue={STORE_DEFAULTS.postprocess.particleCount}
+                  limitKey="postprocess.particleCount"
                 />
                 <SliderField
                   label="Seed"
-                  min={0}
-                  max={99}
-                  step={1}
                   value={postprocess.particleSeed}
                   onChange={(v) => setPostprocess({ particleSeed: Math.round(v) })}
-                  defaultValue={STORE_DEFAULTS.postprocess.particleSeed}
+                  limitKey="postprocess.particleSeed"
                 />
                 <CustomSelect
                   label="Blend"
@@ -1132,66 +975,48 @@ export function PostprocessPanel({ sandboxMode, embedded = false }: PostprocessP
               <PostprocessControlGroup title="Shape">
                 <SliderField
                   label="Size"
-                  min={0.5}
-                  max={18}
-                  step={0.1}
                   value={postprocess.particleSize}
                   onChange={(v) => setPostprocess({ particleSize: v })}
                   format={(v) => `${v.toFixed(1)}px`}
-                  defaultValue={STORE_DEFAULTS.postprocess.particleSize}
+                  limitKey="postprocess.particleSize"
                 />
                 <SliderField
                   label="Size Random"
-                  min={0}
-                  max={1}
-                  step={0.01}
                   value={postprocess.particleSizeRandomness}
                   onChange={(v) => setPostprocess({ particleSizeRandomness: v })}
                   format={(v) => `${Math.round(v * 100)}%`}
-                  defaultValue={STORE_DEFAULTS.postprocess.particleSizeRandomness}
+                  limitKey="postprocess.particleSizeRandomness"
                 />
                 <SliderField
                   label="Feather"
-                  min={0}
-                  max={1}
-                  step={0.01}
                   value={postprocess.particleFeather}
                   onChange={(v) => setPostprocess({ particleFeather: v })}
                   format={(v) => `${Math.round(v * 100)}%`}
-                  defaultValue={STORE_DEFAULTS.postprocess.particleFeather}
+                  limitKey="postprocess.particleFeather"
                 />
                 <SliderField
                   label="Core"
-                  min={0}
-                  max={1}
-                  step={0.01}
                   value={postprocess.particleCore}
                   onChange={(v) => setPostprocess({ particleCore: v })}
                   format={(v) => `${Math.round(v * 100)}%`}
-                  defaultValue={STORE_DEFAULTS.postprocess.particleCore}
+                  limitKey="postprocess.particleCore"
                 />
               </PostprocessControlGroup>
 
               <PostprocessControlGroup title="Lifetime">
                 <SliderField
                   label="Life Time"
-                  min={0.25}
-                  max={20}
-                  step={0.05}
                   value={postprocess.particleLifeCycle ?? STORE_DEFAULTS.postprocess.particleLifeCycle}
                   onChange={(v) => setPostprocess({ particleLifeCycle: v })}
                   format={(v) => `${v.toFixed(2)}s`}
-                  defaultValue={STORE_DEFAULTS.postprocess.particleLifeCycle}
+                  limitKey="postprocess.particleLifeCycle"
                 />
                 <SliderField
                   label="Life Random"
-                  min={0}
-                  max={1}
-                  step={0.01}
                   value={postprocess.particleLifeRandom ?? STORE_DEFAULTS.postprocess.particleLifeRandom}
                   onChange={(v) => setPostprocess({ particleLifeRandom: v })}
                   format={(v) => `${Math.round(v * 100)}%`}
-                  defaultValue={STORE_DEFAULTS.postprocess.particleLifeRandom}
+                  limitKey="postprocess.particleLifeRandom"
                 />
                 <ParticleLifeGraph
                   label="Size Over Life"
@@ -1199,161 +1024,115 @@ export function PostprocessPanel({ sandboxMode, embedded = false }: PostprocessP
                 />
                 <SliderField
                   label="Size Over Life"
-                  min={0}
-                  max={1}
-                  step={0.01}
                   value={postprocess.particleSizeOverLife ?? STORE_DEFAULTS.postprocess.particleSizeOverLife}
                   onChange={(v) => setPostprocess({ particleSizeOverLife: v })}
                   format={(v) => `${Math.round(v * 100)}%`}
-                  defaultValue={STORE_DEFAULTS.postprocess.particleSizeOverLife}
+                  limitKey="postprocess.particleSizeOverLife"
                 />
               </PostprocessControlGroup>
 
               <PostprocessControlGroup title="Motion" defaultOpen={false}>
                 <SliderField
                   label="Speed"
-                  min={0}
-                  max={2}
-                  step={0.01}
                   value={postprocess.particleSpeed}
                   onChange={(v) => setPostprocess({ particleSpeed: v })}
                   format={(v) => v.toFixed(2)}
-                  defaultValue={STORE_DEFAULTS.postprocess.particleSpeed}
+                  limitKey="postprocess.particleSpeed"
                 />
                 <SliderField
                   label="Direction"
-                  min={0}
-                  max={360}
-                  step={1}
                   value={postprocess.particleDirection}
                   onChange={(v) => setPostprocess({ particleDirection: v })}
                  format={(v) => `${Math.round(v)}°`}
-                 defaultValue={STORE_DEFAULTS.postprocess.particleDirection}
                  control="angle"
                  limitKey="postprocess.particleDirection"
                 />
                 <SliderField
                   label="Spread"
-                  min={0}
-                  max={1}
-                  step={0.01}
                   value={postprocess.particleSpread}
                   onChange={(v) => setPostprocess({ particleSpread: v })}
                   format={(v) => `${Math.round(v * 100)}%`}
-                  defaultValue={STORE_DEFAULTS.postprocess.particleSpread}
+                  limitKey="postprocess.particleSpread"
                 />
                 <SliderField
                   label="Turbulence"
-                  min={0}
-                  max={1}
-                  step={0.01}
                   value={postprocess.particleTurbulence}
                   onChange={(v) => setPostprocess({ particleTurbulence: v })}
                   format={(v) => `${Math.round(v * 100)}%`}
-                  defaultValue={STORE_DEFAULTS.postprocess.particleTurbulence}
+                  limitKey="postprocess.particleTurbulence"
                 />
                 <SliderField
                   label="Curl Scale"
-                  min={0.5}
-                  max={16}
-                  step={0.1}
                   value={postprocess.particleCurlScale}
                   onChange={(v) => setPostprocess({ particleCurlScale: v })}
                   format={(v) => v.toFixed(1)}
-                  defaultValue={STORE_DEFAULTS.postprocess.particleCurlScale}
+                  limitKey="postprocess.particleCurlScale"
                 />
                 <SliderField
                   label="Curl Strength"
-                  min={0}
-                  max={2}
-                  step={0.01}
                   value={postprocess.particleCurlStrength}
                   onChange={(v) => setPostprocess({ particleCurlStrength: v })}
                   format={(v) => v.toFixed(2)}
-                  defaultValue={STORE_DEFAULTS.postprocess.particleCurlStrength}
+                  limitKey="postprocess.particleCurlStrength"
                 />
                 <SliderField
                   label="Curl Speed"
-                  min={0}
-                  max={3}
-                  step={0.01}
                   value={postprocess.particleCurlSpeed}
                   onChange={(v) => setPostprocess({ particleCurlSpeed: v })}
                   format={(v) => v.toFixed(2)}
-                  defaultValue={STORE_DEFAULTS.postprocess.particleCurlSpeed}
+                  limitKey="postprocess.particleCurlSpeed"
                 />
                 <SliderField
                   label="Curl Evolution"
-                  min={0}
-                  max={10}
-                  step={0.01}
                   value={postprocess.particleCurlEvolution}
                   onChange={(v) => setPostprocess({ particleCurlEvolution: v })}
                   format={(v) => v.toFixed(2)}
-                  defaultValue={STORE_DEFAULTS.postprocess.particleCurlEvolution}
+                  limitKey="postprocess.particleCurlEvolution"
                 />
                 <SliderField
                   label="Center Force"
-                  min={-2}
-                  max={2}
-                  step={0.01}
                   value={postprocess.particleRadialForce}
                   onChange={(v) => setPostprocess({ particleRadialForce: v })}
                   format={(v) => v.toFixed(2)}
-                  defaultValue={STORE_DEFAULTS.postprocess.particleRadialForce}
+                  limitKey="postprocess.particleRadialForce"
                 />
                 <SliderField
                   label="Center Falloff"
-                  min={0.1}
-                  max={3}
-                  step={0.01}
                   value={postprocess.particleRadialFalloff}
                   onChange={(v) => setPostprocess({ particleRadialFalloff: v })}
                   format={(v) => v.toFixed(2)}
-                  defaultValue={STORE_DEFAULTS.postprocess.particleRadialFalloff}
+                  limitKey="postprocess.particleRadialFalloff"
                 />
                 <SliderField
                   label="Depth"
-                  min={0}
-                  max={2}
-                  step={0.01}
                   value={postprocess.particleDepth}
                   onChange={(v) => setPostprocess({ particleDepth: v })}
                   format={(v) => v.toFixed(2)}
-                  defaultValue={STORE_DEFAULTS.postprocess.particleDepth}
+                  limitKey="postprocess.particleDepth"
                 />
               </PostprocessControlGroup>
 
               <PostprocessControlGroup title="Color">
                 <SliderField
                   label="Brightness"
-                  min={0.1}
-                  max={4}
-                  step={0.01}
                   value={postprocess.particleBrightness}
                   onChange={(v) => setPostprocess({ particleBrightness: v })}
                   format={(v) => v.toFixed(2)}
-                  defaultValue={STORE_DEFAULTS.postprocess.particleBrightness}
+                  limitKey="postprocess.particleBrightness"
                 />
                 <SliderField
                   label="Opacity"
-                  min={0}
-                  max={1}
-                  step={0.01}
                   value={postprocess.particleOpacity}
                   onChange={(v) => setPostprocess({ particleOpacity: v })}
                   format={(v) => `${Math.round(v * 100)}%`}
-                  defaultValue={STORE_DEFAULTS.postprocess.particleOpacity}
+                  limitKey="postprocess.particleOpacity"
                 />
                 <SliderField
                   label="Color Variance"
-                  min={0}
-                  max={0.5}
-                  step={0.01}
                   value={postprocess.particleColorVariance}
                   onChange={(v) => setPostprocess({ particleColorVariance: v })}
                   format={(v) => `${Math.round(v * 100)}%`}
-                  defaultValue={STORE_DEFAULTS.postprocess.particleColorVariance}
+                  limitKey="postprocess.particleColorVariance"
                 />
                 <div
                   className="h-6 border border-cream/25"
@@ -1382,23 +1161,17 @@ export function PostprocessPanel({ sandboxMode, embedded = false }: PostprocessP
                 />
                 <SliderField
                   label="Color Over Life"
-                  min={0}
-                  max={1}
-                  step={0.01}
                   value={postprocess.particleColorOverLife ?? STORE_DEFAULTS.postprocess.particleColorOverLife}
                   onChange={(v) => setPostprocess({ particleColorOverLife: v, particleColorOverLifeMode: 'ramp' })}
                   format={(v) => `${Math.round(v * 100)}%`}
-                  defaultValue={STORE_DEFAULTS.postprocess.particleColorOverLife}
+                  limitKey="postprocess.particleColorOverLife"
                 />
                 <SliderField
                   label="Edge Fade"
-                  min={0}
-                  max={1}
-                  step={0.01}
                   value={postprocess.particleEdgeFade}
                   onChange={(v) => setPostprocess({ particleEdgeFade: v })}
                   format={(v) => `${Math.round(v * 100)}%`}
-                  defaultValue={STORE_DEFAULTS.postprocess.particleEdgeFade}
+                  limitKey="postprocess.particleEdgeFade"
                 />
               </PostprocessControlGroup>
             </div>
@@ -1431,24 +1204,18 @@ export function PostprocessPanel({ sandboxMode, embedded = false }: PostprocessP
                 {(postprocess.diffuseMode === 'block' || postprocess.diffuseMode === 'smooth') && (
                   <SliderField
                     label="Scatter"
-                    min={0}
-                    max={300}
-                    step={1}
                     value={postprocess.diffuseScatter}
                     onChange={(v) => setPostprocess({ diffuseScatter: v })}
                     format={(v) => `${Math.round(v)}px`}
-                    defaultValue={STORE_DEFAULTS.postprocess.diffuseScatter}
+                    limitKey="diffuse.scatter"
                   />
                 )}
                 <SliderField
                   label={postprocess.diffuseMode === 'dither' ? 'Dot Size' : postprocess.diffuseMode === 'halftone' || postprocess.diffuseMode === 'ascii' ? 'Cell Size' : 'Grain'}
-                  min={postprocess.diffuseMode === 'halftone' ? 2 : postprocess.diffuseMode === 'ascii' ? 4 : 0.01}
-                  max={postprocess.diffuseMode === 'dither' ? 12 : postprocess.diffuseMode === 'halftone' || postprocess.diffuseMode === 'ascii' ? 64 : 5}
-                  step={postprocess.diffuseMode === 'halftone' || postprocess.diffuseMode === 'ascii' ? 1 : 0.01}
                   value={postprocess.diffuseGrain}
                   onChange={(v) => setPostprocess({ diffuseGrain: v })}
                   format={(v) => postprocess.diffuseMode === 'halftone' || postprocess.diffuseMode === 'ascii' ? `${Math.round(v)}px` : `${v.toFixed(2)}px`}
-                  defaultValue={STORE_DEFAULTS.postprocess.diffuseGrain}
+                  limitKey={postprocessDiffuseGrainLimitKey}
                 />
                 {postprocess.diffuseMode === 'halftone' && (
                   <>
@@ -1465,13 +1232,10 @@ export function PostprocessPanel({ sandboxMode, embedded = false }: PostprocessP
                     </div>
                     <SliderField
                       label="Shape Size"
-                      min={0.05}
-                      max={1}
-                      step={0.01}
                       value={postprocess.diffuseHalftoneSize ?? STORE_DEFAULTS.postprocess.diffuseHalftoneSize}
                       onChange={(v) => setPostprocess({ diffuseHalftoneSize: v })}
                       format={(v) => `${Math.round(v * 100)}%`}
-                      defaultValue={STORE_DEFAULTS.postprocess.diffuseHalftoneSize}
+                      limitKey="diffuse.halftoneSize"
                     />
                   </>
                 )}
@@ -1503,23 +1267,17 @@ export function PostprocessPanel({ sandboxMode, embedded = false }: PostprocessP
                 {postprocess.diffuseMode === 'dither' && (
                   <SliderField
                     label="Threshold"
-                    min={0}
-                    max={1}
-                    step={0.01}
                     value={postprocess.diffuseDitherThreshold}
                     onChange={(v) => setPostprocess({ diffuseDitherThreshold: v })}
                     format={(v) => `${Math.round(v * 100)}%`}
-                    defaultValue={STORE_DEFAULTS.postprocess.diffuseDitherThreshold}
+                    limitKey="diffuse.ditherThreshold"
                   />
                 )}
                 <SliderField
                   label="Seed"
-                  min={0}
-                  max={99}
-                  step={1}
                   value={postprocess.diffuseSeed}
                   onChange={(v) => setPostprocess({ diffuseSeed: v })}
-                  defaultValue={STORE_DEFAULTS.postprocess.diffuseSeed}
+                  limitKey="diffuse.seed"
                 />
               </div>
             </Collapsible>

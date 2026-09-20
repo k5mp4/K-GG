@@ -19,34 +19,29 @@ export function IridescencePanel() {
           <>
             <SliderField
               label="Angle"
-              min={0} max={360} step={1}
               value={iridescence.angle}
               onChange={(angle) => setIridescence({ angle })}
               format={(value) => `${Math.round(value)}°`}
-              defaultValue={STORE_DEFAULTS.iridescence.angle}
               control="angle"
               limitKey="iridescence.angle"
             />
             <SliderField
               label="Strength"
-              min={0} max={2} step={0.01}
               value={iridescence.strength}
               onChange={(strength) => setIridescence({ strength })}
-              defaultValue={STORE_DEFAULTS.iridescence.strength}
+              limitKey="iridescence.strength"
             />
             <SliderField
               label="Frequency"
-              min={0.1} max={20} step={0.1}
               value={iridescence.frequency}
               onChange={(frequency) => setIridescence({ frequency })}
-              defaultValue={STORE_DEFAULTS.iridescence.frequency}
+              limitKey="iridescence.frequency"
             />
             <SliderField
               label="Speed"
-              min={0} max={5} step={0.01}
               value={iridescence.speed}
               onChange={(speed) => setIridescence({ speed })}
-              defaultValue={STORE_DEFAULTS.iridescence.speed}
+              limitKey="iridescence.speed"
             />
           </>
         )}

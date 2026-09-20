@@ -34,9 +34,11 @@ uniform float u_prismSeed;
 uniform float u_prismInnerRadius;
 uniform float u_postVoronoiScale;
 uniform float u_postVoronoiRandomness;
+uniform int u_postVoronoiDistMetric;
+uniform int u_postVoronoiFeature;
+uniform float u_postVoronoiMinkowskiExp;
 uniform float u_postVoronoiAngle;
-uniform float u_postVoronoiGradientScale;
-uniform float u_postVoronoiEdgeWidth;
+
 uniform float u_postVoronoiSeed;
 uniform float u_glassScale;
 uniform float u_glassStretch;

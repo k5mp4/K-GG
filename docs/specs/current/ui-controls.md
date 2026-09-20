@@ -6,11 +6,11 @@ status: current
 owners: [maintainer]
 created: 2026-07-28
 updated: 2026-09-20
-requirement_ids: [UI-001, UI-002, UI-003, UI-004, UI-005, UI-006, UI-007, UI-008, UI-009, UI-010, UI-011, UI-012, UI-013, UI-014, UI-015, UI-019, UI-021, UI-022, UI-023, UI-024, UI-026]
-related_adrs: [ADR-0011, ADR-0012]
-related_changes: [CHANGE-010, CHANGE-012, CHANGE-013, CHANGE-014, CHANGE-015, CHANGE-018, CHANGE-019, CHANGE-024, CHANGE-025, CHANGE-026, CHANGE-027, CHANGE-030, CHANGE-031, CHANGE-032, CHANGE-034, CHANGE-037, CHANGE-038, CHANGE-039, CHANGE-041, CHANGE-046]
-related_code: [src/App.tsx, src/App.css, src/types/renderView.ts, src/types/coneView.ts, src/components/CustomSelect.tsx, src/components/GradientRamp.tsx, src/components/SliderField.tsx, src/components/NoiseDistortionPanel.tsx, src/components/BlockNoisePanel.tsx, src/components/DiffuseCurveEditor.tsx, src/components/SlitScanPanel.tsx, src/components/StretchPanel.tsx, src/components/TimelineBar.tsx, src/components/IridescencePanel.tsx, src/components/NormalMapPanel.tsx, src/components/SandboxPanel.tsx, src/components/FlowGradientPanel.tsx, src/components/VideoMotionPanel.tsx, src/components/ClothGradientPanel.tsx, src/components/ClothCanvas.tsx, src/components/ConeCanvas.tsx, src/components/ConeApexEditor.tsx, src/components/ConeViewPanel.tsx, src/components/RadonPanel.tsx, src/components/PostprocessPanel.tsx, src/components/PostprocessStackPanel.tsx, src/components/PresetPanel.tsx, src/components/Toggle.tsx, src/lib/effectPipeline.ts, src/lib/parameterLimits.ts, src/types/videoMotion.ts, src/lib/noiseSeed.ts, src/i18n/uiLabels.ts, src/i18n/messages.ts]
-related_tests: [src/lib/tweeqAngle.test.ts, src/lib/effectPipeline.test.ts, src/lib/parameterLimits.test.ts, src/lib/animationDirection.test.ts, src/lib/effectShaderParity.test.ts, src/lib/flowSimulation.test.ts, src/lib/flowGradientPreset.test.ts, src/lib/presetThumbnail.test.ts, src/types/coneView.test.ts, src/lib/coneView.test.ts, src/lib/coneSeam.test.ts, src/components/CustomSelect.test.tsx, src/components/ConeApexEditor.test.tsx, src/components/NoiseDistortionPanel.test.tsx, src/components/PostprocessPanel.test.tsx, 'manual: SANDBOX Edit Layer and Flow Gradient controls browser check', 'manual: Cone background coverage and color check']
+requirement_ids: [UI-001, UI-002, UI-003, UI-004, UI-005, UI-006, UI-007, UI-008, UI-009, UI-010, UI-011, UI-012, UI-013, UI-014, UI-015, UI-019, UI-021, UI-022, UI-023, UI-024, UI-025, UI-026]
+related_adrs: [ADR-0009, ADR-0011, ADR-0012]
+related_changes: [CHANGE-010, CHANGE-012, CHANGE-013, CHANGE-014, CHANGE-015, CHANGE-018, CHANGE-019, CHANGE-024, CHANGE-025, CHANGE-026, CHANGE-027, CHANGE-030, CHANGE-031, CHANGE-032, CHANGE-034, CHANGE-037, CHANGE-038, CHANGE-039, CHANGE-041, CHANGE-046, CHANGE-047]
+related_code: [src/App.tsx, src/App.css, src/types/renderView.ts, src/types/coneView.ts, src/components/CustomSelect.tsx, src/components/GradientRamp.tsx, src/components/SliderField.tsx, src/components/NoiseDistortionPanel.tsx, src/components/BlockNoisePanel.tsx, src/components/DiffuseCurveEditor.tsx, src/components/SlitScanPanel.tsx, src/components/StretchPanel.tsx, src/components/TimelineBar.tsx, src/components/IridescencePanel.tsx, src/components/NormalMapPanel.tsx, src/components/SandboxPanel.tsx, src/components/FlowGradientPanel.tsx, src/components/ClothGradientPanel.tsx, src/components/ClothCanvas.tsx, src/components/ConeCanvas.tsx, src/components/ConeApexEditor.tsx, src/components/ConeViewPanel.tsx, src/components/RadonPanel.tsx, src/components/PostprocessPanel.tsx, src/components/PostprocessStackPanel.tsx, src/components/PresetPanel.tsx, src/components/Toggle.tsx, src/lib/effectPipeline.ts, src/lib/parameterLimits.ts, src/lib/voronoi.ts, src/lib/glass.ts, src/lib/glassTile.ts, src/lib/webgl.ts, src/store/documentModel.ts, src/store/documentActions.ts, packages/kgg-control/src/parameterLimits.ts, packages/kgg-control/src/parameters.ts, src/types/flowGradient.ts, src/i18n/uiLabels.ts, src/i18n/messages.ts, src/components/VideoMotionPanel.tsx, src/types/videoMotion.ts, src/lib/noiseSeed.ts]
+related_tests: [src/lib/tweeqAngle.test.ts, src/lib/effectPipeline.test.ts, src/lib/parameterLimits.test.ts, src/lib/animationDirection.test.ts, src/lib/effectShaderParity.test.ts, src/lib/flowSimulation.test.ts, src/lib/flowGradientPreset.test.ts, src/lib/presetThumbnail.test.ts, src/types/coneView.test.ts, src/lib/coneView.test.ts, src/lib/coneSeam.test.ts, src/components/CustomSelect.test.tsx, src/components/ConeApexEditor.test.tsx, src/components/NoiseDistortionPanel.test.tsx, 'manual: SANDBOX Edit Layer and Flow Gradient controls browser check', 'manual: Cone background coverage and color check', src/components/PostprocessPanel.test.tsx]
 ---
 
 # UI入力コントロール
@@ -18,6 +18,12 @@ related_tests: [src/lib/tweeqAngle.test.ts, src/lib/effectPipeline.test.ts, src/
 ## 目的
 
 主要なパラメータ入力をTweeqの共通コントロールで表示し、通常のパネルとAnimationタイムラインで同じ値編集・選択操作を提供します。
+
+## 数値パラメータの共通管理
+
+登録された数値パラメータの範囲、step、整数指定、角度単位、既定値は packages/kgg-control/src/parameterLimits.ts の PARAMETER_LIMITS を一次情報とします。列挙選択肢とその既定値は ENUM_PARAMETER_LIMITS で管理し、アプリ側の src/lib/parameterLimits.ts は共通定義を再公開します。
+
+共有キーを指定した SliderField、対応するストア初期値と読込正規化、描画パラメータの正規化、K-GG Controlの数値定義は同じレジストリを参照します。レジストリに登録されていないコントロールは、そのコントロール固有の範囲を使います。Noise Type切替時の NOISE_TYPE_PRESETS のように意味が異なるモード固有プリセットは、共通既定値とは別に管理します。
 
 ## 現在の要件
 
@@ -55,7 +61,7 @@ Effect Stackには主スタック11種類の順序をランダム化する操作
 
 ### UI-024 GlassTileの操作パネル
 
-Postprocessの`Edit Layer`から`GlassTile`を選択できます。PatternとEdge Modeは選択入力、Tile Size、Bevel、Surface Height、Curvature、Detail Scale、Rotation、Refraction、Dispersion、Roughness、Mix、Seedは数値スライダーで編集します。値はKG_Glassの正規化範囲へクランプし、Glassの設定やレイヤーとは別にPresetへ保存します。
+PostprocessのEdit LayerからGlassTileを選択できます。PatternとEdge Modeは選択入力、Tile Size、Bevel、Surface Height、Curvature、Detail Scale、Rotation、Refraction、Dispersion、Roughness、Mix、Seedは数値スライダーで編集します。数値範囲と既定値は共通レジストリを使い、Edge Modeの選択肢と既定値も同レジストリで管理します。値はKG_Glassの正規化範囲へクランプし、Glassの設定やレイヤーとは別にPresetへ保存します。
 
 ### UI-009 Effect Stackの表示形態
 
@@ -104,11 +110,19 @@ Coneの頂点操作点は、シアン色の単一の円形ボタンとして表�
 
 Noiseが有効な場合、Type選択の直後に`Amount`、`Scale`、`Seed`をこの順序で表示します。`Seed`のShuffle操作は共通行へ置き、通常Noiseでは`noiseSeed`、Curl系では`curlSeed`を更新します。Type固有の設定はこの共通プロパティの後ろへ表示します。
 
-Noise Typeの候補は、`Fast Curl`、`Curl (Legacy)`、`Simplex`、`fBm`、`Aura Ridges`、`Fractal Drift`、`Domain Warp`、`Seamless`、`Voronoi`、`Caustics`、`Phasor Lines`の順で表示します。この順序はFlow、Base / Fractal、Warp / Periodic、Structured Fieldの性質が近い候補を隣接させ、Flow系を先頭へ置きます。候補の内部値、入力範囲、既定値、保存・描画上の意味は変更しません。
+Noise Typeの候補は、`Fast Curl`、`Curl (Legacy)`、`Simplex`、`fBm`、`Aura Ridges`、`Fractal Drift`、`Domain Warp`、`Seamless`、`Voronoi`、`Caustics`、`Phasor Lines`の順で表示します。この順序はFlow、Base / Fractal、Warp / Periodic、Structured Fieldの性質が近い候補を隣接させ、Flow系を先頭へ置きます。候補の内部値と保存・描画上の意味は維持します。数値コントロールの範囲、step、既定値はUI-025の共通レジストリに従います。
+
+### UI-025 数値入力範囲と既定値の共有
+
+共通レジストリのキーを持つ数値入力は、そのキーに登録された範囲、step、整数指定、角度単位、既定値を使います。対応する保存データは同じ範囲へ正規化され、各数値入力のリセット値も登録済みの既定値を使います。パラメータの保存キーと型は維持します。旧Presetに範囲外の数値がある場合は読込時に登録範囲へ正規化します。
+
+### UI-026 Postprocess Voronoiの入力
+
+PostprocessのVoronoiではCell Scale、Randomness、Distance Metric（Euclidean／Manhattan／Chebyshev／Minkowski）、Minkowski選択時のExponent、Feature（F1／F2／Edge）、Angle、Seedを編集できます。Distance MetricとFeatureの選択肢・既定値はNoiseのVoronoiと共通です。Gradient Scaleと旧Edge Widthの入力は表示せず、旧Presetに保存された値は読込互換のため保持します。
 
 ## 互換性
 
-Mode、Motion、Seed、Animationの保存キーと値域を維持し、旧Presetの`autoLoop`は読み込み時に破棄します。Tweeqのコントロール変更は表示と操作方法に限定し、描画、プリセット、キーフレームのデータ契約へ影響させません。
+Mode、Motion、Seed、Animationの保存キーを維持し、旧PresetのautoLoopは読み込み時に破棄します。登録済み数値パラメータの既定値と範囲は共通レジストリで正規化します。Postprocess Voronoiの旧Gradient ScaleとEdge WidthはPresetの保存形式に残りますが、描画では使用しません。
 
 ## 検証上の留意事項
 

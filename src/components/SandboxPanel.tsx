@@ -143,7 +143,7 @@ export function SandboxPanel({ renderViewMode, onRenderViewModeChange }: Sandbox
       ? 'Cone'
       : selectedModule === 'normal'
         ? t('effect.normal')
-        : selectedModule === 'prism' ? 'Prism' : selectedModule === 'particles' ? 'Particles' : selectedModule === 'flowGradient' ? 'Flow Gradient' : 'Seamless';
+    : selectedModule === 'prism' ? 'Prism' : selectedModule === 'particles' ? 'Particles' : selectedModule === 'flowGradient' ? 'Flow Gradient' : 'Seamless';
 
   return (
     <div className="space-y-4" data-sandbox-panel>
@@ -280,6 +280,7 @@ export function SandboxPanel({ renderViewMode, onRenderViewModeChange }: Sandbox
             <SeamlessPanel />
           </SandboxModule>
         )}
+
       </div>
     </div>
   );
