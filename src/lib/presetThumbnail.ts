@@ -9,6 +9,7 @@ import { disposeWebGL, initWebGL, type WebGLContext } from './webgl';
 import { resolveDiffuseBezier } from './diffuseCurve';
 import { normalizeSeamlessConfig } from '../types/seamless';
 import { normalizeFlowGradientConfig } from '../types/flowGradient';
+import { normalizeConeViewConfig } from '../types/coneView';
 
 export const PRESET_THUMBNAIL_WIDTH = 320;
 export const PRESET_THUMBNAIL_HEIGHT = 200;
@@ -73,6 +74,7 @@ export function createPresetThumbnailState(snapshot: StoreSnapshot): LatestState
     })(),
     stretch: { ...STORE_DEFAULTS.stretch, ...snapshot.stretch },
     normalMap: { ...STORE_DEFAULTS.normalMap, ...snapshot.normalMap },
+    coneView: normalizeConeViewConfig(snapshot.coneView),
     seamless: normalizeSeamlessConfig(snapshot.seamless),
     flowGradient: normalizeFlowGradientConfig(snapshot.flowGradient),
     radon: { ...STORE_DEFAULTS.radon, ...snapshot.radon, enabled: false },

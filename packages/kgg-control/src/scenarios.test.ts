@@ -9,6 +9,14 @@ describe('K-GG scenario validation', () => {
     ]).ok).toBe(true);
   });
 
+  it('accepts Cone enable and reorder commands as a normal Effect Stack layer', () => {
+    expect(validateScenario([
+      { type: 'enableEffect', kind: 'cone', enabled: true },
+      { type: 'reorderEffect', kind: 'cone', targetIndex: 0 },
+      { type: 'resetEffect', kind: 'cone' },
+    ]).ok).toBe(true);
+  });
+
   it('bounds command count and waits', () => {
     expect(validateScenario(Array.from({ length: MAX_SCENARIO_COMMANDS + 1 }, () => ({ type: 'wait', milliseconds: 0 }))))
       .toMatchObject({ ok: false });

@@ -17,6 +17,7 @@ function createGlassState(glassMotion: number): LatestState {
     slitScan: { ...STORE_DEFAULTS.slitScan },
     stretch: { ...STORE_DEFAULTS.stretch },
     normalMap: { ...STORE_DEFAULTS.normalMap },
+    coneView: { ...STORE_DEFAULTS.coneView },
     radon: { ...STORE_DEFAULTS.radon },
     iridescence: { ...STORE_DEFAULTS.iridescence },
     manualDistort: { ...STORE_DEFAULTS.manualDistort },

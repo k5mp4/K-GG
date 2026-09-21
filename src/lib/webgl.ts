@@ -10,6 +10,12 @@ import {
   renderFlowGradient,
 } from './flowGradientRenderer';
 import type { GradientConfig } from '../types/gradient';
+import {
+  CONE_SEAM_MODE_INDEX,
+  DEFAULT_CONE_VIEW,
+  normalizeConeViewConfig,
+  type ConeViewConfig,
+} from '../types/coneView';
 import type { NoiseDistortionConfig, DiffuseConfig, SlitScanConfig, StretchConfig, NormalMapConfig, RadonConfig, IridescenceConfig, ManualDistortConfig, PostprocessConfig, MatcapConfig, PostprocessStackKind, EffectPipelineConfig } from '../types/distortion';
 import { DEFAULT_DIFFUSE_ASCII_CHARSET, DEFAULT_DIFFUSE_BACKGROUND_COLOR } from '../types/distortion';
 import { IMAGE_GRADIENT_DEFAULTS, type ImageGradientConfig } from '../types/imageGradient';
@@ -75,6 +81,13 @@ import { installWebGLResourceLedger, type WebGLResourceLedger } from './webglRes
 import { normalizeVideoMotionConfig, type VideoMotionConfig } from '../types/videoMotion';
 import { getVideoMotionRuntime } from './videoMotionRuntime';
 import { VIDEO_MOTION_FIELD_HEIGHT, VIDEO_MOTION_FIELD_WIDTH } from './videoMotionSource';
+import {
+  CONE_CAMERA_DISTANCE,
+  CONE_CAMERA_FOV,
+  getConeApertureRadius,
+  getConeApexOffset,
+  getConeTextureTransform,
+} from './coneView';
 
 export type { TileRenderOptions } from '../types/rendering';
 
@@ -83,7 +96,7 @@ export { SHADER_VERSION };
 type ShaderCompileExt = { COMPLETION_STATUS_KHR: number } | null;
 const PARALLEL_SHADER_COMPILE_TIMEOUT_MS = 30_000;
 const GLASS_PARALLEL_SHADER_COMPILE_TIMEOUT_MS = Number.POSITIVE_INFINITY;
-type TextureStackKind = PostprocessStackKind | 'diffuse' | 'noise' | 'slit';
+type TextureStackKind = PostprocessStackKind | 'diffuse' | 'noise' | 'slit' | 'cone';
 type LazyProgramState = {
   promise: Promise<void> | null;
   failed: boolean;
@@ -2181,6 +2194,8 @@ type DrawPostprocessPassOptions = {
   useV2Programs?: boolean;
   diffuseAfterSlit?: boolean;
   useNoiseDiffuseStack?: boolean;
+  coneView?: ConeViewConfig;
+  coneNormalizedTime?: number;
 };
 
 function drawPostprocessPass(
@@ -2210,6 +2225,8 @@ function drawPostprocessPass(
     useV2Programs = false,
     diffuseAfterSlit = false,
     useNoiseDiffuseStack = false,
+    coneView = DEFAULT_CONE_VIEW,
+    coneNormalizedTime = 0,
   } = options;
   const { gl } = ctx;
   if (
@@ -2230,6 +2247,7 @@ function drawPostprocessPass(
     || effectMode === 'kaleidoscope'
     || effectMode === 'voronoi'
     || effectMode === 'diffuse'
+    || effectMode === 'cone'
   );
   const glassProgram = effectMode === 'glassV2'
     ? ctx.glassV2Program
@@ -2331,9 +2349,31 @@ function drawPostprocessPass(
       gl.uniform2f(ctx.postprocessUniforms.u_gradAnchor1, anchors[1][0], anchors[1][1]);
       gl.uniform1f(ctx.postprocessUniforms.u_maxDisplacement, postprocess.maxDisplacement);
       setUniform1i(gl, ctx.postprocessUniforms.u_effectEnabled, 1);
-      const effectModeMap = { distort: 0, mirror: 1, kaleidoscope: 2, prism: 3, voronoi: 4, glass: 5, diffuse: 6, noise: 7, slit: 8, glassV2: 9, glassTile: 10, particles: 0 } as const;
+      const effectModeMap = { distort: 0, mirror: 1, kaleidoscope: 2, prism: 3, voronoi: 4, glass: 5, diffuse: 6, noise: 7, slit: 8, glassV2: 9, glassTile: 10, cone: 11, particles: 0 } as const;
       setUniform1i(gl, ctx.postprocessUniforms.u_effectMode, effectModeMap[effectMode]);
       setUniform1i(gl, ctx.postprocessUniforms.u_stackSlitDiffuseAfter, diffuseAfterSlit ? 1 : 0);
+    }
+    if (effectMode === 'cone') {
+      const normalizedConeView = normalizeConeViewConfig(coneView);
+      const textureTransform = getConeTextureTransform(normalizedConeView, coneNormalizedTime);
+      const aspect = Math.max(0.001, fullWidth / Math.max(fullHeight, 1));
+      const apertureRadius = getConeApertureRadius(CONE_CAMERA_DISTANCE, aspect);
+      const apexOffset = getConeApexOffset(
+        CONE_CAMERA_DISTANCE,
+        normalizedConeView.depth,
+        aspect,
+        normalizedConeView.apexX,
+        normalizedConeView.apexY,
+      );
+      gl.uniform1f(ctx.postprocessUniforms.u_coneCameraDistance, CONE_CAMERA_DISTANCE);
+      gl.uniform1f(ctx.postprocessUniforms.u_coneTangentHalfFov, Math.tan(CONE_CAMERA_FOV * Math.PI / 360));
+      gl.uniform1f(ctx.postprocessUniforms.u_coneDepth, normalizedConeView.depth);
+      gl.uniform1f(ctx.postprocessUniforms.u_coneApertureRadius, apertureRadius);
+      gl.uniform2f(ctx.postprocessUniforms.u_coneApexOffset, apexOffset.x, apexOffset.y);
+      gl.uniform1f(ctx.postprocessUniforms.u_coneTextureRepeat, textureTransform.repeatU);
+      gl.uniform2f(ctx.postprocessUniforms.u_coneTextureOffset, textureTransform.offsetU, textureTransform.offsetV);
+      gl.uniform1f(ctx.postprocessUniforms.u_coneSeamBlend, textureTransform.seamBlend);
+      setUniform1i(gl, ctx.postprocessUniforms.u_coneSeamMode, CONE_SEAM_MODE_INDEX[textureTransform.seamMode]);
     }
   setUniform1i(gl, ctx.postprocessUniforms.u_noiseEnabled, noiseDistortion.enabled ? 1 : 0);
   setUniform1i(gl, ctx.postprocessUniforms.u_noiseType, NOISE_TYPE_MAP[noiseDistortion.type]);
@@ -3289,8 +3329,10 @@ export function render(
   flowLoopEnabled = true,
   flowSessionId = 'preview',
   videoMotion: VideoMotionConfig = normalizeVideoMotionConfig(undefined),
+  coneView: ConeViewConfig = DEFAULT_CONE_VIEW,
 ): void {
   seamless = normalizeSeamlessConfig(seamless);
+  coneView = normalizeConeViewConfig(coneView);
   if (ctx.disposed || ctx.gl.isContextLost()) return;
   const isV2Pipeline = effectPipeline?.version === 'stack-v2';
   const imageGradientProtected = imageGradient.enabled && !!imageGradientSource;
@@ -3711,11 +3753,12 @@ export function render(
     const protectedStipple = imageGradientProtected
       && diffuse.mode === 'legacy'
       && diffuseLayerEnabled;
+    const protectedCone = imageGradientProtected && protectedLayerEnabled('cone');
     const consumedAnalyticLayers = new Set<string>(renderPlan.analyticPrefix.consumedLayers);
     const mainLayerEntries = renderPlan.enabledLayers
       .map((layer, index) => ({ layer, index }))
       .filter(({ layer }) => imageGradientProtected
-        ? protectedStipple && layer.kind === 'diffuse'
+        ? (protectedStipple && layer.kind === 'diffuse') || (protectedCone && layer.kind === 'cone')
         : !consumedAnalyticLayers.has(layer.kind));
     const normalRequested = renderPlan.normalRequested;
     const normalNeedsBlur = renderPlan.normalNeedsBlur;
@@ -3734,6 +3777,7 @@ export function render(
       && !renderPlan.prismRequested
       && !renderPlan.particlesRequested
       && !seamlessRequested
+      && !protectedCone
       && !videoMotionActive;
     const generatorReady = !analyticPrefixEnabled || requestLazyProgram(ctx, 'generator');
     if ((renderPlan.framebufferAllocationMode === 'direct' || protectedDirect) && !flowActive && !videoMotionActive && generatorReady) {
@@ -3750,7 +3794,7 @@ export function render(
       return;
     }
 
-    const stackCoreRequested = (!imageGradientProtected || protectedStipple) && renderPlan.programs.stackCore;
+    const stackCoreRequested = (!imageGradientProtected || protectedStipple || protectedCone) && renderPlan.programs.stackCore;
     // V2's texture stack has its own specialized programs. It must not wait
     // for the Legacy generator unless the analytic prefix explicitly needs
     // the full Generator output.
@@ -4013,6 +4057,8 @@ export function render(
             slitAnimTimeOverride,
             useV2Programs: true,
             diffuseAfterSlit,
+            coneView,
+            coneNormalizedTime: flowNormalizedTime,
           },
         );
       }

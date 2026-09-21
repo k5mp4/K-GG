@@ -50,4 +50,5 @@ export type RenderFrameRequest = {
   flowLoopEnabled?: boolean;
   flowSessionId?: string;
   videoMotion?: LatestState['videoMotion'];
+  coneView?: LatestState['coneView'];
 };

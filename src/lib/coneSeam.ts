@@ -86,27 +86,27 @@ vec3 coneReapplyRgb(vec3 center, vec3 sideEdge, vec3 edgeA, vec3 edgeB, float we
 }
 
 vec4 coneGradientReapplySample(vec2 uv, float blendWidth) {
-  vec4 center = texture2D(map, uv);
+  vec4 center = coneTextureLookup(uv);
   float seamX = coneRaisedCosineSeamWeight(uv.x, blendWidth);
   float seamY = coneRaisedCosineSeamWeight(uv.y, blendWidth);
   vec3 color = center.rgb;
   if (seamX > 0.0) {
-    vec3 edgeX0 = texture2D(map, vec2(0.0, uv.y)).rgb;
-    vec3 edgeX1 = texture2D(map, vec2(1.0, uv.y)).rgb;
+    vec3 edgeX0 = coneTextureLookup(vec2(0.0, uv.y)).rgb;
+    vec3 edgeX1 = coneTextureLookup(vec2(1.0, uv.y)).rgb;
     vec3 sideEdgeX = uv.x <= 0.5 ? edgeX0 : edgeX1;
     color = coneReapplyRgb(color, sideEdgeX, edgeX0, edgeX1, seamX);
   }
   if (seamY > 0.0) {
-    vec3 edgeY0 = texture2D(map, vec2(uv.x, 0.0)).rgb;
-    vec3 edgeY1 = texture2D(map, vec2(uv.x, 1.0)).rgb;
+    vec3 edgeY0 = coneTextureLookup(vec2(uv.x, 0.0)).rgb;
+    vec3 edgeY1 = coneTextureLookup(vec2(uv.x, 1.0)).rgb;
     vec3 sideEdgeY = uv.y <= 0.5 ? edgeY0 : edgeY1;
     color = coneReapplyRgb(color, sideEdgeY, edgeY0, edgeY1, seamY);
   }
   if (seamX > 0.0 && seamY > 0.0) {
-    vec3 corner00 = texture2D(map, vec2(0.0, 0.0)).rgb;
-    vec3 corner10 = texture2D(map, vec2(1.0, 0.0)).rgb;
-    vec3 corner01 = texture2D(map, vec2(0.0, 1.0)).rgb;
-    vec3 corner11 = texture2D(map, vec2(1.0, 1.0)).rgb;
+    vec3 corner00 = coneTextureLookup(vec2(0.0, 0.0)).rgb;
+    vec3 corner10 = coneTextureLookup(vec2(1.0, 0.0)).rgb;
+    vec3 corner01 = coneTextureLookup(vec2(0.0, 1.0)).rgb;
+    vec3 corner11 = coneTextureLookup(vec2(1.0, 1.0)).rgb;
     vec3 cornerTarget = 0.25 * (
       corner00 + corner10 + corner01 + corner11
     );
