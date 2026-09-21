@@ -12,3 +12,4 @@ Active ChangeはDesigned ChangeのPR中だけに置きます。mainへマージ�
 | CHANGE-046 | [Effect Stack Video Motion](./CHANGE-046-video-motion/proposal) | draft |
 | CHANGE-047 | [共通パラメータ定義とPostprocess Voronoi改善](./CHANGE-047-unified-parameters-voronoi/proposal) | draft |
 | CHANGE-048 | [Coneを順序変更可能なEffect Stackレイヤーとして統合](./CHANGE-048-cone-effect-stack/proposal) | draft |
+| CHANGE-049 | [Color Palette GeneratorをGradient Generatorに整理](./CHANGE-049-gradient-generator-controls/proposal) | draft |

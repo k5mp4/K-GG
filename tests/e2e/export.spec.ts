@@ -51,6 +51,10 @@ test('Save PNG downloads a structurally valid image', async ({ page, browserErro
 });
 
 test('PNG ZIP contains sequential valid frames and Preview recovers', async ({ page, browserErrors: _browserErrors }) => {
+  // CI uses SwiftShader; cold app startup plus six rendered frames can exceed
+  // the suite-wide timeout when the Windows runner is under load.
+  test.setTimeout(360_000);
+
   const { canvas } = await openExportPanel(page);
   const expected = await prepareZipSmoke(page);
   expect(expected).toEqual({

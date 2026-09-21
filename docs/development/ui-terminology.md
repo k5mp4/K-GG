@@ -50,8 +50,6 @@ title: UI用語・アイコン表記ガイド
 | Gradient Ramp | `gradient.type.bezier` | Bezier | ベジェ | 端点・制御点・曲線図 |
 | Gradient Ramp | `gradient.type.mesh` | Mesh Gradation | Mesh Gradation | 格子点・共有エッジ・色モード（Ramp/Direct）・Coons Patchグリッド図 |
 | Gradient Ramp | `gradient.openEditor` | Open Gradient Ramp editor | Open Gradient Ramp editor | expand icon + tooltip |
-| Gradient Ramp | `gradient.importImage` | Import image | Import image | image drop zone / file picker |
-| Gradient Ramp | `gradient.importOverlay` | Import Overlay | Import Overlay | Overlay/Mask source |
 | Animation | `animation.loopTiming` | Loop Timing | ループタイミング | Bezier preview |
 | Help | `help.title` | K-GG Guide | K-GG 使い方ガイド | `help` |
 
@@ -72,7 +70,7 @@ title: UI用語・アイコン表記ガイド
 | --- | --- |
 | 共通操作 | `common.close`, `common.open`, `common.reset`, `common.delete`, `common.duplicate`, `common.distribute`, `common.reverse`, `common.load`, `common.save`, `common.saving`, `common.export`, `common.import`, `common.expand`, `common.settings`, `common.help`, `common.undo`, `common.redo`, `common.enabled`, `common.disabled`, `common.on`, `common.off`, `common.preview`, `common.shuffle`, `common.shuffleHint`, `common.restoreShuffle`, `common.refreshApp`, `common.checkUpdates`, `common.checking`, `common.onlineDocs`, `common.version`, `common.webBuild`, `common.none`, `common.custom`, `common.output`, `common.feedback`, `common.cancel`, `common.later`, `common.retry`, `common.notNow`, `common.checkAgain` |
 | 入力・パネル | `input.*`, `section.*`, `panel.toggle`, `settings.*`, `help.*` |
-| Gradient Ramp | `gradient.title`, `gradient.type`, `gradient.type.*`, `gradient.colorStop`, `gradient.opacityStop`, `gradient.colorMode`, `gradient.interpolation`, `gradient.mirror`, `gradient.paletteGenerator`, `gradient.paletteGeneratorDescription`, `gradient.importImage`, `gradient.importOverlay`, `gradient.paletteDropHint`, `gradient.paletteName`, `gradient.builtInPresets`, `gradient.userPalettes`, `gradient.repeat`, `gradient.addStop`, `gradient.deleteStop`, `gradient.duplicateStop`, `gradient.distributeStops`, `gradient.reverseStops`, `gradient.openEditor`, `gradient.closeEditor`, `gradient.recordColorKeyframe`, `gradient.recordOpacityKeyframe`, `gradient.mirrorDescription`, `gradient.editInstructions`, `gradient.editInstructionsCompact` |
+| Gradient Ramp | `gradient.title`, `gradient.type`, `gradient.type.*`, `gradient.colorStop`, `gradient.opacityStop`, `gradient.colorMode`, `gradient.interpolation`, `gradient.mirror`, `gradient.paletteGenerator`, `gradient.paletteGeneratorDescription`, `gradient.generator*`, `gradient.paletteName`, `gradient.builtInPresets`, `gradient.userPalettes`, `gradient.repeat`, `gradient.addStop`, `gradient.deleteStop`, `gradient.duplicateStop`, `gradient.distributeStops`, `gradient.reverseStops`, `gradient.openEditor`, `gradient.closeEditor`, `gradient.recordColorKeyframe`, `gradient.recordOpacityKeyframe`, `gradient.mirrorDescription`, `gradient.editInstructions`, `gradient.editInstructionsCompact` |
 | Effect Stack / Workspace | `effect.*`, `workspace.*`, `stack.swapHistogram`, `stack.version`, `stack.fixed`, `stack.drag`, `stack.category.*`, `stack.status.*`, `histogram.*` |
 | Canvas / Animation / Diffuse | `canvas.*`, `animation.*`, `diffuse.*`, `beta.experimental` |
 | Export / Update / FFmpeg | `export.*`, `update.*`, `ffmpeg.*`, `feedback.*` |

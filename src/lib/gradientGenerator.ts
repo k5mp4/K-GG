@@ -13,8 +13,6 @@ export type GradientGeneratorAlgorithm = 'cubehelix' | 'perceptual';
 export type GradientGeneratorUiParams = {
   algorithm: GradientGeneratorAlgorithm;
   baseColor: string;
-  /** Signed normalized hue travel (-1..1). */
-  hueTravel: number;
   colorIntensity: number;
   brightness: number;
   contrast: number;
@@ -23,6 +21,10 @@ export type GradientGeneratorUiParams = {
   accentWidth: number;
   stopCount: number;
 };
+
+// Preserve the generator's original colorful default without a separate
+// Hue Travel control.
+const DEFAULT_HUE_TRAVEL = 0.5;
 
 function safeStopCount(value: number): number {
   return Math.round(clamp(value, 3, 10, 5));
@@ -46,7 +48,7 @@ export function mapUiToCubehelix(params: GradientGeneratorUiParams): CubehelixPa
   );
   return {
     startHue: baseHueFromColor(params.baseColor),
-    rotations: clamp(params.hueTravel, -1, 1, 0) * 1.75,
+    rotations: DEFAULT_HUE_TRAVEL * 1.75,
     hue: 0.12 + intensity * 0.78,
     gamma: 0.78 + (1 - brightness) * 0.44,
     lightnessStart,
@@ -59,7 +61,7 @@ export function mapUiToPerceptual(params: GradientGeneratorUiParams): Perceptual
   return {
     family: params.family,
     baseHue: baseHueFromColor(params.baseColor),
-    hueTravel: clamp(params.hueTravel, -1, 1, 0) * 360,
+    hueTravel: DEFAULT_HUE_TRAVEL * 360,
     brightness: clamp(params.brightness, 0, 1, 0.5),
     contrast: clamp(params.contrast, 0, 1, 0.5),
     chroma: clamp(params.colorIntensity, 0, 1, 0.5),

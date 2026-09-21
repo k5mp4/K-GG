@@ -391,7 +391,7 @@ export default function App() {
                 open={showGradientRamp}
                 onToggle={() => setShowGradientRamp(value => !value)}
               >
-                <GradientRamp overlayImageElement={overlayImageElement} showHeader={false} />
+                <GradientRamp showHeader={false} />
               </SidebarSection>
 
               <SidebarSection
