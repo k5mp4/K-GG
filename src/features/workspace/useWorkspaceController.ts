@@ -12,7 +12,11 @@ import type { ExportStage, VideoExportFrameRenderer } from '../../adapters';
 import { adapters } from '../../adapters';
 import type { StoreSnapshot as PresetStoreSnapshot } from '../../lib/presetModel';
 import type { KggControlProjectAdapter, KggControlUiAdapter } from '../../lib/kggControlRuntime';
-import { hasEnabledPostprocessEffectStack } from '../../lib/effectPipeline';
+import {
+  hasEnabledPostprocessEffectStack,
+  isEffectStackLayerEnabled,
+  updateEffectStackLayer,
+} from '../../lib/effectPipeline';
 import type { EffectStackKind } from '../../types/distortion';
 import type { RenderViewMode } from '../../types/renderView';
 import type { OverlayImageMode } from '../../types/workspace';
@@ -40,7 +44,10 @@ const TAB_ENABLED_MAP: Partial<Record<LeftTab, (state: AppStoreState) => boolean
   noise: state => state.noiseDistortion.enabled,
   slit: state => state.slitScan.enabled,
   sandbox: state => state.normalMap.enabled || state.effectPipeline.prismEnabled || state.effectPipeline.particlesEnabled || state.seamless.enabled,
-  postprocess: state => state.postprocess.enabled || hasEnabledPostprocessEffectStack(state.effectPipeline),
+  postprocess: state => state.postprocess.enabled
+    || hasEnabledPostprocessEffectStack(state.effectPipeline)
+    || isEffectStackLayerEnabled(state.effectPipeline, 'cone')
+    || state.effectPipeline.selectedKind === 'cone',
 };
 
 const EFFECT_STACK_TAB_MAP: Partial<Record<EffectStackKind, LeftTab>> = {
@@ -48,6 +55,7 @@ const EFFECT_STACK_TAB_MAP: Partial<Record<EffectStackKind, LeftTab>> = {
   noise: 'noise',
   slit: 'slit',
   videoMotion: 'postprocess',
+  cone: 'postprocess',
 };
 
 function formatGpuBytes(bytes: number | null | undefined): string | null {
@@ -86,7 +94,6 @@ export function useWorkspaceController({ translate }: WorkspaceControllerOptions
     matcap: state.matcap,
     animation: state.animation,
     clothGradient: state.clothGradient,
-    coneView: state.coneView,
     noiseDistortion: state.noiseDistortion,
     postprocess: state.postprocess,
     effectPipeline: state.effectPipeline,
@@ -102,7 +109,6 @@ export function useWorkspaceController({ translate }: WorkspaceControllerOptions
     matcap,
     animation,
     clothGradient,
-    coneView,
     noiseDistortion,
     postprocess,
     effectPipeline,
@@ -117,8 +123,6 @@ export function useWorkspaceController({ translate }: WorkspaceControllerOptions
   const [renderViewMode, setRenderViewMode] = useState<RenderViewMode>('canvas');
   const [clothReady, setClothReady] = useState(false);
   const [clothUnavailable, setClothUnavailable] = useState(false);
-  const [coneReady, setConeReady] = useState(false);
-  const [coneUnavailable, setConeUnavailable] = useState(false);
   const [gpuDiagnostics, setGpuDiagnostics] = useState<GpuDiagnostics | null>(() => (
     typeof window === 'undefined' ? null : window.__KAGARIBI_GPU_DIAGNOSTICS__ ?? null
   ));
@@ -126,8 +130,6 @@ export function useWorkspaceController({ translate }: WorkspaceControllerOptions
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const clothCanvasRef = useRef<HTMLCanvasElement | null>(null);
   const clothExportFrameRendererRef = useRef<VideoExportFrameRenderer | null>(null);
-  const coneCanvasRef = useRef<HTMLCanvasElement | null>(null);
-  const coneExportFrameRendererRef = useRef<VideoExportFrameRenderer | null>(null);
   const [seekVersion, setSeekVersion] = useState(0);
   const [exportProgress, setExportProgress] = useState<number | null>(null);
   const [exportStage, setExportStage] = useState<ExportStage>('preparing');
@@ -452,7 +454,17 @@ export function useWorkspaceController({ translate }: WorkspaceControllerOptions
     if (typeof patch.canvasH === 'number') { nextH = patch.canvasH; setCanvasH(nextH); setHDraft(String(nextH)); }
     if (patch.canvasW !== undefined || patch.canvasH !== undefined) aspectRatioRef.current = nextW / nextH;
     if (typeof patch.lockAspect === 'boolean') setLockAspect(patch.lockAspect);
-    if (patch.renderViewMode === 'canvas' || patch.renderViewMode === 'cloth' || patch.renderViewMode === 'cone') setRenderViewMode(patch.renderViewMode);
+    if (patch.renderViewMode === 'cone') {
+      const currentPipeline = useGradientStore.getState().effectPipeline;
+      applicationCommands.setEffectPipeline({
+        effectStack: updateEffectStackLayer(currentPipeline.effectStack, 'cone', { enabled: true }),
+        selectedKind: 'cone',
+      });
+      handleEffectStackSelection('cone');
+      setRenderViewMode('canvas');
+    } else if (patch.renderViewMode === 'canvas' || patch.renderViewMode === 'cloth') {
+      setRenderViewMode(patch.renderViewMode);
+    }
     if (typeof patch.leftTab === 'string') { activeLeftTabRef.current = patch.leftTab as LeftTab; setLeftTab(patch.leftTab as LeftTab); }
     if (typeof patch.tabHoverSwitchEnabled === 'boolean') setTabHoverSwitchMode(patch.tabHoverSwitchEnabled);
     if (typeof patch.isHoverLocked === 'boolean') setIsHoverLocked(patch.isHoverLocked);
@@ -513,15 +525,21 @@ export function useWorkspaceController({ translate }: WorkspaceControllerOptions
   const handleRenderViewModeChange = (mode: RenderViewMode) => {
     setClothUnavailable(false);
     setClothReady(false);
-    setConeUnavailable(false);
-    setConeReady(false);
-    setRenderViewMode(mode);
+    if (mode === 'cone') {
+      const currentPipeline = useGradientStore.getState().effectPipeline;
+      applicationCommands.setEffectPipeline({
+        effectStack: updateEffectStackLayer(currentPipeline.effectStack, 'cone', { enabled: true }),
+        selectedKind: 'cone',
+      });
+      handleEffectStackSelection('cone');
+      setRenderViewMode('canvas');
+    } else {
+      setRenderViewMode(mode);
+    }
   };
   const handlePresetLoad = () => {
     setClothReady(false);
-    setConeReady(false);
     setClothUnavailable(false);
-    setConeUnavailable(false);
     setRenderViewMode('canvas');
   };
   const handleCanvasResize = (width: number, height: number) => {
@@ -542,12 +560,6 @@ export function useWorkspaceController({ translate }: WorkspaceControllerOptions
     setClothUnavailable(true);
     setRenderViewMode('canvas');
   };
-  const handleConeUnavailable = () => {
-    setConeReady(false);
-    setConeUnavailable(true);
-    setRenderViewMode('canvas');
-  };
-
   const getTabEnabled = (value: LeftTab) => TAB_ENABLED_MAP[value]?.(store) ?? false;
   const canvasWorkspaceProps: CanvasWorkspaceProps = {
     viewport: {
@@ -580,11 +592,8 @@ export function useWorkspaceController({ translate }: WorkspaceControllerOptions
     view: {
       renderViewMode,
       clothReady,
-      coneReady,
       clothUnavailable,
-      coneUnavailable,
       clothGradient,
-      coneView,
       postprocess,
       effectPipeline,
       leftTab,
@@ -602,9 +611,7 @@ export function useWorkspaceController({ translate }: WorkspaceControllerOptions
       seekVersion,
       canvasRef,
       clothCanvasRef,
-      coneCanvasRef,
       clothExportFrameRendererRef,
-      coneExportFrameRendererRef,
     },
     controls: {
       controlUi: kggUiAdapter,
@@ -613,8 +620,6 @@ export function useWorkspaceController({ translate }: WorkspaceControllerOptions
       onSelectEffectStack: handleEffectStackSelection,
       onClothReady: () => setClothReady(true),
       onClothUnavailable: handleClothUnavailable,
-      onConeReady: () => setConeReady(true),
-      onConeUnavailable: handleConeUnavailable,
     },
     translate,
   };
@@ -623,7 +628,6 @@ export function useWorkspaceController({ translate }: WorkspaceControllerOptions
     updater,
     animation,
     clothGradient,
-    coneView,
     postprocess,
     effectPipeline,
     canvasSizePresets: CANVAS_SIZE_PRESETS,
@@ -686,10 +690,6 @@ export function useWorkspaceController({ translate }: WorkspaceControllerOptions
     setClothReady,
     clothUnavailable,
     setClothUnavailable,
-    coneReady,
-    setConeReady,
-    coneUnavailable,
-    setConeUnavailable,
     leftPanelW,
     setLeftPanelW,
     rightPanelW,
@@ -709,8 +709,6 @@ export function useWorkspaceController({ translate }: WorkspaceControllerOptions
     canvasRef,
     clothCanvasRef,
     clothExportFrameRendererRef,
-    coneCanvasRef,
-    coneExportFrameRendererRef,
     slitSourceImageCanvas,
     slitSourceImageName,
     imageGradientSource,

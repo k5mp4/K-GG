@@ -67,10 +67,10 @@ Web 版は `index.html` で Google Fonts から Noto Sans JP、Open Sans を読�
 - GlassTileはGlassとは別のエフェクトで、KG_Glassのタイル表面モデルを使います。Pattern、タイルサイズ、表面形状、屈折・分散、粗さ、Mix、Edge Mode、Seedを調整できます。
 - 行のグリップをドラッグすると、行が目的位置へ収束してから描画順序が確定します。各行のスイッチでレイヤーをON/OFFできます。
 - 手描きの`Distort`はPostprocessの`Edit Layer`から編集します。旧Presetの`manualDistort`は読み込み時にPostprocessへ移行されます。
-- Postprocessの全体ON／OFFは、Effect Stack内のStretch／Distort／Mirror／Kaleidoscope／Voronoi／Glass／GlassTileの有効状態を反映します。各レイヤーの個別ON／OFFはEffect Stackで操作し、Postprocessプロパティでは選択レイヤーの詳細を編集します。
+- Postprocessの全体ON／OFFは、Effect Stack内のStretch／Distort／Mirror／Kaleidoscope／Voronoi／Glass／GlassTile／Video Motion／Coneの有効状態を反映します。各レイヤーの個別ON／OFFはEffect Stackで操作し、Postprocessプロパティでは選択レイヤーの詳細を編集します。
 - Effect Stackヘッダーのシャッフル操作で主スタックの順序をランダム化できます。現在の見た目から新しい順序へ滑らかに遷移します。行またはオンオフToggleをAltクリックすると、そのレイヤーだけを有効にするソロ操作になり、ソロ化で一時的に非表示になったレイヤーは黄色の`STAY`で示されます。同じ対象をもう一度Altクリックすると元の有効状態へ戻ります。
 - Effect Stackは別ウィンドウへ切り離せます。別ウィンドウを閉じるとインライン表示へ戻ります。
-- 固定順は `Surface → Main Stack → Prism → Particles` です。Normal、Prism、Particlesはトップバーの`SANDBOX`から編集し、DiffuseはMain Stack内の位置で一度だけ適用されます。
+- 固定段は `Surface → Main Stack → Prism → Particles` です。ConeはMain Stack内の通常レイヤーとして前段textureを投影し、出力を後続レイヤーへ渡します。Normal、Prism、Particlesはトップバーの`SANDBOX`から編集し、DiffuseはMain Stack内の位置で一度だけ適用されます。
 - 画面やGPU描画が壊れた場合は、トップバーの設定モーダル（Hover / Click only）にある `Refresh app` でアプリを再読み込みできます。未保存の編集状態は破棄されます。
 
 
@@ -81,13 +81,12 @@ Web 版は `index.html` で Google Fonts から Noto Sans JP、Open Sans を読�
 
 ### SANDBOX
 - トップバーは `Diffuse → Noise → Slit → Postprocess → SANDBOX → Export → Preset` の順で、Stretchは独立項目およびPostprocessのプロパティモジュールに表示しません。PostprocessではEdit Layerを選択し、その詳細プロパティを操作できます。SANDBOXの文字色はPostprocessと同じです。
-- グラデーションの主スタックとは別に、Cloth、Cone、Normal、Prism、Particlesの描画モジュールを一つのパネルから編集できます。
+- グラデーションの主スタックとは別に、Cloth、Normal、Prism、Particles、Flow Gradient、Seamlessの6モジュールを一つのパネルから編集できます。ConeはSANDBOXに含めず、Effect Stackの通常レイヤーとして扱います。
 - `Normal` はグラデーションの輝度勾配から法線マップを生成します。`Strength`、`Blur`、`Angle`、`Bevel Size`で表面の凹凸を調整します。
 - `Prism` は主スタック後段の光線・グロー、`Particles` は最終オーバーレイのパーティクルを調整します。
 - `Edit Layer`の選択要素から各モジュールを一つずつ表示して編集します。選択を変更しても描画順は変わりません。
-- SANDBOXのCloth／ConeモジュールをONにすると、処理済みCanvasをそれぞれの3D表示へ切り替えられます。専用のPreview Surface表示モードはありません。Coneの頂点ハンドルをキャンバス外までドラッグして移動でき、正規化位置は-2..2に制限されます。ハンドルはシアン色の単一円形で、補助リング・十字線・内側マーカーは表示しません。リセットボタンで中央へ戻せます。グラデーションアンカー非表示ボタンはConeの頂点ハンドルにも適用されます。Seam Modeの表示名は英語の`Mirror Repeat`／`Edge Weld`／`Gradient Reapply`に固定され、Seam Blendと合わせてテクスチャ反復とFlowの継ぎ目を連続化できます。Gradient Reapplyは対向する端色へRGB色場を補正し、中心サンプルのalphaを保持します。準備中や利用できない場合はCanvasへ戻り、表示状態はPresetへ保存されません。
-- WebGL2を利用できないブラウザ／WebViewでは、3D表示を試行し続けず2D Canvasへ戻ります。これは編集を継続するためのフォールバックで、ページを再読み込みするとWebGL2の再検出を行います。
-- ConeはMapping（Flow／Direct Projection）、Depth（最大30）、Rotation、Texture Repeat、Seam Mode、Seam Blend、Flow Cycles（±30）を調整できます。Perspectiveは表示しません。既定のSeam ModeはMirror Repeatです。Direct ProjectionではFlowを止め、処理済み2Dフレームを円錐内面へ固定投影します。Gradient Rampは右サイドバーで編集し、3D表示中も処理済みCanvasへ反映できます。アンカー表示はプレビュー面に重ねて維持され、環境光や立体ライティングは加えません。Texture FlowはAnimationタイムラインと書き出しへ同期し、Mapping設定の変更は直近の処理済みCanvasへ即時反映されます。Cone設定はPresetへ保存されます。
+- ConeはEffect Stackで選択・ON/OFFでき、他レイヤーと同じdrag、randomize、soloに対応します。Cone passは直前のstack textureを円錐面へ投影して色場を保ち、その描画結果を後続レイヤーへ渡します。ApexはCanvas上の単一シアン円形ハンドルをドラッグして編集でき、正規化位置は-2..2に制限されます。補助リング・十字線・内側マーカーは表示せず、リセットボタンで中央へ戻せます。グラデーションアンカー非表示ボタンはConeの頂点ハンドルにも適用されます。Mapping（Flow／Direct Projection）、Depth（最大30）、Rotation、Texture Repeat、Seam Mode、Seam Blend、Flow Cycles（±30）を調整でき、Perspectiveは表示しません。既定のSeam ModeはMirror Repeatです。Direct ProjectionではFlowを止めます。Gradient Rampは前段textureに適用され、Coneはその色を維持します。Seam Modeの表示名は英語の`Mirror Repeat`／`Edge Weld`／`Gradient Reapply`に固定され、Gradient ReapplyはRGB色場を補正して中心サンプルのalphaを保持します。Texture FlowはAnimationタイムラインと書き出しへ同期し、Cone設定、レイヤー順、ON/OFF状態はPresetへ保存されます。
+- ConeはメインCanvasと同じWebGL stack経路を使います。WebGL2を利用できないブラウザ／WebViewではCone passを描画できず、通常の2D Canvas表示で編集を継続します。ページを再読み込みするとWebGL2の再検出を行います。
 
 ### Normal (ノーマルマップ)
 - グラデーションの輝度勾配から法線マップを生成します。

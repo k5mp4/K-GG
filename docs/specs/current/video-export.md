@@ -5,12 +5,12 @@ title: 動画・連番フレーム出力
 status: current
 owners: [maintainer]
 created: 2026-07-31
-updated: 2026-09-18
+updated: 2026-09-21
 requirement_ids: [EXPORT-001, EXPORT-002, EXPORT-003, EXPORT-004, EXPORT-005, EXPORT-006, EXPORT-007, EXPORT-008, EXPORT-009, EXPORT-021]
 related_adrs: [ADR-0004, ADR-0005, ADR-0018]
-related_changes: [CHANGE-011, CHANGE-024, CHANGE-025, CHANGE-027, CHANGE-030, CHANGE-031, CHANGE-032, CHANGE-037, CHANGE-038]
-related_code: [src/adapters/browser/videoExportService.ts, src/adapters/tauri/videoExportService.ts, src/adapters/browser/exportService.ts, src/adapters/tauri/exportService.ts, src/adapters/tauri/afterEffectsService.ts, src/adapters/types.ts, src/lib/export.ts, src/lib/exportSlits.ts, src/lib/exportVideo.ts, src/lib/aftereffectsExport.ts, src/lib/aeStatusController.ts, src/lib/videoExportLifecycle.ts, src/lib/renderBridge.ts, src/lib/renderSceneAtTime.ts, src/lib/flowGradientRenderer.ts, src/lib/flowSimulation.ts, src/lib/videoExportFrames.ts, src/lib/tileRender.ts, src/lib/webgl.ts, src/lib/coneViewRenderer.ts, src/lib/clothGradientRenderer.ts, src/lib/coneSeam.ts, src/components/GradientCanvas.tsx, src/components/ClothCanvas.tsx, src/components/ConeCanvas.tsx, src/components/ExportPanel.tsx, src-tauri/src/lib.rs, tools/ffmpeg-native-smoke.mjs]
-related_tests: [src/lib/renderBridge.test.ts, src/lib/effectPipeline.test.ts, src/lib/flowSimulation.test.ts, src/lib/flowGradientPreset.test.ts, src/lib/webglExportPrograms.test.ts, src/lib/webglShaderSources.test.ts, src/lib/glass.test.ts, src/lib/videoExportFrames.test.ts, src/lib/coneView.test.ts, src/lib/coneSeam.test.ts, src/lib/coneViewRenderer.test.ts, src/lib/webglPerformance.test.ts, src/lib/aftereffectsExport.test.ts, src/lib/aeStatusController.test.ts, src/lib/videoExportLifecycle.test.ts, src/adapters/tauri/exportService.test.ts, src/adapters/tauri/videoExportService.native-artifact.test.ts, src/adapters/tauri/exportService.native-artifact.test.ts, src/adapters/tauri/afterEffectsService.native-artifact.test.ts]
+related_changes: [CHANGE-011, CHANGE-024, CHANGE-025, CHANGE-027, CHANGE-030, CHANGE-031, CHANGE-032, CHANGE-037, CHANGE-038, CHANGE-048]
+related_code: [src/adapters/browser/videoExportService.ts, src/adapters/tauri/videoExportService.ts, src/adapters/browser/exportService.ts, src/adapters/tauri/exportService.ts, src/adapters/tauri/afterEffectsService.ts, src/adapters/types.ts, src/lib/export.ts, src/lib/exportSlits.ts, src/lib/exportVideo.ts, src/lib/aftereffectsExport.ts, src/lib/aeStatusController.ts, src/lib/videoExportLifecycle.ts, src/lib/renderBridge.ts, src/lib/renderSceneAtTime.ts, src/lib/flowGradientRenderer.ts, src/lib/flowSimulation.ts, src/lib/videoExportFrames.ts, src/lib/tileRender.ts, src/lib/webgl.ts, src/lib/clothGradientRenderer.ts, src/lib/coneSeam.ts, src/components/GradientCanvas.tsx, src/components/ClothCanvas.tsx, src/components/ConeApexEditor.tsx, src/components/ExportPanel.tsx, src-tauri/src/lib.rs, tools/ffmpeg-native-smoke.mjs]
+related_tests: [src/lib/renderBridge.test.ts, src/lib/effectPipeline.test.ts, src/lib/renderFrame.test.ts, src/lib/flowSimulation.test.ts, src/lib/flowGradientPreset.test.ts, src/lib/webglExportPrograms.test.ts, src/lib/webglShaderSources.test.ts, src/lib/glass.test.ts, src/lib/videoExportFrames.test.ts, src/lib/coneView.test.ts, src/lib/coneSeam.test.ts, src/lib/coneViewRenderer.test.ts, src/lib/webglPerformance.test.ts, src/lib/aftereffectsExport.test.ts, src/lib/aeStatusController.test.ts, src/lib/videoExportLifecycle.test.ts, src/adapters/tauri/exportService.test.ts, src/adapters/tauri/videoExportService.native-artifact.test.ts, src/adapters/tauri/exportService.native-artifact.test.ts, src/adapters/tauri/afterEffectsService.native-artifact.test.ts]
 ---
 
 # 動画・連番フレーム出力
@@ -49,11 +49,11 @@ AbortSignalによるcancellation、shader program準備失敗、CanvasまたはG
 
 ### EXPORT-007 Preview表示面のフレームキャプチャ
 
-2Dモードの動画・連番フレーム出力は従来のGradientCanvasを使用します。3Dモードでは、export sessionで生成した処理済み2Dフレームを選択中のClothまたはConeのCanvasTextureへ反映し、マッピング後の3D Preview Canvasをキャプチャします。Preview RAFによる上書きや、元の2D Canvasだけの出力を許可しません。
+通常の出力はexport sessionの時刻を`renderSceneAtTime`へ渡し、Previewと同じEffect Stack render planで生成します。Coneレイヤーが有効な場合はMain Stack内の順序位置でshader passを行い、その出力と後続レイヤーを含むメインGradient Canvasをキャプチャします。Cloth表示モードでは既存Cloth Rendererを使います。独立Cone Canvasや別Rendererの同期キャプチャ経路は持ちません。
 
-### EXPORT-008 Cone表示面のフレームキャプチャ
+### EXPORT-008 Cone stack passのフレーム処理
 
-Coneモードではexport sessionのnormalizedTimeをFlow Mappingへ使用します。Direct ProjectionではV offsetを固定します。各フレームの処理済み2D Canvasを生成・GPU完了した後にCone Rendererを同期描画し、そのCone Canvasを静止画、連番PNG、MOV、MP4のキャプチャ対象にします。入力Canvasの寸法が変わった場合は既存GPU Textureを再利用せず再確保します。ConeのSeam ModeとGradient ReapplyのRGB補正を含む設定はPreviewと同じRenderer分岐へ渡し、出力形式ごとに別の合成やalphaブレンドを行いません。
+`effectPipeline.effectStack`にあるConeレイヤーは通常の順序で各フレームを処理します。export sessionのnormalizedTimeをFlow Mappingへ渡し、Direct ProjectionではV offsetを固定します。Cone shader passは直前のstack textureを読み取り、結果をping-pong destinationへ書き込むため、後続レイヤーもこのCone表示を入力にできます。静止画、連番PNG、MOV、MP4の各フレームでPreviewと同じCone mapping、Seam Mode、Gradient Reapply RGB補正、alpha保持を使い、Cone固有のCanvasや出力形式別合成を挟みません。
 
 ### EXPORT-009 Tauri動画成果物の保存・解放
 

@@ -22,6 +22,7 @@ export const EFFECT_STACK_KINDS = [
   'glassTile',
   'diffuse',
   'videoMotion',
+  'cone',
 ] as const satisfies readonly EffectStackKind[];
 
 /** Postprocessの全体ON/OFFへ反映する、主スタック内のレイヤー。 */
@@ -34,6 +35,7 @@ export const POSTPROCESS_EFFECT_STACK_KINDS = [
   'glass',
   'glassTile',
   'videoMotion',
+  'cone',
 ] as const satisfies readonly EffectStackKind[];
 
 const EFFECT_STACK_KIND_SET = new Set<string>(EFFECT_STACK_KINDS);
@@ -148,13 +150,13 @@ export function normalizeEffectPipelineConfig(value: unknown): EffectPipelineCon
   if (typeof value !== 'object' || value === null) return createLegacyEffectPipeline();
 
   const raw = value as Partial<EffectPipelineConfig>;
-  const effectStack = normalizeEffectStack(raw.effectStack);
+  const effectStack = normalizeEffectStack((value as { effectStack?: unknown }).effectStack);
   const rawSelectedKind = (value as { selectedKind?: unknown }).selectedKind;
-  const selectedKind = rawSelectedKind === 'glassV2'
+  const selectedKind: EffectStackKind = rawSelectedKind === 'glassV2'
     ? 'glass'
     : isEffectStackKind(rawSelectedKind)
       ? rawSelectedKind
-    : 'diffuse';
+      : 'diffuse';
 
   return {
     version: normalizeVersion(raw.version),

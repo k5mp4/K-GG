@@ -228,7 +228,8 @@ export type EffectStackKind =
   | 'voronoi'
   | 'glass'
   | 'glassTile'
-  | 'videoMotion';
+  | 'videoMotion'
+  | 'cone';
 
 export type EffectStackLayer = {
   kind: EffectStackKind;

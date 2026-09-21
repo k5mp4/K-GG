@@ -456,6 +456,7 @@ describe('effectPipeline', () => {
         { kind: 'glassTile', enabled: false },
         { kind: 'diffuse', enabled: true },
         { kind: 'videoMotion', enabled: false },
+        { kind: 'cone', enabled: false },
       ],
       selectedKind: 'diffuse',
       prismEnabled: false,
@@ -482,6 +483,7 @@ describe('effectPipeline', () => {
       { kind: 'glassTile', enabled: false },
       { kind: 'diffuse', enabled: false },
       { kind: 'videoMotion', enabled: false },
+      { kind: 'cone', enabled: false },
     ]);
   });
 
@@ -537,6 +539,7 @@ describe('effectPipeline', () => {
       'voronoi',
       'glassTile',
       'videoMotion',
+      'cone',
     ]);
     expect(Object.fromEntries(normalized.map(layer => [layer.kind, layer.enabled]))).toEqual({
       diffuse: false,
@@ -550,6 +553,7 @@ describe('effectPipeline', () => {
       voronoi: true,
       glassTile: false,
       videoMotion: false,
+      cone: false,
     });
   });
 
@@ -580,6 +584,7 @@ describe('effectPipeline', () => {
       'glassTile',
       'diffuse',
       'videoMotion',
+      'cone',
     ]);
 
     expect(moveEffectStackLayer(toggled, 'diffuse', 0).at(0)).toEqual({ kind: 'diffuse', enabled: true });
@@ -616,10 +621,12 @@ describe('effectPipeline', () => {
       'glassTile',
       'diffuse',
       'videoMotion',
+      'cone',
       'noise',
     ]);
-    expect(movedPastDiffuse.at(-3)).toEqual({ kind: 'diffuse', enabled: true });
-    expect(movedPastDiffuse.at(-2)).toEqual({ kind: 'videoMotion', enabled: false });
+    expect(movedPastDiffuse.at(-4)).toEqual({ kind: 'diffuse', enabled: true });
+    expect(movedPastDiffuse.at(-3)).toEqual({ kind: 'videoMotion', enabled: false });
+    expect(movedPastDiffuse.at(-2)).toEqual({ kind: 'cone', enabled: false });
     expect(movedPastDiffuse.at(-1)).toEqual({ kind: 'noise', enabled: true });
   });
 
@@ -633,7 +640,7 @@ describe('effectPipeline', () => {
     let seed = 0;
     const randomized = randomizeEffectStackOrder(stack, () => (seed += 0.17) % 1);
 
-    expect(randomized).toHaveLength(11);
+    expect(randomized).toHaveLength(12);
     expect(new Set(randomized.map(layer => layer.kind))).toEqual(new Set(stack.map(layer => layer.kind)));
     expect(Object.fromEntries(randomized.map(layer => [layer.kind, layer.enabled]))).toEqual(enabledByKind);
     expect(randomized).not.toBe(stack);
@@ -691,4 +698,35 @@ describe('effectPipeline', () => {
     const plan = getV2RenderPlan(pipeline, analyticPlanOptions());
     expect((plan.programs as unknown as Record<string, unknown>).videoMotion).toBe(true);
   });
+
+  it('normalizes and renders Cone as an orderable texture-stack layer', () => {
+    const pipeline = createDefaultEffectPipeline();
+    const coneKind = 'cone' as Parameters<typeof moveEffectStackLayer>[1];
+    const normalized = normalizeEffectStack([
+      ...pipeline.effectStack,
+      { kind: coneKind, enabled: true },
+    ]);
+
+    expect(normalized.map(layer => layer.kind)).toContain('cone');
+
+    const reordered = moveEffectStackLayer(normalized, coneKind, 0);
+    expect(reordered[0]).toMatchObject({ kind: 'cone', enabled: true });
+
+    const selectedCone = normalizeEffectPipelineConfig({
+      ...pipeline,
+      effectStack: reordered,
+      selectedKind: coneKind,
+    });
+    expect(selectedCone.selectedKind).toBe('cone');
+
+    const plan = getV2RenderPlan(selectedCone, analyticPlanOptions());
+    expect(plan.enabledLayers.map(layer => layer.kind)).toEqual(['cone', 'diffuse']);
+    expect(plan.framebufferAllocationMode).toBe('core');
+    expect(plan.programs.stackCore).toBe(true);
+
+    const solo = soloEffectStackLayer(reordered, coneKind);
+    expect(solo.find(layer => layer.kind === 'cone')?.enabled).toBe(true);
+    expect(solo.filter(layer => layer.kind !== 'cone').every(layer => !layer.enabled)).toBe(true);
+  });
+
 });

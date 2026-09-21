@@ -10,6 +10,12 @@ void main() {
   vec2 globalCoord = gl_FragCoord.xy + safeTileOffset;
   vec2 globalUv = globalCoord / safeFullResolution;
 #if !defined(KGG_GLASS_ONLY) && !defined(KGG_PRISM_ONLY)
+  if (u_effectEnabled && u_effectMode == 11) {
+    gl_FragColor = coneViewSample(globalUv);
+    return;
+  }
+#endif
+#if !defined(KGG_GLASS_ONLY) && !defined(KGG_PRISM_ONLY)
   if (u_effectEnabled && u_effectMode == 6) {
     // Only ordered Dither needs a cell-center source sample. Halftone and
     // ASCII must retain the fragment color so their shape/glyph mask remains

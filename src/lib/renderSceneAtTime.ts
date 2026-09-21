@@ -62,6 +62,7 @@ function renderSceneFrame(
     flowLoopEnabled: state.animation.previewLoop ?? true,
     flowSessionId: options.renderSessionId ?? 'preview',
     videoMotion: state.videoMotion,
+    coneView: state.coneView,
   });
 }
 

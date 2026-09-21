@@ -12,6 +12,7 @@ import { Toggle } from './Toggle';
 import { useLanguage } from '../i18n/LanguageProvider';
 import { InputColor, InputDrum, InputRadio, InputString } from 'tweeq';
 import { hasEnabledPostprocessEffectStack } from '../lib/effectPipeline';
+import { ConeViewPanel } from './ConeViewPanel';
 import { getDiffuseGrainParameterLimitKey } from '../lib/parameterLimits';
 import { VORONOI_FEATURES, VORONOI_METRICS } from '../lib/voronoi';
 import { VideoMotionPanel } from './VideoMotionPanel';
@@ -353,6 +354,7 @@ export function PostprocessPanel({ sandboxMode, embedded = false }: PostprocessP
   const selectedVideoMotion = !sandboxMode
     && effectPipeline.version === 'stack-v2'
     && effectPipeline.selectedKind === 'videoMotion';
+  const selectedCone = !sandboxMode && effectPipeline.selectedKind === 'cone';
   const activeEffectMode = sandboxMode ?? (
     selectedVideoMotion
       ? 'videoMotion'
@@ -390,15 +392,19 @@ export function PostprocessPanel({ sandboxMode, embedded = false }: PostprocessP
       {!embedded && (
         <div className="flex items-center justify-between">
           <h2 className="font-semibold text-sm text-k-text">{t('effect.postprocess')}</h2>
-          <Toggle
-            variant="switch"
-            checked={postprocessEnabled}
-            onChange={(v) => setPostprocess({ enabled: v })}
-          />
+          {!selectedCone && (
+            <span data-postprocess-master-toggle>
+              <Toggle
+                variant="switch"
+                checked={postprocessEnabled}
+                onChange={(v) => setPostprocess({ enabled: v })}
+              />
+            </span>
+          )}
         </div>
       )}
 
-      {!sandboxMode && (
+      {!sandboxMode && !selectedCone && (
         <CustomSelect
           label="Edit Layer"
           value={activeEffectMode}
@@ -426,7 +432,10 @@ export function PostprocessPanel({ sandboxMode, embedded = false }: PostprocessP
           <div hidden={activeEffectMode !== 'videoMotion'}>
             <VideoMotionPanel />
           </div>
-          {activeEffectMode !== 'videoMotion' && (
+          <div data-cone-settings={selectedCone ? 'shown' : 'hidden'} hidden={!selectedCone}>
+            <ConeViewPanel />
+          </div>
+          {activeEffectMode !== 'videoMotion' && !selectedCone && (
           <>
           {isDistort ? (
             <ManualDistortControls

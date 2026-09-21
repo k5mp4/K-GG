@@ -46,13 +46,14 @@ const LABELS: Record<EffectStackKind, string> = {
   glass: 'Glass',
   glassTile: 'GlassTile',
   videoMotion: 'Video Motion',
+  cone: 'Cone',
 };
 
 const CATEGORY: Record<EffectStackKind, MessageKey> = {
   diffuse: 'stack.category.texture', noise: 'stack.category.texture',
   slit: 'stack.category.transform', stretch: 'stack.category.transform', distort: 'stack.category.transform', mirror: 'stack.category.transform', kaleidoscope: 'stack.category.transform',
   voronoi: 'stack.category.structure', glass: 'stack.category.structure', glassTile: 'stack.category.structure',
-  videoMotion: 'stack.category.structure',
+  videoMotion: 'stack.category.structure', cone: 'stack.category.transform',
 };
 
 type DragState = Omit<EffectStackDragState, 'kind'> & {
@@ -70,10 +71,10 @@ type LazyProgramKey = 'stackCore' | 'noiseStack' | 'glassV2' | 'glassTile' | 'vi
 type LazyProgramStatus = 'loading' | 'ready' | 'failed' | 'fallback';
 
 const CORE_EFFECTS = new Set<EffectStackKind>([
-  'diffuse', 'noise', 'slit', 'distort', 'mirror', 'kaleidoscope', 'voronoi',
+  'diffuse', 'noise', 'slit', 'distort', 'mirror', 'kaleidoscope', 'voronoi', 'cone',
 ]);
 const IMAGE_GRADIENT_PROTECTED_EFFECTS = new Set<EffectStackKind>([
-  'stretch', 'distort', 'mirror', 'kaleidoscope', 'voronoi', 'glass', 'glassTile',
+  'stretch', 'distort', 'mirror', 'kaleidoscope', 'voronoi', 'glass', 'glassTile', 'cone',
 ]);
 
 type Props = {
@@ -90,7 +91,10 @@ function programKeyForEffect(kind: EffectStackKind): LazyProgramKey {
   return 'stretch';
 }
 
-export function PostprocessStackPanel({ onSwapWorkspace, onSelectEffectStack }: Props = {}) {
+export function PostprocessStackPanel({
+  onSwapWorkspace,
+  onSelectEffectStack,
+}: Props = {}) {
   const { t } = useLanguage();
   const { effectPipeline, normalMap, imageGradient } = useGradientStore();
   const { setPostprocess, setEffectPipeline } = applicationCommands;

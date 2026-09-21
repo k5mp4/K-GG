@@ -30,7 +30,7 @@ export type LatestState = {
   stretch: StretchConfig;
   normalMap: NormalMapConfig;
   clothGradient?: ClothGradientConfig;
-  coneView?: ConeViewConfig;
+  coneView: ConeViewConfig;
   seamless?: SeamlessConfig;
   flowGradient?: FlowGradientConfig;
   videoMotion?: VideoMotionConfig;

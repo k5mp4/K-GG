@@ -43,6 +43,7 @@ describe('renderFrame compatibility adapter', () => {
       flowNormalizedTime: 0.6,
       flowLoopEnabled: false,
       flowSessionId: 'test-session',
+      coneView: { depth: 6, mappingMode: 'flow' },
     } as unknown as RenderFrameRequest;
 
     renderFrame({} as WebGLContext, request);
@@ -83,6 +84,8 @@ describe('renderFrame compatibility adapter', () => {
       request.flowNormalizedTime,
       request.flowLoopEnabled,
       request.flowSessionId,
+      request.videoMotion,
+      request.coneView,
     );
   });
 });

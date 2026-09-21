@@ -193,6 +193,10 @@ vec4 coneEdgeWeldSample(vec2 uv, float blendWidth) {
   return welded;
 }
 
+vec4 coneTextureLookup(vec2 uv) {
+  return texture2D(map, uv);
+}
+
 ${CONE_GRADIENT_REAPPLY_SHADER}
 
 #endif`,
