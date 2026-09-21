@@ -27,7 +27,11 @@ type Props = {
   onSelectEffectStack?: (kind: EffectStackKind) => void;
 };
 
-export function EffectStackWorkspace({ sourceCanvasRef, hidden = false, onSelectEffectStack }: Props) {
+export function EffectStackWorkspace({
+  sourceCanvasRef,
+  hidden = false,
+  onSelectEffectStack,
+}: Props) {
   const { t } = useLanguage();
   const [order, setOrder] = useState<WorkspaceOrder>(readWorkspaceOrder);
   const stackRef = useRef<HTMLDivElement>(null);
@@ -72,7 +76,10 @@ export function EffectStackWorkspace({ sourceCanvasRef, hidden = false, onSelect
     >
       <div className="relative h-full min-w-[480px]">
         <div ref={stackRef} className={`absolute left-0 top-0 ${hidden ? 'pointer-events-none' : 'pointer-events-auto'}`}>
-          <PostprocessStackPanel onSwapWorkspace={swapOrder} onSelectEffectStack={onSelectEffectStack} />
+          <PostprocessStackPanel
+            onSwapWorkspace={swapOrder}
+            onSelectEffectStack={onSelectEffectStack}
+          />
         </div>
         <div ref={histogramRef} className={`absolute left-0 top-0 ${hidden ? 'pointer-events-none' : 'pointer-events-auto'}`}>
           <ColorHistogram sourceCanvasRef={sourceCanvasRef} />

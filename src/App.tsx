@@ -86,7 +86,6 @@ export default function App() {
     setShowPropertyModulesSettings,
     renderViewMode,
     clothReady,
-    coneReady,
     leftPanelW,
     rightPanelW,
     activeResizeSide,
@@ -103,8 +102,6 @@ export default function App() {
     canvasRef,
     clothCanvasRef,
     clothExportFrameRendererRef,
-    coneCanvasRef,
-    coneExportFrameRendererRef,
     slitSourceImageCanvas,
     slitSourceImageName,
     imageGradientSource,
@@ -206,7 +203,6 @@ export default function App() {
                     )}
                     {value === 'sandbox' && (
                       <SandboxPanel
-                        renderViewMode={renderViewMode}
                         onRenderViewModeChange={handleRenderViewModeChange}
                       />
                     )}
@@ -220,16 +216,12 @@ export default function App() {
                         previewCanvasRef={
                           renderViewMode === 'cloth' && clothReady
                             ? clothCanvasRef
-                            : renderViewMode === 'cone' && coneReady
-                              ? coneCanvasRef
-                              : canvasRef
+                            : canvasRef
                         }
                         exportFrameRendererRef={
                           renderViewMode === 'cloth' && clothReady
                             ? clothExportFrameRendererRef
-                            : renderViewMode === 'cone' && coneReady
-                              ? coneExportFrameRendererRef
-                              : undefined
+                            : undefined
                         }
                         ffmpegStatus={ffmpegStatus}
                         ffmpegChecking={ffmpegChecking}

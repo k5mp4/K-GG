@@ -2,7 +2,6 @@ import type { MouseEventHandler, MutableRefObject, RefObject } from 'react';
 import { BezierEasingEditor } from '../../components/BezierEasingEditor';
 import { ClothCanvas } from '../../components/ClothCanvas';
 import { ConeApexEditor } from '../../components/ConeApexEditor';
-import { ConeCanvas } from '../../components/ConeCanvas';
 import { DistortOverlay } from '../../components/DistortOverlay';
 import { EffectStackWorkspace } from '../../components/EffectStackWorkspace';
 import { GradientAnchorEditor } from '../../components/GradientAnchorEditor';
@@ -17,7 +16,6 @@ import { isPostprocessLayerEnabled } from '../../lib/postprocessStack';
 import { isEffectStackLayerEnabled } from '../../lib/effectPipeline';
 import type { KggControlProjectAdapter, KggControlUiAdapter } from '../../lib/kggControlRuntime';
 import type { ClothGradientConfig } from '../../types/clothGradient';
-import type { ConeViewConfig } from '../../types/coneView';
 import type { EffectPipelineConfig, EffectStackKind, PostprocessConfig } from '../../types/distortion';
 import type { RenderViewMode } from '../../types/renderView';
 import type { MessageKey } from '../../i18n/messages';
@@ -57,11 +55,8 @@ type CanvasWorkspaceChromeProps = {
 type CanvasWorkspaceViewProps = {
   renderViewMode: RenderViewMode;
   clothReady: boolean;
-  coneReady: boolean;
   clothUnavailable: boolean;
-  coneUnavailable: boolean;
   clothGradient: ClothGradientConfig;
-  coneView: ConeViewConfig;
   postprocess: PostprocessConfig;
   effectPipeline: EffectPipelineConfig;
   leftTab: LeftTab;
@@ -81,9 +76,7 @@ type CanvasWorkspaceResourcesProps = {
   seekVersion: number;
   canvasRef: RefObject<HTMLCanvasElement | null>;
   clothCanvasRef: MutableRefObject<HTMLCanvasElement | null>;
-  coneCanvasRef: MutableRefObject<HTMLCanvasElement | null>;
   clothExportFrameRendererRef: MutableRefObject<VideoExportFrameRenderer | null>;
-  coneExportFrameRendererRef: MutableRefObject<VideoExportFrameRenderer | null>;
 };
 
 type CanvasWorkspaceControlsProps = {
@@ -93,8 +86,6 @@ type CanvasWorkspaceControlsProps = {
   onSelectEffectStack: (kind: EffectStackKind) => void;
   onClothReady: () => void;
   onClothUnavailable: () => void;
-  onConeReady: () => void;
-  onConeUnavailable: () => void;
 };
 
 export type CanvasWorkspaceProps = {
@@ -146,11 +137,8 @@ export function CanvasWorkspace({
   const {
     renderViewMode,
     clothReady,
-    coneReady,
     clothUnavailable,
-    coneUnavailable,
     clothGradient,
-    coneView,
     postprocess,
     effectPipeline,
     leftTab,
@@ -168,9 +156,7 @@ export function CanvasWorkspace({
     seekVersion,
     canvasRef,
     clothCanvasRef,
-    coneCanvasRef,
     clothExportFrameRendererRef,
-    coneExportFrameRendererRef,
   } = resources;
   const {
     controlUi,
@@ -179,8 +165,6 @@ export function CanvasWorkspace({
     onSelectEffectStack,
     onClothReady,
     onClothUnavailable,
-    onConeReady,
-    onConeUnavailable,
   } = controls;
 
   return (
@@ -313,7 +297,7 @@ export function CanvasWorkspace({
             style={{
               position: 'absolute',
               inset: 0,
-              opacity: renderViewMode === 'canvas' || (renderViewMode === 'cloth' ? !clothReady : !coneReady) ? 1 : 0,
+              opacity: renderViewMode === 'canvas' || !clothReady ? 1 : 0,
               pointerEvents: renderViewMode === 'canvas' ? 'auto' : 'none',
               transition: 'opacity 180ms ease-out',
             }}
@@ -345,20 +329,11 @@ export function CanvasWorkspace({
               onUnavailable={onClothUnavailable}
             />
           )}
-          {renderViewMode === 'cone' && (
-            <ConeCanvas
-              sourceCanvasRef={canvasRef}
-              coneView={coneView}
-              width={canvasW}
-              height={canvasH}
-              onReady={onConeReady}
-              outputCanvasRef={coneCanvasRef}
-              exportFrameRendererRef={coneExportFrameRendererRef}
-              onUnavailable={onConeUnavailable}
-            />
-          )}
-          {renderViewMode === 'cone' && (
-            <ConeApexEditor width={displayW} height={displayH} visible={showGradientAnchors} />
+          {renderViewMode === 'canvas'
+            && effectPipeline.version === 'stack-v2'
+            && effectPipeline.selectedKind === 'cone'
+            && isEffectStackLayerEnabled(effectPipeline, 'cone') && (
+              <ConeApexEditor width={displayW} height={displayH} visible={showGradientAnchors} />
           )}
           <DistortOverlay
             active={renderViewMode === 'canvas' && leftTab === 'postprocess' && postprocess.effectMode === 'distort' && (
@@ -408,14 +383,6 @@ export function CanvasWorkspace({
             className="absolute right-4 top-20 z-30 max-w-[280px] border border-amber-300/30 bg-[#1b1715]/92 px-3 py-2 text-[10px] leading-relaxed text-amber-100 shadow-[0_14px_30px_rgba(0,0,0,0.32)]"
           >
             {translate('canvas.clothUnavailable')}
-          </div>
-        )}
-        {coneUnavailable && (
-          <div
-            role="status"
-            className="absolute right-4 top-20 z-30 max-w-[280px] border border-amber-300/30 bg-[#1b1715]/92 px-3 py-2 text-[10px] leading-relaxed text-amber-100 shadow-[0_14px_30px_rgba(0,0,0,0.32)]"
-          >
-            {translate('canvas.coneUnavailable')}
           </div>
         )}
         <div

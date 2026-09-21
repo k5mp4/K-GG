@@ -55,6 +55,17 @@ describe('Gradient store Effect Pipeline V2 synchronization', () => {
     expect(useGradientStore.getState().videoMotion.enabled).toBe(false);
   });
 
+  it('includes the orderable Cone layer in the Postprocess enabled-state summary', () => {
+    const store = useGradientStore.getState();
+    let effectStack = updateEffectStackLayer(store.effectPipeline.effectStack, 'cone', { enabled: true });
+    store.setEffectPipeline({ effectStack });
+    expect(useGradientStore.getState().postprocess.enabled).toBe(true);
+
+    effectStack = updateEffectStackLayer(effectStack, 'cone', { enabled: false });
+    store.setEffectPipeline({ effectStack });
+    expect(useGradientStore.getState().postprocess.enabled).toBe(false);
+  });
+
   it('normalizes Diffuse Halftone and ASCII background colors for both config boundaries', () => {
     const store = useGradientStore.getState();
     store.setDiffuse({ backgroundColor: '#12abef' });

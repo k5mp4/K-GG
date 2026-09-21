@@ -1,6 +1,6 @@
 ---
 type: change
-id: CHANGE-048
+id: CHANGE-049
 title: Color Palette GeneratorをGradient Generatorに整理
 status: draft
 change_kind: F
@@ -14,7 +14,7 @@ related_tests: [src/lib/gradientGenerator.test.ts, src/lib/perceptualGradient.te
 human_review: required
 ---
 
-# CHANGE-048 Color Palette GeneratorをGradient Generatorに整理
+# CHANGE-049 Color Palette GeneratorをGradient Generatorに整理
 
 ## Request source
 

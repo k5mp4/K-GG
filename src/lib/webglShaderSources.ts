@@ -25,12 +25,133 @@ import flowSplatFragmentGLSL from '../shaders/flow-splat.frag.glsl?raw';
 import flowTrailFragmentGLSL from '../shaders/flow-trail.frag.glsl?raw';
 import flowGradientFragmentGLSL from '../shaders/flow-gradient.frag.glsl?raw';
 import videoMotionGLSL from '../shaders/video-motion.frag.glsl?raw';
+import { CONE_GRADIENT_REAPPLY_SHADER } from './coneSeam';
+
+// The orderable Cone layer projects the preceding stack texture onto the same
+// open cone surface used by ConeViewRenderer. Keeping this shader beside the
+// seam reference preserves the existing input-texture mapping instead of
+// synthesizing a separate color ramp.
+const coneStackGLSL = `
+#if !defined(KGG_STACK_NOISE_ONLY)
+vec4 coneTextureLookup(vec2 uv) {
+  return texture2D(u_sourceTex, sourceUvFromGlobal(uv));
+}
+
+float coneSeamWeight(float coordinate, float blendWidth) {
+  float distanceToSeam = min(coordinate, 1.0 - coordinate);
+  return 1.0 - smoothstep(0.0, max(blendWidth, 0.00001), distanceToSeam);
+}
+
+vec2 coneMirrorRepeatUv(vec2 uv) {
+  return abs(fract(uv) * 2.0 - 1.0);
+}
+
+vec4 coneMirrorRepeatSample(vec2 uv, float blendWidth) {
+  vec2 tiledUv = fract(uv);
+  float seamWeight = max(coneSeamWeight(tiledUv.x, blendWidth), coneSeamWeight(tiledUv.y, blendWidth));
+  vec4 normal = coneTextureLookup(tiledUv);
+  if (seamWeight <= 0.0) return normal;
+  vec4 mirrored = coneTextureLookup(coneMirrorRepeatUv(uv));
+  return mix(normal, mirrored, seamWeight);
+}
+
+vec4 coneEdgeWeldSample(vec2 uv, float blendWidth) {
+  float seamX = coneSeamWeight(uv.x, blendWidth);
+  float seamY = coneSeamWeight(uv.y, blendWidth);
+  vec4 center = coneTextureLookup(uv);
+  vec4 welded = center;
+  if (seamX > 0.0) {
+    vec4 edgeX = 0.5 * (
+      coneTextureLookup(vec2(0.0, uv.y)) +
+      coneTextureLookup(vec2(1.0, uv.y))
+    );
+    welded = mix(welded, edgeX, seamX);
+  }
+  if (seamY > 0.0) {
+    vec4 edgeY = 0.5 * (
+      coneTextureLookup(vec2(uv.x, 0.0)) +
+      coneTextureLookup(vec2(uv.x, 1.0))
+    );
+    welded = mix(welded, edgeY, seamY);
+  }
+  if (seamX > 0.0 && seamY > 0.0) {
+    vec4 corners = 0.25 * (
+      coneTextureLookup(vec2(0.0, 0.0)) +
+      coneTextureLookup(vec2(1.0, 0.0)) +
+      coneTextureLookup(vec2(0.0, 1.0)) +
+      coneTextureLookup(vec2(1.0, 1.0))
+    );
+    welded = mix(welded, corners, seamX * seamY);
+  }
+  return welded;
+}
+
+${CONE_GRADIENT_REAPPLY_SHADER}
+
+vec2 coneMappedUv(vec2 globalUv, out bool hitCone) {
+  float aspect = u_fullResolution.x / max(u_fullResolution.y, 1.0);
+  vec2 ndc = globalUv * 2.0 - 1.0;
+  vec3 rayDirection = vec3(
+    ndc.x * aspect * u_coneTangentHalfFov,
+    ndc.y * u_coneTangentHalfFov,
+    -1.0
+  );
+  float depth = max(u_coneDepth, 0.001);
+  float cameraDistance = max(u_coneCameraDistance, 0.001);
+  vec2 apexOffset = u_coneApexOffset;
+  vec2 rayFromBase = rayDirection.xy - apexOffset / depth;
+  vec2 baseOffset = apexOffset * cameraDistance / depth;
+  float radiusSlope = u_coneApertureRadius / depth;
+  float radiusIntercept = u_coneApertureRadius * (cameraDistance + depth) / depth;
+  float qa = dot(rayFromBase, rayFromBase) - radiusSlope * radiusSlope;
+  float qb = 2.0 * dot(rayFromBase, baseOffset) + 2.0 * radiusSlope * radiusIntercept;
+  float qc = dot(baseOffset, baseOffset) - radiusIntercept * radiusIntercept;
+  hitCone = false;
+  float minDistance = cameraDistance;
+  float maxDistance = cameraDistance + depth;
+  float distance = maxDistance + 1.0;
+  if (abs(qa) < 0.000001) {
+    if (abs(qb) < 0.000001) return vec2(0.0);
+    float linearDistance = -qc / qb;
+    if (linearDistance >= minDistance && linearDistance <= maxDistance) distance = linearDistance;
+  } else {
+    float discriminant = qb * qb - 4.0 * qa * qc;
+    if (discriminant < 0.0) return vec2(0.0);
+    float root = sqrt(max(discriminant, 0.0));
+    float firstDistance = (-qb - root) / (2.0 * qa);
+    float secondDistance = (-qb + root) / (2.0 * qa);
+    if (firstDistance >= minDistance && firstDistance <= maxDistance) distance = firstDistance;
+    if (secondDistance >= minDistance && secondDistance <= maxDistance) distance = min(distance, secondDistance);
+  }
+  if (distance < minDistance || distance > maxDistance) return vec2(0.0);
+  vec2 surfacePoint = rayDirection.xy * distance;
+  float depthFraction = (distance - cameraDistance) / depth;
+  vec2 radialPoint = surfacePoint - apexOffset * depthFraction;
+  float u = fract(atan(radialPoint.x, radialPoint.y) / 6.283185307179586);
+  float v = clamp((distance - cameraDistance) / depth, 0.0, 1.0);
+  hitCone = true;
+  return vec2(u, v);
+}
+
+vec4 coneViewSample(vec2 globalUv) {
+  bool hitCone;
+  vec2 mappedUv = coneMappedUv(globalUv, hitCone);
+  if (!hitCone) return vec4(0.0, 0.0, 0.0, 1.0);
+  vec2 unwrappedUv = mappedUv * vec2(u_coneTextureRepeat, 1.0) + u_coneTextureOffset;
+  vec2 sampleUv = fract(unwrappedUv);
+  if (u_coneSeamMode == 0) return coneMirrorRepeatSample(unwrappedUv, u_coneSeamBlend);
+  if (u_coneSeamMode == 1) return coneEdgeWeldSample(sampleUv, u_coneSeamBlend);
+  return coneGradientReapplySample(sampleUv, u_coneSeamBlend);
+}
+#endif
+`;
 
 const postprocessGLSL = [
   postprocessUniformsGLSL,
   postprocessSharedGLSL,
   postprocessPrismGLSL,
   postprocessStackGLSL,
+  coneStackGLSL,
   postprocessDiffuseGLSL,
   postprocessGlassFieldGLSL,
   postprocessGlassOpticsGLSL,
@@ -229,6 +350,7 @@ function createStackCoreSource(): string {
     'vec2 diffuseHash(vec2 p) {\n  vec3 p3 = fract(vec3(p.xyx) * vec3(0.1031, 0.1030, 0.0973));\n  p3 += dot(p3, p3.yzx + 33.33);\n  return fract((p3.xx + p3.yz) * p3.zy) * 2.0 - 1.0;\n}\n',
     postprocessSharedGLSL,
     postprocessStackGLSL,
+    coneStackGLSL,
     postprocessDiffuseGLSL,
     postprocessMainGLSL,
   ].join('');

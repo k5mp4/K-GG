@@ -5,12 +5,12 @@ title: Effect Stack
 status: current
 owners: [maintainer]
 created: 2026-07-27
-updated: 2026-09-20
+updated: 2026-09-21
 requirement_ids: [EFFECT-001, EFFECT-002, EFFECT-003, EFFECT-004, EFFECT-005, EFFECT-006, EFFECT-007, EFFECT-008, EFFECT-009, EFFECT-010, EFFECT-011, EFFECT-012, EFFECT-013, EFFECT-014, EFFECT-015, EFFECT-016, EFFECT-017, EFFECT-018, EFFECT-019, EFFECT-020, EFFECT-021, EFFECT-022, EFFECT-023, EFFECT-025, EFFECT-026, EFFECT-027, EFFECT-028, DISTORT-001, DISTORT-002, CLOTH-001, CLOTH-002, CLOTH-003, SANDBOX-001, FLOW-001, FLOW-002, FLOW-003, FLOW-004, FLOW-005, FLOW-006, FLOW-007, FLOW-008, FLOW-009, FLOW-010, FLOW-011, FLOW-012, VIDEO-MOTION-001, VIDEO-MOTION-002, VIDEO-MOTION-003, VIDEO-MOTION-004]
 related_adrs: [ADR-0004, ADR-0005, ADR-0009, ADR-0010, ADR-0017]
-related_changes: [CHANGE-001, CHANGE-011, CHANGE-012, CHANGE-013, CHANGE-014, CHANGE-015, CHANGE-018, CHANGE-019, CHANGE-020, CHANGE-021, CHANGE-022, CHANGE-023, CHANGE-024, CHANGE-025, CHANGE-026, CHANGE-027, CHANGE-030, CHANGE-031, CHANGE-032, CHANGE-033, CHANGE-034, CHANGE-035, CHANGE-036, CHANGE-037, CHANGE-044, CHANGE-046, CHANGE-047]
-related_code: [src/types/distortion.ts, src/types/renderView.ts, src/types/coneView.ts, src/lib/effectPipeline.ts, src/lib/normalMap.ts, src/lib/effectStackTransition.ts, src/lib/postprocessStack.ts, src/lib/postprocessAnimation.ts, src/lib/sceneEvaluation.ts, src/lib/animationRegistry.ts, src/lib/glass.ts, src/lib/glassTile.ts, src/lib/webgl.ts, src/lib/voronoi.ts, src/shaders/postprocess/stack.glsl, src/shaders/postprocess/uniforms.glsl, src/store/documentModel.ts, packages/kgg-control/src/parameterLimits.ts, src/lib/slitAnimation.ts, src/lib/webglShaderSources.ts, src/lib/flowGradientRenderer.ts, src/lib/flowSimulation.ts, src/lib/presetModel.ts, src/lib/presetThumbnail.ts, src/lib/coneView.ts, src/lib/coneViewRenderer.ts, src/lib/coneSeam.ts, src/lib/processedCanvasClock.ts, src/store/gradientStore.ts, src/components/PostprocessStackPanel.tsx, src/components/EffectStackWorkspace.tsx, src/components/PostprocessPanel.tsx, src/components/DistortOverlay.tsx, src/components/SandboxPanel.tsx, src/components/FlowGradientPanel.tsx, src/components/BlockNoisePanel.tsx, src/components/DiffuseCurveEditor.tsx, src/components/SlitScanPanel.tsx, src/components/StretchPanel.tsx, src/components/PresetPanel.tsx, src/components/ClothGradientPanel.tsx, src/components/ClothCanvas.tsx, src/components/ConeCanvas.tsx, src/components/ConeViewPanel.tsx, src/lib/clothGradientRenderer.ts, src/lib/clothView.ts, src/types/clothGradient.ts, src/types/flowGradient.ts, src/shaders/normalmap.frag.glsl, src/shaders/postprocess/glass-optics.glsl, src/shaders/postprocess/glass-tile.glsl, src/shaders/postprocess/diffuse.glsl, src/shaders/postprocess/noise-diffuse-main.glsl, src/shaders/flow-splat.vert.glsl, src/shaders/flow-splat.frag.glsl, src/shaders/flow-trail.frag.glsl, src/shaders/flow-gradient.frag.glsl, src/components/VideoMotionPanel.tsx, src/types/videoMotion.ts, src/lib/videoMotionSource.ts, src/lib/videoMotionRuntime.ts, src/shaders/video-motion.frag.glsl]
-related_tests: [src/lib/effectPipeline.test.ts, src/lib/webglNormalMapParity.test.ts, src/lib/effectStackTransition.test.ts, src/lib/postprocessStack.test.ts, src/lib/postprocessAnimation.test.ts, src/lib/effectStackDrag.test.ts, src/lib/effectShaderParity.test.ts, src/lib/imageGradientProtected.test.ts, src/lib/webglExportPrograms.test.ts, src/lib/webglShaderSources.test.ts, src/lib/glassTile.test.ts, src/lib/glassTileShader.test.ts, src/lib/flowSimulation.test.ts, src/lib/flowGradientPreset.test.ts, src/lib/glass.test.ts, src/store/gradientStore.effectPipeline.test.ts, src/store/gradientStore.postprocessStack.test.ts, src/store/gradientStore.glass.test.ts, src/store/gradientStore.animation.test.ts, src/lib/sceneEvaluation.glass.test.ts, src/lib/slitAnimation.test.ts, src/lib/presetModel.slit.test.ts, src/lib/presetThumbnail.test.ts, src/lib/clothView.test.ts, src/lib/coneView.test.ts, src/lib/coneSeam.test.ts, src/lib/presetModel.diffuse.test.ts, src/lib/processedCanvasClock.test.ts, src/types/coneView.test.ts, tests/clothGradient.test.ts, src/types/videoMotion.test.ts, src/lib/videoMotionSource.test.ts, src/lib/videoMotionRuntime.test.ts, src/components/PostprocessPanel.test.tsx]
+related_changes: [CHANGE-001, CHANGE-011, CHANGE-012, CHANGE-013, CHANGE-014, CHANGE-015, CHANGE-018, CHANGE-019, CHANGE-020, CHANGE-021, CHANGE-022, CHANGE-023, CHANGE-024, CHANGE-025, CHANGE-026, CHANGE-027, CHANGE-030, CHANGE-031, CHANGE-032, CHANGE-033, CHANGE-034, CHANGE-035, CHANGE-036, CHANGE-037, CHANGE-044, CHANGE-046, CHANGE-047, CHANGE-048]
+related_code: [src/types/distortion.ts, src/types/coneView.ts, src/lib/effectPipeline.ts, src/lib/normalMap.ts, src/lib/effectStackTransition.ts, src/lib/postprocessStack.ts, src/lib/postprocessAnimation.ts, src/lib/sceneEvaluation.ts, src/lib/animationRegistry.ts, src/lib/glass.ts, src/lib/glassTile.ts, src/lib/webgl.ts, src/lib/voronoi.ts, src/shaders/postprocess/stack.glsl, src/shaders/postprocess/uniforms.glsl, src/store/documentModel.ts, packages/kgg-control/src/parameterLimits.ts, packages/kgg-control/src/types.ts, packages/kgg-control/src/scenarios.ts, src/lib/slitAnimation.ts, src/lib/webglShaderSources.ts, src/lib/flowGradientRenderer.ts, src/lib/flowSimulation.ts, src/lib/presetModel.ts, src/lib/presetThumbnail.ts, src/lib/coneView.ts, src/lib/coneViewRenderer.ts, src/lib/coneSeam.ts, src/store/gradientStore.ts, src/lib/kggControlRuntime.ts, src/components/PostprocessStackPanel.tsx, src/components/EffectStackWorkspace.tsx, src/components/PostprocessPanel.tsx, src/components/DistortOverlay.tsx, src/components/SandboxPanel.tsx, src/components/FlowGradientPanel.tsx, src/components/BlockNoisePanel.tsx, src/components/DiffuseCurveEditor.tsx, src/components/SlitScanPanel.tsx, src/components/StretchPanel.tsx, src/components/PresetPanel.tsx, src/components/ClothGradientPanel.tsx, src/components/ClothCanvas.tsx, src/components/ConeApexEditor.tsx, src/components/ConeViewPanel.tsx, src/lib/clothGradientRenderer.ts, src/lib/clothView.ts, src/types/clothGradient.ts, src/types/flowGradient.ts, src/shaders/normalmap.frag.glsl, src/shaders/postprocess/glass-optics.glsl, src/shaders/postprocess/glass-tile.glsl, src/shaders/postprocess/diffuse.glsl, src/shaders/postprocess/noise-diffuse-main.glsl, src/shaders/flow-splat.vert.glsl, src/shaders/flow-splat.frag.glsl, src/shaders/flow-trail.frag.glsl, src/shaders/flow-gradient.frag.glsl, src/components/VideoMotionPanel.tsx, src/types/videoMotion.ts, src/lib/videoMotionSource.ts, src/lib/videoMotionRuntime.ts, src/shaders/video-motion.frag.glsl]
+related_tests: [src/lib/effectPipeline.test.ts, src/lib/webglNormalMapParity.test.ts, src/lib/effectStackTransition.test.ts, src/lib/postprocessStack.test.ts, src/lib/postprocessAnimation.test.ts, src/lib/effectStackDrag.test.ts, src/lib/effectShaderParity.test.ts, src/lib/imageGradientProtected.test.ts, src/lib/webglExportPrograms.test.ts, src/lib/webglShaderSources.test.ts, src/lib/glassTile.test.ts, src/lib/glassTileShader.test.ts, src/lib/flowSimulation.test.ts, src/lib/flowGradientPreset.test.ts, src/lib/glass.test.ts, src/store/gradientStore.effectPipeline.test.ts, src/store/gradientStore.postprocessStack.test.ts, src/store/gradientStore.glass.test.ts, src/store/gradientStore.animation.test.ts, src/lib/sceneEvaluation.glass.test.ts, src/lib/slitAnimation.test.ts, src/lib/presetModel.slit.test.ts, src/lib/presetThumbnail.test.ts, src/lib/clothView.test.ts, src/lib/coneView.test.ts, src/lib/coneSeam.test.ts, src/lib/presetModel.diffuse.test.ts, src/lib/processedCanvasClock.test.ts, src/types/coneView.test.ts, tests/clothGradient.test.ts, src/types/videoMotion.test.ts, src/lib/videoMotionSource.test.ts, src/lib/videoMotionRuntime.test.ts, src/lib/kggControlRuntime.test.ts, packages/kgg-control/src/scenarios.test.ts, src/components/PostprocessPanel.test.tsx, src/components/PostprocessStackPanel.test.tsx, src/components/SandboxPanel.test.tsx]
 ---
 
 # Effect Stack
@@ -23,23 +23,23 @@ Effect Stackは、Gradientから得た画像・色場へ複数の効果を適用
 
 ### EFFECT-001 主スタックの効果
 
-Unified Effect Stack V2の主スタックは、`Noise`、`Slit`、`Stretch`、`Distort`、`Mirror`、`Kaleidoscope`、`Voronoi`、`Glass`、`GlassTile`、`Diffuse`、`Video Motion`の11種類です。`Glass`はGLASS V2、`GlassTile`はKG_Glassのタイル表面モデルを移植した専用描画経路、`Video Motion`は共有motion fieldを使う専用イメージ空間経路を使用します。各種類はスタック内に一度だけ存在し、同じ種類の複数インスタンスは現在サポートしません。
+Unified Effect Stack V2の主スタックは、`Noise`、`Slit`、`Stretch`、`Distort`、`Mirror`、`Kaleidoscope`、`Voronoi`、`Glass`、`GlassTile`、`Diffuse`、`Video Motion`、`Cone`の12種類です。`Glass`はGLASS V2、`GlassTile`はKG_Glassのタイル表面モデルを移植した専用描画経路、`Video Motion`は共有motion fieldを使う専用イメージ空間経路、`Cone`は前段textureを円錐面へ投影する専用描画経路を使用します。各種類はスタック内に一度だけ存在し、同じ種類の複数インスタンスは現在サポートしません。
 
 主スタックは既知の種類を正規化して保持します。未知の種類や重複は保存・読込時に除外され、欠落した既知の種類は無効状態で補完されます。旧Presetの`glassV2`は`glass`へ写像され、旧`glass`と同時に存在する場合も一つへ統合されます。
 
 ### EFFECT-002 有効化と順序
 
-利用者は主スタックの各効果を有効/無効に切り替え、順序を手動またはランダムに並べ替え、選択中の効果を変更できます。現在の実装は任意の新しい種類を追加・削除するモデルではなく、既知の11種類を無効化することで「使わない」状態を表現します。
+利用者は主スタックの各効果を有効/無効に切り替え、順序を手動またはランダムに並べ替え、選択中の効果を変更できます。現在の実装は任意の新しい種類を追加・削除するモデルではなく、既知の12種類を無効化することで「使わない」状態を表現します。
 
-新規V2状態の既定順は `Noise → Slit → Stretch → Distort → Mirror → Kaleidoscope → Voronoi → Glass → GlassTile → Diffuse → Video Motion` で、Diffuseが既定で有効です。ユーザーが保存した順序と有効状態はPresetへ保存されます。ランダム化操作では11種類を一度ずつ含む順列を作り、有効状態・選択状態・固定段を維持します。現在の描画結果から目標順序の結果へ400msの`easeInOut`表示ブレンドを行い、完了後に目標順序を確定します。
+新規V2状態の既定順は `Noise → Slit → Stretch → Distort → Mirror → Kaleidoscope → Voronoi → Glass → GlassTile → Diffuse → Video Motion → Cone` で、Diffuseが既定で有効です。ユーザーが保存した順序と有効状態はPresetへ保存されます。ランダム化操作では12種類を一度ずつ含む順列を作り、有効状態・選択状態・固定段を維持します。現在の描画結果から目標順序の結果へ400msの`easeInOut`表示ブレンドを行い、完了後に目標順序を確定します。
 
 ### EFFECT-014 Postprocessの全体有効状態
 
-`Stretch`、`Distort`、`Mirror`、`Kaleidoscope`、`Voronoi`、`Glass`、`GlassTile`、`Video Motion`のいずれか一つ以上が有効な場合、Postprocess全体を有効状態として表示します。Postprocessのプロパティモジュールには各レイヤーの個別ON／OFFを表示せず、レイヤーの有効状態はEffect Stackで管理します。プロパティモジュールではPostprocess全体のON／OFFと、選択レイヤーの詳細プロパティを表示します。Postprocessの全レイヤーが無効な場合は全体も無効状態になります。
+`Stretch`、`Distort`、`Mirror`、`Kaleidoscope`、`Voronoi`、`Glass`、`GlassTile`、`Video Motion`、`Cone`のいずれか一つ以上が有効な場合、Postprocess全体を有効状態として表示します。Postprocessのプロパティモジュールには各レイヤーの個別ON／OFFを表示せず、レイヤーの有効状態はEffect Stackで管理します。プロパティモジュールではPostprocess全体のON／OFFと、選択レイヤーの詳細プロパティを表示します。Postprocessの全レイヤーが無効な場合は全体も無効状態になります。
 
 ### EFFECT-003 固定段と描画順
 
-V2の全体順序は `Base → Surface → Main Stack → Prism → Flow Gradient → Particles` です。Normal/MatcapはSurface、PrismはGlowを含む専用段、Flow GradientはGPU密度・Temporal TrailをGradient Rampへ合成する固定段、Particlesは最終オーバーレイとして扱い、これらを主スタックの並べ替え対象には含めません。Video MotionはMain Stackの一レイヤーとして、配置された位置で前段のtextureを入力し、後段へ出力します。固定段の有効状態とパラメータはSANDBOXで編集し、Effect Stackには表示しません。Flow Gradientを無効にした場合は、従来のParticlesまでの経路を使用します。
+V2の全体順序は `Base → Surface → Main Stack → Prism → Flow Gradient → Particles` です。Normal/MatcapはSurface、PrismはGlowを含む専用段、Flow GradientはGPU密度・Temporal TrailをGradient Rampへ合成する固定段、Particlesは最終2Dオーバーレイとして扱い、これらを主スタックの並べ替え対象には含めません。ConeはMain Stack内の通常レイヤーであり、配置された位置で前段textureを円錐面へ投影し、その描画結果を後段へ出力します。Video Motionと同じくConeもdrag、randomize、solo、選択、永続化、render planの対象です。Coneを含む通常レイヤーはSANDBOXの固定段ではありません。Flow Gradientを無効にした場合は、Flow Gradientを除いたParticlesまでの経路を使用します。
 
 有効な主スタックレイヤーは前段の結果を次段の入力として処理します。レイヤーが0件の場合の直接描画、軽量な主スタック、追加の中間バッファが必要な構成は描画計画として一貫して決定されます。
 
@@ -163,7 +163,7 @@ PostprocessのVoronoiは、Euclidean、Manhattan、Chebyshev、Minkowskiの距�
 
 ### EFFECT-010 主スタック順序のランダム化
 
-ユーザーがランダム化操作を実行すると、主スタック10種類の順序だけをランダムな順列へ変更します。各レイヤーの有効状態、レイヤー設定、選択中の種類、Prism／Particlesなど固定段の状態は変更しません。ランダム化は描画フレームやexportフレームごとには実行せず、ユーザー操作時に一度だけ実行します。
+ユーザーがランダム化操作を実行すると、主スタック12種類の順序だけをランダムな順列へ変更します。各レイヤーの有効状態、レイヤー設定、選択中の種類、Prism／Particlesなど固定段の状態は変更しません。ランダム化は描画フレームやexportフレームごとには実行せず、ユーザー操作時に一度だけ実行します。
 
 ### EFFECT-011 Altクリックによるソロレイヤー
 
@@ -230,17 +230,19 @@ Cloth の全パラメータ (Surface Wave, Organic Motion, Lighting, Specular, F
 
 ### SANDBOX-001 SANDBOX パネルモジュールの拡張
 
-SANDBOX パネルのモジュール選択肢に `Cloth` を追加し、アクティブカウント表示を `4/4` に更新する。モジュールの ON/OFF 状態およびプログラミングステータス（applied / fallback / preparing）を UI 上に可視化する。
+SANDBOXのEdit Layerには`Cloth`、`Normal`、`Prism`、`Particles`、`Flow Gradient`、`Seamless`の6モジュールを表示し、アクティブカウントを`/6`で示します。ConeはSANDBOXから除外し、EFFECT-021のMain StackレイヤーとしてEffect Stackで管理します。モジュールのON/OFF状態およびプログラム状態をUI上に可視化します。
 
 ### EFFECT-020 Cloth表示アダプター
 
 Cloth表示はEffect Stackの新しい段階ではなく、処理済みCanvasを受け取る後段の表示アダプターです。Effect Stackの有効状態、順序、処理結果はCanvas表示とCloth表示で共通です。3D表示の入力ではCloth Baseを二重適用せず、CanvasTextureをクロスのUVへ割り当てた後に表面変形・ライティングを一度だけ行います。
 
-表示面の切り替えはSANDBOXのCloth／ConeモジュールのON/OFFで行います。Effect Stackの操作領域やPreview右側に、別のPreview Surface設定を追加しません。
+Cloth表示面はSANDBOXのClothモジュールON/OFFで切り替えます。Coneは次のEFFECT-021で定義するMain StackレイヤーのON/OFFと順序に従って通常のCanvas出力へ合成されます。Preview右側に別のPreview Surface設定を追加しません。
 
-### EFFECT-021 Cone表示アダプター
+### EFFECT-021 Cone Effect Stackレイヤー
 
-Cone表示はEffect Stackの新しい段階ではなく、処理済みCanvasを受け取る後段の表示アダプターです。Cloth Baseを含む現在のGradient／Effect Stack／SANDBOX結果をCanvasTextureとして読み込み、描画完了フレームの通知に同期して、照明計算を持たない円錐内面へ表示します。ConeはMapping、キャンバス上の頂点ハンドル、Seam Blend、Mirror Repeat／Edge Weld／Gradient ReapplyのSeam Modeを表示アダプター内で処理し、Gradient Reapplyでは処理済みCanvasのRGB色場を端色へ補正して中心alphaを保持します。Mapping設定が変わった場合も最後に完了した処理済みCanvasへ同じ時刻で即時再マッピングします。Gradient Rampは右サイドバーで編集し、同じ処理済みCanvasへ反映します。Coneの選択や設定はEffect Stackの有効状態、順序、処理結果を変更しません。
+Coneは通常の`EffectStackKind`であり、順序・有効状態は`effectPipeline.effectStack`に保存します。Effect Stackで選択、toggle、drag、randomize、soloでき、SANDBOX Edit Layerからは除外します。描画では直前のMain Stack textureを`stackCore`のCone GPU passへ渡し、画素レイとCone面の交差から円周U・高さVを求め、前段textureをそのUVへサンプルします。Gradient RampをCone用色源として再サンプルせず、前段の色場を保持します。投影結果は通常のping-pong targetへ書き込み、次のレイヤーが同じ描画結果を入力として使用します。Depth、Apex、Rotation、Texture Repeat、Flow／Direct Projection、Seam Blend、Mirror Repeat／Edge Weld／Gradient Reapplyの既存設定と、Gradient ReapplyのRGB補正・中心alpha保持を維持します。設定はConeレイヤーを選択したとき左Postprocessパネルに表示し、ApexはCanvas上の既存ハンドルで編集します。PreviewとExportは同じWebGL stack passとrender planを使用します。旧形式でConeレイヤーがないeffectStackは、追加されるConeレイヤーを無効状態に正規化します。
+
+K-GG control APIのEffectState一覧はConeを返し、enable／reorder／resetとscenario commandで同じレイヤー状態を操作できます。
 
 ## 他領域との関係
 

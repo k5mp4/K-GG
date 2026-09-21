@@ -129,6 +129,28 @@ describe('webglShaderSources', () => {
     expect(noiseDiffuseStack.match(/uniform vec2 u_tileResolution;/g)).toHaveLength(1);
   });
 
+  it('maps the preceding colored texture through the Cone layer', () => {
+    const stackCore = getProgramSource('stackCore').fragment.replace(/\r\n?/g, '\n');
+    const sourceLookupStart = stackCore.indexOf('vec4 coneTextureLookup(');
+    expect(sourceLookupStart).toBeGreaterThanOrEqual(0);
+    const sourceLookupEnd = stackCore.indexOf('\n}', sourceLookupStart);
+    const sourceLookup = stackCore.slice(sourceLookupStart, sourceLookupEnd + 2);
+    expect(sourceLookup).toContain('texture2D(u_sourceTex, sourceUvFromGlobal(uv))');
+
+    const coneSampleStart = stackCore.indexOf('vec4 coneViewSample(');
+    expect(coneSampleStart).toBeGreaterThanOrEqual(0);
+
+    const coneSampleEnd = stackCore.indexOf('\n}', coneSampleStart);
+    const coneSample = stackCore.slice(coneSampleStart, coneSampleEnd + 2);
+    expect(coneSample).toContain('coneMirrorRepeatSample');
+    expect(coneSample).toContain('coneGradientReapplySample');
+    expect(coneSample).not.toContain('u_gradientRamp');
+
+    const coneBranchStart = stackCore.indexOf('u_effectMode == 11');
+    expect(coneBranchStart).toBeGreaterThanOrEqual(0);
+    expect(stackCore.slice(coneBranchStart, coneBranchStart + 320)).toContain('coneViewSample');
+  });
+
   it('declares Caustics and Phasor uniforms once in generator and Noise Stack sources', () => {
     const declarations = [
       'uniform float u_noiseSpeed;',

@@ -21,6 +21,31 @@ describe('KggControlRuntime', () => {
     expect(result).toMatchObject({ ok: true, value: { path: 'gradient.angle', value: 5 } });
   });
 
+  it('lists, enables, and reorders Cone through the Effect Stack control API', () => {
+    const snapshot = runtime.captureSnapshot();
+    if (!snapshot.ok) throw new Error('Failed to capture control runtime snapshot');
+
+    try {
+      const listed = runtime.listEffects();
+      if (!listed.ok) throw new Error('Failed to list effects');
+      expect(listed.value.some(effect => effect.kind === 'cone')).toBe(true);
+
+      const enabled = runtime.enableEffect('cone', true);
+      if (!enabled.ok) throw new Error('Failed to enable Cone');
+      expect(enabled.value.find(effect => effect.kind === 'cone')?.enabled).toBe(true);
+
+      const reordered = runtime.reorderEffect('cone', 0);
+      if (!reordered.ok) throw new Error('Failed to reorder Cone');
+      expect(reordered.value.find(effect => effect.kind === 'cone')?.index).toBe(0);
+
+      const reset = runtime.resetEffect('cone');
+      if (!reset.ok) throw new Error('Failed to reset Cone');
+      expect(reset.value.find(effect => effect.kind === 'cone')?.enabled).toBe(false);
+    } finally {
+      runtime.restoreSnapshot(snapshot.value.snapshotId);
+    }
+  });
+
   it('rejects unknown paths and exposes preview metadata', () => {
     expect(runtime.setParameter('gradient.unknown', 1)).toMatchObject({ ok: false, error: { code: 'unknown_parameter' } });
     expect(runtime.capturePreview()).toMatchObject({

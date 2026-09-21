@@ -5,6 +5,25 @@ import { updateEffectStackLayer } from '../lib/effectPipeline';
 import { useGradientStore } from '../store/gradientStore';
 import { PostprocessPanel } from './PostprocessPanel';
 
+function renderPostprocessPanelWithConeSelected() {
+  const initialState = useGradientStore.getInitialState();
+  const previousEffectPipeline = initialState.effectPipeline;
+  initialState.effectPipeline = {
+    ...previousEffectPipeline,
+    selectedKind: 'cone',
+    effectStack: updateEffectStackLayer(previousEffectPipeline.effectStack, 'cone', { enabled: true }),
+  };
+  try {
+    return renderToStaticMarkup(
+      <LanguageProvider>
+        <PostprocessPanel />
+      </LanguageProvider>,
+    );
+  } finally {
+    initialState.effectPipeline = previousEffectPipeline;
+  }
+}
+
 describe('PostprocessPanel Video Motion integration', () => {
   beforeEach(() => {
     useGradientStore.setState(useGradientStore.getInitialState(), true);
@@ -44,5 +63,15 @@ describe('PostprocessPanel Video Motion integration', () => {
       </LanguageProvider>,
     );
     expect(otherLayerMarkup).toContain('data-video-motion-panel');
+  });
+
+  it('keeps the existing Cone controls available in the Postprocess property surface', () => {
+    const markup = renderPostprocessPanelWithConeSelected();
+
+    expect(markup).toContain('data-cone-settings="shown"');
+    expect(markup).toContain('data-cone-view-panel');
+    expect(markup).toContain('Mapping');
+    expect(markup).toContain('Flow Cycles');
+    expect(markup).not.toContain('data-postprocess-master-toggle');
   });
 });

@@ -33,6 +33,7 @@ export type EffectKind =
   | 'glass'
   | 'glassTile'
   | 'diffuse'
+  | 'cone'
   | 'videoMotion';
 
 export type EffectState = {

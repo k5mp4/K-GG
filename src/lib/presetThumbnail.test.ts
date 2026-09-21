@@ -42,6 +42,24 @@ describe('presetThumbnail', () => {
     expect(source.manualDistort?.displacement).toBe(displacement);
   });
 
+  it('preserves normalized Cone parameters in the thumbnail render state', () => {
+    const source = snapshot();
+    source.coneView = {
+      ...STORE_DEFAULTS.coneView,
+      depth: 18,
+      rotation: 135,
+      textureRepeat: 3,
+      apexX: 0.45,
+      apexY: -0.3,
+      seamMode: 'weld',
+    };
+
+    const preview = createPresetThumbnailState(source);
+
+    expect(preview.coneView).toEqual(source.coneView);
+    expect(preview.coneView).not.toBe(source.coneView);
+  });
+
   it('fills new Diffuse and Slit fields when loading a legacy snapshot', () => {
     const legacy = snapshot();
     const legacyDiffuse = { ...legacy.diffuse };

@@ -83,6 +83,7 @@ describe('Mesh Gradation preset and preview', () => {
     const source = snapshot();
     const state: LatestState = {
       ...source,
+      coneView: source.coneView ?? STORE_DEFAULTS.coneView,
       imageGradient: source.imageGradient ?? STORE_DEFAULTS.imageGradient,
       stretch: source.stretch ?? STORE_DEFAULTS.stretch,
       iridescence: source.iridescence ?? STORE_DEFAULTS.iridescence,
@@ -116,6 +117,7 @@ describe('Mesh Gradation preset and preview', () => {
     const source = snapshot();
     const state: LatestState = {
       ...source,
+      coneView: source.coneView ?? STORE_DEFAULTS.coneView,
       imageGradient: source.imageGradient ?? STORE_DEFAULTS.imageGradient,
       stretch: source.stretch ?? STORE_DEFAULTS.stretch,
       iridescence: source.iridescence ?? STORE_DEFAULTS.iridescence,
@@ -155,6 +157,7 @@ describe('Mesh Gradation preset and preview', () => {
     source.gradient.mesh = mesh;
     const state: LatestState = {
       ...source,
+      coneView: source.coneView ?? STORE_DEFAULTS.coneView,
       imageGradient: source.imageGradient ?? STORE_DEFAULTS.imageGradient,
       stretch: source.stretch ?? STORE_DEFAULTS.stretch,
       iridescence: source.iridescence ?? STORE_DEFAULTS.iridescence,
@@ -189,6 +192,7 @@ describe('Mesh Gradation preset and preview', () => {
     const source = snapshot();
     const state: LatestState = {
       ...source,
+      coneView: source.coneView ?? STORE_DEFAULTS.coneView,
       imageGradient: source.imageGradient ?? STORE_DEFAULTS.imageGradient,
       stretch: source.stretch ?? STORE_DEFAULTS.stretch,
       iridescence: source.iridescence ?? STORE_DEFAULTS.iridescence,
@@ -225,6 +229,7 @@ describe('Mesh Gradation preset and preview', () => {
     source.gradient.bezierControls = [[0.4, 0.3], [0.6, 0.7]];
     const state: LatestState = {
       ...source,
+      coneView: source.coneView ?? STORE_DEFAULTS.coneView,
       imageGradient: source.imageGradient ?? STORE_DEFAULTS.imageGradient,
       stretch: source.stretch ?? STORE_DEFAULTS.stretch,
       iridescence: source.iridescence ?? STORE_DEFAULTS.iridescence,
