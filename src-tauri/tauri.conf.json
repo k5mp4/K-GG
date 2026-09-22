@@ -6,7 +6,7 @@
   "build": {
     "beforeDevCommand": "npm run dev:local",
     "devUrl": "http://127.0.0.1:5173",
-    "beforeBuildCommand": "npm run build",
+    "beforeBuildCommand": "npm run build:desktop",
     "frontendDist": "../dist"
   },
   "app": {
@@ -32,6 +32,11 @@
       "nsis"
     ],
     "createUpdaterArtifacts": true,
+    "resources": {
+      "../connectors/figma/manifest.json": "connectors/figma/manifest.json",
+      "../connectors/figma/dist/main.js": "connectors/figma/dist/main.js",
+      "../connectors/figma/src/ui.html": "connectors/figma/src/ui.html"
+    },
     "icon": [
       "icons/32x32.png",
       "icons/128x128.png",

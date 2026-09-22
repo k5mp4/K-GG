@@ -28,7 +28,7 @@ title: ValidationとCI
 | Canvas RGBA capture | `npm run capture:render:rgba` |
 | RGBA再現性 / base-head比較 | `npm run compare:render:rgba` |
 | Shader / Render Plan focused | `npm run check:render` |
-| Tauri / Rust | `npm run check:native` |
+| Tauri / Rust（Figma Connectorのビルドを含む） | `npm run check:native` |
 | 実FFmpeg / ffprobe smoke | `npm run check:ffmpeg` |
 | Release設定 | `npm run release:check` または `npm run check:release` |
 | Change Capsule | `npm run change:check` |

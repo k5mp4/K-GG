@@ -1,0 +1,13 @@
+{
+  "name": "K-GG Direct Send",
+  "api": "1.0.0",
+  "editorType": ["figma"],
+  "main": "dist/main.js",
+  "ui": "src/ui.html",
+  "documentAccess": "dynamic-page",
+  "networkAccess": {
+    "allowedDomains": ["http://localhost:43127"],
+    "reasoning": "Connects to the K-GG desktop app on this computer to place PNG images in the active Figma file.",
+    "devAllowedDomains": []
+  }
+}
