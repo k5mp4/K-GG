@@ -1,0 +1,10 @@
+{
+  "name": "kgg-affinity-connector",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "typecheck": "tsc -p tsconfig.json",
+    "build": "npm run typecheck && vite build --config vite.config.ts"
+  }
+}

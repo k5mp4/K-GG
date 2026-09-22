@@ -8,6 +8,7 @@ use std::time::{Duration, Instant};
 use tauri::Manager;
 
 mod after_effects;
+mod design_app_bridge;
 
 #[cfg(windows)]
 use std::os::windows::process::CommandExt;
@@ -27,6 +28,7 @@ pub fn run() {
         .plugin(tauri_plugin_process::init())
         .plugin(tauri_plugin_updater::Builder::new().build())
         .setup(|app| {
+            app.manage(design_app_bridge::DesignAppConnectorBridge::start());
             if cfg!(all(target_os = "windows", target_arch = "x86_64")) {
                 if let Err(err) = ensure_ffmpeg_dir(app.handle()) {
                     eprintln!("K-GG専用FFmpegフォルダを作成できませんでした: {err}");
@@ -46,7 +48,11 @@ pub fn run() {
             after_effects::get_after_effects_status,
             after_effects::ping_after_effects,
             after_effects::save_native_video_artifact,
-            after_effects::send_after_effects_asset
+            after_effects::send_after_effects_asset,
+            design_app_bridge::get_design_app_connector_state,
+            design_app_bridge::disconnect_design_app_connector,
+            design_app_bridge::approve_design_app_connection,
+            design_app_bridge::dismiss_design_app_connection_request
         ])
         .run(tauri::generate_context!())
         .expect("error while running KAGARIBI Grad");
