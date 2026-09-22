@@ -1,9 +1,11 @@
 import { useEffect, useState } from 'react';
+import { isTauriRuntime } from '../adapters/tauri/exportService';
 import {
   approveDesignAppConnection,
   disconnectDesignAppConnector,
   dismissDesignAppConnectionRequest,
   getDesignAppConnectorState,
+  openFigmaConnectorFolder,
   sendCanvasToDesignApp,
   AFFINITY_CONNECTOR_PAUSED_MESSAGE,
   type DesignAppConnectorState,
@@ -39,6 +41,7 @@ export function DesignAppSendPanel({ canvas, imageName }: Props) {
   const [loading, setLoading] = useState(true);
   const [sending, setSending] = useState<DesignAppTarget | null>(null);
   const [approving, setApproving] = useState<DesignAppTarget | null>(null);
+  const [openingConnectorFolder, setOpeningConnectorFolder] = useState(false);
   const [actionMessage, setActionMessage] = useState<ActionMessage>(null);
 
   useEffect(() => {
@@ -119,6 +122,19 @@ export function DesignAppSendPanel({ canvas, imageName }: Props) {
     }
   }
 
+  async function handleOpenFigmaConnectorFolder() {
+    setOpeningConnectorFolder(true);
+    setActionMessage(null);
+    try {
+      await openFigmaConnectorFolder();
+      setActionMessage({ level: 'success', text: 'Figma用manifest.jsonのフォルダーを開きました。' });
+    } catch (cause) {
+      setActionMessage({ level: 'error', text: cause instanceof Error ? cause.message : 'Figma Connectorの場所を開けませんでした。' });
+    } finally {
+      setOpeningConnectorFolder(false);
+    }
+  }
+
   return (
     <section className="space-y-3 border-t border-panel-border border-t-panel pt-4" aria-labelledby="design-app-send-title">
       <div className="flex items-center justify-between gap-3">
@@ -133,6 +149,23 @@ export function DesignAppSendPanel({ canvas, imageName }: Props) {
         <p className="border border-panel-border bg-k-surface px-2.5 py-2 text-[10px] leading-relaxed text-deep" role="status">
           {loading ? 'ローカル接続を確認しています…' : bridge.error || 'K-GG DesktopからFigmaへ直接送信できます。'}
         </p>
+      )}
+
+      {isTauriRuntime() && (
+        <div className="flex items-center gap-2 border border-panel-border bg-k-surface px-2.5 py-2">
+          <div className="min-w-0 flex-1">
+            <p className="text-[10px] font-semibold text-k-text">Figma Pluginの初回登録</p>
+            <p className="mt-0.5 text-[10px] leading-relaxed text-deep">FigmaのDevelopment Plugin登録で、同梱のmanifest.jsonを選びます。</p>
+          </div>
+          <button
+            type="button"
+            onClick={() => void handleOpenFigmaConnectorFolder()}
+            disabled={openingConnectorFolder}
+            className="shrink-0 border border-panel-border px-2 py-1.5 text-[10px] font-semibold text-k-text hover:bg-k-muted disabled:cursor-not-allowed disabled:opacity-40"
+          >
+            {openingConnectorFolder ? '開いています…' : 'manifest.jsonの場所を開く'}
+          </button>
+        </div>
       )}
 
       <div className={`grid gap-2 ${bridge.available ? 'grid-cols-2' : 'grid-cols-1'}`}>

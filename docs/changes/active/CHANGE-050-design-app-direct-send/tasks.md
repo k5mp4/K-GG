@@ -9,3 +9,4 @@
 - [x] U7. Current Spec / ADR / guide / Change Capsuleを直接送信設計へ同期する。
 - [ ] U8. Figmaの実機受信をRelease Observationとして記録する。Affinityは公式登録手順と生成物適合の確認後に行う。
 - [x] U9. AffinityのUI、接続許可、送信経路を停止状態にし、公式SDKの登録条件を記録する。
+- [x] U10. Windows版ReleaseへFigma Pluginのmanifestと実行ファイルを同梱し、Exportパネルから登録用フォルダーを開けるようにする。

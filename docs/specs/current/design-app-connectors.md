@@ -35,6 +35,8 @@ Figma接続中に送信ボタンを押すと、現在の出力キャンバスを
 
 Figma Connector PluginはK-GGで接続を許可された後にK-GG Desktopをポーリングし、受信したPNGを開いているFigmaファイルのviewport中央へRectangleとして配置する。Rectangle名の先頭に`[K-GG]`を付けて識別する。選択中の`[K-GG]` Rectangleがある場合はその画像を更新し、それ以外の場合は新しいRectangleを追加する。転送IDが再配信された場合は二重配置しない。Rectangleを選択し、画面内へ表示する。画像はPNGの寸法を維持したラスタ画像である。
 
+Windows版TauriインストーラーはFigma Pluginの`manifest.json`、`dist/main.js`、`src/ui.html`を`connectors/figma/`として同梱する。Exportパネルの「manifest.jsonの場所を開く」操作から、そのmanifestをFigma DesktopのDevelopment Plugin登録に使用できる。
+
 Pluginを閉じるとFigma接続が停止する。再び送る場合はPluginを開いて接続する。
 
 ### CONN-004 Affinity

@@ -1,6 +1,6 @@
 # デザインアプリ連携ガイド
 
-K-GG Desktopで作成したPNGを、開いているFigmaへ直接送信できます。AffinityはExportパネルに準備中の送信先として表示されます。
+K-GG Desktopで作成したPNGを、開いているFigmaへ直接送信できます。Windows版インストーラーにはFigma Connector一式が含まれ、Exportパネルからmanifest.jsonの場所を開けます。Affinityは準備中の送信先として表示されます。
 
 ## できること
 
@@ -30,17 +30,19 @@ K-GG Desktopで作成したPNGを、開いているFigmaへ直接送信できま
 npm --prefix connectors/figma run build
 ```
 
+上記はConnector単体を開発・確認するときに使います。Windows版インストーラーの作成時には、Tauriが`npm run build:desktop`を実行します。このコマンドはK-GG本体とFigma Pluginをビルドし、生成したmanifest・実行JS・UIファイルをインストーラーに同梱します。`npm run tauri:build:windows`またはタグから実行するRelease workflowで作成したインストーラーに含まれます。
+
 | 対象 | 生成される場所 | アプリでの登録 |
 | --- | --- | --- |
-| Figma Plugin | `connectors/figma/dist/main.js` | FigmaのDevelopment Pluginとして`connectors/figma/manifest.json`を読み込みます。Pluginが`src/ui.html`を画面として使います。 |
+| Figma Plugin | `connectors/figma/manifest.json`、`connectors/figma/dist/main.js`、`connectors/figma/src/ui.html` | K-GG Desktopに同梱されます。Exportパネルからmanifest.jsonの場所を開き、FigmaのDevelopment Pluginとして登録します。 |
 | Affinity | — | 公式SDKのスクリプト登録・配布手順を確認後に利用手順を用意します。 |
 
 K-GG側は通常のアプリビルドに含まれます。開発中に起動するときはリポジトリの既存手順に従ってK-GG Desktopを起動してください。
 
 ## 共通の接続手順
 
-1. K-GG Desktopと送信先アプリを起動します。
-2. Figma Pluginを起動します。
+1. K-GG DesktopとFigma Desktopを起動します。
+2. 登録済みのFigma Plugin「K-GG Direct Send」を起動します。初回登録は「Figmaへ送る」を参照してください。
 3. K-GGの静止画Exportパネルに接続リクエストが表示されたら、送信先を確認して「許可」を押します。
 4. K-GGの送信欄で対象アプリが接続中になったことを確認します。
 5. 「Figmaに送信」を押します。
@@ -50,10 +52,12 @@ Figma Pluginを閉じて再び起動した場合は、K-GGで新しい接続リ�
 ## Figmaへ送る
 
 1. Figmaで送信先のデザインファイルを開きます。
-2. Development Pluginの登録画面で`connectors/figma/manifest.json`を読み込み、Connectorを起動します。
-3. K-GGの静止画Exportパネルに表示されたFigmaの接続リクエストで「許可」を押します。
-4. 接続中になったら「Figmaに送信」を押します。
-5. PNG画像がFigmaのviewport中央に配置され、選択状態になります。
+2. 初回はK-GGの静止画Exportパネルで「manifest.jsonの場所を開く」を押します。
+3. Figma Desktopの`Plugins > Development > Import plugin from manifest...`を選び、開いたフォルダー内の`manifest.json`を指定します。
+4. `Plugins > Development > K-GG Direct Send`を起動します。
+5. K-GGの静止画Exportパネルに表示された接続リクエストで「許可」を押します。
+6. 接続中になったら「Figmaに送信」を押します。
+7. PNG画像がFigmaのviewport中央に配置され、選択状態になります。
 
 起動中のPluginが、画像を配置するFigmaファイルを送信先として使います。レイヤー名の先頭に`[K-GG]`が付いた画像が送信画像です。その画像を選択して送信すると更新し、何も選択せずに送信すると新しい画像を追加します。
 

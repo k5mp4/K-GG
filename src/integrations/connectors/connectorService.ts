@@ -46,6 +46,11 @@ export async function getDesignAppConnectorState(): Promise<DesignAppConnectorSt
   return invoke<DesignAppConnectorState>('get_design_app_connector_state');
 }
 
+export async function openFigmaConnectorFolder(): Promise<void> {
+  if (!isTauriRuntime()) throw new Error('Figma Connectorの場所はK-GG Desktopから開けます。');
+  await invoke('open_figma_connector_folder');
+}
+
 export async function disconnectDesignAppConnector(target: DesignAppTarget): Promise<void> {
   if (!isTauriRuntime()) return;
   await invoke('disconnect_design_app_connector', { target });

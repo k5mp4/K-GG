@@ -44,6 +44,7 @@ Direct request。K-GG独自の画像ファイル形式を介さず、開いて�
 - Affinity送信先をExportパネルに表示し、公式SDKのスクリプト登録手順を確認するまで準備中の無効状態にする。
 - Affinityの接続許可、送信サービス、bridge endpointは停止状態を返す。
 - Figma Pluginをビルドし、生成物のパスと登録方法をガイドに記載する。Affinityのユーザー向け登録手順は公式仕様の確認後に用意する。
+- Windows版TauriインストーラーにFigma Connectorのmanifest、実行JS、UI HTMLを同梱し、Exportパネルからmanifestのフォルダーを開ける。
 - PNGのサイズと寸法を送受信時に制限し、エラー内容をK-GG上に表示する。
 - 通常のPNG/JPG/WebP書き出し、既存の画像入力、After Effects連携を維持する。
 - Exportパネルではデザインアプリ送信をAfter Effects接続の下に配置する。

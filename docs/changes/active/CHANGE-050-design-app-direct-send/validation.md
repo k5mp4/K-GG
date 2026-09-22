@@ -27,3 +27,17 @@
 - `npm run docs:check`: 成功。
 - `npm run change:check`: 成功。
 - Affinity本体での登録・受信確認: 公式の登録仕様確認後に行う。
+
+## Figma Connector同梱の検証
+
+- `npm run build:desktop`: 成功。K-GG本体とFigma Connectorの型確認・ビルドが完了。
+- `npm run lint`: 成功。既存のFigma node名の制御文字サニタイズに必要なルール例外を明記した。既存warningは21件。
+- `cargo fmt --check --manifest-path src-tauri/Cargo.toml`: 成功。
+- `cargo check --manifest-path src-tauri/Cargo.toml`: 成功。
+- `npm run docs:check`: 成功。
+- `npm run change:check`: 成功。
+- `git diff --check`: 成功。
+- デバッグ用NSISパッケージ生成: 成功。`npx tauri build --debug --bundles nsis --target x86_64-pc-windows-msvc --config <一時的なupdater無効化設定> --ci`を実行し、`KAGARIBI Grad_1.1.0_x64-setup.exe`を生成した。Tauriのリソースステージング先に`connectors/figma/manifest.json`、`connectors/figma/dist/main.js`、`connectors/figma/src/ui.html`が配置されることを確認。
+- ViteはTauri APIのstatic/dynamic import混在とmain chunkサイズに関する既存警告を出したが、ビルドは成功。
+- Figma Desktopでのmanifest登録、Connector起動、実際の画像受信は未確認。Release Observationで確認する。
+- この変更ではテストを追加・実行していない。

@@ -4,6 +4,8 @@
 
 `src-tauri/src/design_app_bridge.rs`がローカルHTTP bridge、Figmaの接続要求と利用者の許可、session、送信queueを管理する。`src/integrations/connectors`はK-GGの静止画キャンバスをPNG化し、bridgeへ送る。`DesignAppSendPanel`はFigmaの接続要求、受信状態、送信操作と、準備中のAffinity送信先をExportパネルに表示する。
 
+Tauriの`build:desktop`はFigma PluginをビルドしてからWindows appをパッケージする。Tauri resourcesには`manifest.json`、`dist/main.js`、`src/ui.html`を同じ相対構成で含める。`open_figma_connector_folder` commandはdebug時にリポジトリ内のConnectorを優先し、release時はTauri resource directory内のConnectorを開く。
+
 Figma Plugin UIはlocalhostをpollし、PNG bytesをPlugin mainへ渡す。Plugin mainは`documentAccess: dynamic-page`に合わせて現在のPageNodeを`loadAsync()`し、選択中の`[K-GG]` Rectangleがあれば画像を更新し、それ以外は新規Rectangleを追加する。`[K-GG]`で始まるレイヤー名で対象を識別し、この識別方法はFigma Plugin IDなしで動作する。Plugin mainからUIへは`figma.ui.postMessage`に応答データを直接渡し、UI側で`event.data.pluginMessage`から配置結果を受け取る。Affinityのプロトタイプは`connectors/affinity/`に保持し、公式登録形式を確認するまで製品内のAffinity経路を停止する。
 
 ## 転送契約

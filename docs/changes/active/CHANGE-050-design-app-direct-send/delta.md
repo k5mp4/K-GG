@@ -14,6 +14,8 @@ K-GG Desktopはloopback endpointでFigma Connectorからの接続リクエスト
 
 Figma Pluginは接続許可後にloopback endpointをpollし、受信PNGを開いているFigmaファイルのviewport中央へRectangleとして配置・選択する。選択中のK-GG送信Rectangleがあれば画像を更新し、選択中に対象がなければ新しいRectangleを追加する。転送IDの再配信では二重配置しない。画像はPNG寸法のラスタ画像とする。
 
+Windows版K-GG DesktopインストーラーにはFigma Pluginの`manifest.json`、`dist/main.js`、`src/ui.html`を`connectors/figma/`以下に同じ相対構成で含める。Exportパネルから登録用フォルダーを開き、Figma DesktopのDevelopment Pluginとしてmanifestを登録できる。
+
 ### CONN-004 Affinity receive
 
 Affinity連携はExportパネルに準備中の送信先として表示する。Affinity公式SDKのスクリプト登録・配布手順とK-GG生成物の適合を確認するまで、接続許可、転送、受信確認endpointは503応答を返す。

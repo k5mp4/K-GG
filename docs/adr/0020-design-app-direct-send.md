@@ -64,4 +64,4 @@ Figma PluginのUI iframeはネットワーク要求を行え、manifestで許可
 
 ## 現在の提供状態
 
-2026-09-22時点ではFigma連携を提供し、Affinity連携は準備中としてExportパネルに無効表示する。Affinityの接続許可・送信操作・bridge経路は、公式SDKのスクリプト登録・配布手順とK-GG生成物の適合を確認するまで停止する。再開時はAffinity公式資料とAffinity本体の機能に沿った導入手順を整備し、実機で受信まで確認する。
+2026-09-22時点ではFigma連携を提供し、Affinity連携は準備中としてExportパネルに無効表示する。Windows版インストーラーにはFigma manifestと実行ファイル、UIファイルを同梱し、Exportパネルからmanifestの場所を開ける。Affinityの接続許可・送信操作・bridge経路は、公式SDKのスクリプト登録・配布手順とK-GG生成物の適合を確認するまで停止する。再開時はAffinity公式資料とAffinity本体の機能に沿った導入手順を整備し、実機で受信まで確認する。
