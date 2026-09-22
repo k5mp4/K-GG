@@ -10,13 +10,15 @@ title: Native / FFmpeg / Tauri validation
 
 | 対象 | 入口 | Gate | 判定 |
 | --- | --- | --- | --- |
-| Rust command/path/encoder contract | `npm run check:native` | Merge Gate（対象変更時） | Rust unit testと`cargo check`の結果 |
+| Rust command/path/encoder contract | `npm run check:native` | Merge Gate（対象変更時） | Figma Connectorをビルドした後のRust unit testと`cargo check`の結果 |
 | Browser/Tauri adapter contract | `npm run check:fast`、またはnative gateの`npm test -- src/adapters/tauri` | Merge Gate | fake/native adapter testの結果 |
 | 実FFmpeg + ffprobe | `npm run check:ffmpeg` | Native Release Gate | qtrle MOVとlibx264 MP4のcodec、pix_fmt、SAR、BT.709 metadata、サイズ、フレーム数、非空、temp cleanup |
 | Tauri binary | `npx tauri build --debug --no-bundle` | Native Release Gate | 実行環境でのbuild結果 |
 | Tauri UI | WebDriver手動Release Gate | Release Gate | 起動、Preset、Preview、PNG/ZIP、native FFmpeg statusのUI証跡 |
 
 `check:ffmpeg`は`KGG_FFMPEG_PATH` / `KGG_FFPROBE_PATH`またはPATHにある実行ファイルだけを使います。バイナリのダウンロード、同梱、バージョンの自動更新は行いません。実行ファイルやencoderが見つからない場合は`not-run`（exit code 2）で、passにはなりません。
+
+`check:native`はTauriのbundle resourceに指定されたFigma Connectorの`dist/main.js`を利用するため、最初に`npm run build:figma-connector`を実行します。CIのnative-check jobではNode.jsのセットアップと`npm ci`を行ってからこのコマンドを実行します。
 
 ## FFmpeg smokeの証拠
 

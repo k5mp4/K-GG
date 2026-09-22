@@ -52,7 +52,7 @@ jobs:
                 render=true
                 e2e=true
                 ;;
-              src-tauri/*|src-tauri/Cargo.toml|src-tauri/Cargo.lock|Cargo.toml|Cargo.lock)
+              src-tauri/*|src-tauri/Cargo.toml|src-tauri/Cargo.lock|Cargo.toml|Cargo.lock|connectors/figma/*|package.json|package-lock.json)
                 native=true
                 ;;
               src/App.tsx|src/components/*|src/features/workspace/*|src/adapters/*|src/hooks/useWebGL.ts|src/lib/render*|src/lib/export*|src/lib/webgl*|tests/e2e/*|playwright.config.*|tools/*e2e*|tools/*render-capture*|tools/capture-render*|tools/compare-render*|package.json|package-lock.json|.github/workflows/*)
@@ -160,6 +160,15 @@ jobs:
     steps:
       - name: Check out repository
         uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+
+      - name: Install frontend dependencies
+        run: npm ci
 
       - name: Set up Rust
         uses: dtolnay/rust-toolchain@4be7066ada62dd38de10e7b70166bc74ed198c30
