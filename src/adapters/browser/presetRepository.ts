@@ -1,9 +1,9 @@
+import { importPresetFile } from '../../lib/importPresetFile';
 import { makePreset } from '../../lib/presetModel';
 import type { Preset, StoreSnapshot } from '../../lib/presetModel';
 import {
   createEmptyPresetLibrary,
   createFolder as createLibraryFolder,
-  decodePresetPackage,
   deleteFolder as deleteLibraryFolder,
   encodePresetExport,
   mergePresetLibrary,
@@ -86,8 +86,7 @@ function exportPresetPackage(scope: PresetExportScope): void {
 }
 
 async function importPresetPackage(file: File, targetFolderId: string | null): Promise<void> {
-  const bytes = new Uint8Array(await file.arrayBuffer());
-  const imported = decodePresetPackage(bytes, file.name);
+  const imported = await importPresetFile(file);
   savePresetLibrary(mergePresetLibrary(loadPresetLibrary(), imported, targetFolderId));
 }
 

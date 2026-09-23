@@ -130,7 +130,3 @@ Third-party notices are summarized in `NOTICE`. Current npm and Cargo dependency
 K-GG does not bundle FFmpeg. The desktop app calls the user's externally installed `ffmpeg` command for MOV/MP4 export. FFmpeg licensing depends on the installed build; see the FFmpeg legal page before redistributing any FFmpeg binary with K-GG.
 
 K-GG は FFmpeg を同梱していません。デスクトップ版は MOV/MP4 書き出し時に、利用者環境へ別途インストールされた `ffmpeg` コマンドを呼び出します。将来 FFmpeg バイナリを同梱して配布する場合は、配布する FFmpeg ビルドのライセンスを個別に確認してください。
-
-GSAP is used for UI animation and is licensed under the GSAP Standard License, not MIT. Commercial use is generally allowed under that license, but if K-GG is repositioned or sold as an animation-authoring service or a tool competing with Webflow-style visual animation builders, review the GSAP license or replace GSAP before publication.
-
-GSAP は UI アニメーション用途で使用しており、MIT ではなく GSAP Standard License です。商用利用は一般に許可されていますが、K-GG をアニメーション制作サービスや Webflow 系のビジュアルアニメーション制作ツールと競合する形で公開・販売する場合は、公開前に GSAP ライセンスを確認するか、GSAP 依存を外してください。

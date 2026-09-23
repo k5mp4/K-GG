@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { zipSync, strToU8 } from 'fflate';
 import { IDENTITY_DIFFUSE_BEZIER } from './diffuseCurve';
 import { makePreset } from './presetModel';
 import {
@@ -95,5 +96,33 @@ describe('presetLibrary', () => {
   it('rejects unsupported packages without producing a library', () => {
     expect(() => normalizePresetLibrary({ format: 'other', version: 2, folders: [], presets: [] })).toThrow(/Unsupported/);
     expect(() => decodePresetPackage(new TextEncoder().encode('{"broken":true}'))).toThrow(/Invalid preset package/);
+  });
+});
+
+describe('untrusted preset ZIP limits', () => {
+  it('rejects additional and traversal entries instead of decompressing them', () => {
+    for (const name of ['extra.bin', '../outside.json']) {
+      const zip = zipSync({ 'preset-library.json': strToU8(JSON.stringify(createEmptyPresetLibrary())), [name]: new Uint8Array(32) });
+      expect(() => decodePresetPackage(zip, 'presets.zip')).toThrow();
+    }
+  });
+  it('rejects a corrupt checksum', () => {
+    const zip = zipSync({ 'preset-library.json': strToU8(JSON.stringify(createEmptyPresetLibrary())) });
+    const broken = zip.slice();
+    const view = new DataView(broken.buffer);
+    const central = view.getUint32(broken.length - 6, true);
+    view.setUint32(central + 16, 0, true);
+    expect(() => decodePresetPackage(broken, 'presets.zip')).toThrow();
+  });
+  it('rejects ZIP64, oversized declarations and actual expansion beyond a forged size', () => {
+    const zip = zipSync({ 'preset-library.json': strToU8(' '.repeat(1024 * 1024)) });
+    for (const kind of ['zip64', 'oversized', 'forged']) {
+      const broken = zip.slice();
+      const view = new DataView(broken.buffer);
+      const central = view.getUint32(broken.length - 6, true);
+      if (kind === 'zip64') view.setUint16(central + 6, 45, true);
+      else view.setUint32(central + 24, kind === 'oversized' ? 17 * 1024 * 1024 : 1, true);
+      expect(() => decodePresetPackage(broken, 'presets.zip')).toThrow();
+    }
   });
 });

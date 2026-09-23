@@ -14,7 +14,6 @@ FFmpeg is primarily licensed under GNU LGPL 2.1 or later. GPL applies when a bui
 
 K-GG uses third-party libraries including React, Tauri, fflate, ogl, Tweeq, Zustand, and react-markdown. See `NOTICE` in the repository for a summary of third-party licenses.
 
-GSAP is used for UI animation under the GSAP Standard License. Review that license or remove the dependency before distributing K-GG in a way that competes with animation-production services or Webflow-style visual animation tools.
 
 The web build loads Noto Sans JP and Open Sans from Google Fonts in `index.html`. Self-host the fonts and bundle their license files for offline or privacy-sensitive distribution.
 
@@ -23,7 +22,6 @@ The web build loads Noto Sans JP and Open Sans from Google Fonts in `index.html`
 - FFmpeg license information: https://ffmpeg.org/legal.html
 - Apache License 2.0: https://www.apache.org/licenses/LICENSE-2.0
 - LGPL v2.1: https://www.gnu.org/licenses/old-licenses/lgpl-2.1.html
-- GSAP Standard License: https://gsap.com/standard-license/
 
 ## K-GG Guide
 

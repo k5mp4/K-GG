@@ -1,5 +1,4 @@
 import { useCallback, useLayoutEffect, useRef, useState, type RefObject } from 'react';
-import { gsap } from 'gsap';
 import { ColorHistogram } from './ColorHistogram';
 import { PostprocessStackPanel } from './PostprocessStackPanel';
 import type { EffectStackKind } from '../types/distortion';
@@ -51,12 +50,9 @@ export function EffectStackWorkspace({
 
     nodes.forEach(([node, x]) => {
       if (!node) return;
-      gsap.to(node, {
-        x,
-        duration: 0.42,
-        ease: 'power3.inOut',
-        overwrite: 'auto',
-      });
+      node.style.transition = window.matchMedia('(prefers-reduced-motion: reduce)').matches
+        ? 'none' : 'transform 420ms cubic-bezier(0.65, 0, 0.35, 1)';
+      node.style.transform = `translateX(${x}px)`;
     });
   }, [order]);
 

@@ -35,6 +35,10 @@ export default defineConfig({
       testMatch: '**/lifecycle.spec.ts',
     },
     {
+      name: 'licenses',
+      testMatch: '**/licenses.spec.ts',
+    },
+    {
       name: 'smoke',
       testMatch: '**/smoke.spec.ts',
     },

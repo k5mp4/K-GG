@@ -14,3 +14,4 @@ Active ChangeはDesigned ChangeのPR中だけに置きます。mainへマージ�
 | CHANGE-048 | [Coneを順序変更可能なEffect Stackレイヤーとして統合](./CHANGE-048-cone-effect-stack/proposal) | draft |
 | CHANGE-049 | [Color Palette GeneratorをGradient Generatorに整理](./CHANGE-049-gradient-generator-controls/proposal) | draft |
 | CHANGE-050 | [K-GGからデザインアプリへPNGを直接送信](./CHANGE-050-design-app-direct-send/proposal) | draft |
+| CHANGE-051 | [配布時のライセンス表示と外部入力の安全性](./CHANGE-051-release-safety/proposal) | review |

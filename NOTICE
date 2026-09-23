@@ -19,7 +19,6 @@ Notable direct/runtime dependencies:
 - zustand: MIT
 - tweeq (vendored from arcatdmz/tweeq): MIT
 - react-markdown and unified ecosystem packages: mostly MIT
-- GSAP: Standard "no charge" license, https://gsap.com/standard-license/
 
 Tauri/Rust dependency review found MPL-2.0 components in the current lockfile,
 including cssparser, cssparser-macros, dtoa-short, option-ext, and selectors.
@@ -47,6 +46,10 @@ Fonts
 -----
 
 The web app currently loads Google Fonts from Google-hosted CSS in `index.html`.
-The loaded font families are Material Symbols Rounded, Noto Sans JP, and Open
-Sans. For offline desktop distribution or stricter privacy/compliance
+The loaded font families are Noto Sans JP and Open Sans. For offline desktop distribution or stricter privacy/compliance
 requirements, self-host these fonts and include their license files.
+
+Full third-party license texts, copyright notices, and version-specific source
+links are included in the application Help > Third-party licenses screen.
+The catalog includes conservative build and vendored dependency inventories.
+UI animation uses native browser APIs; GSAP is not distributed.

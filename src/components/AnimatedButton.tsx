@@ -1,5 +1,4 @@
-import {useRef} from 'react';
-import {gsap} from 'gsap';
+import {useRef, useEffect} from 'react';
 
 interface Props { //受け取るデータの型定義
     onClick: () => void; 
@@ -11,12 +10,20 @@ interface Props { //受け取るデータの型定義
 
 export function AnimatedButton ({ onClick, isActive, children, className = '', title}: Props) {
     const btnRef = useRef<HTMLButtonElement>(null); // ボタンのDOM要素を掴むための参照
+    const animationRef = useRef<Animation | null>(null);
+    useEffect(() => () => animationRef.current?.cancel(), []);
     const handleClick = () => {
         onClick();
         btnRef.current?.blur();
-        gsap.timeline()
-            .to(btnRef.current, { scale: 0.7, duration: 0.04, ease: 'power2.in'})
-            .to(btnRef.current, { scale: 1, duration: 0.3, ease: 'elastic.out(2, 0.5)'});
+        animationRef.current?.cancel();
+        if (!window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+            animationRef.current = btnRef.current?.animate?.([
+                { transform: 'scale(1)' },
+                { transform: 'scale(0.7)', offset: 0.12 },
+                { transform: 'scale(1.06)', offset: 0.65 },
+                { transform: 'scale(1)' },
+            ], { duration: 340, easing: 'ease-out' }) ?? null;
+        }
     };
     return (
         <button

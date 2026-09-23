@@ -1,6 +1,7 @@
 const FEEDBACK_FORM_URL = 'https://docs.google.com/forms/d/e/1FAIpQLSePMMNDY7CyVlqA84fr6TEpiSUmbCBPk8gmcooUmD7S8qtMjg/viewform?usp=publish-editor';
 import { IconButton } from './IconButton';
 import { useLanguage } from '../i18n/LanguageProvider';
+import { ExternalLink } from './ExternalLink';
 
 type FeedbackPanelProps = {
   onClose: () => void;
@@ -39,10 +40,8 @@ export function FeedbackPanel({ onClose }: FeedbackPanelProps) {
             <p className="text-sm leading-relaxed text-k-text/85">{t('feedback.description')}</p>
           </div>
 
-          <a
+          <ExternalLink
             href={FEEDBACK_FORM_URL}
-            target="_blank"
-            rel="noopener noreferrer"
             className="flex items-center justify-between gap-3 border border-fire/50 bg-fire/10 px-4 py-3 text-sm text-k-text hover:bg-fire/20 hover:border-fire transition-colors"
           >
             <span className="min-w-0 truncate">{t('feedback.openForm')}</span>
@@ -51,7 +50,7 @@ export function FeedbackPanel({ onClose }: FeedbackPanelProps) {
               <polyline points="15 3 21 3 21 9" />
               <line x1="10" y1="14" x2="21" y2="3" />
             </svg>
-          </a>
+          </ExternalLink>
 
           <p className="break-all text-xs leading-relaxed text-tab-inactive">
             {FEEDBACK_FORM_URL}
