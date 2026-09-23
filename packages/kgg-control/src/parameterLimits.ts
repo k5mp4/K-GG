@@ -213,7 +213,7 @@ export const PARAMETER_LIMITS = {
   'postprocess.glassV2ChromaticSaturation': { min: 0, max: 2, step: 0.01, defaultValue: 1 },
   'postprocess.glassEvolution': { min: 0, max: 1, step: 0.001, defaultValue: 0 },
   'postprocess.glassMotion': { min: 0, max: 1, step: 0.01, defaultValue: 0.35 },
-  'postprocess.glassTileSize': { min: 4, max: 4096, step: 1, defaultValue: 96, integer: true },
+  'postprocess.glassTileSize': { min: 1, max: 100, step: 0.1, defaultValue: 12, integer: true },
   'postprocess.glassTileBevel': { min: 0.01, max: 0.5, step: 0.01, defaultValue: 0.18 },
   'postprocess.glassTileSurfaceHeight': { min: 0, max: 1, step: 0.01, defaultValue: 0.45 },
   'postprocess.glassTileCurvature': { min: 0, max: 1, step: 0.01, defaultValue: 0.75 },
@@ -276,7 +276,7 @@ export const ENUM_PARAMETER_LIMITS = {
   'postprocess.voronoiFeature': VORONOI_FEATURE_LIMIT,
   'postprocess.glassTileEdgeMode': {
     values: ['clamp', 'tile', 'mirror', 'transparent'],
-    defaultValue: 'tile',
+    defaultValue: 'mirror',
   },
 } as const satisfies Record<string, EnumParameterLimit>;
 
