@@ -6,8 +6,11 @@ import type { UpdateStatus } from '../features/updater/types';
 import { Icon } from './Icon';
 import { IconButton } from './IconButton';
 import { useLanguage } from '../i18n/LanguageProvider';
+import { ExternalLink } from './ExternalLink';
 
 import ThirdPartyLicenses from './ThirdPartyLicenses';
+
+const ONLINE_DOCS_URL = 'https://kagaribi15-grad.ke-goworks.com/docs/';
 
 interface HelpPanelProps {
   onClose: () => void;
@@ -49,10 +52,8 @@ export function HelpPanel({
             {t('help.title')}
           </h2>
           <div className="flex items-center gap-4">
-            <a
-              href="/docs/"
-              target="_blank"
-              rel="noopener noreferrer"
+            <ExternalLink
+              href={ONLINE_DOCS_URL}
               className="text-sm text-fire hover:text-cream underline decoration-fire/30 underline-offset-4 transition-colors font-medium flex items-center gap-1"
             >
               <span>{t('common.onlineDocs')}</span>
@@ -61,7 +62,7 @@ export function HelpPanel({
                 <polyline points="15 3 21 3 21 9"></polyline>
                 <line x1="10" y1="14" x2="21" y2="3"></line>
               </svg>
-            </a>
+            </ExternalLink>
             <IconButton
               icon="close"
               label={t('common.close')}
@@ -80,16 +81,11 @@ export function HelpPanel({
         <div className="p-8 text-k-text overflow-y-auto scrollbar-thin">
           {showLicenses ? <ThirdPartyLicenses /> : <ReactMarkdown
             components={{
-              a: ({ href, children }) => (
-                <a
-                  href={href}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="text-fire hover:text-cream underline decoration-fire/30 underline-offset-4 transition-colors"
-                >
+              a: ({ href, children }) => href ? (
+                <ExternalLink href={href} className="text-fire hover:text-cream underline decoration-fire/30 underline-offset-4 transition-colors">
                   {children}
-                </a>
-              ),
+                </ExternalLink>
+              ) : <span>{children}</span>,
               h1: ({ children }) => <h1 className="hidden">{children}</h1>,
               h2: ({ children }) => <h2 className="text-lg font-display font-bold mt-8 mb-4 text-k-text border-l-4 border-fire pl-3 bg-fire/5 py-1">{children}</h2>,
               h3: ({ children }) => <h3 className="text-md font-display font-semibold mt-6 mb-2 text-cream">{children}</h3>,

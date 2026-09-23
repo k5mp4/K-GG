@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import catalogText from '../generated/thirdPartyLicenses.json?raw';
 import { useLanguage } from '../i18n/LanguageProvider';
+import { ExternalLink } from './ExternalLink';
 
 const textClass = 'mt-3 whitespace-pre-wrap break-words text-xs leading-relaxed text-k-text/85';
 type LicenseEntry = {
@@ -25,7 +26,7 @@ function ComponentLicense({ entry }: { entry: LicenseEntry }) {
       <strong>{entry.name}</strong> {entry.version} — {entry.license}
     </summary>
     {open && <>
-      <a href={entry.source} target="_blank" rel="noopener noreferrer" className="mt-3 inline-block break-all text-sm text-fire underline">{t('help.licenseSource')}</a>
+      <ExternalLink href={entry.source} className="mt-3 inline-block break-all text-sm text-fire underline">{t('help.licenseSource')}</ExternalLink>
       {entry.notices.map((notice, index) => <div key={index}>
         <p className="mt-4 break-all text-xs font-semibold">{notice.file}</p>
         <pre className={textClass}>{notice.text}</pre>

@@ -5,7 +5,7 @@ title: UI入力コントロール
 status: current
 owners: [maintainer]
 created: 2026-07-28
-updated: 2026-09-22
+updated: 2026-09-23
 requirement_ids: [UI-001, UI-002, UI-003, UI-004, UI-005, UI-006, UI-007, UI-008, UI-009, UI-010, UI-011, UI-012, UI-013, UI-014, UI-015, UI-019, UI-021, UI-022, UI-023, UI-024, UI-025, UI-026, UI-027]
 related_adrs: [ADR-0009, ADR-0011, ADR-0012]
 related_changes: [CHANGE-010, CHANGE-012, CHANGE-013, CHANGE-014, CHANGE-015, CHANGE-018, CHANGE-019, CHANGE-024, CHANGE-025, CHANGE-026, CHANGE-027, CHANGE-030, CHANGE-031, CHANGE-032, CHANGE-034, CHANGE-037, CHANGE-038, CHANGE-039, CHANGE-041, CHANGE-046, CHANGE-047, CHANGE-048, CHANGE-051]
@@ -130,4 +130,4 @@ Mode、Motion、Seed、Animationの保存キーを維持し、旧PresetのautoLo
 
 ### UI-027 オフラインのライセンス表示
 
-ヘルプ内の「第三者ライセンス」からコンポーネント名・ライセンス名を検索し、同梱した本文・著作権通知とバージョン別ソースのリンクを閲覧できる。表示案内は日英に対応する。UIアニメーションはブラウザ標準機能を使用し、GSAPへ依存しない。動きを減らす設定では開閉アニメーションを省略する。
+ヘルプ内の「第三者ライセンス」からコンポーネント名・ライセンス名を検索し、同梱した本文・著作権通知とバージョン別ソースのリンクを閲覧できる。デスクトップ版ではオンラインURLを既定のブラウザーで開き、Web版ではブラウザー標準のリンク動作を使う。「オンラインドキュメント」は公開ドキュメントURLを開く。表示案内は日英に対応する。UIアニメーションはブラウザ標準機能を使用し、GSAPへ依存しない。動きを減らす設定では開閉アニメーションを省略する。

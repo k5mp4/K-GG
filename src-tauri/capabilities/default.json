@@ -13,6 +13,10 @@
     "dialog:allow-open",
     "dialog:allow-save",
     "dialog:allow-message",
+    {
+      "identifier": "opener:allow-open-url",
+      "allow": [{ "url": "https://*" }, { "url": "http://*" }]
+    },
     "updater:default",
     "process:allow-restart",
     "fs:allow-mkdir",
