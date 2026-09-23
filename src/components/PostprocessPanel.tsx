@@ -453,15 +453,6 @@ export function PostprocessPanel({ sandboxMode, embedded = false }: PostprocessP
                 options={MIRROR_AXIS_OPTIONS}
                 onChange={(value) => setPostprocess({ mirrorMode: value as typeof postprocess.mirrorMode })}
               />
-              <div className="flex items-center justify-between border-t border-cream/40 pt-3">
-                <span className="text-xs text-deep font-display uppercase tracking-wider">Overlay</span>
-                <Toggle
-                  variant="switch"
-                  size="xs"
-                  checked={postprocess.showOverlay}
-                  onChange={(v) => setPostprocess({ showOverlay: v })}
-                />
-              </div>
             </div>
           ) : activeEffectMode === 'kaleidoscope' ? (
             <div className="space-y-4">
@@ -493,15 +484,6 @@ export function PostprocessPanel({ sandboxMode, embedded = false }: PostprocessP
                 format={(v) => v.toFixed(2)}
                 limitKey="postprocess.kaleidoscopeZoom"
               />
-              <div className="flex items-center justify-between border-t border-cream/40 pt-3">
-                <span className="text-xs text-deep font-display uppercase tracking-wider">Overlay</span>
-                <Toggle
-                  variant="switch"
-                  size="xs"
-                  checked={postprocess.showOverlay}
-                  onChange={(v) => setPostprocess({ showOverlay: v })}
-                />
-              </div>
             </div>
           ) : activeEffectMode === 'prism' ? (
             <div className="space-y-4">

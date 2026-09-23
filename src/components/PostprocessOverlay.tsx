@@ -1,4 +1,6 @@
-import type { PostprocessConfig } from '../types/distortion';
+import { isEffectStackLayerEnabled } from '../lib/effectPipeline';
+import { isPostprocessLayerEnabled } from '../lib/postprocessStack';
+import type { EffectPipelineConfig, PostprocessConfig } from '../types/distortion';
 import type React from 'react';
 
 type Props = {
@@ -6,6 +8,7 @@ type Props = {
   width: number;
   height: number;
   postprocess: PostprocessConfig;
+  effectPipeline: EffectPipelineConfig;
 };
 
 type Point = {
@@ -181,13 +184,20 @@ function KaleidoscopeGuide({ width, height, postprocess }: { width: number; heig
   );
 }
 
-export function PostprocessOverlay({ active, width, height, postprocess }: Props) {
-  if (!active || !postprocess.enabled || !postprocess.showOverlay) return null;
-  if (postprocess.effectMode !== 'mirror' && postprocess.effectMode !== 'kaleidoscope') return null;
+export function PostprocessOverlay({ active, width, height, postprocess, effectPipeline }: Props) {
+  const effectKind = effectPipeline.version === 'stack-v2'
+    ? effectPipeline.selectedKind
+    : postprocess.effectMode;
+  if (!active || (effectKind !== 'mirror' && effectKind !== 'kaleidoscope')) return null;
+
+  const effectEnabled = effectPipeline.version === 'stack-v2'
+    ? isEffectStackLayerEnabled(effectPipeline, effectKind)
+    : isPostprocessLayerEnabled(postprocess, effectKind);
+  if (!effectEnabled) return null;
 
   return (
     <div className="pointer-events-none absolute inset-0 z-10 overflow-hidden mix-blend-screen">
-      {postprocess.effectMode === 'mirror' ? (
+      {effectKind === 'mirror' ? (
         <MirrorGuide width={width} height={height} mode={postprocess.mirrorMode} />
       ) : (
         <KaleidoscopeGuide width={width} height={height} postprocess={postprocess} />
