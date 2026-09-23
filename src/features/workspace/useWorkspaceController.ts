@@ -1,6 +1,5 @@
 import { useEffect, useLayoutEffect, useRef, useState, type ChangeEvent, type PointerEvent as ReactPointerEvent } from 'react';
 import { useShallow } from 'zustand/react/shallow';
-import { gsap } from 'gsap';
 import { AnimationLoop } from '../../lib/animation';
 import { useGradientStore } from '../../store/gradientStore';
 import { useViewportControl } from '../../hooks/useViewportControl';
@@ -310,7 +309,10 @@ export function useWorkspaceController({ translate }: WorkspaceControllerOptions
   useLayoutEffect(() => {
     if (!panelsContainerRef.current) return;
     const index = LEFT_TABS.findIndex(tab => tab.value === leftTab);
-    gsap.to(panelsContainerRef.current, { x: `-${index * 100}%`, duration: 0.9, ease: 'expo.out' });
+    const node = panelsContainerRef.current;
+    node.style.transition = window.matchMedia('(prefers-reduced-motion: reduce)').matches
+      ? 'none' : 'transform 900ms cubic-bezier(0.16, 1, 0.3, 1)';
+    node.style.transform = `translateX(-${index * 100}%)`;
   }, [leftTab]);
 
   const [overlayImageSrc, setOverlayImageSrc] = useState<string | null>(null);

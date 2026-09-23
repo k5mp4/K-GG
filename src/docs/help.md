@@ -17,7 +17,6 @@ FFmpegは主にGNU Lesser General Public License version 2.1 or laterの下で�
 
 K-GG は React、Tauri、fflate、ogl、tweeq、zustand、react-markdown などの第三者ライブラリを使用しています。現在の依存関係は MIT、Apache-2.0、BSD、ISC 系が中心で、Tauri/Rust 依存ツリーには MPL-2.0 のコンポーネントが含まれます。第三者ライセンスの要点はリポジトリの `NOTICE` に記載しています。
 
-GSAP は UI アニメーション用途で使用しています。GSAP は MIT ではなく GSAP Standard License です。K-GG をアニメーション制作サービスや Webflow 系のビジュアルアニメーション制作ツールと競合する形で公開・販売する場合は、公開前に GSAP ライセンスを確認するか、GSAP 依存を外してください。
 
 Web 版は `index.html` で Google Fonts から Noto Sans JP、Open Sans を読み込んでいます。オフライン配布やプライバシー要件を重視する配布では、フォントをセルフホストし、該当フォントのライセンスファイルを同梱してください。
 
@@ -26,7 +25,6 @@ Web 版は `index.html` で Google Fonts から Noto Sans JP、Open Sans を読�
 - FFmpeg license information: https://ffmpeg.org/legal.html
 - Apache License 2.0: https://www.apache.org/licenses/LICENSE-2.0
 - LGPL v2.1: https://www.gnu.org/licenses/old-licenses/lgpl-2.1.html
-- GSAP Standard License: https://gsap.com/standard-license/
 
 ## K-GG 使い方ガイド
 

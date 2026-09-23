@@ -39,3 +39,5 @@ npm run verify:windows
 - 不要なreview人数・CODEOWNERS・外部Botを必須にしない
 
 設定はGitHub側の権限を持つ人が変更し、変更後のRuleset名とrequired check名をPR/開発文書へ反映します。
+
+更新署名、CSP、ライセンス一覧の更新は[配布安全性とライセンス](./release-security.md)を参照してください。

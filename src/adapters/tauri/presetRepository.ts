@@ -1,3 +1,4 @@
+import { importPresetFile } from '../../lib/importPresetFile';
 import { invoke } from '@tauri-apps/api/core';
 import { save as saveDialog } from '@tauri-apps/plugin-dialog';
 import { writeFile } from '@tauri-apps/plugin-fs';
@@ -6,7 +7,6 @@ import type { Preset, StoreSnapshot } from '../../lib/presetModel';
 import {
   createEmptyPresetLibrary,
   createFolder as createLibraryFolder,
-  decodePresetPackage,
   deleteFolder as deleteLibraryFolder,
   encodePresetExport,
   mergePresetLibrary,
@@ -90,7 +90,7 @@ async function exportPresetPackage(scope: PresetExportScope): Promise<void> {
 }
 
 async function importPresetPackage(file: File, targetFolderId: string | null): Promise<void> {
-  const imported = decodePresetPackage(new Uint8Array(await file.arrayBuffer()), file.name);
+  const imported = await importPresetFile(file);
   await writeLibrary(mergePresetLibrary(await loadPresetLibrary(), imported, targetFolderId));
 }
 

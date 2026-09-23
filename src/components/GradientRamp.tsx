@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
-import { gsap } from 'gsap';
+import { Collapsible } from './Collapsible';
+import { useDisclosureAnimation } from '../hooks/useDisclosureAnimation';
 import { useGradientStore, GRADIENT_ANCHOR_DEFAULTS, defaultBezierControlsForAnchors } from '../store/gradientStore';
 import { gradientRampPresets, getColorAtPosition, getOpacityAtPosition, applyMirrorT, applyRampRepeatT, normalizeRampSettings } from '../lib/gradientRampUtils';
 import { buildGradientPreviewStyle } from '../lib/gradientPreview';
@@ -481,47 +482,7 @@ function diceStopPositions<T extends { position: number }>(stops: T[], maxPositi
 }
 
 function AnimatedOpacityControls({ visible, children }: { visible: boolean; children: ReactNode }) {
-  const wrapperRef = useRef<HTMLDivElement>(null);
-  const [shouldRender, setShouldRender] = useState(visible);
-
-  useEffect(() => {
-    const el = wrapperRef.current;
-    if (visible) {
-      setShouldRender(true);
-      requestAnimationFrame(() => {
-        if (!wrapperRef.current) return;
-        gsap.killTweensOf(wrapperRef.current);
-        gsap.fromTo(
-          wrapperRef.current,
-          { height: 0, autoAlpha: 0, y: -4, marginBottom: 0 },
-          { height: 'auto', autoAlpha: 1, y: 0, marginBottom: 0, duration: 0.22, ease: 'power2.out' }
-        );
-      });
-      return;
-    }
-
-    if (!el) return;
-    gsap.killTweensOf(el);
-    gsap.to(el, {
-      height: 0,
-      autoAlpha: 0,
-      y: -4,
-      marginBottom: 0,
-      duration: 0.18,
-      ease: 'power2.in',
-      onComplete: () => setShouldRender(false),
-    });
-  }, [visible]);
-
-  if (!shouldRender) return null;
-
-  return (
-    <div ref={wrapperRef} className="overflow-hidden">
-      <div className="space-y-1">
-        {children}
-      </div>
-    </div>
-  );
+  return <Collapsible isOpen={visible} duration={0.22}><div className="space-y-1">{children}</div></Collapsible>;
 }
 
 type GradientRampProps = {
@@ -704,21 +665,7 @@ export function GradientRamp({ showHeader = true }: GradientRampProps = {}) {
     if (selectedOpacityStops.length > 0) setIsOpacityControlsDismissed(false);
   }, [selectedOpacityStops]);
 
-  useEffect(() => {
-    if (!pickerWrapperRef.current) return;
-    if (isPickerOpen && selectedIdxs.size > 0) {
-      gsap.to(pickerWrapperRef.current, {
-        height: 'auto', opacity: 1, marginBottom: 12,
-        duration: 0.4, ease: 'power3.out', display: 'block'
-      });
-    } else {
-      gsap.to(pickerWrapperRef.current, {
-        height: 0, opacity: 0, marginBottom: 0,
-        duration: 0.3, ease: 'power3.in',
-        onComplete: () => { if (pickerWrapperRef.current) pickerWrapperRef.current.style.display = 'none'; }
-      });
-    }
-  }, [isPickerOpen, selectedIdxs.size]);
+  useDisclosureAnimation(pickerWrapperRef, isPickerOpen && selectedIdxs.size > 0, 350, 12);
 
   // ===== サイドバーキャンバス =====
   const canvasRef = useRef<HTMLCanvasElement | null>(null);

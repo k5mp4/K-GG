@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect, type ReactNode } from 'react';
-import { gsap } from 'gsap';
+import { useDisclosureAnimation } from '../hooks/useDisclosureAnimation';
 import { useInteractionSettings } from './InteractionSettingsContext';
 import { useLanguage } from '../i18n/LanguageProvider';
 import { localizeUiLabel } from '../i18n/uiLabels';
@@ -40,49 +40,12 @@ export function CustomSelect({
   const dropdownRef = useRef<HTMLDivElement>(null);
   const triggerRef = useRef<HTMLButtonElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
-  const timeline = useRef<gsap.core.Timeline | null>(null);
+
 
   const selectedOption = options.find(o => o.value === value) || options[0];
   const isPreviewOnly = previewOnly && alwaysShowPreviews && Boolean(optionPreview);
 
-  useEffect(() => {
-    if (!dropdownRef.current) return;
-    
-    // 初期状態をセット（非表示）
-    gsap.set(dropdownRef.current, { 
-      display: 'none', 
-      height: 0, 
-      opacity: 0, 
-      scaleY: 0.95,
-      transformOrigin: 'top'
-    });
-    
-    // Timelineの構築
-    timeline.current = gsap.timeline({ paused: true })
-      .to(dropdownRef.current, { // CSS仕様でdisplay中間状態が無いため瞬間表示させる
-        display: 'block', 
-        duration: 0 
-      })
-      .to(dropdownRef.current, { // 見た目のアニメーション実行
-        height: 'auto',
-        opacity: 1,
-        scaleY: 1,
-        duration: 0.3,
-        ease: 'power4.out'
-      });
-
-    return () => {
-      timeline.current?.kill();
-    };
-  }, []);
-
-  useEffect(() => {
-    if (isOpen) {
-      timeline.current?.play();
-    } else {
-      timeline.current?.reverse();// timelineの逆再生
-    }
-  }, [isOpen]);
+  useDisclosureAnimation(dropdownRef, isOpen && !isPreviewOnly);
 
   useEffect(() => {
     if (isPreviewOnly) setIsOpen(false);
@@ -152,6 +115,8 @@ export function CustomSelect({
 
       <div
         ref={dropdownRef}
+        inert={!isOpen || isPreviewOnly}
+        style={{ display: 'none' }}
         className={`${isPreviewOnly ? 'hidden ' : ''}absolute z-50 w-full mt-0 bg-k-surface border border-panel-border border-panel rounded-none shadow-xl overflow-hidden`}
       >
             <div className="py-1 max-h-60 overflow-y-auto scrollbar-thin">

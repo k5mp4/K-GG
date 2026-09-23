@@ -127,6 +127,25 @@ async function checkVersion() {
     );
   }
 
+  const updater = project.tauriConfig.plugins?.updater;
+  const keyText = Buffer.from(updater?.pubkey ?? '', 'base64').toString('utf8').trim().split(/\r?\n/);
+  const key = Buffer.from(keyText[1] ?? '', 'base64');
+  if (!keyText[0]?.startsWith('untrusted comment:') || key.length !== 42 || key.subarray(0, 2).toString() !== 'Ed') {
+    fail('updater must contain a valid Minisign public key');
+  }
+  if (!updater?.endpoints?.length || updater.endpoints.some(endpoint => {
+    try {
+      const url = new URL(endpoint);
+      return url.protocol !== 'https:' || Boolean(url.username || url.password);
+    } catch { return true; }
+  })) fail('updater endpoints must use HTTPS without embedded credentials');
+  if (updater?.dangerousInsecureTransportProtocol === true) fail('insecure updater transport is forbidden');
+  if (!project.tauriConfig.bundle?.createUpdaterArtifacts) fail('signed updater artifacts must be enabled');
+  if (!project.tauriConfig.app?.security?.csp) fail('production CSP must be enabled');
+  if (project.tauriConfig.app?.windows?.some(window => window.additionalBrowserArgs?.includes('msSmartScreenProtection'))) {
+    fail('do not disable WebView SmartScreen protection');
+  }
+
   if (!process.exitCode) {
     console.log(`Release configuration is valid for v${canonicalVersion}.`);
   }

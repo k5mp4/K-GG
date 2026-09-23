@@ -7,6 +7,7 @@ use std::process::{Command, Stdio};
 use std::sync::{LazyLock, Mutex};
 use std::thread;
 use std::time::{Duration, Instant};
+use tauri_plugin_fs::FsExt;
 use uuid::Uuid;
 
 #[cfg(windows)]
@@ -93,10 +94,16 @@ pub async fn get_after_effects_status() -> Result<AfterEffectsStatus, String> {
 }
 
 #[tauri::command]
-pub async fn save_native_video_artifact(request: NativeVideoSaveRequest) -> Result<String, String> {
-    tauri::async_runtime::spawn_blocking(move || save_native_video_artifact_sync(request))
-        .await
-        .map_err(|err| format!("Exportファイルの保存に失敗しました: {err}"))?
+pub async fn save_native_video_artifact(
+    app: tauri::AppHandle,
+    request: NativeVideoSaveRequest,
+) -> Result<String, String> {
+    let scope = app.fs_scope();
+    tauri::async_runtime::spawn_blocking(move || {
+        save_native_video_artifact_sync(request, |path| scope.is_allowed(path))
+    })
+    .await
+    .map_err(|err| format!("Exportファイルの保存に失敗しました: {err}"))?
 }
 
 /// AfterFX.exeの準備から完了待ちまでをblocking poolで直列実行する。
@@ -335,7 +342,10 @@ fn validate_native_video_output_path(path: &Path, extension: &str) -> Result<Pat
     Ok(target)
 }
 
-fn save_native_video_artifact_sync(request: NativeVideoSaveRequest) -> Result<String, String> {
+fn save_native_video_artifact_sync(
+    request: NativeVideoSaveRequest,
+    is_allowed: impl Fn(&Path) -> bool,
+) -> Result<String, String> {
     let input_path = Path::new(&request.input_path);
     let extension = Path::new(&request.output_path)
         .extension()
@@ -346,6 +356,10 @@ fn save_native_video_artifact_sync(request: NativeVideoSaveRequest) -> Result<St
     let target = fs::canonicalize(target.parent().expect("validated parent"))
         .map_err(|err| format!("Export先フォルダーを正規化できませんでした: {err}"))?
         .join(target.file_name().expect("validated file name"));
+
+    if !is_allowed(&target) {
+        return Err("保存先が許可されていません。保存ダイアログで選択してください。".to_string());
+    }
 
     if source != target {
         fs::copy(&source, &target)
@@ -1475,10 +1489,23 @@ mod tests {
         let target = output_dir.join("gradient.mov");
         std::fs::write(&source, b"video").expect("write native video fixture");
 
-        let saved = save_native_video_artifact_sync(NativeVideoSaveRequest {
-            input_path: source.to_string_lossy().to_string(),
-            output_path: target.to_string_lossy().to_string(),
-        })
+        std::fs::write(&target, b"original").expect("write existing destination");
+        let denied = save_native_video_artifact_sync(
+            NativeVideoSaveRequest {
+                input_path: source.to_string_lossy().to_string(),
+                output_path: target.to_string_lossy().to_string(),
+            },
+            |_| false,
+        );
+        assert!(denied.is_err());
+        assert_eq!(std::fs::read(&target).unwrap(), b"original");
+        let saved = save_native_video_artifact_sync(
+            NativeVideoSaveRequest {
+                input_path: source.to_string_lossy().to_string(),
+                output_path: target.to_string_lossy().to_string(),
+            },
+            |path| path == std::fs::canonicalize(&target).unwrap(),
+        )
         .expect("native video save should succeed");
         let canonical_target = std::fs::canonicalize(&target).expect("canonicalize saved export");
 

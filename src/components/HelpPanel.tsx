@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import ReactMarkdown from 'react-markdown';
 import helpContentJa from '../docs/help.md?raw';
 import helpContentEn from '../docs/help.en.md?raw';
@@ -5,6 +6,8 @@ import type { UpdateStatus } from '../features/updater/types';
 import { Icon } from './Icon';
 import { IconButton } from './IconButton';
 import { useLanguage } from '../i18n/LanguageProvider';
+
+import ThirdPartyLicenses from './ThirdPartyLicenses';
 
 interface HelpPanelProps {
   onClose: () => void;
@@ -21,6 +24,7 @@ export function HelpPanel({
   updateStatus,
   onCheckForUpdates,
 }: HelpPanelProps) {
+  const [showLicenses, setShowLicenses] = useState(false);
   const checking = updateStatus === 'checking';
   const { language, t } = useLanguage();
 
@@ -68,9 +72,13 @@ export function HelpPanel({
           </div>
         </div>
 
+        <div className="flex gap-2 border-b border-panel-border px-5 py-2">
+          <button type="button" aria-pressed={!showLicenses} onClick={() => setShowLicenses(false)} className="px-3 py-2 text-sm text-fire">{t('help.title')}</button>
+          <button type="button" aria-pressed={showLicenses} onClick={() => setShowLicenses(true)} className="px-3 py-2 text-sm text-fire">{t('help.licenses')}</button>
+        </div>
         {/* コンテンツエリア (スクロール可能) */}
         <div className="p-8 text-k-text overflow-y-auto scrollbar-thin">
-          <ReactMarkdown
+          {showLicenses ? <ThirdPartyLicenses /> : <ReactMarkdown
             components={{
               a: ({ href, children }) => (
                 <a
@@ -94,7 +102,7 @@ export function HelpPanel({
             }}
           >
             {language === 'ja' ? helpContentJa : helpContentEn}
-          </ReactMarkdown>
+          </ReactMarkdown>}
         </div>
         <footer className="flex shrink-0 flex-col gap-3 border-t border-cream/30 bg-k-bg/65 px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
           <div>

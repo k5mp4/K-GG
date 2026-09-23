@@ -1,12 +1,11 @@
-import { strFromU8, strToU8, unzipSync, zipSync } from 'fflate';
+import { readPresetArchive, MAX_PRESET_PACKAGE_BYTES, MAX_PRESET_MANIFEST_BYTES } from './presetArchive';
+import { strFromU8, strToU8, zipSync } from 'fflate';
 import type { Preset, StoreSnapshot } from './presetModel';
 import { isPreset, makePreset } from './presetModel';
 
 export const PRESET_LIBRARY_FORMAT = 'kgg-preset-library';
 export const PRESET_LIBRARY_VERSION = 2 as const;
 const MANIFEST_NAME = 'preset-library.json';
-const MAX_PACKAGE_BYTES = 32 * 1024 * 1024;
-const MAX_MANIFEST_BYTES = 16 * 1024 * 1024;
 
 export type PresetFolder = {
   id: string;
@@ -284,16 +283,13 @@ export function encodePresetExport(library: PresetLibrary, scope: PresetExportSc
 }
 
 export function decodePresetPackage(bytes: Uint8Array, filename = ''): PresetLibrary {
-  if (bytes.byteLength > MAX_PACKAGE_BYTES) throw new Error('Preset package is too large');
+  if (bytes.byteLength > MAX_PRESET_PACKAGE_BYTES) throw new Error('Preset package is too large');
   const isZip = filename.toLocaleLowerCase().endsWith('.zip') || (bytes[0] === 0x50 && bytes[1] === 0x4b);
   let jsonText: string;
   if (isZip) {
-    const files = unzipSync(bytes);
-    const manifest = files[MANIFEST_NAME];
-    if (!manifest || manifest.byteLength > MAX_MANIFEST_BYTES) throw new Error('Preset archive manifest is missing or too large');
-    jsonText = strFromU8(manifest);
+    jsonText = readPresetArchive(bytes);
   } else {
-    if (bytes.byteLength > MAX_MANIFEST_BYTES) throw new Error('Preset file is too large');
+    if (bytes.byteLength > MAX_PRESET_MANIFEST_BYTES) throw new Error('Preset file is too large');
     jsonText = strFromU8(bytes);
   }
   try {
