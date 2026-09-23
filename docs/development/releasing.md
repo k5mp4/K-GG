@@ -9,6 +9,7 @@ ReleaseはMergeとは別の判断です。CIのMerge Gateが成功しても、GP
 ## Release Gateチェックリスト
 
 - Windows x64 Tauri installerが起動する。
+- Windows x64 Tauri installerにFigma Connectorのmanifest、実行JS、UI HTMLが含まれ、K-GG Exportパネルからmanifestの場所を開ける。
 - updater署名、`latest.json`、draft Release assetが整合する。
 - FFmpegが未導入・導入済みの両方でMOV/MP4出力を確認する。
 - After Effects連携を対象バージョンで確認する。

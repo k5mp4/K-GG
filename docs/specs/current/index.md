@@ -18,6 +18,7 @@ title: 現行仕様
 | CURRENT-WEBGL-PERFORMANCE | [WebGL Performance Debug / Profiler](./webgl-performance) | current |
 | CURRENT-MCP-DEVELOPER-INTERFACE | [MCP Developer Interface](./mcp-developer-interface) | current |
 | CURRENT-AFTER-EFFECTS-INTEGRATION | [After Effects連携](./after-effects-integration) | current |
+| CURRENT-DESIGN-APP-CONNECTORS | [Design App Direct Send](./design-app-connectors) | current |
 
 ## 読み方
 

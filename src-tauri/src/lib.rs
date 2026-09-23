@@ -8,6 +8,7 @@ use std::time::{Duration, Instant};
 use tauri::Manager;
 
 mod after_effects;
+mod design_app_bridge;
 
 #[cfg(windows)]
 use std::os::windows::process::CommandExt;
@@ -27,6 +28,7 @@ pub fn run() {
         .plugin(tauri_plugin_process::init())
         .plugin(tauri_plugin_updater::Builder::new().build())
         .setup(|app| {
+            app.manage(design_app_bridge::DesignAppConnectorBridge::start());
             if cfg!(all(target_os = "windows", target_arch = "x86_64")) {
                 if let Err(err) = ensure_ffmpeg_dir(app.handle()) {
                     eprintln!("K-GG専用FFmpegフォルダを作成できませんでした: {err}");
@@ -39,6 +41,7 @@ pub fn run() {
             encode_h264_rgb_mp4,
             get_native_ffmpeg_status,
             open_native_ffmpeg_folder,
+            open_figma_connector_folder,
             open_ffmpeg_builds_page,
             load_presets_file,
             save_presets_file,
@@ -46,7 +49,11 @@ pub fn run() {
             after_effects::get_after_effects_status,
             after_effects::ping_after_effects,
             after_effects::save_native_video_artifact,
-            after_effects::send_after_effects_asset
+            after_effects::send_after_effects_asset,
+            design_app_bridge::get_design_app_connector_state,
+            design_app_bridge::disconnect_design_app_connector,
+            design_app_bridge::approve_design_app_connection,
+            design_app_bridge::dismiss_design_app_connection_request
         ])
         .run(tauri::generate_context!())
         .expect("error while running KAGARIBI Grad");
@@ -705,20 +712,7 @@ fn open_native_ffmpeg_folder(app: tauri::AppHandle) -> Result<(), String> {
     let directory = ensure_ffmpeg_dir(&app)?;
     #[cfg(windows)]
     {
-        let explorer = windows_system_executable("explorer.exe")
-            .or_else(|| {
-                let fallback = PathBuf::from(r"C:\Windows\explorer.exe");
-                fallback.is_file().then_some(fallback)
-            })
-            .ok_or_else(|| "Windows Explorerを見つけられませんでした。".to_string())?;
-        if !explorer.is_file() {
-            return Err("Windows Explorerを見つけられませんでした。".to_string());
-        }
-        Command::new(explorer)
-            .arg(&directory)
-            .spawn()
-            .map(|_| ())
-            .map_err(|err| format!("FFmpegフォルダを開けませんでした: {err}"))
+        open_in_windows_explorer(&directory, "FFmpegフォルダを開けませんでした")
     }
     #[cfg(not(windows))]
     {
@@ -728,20 +722,69 @@ fn open_native_ffmpeg_folder(app: tauri::AppHandle) -> Result<(), String> {
 }
 
 #[tauri::command]
+fn open_figma_connector_folder(app: tauri::AppHandle) -> Result<(), String> {
+    let directory = figma_connector_directory(&app)?;
+    #[cfg(windows)]
+    {
+        open_in_windows_explorer(&directory, "Figma Connectorフォルダーを開けませんでした")
+    }
+    #[cfg(not(windows))]
+    {
+        let _ = directory;
+        Err("Figma Connectorフォルダーを開く操作はWindows版で利用できます。".to_string())
+    }
+}
+
+fn figma_connector_directory(app: &tauri::AppHandle) -> Result<PathBuf, String> {
+    #[cfg(debug_assertions)]
+    {
+        let source_directory =
+            PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../connectors/figma");
+        if has_figma_connector_files(&source_directory) {
+            return Ok(source_directory);
+        }
+    }
+
+    let resource_directory = app
+        .path()
+        .resolve("connectors/figma", tauri::path::BaseDirectory::Resource)
+        .map_err(|error| format!("Figma Connectorの場所を取得できませんでした: {error}"))?;
+    if has_figma_connector_files(&resource_directory) {
+        return Ok(resource_directory);
+    }
+
+    Err("Figma Connectorの配布ファイルを見つけられません。K-GG Desktopを再インストールしてください。".to_string())
+}
+
+fn has_figma_connector_files(directory: &Path) -> bool {
+    ["manifest.json", "dist/main.js", "src/ui.html"]
+        .iter()
+        .all(|relative_path| directory.join(relative_path).is_file())
+}
+
+#[cfg(windows)]
+fn open_in_windows_explorer(
+    target: impl AsRef<OsStr>,
+    failure_context: &str,
+) -> Result<(), String> {
+    let explorer = windows_system_executable("explorer.exe")
+        .or_else(|| {
+            let fallback = PathBuf::from(r"C:\Windows\explorer.exe");
+            fallback.is_file().then_some(fallback)
+        })
+        .ok_or_else(|| "Windows Explorerを見つけられませんでした。".to_string())?;
+    Command::new(explorer)
+        .arg(target)
+        .spawn()
+        .map(|_| ())
+        .map_err(|err| format!("{failure_context}: {err}"))
+}
+
+#[tauri::command]
 fn open_ffmpeg_builds_page() -> Result<(), String> {
     #[cfg(windows)]
     {
-        let explorer = windows_system_executable("explorer.exe")
-            .or_else(|| {
-                let fallback = PathBuf::from(r"C:\Windows\explorer.exe");
-                fallback.is_file().then_some(fallback)
-            })
-            .ok_or_else(|| "Windows Explorerを見つけられませんでした。".to_string())?;
-        Command::new(explorer)
-            .arg(FFMPEG_BUILDS_URL)
-            .spawn()
-            .map(|_| ())
-            .map_err(|err| format!("gyan.devを開けませんでした: {err}"))
+        open_in_windows_explorer(FFMPEG_BUILDS_URL, "gyan.devを開けませんでした")
     }
     #[cfg(not(windows))]
     {

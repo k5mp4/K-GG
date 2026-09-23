@@ -1,0 +1,228 @@
+<!doctype html>
+<html lang="ja">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>K-GG Connector</title>
+    <style>
+      :root { color-scheme: light; font: 12px Inter, system-ui, sans-serif; color: #25262a; background: #f7f7f8; }
+      body { margin: 0; padding: 15px; }
+      h1 { margin: 0; font-size: 14px; letter-spacing: -.015em; }
+      p { margin: 5px 0 12px; color: #666a72; line-height: 1.45; }
+      .topline { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+      .file { max-width: 165px; overflow: hidden; color: #777b83; font-size: 10px; text-overflow: ellipsis; white-space: nowrap; }
+      .card { margin-top: 12px; padding: 11px; border: 1px solid #e1e2e6; background: #fff; }
+      .card-title { margin: 0 0 8px; color: #444850; font-size: 10px; font-weight: 650; letter-spacing: .08em; text-transform: uppercase; }
+      .connect-form { display: flex; }
+      button { border: 0; border-radius: 3px; padding: 8px 10px; color: #282a30; background: #e9e9ed; font: inherit; font-weight: 600; cursor: pointer; }
+      button:hover { background: #dedee4; }
+      button:disabled { opacity: .48; cursor: default; }
+      button.primary { color: #fff; background: #5543d7; }
+      button.primary:hover { background: #4836c6; }
+      .connected { display: none; align-items: center; gap: 7px; margin: 9px 0 0; color: #087443; font-size: 10px; }
+      .connected[data-active="true"] { display: flex; }
+      .dot { width: 7px; height: 7px; border-radius: 50%; background: #19a566; }
+      #status { min-height: 28px; margin: 10px 1px 0; overflow-wrap: anywhere; white-space: pre-wrap; }
+      #status[data-level="error"] { color: #b42318; }
+      #status[data-level="success"] { color: #087443; }
+      #status[data-level="info"] { color: #5f6368; }
+      .footnote { margin: 9px 1px 0; font-size: 10px; }
+    </style>
+  </head>
+  <body>
+    <div class="topline">
+      <h1>K-GG Connector</h1>
+      <span class="file" id="file-name">Figma</span>
+    </div>
+    <p>K-GG DesktopからPNGを受け取り、開いているFigmaファイルへ配置します。</p>
+
+    <section class="card" aria-labelledby="connect-title">
+      <h2 class="card-title" id="connect-title">K-GG Desktopに接続</h2>
+      <form class="connect-form" id="connect-form">
+        <button class="primary" type="submit">K-GGに接続</button>
+      </form>
+      <div class="connected" id="connected"><span class="dot"></span><span>K-GGからのPNGを待っています</span></div>
+    </section>
+
+    <p id="status" role="status" aria-live="polite"></p>
+    <p class="footnote">接続要求をK-GG Desktopで許可すると、画像を受信できます。</p>
+
+    <script>
+      const BASE_URL = 'http://localhost:43127';
+      const MAX_PNG_BYTES = 20 * 1024 * 1024;
+      const IMPORT_RESULT_TIMEOUT_MS = 45000;
+      const status = document.getElementById('status');
+      const connectForm = document.getElementById('connect-form');
+      const connected = document.getElementById('connected');
+      const fileName = document.getElementById('file-name');
+      let connectionToken = null;
+      let connectionRequestId = null;
+      let polling = false;
+      let importingTransferId = null;
+      let importWatchdog = null;
+
+      function setStatus(level, message) {
+        status.dataset.level = level;
+        status.textContent = message;
+      }
+
+      function send(pluginMessage) {
+        parent.postMessage({ pluginMessage }, '*');
+      }
+
+      function setConnection(active) {
+        connected.dataset.active = String(active);
+        connectForm.style.display = active ? 'none' : 'flex';
+      }
+
+      connectForm.addEventListener('submit', async event => {
+        event.preventDefault();
+        const button = connectForm.querySelector('button');
+        button.disabled = true;
+        setStatus('info', 'K-GG Desktopへ接続をリクエストしています…');
+        try {
+          const response = await fetch(`${BASE_URL}/api/connect/figma`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ displayName: fileName.textContent || 'Figma' }),
+            cache: 'no-store',
+          });
+          const result = await response.json();
+          if (response.status !== 202 || typeof result.id !== 'string') throw new Error(result.error || '接続をリクエストできませんでした。');
+          connectionRequestId = result.id;
+          setStatus('info', 'K-GG Desktopで接続を許可してください。');
+        } catch (error) {
+          setStatus('error', error instanceof Error ? error.message : 'K-GG Desktopへの接続に失敗しました。');
+        } finally {
+          button.disabled = false;
+        }
+      });
+
+      async function pollConnection() {
+        if (!connectionRequestId || connectionToken) return;
+        try {
+          const url = new URL(`${BASE_URL}/api/connect/figma/status`);
+          url.searchParams.set('id', connectionRequestId);
+          const response = await fetch(url, { cache: 'no-store' });
+          if (response.status === 202) return;
+          const result = await response.json();
+          if (!response.ok || typeof result.token !== 'string') throw new Error(result.error || 'K-GG Desktopとの接続を確認できませんでした。');
+          connectionToken = result.token;
+          connectionRequestId = null;
+          setConnection(true);
+          setStatus('success', 'K-GG Desktopと接続しました。');
+        } catch (error) {
+          connectionRequestId = null;
+          setStatus('error', error instanceof Error ? error.message : 'K-GG Desktopへの接続に失敗しました。');
+        }
+      }
+
+      async function acknowledge(transferId, result, message) {
+        if (!connectionToken) {
+          finishImport(transferId);
+          return;
+        }
+        const query = new URLSearchParams({ id: transferId, result, message });
+        for (let attempt = 0; attempt < 3; attempt += 1) {
+          try {
+            const response = await fetch(`${BASE_URL}/api/ack/figma?${query}`, {
+              headers: { Authorization: `Bearer ${connectionToken}` },
+              cache: 'no-store',
+            });
+            if (response.ok) {
+              finishImport(transferId);
+              return;
+            }
+          } catch (_) {}
+          await new Promise(resolve => setTimeout(resolve, 300 * (attempt + 1)));
+        }
+        finishImport(transferId);
+        setStatus('error', '配置結果をK-GG Desktopへ返せませんでした。');
+      }
+
+      function finishImport(transferId) {
+        if (importingTransferId !== transferId) return;
+        importingTransferId = null;
+        if (importWatchdog !== null) {
+          clearTimeout(importWatchdog);
+          importWatchdog = null;
+        }
+      }
+
+      function beginImportWatchdog(transferId) {
+        if (importWatchdog !== null) clearTimeout(importWatchdog);
+        importWatchdog = window.setTimeout(() => {
+          if (importingTransferId !== transferId) return;
+          const message = 'Figmaから配置結果が返らなかったため、この転送を失敗として閉じました。';
+          setStatus('error', message);
+          void acknowledge(transferId, 'failed', message);
+        }, IMPORT_RESULT_TIMEOUT_MS);
+      }
+
+      async function poll() {
+        if (!connectionToken || polling || importingTransferId) return;
+        polling = true;
+        let transferId = null;
+        try {
+          const response = await fetch(`${BASE_URL}/api/poll/figma`, {
+            headers: { Authorization: `Bearer ${connectionToken}` },
+            cache: 'no-store',
+          });
+          if (response.status === 204) return;
+          if (response.status === 401) {
+            connectionToken = null;
+            setConnection(false);
+            setStatus('error', 'K-GG Desktopを再起動しました。もう一度接続してください。');
+            return;
+          }
+          if (!response.ok) throw new Error('PNGを受信できませんでした。');
+          transferId = response.headers.get('X-KGG-Transfer-Id');
+          const encodedName = response.headers.get('X-KGG-Transfer-Name') || 'K-GG Image';
+          const name = decodeURIComponent(encodedName);
+          if (!transferId) throw new Error('転送IDを読み取れませんでした。');
+          importingTransferId = transferId;
+          const bytes = new Uint8Array(await response.arrayBuffer());
+          if (bytes.byteLength > MAX_PNG_BYTES) throw new Error('受信したPNGのデータが上限を超えています。');
+          setStatus('info', 'PNGをFigmaへ配置しています…');
+          beginImportWatchdog(transferId);
+          send({ type: 'import-png', transferId, name, bytes });
+        } catch (error) {
+          const message = error instanceof Error ? error.message : 'K-GGからPNGを受信できませんでした。';
+          if (transferId) {
+            setStatus('error', message);
+            void acknowledge(transferId, 'failed', message);
+          } else {
+            importingTransferId = null;
+            setStatus('error', message);
+          }
+        } finally {
+          polling = false;
+        }
+      }
+
+      window.addEventListener('message', event => {
+        const message = event.data && event.data.pluginMessage;
+        if (!message || typeof message !== 'object') return;
+        if (message.type === 'file-name' && typeof message.name === 'string') {
+          fileName.textContent = message.name;
+          return;
+        }
+        if (message.type === 'status') {
+          setStatus(message.level || 'info', message.message || '');
+          return;
+        }
+        if (message.type === 'import-result') {
+          void acknowledge(message.transferId, message.result, message.message || '');
+          setStatus(message.result === 'delivered' ? 'success' : 'error', message.message || 'PNGの配置結果を受信しました。');
+          return;
+        }
+      });
+
+      setInterval(() => {
+        void pollConnection();
+        void poll();
+      }, 800);
+      send({ type: 'ready' });
+    </script>
+  </body>
+</html>

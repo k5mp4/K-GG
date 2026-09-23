@@ -40,6 +40,7 @@ import { exportDisplayProgress, exportProgressPercent, exportStageLabel } from '
 import { completeVideoExport } from '../lib/videoExportLifecycle';
 import { createAeStatusController } from '../lib/aeStatusController';
 import { useLanguage } from '../i18n/LanguageProvider';
+import { DesignAppSendPanel } from './DesignAppSendPanel';
 
 type ExportJob = 'mov' | 'mp4' | 'zip' | 'slits' | null;
 type VideoExt = 'mov' | 'mp4';
@@ -1012,6 +1013,7 @@ export function ExportPanel({
           </div>
         )}
       </div>
+      <DesignAppSendPanel canvas={getOutputCanvas()} imageName={stem} />
     </div>
   );
 }
