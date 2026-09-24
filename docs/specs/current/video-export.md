@@ -5,10 +5,10 @@ title: 動画・連番フレーム出力
 status: current
 owners: [maintainer]
 created: 2026-07-31
-updated: 2026-09-22
-requirement_ids: [EXPORT-001, EXPORT-002, EXPORT-003, EXPORT-004, EXPORT-005, EXPORT-006, EXPORT-007, EXPORT-008, EXPORT-009, EXPORT-021]
-related_adrs: [ADR-0004, ADR-0005, ADR-0018]
-related_changes: [CHANGE-011, CHANGE-024, CHANGE-025, CHANGE-027, CHANGE-030, CHANGE-031, CHANGE-032, CHANGE-037, CHANGE-038, CHANGE-048, CHANGE-051]
+updated: 2026-09-24
+requirement_ids: [EXPORT-001, EXPORT-002, EXPORT-003, EXPORT-004, EXPORT-005, EXPORT-006, EXPORT-007, EXPORT-008, EXPORT-009, EXPORT-010, EXPORT-011, EXPORT-021]
+related_adrs: [ADR-0004, ADR-0005, ADR-0018, ADR-0021]
+related_changes: [CHANGE-011, CHANGE-024, CHANGE-025, CHANGE-027, CHANGE-030, CHANGE-031, CHANGE-032, CHANGE-037, CHANGE-038, CHANGE-048, CHANGE-051, CHANGE-052]
 related_code: [src/adapters/browser/videoExportService.ts, src/adapters/tauri/videoExportService.ts, src/adapters/browser/exportService.ts, src/adapters/tauri/exportService.ts, src/adapters/tauri/afterEffectsService.ts, src/adapters/types.ts, src/lib/export.ts, src/lib/exportSlits.ts, src/lib/exportVideo.ts, src/lib/aftereffectsExport.ts, src/lib/aeStatusController.ts, src/lib/videoExportLifecycle.ts, src/lib/renderBridge.ts, src/lib/renderSceneAtTime.ts, src/lib/flowGradientRenderer.ts, src/lib/flowSimulation.ts, src/lib/videoExportFrames.ts, src/lib/tileRender.ts, src/lib/webgl.ts, src/lib/clothGradientRenderer.ts, src/lib/coneSeam.ts, src/components/GradientCanvas.tsx, src/components/ClothCanvas.tsx, src/components/ConeApexEditor.tsx, src/components/ExportPanel.tsx, src-tauri/src/lib.rs, tools/ffmpeg-native-smoke.mjs]
 related_tests: [src/lib/renderBridge.test.ts, src/lib/effectPipeline.test.ts, src/lib/renderFrame.test.ts, src/lib/flowSimulation.test.ts, src/lib/flowGradientPreset.test.ts, src/lib/webglExportPrograms.test.ts, src/lib/webglShaderSources.test.ts, src/lib/glass.test.ts, src/lib/videoExportFrames.test.ts, src/lib/coneView.test.ts, src/lib/coneSeam.test.ts, src/lib/coneViewRenderer.test.ts, src/lib/webglPerformance.test.ts, src/lib/aftereffectsExport.test.ts, src/lib/aeStatusController.test.ts, src/lib/videoExportLifecycle.test.ts, src/adapters/tauri/exportService.test.ts, src/adapters/tauri/videoExportService.native-artifact.test.ts, src/adapters/tauri/exportService.native-artifact.test.ts, src/adapters/tauri/afterEffectsService.native-artifact.test.ts]
 ---
@@ -66,6 +66,14 @@ Tauri版MP4は標準互換のH.264（`libx264`）／`yuv420p`で生成し、動�
 After Effectsへの自動送信は書き出し完了とPreview復帰を待たせません。複数のAE操作は直列化し、古い操作結果またはタイマーが新しい送信中状態を上書きしないよう、最新操作だけを表示状態へ反映します。自動送信が実行中1件と待機中1件に達した場合は、待機する大容量成果物が無制限に増えないよう、新しいMOV・MP4書き出しを送信完了まで無効にします。
 
 Rustで保存先を正規化し、Tauri filesystem scopeに含まれることをコピー前に確認する。許可されていない保存先へは書き込まない。既存のリンク・一時成果物・拡張子検証も維持する。
+
+### EXPORT-010 デスクトップ版プラットフォーム
+
+Tauriデスクトップ版の動画出力はWindows x64とmacOS arm64/Intelで提供する。WindowsはNSISと既存のTauri updaterを使用する。macOSはDMGを試験配布し、現時点ではコード署名・公証・自動更新を提供しない。Browser版のPNG連番ZIPと静止画出力はこの区分に依存しない。
+
+### EXPORT-011 外部FFmpegの検出
+
+Windows x64はアプリローカルデータの`ffmpeg/ffmpeg.exe`を優先し、利用できない場合はPATHとWindows環境変数Pathを探索する。macOSはPATH上の`ffmpeg`と`ffprobe`を探索する。どちらもRust側でFFmpegの起動、バージョン、`qtrle`、`libx264`を検証し、K-GGはFFmpegを同梱・ダウンロード・PATH変更しない。macOSの`ffprobe`はアプリの検出警告とCI/Release Gateの生成物検証に使用する。
 
 ### EXPORT-021 Flow Gradientの論理フレーム
 

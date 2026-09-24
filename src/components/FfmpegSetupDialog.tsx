@@ -5,6 +5,7 @@ import { IconButton } from './IconButton';
 import { useLanguage } from '../i18n/LanguageProvider';
 
 const FFMPEG_BUILDS_URL = 'https://www.gyan.dev/ffmpeg/builds/#release-builds';
+const FFMPEG_MACOS_URL = 'https://formulae.brew.sh/formula/ffmpeg';
 
 type Props = {
   open: boolean;
@@ -36,6 +37,9 @@ export function FfmpegSetupDialog({
   }, [checking, onClose, open]);
 
   if (!open) return null;
+
+  const isMacOs = status?.platform === 'macos';
+  const installUrl = isMacOs ? FFMPEG_MACOS_URL : FFMPEG_BUILDS_URL;
 
   return (
     <div className="fixed inset-0 z-[90] flex items-center justify-center p-4 sm:p-10">
@@ -79,17 +83,27 @@ export function FfmpegSetupDialog({
 
         <div className="space-y-5 overflow-y-auto p-6 scrollbar-thin">
           <p className="text-sm leading-relaxed text-k-text/85">
-            {t('ffmpeg.description')}
+            {t(isMacOs ? 'ffmpeg.macosDescription' : 'ffmpeg.description')}
           </p>
 
           <ol className="list-decimal space-y-2 pl-5 text-xs leading-relaxed text-k-text/75">
-            <li>{t('ffmpeg.stepDownload')}</li>
-            <li>{t('ffmpeg.stepCopy')}</li>
-            <li>{t('ffmpeg.stepPlace')}</li>
+            {isMacOs ? (
+              <>
+                <li>{t('ffmpeg.macosStepInstall')}</li>
+                <li>{t('ffmpeg.macosStepPath')}</li>
+                <li>{t('ffmpeg.macosStepCheck')}</li>
+              </>
+            ) : (
+              <>
+                <li>{t('ffmpeg.stepDownload')}</li>
+                <li>{t('ffmpeg.stepCopy')}</li>
+                <li>{t('ffmpeg.stepPlace')}</li>
+              </>
+            )}
           </ol>
 
           <div className="border border-cream/20 bg-k-bg/55 p-4 text-xs leading-relaxed text-tab-inactive">
-            {t('ffmpeg.pathDescription')}
+            {t(isMacOs ? 'ffmpeg.macosPathDescription' : 'ffmpeg.pathDescription')}
           </div>
 
           {(status?.error || status?.warning) && (
@@ -99,17 +113,17 @@ export function FfmpegSetupDialog({
             </div>
           )}
 
-          {status?.folderPath && (
+          {!isMacOs && status?.folderPath && (
             <p className="break-all text-[10px] leading-relaxed text-tab-inactive">
               {t('ffmpeg.folder', { path: status.folderPath })}
             </p>
           )}
 
           <p className="text-[10px] leading-relaxed text-tab-inactive">
-            {t('ffmpeg.license')}
+            {t(isMacOs ? 'ffmpeg.macosLicense' : 'ffmpeg.license')}
           </p>
           <p className="break-all text-[10px] leading-relaxed text-tab-inactive">
-            {FFMPEG_BUILDS_URL}
+            {installUrl}
           </p>
 
           <div className="grid gap-2 sm:grid-cols-2">
@@ -118,15 +132,17 @@ export function FfmpegSetupDialog({
               onClick={onOpenBuildsPage}
               className="flex items-center justify-center border border-fire bg-fire/15 px-4 py-2.5 text-xs font-display font-bold uppercase tracking-wider text-fire hover:bg-fire hover:text-k-bg"
             >
-              {t('ffmpeg.openBuilds')}
+              {t(isMacOs ? 'ffmpeg.openHomebrew' : 'ffmpeg.openBuilds')}
             </button>
-            <button
-              type="button"
-              onClick={onOpenFolder}
-              className="border border-cream/35 px-4 py-2.5 text-xs font-display font-semibold uppercase tracking-wider text-k-text hover:border-cream"
-            >
-              {t('ffmpeg.openFolder')}
-            </button>
+            {!isMacOs && status?.folderPath && (
+              <button
+                type="button"
+                onClick={onOpenFolder}
+                className="border border-cream/35 px-4 py-2.5 text-xs font-display font-semibold uppercase tracking-wider text-k-text hover:border-cream"
+              >
+                {t('ffmpeg.openFolder')}
+              </button>
+            )}
           </div>
 
           <div className="flex justify-end gap-2">

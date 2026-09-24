@@ -6,6 +6,7 @@ use std::process::{Command, Stdio};
 use std::thread;
 use std::time::{Duration, Instant};
 use tauri::Manager;
+use tauri_plugin_opener::OpenerExt;
 
 mod after_effects;
 mod design_app_bridge;
@@ -30,7 +31,7 @@ pub fn run() {
         .plugin(tauri_plugin_updater::Builder::new().build())
         .setup(|app| {
             app.manage(design_app_bridge::DesignAppConnectorBridge::start());
-            if cfg!(all(target_os = "windows", target_arch = "x86_64")) {
+            if native_ffmpeg_supported_target() && cfg!(target_os = "windows") {
                 if let Err(err) = ensure_ffmpeg_dir(app.handle()) {
                     eprintln!("K-GG専用FFmpegフォルダを作成できませんでした: {err}");
                 }
@@ -63,6 +64,7 @@ pub fn run() {
 #[derive(Clone, Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
 struct NativeFfmpegStatus {
+    platform: &'static str,
     supported: bool,
     available: bool,
     source: Option<String>,
@@ -71,6 +73,8 @@ struct NativeFfmpegStatus {
     error: Option<String>,
     warning: Option<String>,
     folder_path: Option<String>,
+    ffprobe_path: Option<String>,
+    ffprobe_version: Option<String>,
 }
 
 #[derive(Debug)]
@@ -134,6 +138,28 @@ fn ffmpeg_dir(app: &tauri::AppHandle) -> Result<PathBuf, String> {
         .app_local_data_dir()
         .map(|dir| dir.join("ffmpeg"))
         .map_err(|err| format!("アプリデータの場所を取得できませんでした: {err}"))
+}
+
+fn native_ffmpeg_supported_target() -> bool {
+    cfg!(all(target_os = "windows", target_arch = "x86_64")) || cfg!(target_os = "macos")
+}
+
+fn native_platform() -> &'static str {
+    if cfg!(target_os = "windows") {
+        "windows"
+    } else if cfg!(target_os = "macos") {
+        "macos"
+    } else {
+        "unknown"
+    }
+}
+
+fn ffmpeg_executable_name() -> &'static str {
+    if cfg!(windows) {
+        "ffmpeg.exe"
+    } else {
+        "ffmpeg"
+    }
 }
 
 fn ensure_ffmpeg_dir(app: &tauri::AppHandle) -> Result<PathBuf, String> {
@@ -223,8 +249,8 @@ fn run_command_with_timeout(
     })
 }
 
-#[cfg(windows)]
-fn is_windows_x64_executable(path: &Path) -> Result<bool, String> {
+#[cfg(all(target_os = "windows", target_arch = "x86_64"))]
+fn is_supported_ffmpeg_executable(path: &Path) -> Result<bool, String> {
     let mut file = std::fs::File::open(path)
         .map_err(|err| format!("実行ファイルを読み込めませんでした: {err}"))?;
     let mut dos_header = [0_u8; 64];
@@ -246,9 +272,14 @@ fn is_windows_x64_executable(path: &Path) -> Result<bool, String> {
     Ok(&pe_header[0..4] == b"PE\0\0" && u16::from_le_bytes([pe_header[4], pe_header[5]]) == 0x8664)
 }
 
-#[cfg(not(windows))]
-fn is_windows_x64_executable(_path: &Path) -> Result<bool, String> {
-    Ok(false)
+#[cfg(windows)]
+fn is_windows_x64_executable(path: &Path) -> Result<bool, String> {
+    is_supported_ffmpeg_executable(path)
+}
+
+#[cfg(not(all(target_os = "windows", target_arch = "x86_64")))]
+fn is_supported_ffmpeg_executable(_path: &Path) -> Result<bool, String> {
+    Ok(true)
 }
 
 fn encoder_list_has(output: &str, encoder: &str) -> bool {
@@ -270,8 +301,8 @@ fn validate_ffmpeg(path: &Path) -> Result<ValidatedFfmpeg, String> {
     if !path.is_file() {
         return Err("ファイルが見つかりません。".to_string());
     }
-    if !is_windows_x64_executable(path)? {
-        return Err("Windows x64実行ファイルではありません。".to_string());
+    if !is_supported_ffmpeg_executable(path)? {
+        return Err("このプラットフォームで実行できるFFmpegではありません。".to_string());
     }
 
     let version_output = run_command_with_timeout(path, &["-version"], FFMPEG_CHECK_TIMEOUT)?;
@@ -330,10 +361,19 @@ fn push_unique_candidate(candidates: &mut Vec<PathBuf>, candidate: PathBuf) {
     }
 }
 
-fn append_ffmpeg_candidates_from_path_value(candidates: &mut Vec<PathBuf>, path_value: &OsStr) {
+fn append_executable_candidates_from_path_value(
+    candidates: &mut Vec<PathBuf>,
+    path_value: &OsStr,
+    executable_name: &str,
+) {
     for directory in std::env::split_paths(path_value) {
-        push_unique_candidate(candidates, directory.join("ffmpeg.exe"));
+        push_unique_candidate(candidates, directory.join(executable_name));
     }
+}
+
+#[cfg(test)]
+fn append_ffmpeg_candidates_from_path_value(candidates: &mut Vec<PathBuf>, path_value: &OsStr) {
+    append_executable_candidates_from_path_value(candidates, path_value, ffmpeg_executable_name());
 }
 
 #[cfg(windows)]
@@ -423,18 +463,78 @@ fn windows_registry_path_values() -> Vec<String> {
     .collect()
 }
 
-fn path_ffmpeg_candidates() -> Vec<PathBuf> {
+fn path_executable_candidates(executable_name: &str) -> Vec<PathBuf> {
     let mut candidates = Vec::new();
     if let Some(path) = std::env::var_os("PATH") {
-        append_ffmpeg_candidates_from_path_value(&mut candidates, &path);
+        append_executable_candidates_from_path_value(&mut candidates, &path, executable_name);
     }
     #[cfg(windows)]
     {
         for path in windows_registry_path_values() {
-            append_ffmpeg_candidates_from_path_value(&mut candidates, OsStr::new(&path));
+            append_executable_candidates_from_path_value(
+                &mut candidates,
+                OsStr::new(&path),
+                executable_name,
+            );
         }
     }
     candidates
+}
+
+fn path_ffmpeg_candidates() -> Vec<PathBuf> {
+    path_executable_candidates(ffmpeg_executable_name())
+}
+
+fn path_ffprobe_candidates() -> Vec<PathBuf> {
+    path_executable_candidates(if cfg!(windows) {
+        "ffprobe.exe"
+    } else {
+        "ffprobe"
+    })
+}
+
+fn ffprobe_version(path: &Path) -> Result<String, String> {
+    let output = run_command_with_timeout(path, &["-version"], FFMPEG_CHECK_TIMEOUT)?;
+    if !output.success {
+        let detail = output.stderr.trim();
+        return Err(if detail.is_empty() {
+            "`ffprobe -version`が失敗しました。".to_string()
+        } else {
+            format!("`ffprobe -version`が失敗しました: {detail}")
+        });
+    }
+    output
+        .stdout
+        .lines()
+        .find(|line| line.trim_start().starts_with("ffprobe version "))
+        .map(str::trim)
+        .map(str::to_string)
+        .ok_or_else(|| "ffprobeのバージョン情報を確認できませんでした。".to_string())
+}
+
+fn find_ffprobe() -> Result<(PathBuf, String), String> {
+    let candidates = path_ffprobe_candidates();
+    let mut errors = Vec::new();
+    for candidate in candidates {
+        let label = candidate.display().to_string();
+        match ffprobe_version(&candidate) {
+            Ok(version) => return Ok((candidate, version)),
+            Err(err) => errors.push(format!("{label}: {err}")),
+        }
+    }
+    if errors.is_empty() {
+        Err("PATH上にffprobeが見つかりません。".to_string())
+    } else {
+        Err(format!(
+            "PATH上のffprobeを利用できません: {}",
+            errors.join(" / ")
+        ))
+    }
+}
+
+fn combine_warnings(warnings: impl IntoIterator<Item = Option<String>>) -> Option<String> {
+    let warnings = warnings.into_iter().flatten().collect::<Vec<_>>();
+    (!warnings.is_empty()).then(|| warnings.join(" / "))
 }
 
 fn status_from_validated(
@@ -442,8 +542,10 @@ fn status_from_validated(
     source: &str,
     folder_path: Option<String>,
     warning: Option<String>,
+    ffprobe: Option<(PathBuf, String)>,
 ) -> NativeFfmpegStatus {
     NativeFfmpegStatus {
+        platform: native_platform(),
         supported: true,
         available: true,
         source: Some(source.to_string()),
@@ -452,33 +554,54 @@ fn status_from_validated(
         error: None,
         warning,
         folder_path,
+        ffprobe_path: ffprobe
+            .as_ref()
+            .map(|(path, _)| path.to_string_lossy().into_owned()),
+        ffprobe_version: ffprobe.map(|(_, version)| version),
     }
 }
 
 fn native_ffmpeg_status(app: &tauri::AppHandle) -> NativeFfmpegStatus {
-    if !cfg!(all(target_os = "windows", target_arch = "x86_64")) {
+    if !native_ffmpeg_supported_target() {
         return NativeFfmpegStatus {
+            platform: native_platform(),
             supported: false,
             available: false,
             source: None,
             path: None,
             version: None,
             error: Some(
-                "FFmpeg動画出力はWindows x64デスクトップ版でのみ利用できます。".to_string(),
+                "FFmpeg動画出力はWindows x64またはmacOSデスクトップ版で利用できます。".to_string(),
             ),
             warning: None,
             folder_path: None,
+            ffprobe_path: None,
+            ffprobe_version: None,
         };
     }
 
-    let (folder, folder_error) = match ensure_ffmpeg_dir(app) {
-        Ok(dir) => (Some(dir), None),
-        Err(err) => (ffmpeg_dir(app).ok(), Some(err)),
+    let (folder, folder_error) = if cfg!(target_os = "windows") {
+        match ensure_ffmpeg_dir(app) {
+            Ok(dir) => (Some(dir), None),
+            Err(err) => (ffmpeg_dir(app).ok(), Some(err)),
+        }
+    } else {
+        (None, None)
     };
     let folder_path = folder
         .as_ref()
         .map(|path| path.to_string_lossy().into_owned());
-    let local_path = folder.as_ref().map(|dir| dir.join("ffmpeg.exe"));
+    let (ffprobe, ffprobe_error) = if cfg!(target_os = "macos") {
+        match find_ffprobe() {
+            Ok(probe) => (Some(probe), None),
+            Err(err) => (None, Some(err)),
+        }
+    } else {
+        (None, None)
+    };
+    let local_path = folder
+        .as_ref()
+        .map(|dir| dir.join(ffmpeg_executable_name()));
     let local_result = local_path.as_ref().and_then(|path| {
         if !path.exists() {
             None
@@ -488,7 +611,8 @@ fn native_ffmpeg_status(app: &tauri::AppHandle) -> NativeFfmpegStatus {
                     return Some(Ok(validated));
                 }
                 Err(err) => Some(Err(format!(
-                    "K-GG専用フォルダのffmpeg.exeを利用できません: {err}"
+                    "K-GG専用フォルダの{}を利用できません: {err}",
+                    ffmpeg_executable_name()
                 ))),
             }
         }
@@ -504,9 +628,9 @@ fn native_ffmpeg_status(app: &tauri::AppHandle) -> NativeFfmpegStatus {
             })
             .collect()
     });
-    let warning = selection.warning.or(folder_error);
+    let warning = combine_warnings([selection.warning, folder_error, ffprobe_error]);
     if let Some((validated, source)) = selection.selected {
-        return status_from_validated(validated, source, folder_path, warning);
+        return status_from_validated(validated, source, folder_path, warning, ffprobe);
     }
 
     let error = if !selection.errors.is_empty() {
@@ -515,9 +639,11 @@ fn native_ffmpeg_status(app: &tauri::AppHandle) -> NativeFfmpegStatus {
             selection.errors.join(" / ")
         )
     } else {
-        "K-GG専用フォルダとシステムPATHに利用可能なFFmpegが見つかりません。".to_string()
+        "利用可能なFFmpegが見つかりません。FFmpegをPATHに追加してから再確認してください。"
+            .to_string()
     };
     NativeFfmpegStatus {
+        platform: native_platform(),
         supported: true,
         available: false,
         source: None,
@@ -526,6 +652,10 @@ fn native_ffmpeg_status(app: &tauri::AppHandle) -> NativeFfmpegStatus {
         error: Some(error),
         warning,
         folder_path,
+        ffprobe_path: ffprobe
+            .as_ref()
+            .map(|(path, _)| path.to_string_lossy().into_owned()),
+        ffprobe_version: ffprobe.map(|(_, version)| version),
     }
 }
 
@@ -710,30 +840,23 @@ fn font_name_from_file_name(file_name: &str) -> String {
 
 #[tauri::command]
 fn open_native_ffmpeg_folder(app: tauri::AppHandle) -> Result<(), String> {
+    if !cfg!(all(target_os = "windows", target_arch = "x86_64")) {
+        return Err(
+            "macOSではFFmpegをPATHから利用します。K-GG専用フォルダはありません。".to_string(),
+        );
+    }
     let directory = ensure_ffmpeg_dir(&app)?;
-    #[cfg(windows)]
-    {
-        open_in_windows_explorer(&directory, "FFmpegフォルダを開けませんでした")
-    }
-    #[cfg(not(windows))]
-    {
-        let _ = directory;
-        Err("この環境ではFFmpegフォルダを開けません。".to_string())
-    }
+    app.opener()
+        .reveal_item_in_dir(&directory)
+        .map_err(|err| format!("FFmpegフォルダを開けませんでした: {err}"))
 }
 
 #[tauri::command]
 fn open_figma_connector_folder(app: tauri::AppHandle) -> Result<(), String> {
     let directory = figma_connector_directory(&app)?;
-    #[cfg(windows)]
-    {
-        open_in_windows_explorer(&directory, "Figma Connectorフォルダーを開けませんでした")
-    }
-    #[cfg(not(windows))]
-    {
-        let _ = directory;
-        Err("Figma Connectorフォルダーを開く操作はWindows版で利用できます。".to_string())
-    }
+    app.opener()
+        .reveal_item_in_dir(&directory)
+        .map_err(|err| format!("Figma Connectorフォルダーを開けませんでした: {err}"))
 }
 
 fn figma_connector_directory(app: &tauri::AppHandle) -> Result<PathBuf, String> {
@@ -763,34 +886,16 @@ fn has_figma_connector_files(directory: &Path) -> bool {
         .all(|relative_path| directory.join(relative_path).is_file())
 }
 
-#[cfg(windows)]
-fn open_in_windows_explorer(
-    target: impl AsRef<OsStr>,
-    failure_context: &str,
-) -> Result<(), String> {
-    let explorer = windows_system_executable("explorer.exe")
-        .or_else(|| {
-            let fallback = PathBuf::from(r"C:\Windows\explorer.exe");
-            fallback.is_file().then_some(fallback)
-        })
-        .ok_or_else(|| "Windows Explorerを見つけられませんでした。".to_string())?;
-    Command::new(explorer)
-        .arg(target)
-        .spawn()
-        .map(|_| ())
-        .map_err(|err| format!("{failure_context}: {err}"))
-}
-
 #[tauri::command]
-fn open_ffmpeg_builds_page() -> Result<(), String> {
-    #[cfg(windows)]
-    {
-        open_in_windows_explorer(FFMPEG_BUILDS_URL, "gyan.devを開けませんでした")
-    }
-    #[cfg(not(windows))]
-    {
-        Err("この環境ではgyan.devを開けません。".to_string())
-    }
+fn open_ffmpeg_builds_page(app: tauri::AppHandle) -> Result<(), String> {
+    let url = if cfg!(target_os = "macos") {
+        "https://formulae.brew.sh/formula/ffmpeg"
+    } else {
+        FFMPEG_BUILDS_URL
+    };
+    app.opener()
+        .open_url(url, None::<&str>)
+        .map_err(|err| format!("FFmpegの案内ページを開けませんでした: {err}"))
 }
 
 fn presets_file_path(app: &tauri::AppHandle) -> Result<PathBuf, String> {
@@ -1254,7 +1359,7 @@ mod tests {
         let root = test_dir("path-candidates");
         let bin = root.join("bin");
         std::fs::create_dir_all(&bin).expect("create bin dir");
-        let ffmpeg = bin.join("ffmpeg.exe");
+        let ffmpeg = bin.join(super::ffmpeg_executable_name());
         std::fs::write(&ffmpeg, b"fixture").expect("write ffmpeg fixture");
 
         let path_value =
@@ -1384,7 +1489,7 @@ HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Windows NT\CurrentVersion\Fonts
     #[cfg(windows)]
     #[test]
     fn recognizes_a_windows_x64_pe_header() {
-        use super::is_windows_x64_executable;
+        use super::is_supported_ffmpeg_executable;
 
         let root = test_dir("ffmpeg-pe");
         let path = root.join("ffmpeg.exe");
@@ -1396,7 +1501,7 @@ HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Windows NT\CurrentVersion\Fonts
         bytes[68..70].copy_from_slice(&0x8664_u16.to_le_bytes());
         std::fs::write(&path, bytes).expect("write PE fixture");
 
-        assert!(is_windows_x64_executable(&path).expect("inspect PE fixture"));
+        assert!(is_supported_ffmpeg_executable(&path).expect("inspect PE fixture"));
         let _ = std::fs::remove_dir_all(root);
     }
 

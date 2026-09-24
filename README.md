@@ -67,6 +67,18 @@ For a signed Windows x64 NSIS installer / 署名付きWindows x64 NSISインス�
 npm run tauri:build:windows
 ```
 
+For macOS arm64 or Intel DMG builds / macOS arm64・Intel向けDMG:
+
+```sh
+npm run tauri:build:macos
+```
+
+## Desktop platform status / デスクトップ版の対応状況
+
+Windows x64 is the supported production target. macOS arm64 and Intel builds are Experimental: GitHub Actions builds and tests them, but the developer has not verified them on physical macOS hardware. The DMGs are currently unsigned and not notarized, so Gatekeeper may show a warning. macOS video export uses `ffmpeg` and `ffprobe` from PATH; install them with Homebrew (`brew install ffmpeg`) or another suitable method. After Effects automation remains unavailable on macOS. Figma loopback direct send is available, including opening the bundled connector folder.
+
+Windows x64は本番対応ターゲットです。macOS arm64・Intel版はExperimentalです。GitHub Actions上でビルドと自動テストを行っていますが、開発者によるmacOS実機での動作確認は行っていません。DMGには現在コード署名・公証を行っていないため、Gatekeeperの警告が表示される場合があります。macOSの動画書き出しはPATH上の`ffmpeg`と`ffprobe`を使うため、Homebrew（`brew install ffmpeg`）など適切な方法で導入してください。After Effects自動連携はmacOSでは利用できません。Figmaのloopback直接送信と、同梱Connectorフォルダーを開く操作は利用できます。
+
 Run all branch checks / ブランチ検証を一括実行:
 
 ```sh
@@ -89,9 +101,9 @@ The initial installer is protected by the Tauri updater signature but does not y
 
 初回インストーラーにはTauriの更新署名を使用しますが、Windows Authenticodeコード署名はまだ使用しません。そのため、初回インストール時にMicrosoft Defender SmartScreenの警告が表示される場合があります。
 
-Maintainers must complete the updater key and GitHub Environment setup before creating a release. See the [Windows release guide](docs/releasing.md).
+Maintainers must complete the updater key and GitHub Environment setup before creating a release. See the [release guide](docs/development/releasing.md).
 
-管理者はリリース前に更新署名鍵とGitHub Environmentを設定する必要があります。詳しくは[Windows版リリース手順](docs/releasing.md)を参照してください。
+管理者はリリース前に更新署名鍵とGitHub Environmentを設定する必要があります。詳しくは[リリース手順](docs/development/releasing.md)を参照してください。
 
 ## Documentation / ドキュメント
 

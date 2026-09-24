@@ -13,6 +13,10 @@ const AUTO_SAVE_DIR: AeSaveDirStatus = { mode: 'auto', path: null, name: null };
 export const browserAfterEffectsService: AfterEffectsService = {
   runtime: 'browser-bridge',
 
+  async isPlatformSupported(): Promise<boolean> {
+    return true;
+  },
+
   async isAvailable(): Promise<boolean> {
     try {
       const res = await fetch(`${AE_BASE}/api/ae/status`, {

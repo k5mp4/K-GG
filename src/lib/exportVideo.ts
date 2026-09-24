@@ -49,6 +49,7 @@ export function nativeFfmpegSupported(): boolean {
 export async function getNativeFfmpegStatus(): Promise<NativeFfmpegStatus> {
   if (isFfmpegMissingDebugEnabled()) {
     return {
+      platform: 'unknown',
       supported: true,
       available: false,
       source: null,
@@ -57,20 +58,25 @@ export async function getNativeFfmpegStatus(): Promise<NativeFfmpegStatus> {
       error: null,
       warning: null,
       folderPath: null,
+      ffprobePath: null,
+      ffprobeVersion: null,
     };
   }
   if (adapters.videoExportService.getNativeFfmpegStatus) {
     return await adapters.videoExportService.getNativeFfmpegStatus();
   }
   return {
+    platform: 'unknown',
     supported: false,
     available: false,
     source: null,
     path: null,
     version: null,
-    error: 'MOV / MP4 エクスポートはWindows x64デスクトップ版でのみ利用できます。',
+    error: 'MOV / MP4 エクスポートにはTauriデスクトップ版と外部FFmpegが必要です。',
     warning: null,
     folderPath: null,
+    ffprobePath: null,
+    ffprobeVersion: null,
   };
 }
 

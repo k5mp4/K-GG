@@ -5,10 +5,10 @@ title: After Effects連携
 status: current
 owners: [maintainer]
 created: 2026-08-30
-updated: 2026-09-18
-requirement_ids: [AE-001, AE-002, AE-003, AE-004, AE-005, AE-006]
+updated: 2026-09-24
+requirement_ids: [AE-001, AE-002, AE-003, AE-004, AE-005, AE-006, AE-007]
 related_adrs: [ADR-0018]
-related_changes: [CHANGE-038]
+related_changes: [CHANGE-038, CHANGE-052]
 related_code: [src/lib/aftereffectsExport.ts, src/lib/afterEffectsVideoDestination.ts, src/lib/aeStatusController.ts, src/lib/videoExportLifecycle.ts, src/lib/exportVideo.ts, src/components/ExportPanel.tsx, src/adapters/types.ts, src/adapters/browser/exportService.ts, src/adapters/tauri/afterEffectsService.ts, src/adapters/tauri/exportService.ts, src/lib/export.ts, src-tauri/src/after_effects.rs, src-tauri/src/lib.rs, src-tauri/tauri.conf.json, src-tauri/capabilities/default.json]
 related_tests: [src/lib/aeStatusController.test.ts, src/lib/afterEffectsVideoDestination.test.ts, src/lib/videoExportLifecycle.test.ts, src/adapters/tauri/afterEffectsService.native-artifact.test.ts, src/adapters/tauri/exportService.native-artifact.test.ts, src/adapters/tauri/exportService.test.ts]
 ---
@@ -51,6 +51,10 @@ Tauri版のAfter Effects操作は、`requestId`と操作種別が一致する完
 
 現在のK-GGはAfter EffectsのKagaribiエフェクト設定をK-GGの編集状態へ変換しない。
 
+### AE-007 プラットフォーム境界
+
+TauriのAfter Effects自動操作はWindows x64で利用する。macOS版ではAfter Effects連携を利用不可として表示し、After Effects自動操作の代替経路や対応を約束しない。Browser版のBridge契約は既存の開発用途として維持する。
+
 ## 他領域との関係
 
 - [動画・連番フレーム出力](./video-export)で生成したMOV・MP4を送信対象とする。
@@ -64,4 +68,4 @@ Tauri版のAfter Effects操作は、`requestId`と操作種別が一致する完
 ## 未確認・今後の現行仕様化
 
 - After Effectsの実機を使ったWindows x64での送受信確認はCHANGE-038のvalidationへ記録する。
-- macOSのAfter Effects自動操作は、対象Tauri配布ターゲットを確認した後に現行仕様化する。
+- macOSのAfter Effects自動操作は対象外であり、別Requestが承認されるまで実装しない。

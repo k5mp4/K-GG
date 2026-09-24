@@ -1,4 +1,4 @@
-name: Publish Windows release
+name: Publish desktop release
 
 on:
   push:
@@ -57,10 +57,71 @@ jobs:
           releaseName: K-GG v__VERSION__
           releaseBody: |
             Windows x64 release candidate.
+            macOS arm64 and Intel builds are Experimental. GitHub Actions builds and tests them, but they have not been verified by the developer on physical macOS hardware. The DMGs are unsigned and not notarized.
 
-            Review the installer, updater signatures, latest.json, and release notes before publishing this draft.
+            Review the Windows installer, updater signatures, macOS DMGs, latest.json, and release notes before publishing this draft.
           releaseDraft: true
           prerelease: false
           uploadUpdaterJson: true
           updaterJsonPreferNsis: true
           args: --bundles nsis --target x86_64-pc-windows-msvc
+
+  publish-macos:
+    name: Build macOS ${{ matrix.arch }} DMG
+    needs: publish
+    strategy:
+      max-parallel: 1
+      matrix:
+        include:
+          - arch: arm64
+            runner: macos-15
+            target: aarch64-apple-darwin
+          - arch: Intel
+            runner: macos-15-intel
+            target: x86_64-apple-darwin
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 60
+
+    steps:
+      - name: Check out tagged source
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+
+      - name: Install FFmpeg
+        run: brew install ffmpeg
+
+      - name: Set up Rust
+        uses: dtolnay/rust-toolchain@4be7066ada62dd38de10e7b70166bc74ed198c30
+        with:
+          toolchain: stable
+          targets: ${{ matrix.target }}
+
+      - name: Cache Rust build
+        uses: Swatinem/rust-cache@42dc69e1aa15d09112580998cf2ef0119e2e91ae # v2
+        with:
+          workspaces: src-tauri -> target
+
+      - name: Install frontend dependencies
+        run: npm ci
+
+      - name: Run macOS FFmpeg smoke gate
+        run: npm run check:ffmpeg
+
+      - name: Run native checks
+        run: npm run check:native
+
+      - name: Build and upload macOS DMG
+        uses: tauri-apps/tauri-action@944946e3e4cac6603d1fe8f514171e9ecd3c78aa # v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tagName: ${{ github.ref_name }}
+          releaseDraft: true
+          prerelease: false
+          uploadUpdaterJson: false
+          args: --config src-tauri/tauri.macos.conf.json --bundles dmg --target ${{ matrix.target }}
