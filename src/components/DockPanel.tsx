@@ -20,7 +20,6 @@ type DockPanelProps = {
   onResizeStart: PointerEventHandler<HTMLDivElement>;
   resizing?: boolean;
   children: ReactNode;
-  headerEnd?: ReactNode;
   bodyClassName?: string;
   mobileWidth?: string;
 };
@@ -58,7 +57,6 @@ export function DockPanel({
   onResizeStart,
   resizing = false,
   children,
-  headerEnd,
   bodyClassName = '',
   mobileWidth = 'min(90vw, 400px)',
 }: DockPanelProps) {
