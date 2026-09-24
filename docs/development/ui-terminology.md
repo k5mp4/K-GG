@@ -50,6 +50,8 @@ title: UI用語・アイコン表記ガイド
 | Gradient Ramp | `gradient.type.bezier` | Bezier | ベジェ | 端点・制御点・曲線図 |
 | Gradient Ramp | `gradient.type.mesh` | Mesh Gradation | Mesh Gradation | 格子点・共有エッジ・色モード（Ramp/Direct）・Coons Patchグリッド図 |
 | Gradient Ramp | `gradient.openEditor` | Open Gradient Ramp editor | Open Gradient Ramp editor | expand icon + tooltip |
+| Postprocess / Glass | `uiLabels.ts`; `postprocess.glass.*` | Surface Type / Organic / Ripple / Animation Speed / IOR / Chromatic Steps | 表面の種類 / 有機的 / 波紋 / アニメーション速度 / 屈折率 / 色分散の段数 | Glass Surface Type contains animated Organic and Ripple forms; Ripple uses concentric lenticular ridges and Animation Speed sets complete cycles per Animation loop |
+| Postprocess / GlassTile | `uiLabels.ts`; `postprocess.glassTile.*` | Faceted / Facet Density / Facet Depth | 多面カット / 面の密度 / 面の高低差 | Faceted is a static GlassTile pattern with continuous shared-vertex triangular planes and no tile domes or seams |
 | Animation | `animation.loopTiming` | Loop Timing | ループタイミング | Bezier preview |
 | Help | `help.title` | K-GG Guide | K-GG 使い方ガイド | `help` |
 
@@ -71,12 +73,12 @@ title: UI用語・アイコン表記ガイド
 | 共通操作 | `common.close`, `common.open`, `common.reset`, `common.delete`, `common.duplicate`, `common.distribute`, `common.reverse`, `common.load`, `common.save`, `common.saving`, `common.export`, `common.import`, `common.expand`, `common.settings`, `common.help`, `common.undo`, `common.redo`, `common.enabled`, `common.disabled`, `common.on`, `common.off`, `common.preview`, `common.shuffle`, `common.shuffleHint`, `common.restoreShuffle`, `common.refreshApp`, `common.checkUpdates`, `common.checking`, `common.onlineDocs`, `common.version`, `common.webBuild`, `common.none`, `common.custom`, `common.output`, `common.feedback`, `common.cancel`, `common.later`, `common.retry`, `common.notNow`, `common.checkAgain` |
 | 入力・パネル | `input.*`, `section.*`, `panel.toggle`, `settings.*`, `help.*` |
 | Gradient Ramp | `gradient.title`, `gradient.type`, `gradient.type.*`, `gradient.colorStop`, `gradient.opacityStop`, `gradient.colorMode`, `gradient.interpolation`, `gradient.mirror`, `gradient.paletteGenerator`, `gradient.paletteGeneratorDescription`, `gradient.generator*`, `gradient.paletteName`, `gradient.builtInPresets`, `gradient.userPalettes`, `gradient.repeat`, `gradient.addStop`, `gradient.deleteStop`, `gradient.duplicateStop`, `gradient.distributeStops`, `gradient.reverseStops`, `gradient.openEditor`, `gradient.closeEditor`, `gradient.recordColorKeyframe`, `gradient.recordOpacityKeyframe`, `gradient.mirrorDescription`, `gradient.editInstructions`, `gradient.editInstructionsCompact` |
-| Effect Stack / Workspace | `effect.*`, `workspace.*`, `stack.swapHistogram`, `stack.version`, `stack.fixed`, `stack.drag`, `stack.category.*`, `stack.status.*`, `histogram.*` |
+| Effect Stack / Workspace | `effect.*`, `workspace.*`, `stack.swapHistogram`, `stack.version`, `stack.fixed`, `stack.drag`, `stack.category.*`, `stack.status.*`, `histogram.*`, `postprocess.glass.*` |
 | Canvas / Animation / Diffuse | `canvas.*`, `animation.*`, `diffuse.*`, `beta.experimental` |
 | Export / Update / FFmpeg | `export.*`, `update.*`, `ffmpeg.*`, `feedback.*` |
 | Preset Library | `preset.library`, `preset.folders`, `preset.root`, `preset.builtIn`, `preset.saved`, `preset.destination`, `preset.deleteNamed`, `preset.folderPreview`, `preset.loadFailed`, `preset.saveFailed`, `preset.createFolderFailed`, `preset.renameFolderFailed`, `preset.deleteFolderFailed`, `preset.moveFailed`, `preset.deleteFailed`, `preset.exportFailed`, `preset.importFailed`, `preset.selectForExport`, `preset.folderName`, `preset.deleteFolderConfirm`, `preset.itemCount`, `preset.folderTree`, `preset.newFolder`, `preset.createFolder`, `preset.renameFolder`, `preset.folderCount`, `preset.empty`, `preset.saveTo`, `preset.exportSelected`, `preset.exportFolder`, `preset.exportLibrary`, `preset.select`, `preset.importTo`, `preset.gridView`, `preset.listView` |
 
-`src/i18n/uiLabels.ts`には、パネルが条件付きで表示するパラメータ名、エフェクト名、Gradient Type、補間方式、回転方向を含む153組の英日別名を登録している。新しいパラメータを追加するときは、まずこの配列へ英語名・日本語名を追加し、同じ文字列をコンポーネントへ直書きしない。
+`src/i18n/uiLabels.ts`には、パネルが条件付きで表示するパラメータ名、エフェクト名、Gradient Type、補間方式、回転方向を含む182組の英日別名を登録している。新しいパラメータを追加するときは、まずこの配列へ英語名・日本語名を追加し、同じ文字列をコンポーネントへ直書きしない。
 
 ## 非表示・条件付き領域の命名
 

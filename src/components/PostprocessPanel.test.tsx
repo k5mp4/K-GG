@@ -74,4 +74,90 @@ describe('PostprocessPanel Video Motion integration', () => {
     expect(markup).toContain('Flow Cycles');
     expect(markup).not.toContain('data-postprocess-master-toggle');
   });
+
+  it('exposes Glass IOR and refinable Chromatic Steps in Optics', () => {
+    const initialState = useGradientStore.getInitialState();
+    const previousPostprocess = initialState.postprocess;
+    const previousEffectPipeline = initialState.effectPipeline;
+    initialState.postprocess = {
+      ...previousPostprocess,
+      effectMode: 'glassV2',
+      glassSurfaceType: 'organic',
+    };
+    initialState.effectPipeline = {
+      ...previousEffectPipeline,
+      selectedKind: 'glass',
+      effectStack: updateEffectStackLayer(previousEffectPipeline.effectStack, 'glass', { enabled: true }),
+    };
+    let organicMarkup: string;
+    let rippleMarkup: string;
+    try {
+      organicMarkup = renderToStaticMarkup(
+        <LanguageProvider>
+          <PostprocessPanel />
+        </LanguageProvider>,
+      );
+      initialState.postprocess = { ...initialState.postprocess, glassSurfaceType: 'ripple' };
+      rippleMarkup = renderToStaticMarkup(
+        <LanguageProvider>
+          <PostprocessPanel />
+        </LanguageProvider>,
+      );
+    } finally {
+      initialState.postprocess = previousPostprocess;
+      initialState.effectPipeline = previousEffectPipeline;
+    }
+
+    expect(organicMarkup).toContain('Surface Type');
+    expect(organicMarkup).toContain('Organic');
+    expect(organicMarkup).toContain('IOR');
+    expect(organicMarkup).toContain('Chromatic Steps');
+    expect(organicMarkup).toContain('1 keeps the current dispersion samples');
+    expect(organicMarkup).not.toContain('value="faceted"');
+    expect(rippleMarkup).toContain('Ripple');
+    expect(rippleMarkup).toContain('Frequency');
+    expect(rippleMarkup).toContain('Depth');
+    expect(rippleMarkup).toContain('Animation Speed');
+    expect(rippleMarkup).toContain('complete Ripple cycles run in one Animation loop');
+    expect(rippleMarkup).toContain('lenticular ridge');
+  });
+
+  it('exposes Faceted as a static GlassTile pattern with planar surface controls', () => {
+    const initialState = useGradientStore.getInitialState();
+    const previousPostprocess = initialState.postprocess;
+    const previousEffectPipeline = initialState.effectPipeline;
+    initialState.postprocess = {
+      ...previousPostprocess,
+      effectMode: 'glassTile',
+      glassTilePattern: 'faceted',
+    };
+    initialState.effectPipeline = {
+      ...previousEffectPipeline,
+      selectedKind: 'glassTile',
+      effectStack: updateEffectStackLayer(previousEffectPipeline.effectStack, 'glassTile', { enabled: true }),
+    };
+
+    let markup: string;
+    try {
+      markup = renderToStaticMarkup(
+        <LanguageProvider>
+          <PostprocessPanel />
+        </LanguageProvider>,
+      );
+    } finally {
+      initialState.postprocess = previousPostprocess;
+      initialState.effectPipeline = previousEffectPipeline;
+    }
+
+    expect(markup).toContain('Pattern');
+    expect(markup).toContain('Faceted');
+    expect(markup).toContain('Facet Density');
+    expect(markup).toContain('Facet Depth');
+    expect(markup).toContain('continuous shared-vertex triangular surface');
+    expect(markup).not.toContain('Tile Size');
+    expect(markup).not.toContain('Bevel');
+    expect(markup).not.toContain('Surface Height');
+    expect(markup).not.toContain('Curvature');
+    expect(markup).not.toContain('Detail Scale');
+  });
 });

@@ -5,12 +5,12 @@ title: UI入力コントロール
 status: current
 owners: [maintainer]
 created: 2026-07-28
-updated: 2026-09-23
-requirement_ids: [UI-001, UI-002, UI-003, UI-004, UI-005, UI-006, UI-007, UI-008, UI-009, UI-010, UI-011, UI-012, UI-013, UI-014, UI-015, UI-019, UI-021, UI-022, UI-023, UI-024, UI-025, UI-026, UI-027]
+updated: 2026-09-25
+requirement_ids: [UI-001, UI-002, UI-003, UI-004, UI-005, UI-006, UI-007, UI-008, UI-009, UI-010, UI-011, UI-012, UI-013, UI-014, UI-015, UI-019, UI-021, UI-022, UI-023, UI-024, UI-025, UI-026, UI-027, UI-028]
 related_adrs: [ADR-0009, ADR-0011, ADR-0012]
-related_changes: [CHANGE-010, CHANGE-012, CHANGE-013, CHANGE-014, CHANGE-015, CHANGE-018, CHANGE-019, CHANGE-024, CHANGE-025, CHANGE-026, CHANGE-027, CHANGE-030, CHANGE-031, CHANGE-032, CHANGE-034, CHANGE-037, CHANGE-038, CHANGE-039, CHANGE-041, CHANGE-046, CHANGE-047, CHANGE-048, CHANGE-051]
-related_code: [src/App.tsx, src/App.css, src/types/coneView.ts, src/components/CustomSelect.tsx, src/components/GradientRamp.tsx, src/components/SliderField.tsx, src/components/NoiseDistortionPanel.tsx, src/components/BlockNoisePanel.tsx, src/components/DiffuseCurveEditor.tsx, src/components/SlitScanPanel.tsx, src/components/StretchPanel.tsx, src/components/TimelineBar.tsx, src/components/IridescencePanel.tsx, src/components/NormalMapPanel.tsx, src/components/SandboxPanel.tsx, src/components/FlowGradientPanel.tsx, src/components/ClothGradientPanel.tsx, src/components/ClothCanvas.tsx, src/components/ConeApexEditor.tsx, src/components/ConeViewPanel.tsx, src/components/RadonPanel.tsx, src/components/PostprocessPanel.tsx, src/components/PostprocessStackPanel.tsx, src/components/PresetPanel.tsx, src/components/Toggle.tsx, src/lib/effectPipeline.ts, src/lib/parameterLimits.ts, src/lib/voronoi.ts, src/lib/glass.ts, src/lib/glassTile.ts, src/lib/webgl.ts, src/lib/webglShaderSources.ts, src/store/documentModel.ts, src/store/documentActions.ts, packages/kgg-control/src/parameterLimits.ts, packages/kgg-control/src/parameters.ts, src/types/flowGradient.ts, src/i18n/uiLabels.ts, src/i18n/messages.ts, src/components/VideoMotionPanel.tsx, src/types/videoMotion.ts, src/lib/noiseSeed.ts]
-related_tests: [src/lib/tweeqAngle.test.ts, src/lib/effectPipeline.test.ts, src/lib/parameterLimits.test.ts, src/lib/animationDirection.test.ts, src/lib/effectShaderParity.test.ts, src/lib/flowSimulation.test.ts, src/lib/flowGradientPreset.test.ts, src/lib/presetThumbnail.test.ts, src/types/coneView.test.ts, src/lib/coneView.test.ts, src/lib/coneSeam.test.ts, src/lib/webglShaderSources.test.ts, src/components/CustomSelect.test.tsx, src/components/ConeApexEditor.test.tsx, src/components/NoiseDistortionPanel.test.tsx, 'manual: Cone Effect Stack ordering and SANDBOX controls browser check', 'manual: Cone background coverage and color check', src/components/PostprocessPanel.test.tsx, src/components/PostprocessStackPanel.test.tsx, src/components/SandboxPanel.test.tsx]
+related_changes: [CHANGE-010, CHANGE-012, CHANGE-013, CHANGE-014, CHANGE-015, CHANGE-018, CHANGE-019, CHANGE-024, CHANGE-025, CHANGE-026, CHANGE-027, CHANGE-030, CHANGE-031, CHANGE-032, CHANGE-034, CHANGE-037, CHANGE-038, CHANGE-039, CHANGE-041, CHANGE-046, CHANGE-047, CHANGE-048, CHANGE-051, CHANGE-052]
+related_code: [src/App.tsx, src/App.css, src/types/coneView.ts, src/components/CustomSelect.tsx, src/components/GradientRamp.tsx, src/components/SliderField.tsx, src/components/NoiseDistortionPanel.tsx, src/components/BlockNoisePanel.tsx, src/components/DiffuseCurveEditor.tsx, src/components/SlitScanPanel.tsx, src/components/StretchPanel.tsx, src/components/TimelineBar.tsx, src/components/IridescencePanel.tsx, src/components/NormalMapPanel.tsx, src/components/SandboxPanel.tsx, src/components/FlowGradientPanel.tsx, src/components/ClothGradientPanel.tsx, src/components/ClothCanvas.tsx, src/components/ConeApexEditor.tsx, src/components/ConeViewPanel.tsx, src/components/RadonPanel.tsx, src/components/PostprocessPanel.tsx, src/components/PostprocessStackPanel.tsx, src/components/PresetPanel.tsx, src/components/Toggle.tsx, src/lib/effectPipeline.ts, src/lib/parameterLimits.ts, src/lib/voronoi.ts, src/lib/glass.ts, src/lib/glassTile.ts, src/lib/webgl.ts, src/lib/webglShaderSources.ts, src/store/documentModel.ts, src/store/documentActions.ts, packages/kgg-control/src/parameterLimits.ts, packages/kgg-control/src/parameters.ts, src/types/flowGradient.ts, src/types/distortion.ts, src/i18n/uiLabels.ts, src/i18n/messages.ts, src/components/VideoMotionPanel.tsx, src/types/videoMotion.ts, src/lib/noiseSeed.ts]
+related_tests: [src/lib/tweeqAngle.test.ts, src/lib/effectPipeline.test.ts, src/lib/parameterLimits.test.ts, src/lib/animationDirection.test.ts, src/lib/effectShaderParity.test.ts, src/lib/glass.test.ts, src/lib/postprocessAnimation.test.ts, src/store/gradientStore.glass.test.ts, src/lib/flowSimulation.test.ts, src/lib/flowGradientPreset.test.ts, src/lib/presetThumbnail.test.ts, src/types/coneView.test.ts, src/lib/coneView.test.ts, src/lib/coneSeam.test.ts, src/lib/webglShaderSources.test.ts, src/components/CustomSelect.test.tsx, src/components/ConeApexEditor.test.tsx, src/components/NoiseDistortionPanel.test.tsx, 'manual: Cone Effect Stack ordering and SANDBOX controls browser check', 'manual: Cone background coverage and color check', src/components/PostprocessPanel.test.tsx, src/components/PostprocessStackPanel.test.tsx, src/components/SandboxPanel.test.tsx]
 ---
 
 # UI入力コントロール
@@ -55,13 +55,19 @@ GradientRampでInterpがVariableの場合、VariableはTweeqのInputNumberで表
 
 PostprocessのプロパティモジュールにはGlassを一つだけ表示し、その実体はGLASS V2です。ColorグループへChromatic Hue、Chromatic Saturation、Transmission Tint、Highlight Tintを表示します。HueとSaturationは数値編集、TintはTweeqのInputColorで即時に描画へ反映します。Transmission TintとHighlight TintのInputColorは同じ固定横幅で表示します。旧Glassの選択肢と`Glass V2`の別表示はありません。この変更では4項目にキーフレーム／自動アニメーション操作を表示しません。
 
+### UI-028 Glassの表面種類・IOR・色収差サンプル数
+
+GlassのSurface groupにはSurface Typeを表示し、Organic／Rippleを選択できます。OrganicはScale、Stretch、Rotation、Complexity、Warp、Seedを表示します。RippleはFrequency（`0.5..18`、step`0.1`、既定値`6`）、Depth（`0..1`、step`0.01`、既定値`0.35`）、Animation Speed（Animationループ1周あたり`1..8`周期、step`1`、既定値`1`）を表示します。Glass Surfaceは有機的に変化する形状を対象とし、Noise Distortion Influenceは両Surfaceで共通です。
+
+Optics groupにはIORを`1.0..2.5`、step`0.01`、既定値`1.5`で表示します。説明文はIORが屈折、波長分散、Fresnel反射率へ作用する2Dスクリーン空間近似であることを伝えます。Chromatic StepsはChromatic Aberrationの近くに表示する`1..3`の整数スライダーで、既定値は1です。1は各shader経路の現行色分散サンプルを保ち、2..3はその経路の分散アンカー間を細分化します。新しいラベルと説明は英語／日本語に対応します。
+
 ### UI-008 Effect Stack探索操作
 
 Effect Stackには主スタック11種類の順序をランダム化する操作を表示します。操作は既存の有効状態・選択状態を維持し、現在の描画結果から新しい順序へ滑らかに遷移します。主スタックの行位置もキャンバス遷移と同じ400msの`easeInOut`で、現在位置から移動します。主スタックの行またはそのオンオフToggleをAltクリックすると、その行だけを有効にするソロ操作になります。ソロ化によって新たに無効化された行は黄色の`STAY`で表示します。同じ対象を再度Altクリックするとソロ化前の有効状態へ戻ります。Altキーなしのクリック、トグル、ドラッグ並べ替えは既存の操作を維持します。Video Motionを選択しても、別のNoise／Glassレイヤーを選択した際に動画source/runtimeを破棄しません。
 
 ### UI-024 GlassTileの操作パネル
 
-PostprocessのEdit LayerからGlassTileを選択できます。PatternとEdge Modeは選択入力、Tile Size、Bevel、Surface Height、Curvature、Detail Scale、Rotation、Refraction、Dispersion、Roughness、Mix、Seedは数値スライダーで編集します。数値範囲と既定値は共通レジストリを使い、Edge Modeの選択肢と既定値も同レジストリで管理します。値はKG_Glassの正規化範囲へクランプし、Glassの設定やレイヤーとは別にPresetへ保存します。
+PostprocessのEdit LayerからGlassTileを選択できます。PatternとEdge Modeは選択入力です。Square／Diamond／Hexagon／Triangle／BrickではTile Size、Bevel、Surface Height、Curvature、Detail Scale、Roughnessを表示します。FacetedではFacet Density（`1..16`、step`0.1`、既定値`5`）とFacet Depth（`0..1`、step`0.01`、既定値`0.48`）を表示し、タイルのベベルやドームを使わない共有頂点の平面三角面を説明します。Rotation、Refraction、Dispersion、Mix、Seedは共通です。数値範囲と既定値は共通レジストリを使い、Edge Modeの選択肢と既定値も同レジストリで管理します。値はGlassの設定やレイヤーとは別にPresetへ保存します。
 
 ### UI-009 Effect Stackの表示形態
 

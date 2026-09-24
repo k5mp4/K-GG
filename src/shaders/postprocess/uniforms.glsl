@@ -47,6 +47,10 @@ uniform int u_glassComplexity;
 uniform float u_glassWarp;
 uniform float u_glassSeed;
 uniform float u_glassNoiseInfluence;
+uniform int u_glassSurfaceType;
+uniform float u_glassRippleFrequency;
+uniform float u_glassRippleDepth;
+uniform float u_glassRippleSpeed;
 uniform float u_glassRefraction;
 uniform float u_glassChromaticAberration;
 uniform float u_glassRoughness;
@@ -54,13 +58,17 @@ uniform float u_glassHighlight;
 uniform float u_glassMix;
 uniform float u_glassEvolution;
 uniform float u_glassMotion;
+uniform float u_glassIor;
 #if !defined(KGG_LEGACY_GLASS_ONLY)
+uniform int u_glassChromaticSteps;
 uniform float u_glassV2ChromaticHue;
 uniform float u_glassV2ChromaticSaturation;
 uniform vec3 u_glassV2TransmissionTint;
 uniform vec3 u_glassV2HighlightTint;
 #endif
 uniform int u_glassTilePattern;
+uniform float u_glassTileFacetDensity;
+uniform float u_glassTileFacetDepth;
 uniform float u_glassTileSize;
 uniform float u_glassTileBevel;
 uniform float u_glassTileSurfaceHeight;

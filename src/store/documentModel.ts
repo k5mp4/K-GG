@@ -312,8 +312,14 @@ export const STORE_DEFAULTS = {
     glassWarp: getParameterDefault('postprocess.glassWarp'),
     glassSeed: getParameterDefault('postprocess.glassSeed'),
     glassNoiseInfluence: getParameterDefault('postprocess.glassNoiseInfluence'),
+    glassSurfaceType: getEnumParameterDefault('postprocess.glassSurfaceType'),
+    glassRippleFrequency: getParameterDefault('postprocess.glassRippleFrequency'),
+    glassRippleDepth: getParameterDefault('postprocess.glassRippleDepth'),
+    glassRippleSpeed: getParameterDefault('postprocess.glassRippleSpeed'),
     glassRefraction: getParameterDefault('postprocess.glassRefraction'),
+    glassIor: getParameterDefault('postprocess.glassIor'),
     glassChromaticAberration: getParameterDefault('postprocess.glassChromaticAberration'),
+    glassChromaticSteps: getParameterDefault('postprocess.glassChromaticSteps'),
     glassRoughness: getParameterDefault('postprocess.glassRoughness'),
     glassHighlight: getParameterDefault('postprocess.glassHighlight'),
     glassMix: getParameterDefault('postprocess.glassMix'),
@@ -324,6 +330,8 @@ export const STORE_DEFAULTS = {
     glassV2TransmissionTint: GLASS_V2_COLOR_DEFAULTS.transmissionTint,
     glassV2HighlightTint: GLASS_V2_COLOR_DEFAULTS.highlightTint,
     glassTilePattern: GLASS_TILE_DEFAULTS.pattern,
+    glassTileFacetDensity: GLASS_TILE_DEFAULTS.facetDensity,
+    glassTileFacetDepth: GLASS_TILE_DEFAULTS.facetDepth,
     glassTileSize: GLASS_TILE_DEFAULTS.tileSize,
     glassTileBevel: GLASS_TILE_DEFAULTS.bevel,
     glassTileSurfaceHeight: GLASS_TILE_DEFAULTS.surfaceHeight,
@@ -523,8 +531,13 @@ const POSTPROCESS_PARAMETER_LIMIT_KEYS = {
   glassWarp: 'postprocess.glassWarp',
   glassSeed: 'postprocess.glassSeed',
   glassNoiseInfluence: 'postprocess.glassNoiseInfluence',
+  glassRippleFrequency: 'postprocess.glassRippleFrequency',
+  glassRippleDepth: 'postprocess.glassRippleDepth',
+  glassRippleSpeed: 'postprocess.glassRippleSpeed',
   glassRefraction: 'postprocess.glassRefraction',
+  glassIor: 'postprocess.glassIor',
   glassChromaticAberration: 'postprocess.glassChromaticAberration',
+  glassChromaticSteps: 'postprocess.glassChromaticSteps',
   glassRoughness: 'postprocess.glassRoughness',
   glassHighlight: 'postprocess.glassHighlight',
   glassMix: 'postprocess.glassMix',
@@ -621,6 +634,7 @@ export function normalizePostprocessConfig(
   ];
   normalized.voronoiDistMetric = normalizeEnumParameter('postprocess.voronoiDistMetric', normalized.voronoiDistMetric);
   normalized.voronoiFeature = normalizeEnumParameter('postprocess.voronoiFeature', normalized.voronoiFeature);
+  normalized.glassSurfaceType = normalizeEnumParameter('postprocess.glassSurfaceType', normalized.glassSurfaceType);
   const glassV2Color = normalizeGlassV2ColorParameters(normalized);
   normalized.glassV2ChromaticHue = glassV2Color.chromaticHueDegrees;
   normalized.glassV2ChromaticSaturation = glassV2Color.chromaticSaturation;
@@ -628,6 +642,8 @@ export function normalizePostprocessConfig(
   normalized.glassV2HighlightTint = glassV2Color.highlightTint;
   const glassTile = normalizeGlassTileRenderParameters(normalized);
   normalized.glassTilePattern = glassTile.pattern;
+  normalized.glassTileFacetDensity = glassTile.facetDensity;
+  normalized.glassTileFacetDepth = glassTile.facetDepth;
   normalized.glassTileSize = glassTile.tileSize;
   normalized.glassTileBevel = glassTile.bevel;
   normalized.glassTileSurfaceHeight = glassTile.surfaceHeight;

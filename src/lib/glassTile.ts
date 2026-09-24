@@ -15,6 +15,8 @@ import {
 } from './parameterLimits';
 
 export const GLASS_TILE_LIMITS = {
+  facetDensity: getParameterLimit('postprocess.glassTileFacetDensity').max,
+  facetDepth: getParameterLimit('postprocess.glassTileFacetDepth').max,
   tileSize: getParameterLimit('postprocess.glassTileSize').max,
   bevel: getParameterLimit('postprocess.glassTileBevel').max,
   surfaceHeight: getParameterLimit('postprocess.glassTileSurfaceHeight').max,
@@ -33,6 +35,8 @@ export const GLASS_TILE_LIMITS = {
 
 export const GLASS_TILE_DEFAULTS = {
   pattern: 'square' as GlassTilePattern,
+  facetDensity: getParameterDefault('postprocess.glassTileFacetDensity'),
+  facetDepth: getParameterDefault('postprocess.glassTileFacetDepth'),
   tileSize: getParameterDefault('postprocess.glassTileSize'),
   bevel: getParameterDefault('postprocess.glassTileBevel'),
   surfaceHeight: getParameterDefault('postprocess.glassTileSurfaceHeight'),
@@ -50,6 +54,8 @@ export const GLASS_TILE_DEFAULTS = {
 export type GlassTileRenderParameters = {
   pattern: GlassTilePattern;
   patternIndex: number;
+  facetDensity: number;
+  facetDepth: number;
   tileSize: number;
   bevel: number;
   surfaceHeight: number;
@@ -71,6 +77,7 @@ const PATTERN_INDEX: Record<GlassTilePattern, number> = {
   hexagon: 2,
   triangle: 3,
   brick: 4,
+  faceted: 5,
 };
 
 const EDGE_MODE_INDEX: Record<GlassTileEdgeMode, number> = {
@@ -92,6 +99,8 @@ export function normalizeGlassTileRenderParameters(
   config: Partial<Pick<
     PostprocessConfig,
     | 'glassTilePattern'
+    | 'glassTileFacetDensity'
+    | 'glassTileFacetDepth'
     | 'glassTileSize'
     | 'glassTileBevel'
     | 'glassTileSurfaceHeight'
@@ -112,6 +121,8 @@ export function normalizeGlassTileRenderParameters(
   return {
     pattern,
     patternIndex: PATTERN_INDEX[pattern],
+    facetDensity: clampParameter(config.glassTileFacetDensity, GLASS_TILE_DEFAULTS.facetDensity, getParameterLimit('postprocess.glassTileFacetDensity')),
+    facetDepth: clampParameter(config.glassTileFacetDepth, GLASS_TILE_DEFAULTS.facetDepth, getParameterLimit('postprocess.glassTileFacetDepth')),
     tileSize: clampParameter(config.glassTileSize, GLASS_TILE_DEFAULTS.tileSize, getParameterLimit('postprocess.glassTileSize')),
     bevel: clampParameter(config.glassTileBevel, GLASS_TILE_DEFAULTS.bevel, getParameterLimit('postprocess.glassTileBevel')),
     surfaceHeight: clampParameter(config.glassTileSurfaceHeight, GLASS_TILE_DEFAULTS.surfaceHeight, getParameterLimit('postprocess.glassTileSurfaceHeight')),
@@ -135,7 +146,9 @@ export function isGlassTileOpticallyIdentity(
 ): boolean {
   const params = normalizeGlassTileRenderParameters(postprocess ?? {});
   return params.mix <= GLASS_TILE_ZERO_EPSILON
-    || params.surfaceHeight <= GLASS_TILE_ZERO_EPSILON
+    || (params.pattern === 'faceted'
+      ? params.facetDepth <= GLASS_TILE_ZERO_EPSILON
+      : params.surfaceHeight <= GLASS_TILE_ZERO_EPSILON)
     || params.refraction <= GLASS_TILE_ZERO_EPSILON;
 }
 

@@ -118,6 +118,29 @@ describe('normalizeGlassRenderParameters', () => {
     expect(normalizeGlassRenderParameters({ glassChromaticAberration: 80 }).chromaticAberration).toBe(80);
   });
 
+  it('uses an adjustable refractive index with a backward-compatible 1.5 default', () => {
+    expect(GLASS_DEFAULTS.ior).toBe(1.5);
+    expect(GLASS_LIMITS.ior).toBe(2.5);
+    expect(normalizeGlassRenderParameters({ glassIor: 1 }).ior).toBe(1);
+    expect(normalizeGlassRenderParameters({ glassIor: 2.25 }).ior).toBe(2.25);
+    expect(normalizeGlassRenderParameters({ glassIor: 99 }).ior).toBe(2.5);
+    expect(normalizeGlassRenderParameters({ glassIor: Number.NaN }).ior).toBe(1.5);
+  });
+
+  it('normalizes Organic and Ripple surface controls with backward-compatible defaults', () => {
+    expect(GLASS_DEFAULTS.surfaceType).toBe('organic');
+    expect(normalizeGlassRenderParameters({ glassSurfaceType: 'ripple' }).surfaceType).toBe('ripple');
+    expect(normalizeGlassRenderParameters({ glassSurfaceType: 'faceted' as never }).surfaceType).toBe('organic');
+    expect(normalizeGlassRenderParameters({ glassRippleFrequency: 8.2 }).rippleFrequency).toBe(8.2);
+    expect(normalizeGlassRenderParameters({ glassRippleFrequency: 99 }).rippleFrequency).toBe(18);
+    expect(normalizeGlassRenderParameters({ glassRippleDepth: 0.7 }).rippleDepth).toBe(0.7);
+    expect(normalizeGlassRenderParameters({ glassRippleDepth: Number.NaN }).rippleDepth).toBe(0.35);
+    expect(GLASS_DEFAULTS.rippleSpeed).toBe(1);
+    expect(normalizeGlassRenderParameters({ glassRippleSpeed: 4 }).rippleSpeed).toBe(4);
+    expect(normalizeGlassRenderParameters({ glassRippleSpeed: 99 }).rippleSpeed).toBe(8);
+    expect(normalizeGlassRenderParameters({ glassRippleSpeed: Number.NaN }).rippleSpeed).toBe(1);
+  });
+
   it('uses finite renderer-safe values for every Glass uniform', () => {
     const params = normalizeGlassRenderParameters({
       glassScale: Number.NaN,
@@ -126,6 +149,7 @@ describe('normalizeGlassRenderParameters', () => {
       glassComplexity: Number.NaN,
       glassNoiseInfluence: Number.NaN,
       glassRefraction: Number.POSITIVE_INFINITY,
+      glassIor: Number.NaN,
       glassChromaticAberration: Number.NEGATIVE_INFINITY,
       glassRoughness: Number.NaN,
       glassHighlight: Number.POSITIVE_INFINITY,
@@ -140,10 +164,13 @@ describe('normalizeGlassRenderParameters', () => {
       mix: GLASS_DEFAULTS.mix,
     }));
     expect(params.refraction).toBe(GLASS_DEFAULTS.refraction);
+    expect(params.ior).toBe(GLASS_DEFAULTS.ior);
     expect(params.chromaticAberration).toBe(GLASS_DEFAULTS.chromaticAberration);
     expect(params.roughness).toBe(GLASS_DEFAULTS.roughness);
     expect(params.highlight).toBe(GLASS_DEFAULTS.highlight);
-    for (const value of Object.values(params)) expect(Number.isFinite(value)).toBe(true);
+    for (const value of Object.values(params)) {
+      if (typeof value === 'number') expect(Number.isFinite(value)).toBe(true);
+    }
   });
 
   it('keeps sample padding and optical uniforms on the same bounded contract', () => {
@@ -154,6 +181,15 @@ describe('normalizeGlassRenderParameters', () => {
     });
     expect(Math.ceil(params.refraction + params.chromaticAberration + params.roughness) + 2)
       .toBe(GLASS_LIMITS.refraction + GLASS_LIMITS.chromaticAberration + GLASS_LIMITS.roughness + 2);
+  });
+
+  it('reserves tiled source padding for the maximum IOR fallback offset', () => {
+    expect(getPostprocessStackSamplePadding(glassConfig({
+      glassRefraction: 120,
+      glassIor: 2.5,
+      glassChromaticAberration: 80,
+      glassRoughness: 12,
+    }))).toBe(120 * 3 + 80 * 3 + 12 + 2);
   });
 });
 

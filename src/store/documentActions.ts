@@ -459,6 +459,8 @@ export function createDocumentActions(set: DocumentStoreSet, defaults: DocumentD
     next.glassRotation = clampParameter(next.glassRotation, s.postprocess.glassRotation, getParameterLimit('postprocess.glassRotation'));
     const glassTile = normalizeGlassTileRenderParameters(next);
     next.glassTilePattern = glassTile.pattern;
+    next.glassTileFacetDensity = glassTile.facetDensity;
+    next.glassTileFacetDepth = glassTile.facetDepth;
     next.glassTileSize = glassTile.tileSize;
     next.glassTileBevel = glassTile.bevel;
     next.glassTileSurfaceHeight = glassTile.surfaceHeight;
