@@ -8,6 +8,20 @@ import { GRADIENT_TYPE_MAP, NOISE_TYPE_MAP } from './webgl';
 import webglSource from './webgl.ts?raw';
 
 describe('webglShaderSources', () => {
+  it('declares Chromatic Steps outside the V2-only uniform block for every Glass program', () => {
+    // The compact source compiled into legacy Glass still contains opticalGlassV2(),
+    // so a uniform hidden behind !KGG_LEGACY_GLASS_ONLY breaks that program.
+    for (const key of ['glass', 'glassV2'] as const) {
+      const fragment = getProgramSource(key).fragment;
+      const withoutV2OnlyBlocks = fragment.replace(
+        /#if !defined\(KGG_LEGACY_GLASS_ONLY\)\n(?:(?!#if|#endif)[^\n]*\n)*?#endif\n/g,
+        '',
+      );
+      expect(fragment).toContain('u_glassChromaticSteps');
+      expect(withoutV2OnlyBlocks).toContain('uniform int u_glassChromaticSteps;');
+    }
+  });
+
   it('adds Mesh Gradation at mapping value 6 without shifting existing types', () => {
     expect(GRADIENT_TYPE_MAP).toEqual({ linear: 0, radial: 1, fourcolor: 2, diamond: 3, angle: 4, bezier: 5, mesh: 6 });
     const source = getInitialProgramSource().fragment;

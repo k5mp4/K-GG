@@ -213,7 +213,8 @@ describe('V2 effect shader parity', () => {
 
   it('declares Glass V2 color uniforms outside the legacy Glass specialization', () => {
     expect(postprocessShader).toContain('uniform float u_glassIor;');
-    expect(postprocessShader).toContain('#if !defined(KGG_LEGACY_GLASS_ONLY)\nuniform int u_glassChromaticSteps;');
+    // Legacy Glass compiles the compact opticalGlassV2(), which reads this uniform.
+    expect(postprocessShader).not.toContain('#if !defined(KGG_LEGACY_GLASS_ONLY)\nuniform int u_glassChromaticSteps;');
     expect(postprocessShader).toContain('uniform int u_glassChromaticSteps;');
     expect(postprocessShader).toContain('uniform float u_glassV2ChromaticHue;');
     expect(postprocessShader).toContain('uniform float u_glassV2ChromaticSaturation;');

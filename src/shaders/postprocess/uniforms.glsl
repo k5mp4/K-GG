@@ -59,8 +59,10 @@ uniform float u_glassMix;
 uniform float u_glassEvolution;
 uniform float u_glassMotion;
 uniform float u_glassIor;
-#if !defined(KGG_LEGACY_GLASS_ONLY)
+// Declared for every Glass variant: the compact source shared by the legacy
+// and V2 specializations reads it inside opticalGlassV2().
 uniform int u_glassChromaticSteps;
+#if !defined(KGG_LEGACY_GLASS_ONLY)
 uniform float u_glassV2ChromaticHue;
 uniform float u_glassV2ChromaticSaturation;
 uniform vec3 u_glassV2TransmissionTint;
