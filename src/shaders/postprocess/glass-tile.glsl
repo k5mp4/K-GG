@@ -126,13 +126,51 @@ float glassTileHash01(vec2 cell) {
   return fract(sin(value) * 43758.5453123);
 }
 
+float glassTileFacetedHeight(vec2 position) {
+  float density = glassTileFloat(u_glassTileFacetDensity, 5.0, 1.0, 16.0);
+  float depth = glassTileFloat(u_glassTileFacetDepth, 0.48, 0.0, 1.0);
+  float rotation = glassTileFloat(u_glassTileRotation, 0.0, -3.141592653589793, 3.141592653589793);
+  vec2 resolution = glassTileResolution();
+  float minDimension = max(min(resolution.x, resolution.y), 1.0);
+  vec2 centered = (position - resolution * 0.5) / minDimension;
+  centered = glassTileRotatePosition(centered, rotation);
+  vec2 lattice = vec2(
+    centered.x - centered.y * 0.57735026919,
+    centered.y * 1.15470053838
+  ) * density;
+  vec2 cell = floor(lattice);
+  vec2 local = fract(lattice);
+  vec2 vertex10 = cell + vec2(1.0, 0.0);
+  vec2 vertex01 = cell + vec2(0.0, 1.0);
+  vec2 vertex11 = cell + vec2(1.0, 1.0);
+  float h00 = glassTileHash01(cell);
+  float h10 = glassTileHash01(vertex10);
+  float h01 = glassTileHash01(vertex01);
+  float h11 = glassTileHash01(vertex11);
+  float height;
+  if (local.x + local.y <= 1.0) {
+    height = h00 * (1.0 - local.x - local.y) + h10 * local.x + h01 * local.y;
+  } else {
+    height = h11 * (local.x + local.y - 1.0)
+      + h10 * (1.0 - local.y)
+      + h01 * (1.0 - local.x);
+  }
+  float phaseFootprint = density * 2.0 / minDimension;
+  float bandLimit = 1.0 - smoothstep(0.75, 2.25, phaseFootprint);
+  // Height units follow the full-canvas scale so finite-difference normals
+  // retain the same facet slope at preview and export resolutions.
+  return finiteFloat(0.5 + (height - 0.5) * depth * bandLimit * minDimension, 0.5);
+}
+
 float glassTileSurfaceHeight(vec2 position) {
+  int pattern = int(clamp(floor(finiteFloat(float(u_glassTilePattern), 0.0) + 0.5), 0.0, 5.0));
+  if (pattern == 5) return glassTileFacetedHeight(position);
+
   GlassTileCoordinate tile = glassTileCoordinate(position);
   float bevel = glassTileFloat(u_glassTileBevel, 0.18, 0.01, 0.5);
   float feather = 0.02;
   float mask = smoothstep(-feather, feather, tile.edge);
   float edgeProfile = smoothstep(0.0, 1.0, clamp(tile.edge / bevel, 0.0, 1.0));
-  int pattern = int(clamp(floor(finiteFloat(float(u_glassTilePattern), 0.0) + 0.5), 0.0, 4.0));
   float centerEdge = pattern == 3 ? 1.0 / 6.0 : 0.5;
   float dome = smoothstep(0.0, 1.0, clamp(tile.edge / centerEdge, 0.0, 1.0));
   float curvature = glassTileFloat(u_glassTileCurvature, 0.75, 0.0, 1.0);
@@ -149,7 +187,13 @@ float glassTileSurfaceHeight(vec2 position) {
 
 vec3 glassTileSurfaceNormal(vec2 position) {
   float tileSize = glassTileFloat(u_glassTileSize, 96.0, 4.0, 4096.0);
-  float epsilon = clamp(tileSize * 0.002, 0.25, 4.0);
+  int pattern = int(clamp(floor(finiteFloat(float(u_glassTilePattern), 0.0) + 0.5), 0.0, 5.0));
+  vec2 resolution = glassTileResolution();
+  float minDimension = max(min(resolution.x, resolution.y), 1.0);
+  float facetDensity = glassTileFloat(u_glassTileFacetDensity, 5.0, 1.0, 16.0);
+  float epsilon = pattern == 5
+    ? clamp(minDimension / facetDensity * 0.005, 0.25, 2.0)
+    : clamp(tileSize * 0.002, 0.25, 4.0);
   float dx = glassTileSurfaceHeight(position + vec2(epsilon, 0.0))
     - glassTileSurfaceHeight(position - vec2(epsilon, 0.0));
   float dy = glassTileSurfaceHeight(position + vec2(0.0, epsilon))

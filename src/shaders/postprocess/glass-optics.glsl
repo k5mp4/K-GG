@@ -32,10 +32,10 @@ vec2 glassBoundedGradient(vec2 gradient) {
 }
 
 float glassCauchyIor(float wavelengthMicrometers, float chromaticAberration) {
-  // Two-term Cauchy dispersion. The existing Chromatic Aberration control is
-  // mapped to an effective Abbe-like spread while n_d remains fixed at 1.5.
-  // At zero every wavelength has exactly the same IOR.
-  const float nD = 1.5;
+  // Two-term Cauchy dispersion. Chromatic Aberration controls the spread while
+  // the Glass IOR control sets the base refractive index at the d line.
+  // At zero Chromatic Aberration every wavelength uses the selected base IOR.
+  float nD = glassFloat(u_glassIor, 1.5, 1.0, 2.5);
   const float lambdaD = 0.5876;
   const float lambdaF = 0.4861;
   const float lambdaC = 0.6563;
@@ -95,7 +95,8 @@ vec3 glassSpectralColor(
     float cyanIor = glassCauchyIor(0.4861, chromaticAberration);
     float blueIor = glassCauchyIor(0.4358, chromaticAberration);
     float iorSpan = max(blueIor - redIor, 0.000001);
-    vec2 aberrationUv = stableDirection * chromaticAberration * 2.0 / resolution;
+    float iorScale = clamp((glassFloat(u_glassIor, 1.5, 1.0, 2.5) - 1.0) / 0.5, 0.0, 3.0);
+    vec2 aberrationUv = stableDirection * chromaticAberration * 2.0 * iorScale / resolution;
     vec4 redSample = sampleGlassSource(centerGlobal + aberrationUv * ((greenIor - redIor) / iorSpan));
     vec4 yellowSample = sampleGlassSource(centerGlobal + aberrationUv * ((greenIor - yellowIor) / iorSpan));
     vec4 cyanSample = sampleGlassSource(centerGlobal - aberrationUv * ((cyanIor - greenIor) / iorSpan));
@@ -122,6 +123,7 @@ vec3 glassSpectralColor(
 
 vec4 organicGlass(vec2 globalUv, vec2 globalCoord) {
   float glassRefraction = glassFloat(u_glassRefraction, 32.0, 0.0, 120.0);
+  float glassIor = glassFloat(u_glassIor, 1.5, 1.0, 2.5);
   float glassChromaticAberration = glassFloat(u_glassChromaticAberration, 4.0, 0.0, 80.0);
   float glassRoughness = glassFloat(u_glassRoughness, 1.5, 0.0, 12.0);
   float glassHighlight = glassFloat(u_glassHighlight, 0.45, 0.0, 2.0);
@@ -132,7 +134,8 @@ vec4 organicGlass(vec2 globalUv, vec2 globalCoord) {
   vec2 boundedGradient = glassBoundedGradient(gradient);
   float slope = length(boundedGradient);
   vec2 stableDirection = glassStableDirection(boundedGradient);
-  vec2 refractionPx = glassStableDisplacement(boundedGradient) * glassRefraction;
+  float iorScale = clamp((glassIor - 1.0) / 0.5, 0.0, 3.0);
+  vec2 refractionPx = glassStableDisplacement(boundedGradient) * glassRefraction * iorScale;
 
   vec2 centerGlobal = diffuseGlassGlobalUv(
     globalUv + refractionPx / resolution,
@@ -147,7 +150,16 @@ vec4 organicGlass(vec2 globalUv, vec2 globalCoord) {
   vec3 lightDirection = normalize(vec3(-0.38, 0.48, 0.79));
   // 広いローブにして、パラメータの微小変化でハイライトが点滅しないようにする。
   float specular = pow(max(dot(surfaceNormal, lightDirection), 0.0), 8.0);
-  float fresnel = pow(clamp(1.0 - surfaceNormal.z, 0.0, 1.0), 2.0);
+  float f0 = pow((glassIor - 1.0) / (glassIor + 1.0), 2.0);
+  float cosTheta = clamp(surfaceNormal.z, 0.0, 1.0);
+  float edgeFresnel = pow(1.0 - cosTheta, 2.0);
+  // Preserve the current Organic Glass response at IOR 1.5 while adjusting
+  // edge reflectance and normal-incidence reflectance with the selected IOR.
+  float fresnel = clamp(
+    edgeFresnel * iorScale + (f0 - 0.04) * cosTheta * cosTheta,
+    0.0,
+    1.0
+  );
   float highlight = clamp((specular * 0.72 + fresnel * 0.48 + slope * 0.08) * glassHighlight, 0.0, 1.0);
   vec3 highlighted = vec3(1.0) - (vec3(1.0) - opticalColor) * (vec3(1.0) - highlight);
 
@@ -206,6 +218,35 @@ vec3 glassV2AdjustChromaticResidual(
   return clamp(baseTransmission + rotated, 0.0, 1.0);
 }
 
+vec2 glassV2SpectralOffset(
+  float t,
+  vec2 redOffset,
+  vec2 yellowOffset,
+  vec2 greenOffset,
+  vec2 cyanOffset,
+  vec2 blueOffset
+) {
+  t = clamp(t, 0.0, 1.0);
+  if (t < 0.25) return mix(redOffset, yellowOffset, t * 4.0);
+  if (t < 0.5) return mix(yellowOffset, greenOffset, (t - 0.25) * 4.0);
+  if (t < 0.75) return mix(greenOffset, cyanOffset, (t - 0.5) * 4.0);
+  return mix(cyanOffset, blueOffset, (t - 0.75) * 4.0);
+}
+
+vec3 glassV2SpectralWeight(float t) {
+  t = clamp(t, 0.0, 1.0);
+  if (t < 0.25) {
+    return mix(vec3(0.72, 0.0, 0.0), vec3(0.28, 0.22, 0.0), t * 4.0);
+  }
+  if (t < 0.5) {
+    return mix(vec3(0.28, 0.22, 0.0), vec3(0.0, 0.56, 0.0), (t - 0.25) * 4.0);
+  }
+  if (t < 0.75) {
+    return mix(vec3(0.0, 0.56, 0.0), vec3(0.0, 0.22, 0.28), (t - 0.5) * 4.0);
+  }
+  return mix(vec3(0.0, 0.22, 0.28), vec3(0.0, 0.0, 0.72), (t - 0.75) * 4.0);
+}
+
 vec3 glassV2Transmission(
   vec2 baseUv,
   vec2 redOffset,
@@ -216,18 +257,41 @@ vec3 glassV2Transmission(
   vec2 roughnessOffset,
   float roughness,
   float chromaticHue,
-  float chromaticSaturation
+  float chromaticSaturation,
+  int chromaticSteps
 ) {
-  vec3 redCenter = sampleGlassSource(baseUv + redOffset).rgb;
-  vec3 yellowCenter = sampleGlassSource(baseUv + yellowOffset).rgb;
-  vec3 greenCenter = sampleGlassSource(baseUv + greenOffset).rgb;
-  vec3 cyanCenter = sampleGlassSource(baseUv + cyanOffset).rgb;
-  vec3 blueCenter = sampleGlassSource(baseUv + blueOffset).rgb;
-  vec3 color = vec3(
-    redCenter.r * 0.72 + yellowCenter.r * 0.28,
-    yellowCenter.g * 0.22 + greenCenter.g * 0.56 + cyanCenter.g * 0.22,
-    cyanCenter.b * 0.28 + blueCenter.b * 0.72
-  );
+  vec3 color;
+  vec3 greenCenter;
+  if (chromaticSteps <= 1) {
+    vec3 redSample = sampleGlassSource(baseUv + redOffset).rgb;
+    vec3 yellowSample = sampleGlassSource(baseUv + yellowOffset).rgb;
+    greenCenter = sampleGlassSource(baseUv + greenOffset).rgb;
+    vec3 cyanSample = sampleGlassSource(baseUv + cyanOffset).rgb;
+    vec3 blueSample = sampleGlassSource(baseUv + blueOffset).rgb;
+    color = vec3(
+      redSample.r * 0.72 + yellowSample.r * 0.28,
+      yellowSample.g * 0.22 + greenCenter.g * 0.56 + cyanSample.g * 0.22,
+      cyanSample.b * 0.28 + blueSample.b * 0.72
+    );
+  } else {
+    int sampleCount = chromaticSteps * 4 + 1;
+    vec3 accumulatedWeight = vec3(0.0);
+    color = vec3(0.0);
+    greenCenter = vec3(0.0);
+    for (int i = 0; i < 13; i++) {
+      if (i >= sampleCount) break;
+      float t = float(i) / float(sampleCount - 1);
+      vec2 offset = glassV2SpectralOffset(
+        t, redOffset, yellowOffset, greenOffset, cyanOffset, blueOffset
+      );
+      vec3 sampleColor = sampleGlassSource(baseUv + offset).rgb;
+      vec3 weight = glassV2SpectralWeight(t);
+      color += sampleColor * weight;
+      accumulatedWeight += weight;
+      if (i == sampleCount / 2) greenCenter = sampleColor;
+    }
+    color /= max(accumulatedWeight, vec3(0.0001));
+  }
   color = glassV2AdjustChromaticResidual(
     color,
     greenCenter,
@@ -255,6 +319,7 @@ vec4 opticalGlassV2(vec2 globalUv, vec2 globalCoord) {
   float mixAmount = glassFloat(u_glassMix, 1.0, 0.0, 1.0);
   float chromaticHue = glassFloat(u_glassV2ChromaticHue, 0.0, -PI, PI);
   float chromaticSaturation = glassFloat(u_glassV2ChromaticSaturation, 1.0, 0.0, 2.0);
+  int chromaticSteps = int(clamp(float(u_glassChromaticSteps), 1.0, 3.0));
   vec3 transmissionTint = clamp(vec3(
     finiteFloat(u_glassV2TransmissionTint.r, 1.0),
     finiteFloat(u_glassV2TransmissionTint.g, 1.0),
@@ -302,7 +367,8 @@ vec4 opticalGlassV2(vec2 globalUv, vec2 globalCoord) {
     roughnessOffset,
     roughnessPx,
     chromaticHue,
-    chromaticSaturation
+    chromaticSaturation,
+    chromaticSteps
   );
   transmission *= transmissionTint;
 

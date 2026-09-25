@@ -36,6 +36,28 @@ describe('K-GG control parameter registry', () => {
     });
   });
 
+  it('exposes GlassTile Faceted in pattern controls and shares its limits', () => {
+    expect(getParameterDefinition('postprocess.glassTilePattern')).toMatchObject({
+      path: 'postprocess.glassTilePattern',
+      type: 'enum',
+      enumValues: ['square', 'diamond', 'hexagon', 'triangle', 'brick', 'faceted'],
+    });
+    expect(getParameterDefinition('postprocess.glassTileFacetDensity')).toMatchObject({
+      path: 'postprocess.glassTileFacetDensity',
+      min: 1,
+      max: 16,
+      step: 0.1,
+      defaultValue: 5,
+    });
+    expect(getParameterDefinition('postprocess.glassTileFacetDepth')).toMatchObject({
+      path: 'postprocess.glassTileFacetDepth',
+      min: 0,
+      max: 1,
+      step: 0.01,
+      defaultValue: 0.48,
+    });
+  });
+
   it('normalizes angles but rejects invalid types', () => {
     const definition = getParameterDefinition('gradient.angle');
     expect(definition).not.toBeNull();

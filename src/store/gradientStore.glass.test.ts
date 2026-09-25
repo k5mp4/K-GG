@@ -14,6 +14,14 @@ describe('Glass postprocess preset compatibility', () => {
     expect(loaded.glassChromaticAberration).toBe(
       STORE_DEFAULTS.postprocess.glassChromaticAberration,
     );
+    expect(loaded.glassIor).toBe(1.5);
+    expect(loaded.glassChromaticSteps).toBe(1);
+    expect(loaded.glassSurfaceType).toBe('organic');
+    expect(loaded.glassRippleFrequency).toBe(6);
+    expect(loaded.glassRippleDepth).toBe(0.35);
+    expect(loaded.glassRippleSpeed).toBe(1);
+    expect(loaded.glassTileFacetDensity).toBe(5);
+    expect(loaded.glassTileFacetDepth).toBe(0.48);
     expect(loaded.glassNoiseInfluence).toBe(
       STORE_DEFAULTS.postprocess.glassNoiseInfluence,
     );
@@ -81,12 +89,21 @@ describe('Glass postprocess preset compatibility', () => {
         )),
       ],
       glassRefraction: 48,
+      glassIor: 2.15,
+      glassSurfaceType: 'ripple',
+      glassRippleFrequency: 8.4,
+      glassRippleDepth: 0.72,
+      glassRippleSpeed: 3,
       glassChromaticAberration: 9,
+      glassChromaticSteps: 3,
       glassRoughness: 3,
       glassV2ChromaticHue: -42,
       glassV2ChromaticSaturation: 1.35,
       glassV2TransmissionTint: '#A0D8FF',
       glassV2HighlightTint: '#FFD6A0',
+      glassTilePattern: 'faceted',
+      glassTileFacetDensity: 9.5,
+      glassTileFacetDepth: 0.8,
     }));
 
     const loaded = normalizePostprocessConfig(saved);
@@ -96,12 +113,39 @@ describe('Glass postprocess preset compatibility', () => {
       { kind: 'distort', enabled: true },
     ]);
     expect(loaded.glassRefraction).toBe(48);
+    expect(loaded.glassIor).toBe(2.15);
+    expect(loaded.glassSurfaceType).toBe('ripple');
+    expect(loaded.glassRippleFrequency).toBe(8.4);
+    expect(loaded.glassRippleDepth).toBe(0.72);
+    expect(loaded.glassRippleSpeed).toBe(3);
+    expect(loaded.glassTilePattern).toBe('faceted');
+    expect(loaded.glassTileFacetDensity).toBe(9.5);
+    expect(loaded.glassTileFacetDepth).toBe(0.8);
     expect(loaded.glassChromaticAberration).toBe(9);
+    expect(loaded.glassChromaticSteps).toBe(3);
     expect(loaded.glassRoughness).toBe(3);
     expect(loaded.glassV2ChromaticHue).toBe(-42);
     expect(loaded.glassV2ChromaticSaturation).toBe(1.35);
     expect(loaded.glassV2TransmissionTint).toBe('#A0D8FF');
     expect(loaded.glassV2HighlightTint).toBe('#FFD6A0');
+  });
+
+  it('preserves GlassTile Faceted pattern controls through a JSON preset round trip', () => {
+    const saved = JSON.parse(JSON.stringify({
+      ...STORE_DEFAULTS.postprocess,
+      glassTilePattern: 'faceted',
+      glassTileFacetDensity: 11.2,
+      glassTileFacetDepth: 0.82,
+      glassTileRotation: 45,
+      glassTileSeed: 23,
+    }));
+    const loaded = normalizePostprocessConfig(saved);
+
+    expect(loaded.glassTilePattern).toBe('faceted');
+    expect(loaded.glassTileFacetDensity).toBe(11.2);
+    expect(loaded.glassTileFacetDepth).toBe(0.82);
+    expect(loaded.glassTileRotation).toBe(45);
+    expect(loaded.glassTileSeed).toBe(23);
   });
 
   it('normalizes malformed Glass V2 color values without affecting shared optics', () => {

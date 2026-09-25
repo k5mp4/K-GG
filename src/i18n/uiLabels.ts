@@ -1,11 +1,11 @@
 import type { UiLanguage } from './language';
 
 const uiTerms = [
-  ['Amount', '量'], ['Anchor Influence', 'アンカー影響'], ['Angle', '角度'], ['Apex X', '頂点 X'], ['Apex Y', '頂点 Y'], ['Band Height', '帯の高さ'],
+  ['Animation Speed', 'アニメーション速度'], ['Amount', '量'], ['Anchor Influence', 'アンカー影響'], ['Angle', '角度'], ['Apex X', '頂点 X'], ['Apex Y', '頂点 Y'], ['Band Height', '帯の高さ'],
   ['Bevel Size', 'ベベルサイズ'], ['Blend', '合成'], ['Blend Width', '合成幅'], ['Blur', 'ぼかし'], ['Brightness', '明るさ'],
   ['Brush Size', 'ブラシサイズ'], ['Cascade Gain', 'カスケードゲイン'], ['Cell Scale', 'セルスケール'],
   ['Center Falloff', '中心減衰'], ['Center Force', '中心力'], ['Center X', '中心 X'], ['Center Y', '中心 Y'],
-  ['Channel', 'チャンネル'], ['Chromatic Aberration', '色収差'], ['Color Mode', 'カラーモード'],
+  ['Channel', 'チャンネル'], ['Chromatic Aberration', '色収差'], ['Chromatic Steps', '色分散の段数'], ['Color Mode', 'カラーモード'],
   ['Color Over Life', '寿命による色'], ['Color Variance', '色のばらつき'], ['Complexity', '複雑さ'],
   ['Contrast', 'コントラスト'], ['Core', 'コア'], ['Count', '個数'], ['Curl Eps', 'カール差分'],
   ['Curl Evolution', 'カール展開'], ['Curl Scale', 'カールスケール'], ['Curl Seed', 'カールシード'],
@@ -13,11 +13,11 @@ const uiTerms = [
   ['Direction', '方向'], ['Distance Metric', '距離方式'], ['Dot Size', 'ドットサイズ'], ['Drift Angle', 'ドリフト角度'], ['Drift Speed', 'ドリフト速度'],
   ['Edge', 'エッジ'], ['Edge Crossfade', 'エッジクロスフェード'], ['Edge Fade', 'エッジ減衰'], ['Edge Weld', 'エッジ溶接'], ['Emitter Type', '放出方式'], ['Evolution', '展開'],
   ['Exponent', '指数'], ['Falloff', '減衰'], ['Feather', 'ぼかし幅'], ['Final Mix', '最終合成'],
-  ['Flow Gradient', 'Flow Gradient'], ['Flow Steps', 'フローステップ'], ['Fractal Type', 'フラクタル形式'], ['Frequency', '周波数'],
-  ['Glow Intensity', '発光強度'], ['Glow Radius', '発光半径'], ['Glow Threshold', '発光しきい値'], ['Grain', '粒度'],
+  ['Flow Gradient', 'Flow Gradient'], ['Flow Strength', 'フロー強度'], ['Flow Steps', 'フローステップ'], ['Fractal Type', 'フラクタル形式'], ['Frequency', '周波数'],
+  ['Flow Speed', 'フロー速度'], ['Glow Intensity', '発光強度'], ['Glow Radius', '発光半径'], ['Glow Threshold', '発光しきい値'], ['Grain', '粒度'],
   ['Gradient Scale', 'グラデーションスケール'], ['Gradient Type', 'グラデーション形式'],
   ['Height Variance', '高さのばらつき'], ['Highlight', 'ハイライト'], ['Inner Radius', '内側半径'],
-  ['Intensity', '強度'], ['Interp', '補間'], ['Lacunarity', 'ラカナリティ'], ['Length', '長さ'],
+  ['Intensity', '強度'], ['Interp', '補間'], ['IOR', '屈折率'], ['Lacunarity', 'ラカナリティ'], ['Length', '長さ'],
   ['Texture Repeat', 'テクスチャ反復'], ['Flow Cycles', 'フロー周期'],
   ['Length Randomness', '長さのランダム量'], ['Life Random', '寿命のランダム量'], ['Life Time', '寿命'],
   ['Max Displacement', '最大変位'], ['Mid Speed', '中間速度'], ['Mirror Axis', 'ミラー軸'],
@@ -37,7 +37,7 @@ const uiTerms = [
   ['Variance', 'ばらつき'], ['Variation', '変化量'], ['Warp', 'ワープ'], ['Warp Strength', 'ワープ強度'],
   ['Wave Height', '波の高さ'], ['Wave Type', '波形'], ['Width', '幅'], ['Zoom', 'ズーム'],
   ['Diffuse', '拡散'], ['Noise', 'ノイズ'], ['Slit', 'スリット'], ['Distort', '歪み'],
-  ['Mirror', 'ミラー'], ['Kaleidoscope', '万華鏡'], ['Voronoi', 'ボロノイ'], ['Glass', 'ガラス'], ['Glass V2', 'ガラス V2'],
+  ['Mirror', 'ミラー'], ['Kaleidoscope', '万華鏡'], ['Voronoi', 'Voronoi'], ['Glass', 'ガラス'], ['Glass V2', 'ガラス V2'],
   ['Prism', 'プリズム'], ['Particles', 'パーティクル'], ['Cone', 'コーン'],
   ['Linear', 'リニア'], ['Radial', '放射'], ['4-color', '4色'], ['Diamond', 'ひし形'], ['Angle', '角度'],
   ['Bezier', 'ベジェ'], ['Ease', 'イーズ'], ['Cardinal', 'カーディナル'], ['Constant', '一定'],
@@ -46,6 +46,8 @@ const uiTerms = [
   ['Ease In', 'イーズイン'], ['Ease Out', 'イーズアウト'], ['In-Out', 'イン・アウト'],
   ['Variable', '可変'], ['Near', '近い方'], ['Far', '遠い方'], ['Clockwise', '時計回り'],
   ['Counter-Clockwise', '反時計回り'], ['Point', '点'], ['Line', '線'], ['Circle', '円'],
+  ['Surface Type', '表面の種類'], ['Organic', '有機的'], ['Ripple', '波紋'], ['Faceted', '多面カット'],
+  ['Facet Density', '面の密度'], ['Facet Depth', '面の高低差'],
 ] as const;
 
 const aliases = new Map<string, { en: string; ja: string }>();

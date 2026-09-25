@@ -349,16 +349,11 @@ export function CanvasWorkspace({
             setManualDistort={setManualDistort}
           />
           <PostprocessOverlay
-            active={renderViewMode === 'canvas' &&
-              leftTab === 'postprocess' &&
-              (
-                (postprocess.effectMode === 'mirror' && isPostprocessLayerEnabled(postprocess, 'mirror')) ||
-                (postprocess.effectMode === 'kaleidoscope' && isPostprocessLayerEnabled(postprocess, 'kaleidoscope'))
-              )
-            }
+            active={renderViewMode === 'canvas' && leftTab === 'postprocess'}
             width={displayW}
             height={displayH}
             postprocess={postprocess}
+            effectPipeline={effectPipeline}
           />
           {renderViewMode === 'canvas' && overlayImageSrc && overlayImageMode === 'overlay' && (
             <img

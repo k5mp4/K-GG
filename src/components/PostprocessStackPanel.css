@@ -1,0 +1,45 @@
+@reference "../index.css";
+
+.effect-stack-row {
+  @apply absolute left-0 right-0 flex h-[38px] items-center gap-2 border-b border-cream/10 px-2 transition-[top,transform,background-color,border-color,opacity] ease-in-out duration-150;
+}
+
+.effect-stack-row[data-selected='true'] {
+  @apply bg-fire/15 text-k-text;
+}
+
+.effect-stack-row[data-selected='false'] {
+  @apply bg-transparent text-cream/80;
+}
+
+.effect-stack-row[data-selected='false']:hover {
+  @apply bg-cream/10;
+}
+
+.effect-stack-row[data-enabled='false'] {
+  @apply opacity-56;
+}
+
+.effect-stack-row[data-dragging='true'] {
+  @apply z-10 shadow-[0_12px_28px_rgba(0,0,0,0.42)];
+}
+
+.effect-stack-row[data-dragging='false'] {
+  @apply z-0;
+}
+
+.effect-stack-row__drag-handle {
+  @apply flex h-7 w-6 cursor-grab touch-none items-center justify-center text-cream/50 transition-colors hover:text-fire active:cursor-grabbing;
+}
+
+.effect-stack-row__title {
+  @apply flex items-center gap-1.5 truncate font-display text-[10px] font-bold uppercase tracking-wider;
+}
+
+.effect-stack-row__category {
+  @apply rounded border border-cream/20 px-1 text-[7px] font-medium tracking-normal text-cream/60;
+}
+
+.effect-stack-row__status {
+  @apply text-[8px] font-medium uppercase tracking-wide;
+}

@@ -197,8 +197,9 @@ export type ManualDistortConfig = {
   maxDisplacement: number; // max UV displacement represented by +/-1 in the map
 };
 
-export type GlassTilePattern = 'square' | 'diamond' | 'hexagon' | 'triangle' | 'brick';
+export type GlassTilePattern = 'square' | 'diamond' | 'hexagon' | 'triangle' | 'brick' | 'faceted';
 export type GlassTileEdgeMode = 'clamp' | 'tile' | 'mirror' | 'transparent';
+export type GlassSurfaceType = 'organic' | 'ripple';
 export type PostprocessEffectMode = 'distort' | 'mirror' | 'kaleidoscope' | 'prism' | 'voronoi' | 'glass' | 'glassV2' | 'glassTile' | 'particles';
 export type PostprocessMirrorMode = 'horizontal' | 'vertical' | 'quad';
 export type PostprocessKaleidoscopeType = 'unfold' | 'flower' | 'starlish';
@@ -302,8 +303,14 @@ export type PostprocessConfig = ManualDistortConfig & {
   glassWarp: number;
   glassSeed: number;
   glassNoiseInfluence: number;
+  glassSurfaceType: GlassSurfaceType;
+  glassRippleFrequency: number;
+  glassRippleDepth: number;
+  glassRippleSpeed: number;
   glassRefraction: number;
+  glassIor: number;
   glassChromaticAberration: number;
+  glassChromaticSteps: number;
   glassRoughness: number;
   glassHighlight: number;
   glassMix: number;
@@ -314,6 +321,8 @@ export type PostprocessConfig = ManualDistortConfig & {
   glassV2TransmissionTint: string;
   glassV2HighlightTint: string;
   glassTilePattern: GlassTilePattern;
+  glassTileFacetDensity: number;
+  glassTileFacetDepth: number;
   glassTileSize: number;
   glassTileBevel: number;
   glassTileSurfaceHeight: number;

@@ -2,6 +2,15 @@ import type { EffectPipelineConfig, PostprocessConfig } from '../types/distortio
 import { getActivePostprocessStackLayers } from './postprocessStack';
 import { isEffectStackLayerEnabled } from './effectPipeline';
 
+function glassNeedsTimeAnimation(postprocess: PostprocessConfig): boolean {
+  const noiseMoves = Number.isFinite(postprocess.glassNoiseInfluence) && postprocess.glassNoiseInfluence > 0;
+  if (postprocess.glassSurfaceType === 'ripple') {
+    const rippleMoves = Number.isFinite(postprocess.glassRippleDepth) && postprocess.glassRippleDepth > 0;
+    return rippleMoves || noiseMoves;
+  }
+  return (Number.isFinite(postprocess.glassMotion) && postprocess.glassMotion > 0) || noiseMoves;
+}
+
 /**
  * Postprocessが共有時間トラックによる描画更新を必要とするか判定する。
  *
@@ -15,8 +24,7 @@ export function isPostprocessTimeAnimationActive(
   if (effectPipeline?.version === 'stack-v2') {
     if (effectPipeline.particlesEnabled || effectPipeline.prismEnabled) return true;
     return isEffectStackLayerEnabled(effectPipeline, 'glass')
-      && Number.isFinite(postprocess.glassMotion)
-      && postprocess.glassMotion > 0;
+      && glassNeedsTimeAnimation(postprocess);
   }
 
   if (!postprocess.enabled) return false;
@@ -24,7 +32,9 @@ export function isPostprocessTimeAnimationActive(
 
   for (const layer of getActivePostprocessStackLayers(postprocess)) {
     if (layer.kind === 'prism') return true;
-    if (layer.kind === 'glass' || layer.kind === 'glassV2') return postprocess.glassMotion > 0;
+    if (layer.kind === 'glass' || layer.kind === 'glassV2') {
+      return glassNeedsTimeAnimation(postprocess);
+    }
   }
   return false;
 }

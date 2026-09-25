@@ -355,23 +355,46 @@ float glassNoiseHeight(vec2 uv) {
   return finiteFloat(mix(0.5, clamp(finiteFloat(pattern, 0.5), 0.0, 1.0), amount), 0.5);
 }
 
+float glassRippleHeight(vec2 uv) {
+  float frequency = glassFloat(u_glassRippleFrequency, 6.0, 0.5, 18.0);
+  float depth = glassFloat(u_glassRippleDepth, 0.35, 0.0, 1.0);
+  float evolution = glassFloat(u_glassEvolution, 0.0, 0.0, 1.0);
+  float speed = glassFloat(u_glassRippleSpeed, 1.0, 1.0, 8.0);
+  vec2 resolution = glassResolution();
+  float minDimension = max(min(resolution.x, resolution.y), 1.0);
+  vec2 position = (glassFiniteUv(uv) - vec2(0.5)) * resolution / minDimension;
+  float loopPhase = prismLoopProgress() * speed;
+  float radialCycles = length(position) * frequency + evolution + loopPhase;
+  float bandPosition = fract(radialCycles);
+  float lensProfile = 0.5 + 0.5 * cos((bandPosition - 0.5) * 6.28318530718);
+  float phaseFootprint = frequency * 6.28318530718 * 2.0 / minDimension;
+  float bandLimit = 1.0 - smoothstep(0.65, 2.4, phaseFootprint);
+  return finiteFloat(0.5 + (lensProfile - 0.5) * depth * bandLimit, 0.5);
+}
+
 #if !defined(KGG_GLASS_V2_ONLY)
 float glassSurfaceHeight(vec2 uv) {
   uv = glassFiniteUv(uv);
+  int surfaceType = int(clamp(float(u_glassSurfaceType), 0.0, 1.0));
+  float surfaceHeight = glassHeight(uv);
+  if (surfaceType == 1) surfaceHeight = glassRippleHeight(uv);
   float influence = glassFloat(u_glassNoiseInfluence, 0.0, 0.0, 1.0);
-  if (influence <= 0.0) return finiteFloat(glassHeight(uv), 0.5);
+  if (influence <= 0.0) return finiteFloat(surfaceHeight, 0.5);
   if (influence >= 1.0) return finiteFloat(glassNoiseHeight(uv), 0.5);
-  return finiteFloat(mix(glassHeight(uv), glassNoiseHeight(uv), influence), 0.5);
+  return finiteFloat(mix(surfaceHeight, glassNoiseHeight(uv), influence), 0.5);
 }
 #endif
 
 #if !defined(KGG_LEGACY_GLASS_ONLY)
 float glassV2SurfaceHeight(vec2 uv) {
   uv = glassFiniteUv(uv);
+  int surfaceType = int(clamp(float(u_glassSurfaceType), 0.0, 1.0));
+  float surfaceHeight = glassV2Height(uv);
+  if (surfaceType == 1) surfaceHeight = glassRippleHeight(uv);
   float influence = glassFloat(u_glassNoiseInfluence, 0.0, 0.0, 1.0);
-  if (influence <= 0.0) return finiteFloat(glassV2Height(uv), 0.5);
+  if (influence <= 0.0) return finiteFloat(surfaceHeight, 0.5);
   if (influence >= 1.0) return finiteFloat(glassNoiseHeight(uv), 0.5);
-  return finiteFloat(mix(glassV2Height(uv), glassNoiseHeight(uv), influence), 0.5);
+  return finiteFloat(mix(surfaceHeight, glassNoiseHeight(uv), influence), 0.5);
 }
 #endif
 

@@ -63,6 +63,24 @@ describe('isPostprocessTimeAnimationActive', () => {
     },
   );
 
+  it('keeps Ripple cycling even when Organic Motion is zero', () => {
+    for (const effectMode of ['glass', 'glassV2'] satisfies PostprocessEffectMode[]) {
+      expect(isPostprocessTimeAnimationActive(createPostprocess(effectMode, {
+        glassSurfaceType: 'ripple',
+        glassMotion: 0,
+      })), effectMode).toBe(true);
+    }
+  });
+
+  it('keeps static GlassTile Faceted independent from the animated Glass surface', () => {
+    expect(isPostprocessTimeAnimationActive(createPostprocess('glassV2', {
+      glassSurfaceType: 'organic',
+      glassMotion: 0,
+      glassNoiseInfluence: 0,
+      glassTilePattern: 'faceted',
+    }))).toBe(false);
+  });
+
   it.each([
     'distort',
     'mirror',
@@ -123,5 +141,25 @@ describe('isPostprocessTimeAnimationActive', () => {
       createPostprocess('distort', { glassMotion: 0 }),
       glassPipeline,
     )).toBe(false);
+    expect(isPostprocessTimeAnimationActive(
+      createPostprocess('distort', { glassSurfaceType: 'ripple', glassMotion: 0 }),
+      glassPipeline,
+    )).toBe(true);
+    expect(isPostprocessTimeAnimationActive(
+      createPostprocess('distort', {
+        glassSurfaceType: 'ripple',
+        glassRippleDepth: 0,
+        glassNoiseInfluence: 0,
+      }),
+      glassPipeline,
+    )).toBe(false);
+    expect(isPostprocessTimeAnimationActive(
+      createPostprocess('distort', {
+        glassSurfaceType: 'ripple',
+        glassRippleDepth: 0,
+        glassNoiseInfluence: 0.5,
+      }),
+      glassPipeline,
+    )).toBe(true);
   });
 });

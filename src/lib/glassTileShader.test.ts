@@ -23,6 +23,19 @@ describe('GlassTile shader source', () => {
     expect(source).toContain('sampleGlassTileSource');
   });
 
+  it('renders Faceted as a continuous shared-vertex triangular surface', () => {
+    const source = getProgramSource('glassTile').fragment;
+
+    expect(source).toContain('uniform float u_glassTileFacetDensity;');
+    expect(source).toContain('uniform float u_glassTileFacetDepth;');
+    expect(source).toContain('float glassTileFacetedHeight(vec2 position)');
+    expect(source).toContain('height = h00 * (1.0 - local.x - local.y) + h10 * local.x + h01 * local.y;');
+    expect(source).toContain('height = h11 * (local.x + local.y - 1.0)');
+    expect(source).toContain('depth * bandLimit * minDimension');
+    expect(source).toContain('if (pattern == 5) return glassTileFacetedHeight(position);');
+    expect(source).toContain('int pattern = int(clamp(floor(finiteFloat(float(u_glassTilePattern), 0.0) + 0.5), 0.0, 5.0));');
+  });
+
   it('does not add tile-only calls to the lightweight Stack Core variant', () => {
     const source = getProgramSource('stackCore').fragment;
 

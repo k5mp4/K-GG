@@ -43,7 +43,9 @@ vec3 glassSafeNormal(vec2 boundedGradient) {
 float glassCauchyIor(float wavelengthMicrometers, float chromaticAberration) {
   float wavelength = clamp(wavelengthMicrometers, 0.4, 0.7);
   float amount = clamp(chromaticAberration / 40.0, 0.0, 2.0);
-  return 1.5 + (0.5876 / max(wavelength, 0.0001) - 1.0) * 0.035 * amount;
+  float baseIor = glassFloat(u_glassIor, 1.5, 1.0, 2.5);
+  float iorScale = clamp((baseIor - 1.0) / 0.5, 0.0, 3.0);
+  return baseIor + (0.5876 / max(wavelength, 0.0001) - 1.0) * 0.035 * amount * iorScale;
 }
 
 float glassUvPixelFootprint(float scale, float stretch, vec2 resolution) {
@@ -139,9 +141,28 @@ float glassNoiseHeight(vec2 uv) {
   return finiteFloat(value / max(normalization, 0.0001), 0.5);
 }
 
+float glassV2RippleHeight(vec2 uv) {
+  float frequency = glassFloat(u_glassRippleFrequency, 6.0, 0.5, 18.0);
+  float depth = glassFloat(u_glassRippleDepth, 0.35, 0.0, 1.0);
+  float evolution = glassFloat(u_glassEvolution, 0.0, 0.0, 1.0);
+  float speed = glassFloat(u_glassRippleSpeed, 1.0, 1.0, 8.0);
+  vec2 resolution = glassResolution();
+  float minDimension = max(min(resolution.x, resolution.y), 1.0);
+  vec2 position = (glassFiniteUv(uv) - vec2(0.5)) * resolution / minDimension;
+  float loopPhase = prismLoopProgress() * speed;
+  float radialCycles = length(position) * frequency + evolution + loopPhase;
+  float bandPosition = fract(radialCycles);
+  float lensProfile = 0.5 + 0.5 * cos((bandPosition - 0.5) * 6.28318530718);
+  float phaseFootprint = frequency * 6.28318530718 * 2.0 / minDimension;
+  float bandLimit = 1.0 - smoothstep(0.65, 2.4, phaseFootprint);
+  return finiteFloat(0.5 + (lensProfile - 0.5) * depth * bandLimit, 0.5);
+}
+
 float glassV2SurfaceHeight(vec2 uv) {
   float influence = glassFloat(u_glassNoiseInfluence, 0.0, 0.0, 1.0);
+  int surfaceType = int(clamp(float(u_glassSurfaceType), 0.0, 1.0));
   float glassHeight = glassV2Height(uv);
+  if (surfaceType == 1) glassHeight = glassV2RippleHeight(uv);
   if (influence <= 0.0) return glassHeight;
   return finiteFloat(mix(glassHeight, glassNoiseHeight(uv), influence), 0.5);
 }
@@ -223,17 +244,55 @@ vec3 glassV2HighlightTintValue() {
 #endif
 }
 
-vec3 glassV2Transmission(vec2 baseUv, vec2 redOffset, vec2 greenOffset, vec2 blueOffset, vec2 roughnessOffset, float roughness, float hue, float saturation) {
+vec2 glassV2SpectralOffset(float t, vec2 redOffset, vec2 greenOffset, vec2 blueOffset) {
+  t = clamp(t, 0.0, 1.0);
+  if (t < 0.5) return mix(redOffset, greenOffset, t * 2.0);
+  return mix(greenOffset, blueOffset, (t - 0.5) * 2.0);
+}
+
+vec3 glassV2SpectralWeight(float t) {
+  t = clamp(t, 0.0, 1.0);
+  if (t < 0.5) return mix(vec3(1.0, 0.0, 0.0), vec3(0.0, 1.0, 0.0), t * 2.0);
+  return mix(vec3(0.0, 1.0, 0.0), vec3(0.0, 0.0, 1.0), (t - 0.5) * 2.0);
+}
+
+vec3 glassV2Transmission(
+  vec2 baseUv,
+  vec2 redOffset,
+  vec2 greenOffset,
+  vec2 blueOffset,
+  vec2 roughnessOffset,
+  float roughness,
+  float hue,
+  float saturation,
+  int chromaticSteps
+) {
   vec3 color;
   vec3 green;
   if (redOffset.x == greenOffset.x && redOffset.y == greenOffset.y && blueOffset.x == greenOffset.x && blueOffset.y == greenOffset.y) {
     green = sampleGlassSource(baseUv + greenOffset).rgb;
     color = green;
-  } else {
+  } else if (chromaticSteps <= 1) {
     vec3 red = sampleGlassSource(baseUv + redOffset).rgb;
     green = sampleGlassSource(baseUv + greenOffset).rgb;
     vec3 blue = sampleGlassSource(baseUv + blueOffset).rgb;
     color = vec3(red.r, green.g, blue.b);
+  } else {
+    int sampleCount = chromaticSteps * 2 + 1;
+    vec3 accumulatedWeight = vec3(0.0);
+    color = vec3(0.0);
+    green = vec3(0.0);
+    for (int i = 0; i < 7; i++) {
+      if (i >= sampleCount) break;
+      float t = float(i) / float(sampleCount - 1);
+      vec2 offset = glassV2SpectralOffset(t, redOffset, greenOffset, blueOffset);
+      vec3 sampleColor = sampleGlassSource(baseUv + offset).rgb;
+      vec3 weight = glassV2SpectralWeight(t);
+      color += sampleColor * weight;
+      accumulatedWeight += weight;
+      if (i == sampleCount / 2) green = sampleColor;
+    }
+    color /= max(accumulatedWeight, vec3(0.0001));
   }
   color = glassV2AdjustChromaticResidual(color, green, hue, saturation);
   if (roughness > 0.0001) {
@@ -249,21 +308,33 @@ vec4 opticalGlassV2(vec2 globalUv, vec2 globalCoord) {
   float roughness = glassFloat(u_glassRoughness, 1.5, 0.0, 12.0);
   float highlightAmount = glassFloat(u_glassHighlight, 0.45, 0.0, 2.0);
   float mixAmount = glassFloat(u_glassMix, 1.0, 0.0, 1.0);
+  int chromaticSteps = int(clamp(float(u_glassChromaticSteps), 1.0, 3.0));
   vec2 resolution = glassResolution();
   vec2 gradient = glassV2SurfaceGradient(globalUv, resolution, 2.0);
   vec2 boundedGradient = gradient / (1.0 + length(gradient) * 0.085);
   vec3 normal = glassSafeNormal(boundedGradient);
   vec3 incident = vec3(0.0, 0.0, -1.0);
-  vec2 direction = glassV2RefractDirection(incident, normal, glassCauchyIor(0.5461, chromatic));
+  float greenIor = glassCauchyIor(0.5461, chromatic);
+  vec2 direction = glassV2RefractDirection(incident, normal, greenIor);
   vec2 redOffset = direction * (refraction + chromatic) / resolution;
   vec2 greenOffset = direction * refraction / resolution;
   vec2 blueOffset = direction * (refraction - chromatic) / resolution;
   vec2 tangent = glassSafeDirection(vec2(-boundedGradient.y, boundedGradient.x));
   vec2 roughnessOffset = tangent * roughness / resolution;
   vec2 baseUv = diffuseGlassGlobalUv(globalUv, globalCoord);
-  vec3 transmission = glassV2Transmission(baseUv, redOffset, greenOffset, blueOffset, roughnessOffset, roughness, glassV2ChromaticHueValue(), glassV2ChromaticSaturationValue());
+  vec3 transmission = glassV2Transmission(baseUv, redOffset, greenOffset, blueOffset, roughnessOffset, roughness, glassV2ChromaticHueValue(), glassV2ChromaticSaturationValue(), chromaticSteps);
   transmission *= clamp(glassV2TransmissionTintValue(), 0.0, 1.0);
-  float fresnel = pow(clamp(1.0 - dot(-incident, normal), 0.0, 1.0), 2.0);
+  float baseIor = glassFloat(u_glassIor, 1.5, 1.0, 2.5);
+  float f0 = pow((baseIor - 1.0) / (baseIor + 1.0), 2.0);
+  float cosTheta = clamp(dot(-incident, normal), 0.0, 1.0);
+  float edgeFresnel = pow(1.0 - cosTheta, 2.0);
+  // Keep the existing edge response at IOR 1.5 while exposing its normal-angle F0.
+  float fresnel = clamp(
+    edgeFresnel * clamp((baseIor - 1.0) / 0.5, 0.0, 3.0)
+      + (f0 - 0.04) * cosTheta * cosTheta,
+    0.0,
+    1.0
+  );
   float broadSpecular = pow(max(dot(normal, normalize(vec3(-0.38, 0.48, 1.79))), 0.0), 8.0);
   float highlight = clamp((fresnel * 0.72 + broadSpecular * 0.58) * highlightAmount, 0.0, 1.0);
   vec3 highlighted = vec3(1.0) - (vec3(1.0) - transmission) * (1.0 - highlight * clamp(glassV2HighlightTintValue(), 0.0, 1.0));

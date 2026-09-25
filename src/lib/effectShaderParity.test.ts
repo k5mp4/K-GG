@@ -212,7 +212,11 @@ describe('V2 effect shader parity', () => {
   });
 
   it('declares Glass V2 color uniforms outside the legacy Glass specialization', () => {
-    expect(postprocessShader).toContain('#if !defined(KGG_LEGACY_GLASS_ONLY)\nuniform float u_glassV2ChromaticHue;');
+    expect(postprocessShader).toContain('uniform float u_glassIor;');
+    // Legacy Glass compiles the compact opticalGlassV2(), which reads this uniform.
+    expect(postprocessShader).not.toContain('#if !defined(KGG_LEGACY_GLASS_ONLY)\nuniform int u_glassChromaticSteps;');
+    expect(postprocessShader).toContain('uniform int u_glassChromaticSteps;');
+    expect(postprocessShader).toContain('uniform float u_glassV2ChromaticHue;');
     expect(postprocessShader).toContain('uniform float u_glassV2ChromaticSaturation;');
     expect(postprocessShader).toContain('uniform vec3 u_glassV2TransmissionTint;');
     expect(postprocessShader).toContain('uniform vec3 u_glassV2HighlightTint;');
@@ -269,6 +273,84 @@ describe('V2 effect shader parity', () => {
     expect(glassV2).toContain('vec4 opticalGlassV2(');
     expect(main).toContain('u_effectMode == 9');
     expect(main).toContain('opticalGlassV2(globalUv, globalCoord)');
+  });
+
+  it('uses the configured IOR and refinable chromatic sampling on both Glass V2 routes', () => {
+    const compactGlassV2 = getProgramSource('glassV2').fragment.replace(/\r\n?/g, '\n');
+
+    for (const source of [postprocessShader, compactGlassV2]) {
+      expect(source).toContain('uniform float u_glassIor;');
+      expect(source).toContain('uniform int u_glassChromaticSteps;');
+      expect(extractFunction(source, 'glassCauchyIor')).toContain('glassFloat(u_glassIor, 1.5, 1.0, 2.5)');
+      const cauchyIor = compact(extractFunction(source, 'glassCauchyIor'));
+      if (source === compactGlassV2) {
+        expect(cauchyIor).toContain('floatiorScale=clamp((baseIor-1.0)/0.5,0.0,3.0);');
+      } else {
+        expect(cauchyIor).toContain('floatdeltaFC=(nD-1.0)*amount/8.0;');
+      }
+
+      const transmission = compact(extractFunction(source, 'glassV2Transmission'));
+      const optical = compact(extractFunction(source, 'opticalGlassV2'));
+      expect(transmission).toContain('chromaticSteps<=1');
+      expect(transmission).toContain(source === compactGlassV2
+        ? 'for(inti=0;i<7;i++)'
+        : 'for(inti=0;i<13;i++)');
+      expect(transmission).toContain('glassV2SpectralOffset(');
+      expect(transmission).toContain('glassV2SpectralWeight(');
+      expect(optical).toContain('intchromaticSteps=int(clamp(float(u_glassChromaticSteps),1.0,3.0));');
+      if (source === compactGlassV2) {
+        expect(optical).toContain('floatbaseIor=glassFloat(u_glassIor,1.5,1.0,2.5);');
+        expect(optical).toContain('floatfresnel=clamp(edgeFresnel*clamp((baseIor-1.0)/0.5,0.0,3.0)+(f0-0.04)*cosTheta*cosTheta,0.0,1.0);');
+      } else {
+        expect(optical).toContain('floatf0=pow((greenIor-1.0)/(greenIor+1.0),2.0);');
+        expect(optical).toContain('floatfresnel=f0+(1.0-f0)*pow(1.0-cosTheta,5.0);');
+      }
+    }
+
+    const fallback = compact(extractFunction(postprocessShader, 'organicGlass'));
+    expect(fallback).toContain('floatiorScale=clamp((glassIor-1.0)/0.5,0.0,3.0);');
+    expect(fallback).toContain('floatf0=pow((glassIor-1.0)/(glassIor+1.0),2.0);');
+    expect(fallback).toContain('floatfresnel=clamp(edgeFresnel*iorScale+(f0-0.04)*cosTheta*cosTheta,0.0,1.0);');
+  });
+
+  it('uses a shared, band-limited concentric Ripple field on both Glass shader routes', () => {
+    const compactGlassV2 = getProgramSource('glassV2').fragment.replace(/\r\n?/g, '\n');
+    expect(postprocessShader).toContain('uniform int u_glassSurfaceType;');
+    expect(postprocessShader).toContain('uniform float u_glassRippleFrequency;');
+    expect(postprocessShader).toContain('uniform float u_glassRippleDepth;');
+    expect(postprocessShader).toContain('uniform float u_glassRippleSpeed;');
+
+    const fullRipple = compact(extractFunction(postprocessShader, 'glassRippleHeight'));
+    const compactRipple = compact(extractFunction(compactGlassV2, 'glassV2RippleHeight'));
+    expect(fullRipple.replaceAll('glassRippleHeight', 'rippleHeight'))
+      .toBe(compactRipple.replaceAll('glassV2RippleHeight', 'rippleHeight'));
+    for (const ripple of [fullRipple, compactRipple]) {
+      expect(ripple).toContain('loopPhase=prismLoopProgress()*speed');
+      expect(ripple).toContain('fract(radialCycles)');
+      expect(ripple).toContain('0.5+0.5*cos((bandPosition-0.5)*6.28318530718)');
+      expect(ripple).toContain('smoothstep(0.65,2.4,phaseFootprint)');
+      expect(ripple).toContain('u_glassRippleDepth');
+      expect(ripple).not.toContain('u_glassMotion');
+    }
+
+    expect(compact(extractFunction(postprocessShader, 'glassV2SurfaceHeight')))
+      .toContain('if(surfaceType==1)surfaceHeight=glassRippleHeight(uv);');
+    expect(compact(extractFunction(compactGlassV2, 'glassV2SurfaceHeight')))
+      .toContain('if(surfaceType==1)glassHeight=glassV2RippleHeight(uv);');
+    expect(compact(extractFunction(postprocessShader, 'glassSurfaceHeight')))
+      .toContain('if(surfaceType==1)surfaceHeight=glassRippleHeight(uv);');
+  });
+
+  it('keeps Glass animated surface choices separate from the static GlassTile Faceted pattern', () => {
+    const compactGlassV2 = getProgramSource('glassV2').fragment.replace(/\r\n?/g, '\n');
+    expect(postprocessShader).not.toContain('u_glassFacetedDensity');
+    expect(postprocessShader).not.toContain('u_glassFacetedDepth');
+    expect(compact(extractFunction(postprocessShader, 'glassV2SurfaceHeight')))
+      .toContain('intsurfaceType=int(clamp(float(u_glassSurfaceType),0.0,1.0));');
+    expect(compact(extractFunction(compactGlassV2, 'glassV2SurfaceHeight')))
+      .toContain('intsurfaceType=int(clamp(float(u_glassSurfaceType),0.0,1.0));');
+    expect(compact(webglSource)).toContain('glass.surfaceType===\'ripple\'?1:0');
+    expect(getProgramSource('glassTile').fragment).toContain('glassTileFacetedHeight');
   });
 
   it('keeps Dither cell-center and Bayer threshold behavior identical to the Diffuse panel', () => {

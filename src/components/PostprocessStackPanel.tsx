@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import type { EffectStackKind, PostprocessStackKind } from '../types/distortion';
+import './PostprocessStackPanel.css';
 import {
   canRenderV2Direct,
   captureEffectStackEnabledState,
@@ -432,9 +433,10 @@ export function PostprocessStackPanel({
           return (
             <div
               key={layer.kind}
-              className={`absolute left-0 right-0 flex h-[38px] items-center gap-2 border-b border-cream/10 px-2 transition-[top,transform,background-color,border-color,opacity] ease-in-out duration-150 ${
-                selected ? 'bg-fire/15 text-k-text' : 'bg-transparent text-cream/80 hover:bg-cream/10'
-              } ${layer.enabled ? 'opacity-100' : 'opacity-56'} ${isDragging ? 'z-10 shadow-[0_12px_28px_rgba(0,0,0,0.42)]' : 'z-0'}`}
+              className="effect-stack-row"
+              data-selected={selected ? 'true' : 'false'}
+              data-enabled={layer.enabled ? 'true' : 'false'}
+              data-dragging={isDragging ? 'true' : 'false'}
               style={{
                 top: index * ROW_HEIGHT,
                 transform: rowTransform(layer.kind, index),
@@ -451,7 +453,7 @@ export function PostprocessStackPanel({
             >
               <button
                 type="button"
-                className="flex h-7 w-6 cursor-grab touch-none items-center justify-center text-cream/50 transition-colors hover:text-fire active:cursor-grabbing"
+                className="effect-stack-row__drag-handle"
                 aria-label={t('stack.drag', { effect: LABELS[layer.kind] })}
                 title={t('stack.drag', { effect: LABELS[layer.kind] })}
                 onPointerDown={(e) => startDrag(e, layer.kind, index)}
@@ -459,11 +461,11 @@ export function PostprocessStackPanel({
                 <Icon name="gripVertical" className="text-[15px]" />
               </button>
               <div className="min-w-0 flex-1">
-                <div className="flex items-center gap-1.5 truncate font-display text-[10px] font-bold uppercase tracking-wider">
+                <div className="effect-stack-row__title">
                   {LABELS[layer.kind]}
-                  <span className="rounded border border-cream/20 px-1 text-[7px] font-medium tracking-normal text-cream/60">{t(CATEGORY[layer.kind])}</span>
+                  <span className="effect-stack-row__category">{t(CATEGORY[layer.kind])}</span>
                 </div>
-                <div className={`text-[8px] font-medium uppercase tracking-wide ${status.className}`}>{status.label}</div>
+                <div className={`effect-stack-row__status ${status.className}`}>{status.label}</div>
               </div>
               <div
                 onClick={(event) => event.stopPropagation()}

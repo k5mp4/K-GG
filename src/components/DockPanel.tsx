@@ -20,7 +20,6 @@ type DockPanelProps = {
   onResizeStart: PointerEventHandler<HTMLDivElement>;
   resizing?: boolean;
   children: ReactNode;
-  headerEnd?: ReactNode;
   bodyClassName?: string;
   mobileWidth?: string;
 };
@@ -58,7 +57,6 @@ export function DockPanel({
   onResizeStart,
   resizing = false,
   children,
-  headerEnd,
   bodyClassName = '',
   mobileWidth = 'min(90vw, 400px)',
 }: DockPanelProps) {
@@ -106,14 +104,6 @@ export function DockPanel({
           onPointerDown={onResizeStart}
           aria-hidden="true"
         />
-
-        <header className="flex min-h-13 shrink-0 items-center gap-3 border-b border-panel-border bg-k-bg px-4 py-3">
-          <span className="min-w-0 flex-1 truncate text-[10px] font-display font-semibold uppercase tracking-widest text-k-text">
-            {title}
-          </span>
-          {headerEnd}
-        </header>
-
         <div className={`min-h-0 flex-1 ${bodyClassName}`}>
           {children}
         </div>

@@ -2480,8 +2480,15 @@ function drawPostprocessPass(
     gl.uniform1f(ctx.postprocessUniforms.u_glassWarp, glass.warp);
     gl.uniform1f(ctx.postprocessUniforms.u_glassSeed, glass.seed);
     gl.uniform1f(ctx.postprocessUniforms.u_glassNoiseInfluence, glass.noiseInfluence);
+    const glassSurfaceTypeIndex = glass.surfaceType === 'ripple' ? 1 : 0;
+    setUniform1i(gl, ctx.postprocessUniforms.u_glassSurfaceType, glassSurfaceTypeIndex);
+    gl.uniform1f(ctx.postprocessUniforms.u_glassRippleFrequency, glass.rippleFrequency);
+    gl.uniform1f(ctx.postprocessUniforms.u_glassRippleDepth, glass.rippleDepth);
+    gl.uniform1f(ctx.postprocessUniforms.u_glassRippleSpeed, glass.rippleSpeed);
     gl.uniform1f(ctx.postprocessUniforms.u_glassRefraction, glass.refraction);
+    gl.uniform1f(ctx.postprocessUniforms.u_glassIor, glass.ior);
     gl.uniform1f(ctx.postprocessUniforms.u_glassChromaticAberration, glass.chromaticAberration);
+    setUniform1i(gl, ctx.postprocessUniforms.u_glassChromaticSteps, glass.chromaticSteps);
     gl.uniform1f(ctx.postprocessUniforms.u_glassRoughness, glass.roughness);
     gl.uniform1f(ctx.postprocessUniforms.u_glassHighlight, glass.highlight);
     gl.uniform1f(ctx.postprocessUniforms.u_glassMix, glass.mix);
@@ -2509,6 +2516,8 @@ function drawPostprocessPass(
     );
     const glassTile = normalizeGlassTileRenderParameters(postprocess);
     setUniform1i(gl, ctx.postprocessUniforms.u_glassTilePattern, glassTile.patternIndex);
+    gl.uniform1f(ctx.postprocessUniforms.u_glassTileFacetDensity, glassTile.facetDensity);
+    gl.uniform1f(ctx.postprocessUniforms.u_glassTileFacetDepth, glassTile.facetDepth);
     gl.uniform1f(ctx.postprocessUniforms.u_glassTileSize, glassTile.tileSize);
     gl.uniform1f(ctx.postprocessUniforms.u_glassTileBevel, glassTile.bevel);
     gl.uniform1f(ctx.postprocessUniforms.u_glassTileSurfaceHeight, glassTile.surfaceHeight);
