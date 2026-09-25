@@ -38,7 +38,11 @@
   uniform float u_ridgeOffset;
   uniform float u_ridgeWarp;
 
-  uniform float u_fbmTonality;
+  // Perlin 3D パラメータ
+  uniform float u_perlinRoughness;   // 主レイヤーのオクターブ振幅倍率 (小→なめらか, 大→細い線が増える)
+  uniform float u_perlinSharpness;   // Tonality相当のカーブ強度 (大→暗部が広く線が細い)
+  uniform float u_perlinLayerMix;    // 2枚目レイヤーのLighten不透明度
+  uniform float u_perlinAngle;       // UVを押し出す方向 (度)
 
   // AE Fractal Noise パラメータ
   uniform int   u_aeFractalType;     // 0=Basic, 1=Turbulent
@@ -179,33 +183,6 @@
       frequency *= 2.0;
     }
     return value;
-  }
-
-  // Material Maker "FBM Noise -> Invert -> Tonality" look, built on top of the
-  // shared fbm() above without touching it. Standard fbm is inverted into
-  // [0,1] and reshaped by a convex power curve: most of the field compresses
-  // toward the dark end, while only the extreme troughs of the source fbm
-  // (mapped to inverted ~= 1) survive as thin, branching bright veins between
-  // large smooth dark cells. This is a distinct family from ridgedFbm(), which
-  // brightens every octave's zero-crossing independently; here a single
-  // post-curve reshapes one plain fbm sum, so it stays low-frequency and
-  // smooth rather than layered and ridge-like.
-  //
-  // shaped = pow(inverted, curve) always lands in [0,1], and for inverted
-  // uniform on [0,1] its expected value is 1/(curve+1). Subtracting that
-  // analytic mean and rescaling by 1/(1-mean) keeps the returned field inside
-  // [-1,1] and close to zero-mean across the image, so Amount does not read
-  // as a constant directional drift once Tonality pushes most of the field
-  // toward one side of the curve.
-  float shapedFbm(vec2 p, int octaves, float curve) {
-    float n = fbm(p, octaves);
-    float normalized = clamp(n * 0.5 + 0.5, 0.0, 1.0);
-    float inverted = 1.0 - normalized;
-    float safeCurve = max(curve, 0.0001);
-    float shaped = pow(inverted, safeCurve);
-    float meanApprox = 1.0 / (safeCurve + 1.0);
-    float gain = 1.0 / max(1.0 - meanApprox, 0.0001);
-    return (shaped - meanApprox) * gain;
   }
 
   float randDW(vec2 n) {
@@ -762,6 +739,133 @@
     return value;
   }
 
+  // Classic 3D gradient Perlin noise (Gustavson GLSL port, quintic fade).
+  // Unlike simplex, the eight-corner trilinear blend with the C2 quintic fade
+  // produces broad, rounded lobes and continuous second derivatives, so the
+  // displacement reads as soft gradation rather than cell/vein structure.
+  const int PERLIN_NOISE_TYPE = 11;
+
+  vec3 perlinFade(vec3 t) {
+    return t * t * t * (t * (t * 6.0 - 15.0) + 10.0);
+  }
+
+  float perlin3D(vec3 P) {
+    vec3 Pi0 = floor(P);
+    vec3 Pi1 = Pi0 + vec3(1.0);
+    Pi0 = mod289v3(Pi0);
+    Pi1 = mod289v3(Pi1);
+    vec3 Pf0 = fract(P);
+    vec3 Pf1 = Pf0 - vec3(1.0);
+    vec4 ix = vec4(Pi0.x, Pi1.x, Pi0.x, Pi1.x);
+    vec4 iy = vec4(Pi0.yy, Pi1.yy);
+    vec4 iz0 = Pi0.zzzz;
+    vec4 iz1 = Pi1.zzzz;
+
+    vec4 ixy = permute4(permute4(ix) + iy);
+    vec4 ixy0 = permute4(ixy + iz0);
+    vec4 ixy1 = permute4(ixy + iz1);
+
+    vec4 gx0 = ixy0 * (1.0 / 7.0);
+    vec4 gy0 = fract(floor(gx0) * (1.0 / 7.0)) - 0.5;
+    gx0 = fract(gx0);
+    vec4 gz0 = vec4(0.5) - abs(gx0) - abs(gy0);
+    vec4 sz0 = step(gz0, vec4(0.0));
+    gx0 -= sz0 * (step(0.0, gx0) - 0.5);
+    gy0 -= sz0 * (step(0.0, gy0) - 0.5);
+
+    vec4 gx1 = ixy1 * (1.0 / 7.0);
+    vec4 gy1 = fract(floor(gx1) * (1.0 / 7.0)) - 0.5;
+    gx1 = fract(gx1);
+    vec4 gz1 = vec4(0.5) - abs(gx1) - abs(gy1);
+    vec4 sz1 = step(gz1, vec4(0.0));
+    gx1 -= sz1 * (step(0.0, gx1) - 0.5);
+    gy1 -= sz1 * (step(0.0, gy1) - 0.5);
+
+    vec3 g000 = vec3(gx0.x, gy0.x, gz0.x);
+    vec3 g100 = vec3(gx0.y, gy0.y, gz0.y);
+    vec3 g010 = vec3(gx0.z, gy0.z, gz0.z);
+    vec3 g110 = vec3(gx0.w, gy0.w, gz0.w);
+    vec3 g001 = vec3(gx1.x, gy1.x, gz1.x);
+    vec3 g101 = vec3(gx1.y, gy1.y, gz1.y);
+    vec3 g011 = vec3(gx1.z, gy1.z, gz1.z);
+    vec3 g111 = vec3(gx1.w, gy1.w, gz1.w);
+
+    vec4 norm0 = taylorInvSqrt4(vec4(dot(g000, g000), dot(g010, g010), dot(g100, g100), dot(g110, g110)));
+    g000 *= norm0.x; g010 *= norm0.y; g100 *= norm0.z; g110 *= norm0.w;
+    vec4 norm1 = taylorInvSqrt4(vec4(dot(g001, g001), dot(g011, g011), dot(g101, g101), dot(g111, g111)));
+    g001 *= norm1.x; g011 *= norm1.y; g101 *= norm1.z; g111 *= norm1.w;
+
+    float n000 = dot(g000, Pf0);
+    float n100 = dot(g100, vec3(Pf1.x, Pf0.yz));
+    float n010 = dot(g010, vec3(Pf0.x, Pf1.y, Pf0.z));
+    float n110 = dot(g110, vec3(Pf1.xy, Pf0.z));
+    float n001 = dot(g001, vec3(Pf0.xy, Pf1.z));
+    float n101 = dot(g101, vec3(Pf1.x, Pf0.y, Pf1.z));
+    float n011 = dot(g011, vec3(Pf0.x, Pf1.yz));
+    float n111 = dot(g111, Pf1);
+
+    vec3 fadeXYZ = perlinFade(Pf0);
+    vec4 nZ = mix(vec4(n000, n100, n010, n110), vec4(n001, n101, n011, n111), fadeXYZ.z);
+    vec2 nYZ = mix(nZ.xy, nZ.zw, fadeXYZ.y);
+    return 2.2 * mix(nYZ.x, nYZ.y, fadeXYZ.x);
+  }
+
+  // Material Maker style folded Perlin fBm in 3D:
+  //   octave = |perlin| (one "fold" of the [0,1] noise: abs(2n - 1))
+  // Folding turns every zero crossing of the Perlin field into a soft valley,
+  // so after inversion each crossing becomes a smooth, glowing line. Octaves
+  // are rotated so the lattice axes never line up between layers, and the sum
+  // is normalized by the total amplitude (range stays [0,1]).
+  float perlinFoldedFbm3D(vec3 p, int octaves, float persistence) {
+    const mat3 octaveRot = mat3( 0.00,  0.80,  0.60,
+                                -0.80,  0.36, -0.48,
+                                -0.60, -0.48,  0.64);
+    float value = 0.0;
+    float amplitude = 1.0;
+    float total = 0.0;
+    for (int i = 0; i < 8; i++) {
+      if (i >= octaves) break;
+      value += amplitude * min(abs(perlin3D(p)), 1.0);
+      total += amplitude;
+      p = octaveRot * p * 2.0;
+      amplitude *= persistence;
+    }
+    return value / max(total, 0.0001);
+  }
+
+  // Smeary Perlin field in [0,1], equivalent to the Material Maker graph
+  //   FBM(Perlin, folds 1, persistence=Roughness) -> Invert -> Tonality
+  //   FBM(Perlin, folds 1, persistence 1) -> Translate -> Invert
+  //   Blend(Lighten, opacity=Layer Mix) -> Tonality
+  // and close to After Effects Fractal Noise "Smeary": dark, smooth regions
+  // crossed by soft bright filaments that fade out with a glow.
+  float perlinSmearyField(vec3 q, int octaves) {
+    float roughness = clamp(u_perlinRoughness, 0.0, 1.0);
+    float sharpness = clamp(u_perlinSharpness, 1.0, 8.0);
+    float layerMix = clamp(u_perlinLayerMix, 0.0, 1.0);
+    float base = pow(1.0 - perlinFoldedFbm3D(q, octaves, roughness), sharpness);
+    float layer = 1.0 - perlinFoldedFbm3D(q + vec3(-0.59, 1.145, 7.31), octaves, 1.0);
+    float blended = mix(base, max(base, layer), layerMix);
+    return pow(blended, 1.0 + sharpness * 0.5);
+  }
+
+  // Perlin 3D displacement. XY is the image plane and Z is time, so animation
+  // morphs the filaments in place instead of only scrolling a frozen field.
+  // The scalar field pushes the UV along one direction (Angle) so the
+  // gradient reproduces the texture itself; two independent X/Y fields would
+  // mix two unrelated textures and wash the filaments out. The field is
+  // mostly dark, so it is not re-centered: dark regions keep the source
+  // gradient untouched and only the glowing filaments displace it (centering
+  // would turn the dark majority into a constant shift of the whole image).
+  vec2 perlinDistortion(vec2 uv, float scale, float evolution, int octaves) {
+    vec2 p = uv * scale + linearDrift(noiseAnimDir(), evolution, 0.25);
+    p += vec2(u_noiseSeed * 127.1, u_noiseSeed * 311.7);
+    vec3 q = vec3(p, evolution * 0.6);
+    float field = perlinSmearyField(q, octaves);
+    float angle = radians(u_perlinAngle);
+    return vec2(cos(angle), sin(angle)) * field;
+  }
+
   // A divergence-free 2D vector field from the perpendicular of an analytic
   // scalar-field gradient. This replaces the four finite-difference fBM calls
   // used by Legacy Curl with one derivative simplex evaluation per octave.
@@ -795,9 +899,8 @@
       nx = simplex2D(p);
       ny = simplex2D(p + vec2(43.7, 17.3));
     } else if (noiseType == 1) {
-      float tonalityCurve = max(u_fbmTonality, 0.0001);
-      nx = shapedFbm(p, octaves, tonalityCurve);
-      ny = shapedFbm(p + vec2(43.7, 17.3), octaves, tonalityCurve);
+      nx = fbm(p, octaves);
+      ny = fbm(p + vec2(43.7, 17.3), octaves);
     } else if (noiseType == 2) {
       float v1 = voronoiScalar(p);
       float v2 = voronoiScalar(p + vec2(17.9, 43.5));
@@ -838,6 +941,9 @@
       // AE Fractal Noise: 各オクターブに累積回転を適用したfbm
       nx = aeFractalNoise(p, octaves) * 2.0 - 1.0;
       ny = aeFractalNoise(p + vec2(43.7, 17.3), octaves) * 2.0 - 1.0;
+    } else if (noiseType == PERLIN_NOISE_TYPE) {
+      // Perlin samples XY + time-Z itself with its own reduced drift.
+      return perlinDistortion(uv, scale, evolution, octaves);
     } else if (noiseType == PHASOR_NOISE_TYPE) {
       // Phasor is already a phase-gradient vector field; do not duplicate its
       // scalar line signal into X/Y like the legacy scalar noise types.

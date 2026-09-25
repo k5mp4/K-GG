@@ -307,34 +307,39 @@ describe('Gradient store Effect Pipeline V2 synchronization', () => {
     expect(legacyNoise.phasorDirectionMode).toBe('directional');
   });
 
-  it('adds fBm Tonality with a deterministic default and clamps out-of-range/invalid values', () => {
+  it('adds Perlin 3D with deterministic defaults and clamps out-of-range/invalid values', () => {
     const store = useGradientStore.getState();
-    store.setNoiseDistortion({ type: 'fbm' });
+    store.setNoiseDistortion({ type: 'perlin' });
 
     expect(useGradientStore.getState().noiseDistortion).toMatchObject({
-      type: 'fbm',
-      fbmTonality: 4,
+      type: 'perlin',
+      scale: 1.2,
+      octaves: 2,
+      perlinRoughness: 0.29,
+      perlinSharpness: 4,
+      perlinLayerMix: 0.56,
+      perlinAngle: 90,
     });
 
-    store.setNoiseDistortion({ fbmTonality: 99 });
-    expect(useGradientStore.getState().noiseDistortion.fbmTonality).toBe(8);
+    store.setNoiseDistortion({ perlinRoughness: 99, perlinSharpness: 99, perlinLayerMix: 99 });
+    expect(useGradientStore.getState().noiseDistortion).toMatchObject({ perlinRoughness: 1, perlinSharpness: 8, perlinLayerMix: 1 });
 
-    store.setNoiseDistortion({ fbmTonality: -5 });
-    expect(useGradientStore.getState().noiseDistortion.fbmTonality).toBe(1);
+    store.setNoiseDistortion({ perlinRoughness: -5, perlinSharpness: -5, perlinLayerMix: -5 });
+    expect(useGradientStore.getState().noiseDistortion).toMatchObject({ perlinRoughness: 0, perlinSharpness: 1, perlinLayerMix: 0 });
 
-    store.setNoiseDistortion({ fbmTonality: Number.NaN });
-    expect(useGradientStore.getState().noiseDistortion.fbmTonality).toBe(STORE_DEFAULTS.noiseDistortion.fbmTonality);
+    store.setNoiseDistortion({ perlinSharpness: Number.NaN, perlinAngle: -90 });
+    expect(useGradientStore.getState().noiseDistortion.perlinSharpness).toBe(STORE_DEFAULTS.noiseDistortion.perlinSharpness);
+    expect(useGradientStore.getState().noiseDistortion.perlinAngle).toBe(270);
 
-    const legacyNoise = normalizeNoiseDistortionConfig({ type: 'simplex' });
-    expect(legacyNoise.fbmTonality).toBe(STORE_DEFAULTS.noiseDistortion.fbmTonality);
-
-    const presetWithoutTonality = normalizeNoiseDistortionConfig({
+    const legacyFbm = normalizeNoiseDistortionConfig({
       type: 'fbm',
       amount: 0.2,
       scale: 2,
       octaves: 4,
     } as never);
-    expect(presetWithoutTonality.fbmTonality).toBe(STORE_DEFAULTS.noiseDistortion.fbmTonality);
+    expect(legacyFbm.type).toBe('fbm');
+    expect(legacyFbm.perlinSharpness).toBe(STORE_DEFAULTS.noiseDistortion.perlinSharpness);
+    expect(legacyFbm.perlinAngle).toBe(STORE_DEFAULTS.noiseDistortion.perlinAngle);
   });
 
   it('applies GPU-tier octave and step limits to Fast Curl', () => {

@@ -557,7 +557,10 @@ export async function initWebGL(canvas: HTMLCanvasElement): Promise<WebGLContext
     u_ridgePersistence: gl.getUniformLocation(program, 'u_ridgePersistence'),
     u_ridgeOffset: gl.getUniformLocation(program, 'u_ridgeOffset'),
     u_ridgeWarp: gl.getUniformLocation(program, 'u_ridgeWarp'),
-    u_fbmTonality: gl.getUniformLocation(program, 'u_fbmTonality'),
+    u_perlinRoughness: gl.getUniformLocation(program, 'u_perlinRoughness'),
+    u_perlinSharpness: gl.getUniformLocation(program, 'u_perlinSharpness'),
+    u_perlinLayerMix: gl.getUniformLocation(program, 'u_perlinLayerMix'),
+    u_perlinAngle: gl.getUniformLocation(program, 'u_perlinAngle'),
     u_aeFractalType: gl.getUniformLocation(program, 'u_aeFractalType'),
     u_aeSubInfluence: gl.getUniformLocation(program, 'u_aeSubInfluence'),
     u_aeSubScaling: gl.getUniformLocation(program, 'u_aeSubScaling'),
@@ -1762,7 +1765,7 @@ export function hexToRgb(hex: string): [number, number, number] {
   return [r, g, b];
 }
 
-export const NOISE_TYPE_MAP = { simplex: 0, fbm: 1, voronoi: 2, curl: 3, domain_warp_anim: 4, seamless: 5, ridged_fbm: 6, ae_fractal: 7, fast_curl: 8, caustics: 9, phasor: 10 } as const;
+export const NOISE_TYPE_MAP = { simplex: 0, fbm: 1, voronoi: 2, curl: 3, domain_warp_anim: 4, seamless: 5, ridged_fbm: 6, ae_fractal: 7, fast_curl: 8, caustics: 9, phasor: 10, perlin: 11 } as const;
 export const GRADIENT_TYPE_MAP = { linear: 0, radial: 1, fourcolor: 2, diamond: 3, angle: 4, bezier: 5, mesh: 6 } as const;
 const DIFFUSE_MODE_MAP = { block: 0, smooth: 1, dither: 2, halftone: 3, ascii: 4, legacy: 5 } as const;
 const PARTICLE_EMITTER_TYPE_MAP = { field: 0, line: 1, burst: 2, point: 3 } as const;
@@ -2417,7 +2420,10 @@ function drawPostprocessPass(
   gl.uniform1f(ctx.postprocessUniforms.u_ridgePersistence, noiseDistortion.ridgePersistence ?? 0.6);
   gl.uniform1f(ctx.postprocessUniforms.u_ridgeOffset, noiseDistortion.ridgeOffset ?? 1);
   gl.uniform1f(ctx.postprocessUniforms.u_ridgeWarp, noiseDistortion.ridgeWarp ?? 1);
-  gl.uniform1f(ctx.postprocessUniforms.u_fbmTonality, noiseDistortion.fbmTonality ?? 4);
+  gl.uniform1f(ctx.postprocessUniforms.u_perlinRoughness, finiteClamp(noiseDistortion.perlinRoughness, 0.29, 0, 1));
+  gl.uniform1f(ctx.postprocessUniforms.u_perlinSharpness, finiteClamp(noiseDistortion.perlinSharpness, 4, 1, 8));
+  gl.uniform1f(ctx.postprocessUniforms.u_perlinLayerMix, finiteClamp(noiseDistortion.perlinLayerMix, 0.56, 0, 1));
+  gl.uniform1f(ctx.postprocessUniforms.u_perlinAngle, finiteClamp(noiseDistortion.perlinAngle, 90, 0, 360));
   setUniform1i(gl, ctx.postprocessUniforms.u_aeFractalType, noiseDistortion.aeFractalType === 'turbulent' ? 1 : 0);
   gl.uniform1f(ctx.postprocessUniforms.u_aeSubInfluence, noiseDistortion.aeSubInfluence ?? 0.7);
   gl.uniform1f(ctx.postprocessUniforms.u_aeSubScaling, noiseDistortion.aeSubScaling ?? 1.78);
@@ -3545,7 +3551,10 @@ export function render(
   gl.uniform1f(uniforms.u_ridgePersistence, noiseDistortion.ridgePersistence ?? 0.6);
   gl.uniform1f(uniforms.u_ridgeOffset, noiseDistortion.ridgeOffset ?? 1.0);
   gl.uniform1f(uniforms.u_ridgeWarp, noiseDistortion.ridgeWarp ?? 1.0);
-  gl.uniform1f(uniforms.u_fbmTonality, noiseDistortion.fbmTonality ?? 4.0);
+  gl.uniform1f(uniforms.u_perlinRoughness, finiteClamp(noiseDistortion.perlinRoughness, 0.29, 0, 1));
+  gl.uniform1f(uniforms.u_perlinSharpness, finiteClamp(noiseDistortion.perlinSharpness, 4, 1, 8));
+  gl.uniform1f(uniforms.u_perlinLayerMix, finiteClamp(noiseDistortion.perlinLayerMix, 0.56, 0, 1));
+  gl.uniform1f(uniforms.u_perlinAngle, finiteClamp(noiseDistortion.perlinAngle, 90, 0, 360));
   setUniform1i(gl, uniforms.u_aeFractalType, noiseDistortion.aeFractalType === 'turbulent' ? 1 : 0);
   gl.uniform1f(uniforms.u_aeSubInfluence, noiseDistortion.aeSubInfluence ?? 0.7);
   gl.uniform1f(uniforms.u_aeSubScaling, noiseDistortion.aeSubScaling ?? 1.78);

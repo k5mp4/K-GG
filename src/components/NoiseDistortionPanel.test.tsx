@@ -9,7 +9,7 @@ const TYPE_ORDER = [
   'Fast Curl',
   'Curl (Legacy)',
   'Simplex',
-  'fBm',
+  'Perlin',
   'Aura Ridges',
   'Fractal Drift',
   'Domain Warp',
@@ -48,6 +48,7 @@ describe('NoiseDistortionPanel', () => {
 
     expect(positions.every((position) => position >= 0)).toBe(true);
     expect(positions).toEqual([...positions].sort((a, b) => a - b));
+    expect(markup).not.toContain('title="fBm"');
   });
 
   it.each([
@@ -58,7 +59,7 @@ describe('NoiseDistortionPanel', () => {
     expect(getNoiseSeedField(type)).toBe(field);
   });
 
-  it('shows the fBm Tonality control only when Type is fBm', () => {
+  it('shows the Perlin Roughness/Sharpness/Layer Mix controls only when Type is Perlin', () => {
     // renderToStaticMarkup drives React's SSR snapshot, which zustand reads
     // from getInitialState() rather than the live getState() (see
     // node_modules/zustand/react.js useStore). Mutate getInitialState()
@@ -67,13 +68,24 @@ describe('NoiseDistortionPanel', () => {
     const initialState = useGradientStore.getInitialState();
     const previousNoiseDistortion = initialState.noiseDistortion;
     try {
+      initialState.noiseDistortion = { ...previousNoiseDistortion, type: 'perlin' };
+      const perlinMarkup = renderToStaticMarkup(
+        <LanguageProvider>
+          <NoiseDistortionPanel />
+        </LanguageProvider>,
+      );
+      expect(perlinMarkup).toContain('>Roughness</label>');
+      expect(perlinMarkup).toContain('>Sharpness</label>');
+      expect(perlinMarkup).toContain('>Layer Mix</label>');
+      expect(perlinMarkup).toContain('>Octaves</label>');
+
       initialState.noiseDistortion = { ...previousNoiseDistortion, type: 'fbm' };
       const fbmMarkup = renderToStaticMarkup(
         <LanguageProvider>
           <NoiseDistortionPanel />
         </LanguageProvider>,
       );
-      expect(fbmMarkup).toContain('>Tonality</label>');
+      expect(fbmMarkup).not.toContain('>Roughness</label>');
 
       initialState.noiseDistortion = { ...previousNoiseDistortion, type: 'simplex' };
       const simplexMarkup = renderToStaticMarkup(
@@ -81,7 +93,7 @@ describe('NoiseDistortionPanel', () => {
           <NoiseDistortionPanel />
         </LanguageProvider>,
       );
-      expect(simplexMarkup).not.toContain('>Tonality</label>');
+      expect(simplexMarkup).not.toContain('>Roughness</label>');
 
       initialState.noiseDistortion = { ...previousNoiseDistortion, type: 'ridged_fbm' };
       const ridgedMarkup = renderToStaticMarkup(
@@ -89,7 +101,7 @@ describe('NoiseDistortionPanel', () => {
           <NoiseDistortionPanel />
         </LanguageProvider>,
       );
-      expect(ridgedMarkup).not.toContain('>Tonality</label>');
+      expect(ridgedMarkup).not.toContain('>Roughness</label>');
     } finally {
       initialState.noiseDistortion = previousNoiseDistortion;
     }

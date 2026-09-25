@@ -209,7 +209,7 @@ describe('webglShaderSources', () => {
   });
 
   it('keeps Phasor Lines at the end of the Noise type mapping and includes its field contract', () => {
-    expect(NOISE_TYPE_MAP).toMatchObject({ caustics: 9, phasor: 10 });
+    expect(NOISE_TYPE_MAP).toMatchObject({ caustics: 9, phasor: 10, perlin: 11 });
     const generator = getProgramSource('generator').fragment;
     const noiseStack = getProgramSource('noiseStack').fragment;
     for (const source of [generator, noiseStack]) {

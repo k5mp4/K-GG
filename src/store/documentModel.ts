@@ -55,7 +55,7 @@ export function isGradientType(value: unknown): value is import('../types/gradie
 /** ノイズタイプ切り替え時に自動適用するタイプ別初期値 */
 export const NOISE_TYPE_PRESETS: Record<NoiseDistortionConfig['type'], Partial<NoiseDistortionConfig>> = {
   simplex: { amount: 0.15, scale: 3.0 },
-  fbm: { amount: 0.20, scale: 2.0, octaves: 4, fbmTonality: getParameterDefault('noise.fbmTonality') },
+  fbm: { amount: 0.20, scale: 2.0, octaves: 4 },
   voronoi: { amount: 0.15, scale: 6.0, voronoiDistMetric: 'euclidean', voronoiRandomness: 1.0, voronoiFeature: 'f1', voronoiMinkowskiExp: 2.0 },
   curl: { amount: 0.30, scale: 0.5, octaves: 3, curlSteps: 4, curlSpeed: 0.5, curlEps: 0.01, curlSeed: 0.0 },
   fast_curl: { amount: 0.30, scale: 0.5, octaves: 3, curlSteps: 2, curlSpeed: 0.5, curlSeed: 0.0, noiseLoopMode: 'seamless' },
@@ -65,6 +65,7 @@ export const NOISE_TYPE_PRESETS: Record<NoiseDistortionConfig['type'], Partial<N
   ae_fractal: { amount: 0.30, scale: 2.0, octaves: 6, aeFractalType: 'basic', aeSubInfluence: 0.7, aeSubScaling: 1.78, aeSubRotation: 45, aeContrast: 1.0, aeBrightness: 0.0 },
   caustics: { amount: 0.45, scale: 2.4, octaves: 4, speed: 0.5, noiseLoopMode: 'seamless', noiseLoopBlend: 0.75, causticsDepth: 0.65, causticsRefraction: 1.0, causticsSharpness: 2.5, causticsComplexity: 4, causticsWaveSpread: 0.75, causticsBoundaryWidth: 0.75 },
   phasor: { amount: 0.24, scale: 2.8, octaves: 3, speed: 0.5, noiseLoopMode: 'seamless', noiseLoopBlend: 0.75, phasorFrequency: 5.0, phasorBandwidth: 0.8, phasorDirection: 28, phasorDirectionSpread: 0.35, phasorSharpness: 3.0, phasorWarpStrength: 0.18, phasorTangentMix: 0.65, phasorKernelDensity: 1.0, phasorDirectionMode: 'directional' },
+  perlin: { amount: 0.3, scale: 1.2, octaves: 2, perlinRoughness: getParameterDefault('noise.perlinRoughness'), perlinSharpness: getParameterDefault('noise.perlinSharpness'), perlinLayerMix: getParameterDefault('noise.perlinLayerMix'), perlinAngle: getParameterDefault('noise.perlinAngle') },
 };
 
 const MANUAL_DISTORT_MAP_RESOLUTION = 64;
@@ -128,7 +129,10 @@ export const STORE_DEFAULTS = {
     ridgePersistence: getParameterDefault('noise.ridgePersistence'),
     ridgeOffset: getParameterDefault('noise.ridgeOffset'),
     ridgeWarp: getParameterDefault('noise.ridgeWarp'),
-    fbmTonality: getParameterDefault('noise.fbmTonality'),
+    perlinRoughness: getParameterDefault('noise.perlinRoughness'),
+    perlinSharpness: getParameterDefault('noise.perlinSharpness'),
+    perlinLayerMix: getParameterDefault('noise.perlinLayerMix'),
+    perlinAngle: getParameterDefault('noise.perlinAngle'),
     aeFractalType: 'basic' as const,
     aeSubInfluence: getParameterDefault('noise.aeSubInfluence'),
     aeSubScaling: getParameterDefault('noise.aeSubScaling'),
@@ -436,7 +440,10 @@ const NOISE_PARAMETER_LIMIT_KEYS = {
   ridgeLacunarity: 'noise.ridgeLacunarity',
   ridgePersistence: 'noise.ridgePersistence',
   ridgeGain: 'noise.ridgeGain',
-  fbmTonality: 'noise.fbmTonality',
+  perlinRoughness: 'noise.perlinRoughness',
+  perlinSharpness: 'noise.perlinSharpness',
+  perlinLayerMix: 'noise.perlinLayerMix',
+  perlinAngle: 'noise.perlinAngle',
   aeSubInfluence: 'noise.aeSubInfluence',
   aeSubScaling: 'noise.aeSubScaling',
   aeContrast: 'noise.aeContrast',

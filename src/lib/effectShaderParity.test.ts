@@ -588,17 +588,33 @@ describe('V2 effect shader parity', () => {
     expect(legacyCurl).toContain('u_curlEps');
   });
 
-  it('shapes only the fBm noise type with a dedicated Invert/Tonality function, leaving shared fbm() and other noise types untouched', () => {
-    expect(noiseShader).toContain('float shapedFbm(vec2 p, int octaves, float curve)');
-    expect(noiseShader).toContain('uniform float u_fbmTonality;');
+  it('adds Perlin as a 3D (XY + time Z) Material Maker style smeary field without changing fBm or other noise types', () => {
+    expect(noiseShader).toContain('const int PERLIN_NOISE_TYPE = 11;');
+    for (const uniform of ['u_perlinRoughness', 'u_perlinSharpness', 'u_perlinLayerMix', 'u_perlinAngle']) {
+      expect(noiseShader).toContain(`uniform float ${uniform};`);
+    }
+    expect(noiseShader).not.toContain('u_fbmTonality');
+    expect(noiseShader).not.toContain('u_perlinWarp');
 
-    const shapedFbmFn = extractFunction(noiseShader, 'shapedFbm');
-    expect(shapedFbmFn).toContain('float n = fbm(p, octaves);');
-    expect(shapedFbmFn).toContain('pow(inverted, safeCurve)');
+    // Classic Perlin: eight lattice corners blended with the C2 quintic fade.
+    const perlinFn = extractFunction(noiseShader, 'perlin3D');
+    expect(perlinFn).toContain('float perlin3D(vec3 P)');
+    expect(perlinFn).toContain('vec3 fadeXYZ = perlinFade(Pf0);');
+    expect(perlinFn).toContain('float n111 = dot(g111, Pf1);');
+    expect(extractFunction(noiseShader, 'perlinFade')).toContain('t * t * t * (t * (t * 6.0 - 15.0) + 10.0)');
 
-    // The shared fbm() body itself must remain the plain, unmodified sum of
-    // octaves so Curl, Domain Warp, and Seamless (which all call fbm()/fbm3D
-    // directly, not shapedFbm) keep their existing behavior.
+    // Folds 1 -> Invert -> Tonality, plus a translated inverted layer blended with Lighten.
+    expect(extractFunction(noiseShader, 'perlinFoldedFbm3D')).toContain('abs(perlin3D(p))');
+    const smeary = extractFunction(noiseShader, 'perlinSmearyField');
+    expect(smeary).toContain('pow(1.0 - perlinFoldedFbm3D(q, octaves, roughness), sharpness)');
+    expect(smeary).toContain('mix(base, max(base, layer), layerMix)');
+
+    // Time drives Z, and the scalar field pushes UV along a single direction.
+    const distortionFn = extractFunction(noiseShader, 'perlinDistortion');
+    expect(distortionFn).toContain('vec3 q = vec3(p, evolution * 0.6);');
+    expect(distortionFn).toContain('vec2(cos(angle), sin(angle)) * field;');
+
+    // The shared fbm() body stays the plain, unmodified simplex sum.
     const fbmFn = compact(extractFunction(noiseShader, 'fbm'));
     expect(fbmFn).toBe(compact(`float fbm(vec2 p, int octaves) {
       float value = 0.0;
@@ -614,31 +630,12 @@ describe('V2 effect shader parity', () => {
     }`));
 
     const dispatch = extractFunction(noiseShader, 'noiseDisplaceRaw');
-    const fbmBranchStart = dispatch.indexOf('noiseType == 1');
-    const nextBranchStart = dispatch.indexOf('noiseType == 2');
-    expect(fbmBranchStart).toBeGreaterThan(0);
-    expect(nextBranchStart).toBeGreaterThan(fbmBranchStart);
-    const fbmBranch = dispatch.slice(fbmBranchStart, nextBranchStart);
-    expect(fbmBranch).toContain('shapedFbm(p, octaves, tonalityCurve)');
-    expect(fbmBranch).toContain('shapedFbm(p + vec2(43.7, 17.3), octaves, tonalityCurve)');
-    expect(fbmBranch).not.toContain('= fbm(');
-
-    // Legacy Curl (noiseType == 3) differentiates the shared plain fbm()
-    // field directly; it must not be rerouted through the fBm-only shaping.
-    const curlBranchStart = dispatch.indexOf('noiseType == 3');
-    const domainWarpBranchStart = dispatch.indexOf('noiseType == 4');
-    const curlBranch = dispatch.slice(curlBranchStart, domainWarpBranchStart);
-    expect(curlBranch).toContain('fbm(p + vec2(');
-    expect(curlBranch).not.toContain('shapedFbm(');
-
-    // ridgedFbm (Aura Ridges, noiseType == 6) stays its own zero-crossing
-    // ridge algorithm, independent from the fBm Tonality reshaping.
-    expect(noiseShader).toContain('float ridgedFbm(vec2 p, int octaves)');
-    const ridgedBranchStart = dispatch.indexOf('noiseType == 6');
-    const aeBranchStart = dispatch.indexOf('noiseType == 7');
-    const ridgedBranch = dispatch.slice(ridgedBranchStart, aeBranchStart);
-    expect(ridgedBranch).toContain('ridgedFbm(p, octaves)');
-    expect(ridgedBranch).not.toContain('shapedFbm(');
+    const fbmBranch = dispatch.slice(dispatch.indexOf('noiseType == 1'), dispatch.indexOf('noiseType == 2'));
+    expect(fbmBranch).toContain('nx = fbm(p, octaves);');
+    expect(fbmBranch).toContain('ny = fbm(p + vec2(43.7, 17.3), octaves);');
+    expect(fbmBranch).not.toContain('perlin');
+    expect(dispatch).toContain('if (noiseType == PERLIN_NOISE_TYPE)');
+    expect(dispatch).toContain('return perlinDistortion(uv, scale, evolution, octaves);');
   });
 
   it('keeps Phasor as a complex phase-gradient field rather than scalar noise duplication', () => {

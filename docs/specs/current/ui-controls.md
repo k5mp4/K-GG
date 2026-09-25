@@ -116,7 +116,9 @@ Coneの頂点操作点は、シアン色の単一の円形ボタンとして表�
 
 Noiseが有効な場合、Type選択の直後に`Amount`、`Scale`、`Seed`をこの順序で表示します。`Seed`のShuffle操作は共通行へ置き、通常Noiseでは`noiseSeed`、Curl系では`curlSeed`を更新します。Type固有の設定はこの共通プロパティの後ろへ表示します。
 
-Noise Typeの候補は、`Fast Curl`、`Curl (Legacy)`、`Simplex`、`fBm`、`Aura Ridges`、`Fractal Drift`、`Domain Warp`、`Seamless`、`Voronoi`、`Caustics`、`Phasor Lines`の順で表示します。この順序はFlow、Base / Fractal、Warp / Periodic、Structured Fieldの性質が近い候補を隣接させ、Flow系を先頭へ置きます。候補の内部値と保存・描画上の意味は維持します。数値コントロールの範囲、step、既定値はUI-025の共通レジストリに従います。
+Noise Typeの候補は、`Fast Curl`、`Curl (Legacy)`、`Simplex`、`Perlin`、`Aura Ridges`、`Fractal Drift`、`Domain Warp`、`Seamless`、`Voronoi`、`Caustics`、`Phasor Lines`の順で表示します。この順序はFlow、Base / Fractal、Warp / Periodic、Structured Fieldの性質が近い候補を隣接させ、Flow系を先頭へ置きます。候補の内部値と保存・描画上の意味は維持します。数値コントロールの範囲、step、既定値はUI-025の共通レジストリに従います。
+
+`Perlin`（内部値`perlin`）は画面XYと時間Zを軸にした3D gradient Perlin noiseから、Material Makerの`FBM Noise(Perlin, Folds 1) → Invert → Tonality`に反転した2枚目レイヤーをLightenで重ねて`Tonality`をかけた構成と同等のスカラー場（After Effectsフラクタルノイズの「にじみ」に近い、暗い領域を横切る柔らかく光る筋）を作り、その値で`Direction`方向へUVを押し出します。時間経過では形状がその場で変形します。`Perlin`選択時だけ`Octaves`、`Roughness`（`noise.perlinRoughness`、主レイヤーのオクターブ振幅倍率）、`Sharpness`（`noise.perlinSharpness`、Tonality相当のカーブ強度）、`Layer Mix`（`noise.perlinLayerMix`、2枚目レイヤーの不透明度）、`Direction`（`noise.perlinAngle`、押し出し方向）を表示します。`fBm`（内部値`fbm`）はPerlinで置き換えたため候補に表示しませんが、`fbm`で保存されたプリセットは従来どおり描画します。
 
 ### UI-025 数値入力範囲と既定値の共有
 
