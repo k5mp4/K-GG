@@ -32,6 +32,8 @@ import {
   shouldDisposeResolvedWebGLRequest,
   type SharedWebGLInitRequest,
 } from './webglLifecycle';
+import { markShaderWarmupUnavailable, startShaderWarmup } from '../lib/shaderWarmup';
+import { createPreviewShaderWarmupHost } from '../lib/shaderWarmupHost';
 
 export function useWebGL(
   canvasRef: React.RefObject<HTMLCanvasElement | null>,
@@ -113,7 +115,10 @@ export function useWebGL(
     }
 
     setIsWebGLReady(false);
-    if (getWebGL2Availability() === 'unavailable') return;
+    if (getWebGL2Availability() === 'unavailable') {
+      markShaderWarmupUnavailable();
+      return;
+    }
 
     // StrictMode は setup → cleanup → setup を意図的に行う。同じ canvas/version の
     // 初期化Promiseを共有することで、最初のcleanupが進行中のGPUコンパイルを無効化しない。
@@ -149,6 +154,7 @@ export function useWebGL(
       setIsWebGLReady(true);
     }).catch(e => {
       if (disposed) return;
+      markShaderWarmupUnavailable();
       if (isWebGL2UnavailableError(e)) {
         setIsWebGLReady(false);
         return;
@@ -342,6 +348,15 @@ export function useWebGL(
       bridge?.stop();
     };
   }, [canvasRef, isWebGLReady, controlAdapters.ui, controlAdapters.project]);
+
+  // 現在のシーンに必要なShaderを優先し、残りのEffect Stack用Shaderを
+  // アイドル時間に1つずつ事前コンパイルする。context lost/破棄時は停止する。
+  useEffect(() => {
+    if (!isWebGLReady) return;
+    const ctx = webglRef.current;
+    if (!ctx) return;
+    return startShaderWarmup(createPreviewShaderWarmupHost(ctx, () => latestRef.current));
+  }, [isWebGLReady]);
 
   // グラデーションランプテクスチャの更新
   useEffect(() => {
