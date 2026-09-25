@@ -41,6 +41,7 @@ import { completeVideoExport } from '../lib/videoExportLifecycle';
 import { createAeStatusController } from '../lib/aeStatusController';
 import { useLanguage } from '../i18n/LanguageProvider';
 import { DesignAppSendPanel } from './DesignAppSendPanel';
+import { SpoutOutputPanel } from './SpoutOutputPanel';
 
 type ExportJob = 'mov' | 'mp4' | 'zip' | 'slits' | null;
 type VideoExt = 'mov' | 'mp4';
@@ -1033,6 +1034,7 @@ export function ExportPanel({
         )}
       </div>
       <DesignAppSendPanel canvas={getOutputCanvas()} imageName={stem} />
+      <SpoutOutputPanel canvasRef={canvasRef} />
     </div>
   );
 }
