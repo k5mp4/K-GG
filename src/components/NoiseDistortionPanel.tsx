@@ -59,6 +59,11 @@ const NOISE_LOOP_MODES = [
   { value: 'seamless', label: 'Seamless' },
 ];
 
+const PERLIN_DIMENSIONS = [
+  { value: '3d', label: '3D' },
+  { value: '4d', label: '4D (Loop)' },
+];
+
 const PHASOR_DIRECTION_MODES = [
   { value: 'directional', label: 'Directional' },
   { value: 'radial', label: 'Radial' },
@@ -407,6 +412,22 @@ export function NoiseDistortionPanel() {
 
           {isPerlin && (
             <>
+              <CustomSelect
+                label="Dimension"
+                value={noiseDistortion.perlinDimension ?? D.perlinDimension}
+                options={PERLIN_DIMENSIONS}
+                onChange={(val) => setNoiseDistortion({ perlinDimension: val as NoiseDistortionConfig['perlinDimension'] })}
+              />
+              {noiseDistortion.perlinDimension === '4d' && (
+                <SliderField
+                  label="Loop Wobble"
+                  value={noiseDistortion.perlinLoopWobble ?? D.perlinLoopWobble}
+                  onChange={(v) => setNoiseDistortion({ perlinLoopWobble: v })}
+                  format={(v) => v.toFixed(2)}
+                  trackId="noiseDistortion.perlinLoopWobble"
+                  limitKey="noise.perlinLoopWobble"
+                />
+              )}
               <SliderField
                 label="Roughness"
                 value={noiseDistortion.perlinRoughness ?? D.perlinRoughness}

@@ -226,6 +226,8 @@ uniform float u_perlinRoughness;
 uniform float u_perlinSharpness;
 uniform float u_perlinLayerMix;
 uniform float u_perlinAngle;
+uniform int u_perlinDimension;
+uniform float u_perlinLoopWobble;
 uniform int u_aeFractalType;
 uniform float u_aeSubInfluence;
 uniform float u_aeSubScaling;

@@ -47,6 +47,8 @@ export type NoiseDistortionConfig = {
   perlinSharpness: number;   // 1.0–8.0: Tonality相当のカーブ強度（大→暗部が広く光の筋が細い）
   perlinLayerMix: number;    // 0.0–1.0: 2枚目レイヤーのLighten不透明度（淡い副次的な筋）
   perlinAngle: number;       // 0–360°: UVを押し出す方向
+  perlinDimension: '3d' | '4d'; // 3d=XY+時間Z, 4d=XY+時間を円周ZW（Loop Periodで完全に一周するシームレスループ）
+  perlinLoopWobble: number;  // 0.0–1.0: 4D Loop軌道のうねり（0=真円, 大→場所ごとに位相がずれ速度・半径・位置が揺らぐ）
   // AE Fractal Noise 専用パラメータ
   aeFractalType: 'basic' | 'turbulent'; // basic=標準fbm, turbulent=abs()で全値正化
   aeSubInfluence: number;    // 0.01–1.0: オクターブ振幅倍率 (AE: Sub Influence)

@@ -319,7 +319,16 @@ describe('Gradient store Effect Pipeline V2 synchronization', () => {
       perlinSharpness: 4,
       perlinLayerMix: 0.56,
       perlinAngle: 90,
+      perlinDimension: '3d',
+      perlinLoopWobble: 0.5,
     });
+    store.setNoiseDistortion({ perlinLoopWobble: 5 });
+    expect(useGradientStore.getState().noiseDistortion.perlinLoopWobble).toBe(1);
+
+    store.setNoiseDistortion({ perlinDimension: '4d' });
+    expect(useGradientStore.getState().noiseDistortion.perlinDimension).toBe('4d');
+    store.setNoiseDistortion({ perlinDimension: '5d' as never });
+    expect(useGradientStore.getState().noiseDistortion.perlinDimension).toBe('3d');
 
     store.setNoiseDistortion({ perlinRoughness: 99, perlinSharpness: 99, perlinLayerMix: 99 });
     expect(useGradientStore.getState().noiseDistortion).toMatchObject({ perlinRoughness: 1, perlinSharpness: 8, perlinLayerMix: 1 });
@@ -340,6 +349,7 @@ describe('Gradient store Effect Pipeline V2 synchronization', () => {
     expect(legacyFbm.type).toBe('fbm');
     expect(legacyFbm.perlinSharpness).toBe(STORE_DEFAULTS.noiseDistortion.perlinSharpness);
     expect(legacyFbm.perlinAngle).toBe(STORE_DEFAULTS.noiseDistortion.perlinAngle);
+    expect(legacyFbm.perlinDimension).toBe('3d');
   });
 
   it('applies GPU-tier octave and step limits to Fast Curl', () => {

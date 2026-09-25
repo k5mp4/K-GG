@@ -77,6 +77,7 @@ describe('NoiseDistortionPanel', () => {
       expect(perlinMarkup).toContain('>Roughness</label>');
       expect(perlinMarkup).toContain('>Sharpness</label>');
       expect(perlinMarkup).toContain('>Layer Mix</label>');
+      expect(perlinMarkup).toContain('>Dimension</label>');
       expect(perlinMarkup).toContain('>Octaves</label>');
 
       initialState.noiseDistortion = { ...previousNoiseDistortion, type: 'fbm' };

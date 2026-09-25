@@ -606,12 +606,28 @@ describe('V2 effect shader parity', () => {
     // Folds 1 -> Invert -> Tonality, plus a translated inverted layer blended with Lighten.
     expect(extractFunction(noiseShader, 'perlinFoldedFbm3D')).toContain('abs(perlin3D(p))');
     const smeary = extractFunction(noiseShader, 'perlinSmearyField');
-    expect(smeary).toContain('pow(1.0 - perlinFoldedFbm3D(q, octaves, roughness), sharpness)');
-    expect(smeary).toContain('mix(base, max(base, layer), layerMix)');
+    expect(smeary).toContain('perlinFoldedFbm3D(q, octaves, roughness)');
+    const shape = extractFunction(noiseShader, 'perlinSmearyShape');
+    expect(shape).toContain('pow(1.0 - baseFbm, sharpness)');
+    expect(shape).toContain('mix(base, max(base, layer), layerMix)');
+
+    // 4D (Loop): 16-corner Perlin with time on a ZW circle covered once per
+    // Loop Period, so it loops exactly and skips the wrap cross-fade.
+    expect(noiseShader).toContain('uniform int   u_perlinDimension;');
+    expect(extractFunction(noiseShader, 'perlin4D')).toContain('float n1111 = dot(g1111, Pf1);');
+    expect(extractFunction(noiseShader, 'perlinSmearyField4D')).toContain('perlinFoldedFbm4D(q, octaves, roughness)');
+    expect(extractFunction(noiseShader, 'noiseDisplace')).toContain('if (noiseType == PERLIN_NOISE_TYPE && u_perlinDimension == 1) return current;'); 
 
     // Time drives Z, and the scalar field pushes UV along a single direction.
     const distortionFn = extractFunction(noiseShader, 'perlinDistortion');
-    expect(distortionFn).toContain('vec3 q = vec3(p, evolution * 0.6);');
+    expect(distortionFn).toContain('perlinSmearyField(vec3(p, evolution * 0.6), octaves)');
+    expect(distortionFn).toContain('float phase = KG_TAU * fract(evolution / period);');
+    expect(distortionFn).toContain('perlinSmearyField4D(perlinLoopCoord(p, phase, radius), octaves)');
+    // Loop Wobble only uses integer harmonics of the loop angle, so the path stays closed.
+    const loopCoord = extractFunction(noiseShader, 'perlinLoopCoord');
+    expect(loopCoord).toContain('return vec4(p, cos(phase) * radius, sin(phase) * radius);');
+    expect(loopCoord).toContain('float theta = phase + regionPhase;');
+    expect(loopCoord).toContain('return vec4(p + sway, cos(theta) * r, sin(theta) * r);');
     expect(distortionFn).toContain('vec2(cos(angle), sin(angle)) * field;');
 
     // The shared fbm() body stays the plain, unmodified simplex sum.

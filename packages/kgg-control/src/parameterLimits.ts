@@ -52,6 +52,7 @@ export const PARAMETER_LIMITS = {
   'noise.perlinSharpness': { min: 1, max: 8, step: 0.1, defaultValue: 4 },
   'noise.perlinLayerMix': { min: 0, max: 1, step: 0.01, defaultValue: 0.56 },
   'noise.perlinAngle': { min: 0, max: 360, step: 1, defaultValue: 90, angleUnit: 'degrees', wrapAngle: true },
+  'noise.perlinLoopWobble': { min: 0, max: 1, step: 0.01, defaultValue: 0.5 },
   'noise.aeSubInfluence': { min: 0.01, max: 1, step: 0.01, defaultValue: 0.7 },
   'noise.aeSubScaling': { min: 1.01, max: 4, step: 0.01, defaultValue: 1.78 },
   'noise.aeContrast': { min: 0.5, max: 4, step: 0.05, defaultValue: 1 },
@@ -283,6 +284,10 @@ const VORONOI_FEATURE_LIMIT = {
 export const ENUM_PARAMETER_LIMITS = {
   'noise.voronoiDistMetric': VORONOI_DISTANCE_METRIC_LIMIT,
   'noise.voronoiFeature': VORONOI_FEATURE_LIMIT,
+  'noise.perlinDimension': {
+    values: ['3d', '4d'],
+    defaultValue: '3d',
+  },
   'postprocess.voronoiDistMetric': VORONOI_DISTANCE_METRIC_LIMIT,
   'postprocess.voronoiFeature': VORONOI_FEATURE_LIMIT,
   'postprocess.glassSurfaceType': {
@@ -388,6 +393,7 @@ const TRACK_LIMIT_KEYS: Record<string, ParameterLimitKey> = {
   'noiseDistortion.perlinSharpness': 'noise.perlinSharpness',
   'noiseDistortion.perlinLayerMix': 'noise.perlinLayerMix',
   'noiseDistortion.perlinAngle': 'noise.perlinAngle',
+  'noiseDistortion.perlinLoopWobble': 'noise.perlinLoopWobble',
   'slitScan.angle': 'slit.angle',
   'slitScan.offsetAngle': 'slit.offsetAngle',
   'normalMap.angle': 'normalMap.angle',

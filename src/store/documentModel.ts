@@ -65,7 +65,7 @@ export const NOISE_TYPE_PRESETS: Record<NoiseDistortionConfig['type'], Partial<N
   ae_fractal: { amount: 0.30, scale: 2.0, octaves: 6, aeFractalType: 'basic', aeSubInfluence: 0.7, aeSubScaling: 1.78, aeSubRotation: 45, aeContrast: 1.0, aeBrightness: 0.0 },
   caustics: { amount: 0.45, scale: 2.4, octaves: 4, speed: 0.5, noiseLoopMode: 'seamless', noiseLoopBlend: 0.75, causticsDepth: 0.65, causticsRefraction: 1.0, causticsSharpness: 2.5, causticsComplexity: 4, causticsWaveSpread: 0.75, causticsBoundaryWidth: 0.75 },
   phasor: { amount: 0.24, scale: 2.8, octaves: 3, speed: 0.5, noiseLoopMode: 'seamless', noiseLoopBlend: 0.75, phasorFrequency: 5.0, phasorBandwidth: 0.8, phasorDirection: 28, phasorDirectionSpread: 0.35, phasorSharpness: 3.0, phasorWarpStrength: 0.18, phasorTangentMix: 0.65, phasorKernelDensity: 1.0, phasorDirectionMode: 'directional' },
-  perlin: { amount: 0.3, scale: 1.2, octaves: 2, perlinRoughness: getParameterDefault('noise.perlinRoughness'), perlinSharpness: getParameterDefault('noise.perlinSharpness'), perlinLayerMix: getParameterDefault('noise.perlinLayerMix'), perlinAngle: getParameterDefault('noise.perlinAngle') },
+  perlin: { amount: 0.3, scale: 1.2, octaves: 2, perlinRoughness: getParameterDefault('noise.perlinRoughness'), perlinSharpness: getParameterDefault('noise.perlinSharpness'), perlinLayerMix: getParameterDefault('noise.perlinLayerMix'), perlinAngle: getParameterDefault('noise.perlinAngle'), perlinDimension: getEnumParameterDefault('noise.perlinDimension'), perlinLoopWobble: getParameterDefault('noise.perlinLoopWobble') },
 };
 
 const MANUAL_DISTORT_MAP_RESOLUTION = 64;
@@ -133,6 +133,8 @@ export const STORE_DEFAULTS = {
     perlinSharpness: getParameterDefault('noise.perlinSharpness'),
     perlinLayerMix: getParameterDefault('noise.perlinLayerMix'),
     perlinAngle: getParameterDefault('noise.perlinAngle'),
+    perlinDimension: getEnumParameterDefault('noise.perlinDimension'),
+    perlinLoopWobble: getParameterDefault('noise.perlinLoopWobble'),
     aeFractalType: 'basic' as const,
     aeSubInfluence: getParameterDefault('noise.aeSubInfluence'),
     aeSubScaling: getParameterDefault('noise.aeSubScaling'),
@@ -444,6 +446,7 @@ const NOISE_PARAMETER_LIMIT_KEYS = {
   perlinSharpness: 'noise.perlinSharpness',
   perlinLayerMix: 'noise.perlinLayerMix',
   perlinAngle: 'noise.perlinAngle',
+  perlinLoopWobble: 'noise.perlinLoopWobble',
   aeSubInfluence: 'noise.aeSubInfluence',
   aeSubScaling: 'noise.aeSubScaling',
   aeContrast: 'noise.aeContrast',
@@ -489,6 +492,7 @@ export function normalizeNoiseDistortionConfig(
   );
   normalized.voronoiDistMetric = normalizeEnumParameter('noise.voronoiDistMetric', normalized.voronoiDistMetric);
   normalized.voronoiFeature = normalizeEnumParameter('noise.voronoiFeature', normalized.voronoiFeature);
+  normalized.perlinDimension = normalizeEnumParameter('noise.perlinDimension', normalized.perlinDimension);
   // Refraction is intentionally fixed at 1 for Caustics. Keep the field in
   // persisted data so older presets remain readable, but do not expose an
   // obsolete user-controlled degree of freedom.

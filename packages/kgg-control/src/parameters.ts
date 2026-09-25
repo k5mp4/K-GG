@@ -74,6 +74,8 @@ const RAW_CONTROL_PARAMETER_DEFINITIONS: readonly ParameterDefinition[] = [
   numberParameter('noise.perlinSharpness', 'noiseDistortion', 'perlinSharpness', 'Perlin filament sharpness'),
   numberParameter('noise.perlinLayerMix', 'noiseDistortion', 'perlinLayerMix', 'Perlin secondary layer mix'),
   numberParameter('noise.perlinAngle', 'noiseDistortion', 'perlinAngle', 'Perlin displacement direction'),
+  numberParameter('noise.perlinLoopWobble', 'noiseDistortion', 'perlinLoopWobble', 'Perlin 4D loop path wobble'),
+  enumParameter('noise.perlinDimension', 'noiseDistortion', 'perlinDimension', getEnumParameterLimit('noise.perlinDimension').values, 'Perlin dimension (3D or 4D seamless loop)', { defaultValue: getEnumParameterDefault('noise.perlinDimension') }),
 
   booleanParameter('diffuse.enabled', 'diffuse', 'enabled', 'Enable diffuse/stipple rendering'),
   enumParameter('diffuse.mode', 'diffuse', 'mode', ['block', 'smooth', 'dither', 'halftone', 'ascii', 'legacy'], 'Diffuse rendering mode'),

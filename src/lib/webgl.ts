@@ -561,6 +561,8 @@ export async function initWebGL(canvas: HTMLCanvasElement): Promise<WebGLContext
     u_perlinSharpness: gl.getUniformLocation(program, 'u_perlinSharpness'),
     u_perlinLayerMix: gl.getUniformLocation(program, 'u_perlinLayerMix'),
     u_perlinAngle: gl.getUniformLocation(program, 'u_perlinAngle'),
+    u_perlinDimension: gl.getUniformLocation(program, 'u_perlinDimension'),
+    u_perlinLoopWobble: gl.getUniformLocation(program, 'u_perlinLoopWobble'),
     u_aeFractalType: gl.getUniformLocation(program, 'u_aeFractalType'),
     u_aeSubInfluence: gl.getUniformLocation(program, 'u_aeSubInfluence'),
     u_aeSubScaling: gl.getUniformLocation(program, 'u_aeSubScaling'),
@@ -2424,6 +2426,8 @@ function drawPostprocessPass(
   gl.uniform1f(ctx.postprocessUniforms.u_perlinSharpness, finiteClamp(noiseDistortion.perlinSharpness, 4, 1, 8));
   gl.uniform1f(ctx.postprocessUniforms.u_perlinLayerMix, finiteClamp(noiseDistortion.perlinLayerMix, 0.56, 0, 1));
   gl.uniform1f(ctx.postprocessUniforms.u_perlinAngle, finiteClamp(noiseDistortion.perlinAngle, 90, 0, 360));
+  setUniform1i(gl, ctx.postprocessUniforms.u_perlinDimension, noiseDistortion.perlinDimension === '4d' ? 1 : 0);
+  gl.uniform1f(ctx.postprocessUniforms.u_perlinLoopWobble, finiteClamp(noiseDistortion.perlinLoopWobble, 0.5, 0, 1));
   setUniform1i(gl, ctx.postprocessUniforms.u_aeFractalType, noiseDistortion.aeFractalType === 'turbulent' ? 1 : 0);
   gl.uniform1f(ctx.postprocessUniforms.u_aeSubInfluence, noiseDistortion.aeSubInfluence ?? 0.7);
   gl.uniform1f(ctx.postprocessUniforms.u_aeSubScaling, noiseDistortion.aeSubScaling ?? 1.78);
@@ -3555,6 +3559,8 @@ export function render(
   gl.uniform1f(uniforms.u_perlinSharpness, finiteClamp(noiseDistortion.perlinSharpness, 4, 1, 8));
   gl.uniform1f(uniforms.u_perlinLayerMix, finiteClamp(noiseDistortion.perlinLayerMix, 0.56, 0, 1));
   gl.uniform1f(uniforms.u_perlinAngle, finiteClamp(noiseDistortion.perlinAngle, 90, 0, 360));
+  setUniform1i(gl, uniforms.u_perlinDimension, noiseDistortion.perlinDimension === '4d' ? 1 : 0);
+  gl.uniform1f(uniforms.u_perlinLoopWobble, finiteClamp(noiseDistortion.perlinLoopWobble, 0.5, 0, 1));
   setUniform1i(gl, uniforms.u_aeFractalType, noiseDistortion.aeFractalType === 'turbulent' ? 1 : 0);
   gl.uniform1f(uniforms.u_aeSubInfluence, noiseDistortion.aeSubInfluence ?? 0.7);
   gl.uniform1f(uniforms.u_aeSubScaling, noiseDistortion.aeSubScaling ?? 1.78);

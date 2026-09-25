@@ -129,7 +129,7 @@ Linear/Radial/4-color/Diamond/Angle/Bezier/Mesh Gradationのグラデーショ�
 - `Caustics`
   - 複数の周期的な波面から解析的な集光場を作り、Depth/Boundary Width/Sharpness/Complexity/Wave Spreadで水面コースティクス風の強いUV歪みを調整できます。Boundary Widthは境界線から歪みを広げる距離です。Refractionは常に1です。
 - `Perlin`
-  - 3D Perlinノイズ（画面XY＋時間Z）から、暗い領域を柔らかく光る筋が横切るテクスチャ（AEフラクタルノイズの「にじみ」風）を作り、Direction方向へグラデーションを歪ませます。アニメーションでは形がその場で有機的に変化します。Roughnessで細部、Sharpnessで筋の細さ、Layer Mixで淡い副次的な筋の量を調整できます。
+  - 3D Perlinノイズ（画面XY＋時間Z）から、暗い領域を柔らかく光る筋が横切るテクスチャ（AEフラクタルノイズの「にじみ」風）を作り、Direction方向へグラデーションを歪ませます。アニメーションでは形がその場で有機的に変化します。Roughnessで細部、Sharpnessで筋の細さ、Layer Mixで淡い副次的な筋の量を調整できます。Dimensionを`4D (Loop)`にすると、時間を4次元目の円周上で進めるため、ループ期間ごとに継ぎ目なく元の形へ戻ります。Loop Wobbleを上げると、ループの軌道がうねり、場所ごとにタイミングのずれた有機的な動きになります。
 - `Phasor Lines`
   - 3×3近傍の決定論的な局所波を複素Phasorとして合成し、連続した線状構造と位相勾配からUVを歪ませます。Direction Mode（Directional/Radial/Swirl）、Frequency、Direction Spread、Sharpness、Warp Strength、Tangent Mix、Bandwidth、Kernel Densityで調整できます。
 
