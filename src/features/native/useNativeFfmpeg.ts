@@ -9,6 +9,7 @@ import type { NativeFfmpegStatus } from '../../adapters';
 
 function statusAfterError(error: unknown, current: NativeFfmpegStatus | null): NativeFfmpegStatus {
   return {
+    platform: current?.platform ?? 'unknown',
     supported: true,
     available: current?.available ?? false,
     source: current?.source ?? null,
@@ -17,6 +18,8 @@ function statusAfterError(error: unknown, current: NativeFfmpegStatus | null): N
     error: error instanceof Error ? error.message : String(error),
     warning: current?.warning ?? null,
     folderPath: current?.folderPath ?? null,
+    ffprobePath: current?.ffprobePath ?? null,
+    ffprobeVersion: current?.ffprobeVersion ?? null,
   };
 }
 

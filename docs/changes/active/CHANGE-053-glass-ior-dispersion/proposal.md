@@ -1,6 +1,6 @@
 ---
 type: change
-id: CHANGE-052
+id: CHANGE-053
 title: Glass Organic／RippleとGlassTile Faceted・屈折率・色分散サンプル数
 status: draft
 change_kind: F
@@ -14,7 +14,7 @@ related_tests: [src/lib/glass.test.ts, src/lib/glassTile.test.ts, src/lib/glassT
 human_review: required
 ---
 
-# CHANGE-052 Glass Organic／RippleとGlassTile Faceted・屈折率・色分散サンプル数
+# CHANGE-053 Glass Organic／RippleとGlassTile Faceted・屈折率・色分散サンプル数
 
 ## 背景・問題
 

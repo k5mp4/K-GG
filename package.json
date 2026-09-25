@@ -20,6 +20,7 @@
     "tauri:dev": "node tools/tauri-dev.mjs",
     "tauri:build": "tauri build",
     "tauri:build:windows": "tauri build --bundles nsis --target x86_64-pc-windows-msvc",
+    "tauri:build:macos": "tauri build --config src-tauri/tauri.macos.conf.json --bundles app,dmg",
     "build:figma-connector": "npm --prefix connectors/figma run build",
     "build:desktop": "npm run build && npm run build:figma-connector",
     "typecheck": "tsc -b",
