@@ -41,6 +41,7 @@
     "change:check": "node tools/change-workflow.mjs check",
     "change:finalize": "node tools/change-workflow.mjs finalize",
     "change:new": "node tools/change-workflow.mjs new",
+    "adr:new": "node tools/change-workflow.mjs adr-new",
     "verify:windows": "pwsh -NoProfile -File tools/verify-windows.ps1",
     "updater:key": "node tools/set-updater-public-key.mjs",
     "release:version": "node tools/release-version.mjs set",

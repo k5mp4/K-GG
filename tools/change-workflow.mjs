@@ -4,6 +4,7 @@ import path from 'node:path';
 import process from 'node:process';
 import { execFileSync } from 'node:child_process';
 import { pathToFileURL } from 'node:url';
+import { datedId, validateAdrId, validateChangeId } from './doc-ids.mjs';
 
 const root = process.cwd();
 const docsDir = path.join(root, 'docs');
@@ -24,10 +25,6 @@ const allowedOutcomes = new Set([
   'cancelled',
   'superseded',
 ]);
-// CHANGE-001〜CHANGE-056は連番時代のIDとして有効なまま残す。
-// 新しいChangeは並列ブランチで衝突しない日付+slug IDを使う。
-const legacyChangeIdMax = 56;
-const datedChangeIdPattern = /^CHANGE-(\d{4})(\d{2})(\d{2})-([a-z0-9]+(?:-[a-z0-9]+)*)$/;
 const knownChangeFiles = new Set([
   'proposal.md',
   'delta.md',
@@ -36,26 +33,19 @@ const knownChangeFiles = new Set([
   'validation.md',
 ]);
 
-export function validateChangeId(id, directory) {
-  const legacy = /^CHANGE-(\d{3})$/.exec(id ?? '');
-  if (legacy) {
-    return Number(legacy[1]) <= legacyChangeIdMax
-      ? null
-      : `sequential change id "${id}" is reserved for history; use CHANGE-YYYYMMDD-slug (npm run change:new)`;
-  }
-  const dated = datedChangeIdPattern.exec(id ?? '');
-  if (!dated) return `invalid change id "${id ?? ''}"; use CHANGE-YYYYMMDD-slug`;
-  const [, year, month, day] = dated;
-  const date = new Date(`${year}-${month}-${day}T00:00:00Z`);
-  if (Number.isNaN(date.getTime()) || date.toISOString().slice(0, 10) !== `${year}-${month}-${day}`) {
-    return `invalid date in change id "${id}"`;
-  }
-  if (directory !== undefined && directory !== id) return `directory name must equal change id "${id}"`;
-  return null;
-}
+export { validateAdrId, validateChangeId };
 
 export function newChangeId(slug, date = currentDate()) {
-  return `CHANGE-${date.replaceAll('-', '')}-${slug}`;
+  return datedId('CHANGE', slug, date);
+}
+
+export function newAdrId(slug, date = currentDate()) {
+  return datedId('ADR', slug, date);
+}
+
+export function buildNewAdr(template, { id, title, date }) {
+  return updateFrontmatter(template, { id, title, date })
+    .replace(/^# ADR-[^:\n]+: .*$/m, `# ${id}: ${title}`);
 }
 
 export function buildNewProposal(template, { id, title, date }) {
@@ -461,6 +451,21 @@ async function createChange(slug, options) {
   console.log(`${id} created at docs/changes/active/${id}/proposal.md. Copy delta/design/tasks/validation from docs/changes/_template only when needed.`);
 }
 
+async function createAdr(slug, options) {
+  if (!slug) throw new Error('usage: adr:new <slug> [--title="判断のタイトル"]');
+  const date = currentDate();
+  const id = newAdrId(slug, date);
+  const fileName = `${id.slice('ADR-'.length)}.md`;
+  const idError = validateAdrId(id, fileName);
+  if (idError) throw new Error(`${idError} (slug must be lowercase kebab-case)`);
+  const adrDir = path.join(docsDir, 'adr');
+  const target = path.join(adrDir, fileName);
+  if (existsSync(target)) throw new Error(`${id} already exists`);
+  const template = await readFile(path.join(adrDir, '_template.md'), 'utf8');
+  await writeFile(target, buildNewAdr(template, { id, title: options.title ?? slug, date }));
+  console.log(`${id} created at docs/adr/${fileName}.`);
+}
+
 function printCheck(result, requireEmpty) {
   const branch = currentBranch() || '(unknown)';
   console.log(`Change check on ${branch}: ${result.active.length} active, ${result.archive.length} archive entries.`);
@@ -476,7 +481,7 @@ function printCheck(result, requireEmpty) {
 }
 
 function printHelp() {
-  console.log(`Usage:\n  npm run change:new -- <slug> --title="変更の短い名前"\n  npm run change:check [-- --require-empty]\n  npm run change:finalize <CHANGE-ID>\n  npm run change:finalize <CHANGE-ID> -- --migration --outcome=follow-up --follow-up="issue-needed: ..."`);
+  console.log(`Usage:\n  npm run change:new -- <slug> --title="変更の短い名前"\n  npm run adr:new -- <slug> --title="判断のタイトル"\n  npm run change:check [-- --require-empty]\n  npm run change:finalize <CHANGE-ID>\n  npm run change:finalize <CHANGE-ID> -- --migration --outcome=follow-up --follow-up="issue-needed: ..."`);
 }
 
 export async function main(argv = process.argv.slice(2)) {
@@ -492,6 +497,10 @@ export async function main(argv = process.argv.slice(2)) {
   }
   if (command === 'new') {
     await createChange(options.positional[0], options);
+    return 0;
+  }
+  if (command === 'adr-new') {
+    await createAdr(options.positional[0], options);
     return 0;
   }
   if (command === 'finalize') {

@@ -1,6 +1,6 @@
 ---
-id: ADR-0024
-title: 並列開発で衝突しないChange ID・一覧・逆参照
+id: ADR-20260925-conflict-free-doc-metadata
+title: 並列開発で衝突しないChange・ADRのID・一覧・逆参照
 status: accepted
 date: 2026-09-25
 deciders: [maintainer]
@@ -8,7 +8,7 @@ related_specs: []
 supersedes: []
 ---
 
-# ADR-0024: 並列開発で衝突しないChange ID・一覧・逆参照
+# ADR-20260925-conflict-free-doc-metadata: 並列開発で衝突しないChange・ADRのID・一覧・逆参照
 
 ## コンテキスト
 
@@ -17,17 +17,20 @@ supersedes: []
 - `docs/changes/active/index.md`と`docs/changes/archive/index.md`: `change:finalize`が再生成し、各PRが表の同じ末尾へ行を追加する。
 - `CHANGE-###`の連番: 各ブランチがmainを見て同じ「次の番号」を採番し、merge時に付け直しが必要になる。
 - Current Specの`related_changes: [...]`: 1行のYAMLリストへ各PRが追記するため、同じ行で衝突する。
+- `docs/adr/index.md`と`ADR-NNNN`の連番: Changeと同じ構造で衝突する。実際に、並列PRがそれぞれADR-0022を採番し、merge時に付け直しが必要になった。
 
 これらはどれも他の情報から導出できる、またはブランチ間で調整が必要な採番であり、意味的な競合ではない。
 
 ## 決定
 
-Change Capsuleは自分のdirectoryだけで完結させ、複数PRが共有ファイルへ追記しない構造にする。
+Change CapsuleとADRは自分のdirectoryまたはファイルだけで完結させ、複数PRが共有ファイルへ追記しない構造にする。
 
 - Change一覧は各`proposal.md`のfrontmatterを正本とし、VitePressのdata loader（`docs/.vitepress/theme/changes.data.ts`）と`<ChangeIndex>`コンポーネントでビルド時に描画する。`docs/changes/{active,archive}/index.md`は説明文とコンポーネントだけを持ち、行をコミットしない。`docs:check`は手書きの行が戻っていないことを検査する。
 - 新しいChange IDは`CHANGE-YYYYMMDD-slug`とし、directory名と一致させる。`npm run change:new`で作成する。`CHANGE-001`〜`CHANGE-056`は既存リンクと履歴のため有効なまま残し、CHANGE-057以降の連番は拒否する。
 - ChangeとCurrent Specの関係はChangeの`current_specs`を正本とする。Current Specの`related_changes`への追記は要求しない。既存の値は履歴として残し、記載されたIDが実在することだけを検査する。
 - `change:finalize`はindexを再生成せず、Change directoryの移動とproposal更新だけを行う。
+- ADRも同じ方針にする。新しいADRのIDは`ADR-YYYYMMDD-slug`、ファイル名は`YYYYMMDD-slug.md`とし、`npm run adr:new`で作成する。`ADR-0001`〜`ADR-0023`は履歴IDとして有効なまま残し、ADR-0024以降の連番は拒否する。`docs/adr/index.md`はVitePressのdata loader（`docs/.vitepress/theme/adr.data.ts`）と`<AdrIndex>`でビルド時に一覧を描画し、行をコミットしない。
+- IDの規則は`tools/doc-ids.mjs`へ集約し、`change:check`と`docs:check`が同じ規則で検査する。
 
 Current Specの本文や要件の変更で起きる衝突は、同じ契約を並列に変えている意味的な競合なので、この決定では回避しない。
 
@@ -51,15 +54,15 @@ Current Specの本文や要件の変更で起きる衝突は、同じ契約を�
 
 ### 利点
 
-- Change Capsuleの追加・finalizeが他PRと衝突しない。
-- `change:new`によりAIや人間がID採番を判断しなくてよい。
+- Change Capsuleの追加・finalize、ADRの追加が他PRと衝突しない。
+- `change:new`と`adr:new`により、AIや人間がID採番を判断しなくてよい。
 
 ### 欠点・コスト
 
 - 一覧はMarkdownのままでは読めず、VitePressのビルド結果かproposalを直接参照する必要がある。
-- IDが連番より長くなる。
+- IDが連番より長くなる。ADRの採番順は日付でしか表せない。
 - Current Spec側から関連Changeを辿るには、ビルド済み一覧のCurrent Spec列かChangeの`current_specs`を検索する。
 
 ## 再検討条件
 
-ADR一覧やADR番号など、他の共有indexでも並列PRの衝突が継続的に発生した場合、同じ方針（正本からビルド時に生成、衝突しないID）を適用するか検討する。
+Legacy SPEC、Current Spec一覧など、他の共有indexでも並列PRの衝突が継続的に発生した場合、同じ方針（正本からビルド時に生成、衝突しないID）を適用するか検討する。

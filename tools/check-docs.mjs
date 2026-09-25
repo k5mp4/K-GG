@@ -2,7 +2,7 @@ import { existsSync, readFileSync } from 'node:fs';
 import { readFile, readdir } from 'node:fs/promises';
 import path from 'node:path';
 import process from 'node:process';
-import { validateChangeId } from './change-workflow.mjs';
+import { validateAdrId, validateChangeId } from './doc-ids.mjs';
 
 const root = process.cwd();
 const docsDir = path.join(root, 'docs');
@@ -186,9 +186,11 @@ function validateLegacySpecifications(specs, adrs, errors) {
       for (const field of ['deciders', 'related_specs', 'supersedes']) requireList(document, field, errors);
     }
 
-    const expectedPattern = document.kind === 'spec' ? /^SPEC-\d{3}$/ : /^ADR-\d{4}$/;
-    if (!expectedPattern.test(document.data.id ?? '')) {
-      errors.push(`${document.relativePath}: invalid ${document.kind} id "${document.data.id}"`);
+    if (document.kind === 'spec') {
+      if (!/^SPEC-\d{3}$/.test(document.data.id ?? '')) errors.push(`${document.relativePath}: invalid spec id "${document.data.id}"`);
+    } else {
+      const idError = validateAdrId(document.data.id, document.name);
+      if (idError) errors.push(`${document.relativePath}: ${idError}`);
     }
     if (ids.has(document.data.id)) {
       errors.push(`${document.relativePath}: duplicate id "${document.data.id}" also used by ${ids.get(document.data.id)}`);
@@ -196,9 +198,8 @@ function validateLegacySpecifications(specs, adrs, errors) {
       ids.set(document.data.id, document.relativePath);
     }
 
-    const expectedFilePrefix = document.kind === 'spec' ? document.data.id : document.data.id?.replace('ADR-', '');
-    if (!document.name.startsWith(expectedFilePrefix ?? '')) {
-      errors.push(`${document.relativePath}: filename must start with "${expectedFilePrefix}"`);
+    if (document.kind === 'spec' && !document.name.startsWith(document.data.id ?? '')) {
+      errors.push(`${document.relativePath}: filename must start with "${document.data.id}"`);
     }
 
     if (document.kind === 'spec') {
@@ -417,6 +418,12 @@ function validateIndexes(currentSpecs, changes, errors) {
     else if (!index.includes(`<ChangeIndex bucket="${bucket}"`)) errors.push(`docs/changes/${bucket}/index.md: must render <ChangeIndex bucket="${bucket}" /> instead of a hand-maintained table`);
     else if (parseIndexTableRows(index).some(row => /^CHANGE-/.test(row.id))) errors.push(`docs/changes/${bucket}/index.md: remove hand-maintained CHANGE rows; the list is generated at build time`);
   }
+
+  const adrIndexPath = path.join(adrDir, 'index.md');
+  const adrIndex = existsSync(adrIndexPath) ? readFileSync(adrIndexPath, 'utf8') : '';
+  if (!adrIndex) errors.push('docs/adr/index.md: index is missing');
+  else if (!adrIndex.includes('<AdrIndex')) errors.push('docs/adr/index.md: must render <AdrIndex /> instead of a hand-maintained table');
+  else if (parseIndexTableRows(adrIndex).some(row => /^ADR-/.test(row.id))) errors.push('docs/adr/index.md: remove hand-maintained ADR rows; the list is generated at build time');
 }
 
 const legacySpecs = await loadDirectMarkdown(specDir, 'specs', 'spec');

@@ -48,7 +48,7 @@ npm run change:new -- export-format --title="書き出し形式の追加"
 
 `docs/changes/active/CHANGE-YYYYMMDD-slug/proposal.md`がテンプレートから作られます。`delta.md`などは必要な場合だけ`docs/changes/_template/`からコピーします。
 
-IDとdirectory名は同じ`CHANGE-YYYYMMDD-slug`にします。slugは小文字英数字とハイフンです。連番は並列ブランチが同じ「次の番号」を取り合って衝突するため、新しいChangeには使いません。`CHANGE-001`〜`CHANGE-056`は履歴IDとして有効なまま残します（[ADR-0024](../adr/0024-conflict-free-change-metadata.md)）。
+IDとdirectory名は同じ`CHANGE-YYYYMMDD-slug`にします。slugは小文字英数字とハイフンです。連番は並列ブランチが同じ「次の番号」を取り合って衝突するため、新しいChangeには使いません。`CHANGE-001`〜`CHANGE-056`は履歴IDとして有効なまま残します（[ADR-20260925-conflict-free-doc-metadata](../adr/20260925-conflict-free-doc-metadata.md)）。
 
 ## 並列開発で衝突させない規則
 
@@ -59,6 +59,8 @@ IDとdirectory名は同じ`CHANGE-YYYYMMDD-slug`にします。slugは小文字�
 | Active/Archive一覧 | 各`proposal.md`のfrontmatter（VitePressがビルド時に描画） | `docs/changes/active/index.md`、`docs/changes/archive/index.md` |
 | Change ID | 日付+slug | 他Changeとの連番調整 |
 | ChangeとCurrent Specの関係 | Changeの`current_specs` | Current Specの`related_changes`への追記 |
+| ADR一覧 | 各ADRのfrontmatter（VitePressがビルド時に描画） | `docs/adr/index.md` |
+| ADR ID | `ADR-YYYYMMDD-slug`（`npm run adr:new -- <slug> --title="..."`、ファイル名`YYYYMMDD-slug.md`） | 他ADRとの連番調整 |
 
 Current Specの本文・要件の変更は同じ領域を触る並列PR同士で衝突し得ます。それは意味的な競合なので、機械的に回避せずPRで解消します。
 
