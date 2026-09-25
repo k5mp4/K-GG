@@ -223,7 +223,7 @@ jobs:
       - name: Run macOS native checks
         run: npm run check:native
 
-      - name: Build macOS DMG
+      - name: Build macOS app and DMG
         run: npm run tauri:build:macos
 
       - name: Verify macOS bundle outputs

@@ -126,4 +126,4 @@ jobs:
           releaseDraft: true
           prerelease: false
           uploadUpdaterJson: false
-          args: --config src-tauri/tauri.macos.conf.json --bundles dmg --target ${{ matrix.target }}
+          args: --config src-tauri/tauri.macos.conf.json --bundles app,dmg --target ${{ matrix.target }}
