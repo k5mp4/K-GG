@@ -2,16 +2,19 @@
 type: change
 id: CHANGE-048
 title: Coneを順序変更可能なEffect Stackレイヤーとして統合
-status: draft
+status: archived
 change_kind: F
 owners: [maintainer]
 created: 2026-09-21
-updated: 2026-09-21
+updated: 2026-09-25
 current_specs: [CURRENT-EFFECT-STACK, CURRENT-UI-CONTROLS, CURRENT-GRADIENT, CURRENT-PRESET, CURRENT-VIDEO-EXPORT]
 related_adrs: [ADR-0004, ADR-0005, ADR-0009, ADR-0010, ADR-0017]
 related_code: [src/types/distortion.ts, src/lib/effectPipeline.ts, src/components/PostprocessStackPanel.tsx, src/components/PostprocessPanel.tsx, src/components/SandboxPanel.tsx, src/features/workspace/CanvasWorkspace.tsx, src/features/workspace/useWorkspaceController.ts, src/lib/webgl.ts, src/lib/webglShaderSources.ts, src/lib/renderSceneAtTime.ts, src/lib/kggControlRuntime.ts, packages/kgg-control/src/types.ts, packages/kgg-control/src/scenarios.ts]
 related_tests: [src/lib/effectPipeline.test.ts, src/lib/webglShaderSources.test.ts, src/lib/renderFrame.test.ts, src/lib/kggControlRuntime.test.ts, packages/kgg-control/src/scenarios.test.ts, src/components/PostprocessPanel.test.tsx, src/components/PostprocessStackPanel.test.tsx, src/components/SandboxPanel.test.tsx, src/store/gradientStore.effectPipeline.test.ts]
 human_review: required
+outcome: follow-up
+migration: historical
+follow_up: "issue-needed: Seam/alpha/aspect ratioの網羅確認と静止画・動画・TileのPreview parity確認"
 ---
 
 # CHANGE-048 Coneを順序変更可能なEffect Stackレイヤーとして統合
@@ -70,3 +73,10 @@ Effect Stack型／正規化／render plan、Cone用WebGL stack pass、スタッ�
 
 - 実装契約とローカル自動検証に未決定事項はありません。GPU／ブラウザーでの目視確認はRelease GateまたはObservationとして残し、人間レビューを必要とします。
 - 外部Issueは作成していません。単一の直接依頼として追跡でき、外部操作も依頼されていないためです。
+
+## Finalization
+
+- Finalized: 2026-09-25
+- Outcome: `follow-up`
+- Mode: historical migration; this move does not claim that every acceptance criterion passed.
+- Follow-up: issue-needed: Seam/alpha/aspect ratioの網羅確認と静止画・動画・TileのPreview parity確認

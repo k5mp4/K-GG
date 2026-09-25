@@ -2,14 +2,17 @@
 type: change
 id: CHANGE-051
 title: 配布時のライセンス表示と外部入力の安全性
-status: review
+status: archived
 change_kind: B
 owners: [maintainer]
 created: 2026-09-22
-updated: 2026-09-22
+updated: 2026-09-25
 current_specs: [CURRENT-PRESET, CURRENT-UI-CONTROLS, CURRENT-VIDEO-EXPORT]
 related_adrs: [ADR-0007, ADR-0011]
 human_review: required
+outcome: follow-up
+migration: historical
+follow_up: "issue-needed: WebView2実機、OS保存、更新署名・改ざん検知のRelease Gate確認"
 ---
 
 # 配布時のライセンス表示と外部入力の安全性
@@ -37,3 +40,10 @@ Windows Authenticode、鍵生成・交換、GitHub管理設定、公開済みバ
 K-GGが出力する単一manifest ZIPと既存JSONを維持する。追加ファイル、ZIP64、破損ZIPは従来読めた場合も拒否する。filesystem scopeはプロセス内で共有されるため、保存操作だけの一回限りの許可とは異なる。
 
 検証と残作業は[validation](./validation.md)、運用は[配布安全性](../../../development/release-security.md)を参照する。
+
+## Finalization
+
+- Finalized: 2026-09-25
+- Outcome: `follow-up`
+- Mode: historical migration; this move does not claim that every acceptance criterion passed.
+- Follow-up: issue-needed: WebView2実機、OS保存、更新署名・改ざん検知のRelease Gate確認

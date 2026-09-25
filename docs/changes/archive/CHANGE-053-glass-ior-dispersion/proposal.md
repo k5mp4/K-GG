@@ -2,7 +2,7 @@
 type: change
 id: CHANGE-053
 title: Glass Organic／RippleとGlassTile Faceted・屈折率・色分散サンプル数
-status: draft
+status: archived
 change_kind: F
 owners: [maintainer]
 created: 2026-09-24
@@ -12,6 +12,9 @@ related_adrs: [ADR-0005, ADR-0009, ADR-0010, ADR-0012, ADR-0017]
 related_code: [src/types/distortion.ts, packages/kgg-control/src/parameterLimits.ts, packages/kgg-control/src/parameters.ts, src/lib/glass.ts, src/lib/glassTile.ts, src/lib/postprocessAnimation.ts, src/store/documentModel.ts, src/store/documentActions.ts, src/lib/webgl.ts, src/shaders/postprocess/uniforms.glsl, src/shaders/postprocess/glass-field.glsl, src/shaders/postprocess/glass-optics.glsl, src/shaders/postprocess/glass-compact.glsl, src/shaders/postprocess/glass-tile.glsl, src/components/PostprocessPanel.tsx, src/i18n/uiLabels.ts, src/i18n/messages.ts]
 related_tests: [src/lib/glass.test.ts, src/lib/glassTile.test.ts, src/lib/glassTileShader.test.ts, src/store/gradientStore.glass.test.ts, src/lib/effectShaderParity.test.ts, src/lib/postprocessAnimation.test.ts, src/lib/webglShaderSources.test.ts, src/components/PostprocessPanel.test.tsx, packages/kgg-control/src/parameters.test.ts]
 human_review: required
+outcome: follow-up
+migration: historical
+follow_up: "issue-needed: DockPanel型エラー解消後にMerge Gateを再実行しGlass各機能のGPU/視覚確認"
 ---
 
 # CHANGE-053 Glass Organic／RippleとGlassTile Faceted・屈折率・色分散サンプル数
@@ -79,3 +82,10 @@ GLASS V2のOrganic／Ripple表面、Rippleのレンズ形状とループ速度�
 
 - 実装範囲とPreset互換性に未決定事項はありません。Browser/GPUでの目視確認はMerge Gateの自動検証と分けてObservationへ記録します。
 - 外部Issueは作成していません。単一の直接依頼として追跡でき、外部操作も依頼されていないためです。
+
+## Finalization
+
+- Finalized: 2026-09-25
+- Outcome: `follow-up`
+- Mode: historical migration; this move does not claim that every acceptance criterion passed.
+- Follow-up: issue-needed: DockPanel型エラー解消後にMerge Gateを再実行しGlass各機能のGPU/視覚確認

@@ -2,15 +2,18 @@
 type: change
 id: CHANGE-050
 title: K-GGからデザインアプリへPNGを直接送信
-status: draft
+status: archived
 change_kind: F
 owners: [maintainer]
 created: 2026-09-21
-updated: 2026-09-22
+updated: 2026-09-25
 current_specs: [CURRENT-DESIGN-APP-CONNECTORS]
 related_adrs: [ADR-0020]
 related_code: [packages/kgg-image/src, src/integrations/connectors, src/components/DesignAppSendPanel.tsx, src/components/ExportPanel.tsx, src-tauri/src/design_app_bridge.rs, connectors/figma, connectors/affinity]
 human_review: required
+outcome: follow-up
+migration: historical
+follow_up: "issue-needed: Figma Desktopでの接続・PNG受信確認とAffinity公式登録条件の確認"
 ---
 
 # CHANGE-050 K-GGからデザインアプリへPNGを直接送信
@@ -64,3 +67,10 @@ Direct request。K-GG独自の画像ファイル形式を介さず、開いて�
 ## 検証
 
 TypeScript型検査、K-GG frontend build、Figma connector build、Rust `cargo check`、Docs checkをMerge Gate候補として確認する。Figma Plugin登録と受信はRelease Observationとして記録し、Affinityは公式登録手順と生成物適合の確認後にRelease Observationを行う。
+
+## Finalization
+
+- Finalized: 2026-09-25
+- Outcome: `follow-up`
+- Mode: historical migration; this move does not claim that every acceptance criterion passed.
+- Follow-up: issue-needed: Figma Desktopでの接続・PNG受信確認とAffinity公式登録条件の確認

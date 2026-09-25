@@ -2,7 +2,7 @@
 type: change
 id: CHANGE-052
 title: macOSデスクトップ版の試験ビルドと配布
-status: review
+status: archived
 change_kind: A
 owners: [maintainer]
 created: 2026-09-24
@@ -10,6 +10,9 @@ updated: 2026-09-25
 current_specs: [CURRENT-VIDEO-EXPORT, CURRENT-AFTER-EFFECTS-INTEGRATION, CURRENT-DESIGN-APP-CONNECTORS]
 related_adrs: [ADR-0002, ADR-0021]
 human_review: required
+outcome: follow-up
+migration: historical
+follow_up: "issue-needed: macOS実機でarm64/Intel DMG、FFmpeg、Figma連携とWindows配布維持を確認"
 ---
 
 # macOSデスクトップ版の試験ビルドと配布
@@ -39,3 +42,10 @@ Apple Developer証明書、notarization、macOS updaterの自動更新、After E
 Windowsでは`<app_local_data_dir>/ffmpeg/ffmpeg.exe`を優先する既存探索順序を維持する。macOSでは専用FFmpegフォルダーを使わず、`PATH`の`ffmpeg`を検証する。Windows release jobがDraft Releaseと`latest.json`を作成し、macOS jobはDMGだけを追加する。
 
 検証と未確認事項は[validation](./validation.md)に記録する。
+
+## Finalization
+
+- Finalized: 2026-09-25
+- Outcome: `follow-up`
+- Mode: historical migration; this move does not claim that every acceptance criterion passed.
+- Follow-up: issue-needed: macOS実機でarm64/Intel DMG、FFmpeg、Figma連携とWindows配布維持を確認

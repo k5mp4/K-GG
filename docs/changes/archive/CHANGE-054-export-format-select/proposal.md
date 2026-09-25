@@ -2,7 +2,7 @@
 type: change
 id: CHANGE-054
 title: 書き出し形式のInputDrum化とFFmpeg動画形式の追加
-status: review
+status: archived
 change_kind: F
 owners: [maintainer]
 created: 2026-09-25
@@ -10,6 +10,9 @@ updated: 2026-09-25
 current_specs: [CURRENT-VIDEO-EXPORT]
 related_adrs: []
 human_review: required
+outcome: follow-up
+migration: historical
+follow_up: "issue-needed: Tauriで全形式・WebM検出・After Effects連携・GIF縮小をWindows/macOS確認"
 ---
 
 # 書き出し形式のInputDrum化とFFmpeg動画形式の追加
@@ -41,3 +44,10 @@ AVIF・TIFFなど静止画形式の追加、アルファ付きWebM／GIF、GIF�
 Tauri commandの`encode_qtrle_mov`と`encode_h264_rgb_mp4`は`encode_native_video`へ統合する。フロントエンドとRustは同じリポジトリで配布されるため外部互換は不要。`videoFormats`を返さない状態でも、フロントエンドはMOV／MP4を利用可能とみなす。
 
 検証と未確認事項は[validation](./validation.md)に記録する。
+
+## Finalization
+
+- Finalized: 2026-09-25
+- Outcome: `follow-up`
+- Mode: historical migration; this move does not claim that every acceptance criterion passed.
+- Follow-up: issue-needed: Tauriで全形式・WebM検出・After Effects連携・GIF縮小をWindows/macOS確認

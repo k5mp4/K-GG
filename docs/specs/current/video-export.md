@@ -112,7 +112,7 @@ Flow Gradientを有効にした出力は、Seed、正規化時刻、設定、Ren
 - [SPEC-005 動画出力表示名とファイル名](../SPEC-005-video-export-naming)
 - [SPEC-023 動画書き出しUXとMP4品質](../SPEC-023-video-export-ux-and-mp4-quality)
 - [SPEC-024 動画書き出しFFmpeg待機の応答性](../SPEC-024-video-export-encode-responsiveness)
-- [CHANGE-054 書き出し形式のInputDrum化とFFmpeg動画形式の追加](../../changes/active/CHANGE-054-export-format-select/proposal)
+- [CHANGE-054 書き出し形式のInputDrum化とFFmpeg動画形式の追加](../../changes/archive/CHANGE-054-export-format-select/proposal)
 
 ## 未確認・今後の現行仕様化
 

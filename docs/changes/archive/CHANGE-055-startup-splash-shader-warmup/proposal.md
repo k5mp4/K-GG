@@ -2,7 +2,7 @@
 type: change
 id: CHANGE-055
 title: 起動スプラッシュとEffect Stack Shaderの事前準備
-status: review
+status: archived
 change_kind: F
 owners: [maintainer]
 created: 2026-09-25
@@ -12,6 +12,9 @@ related_adrs: [ADR-0015, ADR-0022]
 related_code: [index.html, src/main.tsx, src/branding/brand.ts, src/features/splash/SplashScreen.tsx, src/features/splash/SplashScreen.css, src/features/splash/splashPolicy.ts, src/features/splash/splashVisual.ts, src/features/splash/staticSplashVisual.ts, src/features/splash/mediaSplashVisual.ts, src/lib/shaderWarmup.ts, src/lib/shaderWarmupHost.ts, src/lib/webgl.ts, src/hooks/useWebGL.ts, src/components/PostprocessStackPanel.tsx, src/i18n/messages.ts]
 related_tests: [src/lib/webglCompilePolicy.test.ts, src/lib/shaderWarmup.test.ts, src/features/splash/splash.test.ts]
 human_review: required
+outcome: follow-up
+migration: historical
+follow_up: "issue-needed: Tauri起動/実GPU warmup、reduced-motion、初回Shader遅延と再起動クラッシュを確認"
 ---
 
 # CHANGE-055 起動スプラッシュとEffect Stack Shaderの事前準備
@@ -71,3 +74,10 @@ lazy Shaderの優先度付きキュー、起動後の事前準備、Effect Stack
 
 - スプラッシュの最低／最大表示時間（600ms／4秒）の妥当性。ブランド演出が決まった時点で見直します。
 - Lottie／Riveのどちらを採用するか、およびCSPへ`'wasm-unsafe-eval'`を追加するか（Rive／dotLottieを採用する場合）。
+
+## Finalization
+
+- Finalized: 2026-09-25
+- Outcome: `follow-up`
+- Mode: historical migration; this move does not claim that every acceptance criterion passed.
+- Follow-up: issue-needed: Tauri起動/実GPU warmup、reduced-motion、初回Shader遅延と再起動クラッシュを確認

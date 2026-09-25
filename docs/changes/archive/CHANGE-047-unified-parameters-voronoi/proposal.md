@@ -2,16 +2,19 @@
 type: change
 id: CHANGE-047
 title: 共通パラメータ定義とPostprocess Voronoi改善
-status: draft
+status: archived
 change_kind: F
 owners: [maintainer]
 created: 2026-09-20
-updated: 2026-09-20
+updated: 2026-09-25
 current_specs: [CURRENT-UI-CONTROLS, CURRENT-EFFECT-STACK]
 related_adrs: [ADR-0009]
 related_code: [packages/kgg-control/src/parameterLimits.ts, packages/kgg-control/src/parameters.ts, src/lib/parameterLimits.ts, src/lib/voronoi.ts, src/components/SliderField.tsx, src/components/NoiseDistortionPanel.tsx, src/components/PostprocessPanel.tsx, src/store/documentModel.ts, src/store/documentActions.ts, src/types/distortion.ts, src/lib/glass.ts, src/lib/glassTile.ts, src/lib/webgl.ts, src/shaders/postprocess/stack.glsl, src/shaders/postprocess/uniforms.glsl]
 related_tests: [src/lib/parameterLimits.test.ts, src/lib/effectShaderParity.test.ts, src/lib/webglShaderSources.test.ts]
 human_review: required
+outcome: follow-up
+migration: historical
+follow_up: "issue-needed: 実GPUのVoronoi描画とTile/動画出力のRelease Gate確認"
 ---
 
 # CHANGE-047 共通パラメータ定義とPostprocess Voronoi改善
@@ -62,3 +65,10 @@ human_review: required
 ## 未決定事項
 
 なし。GPUを使った最終的な見た目確認はRelease Gateとして別途記録します。
+
+## Finalization
+
+- Finalized: 2026-09-25
+- Outcome: `follow-up`
+- Mode: historical migration; this move does not claim that every acceptance criterion passed.
+- Follow-up: issue-needed: 実GPUのVoronoi描画とTile/動画出力のRelease Gate確認

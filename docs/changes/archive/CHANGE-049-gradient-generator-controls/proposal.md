@@ -2,16 +2,19 @@
 type: change
 id: CHANGE-049
 title: Color Palette GeneratorをGradient Generatorに整理
-status: draft
+status: archived
 change_kind: F
 owners: [maintainer]
 created: 2026-09-21
-updated: 2026-09-21
+updated: 2026-09-25
 current_specs: [CURRENT-GRADIENT]
 related_adrs: []
 related_code: [src/components/ColorPaletteGenerator.tsx, src/components/GradientRamp.tsx, src/App.tsx, src/lib/gradientGenerator.ts, src/lib/perceptualGradient.ts, src/i18n/messages.ts]
 related_tests: [src/lib/gradientGenerator.test.ts, src/lib/perceptualGradient.test.ts]
 human_review: required
+outcome: follow-up
+migration: historical
+follow_up: "issue-needed: Gradient Generatorのブラウザー表示・stop編集・Apply動作を確認しValidationを記録"
 ---
 
 # CHANGE-049 Color Palette GeneratorをGradient Generatorに整理
@@ -40,3 +43,10 @@ Direct request。カラーパレットジェネレーターから配色補助と
 ## 検証
 
 Merge Gateは実行した型チェック、lint、docs checkを記録する。自動テストは今回追加・実行しない。ブラウザーでの表示確認は実施結果をValidationへ記録する。
+
+## Finalization
+
+- Finalized: 2026-09-25
+- Outcome: `follow-up`
+- Mode: historical migration; this move does not claim that every acceptance criterion passed.
+- Follow-up: issue-needed: Gradient Generatorのブラウザー表示・stop編集・Apply動作を確認しValidationを記録
