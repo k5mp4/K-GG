@@ -4,6 +4,7 @@ import { renderAndCaptureExportFrame, withExportSession } from '../../lib/videoE
 import type { AnimationEasing } from '../../types/animation';
 import type {
   NativeVideoArtifact,
+  NativeVideoFormat,
   VideoExportConfig,
   VideoExportFrameRenderer,
   VideoExportService,
@@ -86,16 +87,14 @@ async function captureFrameZipChunks(
 
 export type ExportConfig = VideoExportConfig;
 
-// ---------- Lossless RGB MOV エクスポート ----------
+// ---------- FFmpeg 動画エクスポート ----------
 
-/** QuickTime Animation (qtrle) でロスレス RGB MOV を生成する。
- *  YUV 変換を行わないため PNG と同一の色が保持される。 */
-export async function exportLosslessMOV(_config: ExportConfig): Promise<NativeVideoArtifact> {
-  throw new Error('MOV エクスポートには Tauri ローカルアプリと外部 FFmpeg バイナリが必要です。');
-}
-
-export async function exportHighQualityMP4(_config: ExportConfig): Promise<NativeVideoArtifact> {
-  throw new Error('MP4 エクスポートには Tauri ローカルアプリと外部 FFmpeg バイナリが必要です。');
+/** MOV / MP4 / GIF / WebM は Tauri 版の外部 FFmpeg でのみ生成する。 */
+export async function exportNativeVideo(
+  format: NativeVideoFormat,
+  _config: ExportConfig,
+): Promise<NativeVideoArtifact> {
+  throw new Error(`${format.toUpperCase()} エクスポートには Tauri ローカルアプリと外部 FFmpeg バイナリが必要です。`);
 }
 
 // ---------- 連番 PNG ZIP エクスポート ----------
@@ -118,7 +117,6 @@ export async function exportFrameZip(config: ExportConfig): Promise<Blob> {
 }
 
 export const browserVideoExportService: VideoExportService = {
-  exportLosslessMOV,
-  exportHighQualityMP4,
+  exportNativeVideo,
   exportFrameZip,
 };

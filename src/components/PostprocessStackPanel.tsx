@@ -24,6 +24,7 @@ import { Icon } from './Icon';
 import { useLanguage } from '../i18n/LanguageProvider';
 import type { MessageKey } from '../i18n/messages';
 import { renderBridge } from '../lib/renderBridge';
+import { prefetchEffectStackLayer } from '../lib/shaderWarmup';
 import {
   EFFECT_STACK_TRANSITION_DURATION_MS,
   beginEffectStackTransition,
@@ -450,6 +451,13 @@ export function PostprocessStackPanel({
               }}
               title={t('stack.soloHint')}
               onClick={(event) => selectLayer(layer.kind, event.altKey)}
+              onPointerEnter={() => {
+                // Start a cold shader compile before the toggle click lands.
+                if (!layer.enabled) prefetchEffectStackLayer(layer.kind);
+              }}
+              onFocusCapture={() => {
+                if (!layer.enabled) prefetchEffectStackLayer(layer.kind);
+              }}
             >
               <button
                 type="button"

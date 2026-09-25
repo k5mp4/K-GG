@@ -7,8 +7,8 @@ owners: [maintainer]
 created: 2026-09-25
 updated: 2026-09-25
 requirement_ids: [RTOUT-001, RTOUT-002, RTOUT-003, RTOUT-004, RTOUT-005, RTOUT-006, RTOUT-007, RTOUT-008]
-related_adrs: [ADR-0022]
-related_changes: [CHANGE-054]
+related_adrs: [ADR-0023]
+related_changes: [CHANGE-056]
 related_code: [src/lib/spoutOutput.ts, src/lib/webglFrameReadback.ts, src/features/native/useSpoutOutput.ts, src/adapters/tauri/spoutOutputService.ts, src/components/SpoutOutputPanel.tsx, src-tauri/src/spout_output.rs, src-tauri/src/spout_shared_frames.rs, src-tauri/native/spout, src-tauri/build.rs, vendor/spout2]
 related_tests: [src/lib/spoutOutput.test.ts, src/lib/webglFrameReadback.test.ts, src/adapters/tauri/spoutOutputService.test.ts, src-tauri/src/spout_output.rs, src-tauri/src/spout_shared_frames.rs]
 ---
@@ -67,15 +67,15 @@ DirectX 11を利用できない場合を含め、Senderの作成・送信の失�
 
 ## 他領域との関係
 
-- 設計判断は[ADR-0022](../../adr/0022-spout-output-cpu-readback.md)。
+- 設計判断は[ADR-0023](../../adr/0023-spout-output-cpu-readback.md)。
 - 送信する画像は[Effect Stack](./effect-stack.md)の最終結果で、[動画・連番フレーム出力](./video-export.md)の書き出し中は読み取りを止める。
 - Spout2のライセンス表示はHelp > Third-party licensesとNOTICEに含める。
 
 ## 変更履歴
 
-- CHANGE-054: Spout Sender出力を追加。
+- CHANGE-056: Spout Sender出力を追加。
 
 ## 未確認・今後の現行仕様化
 
-- TouchDesigner、Resolume、OBSでの受信表示とCPU使用率は、Windows実機のRelease Gateとして記録する（CHANGE-054 validation）。1080p/30fps・60fpsの送信fpsは、Tauri実アプリでの計測を同validationに記録済み。
+- TouchDesigner、Resolume、OBSでの受信表示とCPU使用率は、Windows実機のRelease Gateとして記録する（CHANGE-056 validation）。1080p/30fps・60fpsの送信fpsは、Tauri実アプリでの計測を同validationに記録済み。
 - Cloth/Cone 3D表示の送信、GPU共有textureによる`SendTexture`送信、Spout Receiver機能、Syphon、NDIは未定義。

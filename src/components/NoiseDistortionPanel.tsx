@@ -26,7 +26,9 @@ const NOISE_TYPES = [
   { value: 'fast_curl',        label: 'Fast Curl' },
   { value: 'curl',             label: 'Curl (Legacy)' },
   { value: 'simplex',          label: 'Simplex' },
-  { value: 'fbm',              label: 'fBm' },
+  // fBm is superseded by Perlin; keep it rendering for saved presets only.
+  { value: 'fbm',              label: 'fBm', hidden: true },
+  { value: 'perlin',           label: 'Perlin' },
   { value: 'ridged_fbm',       label: 'Aura Ridges' },
   { value: 'ae_fractal',       label: 'Fractal Drift' },
   { value: 'domain_warp_anim', label: 'Domain Warp' },
@@ -57,6 +59,11 @@ const NOISE_LOOP_MODES = [
   { value: 'seamless', label: 'Seamless' },
 ];
 
+const PERLIN_DIMENSIONS = [
+  { value: '3d', label: '3D' },
+  { value: '4d', label: '4D (Loop)' },
+];
+
 const PHASOR_DIRECTION_MODES = [
   { value: 'directional', label: 'Directional' },
   { value: 'radial', label: 'Radial' },
@@ -71,6 +78,7 @@ export function NoiseDistortionPanel() {
   const isDWAnim = noiseDistortion.type === 'domain_warp_anim';
   const isSeamless = noiseDistortion.type === 'seamless';
   const isVoronoi = noiseDistortion.type === 'voronoi';
+  const isPerlin = noiseDistortion.type === 'perlin';
   const isRidged = noiseDistortion.type === 'ridged_fbm';
   const isAeFractal = noiseDistortion.type === 'ae_fractal';
   const isCurl = noiseDistortion.type === 'curl';
@@ -80,6 +88,7 @@ export function NoiseDistortionPanel() {
   const isCaustics = noiseDistortion.type === 'caustics';
   const isPhasor = noiseDistortion.type === 'phasor';
   const hasOctaves = noiseDistortion.type === 'fbm' ||
+                    isPerlin ||
                     noiseDistortion.type === 'ridged_fbm' ||
                     noiseDistortion.type === 'ae_fractal' ||
                     isCurl ||
@@ -397,6 +406,60 @@ export function NoiseDistortionPanel() {
                 format={(v) => v.toFixed(2)}
                 trackId="noiseDistortion.aeBrightness"
                 limitKey="noise.aeBrightness"
+              />
+            </>
+          )}
+
+          {isPerlin && (
+            <>
+              <CustomSelect
+                label="Dimension"
+                value={noiseDistortion.perlinDimension ?? D.perlinDimension}
+                options={PERLIN_DIMENSIONS}
+                onChange={(val) => setNoiseDistortion({ perlinDimension: val as NoiseDistortionConfig['perlinDimension'] })}
+              />
+              {noiseDistortion.perlinDimension === '4d' && (
+                <SliderField
+                  label="Loop Wobble"
+                  value={noiseDistortion.perlinLoopWobble ?? D.perlinLoopWobble}
+                  onChange={(v) => setNoiseDistortion({ perlinLoopWobble: v })}
+                  format={(v) => v.toFixed(2)}
+                  trackId="noiseDistortion.perlinLoopWobble"
+                  limitKey="noise.perlinLoopWobble"
+                />
+              )}
+              <SliderField
+                label="Roughness"
+                value={noiseDistortion.perlinRoughness ?? D.perlinRoughness}
+                onChange={(v) => setNoiseDistortion({ perlinRoughness: v })}
+                format={(v) => v.toFixed(2)}
+                trackId="noiseDistortion.perlinRoughness"
+                limitKey="noise.perlinRoughness"
+              />
+              <SliderField
+                label="Sharpness"
+                value={noiseDistortion.perlinSharpness ?? D.perlinSharpness}
+                onChange={(v) => setNoiseDistortion({ perlinSharpness: v })}
+                format={(v) => v.toFixed(1)}
+                trackId="noiseDistortion.perlinSharpness"
+                limitKey="noise.perlinSharpness"
+              />
+              <SliderField
+                label="Layer Mix"
+                value={noiseDistortion.perlinLayerMix ?? D.perlinLayerMix}
+                onChange={(v) => setNoiseDistortion({ perlinLayerMix: v })}
+                format={(v) => v.toFixed(2)}
+                trackId="noiseDistortion.perlinLayerMix"
+                limitKey="noise.perlinLayerMix"
+              />
+              <SliderField
+                label="Direction"
+                value={noiseDistortion.perlinAngle ?? D.perlinAngle}
+                onChange={(v) => setNoiseDistortion({ perlinAngle: v })}
+                format={(v) => `${Math.round(v)}°`}
+                trackId="noiseDistortion.perlinAngle"
+                control="angle"
+                limitKey="noise.perlinAngle"
               />
             </>
           )}

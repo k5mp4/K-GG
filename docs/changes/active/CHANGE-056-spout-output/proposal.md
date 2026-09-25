@@ -1,6 +1,6 @@
 ---
 type: change
-id: CHANGE-054
+id: CHANGE-056
 title: Windows Desktop版のSpout出力
 status: review
 change_kind: F
@@ -8,7 +8,7 @@ owners: [maintainer]
 created: 2026-09-25
 updated: 2026-09-25
 current_specs: [CURRENT-REALTIME-OUTPUT]
-related_adrs: [ADR-0022]
+related_adrs: [ADR-0023]
 human_review: required
 ---
 

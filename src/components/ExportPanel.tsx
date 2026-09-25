@@ -1,11 +1,12 @@
 import { useState, useEffect, useRef, type MutableRefObject, type RefObject } from 'react';
 import { Toggle } from './Toggle';
+import { CustomSelect } from './CustomSelect';
+import { InputDrum, InputNumber } from 'tweeq';
 import { useGradientStore } from '../store/gradientStore';
 import { useRecorder } from '../hooks/useRecorder';
 import {
   exportFrameZip,
-  exportHighQualityMP4,
-  exportLosslessMOV,
+  exportNativeVideo,
   nativeFfmpegSupported,
   openNativeFfmpegFolder,
   saveNativeVideoArtifact,
@@ -20,13 +21,14 @@ import {
   aePing, aeImportImage, aeImportVideo, aeBridgeAvailable, aePlatformSupported as checkAePlatformSupported, aeRuntime,
   aeGetSaveDir, aeChooseSaveDir, aeClearSaveDir,
 } from '../lib/aftereffectsExport';
-import { MP4_QUALITY_PRESETS } from '../adapters';
+import { GIF_MAX_FILE_MB, MP4_QUALITY_PRESETS } from '../adapters';
 import type {
   ExportDirectoryHandle,
   ExportStage,
   Mp4QualityPreset,
   NativeFfmpegStatus,
   NativeVideoArtifact,
+  NativeVideoFormat,
   VideoExportFrameRenderer,
 } from '../adapters';
 import type { AeSaveDirStatus, AeStatus } from '../lib/aftereffectsExport';
@@ -42,9 +44,25 @@ import { createAeStatusController } from '../lib/aeStatusController';
 import { useLanguage } from '../i18n/LanguageProvider';
 import { DesignAppSendPanel } from './DesignAppSendPanel';
 import { SpoutOutputPanel } from './SpoutOutputPanel';
+import {
+  FRAME_ZIP_FORMAT,
+  IMAGE_EXPORT_FORMATS,
+  LOSSY_IMAGE_QUALITY,
+  REQUIRED_NATIVE_VIDEO_FORMATS,
+  availableNativeVideoFormats,
+  isNativeVideoFormat,
+  nativeVideoFileName,
+  nativeVideoFormatDefinition,
+  type ImageExportFormat,
+  type VideoExportFormat,
+} from '../lib/videoExportFormats';
 
-type ExportJob = 'mov' | 'mp4' | 'zip' | 'slits' | null;
-type VideoExt = 'mov' | 'mp4';
+type ExportJob = VideoExportFormat | 'slits' | null;
+type AeVideoExt = 'mov' | 'mp4';
+
+function aeVideoExt(format: NativeVideoFormat): AeVideoExt | null {
+  return nativeVideoFormatDefinition(format).afterEffectsCompatible ? format as AeVideoExt : null;
+}
 
 async function releaseVideoArtifact(artifact: NativeVideoArtifact): Promise<void> {
   let lastError: unknown;
@@ -102,6 +120,11 @@ export function ExportPanel({
   const [exportProgress, setExportProgress] = useState(0);
   const [exportStage, setExportStage] = useState<ExportStage>('preparing');
   const [mp4Quality, setMp4Quality] = useState<Mp4QualityPreset>('high');
+  const [gifMaxFileMb, setGifMaxFileMb] = useState<number>(GIF_MAX_FILE_MB.default);
+  const [imageFormat, setImageFormat] = useState<ImageExportFormat>('png');
+  const [videoFormat, setVideoFormat] = useState<VideoExportFormat>(
+    () => nativeFfmpegSupported() ? 'mov' : FRAME_ZIP_FORMAT,
+  );
   const lastReportedProgressRef = useRef(0);
   const [exportError, setExportError] = useState<string | null>(null);
   const [savedFormats, setSavedFormats] = useState<Record<string, boolean>>({});
@@ -156,7 +179,7 @@ export function ExportPanel({
   // 動画エクスポート完了時に AE 送信できるよう最後のネイティブ成果物を保持
   const lastVideoRef = useRef<{
     artifact: NativeVideoArtifact;
-    ext: VideoExt;
+    format: NativeVideoFormat;
     exportPath: string | null;
   } | null>(null);
   const videoSendPromisesRef = useRef(new Map<NativeVideoArtifact, Promise<void>>());
@@ -242,7 +265,7 @@ export function ExportPanel({
 
   async function sendVideoToAe(
     artifact: NativeVideoArtifact,
-    ext: VideoExt,
+    ext: AeVideoExt,
     exportPath: string | null = null,
     sendMode: AeVideoSendMode = aeVideoSendMode,
     aeSaveDir: string | null = aeSaveDirStatus.path,
@@ -320,7 +343,9 @@ export function ExportPanel({
 
   async function handleAeSendVideo() {
     if (!lastVideoRef.current) return;
-    const { artifact, ext, exportPath } = lastVideoRef.current;
+    const { artifact, format, exportPath } = lastVideoRef.current;
+    const ext = aeVideoExt(format);
+    if (!ext) return;
     await sendVideoToAe(artifact, ext, exportPath);
   }
 
@@ -341,6 +366,21 @@ export function ExportPanel({
     && !ffmpegChecking
     && ffmpegStatus?.available === true;
   const videoExportBlockedByAeQueue = sendToAe && pendingAeVideoSends >= 2;
+  // FFmpeg未検出・Browser版では必須形式を無効状態で表示し、検出後は利用可能な形式だけを出す。
+  const nativeVideoFormats = nativeVideoEncodeReady
+    ? availableNativeVideoFormats(ffmpegStatus)
+    : REQUIRED_NATIVE_VIDEO_FORMATS;
+  const videoFormatOptions: VideoExportFormat[] = [...nativeVideoFormats, FRAME_ZIP_FORMAT];
+  const videoFormatLabels = videoFormatOptions.map(format => isNativeVideoFormat(format)
+    ? nativeVideoFormatDefinition(format).shortLabel
+    : t('export.imageSequenceShort'));
+  const selectedVideoFormat: VideoExportFormat = videoFormatOptions.includes(videoFormat)
+    ? videoFormat
+    : videoFormatOptions[0];
+  const selectedNativeVideoFormat = isNativeVideoFormat(selectedVideoFormat)
+    ? nativeVideoFormatDefinition(selectedVideoFormat)
+    : null;
+  const lastVideoAeExt = lastVideoRef.current ? aeVideoExt(lastVideoRef.current.format) : null;
 
   async function ensureNativeVideoEncodeReady(): Promise<boolean> {
     const status = await onCheckFfmpeg(true);
@@ -371,14 +411,14 @@ export function ExportPanel({
     setAeSaveDirStatus(status);
   }
 
-  async function handleExportMov() {
-    console.log('[Export] handleExportMov START');
+  async function handleExportNativeVideo(format: NativeVideoFormat) {
     const canvas = getOutputCanvas();
     const renderFrame = getOutputFrameRenderer();
     if (!canvas || exportJob) return;
     if (!await ensureNativeVideoEncodeReady()) return;
 
-    const controller = beginExport('mov');
+    const definition = nativeVideoFormatDefinition(format);
+    const controller = beginExport(format);
 
     // キャンバスが描画されるまで待機（高解像度で WebGL 初期化が遅延する場合がある）
     console.log(`[Export] Canvas size: ${canvas.width}×${canvas.height}`);
@@ -391,13 +431,15 @@ export function ExportPanel({
     let exportFinished = false;
     let savedExportPath: string | null = null;
     try {
-      artifact = await exportLosslessMOV({
+      artifact = await exportNativeVideo(format, {
         canvas,
         renderFrame,
         fps: animation.fps,
         duration: animation.duration,
         speed: animation.speed,
         easing: animation.easing,
+        mp4Quality: definition.supportsQuality ? mp4Quality : undefined,
+        gifMaxFileMb: format === 'gif' ? gifMaxFileMb : undefined,
         signal: controller.signal,
         onProgress: reportProgress,
         onStage: reportStage,
@@ -405,9 +447,14 @@ export function ExportPanel({
       if (controller.signal.aborted || !mountedRef.current) return;
       reportStage('saving');
       const completedArtifact = artifact;
+      const aeExt = aeVideoExt(format);
       const saved = await completeVideoExport({
         save: async () => {
-          savedExportPath = await saveNativeVideoArtifact(completedArtifact, `${stem}.mov`, dirHandleRef.current);
+          savedExportPath = await saveNativeVideoArtifact(
+            completedArtifact,
+            nativeVideoFileName(stem, format),
+            dirHandleRef.current,
+          );
           return savedExportPath !== null && !controller.signal.aborted && mountedRef.current;
         },
         onSaved: () => {
@@ -415,21 +462,21 @@ export function ExportPanel({
           const previous = lastVideoRef.current;
           lastVideoRef.current = {
             artifact: completedArtifact,
-            ext: 'mov',
+            format,
             exportPath: savedExportPath,
           };
           retained = true;
           if (previous) void releaseVideoWhenIdle(previous.artifact).catch(() => undefined);
-          flashSaved('mov');
+          flashSaved(format);
         },
         releaseExport: () => {
           finishExport(controller);
           exportFinished = true;
         },
-        sendToAe: sendToAe
+        sendToAe: sendToAe && aeExt
           ? () => sendVideoToAe(
             completedArtifact,
-            'mov',
+            aeExt,
             savedExportPath,
             aeVideoSendMode,
             aeSaveDirStatus.path,
@@ -441,10 +488,11 @@ export function ExportPanel({
       if (e instanceof DOMException && e.name === 'AbortError') { /* cancelled */ }
       else {
         const errorMsg = e instanceof Error ? e.message : String(e);
-        console.error('MOV export failed:', e);
-        setExportError(errorMsg.includes('ビデオサイズが大きすぎます')
-          ? errorMsg
-          : 'MOV エクスポートに失敗しました。コンソールを確認してください。');
+        const formatName = format.toUpperCase();
+        console.error(`${formatName} export failed:`, e);
+        setExportError(format === 'mov' && !errorMsg.includes('ビデオサイズが大きすぎます')
+          ? 'MOV エクスポートに失敗しました。コンソールを確認してください。'
+          : errorMsg || `${formatName} エクスポートに失敗しました。コンソールを確認してください。`);
         setTimeout(() => setExportError(null), 8000);
       }
     } finally {
@@ -453,83 +501,24 @@ export function ExportPanel({
     }
   }
 
-  async function handleExportMP4() {
-    const canvas = getOutputCanvas();
-    const renderFrame = getOutputFrameRenderer();
-    if (!canvas || exportJob) return;
-    if (!await ensureNativeVideoEncodeReady()) return;
-
-    const controller = beginExport('mp4');
-
-    console.log(`[Export] Canvas size: ${canvas.width}×${canvas.height}`);
-    await new Promise<void>((resolve) => {
-      setTimeout(resolve, 500);
-    });
-
-    let artifact: NativeVideoArtifact | null = null;
-    let retained = false;
-    let exportFinished = false;
-    let savedExportPath: string | null = null;
-    try {
-      artifact = await exportHighQualityMP4({
-        canvas,
-        renderFrame,
-        fps: animation.fps,
-        duration: animation.duration,
-        speed: animation.speed,
-        easing: animation.easing,
-        mp4Quality,
-        signal: controller.signal,
-        onProgress: reportProgress,
-        onStage: reportStage,
-      });
-      if (controller.signal.aborted || !mountedRef.current) return;
-      reportStage('saving');
-      const completedArtifact = artifact;
-      const saved = await completeVideoExport({
-        save: async () => {
-          savedExportPath = await saveNativeVideoArtifact(completedArtifact, `${stem}_h264rgb.mp4`, dirHandleRef.current);
-          return savedExportPath !== null && !controller.signal.aborted && mountedRef.current;
-        },
-        onSaved: () => {
-          reportProgress(1);
-          const previous = lastVideoRef.current;
-          lastVideoRef.current = {
-            artifact: completedArtifact,
-            ext: 'mp4',
-            exportPath: savedExportPath,
-          };
-          retained = true;
-          if (previous) void releaseVideoWhenIdle(previous.artifact).catch(() => undefined);
-          flashSaved('mp4');
-        },
-        releaseExport: () => {
-          finishExport(controller);
-          exportFinished = true;
-        },
-        sendToAe: sendToAe
-          ? () => sendVideoToAe(
-            completedArtifact,
-            'mp4',
-            savedExportPath,
-            aeVideoSendMode,
-            aeSaveDirStatus.path,
-          )
-          : undefined,
-      });
-      if (!saved) return;
-    } catch (e) {
-      if (e instanceof DOMException && e.name === 'AbortError') { /* cancelled */ }
-      else {
-        const errorMsg = e instanceof Error ? e.message : String(e);
-        console.error('MP4 export failed:', e);
-        setExportError(errorMsg || 'MP4 エクスポートに失敗しました。コンソールを確認してください。');
-        setTimeout(() => setExportError(null), 8000);
-      }
-    } finally {
-      if (!retained && artifact) await releaseVideoArtifact(artifact).catch(() => undefined);
-      if (!exportFinished) finishExport(controller);
+  function handleExportVideo() {
+    if (isNativeVideoFormat(selectedVideoFormat)) {
+      void handleExportNativeVideo(selectedVideoFormat);
+    } else {
+      void handleExportZip();
     }
+  }
+
+  function handleSaveImage() {
+    const canvas = getOutputCanvas();
+    if (!canvas) return;
+    const format = imageFormat;
+    const save = format === 'jpg'
+      ? downloadJPG(canvas, LOSSY_IMAGE_QUALITY, stem, dirHandleRef.current)
+      : format === 'webp'
+        ? downloadWebP(canvas, LOSSY_IMAGE_QUALITY, stem, dirHandleRef.current)
+        : downloadPNG(canvas, stem, dirHandleRef.current);
+    void save.then(saved => { if (saved) flashSaved(format); });
   }
 
   async function handleExportZip() {
@@ -666,26 +655,25 @@ export function ExportPanel({
       {/* 静止画 */}
       <div className="space-y-2">
         <p className="text-xs text-deep">{t('export.stillImage')}</p>
+        <div>
+          <p className="text-xs mb-1 text-deep font-display uppercase tracking-wider">{t('export.format')}</p>
+          <InputDrum
+            value={imageFormat}
+            options={IMAGE_EXPORT_FORMATS.map(format => format.value)}
+            labels={IMAGE_EXPORT_FORMATS.map(format => format.label)}
+            onChange={(format) => format !== undefined && setImageFormat(format)}
+            aria-label={t('export.format')}
+            className="w-full"
+          />
+        </div>
         <button
-          onClick={() => { const c = getOutputCanvas(); if (c) void downloadPNG(c, stem, dirHandleRef.current).then(saved => { if (saved) flashSaved('png'); }); }}
+          onClick={handleSaveImage}
           className="w-full py-2 bg-fire hover:brightness-110 disabled:opacity-40 disabled:cursor-not-allowed rounded-none text-sm font-display font-semibold text-k-text uppercase tracking-wider"
         >
-          {savedFormats['png'] ? `✓ ${t('export.saved')}` : t('export.savePng')}
+          {savedFormats[imageFormat]
+            ? `✓ ${t('export.saved')}`
+            : t('export.saveImage', { format: IMAGE_EXPORT_FORMATS.find(format => format.value === imageFormat)?.label ?? 'PNG' })}
         </button>
-        <div className="flex gap-2">
-          <button
-            onClick={() => { const c = getOutputCanvas(); if (c) void downloadJPG(c, 0.92, stem, dirHandleRef.current).then(saved => { if (saved) flashSaved('jpg'); }); }}
-            className="flex-1 py-1.5 bg-k-muted hover:bg-k-muted/70 disabled:opacity-40 disabled:cursor-not-allowed rounded-none text-xs text-k-text"
-          >
-            {savedFormats['jpg'] ? '✓' : 'JPG'}
-          </button>
-          <button
-            onClick={() => { const c = getOutputCanvas(); if (c) void downloadWebP(c, 0.92, stem, dirHandleRef.current).then(saved => { if (saved) flashSaved('webp'); }); }}
-            className="flex-1 py-1.5 bg-k-muted hover:bg-k-muted/70 disabled:opacity-40 disabled:cursor-not-allowed rounded-none text-xs text-k-text"
-          >
-            {savedFormats['webp'] ? '✓' : 'WebP'}
-          </button>
-        </div>
       </div>
 
       {/* スリット書き出し */}
@@ -791,74 +779,98 @@ export function ExportPanel({
           </div>
         )}
 
-        {nativeFfmpegAvailable && (
-          <div className="space-y-1.5 border border-panel-border/60 bg-k-bg/35 p-3">
-            <label htmlFor="mp4-quality" className="block text-xs text-deep">MP4品質</label>
-            <select
-              id="mp4-quality"
-              value={mp4Quality}
-              onChange={(event) => setMp4Quality(event.target.value as Mp4QualityPreset)}
-              className="w-full border border-panel-border bg-k-surface px-2 py-1.5 text-xs text-k-text focus:border-fire focus:outline-none"
-            >
-              {MP4_QUALITY_PRESETS.map(({ value, label, crf, description }) => (
-                <option key={value} value={value}>{label} — {description}（CRF {crf}）</option>
-              ))}
-            </select>
-            <p className="text-[10px] leading-relaxed text-tab-inactive">
-              標準的なYUV 4:2:0（BT.709）で圧縮します。Highを既定値として、従来の完全無劣化出力より小さいファイルを生成します。
-            </p>
-          </div>
-        )}
-
         {/* オフライン書き出し */}
         <div className="space-y-1.5">
-          <p className="text-xs text-tab-inactive">{t('export.videoFile')}</p>
+          <div>
+            <p className="text-xs mb-1 text-deep font-display uppercase tracking-wider">{t('export.format')}</p>
+            <InputDrum
+              value={selectedVideoFormat}
+              options={videoFormatOptions}
+              labels={videoFormatLabels}
+              onChange={(format) => format !== undefined && setVideoFormat(format)}
+              aria-label={t('export.format')}
+              className="w-full"
+            />
+          </div>
+          <p className="text-[10px] leading-relaxed text-tab-inactive">
+            {selectedNativeVideoFormat
+              ? selectedNativeVideoFormat.description
+              : t('export.imageSequenceDescription')}
+          </p>
+
+          {selectedNativeVideoFormat?.supportsQuality && (
+            <CustomSelect
+              value={mp4Quality}
+              options={MP4_QUALITY_PRESETS.map(({ value, label, crf, description }) => ({
+                value,
+                label: selectedNativeVideoFormat.value === 'mp4'
+                  ? `${label} — ${description}（CRF ${crf}）`
+                  : `${label} — ${description}`,
+              }))}
+              onChange={(value) => setMp4Quality(value as Mp4QualityPreset)}
+              label={t('export.videoQuality')}
+              localizeLabel={false}
+              localizeOptions={false}
+            />
+          )}
+
+          {selectedNativeVideoFormat?.value === 'gif' && (
+            <div>
+              <p className="text-xs mb-1 text-deep font-display uppercase tracking-wider">{t('export.gifMaxFileSize')}</p>
+              <div className="tq-input-number-shell w-full">
+                <InputNumber
+                  className="tq-input-number w-full"
+                  value={gifMaxFileMb}
+                  min={GIF_MAX_FILE_MB.min}
+                  max={GIF_MAX_FILE_MB.max}
+                  step={1}
+                  precision={0}
+                  suffix=" MB"
+                  bar={false}
+                  clampMin
+                  clampMax
+                  default={GIF_MAX_FILE_MB.default}
+                  aria-label={t('export.gifMaxFileSize')}
+                  onChange={(value) => {
+                    if (Number.isFinite(value)) {
+                      setGifMaxFileMb(Math.min(GIF_MAX_FILE_MB.max, Math.max(GIF_MAX_FILE_MB.min, Math.round(value))));
+                    }
+                  }}
+                />
+              </div>
+              <p className="mt-1 text-[10px] leading-relaxed text-tab-inactive">{t('export.gifMaxFileSizeDescription')}</p>
+            </div>
+          )}
+
+          {selectedNativeVideoFormat && !nativeFfmpegAvailable && (
+            <p className="text-[10px] leading-relaxed text-amber-200/80">{t('export.desktopRequired')}</p>
+          )}
+
+          {selectedNativeVideoFormat && !selectedNativeVideoFormat.afterEffectsCompatible && sendToAe && (
+            <p className="text-[10px] leading-relaxed text-amber-200/80">{t('export.aeFormatUnsupported')}</p>
+          )}
 
           <div className="relative min-h-[40px]">
-            {/* MOV Section */}
-            <div style={{ display: exportJob === 'mov' ? 'block' : 'none' }}>
-              <ProgressBar label="MOV" stage={exportStage} progress={exportProgress} onCancel={handleCancel} />
-            </div>
+            {exportJob !== null && exportJob !== 'slits' && (
+              <ProgressBar
+                label={exportJob === FRAME_ZIP_FORMAT ? 'ZIP' : exportJob.toUpperCase()}
+                stage={exportStage}
+                progress={exportProgress}
+                onCancel={handleCancel}
+              />
+            )}
             <div style={{ display: exportJob === null ? 'block' : 'none' }}>
               <button
-                onClick={handleExportMov}
-                disabled={recording || !videoReady || !nativeVideoEncodeReady || videoExportBlockedByAeQueue}
+                onClick={handleExportVideo}
+                disabled={recording || !videoReady || (selectedNativeVideoFormat !== null
+                  && (!nativeVideoEncodeReady || videoExportBlockedByAeQueue))}
                 className="w-full py-1.5 bg-fire hover:brightness-110 disabled:opacity-40 disabled:cursor-not-allowed rounded-none text-xs font-display font-semibold text-k-text uppercase tracking-wider"
               >
-                {savedFormats['mov'] ? `✓ ${t('export.saved')}` : t('export.exportMov')}
-              </button>
-            </div>
-          </div>
-
-          <div className="relative min-h-[40px]">
-            <div style={{ display: exportJob === 'mp4' ? 'block' : 'none' }}>
-              <ProgressBar label="MP4" stage={exportStage} progress={exportProgress} onCancel={handleCancel} />
-            </div>
-            <div style={{ display: exportJob === null ? 'block' : 'none' }}>
-              <button
-                onClick={handleExportMP4}
-                disabled={recording || !videoReady || !nativeVideoEncodeReady || videoExportBlockedByAeQueue}
-                className="w-full py-1.5 bg-fire hover:brightness-110 disabled:opacity-40 disabled:cursor-not-allowed rounded-none text-xs font-display font-semibold text-k-text uppercase tracking-wider"
-              >
-                {savedFormats['mp4'] ? `✓ ${t('export.saved')}` : t('export.exportMp4')}
-              </button>
-            </div>
-          </div>
-
-          <p className="text-xs text-tab-inactive">{t('export.imageSequence')}</p>
-
-          <div className="relative min-h-[40px]">
-            {/* ZIP Section */}
-            <div style={{ display: exportJob === 'zip' ? 'block' : 'none' }}>
-              <ProgressBar label="ZIP" stage={exportStage} progress={exportProgress} onCancel={handleCancel} />
-            </div>
-            <div style={{ display: exportJob === null ? 'block' : 'none' }}>
-              <button
-                onClick={handleExportZip}
-                disabled={recording || !videoReady}
-                className="w-full py-1.5 bg-fire/70 hover:bg-fire disabled:opacity-40 disabled:cursor-not-allowed rounded-none text-xs font-display font-semibold text-k-text uppercase tracking-wider"
-              >
-                {savedFormats['zip'] ? `✓ ${t('export.saved')}` : t('export.exportZip')}
+                {savedFormats[selectedVideoFormat]
+                  ? `✓ ${t('export.saved')}`
+                  : selectedNativeVideoFormat
+                    ? t('export.exportVideoFormat', { format: selectedNativeVideoFormat.shortLabel })
+                    : t('export.exportZip')}
               </button>
             </div>
           </div>
@@ -1004,13 +1016,15 @@ export function ExportPanel({
             {/* 手動送信（前回エクスポート分） */}
             <button
               onClick={handleAeSendVideo}
-              disabled={aeStatus === 'sending' || !lastVideoRef.current}
+              disabled={aeStatus === 'sending' || !lastVideoAeExt}
               className="w-full py-1.5 bg-k-surface hover:bg-k-muted disabled:opacity-40 disabled:cursor-not-allowed rounded-none text-xs text-k-text/80"
-              title={lastVideoRef.current ? undefined : '先に動画をエクスポートしてください'}
+              title={lastVideoRef.current
+                ? lastVideoAeExt ? undefined : t('export.aeFormatUnsupported')
+                : '先に動画をエクスポートしてください'}
             >
               {t('export.aeSendVideo')}
               {lastVideoRef.current && (
-                <span className="ml-1 text-tab-inactive">(.{lastVideoRef.current.ext})</span>
+                <span className="ml-1 text-tab-inactive">(.{lastVideoRef.current.format})</span>
               )}
             </button>
           </>

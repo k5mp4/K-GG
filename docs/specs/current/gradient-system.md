@@ -127,7 +127,7 @@ CanvasはCloth初期化中も描画を継続します。Cloth Rendererが利用�
 
 ### GRAD-018 Preview表示面の書き出し
 
-ExportはPreviewと同じ`renderSceneAtTime`／render-plan経路でフレームを生成します。Coneレイヤーが有効な場合はその位置で処理済み前段textureをCone shader passへ入力し、その出力と後続レイヤーを含む最終WebGL CanvasをPNG／JPG／WebP、連番PNG ZIP、MOV／MP4へ渡します。Cloth表示モードは既存Cloth Renderer Canvasを使用します。Cone専用の別Canvasをキャプチャせず、PreviewとExportで別のCone合成処理を持ちません。
+ExportはPreviewと同じ`renderSceneAtTime`／render-plan経路でフレームを生成します。Coneレイヤーが有効な場合はその位置で処理済み前段textureをCone shader passへ入力し、その出力と後続レイヤーを含む最終WebGL CanvasをPNG／JPG／WebP、連番PNG ZIP、MOV／MP4／WebM／GIFへ渡します。Cloth表示モードは既存Cloth Renderer Canvasを使用します。Cone専用の別Canvasをキャプチャせず、PreviewとExportで別のCone合成処理を持ちません。
 
 ### GRAD-019 Cone面へのstack texture投影
 

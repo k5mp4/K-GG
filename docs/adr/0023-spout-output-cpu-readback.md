@@ -1,5 +1,5 @@
 ---
-id: ADR-0022
+id: ADR-0023
 title: Spout出力をCPU readback・WebView2共有メモリ・静的リンクしたSpoutDXで実装する
 status: accepted
 date: 2026-09-25
@@ -8,7 +8,7 @@ related_specs: []
 supersedes: []
 ---
 
-# ADR-0022: Spout出力をCPU readback・WebView2共有メモリ・静的リンクしたSpoutDXで実装する
+# ADR-0023: Spout出力をCPU readback・WebView2共有メモリ・静的リンクしたSpoutDXで実装する
 
 ## コンテキスト
 
@@ -30,7 +30,7 @@ K-GG Desktop（Windows）の最終描画を、TouchDesigner、Resolume、OBSな�
 
 - WebView2内部のD3D11 textureを取得する公式手段はない。CPU readbackは、今のRenderer・WebView2構成で実装と検証ができる唯一の安定した経路である。
 - PBO＋fenceによる非同期readbackは、同期`readPixels`で生じるGPU stallをPreview描画から切り離す。
-- raw IPC bodyはJSON化を避けられるが、WebView2ではcustom protocolのrequest bodyがstream経由で読まれる。実測では1080p（8MB）1フレームに約4秒、640×360でも約170msかかり、リアルタイム出力に使えなかった（CHANGE-054 validation）。SharedBufferなら転送コピーがなくなり、1080p/60fpsを維持できた。
+- raw IPC bodyはJSON化を避けられるが、WebView2ではcustom protocolのrequest bodyがstream経由で読まれる。実測では1080p（8MB）1フレームに約4秒、640×360でも約170msかかり、リアルタイム出力に使えなかった（CHANGE-056 validation）。SharedBufferなら転送コピーがなくなり、1080p/60fpsを維持できた。
 - 共有メモリへの書込みと送信通知を分けたので、IPCの往復遅延（Preview描画中で約20ms）を2件の並行送信で吸収できる。
 - 変換を再利用バッファ上で行うC++は、Rustのdev profileに左右されず`/O2`で動く。IPC bodyのアラインメントに依存しない。
 - 上流ソースを静的リンクすれば、DLLの同梱・探索・バージョン不整合がない。vendorは約0.5MBで、SDK全体（Examples、Binaries、PDF）を取り込まない。

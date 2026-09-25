@@ -38,6 +38,14 @@
   uniform float u_ridgeOffset;
   uniform float u_ridgeWarp;
 
+  // Perlin 3D パラメータ
+  uniform float u_perlinRoughness;   // 主レイヤーのオクターブ振幅倍率 (小→なめらか, 大→細い線が増える)
+  uniform float u_perlinSharpness;   // Tonality相当のカーブ強度 (大→暗部が広く線が細い)
+  uniform float u_perlinLayerMix;    // 2枚目レイヤーのLighten不透明度
+  uniform float u_perlinAngle;       // UVを押し出す方向 (度)
+  uniform int   u_perlinDimension;   // 0=3D (XY+時間Z), 1=4D Loop (XY+時間を円周ZW)
+  uniform float u_perlinLoopWobble;  // 4D Loop軌道のうねり量 (0=真円)
+
   // AE Fractal Noise パラメータ
   uniform int   u_aeFractalType;     // 0=Basic, 1=Turbulent
   uniform float u_aeSubInfluence;    // persistence per octave
@@ -733,6 +741,331 @@
     return value;
   }
 
+  // Classic 3D gradient Perlin noise (Gustavson GLSL port, quintic fade).
+  // Unlike simplex, the eight-corner trilinear blend with the C2 quintic fade
+  // produces broad, rounded lobes and continuous second derivatives, so the
+  // displacement reads as soft gradation rather than cell/vein structure.
+  const int PERLIN_NOISE_TYPE = 11;
+
+  vec3 perlinFade(vec3 t) {
+    return t * t * t * (t * (t * 6.0 - 15.0) + 10.0);
+  }
+
+  float perlin3D(vec3 P) {
+    vec3 Pi0 = floor(P);
+    vec3 Pi1 = Pi0 + vec3(1.0);
+    Pi0 = mod289v3(Pi0);
+    Pi1 = mod289v3(Pi1);
+    vec3 Pf0 = fract(P);
+    vec3 Pf1 = Pf0 - vec3(1.0);
+    vec4 ix = vec4(Pi0.x, Pi1.x, Pi0.x, Pi1.x);
+    vec4 iy = vec4(Pi0.yy, Pi1.yy);
+    vec4 iz0 = Pi0.zzzz;
+    vec4 iz1 = Pi1.zzzz;
+
+    vec4 ixy = permute4(permute4(ix) + iy);
+    vec4 ixy0 = permute4(ixy + iz0);
+    vec4 ixy1 = permute4(ixy + iz1);
+
+    vec4 gx0 = ixy0 * (1.0 / 7.0);
+    vec4 gy0 = fract(floor(gx0) * (1.0 / 7.0)) - 0.5;
+    gx0 = fract(gx0);
+    vec4 gz0 = vec4(0.5) - abs(gx0) - abs(gy0);
+    vec4 sz0 = step(gz0, vec4(0.0));
+    gx0 -= sz0 * (step(0.0, gx0) - 0.5);
+    gy0 -= sz0 * (step(0.0, gy0) - 0.5);
+
+    vec4 gx1 = ixy1 * (1.0 / 7.0);
+    vec4 gy1 = fract(floor(gx1) * (1.0 / 7.0)) - 0.5;
+    gx1 = fract(gx1);
+    vec4 gz1 = vec4(0.5) - abs(gx1) - abs(gy1);
+    vec4 sz1 = step(gz1, vec4(0.0));
+    gx1 -= sz1 * (step(0.0, gx1) - 0.5);
+    gy1 -= sz1 * (step(0.0, gy1) - 0.5);
+
+    vec3 g000 = vec3(gx0.x, gy0.x, gz0.x);
+    vec3 g100 = vec3(gx0.y, gy0.y, gz0.y);
+    vec3 g010 = vec3(gx0.z, gy0.z, gz0.z);
+    vec3 g110 = vec3(gx0.w, gy0.w, gz0.w);
+    vec3 g001 = vec3(gx1.x, gy1.x, gz1.x);
+    vec3 g101 = vec3(gx1.y, gy1.y, gz1.y);
+    vec3 g011 = vec3(gx1.z, gy1.z, gz1.z);
+    vec3 g111 = vec3(gx1.w, gy1.w, gz1.w);
+
+    vec4 norm0 = taylorInvSqrt4(vec4(dot(g000, g000), dot(g010, g010), dot(g100, g100), dot(g110, g110)));
+    g000 *= norm0.x; g010 *= norm0.y; g100 *= norm0.z; g110 *= norm0.w;
+    vec4 norm1 = taylorInvSqrt4(vec4(dot(g001, g001), dot(g011, g011), dot(g101, g101), dot(g111, g111)));
+    g001 *= norm1.x; g011 *= norm1.y; g101 *= norm1.z; g111 *= norm1.w;
+
+    float n000 = dot(g000, Pf0);
+    float n100 = dot(g100, vec3(Pf1.x, Pf0.yz));
+    float n010 = dot(g010, vec3(Pf0.x, Pf1.y, Pf0.z));
+    float n110 = dot(g110, vec3(Pf1.xy, Pf0.z));
+    float n001 = dot(g001, vec3(Pf0.xy, Pf1.z));
+    float n101 = dot(g101, vec3(Pf1.x, Pf0.y, Pf1.z));
+    float n011 = dot(g011, vec3(Pf0.x, Pf1.yz));
+    float n111 = dot(g111, Pf1);
+
+    vec3 fadeXYZ = perlinFade(Pf0);
+    vec4 nZ = mix(vec4(n000, n100, n010, n110), vec4(n001, n101, n011, n111), fadeXYZ.z);
+    vec2 nYZ = mix(nZ.xy, nZ.zw, fadeXYZ.y);
+    return 2.2 * mix(nYZ.x, nYZ.y, fadeXYZ.x);
+  }
+
+  vec4 perlinFade4(vec4 t) {
+    return t * t * t * (t * (t * 6.0 - 15.0) + 10.0);
+  }
+
+  // Classic 4D gradient Perlin noise (Gustavson GLSL port). Used by the
+  // Perlin 4D (Loop) mode: XY = image plane, ZW = a circle traced by time, so
+  // one trip around the circle returns to exactly the same field.
+  float perlin4D(vec4 P) {
+    vec4 Pi0 = floor(P);
+    vec4 Pi1 = Pi0 + 1.0;
+    Pi0 = mod289v4(Pi0);
+    Pi1 = mod289v4(Pi1);
+    vec4 Pf0 = fract(P);
+    vec4 Pf1 = Pf0 - 1.0;
+    vec4 ix = vec4(Pi0.x, Pi1.x, Pi0.x, Pi1.x);
+    vec4 iy = vec4(Pi0.yy, Pi1.yy);
+    vec4 iz0 = vec4(Pi0.zzzz);
+    vec4 iz1 = vec4(Pi1.zzzz);
+    vec4 iw0 = vec4(Pi0.wwww);
+    vec4 iw1 = vec4(Pi1.wwww);
+
+    vec4 ixy = permute4(permute4(ix) + iy);
+    vec4 ixy0 = permute4(ixy + iz0);
+    vec4 ixy1 = permute4(ixy + iz1);
+    vec4 ixy00 = permute4(ixy0 + iw0);
+    vec4 ixy01 = permute4(ixy0 + iw1);
+    vec4 ixy10 = permute4(ixy1 + iw0);
+    vec4 ixy11 = permute4(ixy1 + iw1);
+
+    vec4 gx00 = ixy00 * (1.0 / 7.0);
+    vec4 gy00 = floor(gx00) * (1.0 / 7.0);
+    vec4 gz00 = floor(gy00) * (1.0 / 6.0);
+    gx00 = fract(gx00) - 0.5;
+    gy00 = fract(gy00) - 0.5;
+    gz00 = fract(gz00) - 0.5;
+    vec4 gw00 = vec4(0.75) - abs(gx00) - abs(gy00) - abs(gz00);
+    vec4 sw00 = step(gw00, vec4(0.0));
+    gx00 -= sw00 * (step(0.0, gx00) - 0.5);
+    gy00 -= sw00 * (step(0.0, gy00) - 0.5);
+
+    vec4 gx01 = ixy01 * (1.0 / 7.0);
+    vec4 gy01 = floor(gx01) * (1.0 / 7.0);
+    vec4 gz01 = floor(gy01) * (1.0 / 6.0);
+    gx01 = fract(gx01) - 0.5;
+    gy01 = fract(gy01) - 0.5;
+    gz01 = fract(gz01) - 0.5;
+    vec4 gw01 = vec4(0.75) - abs(gx01) - abs(gy01) - abs(gz01);
+    vec4 sw01 = step(gw01, vec4(0.0));
+    gx01 -= sw01 * (step(0.0, gx01) - 0.5);
+    gy01 -= sw01 * (step(0.0, gy01) - 0.5);
+
+    vec4 gx10 = ixy10 * (1.0 / 7.0);
+    vec4 gy10 = floor(gx10) * (1.0 / 7.0);
+    vec4 gz10 = floor(gy10) * (1.0 / 6.0);
+    gx10 = fract(gx10) - 0.5;
+    gy10 = fract(gy10) - 0.5;
+    gz10 = fract(gz10) - 0.5;
+    vec4 gw10 = vec4(0.75) - abs(gx10) - abs(gy10) - abs(gz10);
+    vec4 sw10 = step(gw10, vec4(0.0));
+    gx10 -= sw10 * (step(0.0, gx10) - 0.5);
+    gy10 -= sw10 * (step(0.0, gy10) - 0.5);
+
+    vec4 gx11 = ixy11 * (1.0 / 7.0);
+    vec4 gy11 = floor(gx11) * (1.0 / 7.0);
+    vec4 gz11 = floor(gy11) * (1.0 / 6.0);
+    gx11 = fract(gx11) - 0.5;
+    gy11 = fract(gy11) - 0.5;
+    gz11 = fract(gz11) - 0.5;
+    vec4 gw11 = vec4(0.75) - abs(gx11) - abs(gy11) - abs(gz11);
+    vec4 sw11 = step(gw11, vec4(0.0));
+    gx11 -= sw11 * (step(0.0, gx11) - 0.5);
+    gy11 -= sw11 * (step(0.0, gy11) - 0.5);
+
+    vec4 g0000 = vec4(gx00.x, gy00.x, gz00.x, gw00.x);
+    vec4 g1000 = vec4(gx00.y, gy00.y, gz00.y, gw00.y);
+    vec4 g0100 = vec4(gx00.z, gy00.z, gz00.z, gw00.z);
+    vec4 g1100 = vec4(gx00.w, gy00.w, gz00.w, gw00.w);
+    vec4 g0010 = vec4(gx10.x, gy10.x, gz10.x, gw10.x);
+    vec4 g1010 = vec4(gx10.y, gy10.y, gz10.y, gw10.y);
+    vec4 g0110 = vec4(gx10.z, gy10.z, gz10.z, gw10.z);
+    vec4 g1110 = vec4(gx10.w, gy10.w, gz10.w, gw10.w);
+    vec4 g0001 = vec4(gx01.x, gy01.x, gz01.x, gw01.x);
+    vec4 g1001 = vec4(gx01.y, gy01.y, gz01.y, gw01.y);
+    vec4 g0101 = vec4(gx01.z, gy01.z, gz01.z, gw01.z);
+    vec4 g1101 = vec4(gx01.w, gy01.w, gz01.w, gw01.w);
+    vec4 g0011 = vec4(gx11.x, gy11.x, gz11.x, gw11.x);
+    vec4 g1011 = vec4(gx11.y, gy11.y, gz11.y, gw11.y);
+    vec4 g0111 = vec4(gx11.z, gy11.z, gz11.z, gw11.z);
+    vec4 g1111 = vec4(gx11.w, gy11.w, gz11.w, gw11.w);
+
+    vec4 norm00 = taylorInvSqrt4(vec4(dot(g0000, g0000), dot(g0100, g0100), dot(g1000, g1000), dot(g1100, g1100)));
+    g0000 *= norm00.x; g0100 *= norm00.y; g1000 *= norm00.z; g1100 *= norm00.w;
+    vec4 norm01 = taylorInvSqrt4(vec4(dot(g0001, g0001), dot(g0101, g0101), dot(g1001, g1001), dot(g1101, g1101)));
+    g0001 *= norm01.x; g0101 *= norm01.y; g1001 *= norm01.z; g1101 *= norm01.w;
+    vec4 norm10 = taylorInvSqrt4(vec4(dot(g0010, g0010), dot(g0110, g0110), dot(g1010, g1010), dot(g1110, g1110)));
+    g0010 *= norm10.x; g0110 *= norm10.y; g1010 *= norm10.z; g1110 *= norm10.w;
+    vec4 norm11 = taylorInvSqrt4(vec4(dot(g0011, g0011), dot(g0111, g0111), dot(g1011, g1011), dot(g1111, g1111)));
+    g0011 *= norm11.x; g0111 *= norm11.y; g1011 *= norm11.z; g1111 *= norm11.w;
+
+    float n0000 = dot(g0000, Pf0);
+    float n1000 = dot(g1000, vec4(Pf1.x, Pf0.yzw));
+    float n0100 = dot(g0100, vec4(Pf0.x, Pf1.y, Pf0.zw));
+    float n1100 = dot(g1100, vec4(Pf1.xy, Pf0.zw));
+    float n0010 = dot(g0010, vec4(Pf0.xy, Pf1.z, Pf0.w));
+    float n1010 = dot(g1010, vec4(Pf1.x, Pf0.y, Pf1.z, Pf0.w));
+    float n0110 = dot(g0110, vec4(Pf0.x, Pf1.yz, Pf0.w));
+    float n1110 = dot(g1110, vec4(Pf1.xyz, Pf0.w));
+    float n0001 = dot(g0001, vec4(Pf0.xyz, Pf1.w));
+    float n1001 = dot(g1001, vec4(Pf1.x, Pf0.yz, Pf1.w));
+    float n0101 = dot(g0101, vec4(Pf0.x, Pf1.y, Pf0.z, Pf1.w));
+    float n1101 = dot(g1101, vec4(Pf1.xy, Pf0.z, Pf1.w));
+    float n0011 = dot(g0011, vec4(Pf0.xy, Pf1.zw));
+    float n1011 = dot(g1011, vec4(Pf1.x, Pf0.y, Pf1.zw));
+    float n0111 = dot(g0111, vec4(Pf0.x, Pf1.yzw));
+    float n1111 = dot(g1111, Pf1);
+
+    vec4 fadeXYZW = perlinFade4(Pf0);
+    vec4 n0W = mix(vec4(n0000, n1000, n0100, n1100), vec4(n0001, n1001, n0101, n1101), fadeXYZW.w);
+    vec4 n1W = mix(vec4(n0010, n1010, n0110, n1110), vec4(n0011, n1011, n0111, n1111), fadeXYZW.w);
+    vec4 nZW = mix(n0W, n1W, fadeXYZW.z);
+    vec2 nYZW = mix(nZW.xy, nZW.zw, fadeXYZW.y);
+    return 2.2 * mix(nYZW.x, nYZW.y, fadeXYZW.x);
+  }
+
+  // Material Maker style folded Perlin fBm in 3D:
+  //   octave = |perlin| (one "fold" of the [0,1] noise: abs(2n - 1))
+  // Folding turns every zero crossing of the Perlin field into a soft valley,
+  // so after inversion each crossing becomes a smooth, glowing line. Octaves
+  // are rotated so the lattice axes never line up between layers, and the sum
+  // is normalized by the total amplitude (range stays [0,1]).
+  float perlinFoldedFbm3D(vec3 p, int octaves, float persistence) {
+    const mat3 octaveRot = mat3( 0.00,  0.80,  0.60,
+                                -0.80,  0.36, -0.48,
+                                -0.60, -0.48,  0.64);
+    float value = 0.0;
+    float amplitude = 1.0;
+    float total = 0.0;
+    for (int i = 0; i < 8; i++) {
+      if (i >= octaves) break;
+      value += amplitude * min(abs(perlin3D(p)), 1.0);
+      total += amplitude;
+      p = octaveRot * p * 2.0;
+      amplitude *= persistence;
+    }
+    return value / max(total, 0.0001);
+  }
+
+  // 4D variant of perlinFoldedFbm3D. XYZ is rotated per octave exactly like
+  // the 3D version (W is carried along); every transform is linear, so a
+  // periodic ZW input stays periodic at every octave.
+  float perlinFoldedFbm4D(vec4 p, int octaves, float persistence) {
+    const mat3 octaveRot = mat3( 0.00,  0.80,  0.60,
+                                -0.80,  0.36, -0.48,
+                                -0.60, -0.48,  0.64);
+    float value = 0.0;
+    float amplitude = 1.0;
+    float total = 0.0;
+    for (int i = 0; i < 8; i++) {
+      if (i >= octaves) break;
+      value += amplitude * min(abs(perlin4D(p)), 1.0);
+      total += amplitude;
+      p = vec4(octaveRot * p.xyz, p.w) * 2.0;
+      amplitude *= persistence;
+    }
+    return value / max(total, 0.0001);
+  }
+
+  // Smeary Perlin shaping in [0,1], equivalent to the Material Maker graph
+  //   FBM(Perlin, folds 1, persistence=Roughness) -> Invert -> Tonality
+  //   FBM(Perlin, folds 1, persistence 1) -> Translate -> Invert
+  //   Blend(Lighten, opacity=Layer Mix) -> Tonality
+  // and close to After Effects Fractal Noise "Smeary": dark, smooth regions
+  // crossed by soft bright filaments that fade out with a glow.
+  // baseFbm/layerFbm are the two folded fBm values (layer uses persistence 1).
+  float perlinSmearyShape(float baseFbm, float layerFbm) {
+    float sharpness = clamp(u_perlinSharpness, 1.0, 8.0);
+    float layerMix = clamp(u_perlinLayerMix, 0.0, 1.0);
+    float base = pow(1.0 - baseFbm, sharpness);
+    float layer = 1.0 - layerFbm;
+    float blended = mix(base, max(base, layer), layerMix);
+    return pow(blended, 1.0 + sharpness * 0.5);
+  }
+
+  float perlinSmearyField(vec3 q, int octaves) {
+    float roughness = clamp(u_perlinRoughness, 0.0, 1.0);
+    return perlinSmearyShape(
+      perlinFoldedFbm3D(q, octaves, roughness),
+      perlinFoldedFbm3D(q + vec3(-0.59, 1.145, 7.31), octaves, 1.0)
+    );
+  }
+
+  float perlinSmearyField4D(vec4 q, int octaves) {
+    float roughness = clamp(u_perlinRoughness, 0.0, 1.0);
+    return perlinSmearyShape(
+      perlinFoldedFbm4D(q, octaves, roughness),
+      perlinFoldedFbm4D(q + vec4(-0.59, 1.145, 7.31, 3.77), octaves, 1.0)
+    );
+  }
+
+  // Loop path for Perlin 4D. With Loop Wobble = 0 it is a plain circle in ZW.
+  // Wobble bends it into an organic closed curve while keeping every term a
+  // function of integer multiples of the loop angle, so it still closes
+  // exactly once per Loop Period:
+  //   - a static low-frequency spatial field offsets the loop angle per
+  //     region, so different areas move out of sync instead of in lockstep;
+  //   - radius and angular speed breathe with 2nd/3rd harmonics (surges and
+  //     pauses rather than a constant rate);
+  //   - XY follows a small periodic swirl, so the filaments sway sideways.
+  vec4 perlinLoopCoord(vec2 p, float phase, float radius) {
+    float wobble = clamp(u_perlinLoopWobble, 0.0, 1.0);
+    if (wobble <= 0.0001) {
+      return vec4(p, cos(phase) * radius, sin(phase) * radius);
+    }
+    float regionPhase = perlin3D(vec3(p * 0.35, 17.3)) * 2.4 * wobble;
+    float theta = phase + regionPhase;
+    theta += wobble * (0.45 * sin(2.0 * theta + 1.3) + 0.25 * sin(3.0 * theta + 4.1));
+    float r = radius * (1.0 + wobble * (0.35 * sin(2.0 * theta + 0.6) + 0.2 * cos(3.0 * theta + 2.2)));
+    vec2 sway = wobble * 0.3 * vec2(
+      sin(theta + 0.7) + 0.5 * sin(2.0 * theta + 2.9),
+      cos(theta + 1.9) + 0.5 * cos(3.0 * theta + 0.4)
+    );
+    return vec4(p + sway, cos(theta) * r, sin(theta) * r);
+  }
+
+  // Perlin displacement. XY is the image plane.
+  //   3D: Z is time, so animation morphs the filaments in place; Direction
+  //       adds a gentle drift and Seamless loop mode cross-fades at the wrap.
+  //   4D (Loop): time travels around a closed path in ZW that is covered once
+  //       per Loop Period, so the field returns exactly to its start without
+  //       any cross-fade. The base radius keeps the same evolution speed as
+  //       3D; drift is omitted because it is not periodic. See
+  //       perlinLoopCoord() for the Loop Wobble path.
+  // The scalar field pushes the UV along one direction (Angle) so the
+  // gradient reproduces the texture itself; two independent X/Y fields would
+  // mix two unrelated textures and wash the filaments out. The field is
+  // mostly dark, so it is not re-centered: dark regions keep the source
+  // gradient untouched and only the glowing filaments displace it (centering
+  // would turn the dark majority into a constant shift of the whole image).
+  vec2 perlinDistortion(vec2 uv, float scale, float evolution, int octaves) {
+    vec2 p = uv * scale + vec2(u_noiseSeed * 127.1, u_noiseSeed * 311.7);
+    float field;
+    if (u_perlinDimension == 1) {
+      float period = max(u_noiseLoopPeriod, 0.0001);
+      float phase = KG_TAU * fract(evolution / period);
+      float radius = period * 0.6 / KG_TAU;
+      field = perlinSmearyField4D(perlinLoopCoord(p, phase, radius), octaves);
+    } else {
+      p += linearDrift(noiseAnimDir(), evolution, 0.25);
+      field = perlinSmearyField(vec3(p, evolution * 0.6), octaves);
+    }
+    float angle = radians(u_perlinAngle);
+    return vec2(cos(angle), sin(angle)) * field;
+  }
+
   // A divergence-free 2D vector field from the perpendicular of an analytic
   // scalar-field gradient. This replaces the four finite-difference fBM calls
   // used by Legacy Curl with one derivative simplex evaluation per octave.
@@ -808,6 +1141,9 @@
       // AE Fractal Noise: 各オクターブに累積回転を適用したfbm
       nx = aeFractalNoise(p, octaves) * 2.0 - 1.0;
       ny = aeFractalNoise(p + vec2(43.7, 17.3), octaves) * 2.0 - 1.0;
+    } else if (noiseType == PERLIN_NOISE_TYPE) {
+      // Perlin samples XY + time-Z itself with its own reduced drift.
+      return perlinDistortion(uv, scale, evolution, octaves);
     } else if (noiseType == PHASOR_NOISE_TYPE) {
       // Phasor is already a phase-gradient vector field; do not duplicate its
       // scalar line signal into X/Y like the legacy scalar noise types.
@@ -861,6 +1197,8 @@
     float blend = loopBlendWeight();
     if (blend <= 0.0001) return current;
     if (noiseType == PHASOR_NOISE_TYPE && u_noiseLoopMode == 1) return current;
+    // Perlin 4D loops exactly on its own; a cross-fade would only blur it.
+    if (noiseType == PERLIN_NOISE_TYPE && u_perlinDimension == 1) return current;
     float wrapPeriod = noiseType == CAUSTICS_NOISE_TYPE
       ? u_noiseLoopPeriod * clamp(causticsFinite(u_noiseSpeed, 0.5), 0.0, 4.0)
       : u_noiseLoopPeriod;

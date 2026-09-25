@@ -73,7 +73,7 @@ cargo test --manifest-path src-tauri/Cargo.toml spout2 -- --ignored --nocapture 
 判断材料:
 
 - 1080pのmain threadのコストは、PBO経路の約4.4 ms/frameだけになった。60 fps予算16.7 msの約1/4にあたる。
-- 4K出力や、重いEffect Stackで60 fpsを要求する場合は、ADR-0022の再検討条件（GPU共有・`SendTexture`）に進む。
+- 4K出力や、重いEffect Stackで60 fpsを要求する場合は、ADR-0023の再検討条件（GPU共有・`SendTexture`）に進む。
 
 ## Release Gate（Windows実機・手動、未実施）
 

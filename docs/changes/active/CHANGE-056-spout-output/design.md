@@ -1,6 +1,6 @@
 # Design
 
-長期判断は[ADR-0022](../../../adr/0022-spout-output-cpu-readback.md)、利用者向けの契約は[CURRENT-REALTIME-OUTPUT](../../../specs/current/realtime-output.md)を参照する。ここには実装の構成だけを記録する。
+長期判断は[ADR-0023](../../../adr/0023-spout-output-cpu-readback.md)、利用者向けの契約は[CURRENT-REALTIME-OUTPUT](../../../specs/current/realtime-output.md)を参照する。ここには実装の構成だけを記録する。
 
 ## 採用する実装方針
 
@@ -77,7 +77,7 @@ ExportパネルのDesign App Sendの下に`SpoutOutputPanel`を置く。Enable�
 
 ## 代替案とトレードオフ
 
-[ADR-0022](../../../adr/0022-spout-output-cpu-readback.md)の代替案を参照。同期`readPixels`はPBO経路のfallbackとしても実装しない。PBO経路は失敗しても次の送信枠で再試行するだけで、Previewには影響しない。
+[ADR-0023](../../../adr/0023-spout-output-cpu-readback.md)の代替案を参照。同期`readPixels`はPBO経路のfallbackとしても実装しない。PBO経路は失敗しても次の送信枠で再試行するだけで、Previewには影響しない。
 
 ## 移行方法
 

@@ -32,10 +32,14 @@ export type AeVideoImportOptions = {
 
 export type AeRuntime = 'browser-bridge' | 'tauri-native';
 
+/** FFmpegで生成するネイティブ動画形式。Rust側`NativeVideoFormat::id`と一致させる。 */
+export type NativeVideoFormat = 'mov' | 'mp4' | 'gif' | 'webm';
+
 export type NativeVideoArtifact = {
   kind: 'native-path';
   path: string;
-  mimeType: 'video/quicktime' | 'video/mp4';
+  format: NativeVideoFormat;
+  mimeType: 'video/quicktime' | 'video/mp4' | 'image/gif' | 'video/webm';
   release(): Promise<void>;
 };
 
@@ -61,6 +65,8 @@ export const MP4_QUALITY_PRESETS = [
   { value: 'small', label: 'Small', crf: 27, description: 'サイズ優先' },
 ] as const;
 export type Mp4QualityPreset = (typeof MP4_QUALITY_PRESETS)[number]['value'];
+/** GIFの最大ファイルサイズ（MB、1MB = 1,000,000 bytes）。範囲はRust側の検証と揃える。 */
+export const GIF_MAX_FILE_MB = { default: 15, min: 1, max: 1000 } as const;
 export type ExportStage = 'preparing' | 'rendering' | 'encoding' | 'saving';
 
 /**
@@ -141,6 +147,8 @@ export type VideoExportConfig = {
   speed: number;
   easing?: AnimationEasing;
   mp4Quality?: Mp4QualityPreset;
+  /** GIFをこのサイズ未満に収める。超えた場合は解像度を下げて再エンコードする。 */
+  gifMaxFileMb?: number;
   signal?: AbortSignal;
   onProgress?: (p: number) => void;
   onStage?: (stage: ExportStage) => void;
@@ -158,11 +166,12 @@ export type NativeFfmpegStatus = {
   folderPath: string | null;
   ffprobePath: string | null;
   ffprobeVersion: string | null;
+  /** 検出したFFmpegで書き出せる形式。未報告の場合はMOV・MP4のみとみなす。 */
+  videoFormats?: NativeVideoFormat[];
 };
 
 export interface VideoExportService {
-  exportLosslessMOV(config: VideoExportConfig): Promise<NativeVideoArtifact>;
-  exportHighQualityMP4(config: VideoExportConfig): Promise<NativeVideoArtifact>;
+  exportNativeVideo(format: NativeVideoFormat, config: VideoExportConfig): Promise<NativeVideoArtifact>;
   exportFrameZip(config: VideoExportConfig): Promise<Blob>;
   nativeFfmpegSupported?(): boolean;
   getNativeFfmpegStatus?(): Promise<NativeFfmpegStatus>;
