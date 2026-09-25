@@ -25,6 +25,7 @@ title: ValidationとCI
 | TypeScript型 | `npm run typecheck` |
 | Fast / Merge Gate | `npm run check:fast` または `npm run check:merge` |
 | Browser Canvas / PNG / PNG ZIP E2E | `npm run check:e2e` |
+| WebGL context loss/restore E2E（Observation） | `npm run check:e2e:lifecycle` |
 | Canvas RGBA capture | `npm run capture:render:rgba` |
 | RGBA再現性 / base-head比較 | `npm run compare:render:rgba` |
 | Shader / Render Plan focused | `npm run check:render` |
@@ -43,13 +44,15 @@ title: ValidationとCI
 
 このチェックは次を機械的に確認します。
 
-- Previewを起動し、0、0.5、1の正規化時刻でCanvas PNGを取得できること
-- PNGのsignature/IHDR寸法が有効でCanvas寸法と一致すること
+- Previewを起動し、WebGL rendererが準備済みでcontext lostでないこと
+- 保存したPNGのsignature/IHDR寸法が有効でCanvas寸法と一致し、RGBAがCanvasと一致すること
 - PNG ZIPの全フレームが連番で存在し、各PNGのsignature/IHDR寸法が一致すること
 - PNGをRGBAへデコードでき、CanvasのRGBA byte lengthが寸法と一致すること
 - Export完了後に同じPreview Canvasが再び描画できること
-- K-GG resource ledgerがeffect/解像度変更とcontext loss/restoreの作成・解放を記録すること
+- Preset import Workerとライセンス表示が実ブラウザで動くこと
 - `pageerror`、unexpected `console.error`、`unhandledrejection`を成功扱いにしないこと
+
+WebGL context loss/restoreの実ブラウザ確認（`tests/e2e/lifecycle.spec.ts`）は`check:e2e`に含めません。Windows runnerのSwiftShader条件でタイムアウトが繰り返し発生したため、`.github/workflows/e2e-lifecycle.yml`で手動実行と週1回の定期実行を行うObservationとして扱い、Merge可否の判定には使いません。context lost時の破棄と、restored時にPreviewの再初期化を要求する配線は、Merge Gateの`src/hooks/webglLifecycle.test.ts`で確認します。resource ledgerの作成・解放の集計は`src/lib/webglResourceLedger.test.ts`で確認します。
 
 失敗時はPlaywrightのtrace・screenshot・videoと、Browser/OS/Canvas/WebGL/Export状態の診断JSONを証拠として扱います。Google Fontsなど外部リソースはE2E fixture内で空の成功応答に置き換え、ネットワーク揺らぎでHTML moduleの起動が止まらないようにしています。アプリ本体のUI・描画・Export実装をテスト専用経路へ切り替えるものではありません。
 

@@ -28,6 +28,7 @@ import type { KggControlProjectAdapter, KggControlRuntime, KggControlUiAdapter }
 import { getWebGL2Availability, isWebGL2UnavailableError, markWebGL2AvailabilityUnknown } from '../lib/webglCapability';
 import {
   acquireSharedWebGLInitRequest,
+  bindWebGLContextLossHandlers,
   releaseSharedWebGLInitRequest,
   shouldDisposeResolvedWebGLRequest,
   type SharedWebGLInitRequest,
@@ -44,7 +45,6 @@ export function useWebGL(
   const webglRef = useRef<WebGLContext | null>(null);
   const controlRuntimeRef = useRef<KggControlRuntime | null>(null);
   const latestRef = useRef<LatestState | null>(null);
-  const lostResourceLedgerRef = useRef<WebGLContext['resourceLedger']>(null);
   const initRequestRef = useRef<SharedWebGLInitRequest<HTMLCanvasElement, WebGLContext> | null>(null);
   const compiledShaderVersionRef = useRef(0); // コンパイル済みシェーダーのバージョン
   const [isWebGLReady, setIsWebGLReady] = useState(false);
@@ -54,40 +54,21 @@ export function useWebGL(
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
-    const handleContextLost = (event: Event) => {
-      event.preventDefault();
-      const current = webglRef.current;
-      webglRef.current = null;
-      if (current && current.gl.canvas === canvas) {
-        const ledger = current.resourceLedger;
-        ledger?.markContextLost();
-        if (ledger) {
-          lostResourceLedgerRef.current = ledger;
-          recordWebGLResourceLifecycleEvent('context-lost', ledger);
-        }
-        disposeWebGL(current);
-      }
-      compiledShaderVersionRef.current = 0;
-      markWebGL2AvailabilityUnknown();
-      setIsWebGLReady(false);
-    };
-    const handleContextRestored = () => {
-      const ledger = lostResourceLedgerRef.current;
-      if (ledger) {
-        ledger.markContextRestored();
-        recordWebGLResourceLifecycleEvent('context-restored', ledger);
-        lostResourceLedgerRef.current = null;
-      }
-      markWebGL2AvailabilityUnknown();
-      setContextEpoch(epoch => epoch + 1);
-    };
-    canvas.addEventListener('webglcontextlost', handleContextLost);
-    canvas.addEventListener('webglcontextrestored', handleContextRestored);
-    return () => {
-      canvas.removeEventListener('webglcontextlost', handleContextLost);
-      canvas.removeEventListener('webglcontextrestored', handleContextRestored);
-      lostResourceLedgerRef.current = null;
-    };
+    return bindWebGLContextLossHandlers(canvas, {
+      getContext: () => webglRef.current,
+      clearContext: () => { webglRef.current = null; },
+      disposeContext: disposeWebGL,
+      recordEvent: recordWebGLResourceLifecycleEvent,
+      onLost: () => {
+        compiledShaderVersionRef.current = 0;
+        markWebGL2AvailabilityUnknown();
+        setIsWebGLReady(false);
+      },
+      onRestored: () => {
+        markWebGL2AvailabilityUnknown();
+        setContextEpoch(epoch => epoch + 1);
+      },
+    });
   }, [canvasRef]);
 
   // WebGL 初期化（非同期・stale チェック付き）

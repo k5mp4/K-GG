@@ -1,0 +1,49 @@
+name: E2E context lifecycle
+
+# Observation for the real-browser WebGL context loss/restore test. It is not
+# a Merge Gate: on the Windows runner with SwiftShader the test repeatedly
+# timed out, so it runs here on demand and weekly instead of in e2e-check.
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '17 3 * * 1'
+
+permissions:
+  contents: read
+
+jobs:
+  e2e-lifecycle:
+    name: e2e-lifecycle
+    runs-on: windows-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+
+      - name: Install frontend dependencies
+        run: npm ci
+
+      - name: Install Playwright Chromium
+        run: npx playwright install chromium
+
+      - name: Run WebGL context lifecycle E2E
+        run: npm run check:e2e:lifecycle
+
+      - name: Upload lifecycle E2E evidence
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: e2e-lifecycle-evidence-${{ github.run_id }}
+          path: |
+            test-results/**
+            playwright-report/**
+            blob-report/**
+          if-no-files-found: ignore
+          retention-days: 14
