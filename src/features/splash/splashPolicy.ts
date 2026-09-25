@@ -42,3 +42,12 @@ export function nextSplashCheckMs(elapsedMs: number, ready: boolean, timing: Spl
   const target = ready ? timing.minDisplayMs : timing.maxDisplayMs;
   return Math.max(0, target - elapsedMs);
 }
+
+/**
+ * Progress drawn on the bar. Once the splash starts leaving (ready, skipped
+ * or the maximum display time), the bar completes so the app never appears
+ * behind a half-filled bar; shader preparation keeps running afterwards.
+ */
+export function getDisplayedSplashProgress(progress: number, leaving: boolean): number {
+  return leaving ? 1 : progress;
+}

@@ -19,7 +19,8 @@ Effect Stackの各EffectのShaderは初回利用時にコンパイルされる�
 ## 決定
 
 - スプラッシュを「演出（visual adapter）」「進捗（warmup snapshot）」「準備（lazy compile queue）」の3層に分ける。
-- 演出は`SplashVisualAdapter`（mount → `setProgress` / `playExit` / `dispose`）の契約だけに依存する。静的ポスターは常に使える既定・フォールバックとし、Lottie／Riveは動的importで読み込むアダプターとしてレジストリへ追加する。未登録・失敗・時間超過は静的ポスターへ戻す。
+- 演出は`SplashVisualAdapter`（mount → `setProgress` / `playExit` / `dispose`）の契約だけに依存する。静的ポスターは常に使える既定・フォールバックとし、それ以外（同梱の画像・動画、Lottie、Rive）は動的importで読み込むアダプターとしてレジストリへ追加する。未登録・失敗・時間超過は静的ポスターへ戻す。
+- 同梱の画像・動画は、1つの`media`アダプターが`<img>`／`<video>`で表示する。形式ごとにアダプターを分けず、優先順の候補リストから表示環境がデコードできた最初の1つを選ぶ。コーデックの対応はWebViewとOSによって異なるため、形式の追加や差し替えは設定の変更だけで済むようにする。
 - スプラッシュの表示時間、終了条件、スキップはオーバーレイ側が持ち、演出側は描画だけを持つ。終了は最大表示時間で必ず行う。
 - Shaderの準備はPreviewのWebGL contextで行う。直列キューに`demand > prefetch > warmup`の優先度を持たせ、待機中の要求は引き上げ可能にする。起動時は現在のシーンを優先し、残りはアイドル時間に一つずつ準備する。
 - 並列Shaderコンパイルが使えない環境ではwarmupを行わない。
@@ -37,6 +38,8 @@ Effect Stackの各EffectのShaderは初回利用時にコンパイルされる�
 | スプラッシュ中にすべてのShaderを同期的にコンパイルする | Glass系は完了時間の上限がなく、起動が長くなる。閉じられない状態が起こり得る。 |
 | スプラッシュ用の別WebGL contextで事前ロードする | ProgramはPreview contextで再利用できない。GPUとコンパイルを奪い合う。 |
 | Lottie／Riveを最初から依存へ追加して直接描画する | 演出が未確定の段階で初期bundle、CSP、WASM配布の負担を先に負う。 |
+| AVIF、GIF、MP4などの形式ごとにアダプターを分ける | 表示方法は`<img>`か`<video>`の2通りしかなく、形式やコーデックの違いは表示環境のデコーダーが吸収する。形式を増やすたびにコードの変更が必要になる。 |
+| 動画をWebGLのテクスチャとして描画する | Preview contextとGPUを奪い合い、STARTUP-002の分離に反する。 |
 | 事前準備をFIFOのまま追加する | 利用者が有効にしたEffectが事前準備の後ろで待たされる。 |
 
 ## 結果
@@ -49,6 +52,7 @@ Effect Stackの各EffectのShaderは初回利用時にコンパイルされる�
 ### 欠点・コスト
 
 - 起動後しばらく、GPUドライバでのコンパイル負荷とProgramのメモリが増える。
+- 画像・動画の演出は、コーデックの対応が表示環境ごとに異なる（例: LinuxのWebKitGTKはGStreamerのプラグインがないとH.264を再生できない）。候補の順序と最後の静止画でフォールバックするが、どのファイルが表示されるかは実機で確認する必要がある。動画ファイルの容量はそのままインストーラーの容量に加わる。
 - Lottie／Riveを採用する際は、アセットとWASMの自己ホスト、CSP（Rive／dotLottieのWASMには`'wasm-unsafe-eval'`）、Canvas2D描画の選択を別途確認する必要がある。
 
 ## 再検討条件

@@ -1,7 +1,8 @@
 import { describe, expect, it, vi } from 'vitest';
 import { INITIAL_SHADER_WARMUP_SNAPSHOT, type ShaderWarmupSnapshot } from '../../lib/shaderWarmup';
-import { getStartupProgress, isStartupReady, nextSplashCheckMs, shouldExitSplash } from './splashPolicy';
-import { mountSplashVisual, type SplashVisualAdapter, type SplashVisualHandle } from './splashVisual';
+import { getDisplayedSplashProgress, getStartupProgress, isStartupReady, nextSplashCheckMs, shouldExitSplash } from './splashPolicy';
+import { inferSplashMediaElement, planSplashMedia } from './mediaSplashVisual';
+import { mountSplashVisual, SPLASH_VISUAL_REGISTRY, type SplashVisualAdapter, type SplashVisualHandle } from './splashVisual';
 
 const timing = { minDisplayMs: 600, maxDisplayMs: 4000 };
 
@@ -37,6 +38,75 @@ describe('splash policy', () => {
     expect(shouldExitSplash({ elapsedMs: 4000, ready: false, skipped: false, timing })).toBe(true);
     expect(nextSplashCheckMs(100, true, timing)).toBe(500);
     expect(nextSplashCheckMs(100, false, timing)).toBe(3900);
+  });
+
+  it('completes the bar once the splash leaves, even before the scene is ready', () => {
+    const waiting = getStartupProgress(warmup({ status: 'waiting' }));
+    expect(getDisplayedSplashProgress(waiting, false)).toBe(waiting);
+    expect(getDisplayedSplashProgress(waiting, true)).toBe(1);
+  });
+});
+
+describe('splash media planning', () => {
+  const av1 = { src: '/assets/splash-av1.mp4', type: 'video/mp4; codecs="av01.0.05M.08"' };
+  const h264 = { src: '/assets/splash.mp4', type: 'video/mp4; codecs="avc1.640028"' };
+  const avif = { src: '/assets/splash.avif' };
+  const gif = { src: '/assets/splash.gif' };
+  const allCodecs = () => true;
+
+  it('infers <img> or <video> from the MIME type, then the extension', () => {
+    expect(inferSplashMediaElement({ src: '/a.mp4' })).toBe('video');
+    expect(inferSplashMediaElement({ src: '/a.WEBM?v=2' })).toBe('video');
+    expect(inferSplashMediaElement({ src: '/a.avif' })).toBe('image');
+    expect(inferSplashMediaElement({ src: '/a.gif' })).toBe('image');
+    expect(inferSplashMediaElement({ src: '/a.bin', type: 'video/webm' })).toBe('video');
+    expect(inferSplashMediaElement({ src: '/a.mp4', type: 'image/avif' })).toBe('image');
+  });
+
+  it('keeps the declared order and puts the poster last', () => {
+    const plan = planSplashMedia(
+      { kind: 'media', sources: [av1, h264, avif, gif], poster: '/assets/still.png' },
+      { reducedMotion: false, canPlayVideoType: allCodecs },
+    );
+    expect(plan.map(candidate => [candidate.element, candidate.src, candidate.still])).toEqual([
+      ['video', av1.src, false],
+      ['video', h264.src, false],
+      ['image', avif.src, false],
+      ['image', gif.src, false],
+      ['image', '/assets/still.png', true],
+    ]);
+  });
+
+  it('skips videos whose declared codec the WebView cannot play', () => {
+    const plan = planSplashMedia(
+      { kind: 'media', sources: [av1, h264, { src: '/assets/untyped.webm' }] },
+      { reducedMotion: false, canPlayVideoType: type => !type.includes('av01') },
+    );
+    expect(plan.map(candidate => candidate.src)).toEqual([h264.src, '/assets/untyped.webm']);
+  });
+
+  it('shows only stills under reduced motion', () => {
+    const withPoster = planSplashMedia(
+      { kind: 'media', sources: [av1, gif], poster: '/assets/still.png' },
+      { reducedMotion: true, canPlayVideoType: allCodecs },
+    );
+    expect(withPoster).toEqual([{ element: 'image', src: '/assets/still.png', still: true }]);
+
+    const withoutPoster = planSplashMedia(
+      { kind: 'media', sources: [gif, h264] },
+      { reducedMotion: true, canPlayVideoType: allCodecs },
+    );
+    expect(withoutPoster).toEqual([{ element: 'video', src: h264.src, type: h264.type, still: true }]);
+
+    const onlyAnimatedImages = planSplashMedia(
+      { kind: 'media', sources: [avif, gif] },
+      { reducedMotion: true, canPlayVideoType: allCodecs },
+    );
+    expect(onlyAnimatedImages).toEqual([]);
+  });
+
+  it('registers the media adapter so the kind never silently falls back', () => {
+    expect(SPLASH_VISUAL_REGISTRY.media).toBeTypeOf('function');
   });
 });
 

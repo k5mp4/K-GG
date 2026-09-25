@@ -1,3 +1,5 @@
+import { APP_VERSION } from '../../appVersion';
+import { BRAND } from '../../branding/brand';
 import type { SplashVisualAdapter } from './splashVisual';
 
 /** Id of the poster written into `index.html` so it paints before any JavaScript runs. */
@@ -13,26 +15,26 @@ export function removeBootSplash(keepInside?: HTMLElement): void {
   poster.remove();
 }
 
-function createPoster(brandName: string): HTMLElement {
+function createPoster(): HTMLElement {
   const poster = document.createElement('div');
   poster.id = BOOT_SPLASH_ELEMENT_ID;
-  const mark = document.createElement('div');
-  mark.className = 'kgg-boot-splash__mark';
-  mark.setAttribute('aria-hidden', 'true');
   const name = document.createElement('div');
   name.className = 'kgg-boot-splash__name';
-  name.textContent = brandName;
-  poster.append(mark, name);
+  name.textContent = BRAND.displayName;
+  const version = document.createElement('div');
+  version.className = 'kgg-boot-splash__version';
+  version.textContent = `v${APP_VERSION}`;
+  poster.append(name, version);
   return poster;
 }
 
 /**
- * CSS/SVG poster. It adopts the `index.html` poster (same markup and styles)
- * so the hand-off from static HTML to React has no visual jump, and it is the
- * fallback for every other visual kind.
+ * Black screen with the K-GG name and the app version. It adopts the `index.html` poster (same
+ * markup and styles) so the hand-off from static HTML to React has no visual
+ * jump, and it is the fallback for every other visual kind.
  */
-export const mountStaticSplashVisual: SplashVisualAdapter<{ kind: 'static' }> = async (host, _definition, context) => {
-  const poster = document.getElementById(BOOT_SPLASH_ELEMENT_ID) ?? createPoster(context.brandName);
+export const mountStaticSplashVisual: SplashVisualAdapter<{ kind: 'static' }> = async (host) => {
+  const poster = document.getElementById(BOOT_SPLASH_ELEMENT_ID) ?? createPoster();
   poster.dataset.kggSplashOwned = 'true';
   host.append(poster);
   return {

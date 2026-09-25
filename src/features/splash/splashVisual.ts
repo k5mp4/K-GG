@@ -2,14 +2,39 @@
  * Splash visual boundary.
  *
  * The splash overlay (`SplashScreen`) owns timing, readiness and dismissal.
- * A visual adapter owns only drawing: a CSS/SVG poster today, and a Lottie or
- * Rive animation later. Adding a runtime means adding one adapter file and one
+ * A visual adapter owns only drawing: the CSS/SVG poster, a bundled image or
+ * video file, and a Lottie or Rive animation later. Adding a runtime means adding one adapter file and one
  * loader entry below; the startup and shader warmup code does not change.
  */
+
+/**
+ * One bundled image or video file. `type` is the MIME type, optionally with
+ * codecs (e.g. `video/webm; codecs="av01.0.05M.08"`); when omitted the kind
+ * is inferred from the file extension and the WebView decides by trying it.
+ */
+export type SplashMediaSource = {
+  src: string;
+  type?: string;
+};
 
 /** Where a splash animation comes from. Keep asset URLs local (CSP is `'self'`). */
 export type SplashVisualDefinition =
   | { kind: 'static' }
+  | {
+    /**
+     * Bundled image or video: AVIF, GIF, WebP, APNG, PNG, SVG, MP4 (H.264 / AV1),
+     * WebM (VP9 / AV1). Candidates are tried in order and the first one the
+     * WebView can decode is shown, so list the most efficient codec first.
+     */
+    kind: 'media';
+    sources: SplashMediaSource[];
+    /** Still image shown instead of animated media when reduced motion is requested. */
+    poster?: string;
+    /** `contain` (default) keeps the whole frame visible; `cover` fills the window and crops. */
+    fit?: 'contain' | 'cover';
+    /** Video only: on exit, stop looping and let the clip play to its end (capped by `exitTimeoutMs`). */
+    finishOnExit?: boolean;
+  }
   | {
     kind: 'lottie';
     /** Bundled Lottie JSON or .lottie URL. */
@@ -71,7 +96,9 @@ export type SplashVisualRegistry = { [K in SplashVisualKind]?: SplashVisualLoade
  *
  * Kinds without a loader fall back to the static poster.
  */
-export const SPLASH_VISUAL_REGISTRY: SplashVisualRegistry = {};
+export const SPLASH_VISUAL_REGISTRY: SplashVisualRegistry = {
+  media: () => import('./mediaSplashVisual').then(m => m.mountMediaSplashVisual),
+};
 
 function withTimeout<T>(promise: Promise<T>, timeoutMs: number, label: string): Promise<T> {
   return new Promise<T>((resolve, reject) => {
@@ -124,7 +151,10 @@ export async function mountSplashVisual(
       throw error;
     }
   } catch (error) {
-    console.warn(`[Splash] ${definition.kind} visual failed; using the static poster.`, error);
+    // A dismissed or remounted splash aborts on purpose; that is not a broken asset.
+    if (!context.signal.aborted) {
+      console.warn(`[Splash] ${definition.kind} visual failed; using the static poster.`, error);
+    }
     host.replaceChildren();
     return mountFallback();
   }

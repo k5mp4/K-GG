@@ -2,7 +2,7 @@ import { useEffect, useRef, useState, useSyncExternalStore } from 'react';
 import { BRAND } from '../../branding/brand';
 import { useLanguage } from '../../i18n/LanguageProvider';
 import { getShaderWarmupSnapshot, subscribeShaderWarmup } from '../../lib/shaderWarmup';
-import { getStartupProgress, isStartupReady, nextSplashCheckMs, shouldExitSplash } from './splashPolicy';
+import { getDisplayedSplashProgress, getStartupProgress, isStartupReady, nextSplashCheckMs, shouldExitSplash } from './splashPolicy';
 import { mountSplashVisual, type SplashVisualHandle } from './splashVisual';
 import { mountStaticSplashVisual, removeBootSplash } from './staticSplashVisual';
 import './SplashScreen.css';
@@ -44,7 +44,7 @@ export function SplashScreen() {
   const progress = getStartupProgress(warmup);
   const { splash } = BRAND;
 
-  // Mount the visual once. A failed or slow Lottie/Rive load falls back to the poster.
+  // Mount the visual once. A failed or slow media/Lottie/Rive load falls back to the poster.
   useEffect(() => {
     if (disabled) {
       removeBootSplash();
@@ -95,13 +95,17 @@ export function SplashScreen() {
     if (phase !== 'exiting') return;
     let cancelled = false;
     const outro = handleRef.current?.playExit() ?? Promise.resolve();
-    void Promise.race([outro.catch(() => undefined), delay(splash.exitTimeoutMs)]).then(() => {
+    void Promise.all([
+      Promise.race([outro.catch(() => undefined), delay(splash.exitTimeoutMs)]),
+      // Let the bar visibly reach 100% before the app is revealed.
+      delay(splash.progressCompleteMs),
+    ]).then(() => {
       if (!cancelled) setPhase('fading');
     });
     return () => {
       cancelled = true;
     };
-  }, [phase, splash.exitTimeoutMs]);
+  }, [phase, splash.exitTimeoutMs, splash.progressCompleteMs]);
 
   useEffect(() => {
     if (phase !== 'fading') return;
@@ -125,6 +129,7 @@ export function SplashScreen() {
   }, [phase]);
 
   if (phase === 'done') return null;
+  const shownProgress = getDisplayedSplashProgress(progress, phase !== 'showing');
 
   return (
     <div
@@ -143,9 +148,9 @@ export function SplashScreen() {
         role="progressbar"
         aria-valuemin={0}
         aria-valuemax={100}
-        aria-valuenow={Math.round(progress * 100)}
+        aria-valuenow={Math.round(shownProgress * 100)}
       >
-        <div className="kgg-splash__progress-bar" style={{ transform: `scaleX(${progress})` }} />
+        <div className="kgg-splash__progress-bar" style={{ transform: `scaleX(${shownProgress})` }} />
       </div>
     </div>
   );

@@ -7,54 +7,56 @@
     <title>kagaribi15_grad</title>
     <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500&family=Open+Sans:ital,wght@0,300..800;1,300..800&display=swap" rel="stylesheet">
     <!--
-      Pre-JavaScript splash poster. It paints before the bundle loads and is
-      adopted by src/features/splash (SplashScreen). Colors mirror
-      design-tokens.css (--color-k-bg / --color-fire / --color-cream).
+      Pre-JavaScript splash poster: a black screen with the K-GG name and the
+      app version. The name mirrors BRAND.displayName in src/branding/brand.ts. It
+      paints before the bundle loads and is adopted by src/features/splash
+      (SplashScreen), which adds the progress bar. The version placeholder is
+      replaced from package.json at build time (vite.config.ts).
     -->
     <style>
       #kgg-boot-splash {
         position: fixed;
         inset: 0;
         z-index: 2147483001;
-        display: flex;
-        flex-direction: column;
-        align-items: center;
-        justify-content: center;
-        gap: 20px;
-        background: #141414;
-        color: #ECDBBE;
-        font: 600 13px/1 'Open Sans', system-ui, sans-serif;
-        letter-spacing: 0.32em;
-        text-transform: uppercase;
+        background: #000;
+        color: rgba(236, 219, 190, 0.55);
+        font: 500 11px/1 'Open Sans', system-ui, sans-serif;
+        letter-spacing: 0.16em;
         /* Failsafe: never hide the app if the bundle fails before React adopts the poster. */
         animation: kgg-boot-splash-failsafe 300ms ease-out 12s forwards;
       }
       #kgg-boot-splash[data-kgg-splash-owned] { animation: none; }
-      /* Balance the trailing letter-spacing so the name is optically centered. */
-      .kgg-boot-splash__name { padding-left: 0.32em; }
-      .kgg-boot-splash__mark {
-        width: 44px;
-        height: 44px;
-        border-radius: 50%;
-        background: radial-gradient(circle at 50% 70%, #D11402 0%, #D11402 38%, rgba(209, 20, 2, 0) 72%);
-        animation: kgg-boot-splash-pulse 1.6s ease-in-out infinite;
+      /* The name sits just above and the version just below the progress bar,
+         which SplashScreen draws at the vertical center. */
+      .kgg-boot-splash__name {
+        position: absolute;
+        left: 0;
+        right: 0;
+        bottom: calc(50% + 22px);
+        /* Balance the trailing letter-spacing so the name is optically centered. */
+        padding-left: 0.18em;
+        text-align: center;
+        color: #ECDBBE;
+        font: 700 28px/1 'Open Sans', system-ui, sans-serif;
+        letter-spacing: 0.18em;
       }
-      @keyframes kgg-boot-splash-pulse {
-        0%, 100% { transform: scale(0.92); opacity: 0.75; }
-        50% { transform: scale(1.04); opacity: 1; }
+      .kgg-boot-splash__version {
+        position: absolute;
+        left: 0;
+        right: 0;
+        top: calc(50% + 18px);
+        text-align: center;
+        font-variant-numeric: tabular-nums;
       }
       @keyframes kgg-boot-splash-failsafe {
         to { opacity: 0; visibility: hidden; pointer-events: none; }
-      }
-      @media (prefers-reduced-motion: reduce) {
-        .kgg-boot-splash__mark { animation: none; }
       }
     </style>
   </head>
   <body>
     <div id="kgg-boot-splash">
-      <div class="kgg-boot-splash__mark" aria-hidden="true"></div>
-      <div class="kgg-boot-splash__name">KAGARIBI Grad</div>
+      <div class="kgg-boot-splash__name">K-GG</div>
+      <div class="kgg-boot-splash__version">v%KGG_APP_VERSION%</div>
     </div>
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
