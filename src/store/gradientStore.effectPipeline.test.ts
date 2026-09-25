@@ -307,6 +307,36 @@ describe('Gradient store Effect Pipeline V2 synchronization', () => {
     expect(legacyNoise.phasorDirectionMode).toBe('directional');
   });
 
+  it('adds fBm Tonality with a deterministic default and clamps out-of-range/invalid values', () => {
+    const store = useGradientStore.getState();
+    store.setNoiseDistortion({ type: 'fbm' });
+
+    expect(useGradientStore.getState().noiseDistortion).toMatchObject({
+      type: 'fbm',
+      fbmTonality: 4,
+    });
+
+    store.setNoiseDistortion({ fbmTonality: 99 });
+    expect(useGradientStore.getState().noiseDistortion.fbmTonality).toBe(8);
+
+    store.setNoiseDistortion({ fbmTonality: -5 });
+    expect(useGradientStore.getState().noiseDistortion.fbmTonality).toBe(1);
+
+    store.setNoiseDistortion({ fbmTonality: Number.NaN });
+    expect(useGradientStore.getState().noiseDistortion.fbmTonality).toBe(STORE_DEFAULTS.noiseDistortion.fbmTonality);
+
+    const legacyNoise = normalizeNoiseDistortionConfig({ type: 'simplex' });
+    expect(legacyNoise.fbmTonality).toBe(STORE_DEFAULTS.noiseDistortion.fbmTonality);
+
+    const presetWithoutTonality = normalizeNoiseDistortionConfig({
+      type: 'fbm',
+      amount: 0.2,
+      scale: 2,
+      octaves: 4,
+    } as never);
+    expect(presetWithoutTonality.fbmTonality).toBe(STORE_DEFAULTS.noiseDistortion.fbmTonality);
+  });
+
   it('applies GPU-tier octave and step limits to Fast Curl', () => {
     const medium: RenderOptimization = {
       tier: 'medium', reasons: [], maxNoiseOctaves: 6, maxCurlSteps: 5,

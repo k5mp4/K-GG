@@ -38,6 +38,8 @@
   uniform float u_ridgeOffset;
   uniform float u_ridgeWarp;
 
+  uniform float u_fbmTonality;
+
   // AE Fractal Noise パラメータ
   uniform int   u_aeFractalType;     // 0=Basic, 1=Turbulent
   uniform float u_aeSubInfluence;    // persistence per octave
@@ -177,6 +179,33 @@
       frequency *= 2.0;
     }
     return value;
+  }
+
+  // Material Maker "FBM Noise -> Invert -> Tonality" look, built on top of the
+  // shared fbm() above without touching it. Standard fbm is inverted into
+  // [0,1] and reshaped by a convex power curve: most of the field compresses
+  // toward the dark end, while only the extreme troughs of the source fbm
+  // (mapped to inverted ~= 1) survive as thin, branching bright veins between
+  // large smooth dark cells. This is a distinct family from ridgedFbm(), which
+  // brightens every octave's zero-crossing independently; here a single
+  // post-curve reshapes one plain fbm sum, so it stays low-frequency and
+  // smooth rather than layered and ridge-like.
+  //
+  // shaped = pow(inverted, curve) always lands in [0,1], and for inverted
+  // uniform on [0,1] its expected value is 1/(curve+1). Subtracting that
+  // analytic mean and rescaling by 1/(1-mean) keeps the returned field inside
+  // [-1,1] and close to zero-mean across the image, so Amount does not read
+  // as a constant directional drift once Tonality pushes most of the field
+  // toward one side of the curve.
+  float shapedFbm(vec2 p, int octaves, float curve) {
+    float n = fbm(p, octaves);
+    float normalized = clamp(n * 0.5 + 0.5, 0.0, 1.0);
+    float inverted = 1.0 - normalized;
+    float safeCurve = max(curve, 0.0001);
+    float shaped = pow(inverted, safeCurve);
+    float meanApprox = 1.0 / (safeCurve + 1.0);
+    float gain = 1.0 / max(1.0 - meanApprox, 0.0001);
+    return (shaped - meanApprox) * gain;
   }
 
   float randDW(vec2 n) {
@@ -766,8 +795,9 @@
       nx = simplex2D(p);
       ny = simplex2D(p + vec2(43.7, 17.3));
     } else if (noiseType == 1) {
-      nx = fbm(p, octaves);
-      ny = fbm(p + vec2(43.7, 17.3), octaves);
+      float tonalityCurve = max(u_fbmTonality, 0.0001);
+      nx = shapedFbm(p, octaves, tonalityCurve);
+      ny = shapedFbm(p + vec2(43.7, 17.3), octaves, tonalityCurve);
     } else if (noiseType == 2) {
       float v1 = voronoiScalar(p);
       float v2 = voronoiScalar(p + vec2(17.9, 43.5));

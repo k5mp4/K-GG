@@ -48,6 +48,7 @@ export const PARAMETER_LIMITS = {
   'noise.ridgeLacunarity': { min: 1.1, max: 4, step: 0.05, defaultValue: 2 },
   'noise.ridgePersistence': { min: 0.1, max: 1, step: 0.01, defaultValue: 0.6 },
   'noise.ridgeGain': { min: 0, max: 1, step: 0.01, defaultValue: 0 },
+  'noise.fbmTonality': { min: 1.0, max: 8.0, step: 0.1, defaultValue: 4.0 },
   'noise.aeSubInfluence': { min: 0.01, max: 1, step: 0.01, defaultValue: 0.7 },
   'noise.aeSubScaling': { min: 1.01, max: 4, step: 0.01, defaultValue: 1.78 },
   'noise.aeContrast': { min: 0.5, max: 4, step: 0.05, defaultValue: 1 },

@@ -57,4 +57,41 @@ describe('NoiseDistortionPanel', () => {
   ] as const)('routes %s Seed through %s', (type, field) => {
     expect(getNoiseSeedField(type)).toBe(field);
   });
+
+  it('shows the fBm Tonality control only when Type is fBm', () => {
+    // renderToStaticMarkup drives React's SSR snapshot, which zustand reads
+    // from getInitialState() rather than the live getState() (see
+    // node_modules/zustand/react.js useStore). Mutate getInitialState()
+    // directly, matching the pattern PostprocessPanel.test.tsx already uses
+    // for this same SSR quirk.
+    const initialState = useGradientStore.getInitialState();
+    const previousNoiseDistortion = initialState.noiseDistortion;
+    try {
+      initialState.noiseDistortion = { ...previousNoiseDistortion, type: 'fbm' };
+      const fbmMarkup = renderToStaticMarkup(
+        <LanguageProvider>
+          <NoiseDistortionPanel />
+        </LanguageProvider>,
+      );
+      expect(fbmMarkup).toContain('>Tonality</label>');
+
+      initialState.noiseDistortion = { ...previousNoiseDistortion, type: 'simplex' };
+      const simplexMarkup = renderToStaticMarkup(
+        <LanguageProvider>
+          <NoiseDistortionPanel />
+        </LanguageProvider>,
+      );
+      expect(simplexMarkup).not.toContain('>Tonality</label>');
+
+      initialState.noiseDistortion = { ...previousNoiseDistortion, type: 'ridged_fbm' };
+      const ridgedMarkup = renderToStaticMarkup(
+        <LanguageProvider>
+          <NoiseDistortionPanel />
+        </LanguageProvider>,
+      );
+      expect(ridgedMarkup).not.toContain('>Tonality</label>');
+    } finally {
+      initialState.noiseDistortion = previousNoiseDistortion;
+    }
+  });
 });

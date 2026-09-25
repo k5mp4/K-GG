@@ -71,6 +71,7 @@ export function NoiseDistortionPanel() {
   const isDWAnim = noiseDistortion.type === 'domain_warp_anim';
   const isSeamless = noiseDistortion.type === 'seamless';
   const isVoronoi = noiseDistortion.type === 'voronoi';
+  const isFbm = noiseDistortion.type === 'fbm';
   const isRidged = noiseDistortion.type === 'ridged_fbm';
   const isAeFractal = noiseDistortion.type === 'ae_fractal';
   const isCurl = noiseDistortion.type === 'curl';
@@ -399,6 +400,17 @@ export function NoiseDistortionPanel() {
                 limitKey="noise.aeBrightness"
               />
             </>
+          )}
+
+          {isFbm && (
+            <SliderField
+              label="Tonality"
+              value={noiseDistortion.fbmTonality ?? D.fbmTonality}
+              onChange={(v) => setNoiseDistortion({ fbmTonality: v })}
+              format={(v) => v.toFixed(1)}
+              trackId="noiseDistortion.fbmTonality"
+              limitKey="noise.fbmTonality"
+            />
           )}
 
           {isRidged && (

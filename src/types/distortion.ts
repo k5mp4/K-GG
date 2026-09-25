@@ -42,6 +42,8 @@ export type NoiseDistortionConfig = {
   ridgePersistence: number;  // 0.1–1.0: 振幅倍率（大→高周波が支配的で複雑, 小→低周波が支配的）
   ridgeOffset: number;       // 0.0–2.0: 稜線位置オフセット（1.0=ゼロ交差, <1=収縮, >1=太く）
   ridgeWarp: number;         // 0.0–4.0: ドメインワープ量（simplex格子の規則性を破壊してランダムに）
+  // fBm Tonality 専用パラメータ (Material Maker FBM Noise → Invert → Tonality 相当)
+  fbmTonality: number;       // 1.0–8.0: 階調カーブの強さ（低い=通常のfBmに近い, 高い=暗部が広がり白い境界だけ強調）
   // AE Fractal Noise 専用パラメータ
   aeFractalType: 'basic' | 'turbulent'; // basic=標準fbm, turbulent=abs()で全値正化
   aeSubInfluence: number;    // 0.01–1.0: オクターブ振幅倍率 (AE: Sub Influence)

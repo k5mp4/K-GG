@@ -55,7 +55,7 @@ export function isGradientType(value: unknown): value is import('../types/gradie
 /** ノイズタイプ切り替え時に自動適用するタイプ別初期値 */
 export const NOISE_TYPE_PRESETS: Record<NoiseDistortionConfig['type'], Partial<NoiseDistortionConfig>> = {
   simplex: { amount: 0.15, scale: 3.0 },
-  fbm: { amount: 0.20, scale: 2.0, octaves: 4 },
+  fbm: { amount: 0.20, scale: 2.0, octaves: 4, fbmTonality: getParameterDefault('noise.fbmTonality') },
   voronoi: { amount: 0.15, scale: 6.0, voronoiDistMetric: 'euclidean', voronoiRandomness: 1.0, voronoiFeature: 'f1', voronoiMinkowskiExp: 2.0 },
   curl: { amount: 0.30, scale: 0.5, octaves: 3, curlSteps: 4, curlSpeed: 0.5, curlEps: 0.01, curlSeed: 0.0 },
   fast_curl: { amount: 0.30, scale: 0.5, octaves: 3, curlSteps: 2, curlSpeed: 0.5, curlSeed: 0.0, noiseLoopMode: 'seamless' },
@@ -128,6 +128,7 @@ export const STORE_DEFAULTS = {
     ridgePersistence: getParameterDefault('noise.ridgePersistence'),
     ridgeOffset: getParameterDefault('noise.ridgeOffset'),
     ridgeWarp: getParameterDefault('noise.ridgeWarp'),
+    fbmTonality: getParameterDefault('noise.fbmTonality'),
     aeFractalType: 'basic' as const,
     aeSubInfluence: getParameterDefault('noise.aeSubInfluence'),
     aeSubScaling: getParameterDefault('noise.aeSubScaling'),
@@ -435,6 +436,7 @@ const NOISE_PARAMETER_LIMIT_KEYS = {
   ridgeLacunarity: 'noise.ridgeLacunarity',
   ridgePersistence: 'noise.ridgePersistence',
   ridgeGain: 'noise.ridgeGain',
+  fbmTonality: 'noise.fbmTonality',
   aeSubInfluence: 'noise.aeSubInfluence',
   aeSubScaling: 'noise.aeSubScaling',
   aeContrast: 'noise.aeContrast',

@@ -557,6 +557,7 @@ export async function initWebGL(canvas: HTMLCanvasElement): Promise<WebGLContext
     u_ridgePersistence: gl.getUniformLocation(program, 'u_ridgePersistence'),
     u_ridgeOffset: gl.getUniformLocation(program, 'u_ridgeOffset'),
     u_ridgeWarp: gl.getUniformLocation(program, 'u_ridgeWarp'),
+    u_fbmTonality: gl.getUniformLocation(program, 'u_fbmTonality'),
     u_aeFractalType: gl.getUniformLocation(program, 'u_aeFractalType'),
     u_aeSubInfluence: gl.getUniformLocation(program, 'u_aeSubInfluence'),
     u_aeSubScaling: gl.getUniformLocation(program, 'u_aeSubScaling'),
@@ -2416,6 +2417,7 @@ function drawPostprocessPass(
   gl.uniform1f(ctx.postprocessUniforms.u_ridgePersistence, noiseDistortion.ridgePersistence ?? 0.6);
   gl.uniform1f(ctx.postprocessUniforms.u_ridgeOffset, noiseDistortion.ridgeOffset ?? 1);
   gl.uniform1f(ctx.postprocessUniforms.u_ridgeWarp, noiseDistortion.ridgeWarp ?? 1);
+  gl.uniform1f(ctx.postprocessUniforms.u_fbmTonality, noiseDistortion.fbmTonality ?? 4);
   setUniform1i(gl, ctx.postprocessUniforms.u_aeFractalType, noiseDistortion.aeFractalType === 'turbulent' ? 1 : 0);
   gl.uniform1f(ctx.postprocessUniforms.u_aeSubInfluence, noiseDistortion.aeSubInfluence ?? 0.7);
   gl.uniform1f(ctx.postprocessUniforms.u_aeSubScaling, noiseDistortion.aeSubScaling ?? 1.78);
@@ -3543,6 +3545,7 @@ export function render(
   gl.uniform1f(uniforms.u_ridgePersistence, noiseDistortion.ridgePersistence ?? 0.6);
   gl.uniform1f(uniforms.u_ridgeOffset, noiseDistortion.ridgeOffset ?? 1.0);
   gl.uniform1f(uniforms.u_ridgeWarp, noiseDistortion.ridgeWarp ?? 1.0);
+  gl.uniform1f(uniforms.u_fbmTonality, noiseDistortion.fbmTonality ?? 4.0);
   setUniform1i(gl, uniforms.u_aeFractalType, noiseDistortion.aeFractalType === 'turbulent' ? 1 : 0);
   gl.uniform1f(uniforms.u_aeSubInfluence, noiseDistortion.aeSubInfluence ?? 0.7);
   gl.uniform1f(uniforms.u_aeSubScaling, noiseDistortion.aeSubScaling ?? 1.78);

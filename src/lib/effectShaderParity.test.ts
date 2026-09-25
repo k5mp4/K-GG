@@ -588,6 +588,59 @@ describe('V2 effect shader parity', () => {
     expect(legacyCurl).toContain('u_curlEps');
   });
 
+  it('shapes only the fBm noise type with a dedicated Invert/Tonality function, leaving shared fbm() and other noise types untouched', () => {
+    expect(noiseShader).toContain('float shapedFbm(vec2 p, int octaves, float curve)');
+    expect(noiseShader).toContain('uniform float u_fbmTonality;');
+
+    const shapedFbmFn = extractFunction(noiseShader, 'shapedFbm');
+    expect(shapedFbmFn).toContain('float n = fbm(p, octaves);');
+    expect(shapedFbmFn).toContain('pow(inverted, safeCurve)');
+
+    // The shared fbm() body itself must remain the plain, unmodified sum of
+    // octaves so Curl, Domain Warp, and Seamless (which all call fbm()/fbm3D
+    // directly, not shapedFbm) keep their existing behavior.
+    const fbmFn = compact(extractFunction(noiseShader, 'fbm'));
+    expect(fbmFn).toBe(compact(`float fbm(vec2 p, int octaves) {
+      float value = 0.0;
+      float amplitude = 0.5;
+      float frequency = 1.0;
+      for (int i = 0; i < 8; i++) {
+        if (i >= octaves) break;
+        value += amplitude * simplex2D(p * frequency);
+        amplitude *= 0.5;
+        frequency *= 2.0;
+      }
+      return value;
+    }`));
+
+    const dispatch = extractFunction(noiseShader, 'noiseDisplaceRaw');
+    const fbmBranchStart = dispatch.indexOf('noiseType == 1');
+    const nextBranchStart = dispatch.indexOf('noiseType == 2');
+    expect(fbmBranchStart).toBeGreaterThan(0);
+    expect(nextBranchStart).toBeGreaterThan(fbmBranchStart);
+    const fbmBranch = dispatch.slice(fbmBranchStart, nextBranchStart);
+    expect(fbmBranch).toContain('shapedFbm(p, octaves, tonalityCurve)');
+    expect(fbmBranch).toContain('shapedFbm(p + vec2(43.7, 17.3), octaves, tonalityCurve)');
+    expect(fbmBranch).not.toContain('= fbm(');
+
+    // Legacy Curl (noiseType == 3) differentiates the shared plain fbm()
+    // field directly; it must not be rerouted through the fBm-only shaping.
+    const curlBranchStart = dispatch.indexOf('noiseType == 3');
+    const domainWarpBranchStart = dispatch.indexOf('noiseType == 4');
+    const curlBranch = dispatch.slice(curlBranchStart, domainWarpBranchStart);
+    expect(curlBranch).toContain('fbm(p + vec2(');
+    expect(curlBranch).not.toContain('shapedFbm(');
+
+    // ridgedFbm (Aura Ridges, noiseType == 6) stays its own zero-crossing
+    // ridge algorithm, independent from the fBm Tonality reshaping.
+    expect(noiseShader).toContain('float ridgedFbm(vec2 p, int octaves)');
+    const ridgedBranchStart = dispatch.indexOf('noiseType == 6');
+    const aeBranchStart = dispatch.indexOf('noiseType == 7');
+    const ridgedBranch = dispatch.slice(ridgedBranchStart, aeBranchStart);
+    expect(ridgedBranch).toContain('ridgedFbm(p, octaves)');
+    expect(ridgedBranch).not.toContain('shapedFbm(');
+  });
+
   it('keeps Phasor as a complex phase-gradient field rather than scalar noise duplication', () => {
     expect(noiseShader).toContain('vec2 phasorKernelHash(');
     expect(noiseShader).toContain('void phasorComplexField(');

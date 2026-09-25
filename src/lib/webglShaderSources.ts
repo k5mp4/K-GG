@@ -222,6 +222,7 @@ uniform float u_ridgeLacunarity;
 uniform float u_ridgePersistence;
 uniform float u_ridgeOffset;
 uniform float u_ridgeWarp;
+uniform float u_fbmTonality;
 uniform int u_aeFractalType;
 uniform float u_aeSubInfluence;
 uniform float u_aeSubScaling;
