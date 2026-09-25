@@ -1,0 +1,4 @@
+# Keep the upstream Spout2 bytes (CRLF, BOM, Latin-1 comments) unchanged.
+* -text
+README.md text eol=lf
+.gitattributes text eol=lf

@@ -1,5 +1,5 @@
 ---
-id: ADR-0022
+id: ADR-0024
 title: 並列開発で衝突しないChange ID・一覧・逆参照
 status: accepted
 date: 2026-09-25
@@ -8,7 +8,7 @@ related_specs: []
 supersedes: []
 ---
 
-# ADR-0022: 並列開発で衝突しないChange ID・一覧・逆参照
+# ADR-0024: 並列開発で衝突しないChange ID・一覧・逆参照
 
 ## コンテキスト
 
@@ -25,7 +25,7 @@ supersedes: []
 Change Capsuleは自分のdirectoryだけで完結させ、複数PRが共有ファイルへ追記しない構造にする。
 
 - Change一覧は各`proposal.md`のfrontmatterを正本とし、VitePressのdata loader（`docs/.vitepress/theme/changes.data.ts`）と`<ChangeIndex>`コンポーネントでビルド時に描画する。`docs/changes/{active,archive}/index.md`は説明文とコンポーネントだけを持ち、行をコミットしない。`docs:check`は手書きの行が戻っていないことを検査する。
-- 新しいChange IDは`CHANGE-YYYYMMDD-slug`とし、directory名と一致させる。`npm run change:new`で作成する。`CHANGE-001`〜`CHANGE-054`は既存リンクと履歴のため有効なまま残し、それより大きい連番は拒否する。
+- 新しいChange IDは`CHANGE-YYYYMMDD-slug`とし、directory名と一致させる。`npm run change:new`で作成する。`CHANGE-001`〜`CHANGE-056`は既存リンクと履歴のため有効なまま残し、CHANGE-057以降の連番は拒否する。
 - ChangeとCurrent Specの関係はChangeの`current_specs`を正本とする。Current Specの`related_changes`への追記は要求しない。既存の値は履歴として残し、記載されたIDが実在することだけを検査する。
 - `change:finalize`はindexを再生成せず、Change directoryの移動とproposal更新だけを行う。
 

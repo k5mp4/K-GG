@@ -104,18 +104,80 @@ type LazyProgramState = {
   fallback: boolean;
 };
 
-export type SerialAsyncQueue = {
-  enqueue<T>(task: () => Promise<T>): Promise<T>;
+/**
+ * Lazy compile priority. `demand` is a program the current frame or an export
+ * needs, `prefetch` is a likely next interaction (for example hovering an
+ * Effect Stack row), and `warmup` is idle background preparation.
+ */
+export type LazyCompilePriority = 'demand' | 'prefetch' | 'warmup';
+
+const LAZY_COMPILE_PRIORITY_RANK: Record<LazyCompilePriority, number> = {
+  demand: 0,
+  prefetch: 1,
+  warmup: 2,
 };
 
+export type SerialAsyncQueue = {
+  enqueue<T>(task: () => Promise<T>, options?: { priority?: LazyCompilePriority; id?: string }): Promise<T>;
+  /** Raises the priority of a task that is still waiting. Running or unknown tasks are unchanged. */
+  promote(id: string, priority: LazyCompilePriority): void;
+};
+
+/**
+ * Runs one task at a time. Waiting tasks start in priority order and in FIFO
+ * order within the same priority, so user demand never queues behind idle
+ * warmup. A running task is never preempted.
+ */
 export function createSerialAsyncQueue(): SerialAsyncQueue {
-  let tail: Promise<void> = Promise.resolve();
+  type Entry = { id?: string; rank: number; order: number; start: () => void };
+  const pending: Entry[] = [];
+  let running = false;
+  let order = 0;
+
+  const pump = () => {
+    if (running || pending.length === 0) return;
+    let nextIndex = 0;
+    for (let index = 1; index < pending.length; index++) {
+      const candidate = pending[index];
+      const best = pending[nextIndex];
+      if (candidate.rank < best.rank || (candidate.rank === best.rank && candidate.order < best.order)) {
+        nextIndex = index;
+      }
+    }
+    const [entry] = pending.splice(nextIndex, 1);
+    running = true;
+    entry.start();
+  };
 
   return {
-    enqueue<T>(task: () => Promise<T>): Promise<T> {
-      const next = tail.then(() => task(), () => task());
-      tail = next.then(() => undefined, () => undefined);
-      return next;
+    enqueue<T>(task: () => Promise<T>, options: { priority?: LazyCompilePriority; id?: string } = {}): Promise<T> {
+      return new Promise<T>((resolve, reject) => {
+        pending.push({
+          id: options.id,
+          rank: LAZY_COMPILE_PRIORITY_RANK[options.priority ?? 'demand'],
+          order: order++,
+          start: () => {
+            Promise.resolve()
+              .then(task)
+              .then(resolve, reject)
+              .finally(() => {
+                running = false;
+                pump();
+              });
+          },
+        });
+        pump();
+      });
+    },
+    promote(id: string, priority: LazyCompilePriority): void {
+      const rank = LAZY_COMPILE_PRIORITY_RANK[priority];
+      for (const entry of pending) {
+        if (entry.id === id && rank < entry.rank) {
+          // Join the new priority at the back, as if it had been requested now.
+          entry.rank = rank;
+          entry.order = order++;
+        }
+      }
     },
   };
 }
@@ -557,6 +619,12 @@ export async function initWebGL(canvas: HTMLCanvasElement): Promise<WebGLContext
     u_ridgePersistence: gl.getUniformLocation(program, 'u_ridgePersistence'),
     u_ridgeOffset: gl.getUniformLocation(program, 'u_ridgeOffset'),
     u_ridgeWarp: gl.getUniformLocation(program, 'u_ridgeWarp'),
+    u_perlinRoughness: gl.getUniformLocation(program, 'u_perlinRoughness'),
+    u_perlinSharpness: gl.getUniformLocation(program, 'u_perlinSharpness'),
+    u_perlinLayerMix: gl.getUniformLocation(program, 'u_perlinLayerMix'),
+    u_perlinAngle: gl.getUniformLocation(program, 'u_perlinAngle'),
+    u_perlinDimension: gl.getUniformLocation(program, 'u_perlinDimension'),
+    u_perlinLoopWobble: gl.getUniformLocation(program, 'u_perlinLoopWobble'),
     u_aeFractalType: gl.getUniformLocation(program, 'u_aeFractalType'),
     u_aeSubInfluence: gl.getUniformLocation(program, 'u_aeSubInfluence'),
     u_aeSubScaling: gl.getUniformLocation(program, 'u_aeSubScaling'),
@@ -1391,15 +1459,25 @@ function installLazyProgram(ctx: WebGLContext, key: LazyProgramKey, program: Web
   }
 }
 
-function requestLazyProgram(ctx: WebGLContext, key: LazyProgramKey): boolean {
+function requestLazyProgram(
+  ctx: WebGLContext,
+  key: LazyProgramKey,
+  priority: LazyCompilePriority = 'demand',
+): boolean {
   if (ctx.disposed || lazyProgramReady(ctx, key)) return !ctx.disposed;
 
   const state = ctx.lazyProgramState[key];
-  if (!state.promise && !state.failed) {
+  if (state.promise) {
+    // A program first queued by warmup/prefetch must not keep a user request waiting.
+    ctx.lazyProgramCompileQueue.promote(key, priority);
+  } else if (!state.failed) {
     window.dispatchEvent(new CustomEvent('kgg:webgl-lazy-program-state', {
       detail: { key, state: 'loading' as const },
     }));
-    state.promise = ctx.lazyProgramCompileQueue.enqueue(() => compileLazyProgram(ctx, key)).catch((error) => {
+    state.promise = ctx.lazyProgramCompileQueue.enqueue(
+      () => compileLazyProgram(ctx, key),
+      { priority, id: key },
+    ).catch((error) => {
       if (ctx.disposed) return;
       state.failed = true;
       state.timedOut = error instanceof Error && error.message.includes('timed out');
@@ -1517,6 +1595,51 @@ async function waitForLazyProgram(
   if (!lazyProgramReady(ctx, key)) {
     throw new Error(`Required WebGL program is unavailable: ${key}`);
   }
+}
+
+export type LazyProgramSettleResult = 'ready' | 'failed' | 'disposed';
+
+/**
+ * Starts (or promotes) one lazy compile without waiting for it. Returns true
+ * only when the program is already usable.
+ */
+export function requestLazyProgramCompile(
+  ctx: WebGLContext,
+  key: LazyProgramKey,
+  priority: LazyCompilePriority,
+): boolean {
+  return requestLazyProgram(ctx, key, priority);
+}
+
+/**
+ * Waits until one lazy program is usable or has failed. Unlike
+ * `waitForLazyProgram`, this never rejects: warmup and splash readiness must
+ * not turn an optional compile failure into a startup failure.
+ */
+export async function settleLazyProgram(
+  ctx: WebGLContext,
+  key: LazyProgramKey,
+  priority: LazyCompilePriority,
+): Promise<LazyProgramSettleResult> {
+  if (ctx.disposed) return 'disposed';
+  if (requestLazyProgram(ctx, key, priority)) return 'ready';
+  const pending = ctx.lazyProgramState[key].promise;
+  if (pending) await pending.catch(() => undefined);
+  if (ctx.disposed) return 'disposed';
+  return lazyProgramReady(ctx, key) ? 'ready' : 'failed';
+}
+
+/**
+ * Background warmup is limited to contexts that compile through
+ * KHR_parallel_shader_compile. Without it (or while development validation
+ * forces synchronous linking) a warmup compile would block the main thread.
+ */
+export function canWarmLazyProgramsInBackground(ctx: WebGLContext): boolean {
+  if (ctx.disposed || ctx.gl.isContextLost()) return false;
+  return selectShaderCompileExtensionForSnapshot(
+    ctx.shaderCompileExt,
+    ctx.performanceProfiler?.getSnapshot(),
+  ) !== null;
 }
 
 /**
@@ -1761,7 +1884,7 @@ export function hexToRgb(hex: string): [number, number, number] {
   return [r, g, b];
 }
 
-export const NOISE_TYPE_MAP = { simplex: 0, fbm: 1, voronoi: 2, curl: 3, domain_warp_anim: 4, seamless: 5, ridged_fbm: 6, ae_fractal: 7, fast_curl: 8, caustics: 9, phasor: 10 } as const;
+export const NOISE_TYPE_MAP = { simplex: 0, fbm: 1, voronoi: 2, curl: 3, domain_warp_anim: 4, seamless: 5, ridged_fbm: 6, ae_fractal: 7, fast_curl: 8, caustics: 9, phasor: 10, perlin: 11 } as const;
 export const GRADIENT_TYPE_MAP = { linear: 0, radial: 1, fourcolor: 2, diamond: 3, angle: 4, bezier: 5, mesh: 6 } as const;
 const DIFFUSE_MODE_MAP = { block: 0, smooth: 1, dither: 2, halftone: 3, ascii: 4, legacy: 5 } as const;
 const PARTICLE_EMITTER_TYPE_MAP = { field: 0, line: 1, burst: 2, point: 3 } as const;
@@ -2416,6 +2539,12 @@ function drawPostprocessPass(
   gl.uniform1f(ctx.postprocessUniforms.u_ridgePersistence, noiseDistortion.ridgePersistence ?? 0.6);
   gl.uniform1f(ctx.postprocessUniforms.u_ridgeOffset, noiseDistortion.ridgeOffset ?? 1);
   gl.uniform1f(ctx.postprocessUniforms.u_ridgeWarp, noiseDistortion.ridgeWarp ?? 1);
+  gl.uniform1f(ctx.postprocessUniforms.u_perlinRoughness, finiteClamp(noiseDistortion.perlinRoughness, 0.29, 0, 1));
+  gl.uniform1f(ctx.postprocessUniforms.u_perlinSharpness, finiteClamp(noiseDistortion.perlinSharpness, 4, 1, 8));
+  gl.uniform1f(ctx.postprocessUniforms.u_perlinLayerMix, finiteClamp(noiseDistortion.perlinLayerMix, 0.56, 0, 1));
+  gl.uniform1f(ctx.postprocessUniforms.u_perlinAngle, finiteClamp(noiseDistortion.perlinAngle, 90, 0, 360));
+  setUniform1i(gl, ctx.postprocessUniforms.u_perlinDimension, noiseDistortion.perlinDimension === '4d' ? 1 : 0);
+  gl.uniform1f(ctx.postprocessUniforms.u_perlinLoopWobble, finiteClamp(noiseDistortion.perlinLoopWobble, 0.5, 0, 1));
   setUniform1i(gl, ctx.postprocessUniforms.u_aeFractalType, noiseDistortion.aeFractalType === 'turbulent' ? 1 : 0);
   gl.uniform1f(ctx.postprocessUniforms.u_aeSubInfluence, noiseDistortion.aeSubInfluence ?? 0.7);
   gl.uniform1f(ctx.postprocessUniforms.u_aeSubScaling, noiseDistortion.aeSubScaling ?? 1.78);
@@ -3543,6 +3672,12 @@ export function render(
   gl.uniform1f(uniforms.u_ridgePersistence, noiseDistortion.ridgePersistence ?? 0.6);
   gl.uniform1f(uniforms.u_ridgeOffset, noiseDistortion.ridgeOffset ?? 1.0);
   gl.uniform1f(uniforms.u_ridgeWarp, noiseDistortion.ridgeWarp ?? 1.0);
+  gl.uniform1f(uniforms.u_perlinRoughness, finiteClamp(noiseDistortion.perlinRoughness, 0.29, 0, 1));
+  gl.uniform1f(uniforms.u_perlinSharpness, finiteClamp(noiseDistortion.perlinSharpness, 4, 1, 8));
+  gl.uniform1f(uniforms.u_perlinLayerMix, finiteClamp(noiseDistortion.perlinLayerMix, 0.56, 0, 1));
+  gl.uniform1f(uniforms.u_perlinAngle, finiteClamp(noiseDistortion.perlinAngle, 90, 0, 360));
+  setUniform1i(gl, uniforms.u_perlinDimension, noiseDistortion.perlinDimension === '4d' ? 1 : 0);
+  gl.uniform1f(uniforms.u_perlinLoopWobble, finiteClamp(noiseDistortion.perlinLoopWobble, 0.5, 0, 1));
   setUniform1i(gl, uniforms.u_aeFractalType, noiseDistortion.aeFractalType === 'turbulent' ? 1 : 0);
   gl.uniform1f(uniforms.u_aeSubInfluence, noiseDistortion.aeSubInfluence ?? 0.7);
   gl.uniform1f(uniforms.u_aeSubScaling, noiseDistortion.aeSubScaling ?? 1.78);

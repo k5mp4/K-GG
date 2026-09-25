@@ -12,6 +12,7 @@ title: Native / FFmpeg / Tauri validation
 | --- | --- | --- | --- |
 | Rust command/path/encoder contract | `npm run check:native` | Merge Gate（対象変更時） | Figma Connectorをビルドした後のRust unit testと`cargo check`の結果 |
 | Browser/Tauri adapter contract | `npm run check:fast`、またはnative gateの`npm test -- src/adapters/tauri` | Merge Gate | fake/native adapter testの結果 |
+| Spout2 sender（Windows、DirectX 11） | `cargo test --manifest-path src-tauri/Cargo.toml spout2 -- --ignored --nocapture --test-threads=1` | Native Release Gate | 共有textureの向き・BGRA・リサイズ・名前衝突・解放と、1080pの送信コスト。GPUのないrunnerでは実行しない |
 | 実FFmpeg + ffprobe | `npm run check:ffmpeg` | Native Release Gate | qtrle MOVとlibx264 MP4のcodec、pix_fmt、SAR、BT.709 metadata、サイズ、フレーム数、非空、temp cleanup |
 | Tauri binary | `npx tauri build --debug --no-bundle` | Native Release Gate | 実行環境でのbuild結果 |
 | Tauri UI | WebDriver手動Release Gate | Release Gate | 起動、Preset、Preview、PNG/ZIP、native FFmpeg statusのUI証跡 |

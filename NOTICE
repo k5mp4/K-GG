@@ -25,6 +25,18 @@ including cssparser, cssparser-macros, dtoa-short, option-ext, and selectors.
 MPL-2.0 applies to those third-party components and does not change K-GG's
 Apache-2.0 license.
 
+Spout2
+------
+
+The Windows desktop app statically links a vendored subset of Spout2
+(SpoutDX, Spout SDK 2.007.017, https://github.com/leadedge/Spout2) for Spout
+output. The sources are kept unmodified in `vendor/spout2/` with their
+copyright and license headers.
+
+Copyright (c) 2020-2024, Lynn Jarvis. All rights reserved.
+Spout2 is licensed under the BSD 2-Clause License; its full text is in
+`vendor/spout2/LICENSE` and in the Help > Third-party licenses screen.
+
 FFmpeg
 ------
 

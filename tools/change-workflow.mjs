@@ -24,9 +24,9 @@ const allowedOutcomes = new Set([
   'cancelled',
   'superseded',
 ]);
-// CHANGE-001〜CHANGE-054は連番時代のIDとして有効なまま残す。
+// CHANGE-001〜CHANGE-056は連番時代のIDとして有効なまま残す。
 // 新しいChangeは並列ブランチで衝突しない日付+slug IDを使う。
-const legacyChangeIdMax = 54;
+const legacyChangeIdMax = 56;
 const datedChangeIdPattern = /^CHANGE-(\d{4})(\d{2})(\d{2})-([a-z0-9]+(?:-[a-z0-9]+)*)$/;
 const knownChangeFiles = new Set([
   'proposal.md',

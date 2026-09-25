@@ -5,12 +5,12 @@ title: WebGL Performance Debug / Profiler
 status: current
 owners: [maintainer]
 created: 2026-08-12
-updated: 2026-09-20
-requirement_ids: [PERF-001, PERF-002, PERF-003, PERF-004, PERF-005, PERF-006, PERF-007, PERF-008, PERF-009, PERF-010]
-related_adrs: [ADR-0005, ADR-0015]
-related_changes: [CHANGE-028, CHANGE-038]
-related_code: [src/lib/webglPerformance.ts, src/lib/webgl.ts, src/lib/gpuDiagnostics.ts, src/hooks/useWebGL.ts, src/components/WebGLPerformancePanel.tsx, src/components/GradientCanvas.tsx, src/lib/coneViewRenderer.ts, src/lib/clothGradientRenderer.ts]
-related_tests: [src/lib/webglPerformance.test.ts, src/lib/webglPerformanceBenchmark.test.ts, src/lib/webglCompilePolicy.test.ts, src/lib/webglShaderSources.test.ts, src/lib/coneViewRenderer.test.ts]
+updated: 2026-09-25
+requirement_ids: [PERF-001, PERF-002, PERF-003, PERF-004, PERF-005, PERF-006, PERF-007, PERF-008, PERF-009, PERF-010, PERF-011]
+related_adrs: [ADR-0005, ADR-0015, ADR-0022]
+related_changes: [CHANGE-028, CHANGE-038, CHANGE-055]
+related_code: [src/lib/webglPerformance.ts, src/lib/webgl.ts, src/lib/gpuDiagnostics.ts, src/hooks/useWebGL.ts, src/components/WebGLPerformancePanel.tsx, src/components/GradientCanvas.tsx, src/lib/coneViewRenderer.ts, src/lib/clothGradientRenderer.ts, src/lib/shaderWarmup.ts, src/lib/shaderWarmupHost.ts, src/components/PostprocessStackPanel.tsx]
+related_tests: [src/lib/webglPerformance.test.ts, src/lib/webglPerformanceBenchmark.test.ts, src/lib/webglCompilePolicy.test.ts, src/lib/webglShaderSources.test.ts, src/lib/coneViewRenderer.test.ts, src/lib/shaderWarmup.test.ts]
 ---
 
 # WebGL Performance Debug / Profiler
@@ -70,6 +70,14 @@ Effect StackのGlass/glassv2は、汎用Noiseの全アルゴリズムを同じ�
 Noise専用lazy Shaderの反射またはリンクが失敗した場合は、一般postprocess ShaderをNoise passのフォールバックとして使用し、Noise行が描画不能な`Unavailable`状態で固定されないようにする。専用Shaderが利用できる場合は専用passを優先する。
 
 同一WebGL context上で要求されたlazy Shaderは、コンパイル・リンクを一度に一つだけ実行する。後続の`generator`、`stackCore`、Noise専用Shaderなどは前の処理が完了してから開始し、重いShaderの同時コンパイルによるGPU/ANGLEの`context lost`を防ぐ。
+
+### PERF-011 Shaderの事前準備と優先順位
+
+同一context上の直列コンパイルは維持したまま、待機中のlazy Shaderは優先度順に開始する。優先度は高い順に、現在の描画またはExportが必要とするもの（demand）、利用者が次に使う可能性が高いもの（prefetch）、アイドル時間の事前準備（warmup）とし、同じ優先度内は要求順とする。実行中のコンパイルは中断しない。warmupまたはprefetchとして待機中のShaderを描画が必要とした場合は、その時点でdemandへ引き上げる。
+
+Preview contextの初期化後、現在のシーンに必要なShaderをdemandで準備し、その後にEffect Stackで使うShaderをアイドル時間に一つずつwarmupで準備する。順序は`generator`、`stackCore`、`noiseStack`、`stretch`、`noiseDiffuseStack`、`blur`、`normalMap`、`glassTile`、`glassV2`とし、コンパイルが長いGlass系を最後にする。Video Motion、Flow、Particlesなど外部入力や別パネルに依存するShaderはwarmupせず、従来どおり要求時にコンパイルする。warmupはExport中は開始せず、KHR並列Shaderコンパイルが使えない、またはValidationで同期リンクになる環境ではメインスレッドを止めないよう実行しない。
+
+Effect Stackの無効な行にポインターまたはフォーカスが入ったときは、その行を有効にした場合に必要となるShaderをprefetchで準備する。warmup／prefetchの失敗はdemandの失敗と同じ状態・フォールバックへ反映し、起動やEffect Stack全体を止めない。
 
 ## 境界と互換性
 

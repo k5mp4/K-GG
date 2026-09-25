@@ -588,6 +588,72 @@ describe('V2 effect shader parity', () => {
     expect(legacyCurl).toContain('u_curlEps');
   });
 
+  it('adds Perlin as a 3D (XY + time Z) Material Maker style smeary field without changing fBm or other noise types', () => {
+    expect(noiseShader).toContain('const int PERLIN_NOISE_TYPE = 11;');
+    for (const uniform of ['u_perlinRoughness', 'u_perlinSharpness', 'u_perlinLayerMix', 'u_perlinAngle']) {
+      expect(noiseShader).toContain(`uniform float ${uniform};`);
+    }
+    expect(noiseShader).not.toContain('u_fbmTonality');
+    expect(noiseShader).not.toContain('u_perlinWarp');
+
+    // Classic Perlin: eight lattice corners blended with the C2 quintic fade.
+    const perlinFn = extractFunction(noiseShader, 'perlin3D');
+    expect(perlinFn).toContain('float perlin3D(vec3 P)');
+    expect(perlinFn).toContain('vec3 fadeXYZ = perlinFade(Pf0);');
+    expect(perlinFn).toContain('float n111 = dot(g111, Pf1);');
+    expect(extractFunction(noiseShader, 'perlinFade')).toContain('t * t * t * (t * (t * 6.0 - 15.0) + 10.0)');
+
+    // Folds 1 -> Invert -> Tonality, plus a translated inverted layer blended with Lighten.
+    expect(extractFunction(noiseShader, 'perlinFoldedFbm3D')).toContain('abs(perlin3D(p))');
+    const smeary = extractFunction(noiseShader, 'perlinSmearyField');
+    expect(smeary).toContain('perlinFoldedFbm3D(q, octaves, roughness)');
+    const shape = extractFunction(noiseShader, 'perlinSmearyShape');
+    expect(shape).toContain('pow(1.0 - baseFbm, sharpness)');
+    expect(shape).toContain('mix(base, max(base, layer), layerMix)');
+
+    // 4D (Loop): 16-corner Perlin with time on a ZW circle covered once per
+    // Loop Period, so it loops exactly and skips the wrap cross-fade.
+    expect(noiseShader).toContain('uniform int   u_perlinDimension;');
+    expect(extractFunction(noiseShader, 'perlin4D')).toContain('float n1111 = dot(g1111, Pf1);');
+    expect(extractFunction(noiseShader, 'perlinSmearyField4D')).toContain('perlinFoldedFbm4D(q, octaves, roughness)');
+    expect(extractFunction(noiseShader, 'noiseDisplace')).toContain('if (noiseType == PERLIN_NOISE_TYPE && u_perlinDimension == 1) return current;'); 
+
+    // Time drives Z, and the scalar field pushes UV along a single direction.
+    const distortionFn = extractFunction(noiseShader, 'perlinDistortion');
+    expect(distortionFn).toContain('perlinSmearyField(vec3(p, evolution * 0.6), octaves)');
+    expect(distortionFn).toContain('float phase = KG_TAU * fract(evolution / period);');
+    expect(distortionFn).toContain('perlinSmearyField4D(perlinLoopCoord(p, phase, radius), octaves)');
+    // Loop Wobble only uses integer harmonics of the loop angle, so the path stays closed.
+    const loopCoord = extractFunction(noiseShader, 'perlinLoopCoord');
+    expect(loopCoord).toContain('return vec4(p, cos(phase) * radius, sin(phase) * radius);');
+    expect(loopCoord).toContain('float theta = phase + regionPhase;');
+    expect(loopCoord).toContain('return vec4(p + sway, cos(theta) * r, sin(theta) * r);');
+    expect(distortionFn).toContain('vec2(cos(angle), sin(angle)) * field;');
+
+    // The shared fbm() body stays the plain, unmodified simplex sum.
+    const fbmFn = compact(extractFunction(noiseShader, 'fbm'));
+    expect(fbmFn).toBe(compact(`float fbm(vec2 p, int octaves) {
+      float value = 0.0;
+      float amplitude = 0.5;
+      float frequency = 1.0;
+      for (int i = 0; i < 8; i++) {
+        if (i >= octaves) break;
+        value += amplitude * simplex2D(p * frequency);
+        amplitude *= 0.5;
+        frequency *= 2.0;
+      }
+      return value;
+    }`));
+
+    const dispatch = extractFunction(noiseShader, 'noiseDisplaceRaw');
+    const fbmBranch = dispatch.slice(dispatch.indexOf('noiseType == 1'), dispatch.indexOf('noiseType == 2'));
+    expect(fbmBranch).toContain('nx = fbm(p, octaves);');
+    expect(fbmBranch).toContain('ny = fbm(p + vec2(43.7, 17.3), octaves);');
+    expect(fbmBranch).not.toContain('perlin');
+    expect(dispatch).toContain('if (noiseType == PERLIN_NOISE_TYPE)');
+    expect(dispatch).toContain('return perlinDistortion(uv, scale, evolution, octaves);');
+  });
+
   it('keeps Phasor as a complex phase-gradient field rather than scalar noise duplication', () => {
     expect(noiseShader).toContain('vec2 phasorKernelHash(');
     expect(noiseShader).toContain('void phasorComplexField(');

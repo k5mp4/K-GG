@@ -6,8 +6,58 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>kagaribi15_grad</title>
     <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500&family=Open+Sans:ital,wght@0,300..800;1,300..800&display=swap" rel="stylesheet">
+    <!--
+      Pre-JavaScript splash poster: a black screen with the K-GG name and the
+      app version. The name mirrors BRAND.displayName in src/branding/brand.ts. It
+      paints before the bundle loads and is adopted by src/features/splash
+      (SplashScreen), which adds the progress bar. The version placeholder is
+      replaced from package.json at build time (vite.config.ts).
+    -->
+    <style>
+      #kgg-boot-splash {
+        position: fixed;
+        inset: 0;
+        z-index: 2147483001;
+        background: #000;
+        color: rgba(236, 219, 190, 0.55);
+        font: 500 11px/1 'Open Sans', system-ui, sans-serif;
+        letter-spacing: 0.16em;
+        /* Failsafe: never hide the app if the bundle fails before React adopts the poster. */
+        animation: kgg-boot-splash-failsafe 300ms ease-out 12s forwards;
+      }
+      #kgg-boot-splash[data-kgg-splash-owned] { animation: none; }
+      /* The name sits just above and the version just below the progress bar,
+         which SplashScreen draws at the vertical center. */
+      .kgg-boot-splash__name {
+        position: absolute;
+        left: 0;
+        right: 0;
+        bottom: calc(50% + 22px);
+        /* Balance the trailing letter-spacing so the name is optically centered. */
+        padding-left: 0.18em;
+        text-align: center;
+        color: #ECDBBE;
+        font: 700 28px/1 'Open Sans', system-ui, sans-serif;
+        letter-spacing: 0.18em;
+      }
+      .kgg-boot-splash__version {
+        position: absolute;
+        left: 0;
+        right: 0;
+        top: calc(50% + 18px);
+        text-align: center;
+        font-variant-numeric: tabular-nums;
+      }
+      @keyframes kgg-boot-splash-failsafe {
+        to { opacity: 0; visibility: hidden; pointer-events: none; }
+      }
+    </style>
   </head>
   <body>
+    <div id="kgg-boot-splash">
+      <div class="kgg-boot-splash__name">K-GG</div>
+      <div class="kgg-boot-splash__version">v%KGG_APP_VERSION%</div>
+    </div>
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
   </body>

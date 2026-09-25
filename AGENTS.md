@@ -24,7 +24,7 @@ K-GGはRequest-firstの開発フローとDocsDDを採用します。利用者向
 
 - Change CapsuleはDesigned Changeなど複雑な変更に限定し、必要なファイルだけ作る。Quick Changeでは作らない。
 - `docs/changes/active/`はfeature branch/PR上の一時領域であり、`main`上は原則0件にする。
-- Change Capsuleは`npm run change:new -- <slug> --title="..."`で作り、IDは日付+slugの`CHANGE-YYYYMMDD-slug`を使う。`CHANGE-001`〜`CHANGE-054`は履歴用で、新しい連番を採番しない。
+- Change Capsuleは`npm run change:new -- <slug> --title="..."`で作り、IDは日付+slugの`CHANGE-YYYYMMDD-slug`を使う。`CHANGE-001`〜`CHANGE-056`は履歴用で、新しい連番を採番しない。
 - 並列PRで衝突しないよう、Change一覧のindex.mdへ行を追記せず、Current Specの`related_changes`へも追記しない（一覧と逆参照はproposalのfrontmatterから生成する）。
 - Merge前にCurrent Spec/ADRを同期し、`npm run change:check`で構造・参照を確認してから`npm run change:finalize <CHANGE-ID>`を実行する。
 - 手動・GPU・Tauri・FFmpeg・After Effects確認はRelease GateまたはObservationとして記録する。未確認だけを理由にActiveへ残さず、必要な継続作業はIssueへ移す。

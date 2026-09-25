@@ -48,7 +48,7 @@ npm run change:new -- export-format --title="書き出し形式の追加"
 
 `docs/changes/active/CHANGE-YYYYMMDD-slug/proposal.md`がテンプレートから作られます。`delta.md`などは必要な場合だけ`docs/changes/_template/`からコピーします。
 
-IDとdirectory名は同じ`CHANGE-YYYYMMDD-slug`にします。slugは小文字英数字とハイフンです。連番は並列ブランチが同じ「次の番号」を取り合って衝突するため、新しいChangeには使いません。`CHANGE-001`〜`CHANGE-054`は履歴IDとして有効なまま残します（[ADR-0022](../adr/0022-conflict-free-change-metadata.md)）。
+IDとdirectory名は同じ`CHANGE-YYYYMMDD-slug`にします。slugは小文字英数字とハイフンです。連番は並列ブランチが同じ「次の番号」を取り合って衝突するため、新しいChangeには使いません。`CHANGE-001`〜`CHANGE-056`は履歴IDとして有効なまま残します（[ADR-0024](../adr/0024-conflict-free-change-metadata.md)）。
 
 ## 並列開発で衝突させない規則
 

@@ -101,6 +101,16 @@ if not vendor_notices.exists():
     raise RuntimeError('Missing audited Tweeq dependency notices')
 entries.extend(json.loads(vendor_notices.read_text(encoding='utf-8'))['entries'])
 
+# Spout2 SpoutDX sources are compiled into the Windows desktop binary (BSD-2-Clause).
+SPOUT2_COMMIT = 'c2bcc12147711d12ace7d5f08e869d774d840f8a'
+spout_readme = Path('vendor/spout2/README.md').read_text(encoding='utf-8')
+if SPOUT2_COMMIT not in spout_readme:
+    raise RuntimeError('vendor/spout2/README.md does not record the vendored Spout2 commit')
+entries.append({'ecosystem': 'vendor', 'name': 'Spout2 (SpoutDX)', 'version': '2.007.017', 'license': 'BSD-2-Clause',
+                'source': 'https://github.com/leadedge/Spout2/tree/' + SPOUT2_COMMIT,
+                'notices': [{'file': 'LICENSE', 'text': Path('vendor/spout2/LICENSE').read_text(encoding='utf-8').strip()},
+                            {'file': 'SPOUTSDK/licence.txt', 'text': Path('vendor/spout2/SPOUTSDK/licence.txt').read_text(encoding='utf-8').strip()}]})
+
 metadata = json.loads(subprocess.check_output(['cargo', 'metadata', '--locked', '--offline', '--format-version', '1',
                                                '--filter-platform', 'x86_64-pc-windows-msvc', '--manifest-path', 'src-tauri/Cargo.toml']))
 resolved = {node['id'] for node in metadata['resolve']['nodes']}
@@ -117,7 +127,8 @@ entries = list({(entry['ecosystem'], entry['name'], entry['version']): entry for
 entries.sort(key=lambda entry: (entry['ecosystem'], entry['name'], entry['version']))
 inputs = ['package-lock.json', 'src-tauri/Cargo.lock', 'vendor/tweeq/package.json',
           'vendor/tweeq/index.es.js', 'vendor/tweeq/index.cjs', 'vendor/tweeq/style.css',
-          'vendor/tweeq/THIRD_PARTY_LICENSES.json', 'LICENSE', 'NOTICE']
+          'vendor/tweeq/THIRD_PARTY_LICENSES.json', 'vendor/spout2/README.md', 'vendor/spout2/LICENSE',
+          'vendor/spout2/SPOUTSDK/licence.txt', 'LICENSE', 'NOTICE']
 result = {'schemaVersion': 1, 'inputs': {name: hashlib.sha256(Path(name).read_bytes().replace(b'\r\n', b'\n')).hexdigest() for name in inputs},
           'applicationLicense': Path('LICENSE').read_text(encoding='utf-8'),
           'applicationNotice': Path('NOTICE').read_text(encoding='utf-8'), 'entries': entries}

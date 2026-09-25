@@ -12,6 +12,6 @@ title: 変更仕様
 - [現行仕様](../specs/current/)
 - [DocDD運用ガイド](../development/docdd)
 
-新しい変更IDは `CHANGE-YYYYMMDD-slug`（例: `CHANGE-20260925-export-format`）を使い、`npm run change:new -- <slug> --title="..."`で作成します。並列ブランチが同じ連番を取り合わないようにするためです。`CHANGE-001`〜`CHANGE-054`は連番時代の履歴IDとして有効なまま残し、新しい連番は採番しません。変更IDは削除・再利用しません。
+新しい変更IDは `CHANGE-YYYYMMDD-slug`（例: `CHANGE-20260925-export-format`）を使い、`npm run change:new -- <slug> --title="..."`で作成します。並列ブランチが同じ連番を取り合わないようにするためです。`CHANGE-001`〜`CHANGE-056`は連番時代の履歴IDとして有効なまま残し、新しい連番は採番しません。変更IDは削除・再利用しません。
 
 進行中・完了済みの一覧は各`proposal.md`のfrontmatterからビルド時に生成します。index.mdへ行を追記しないため、並列PRが同じ表を編集して衝突することはありません。

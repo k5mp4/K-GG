@@ -43,6 +43,7 @@ import { completeVideoExport } from '../lib/videoExportLifecycle';
 import { createAeStatusController } from '../lib/aeStatusController';
 import { useLanguage } from '../i18n/LanguageProvider';
 import { DesignAppSendPanel } from './DesignAppSendPanel';
+import { SpoutOutputPanel } from './SpoutOutputPanel';
 import {
   FRAME_ZIP_FORMAT,
   IMAGE_EXPORT_FORMATS,
@@ -1047,6 +1048,7 @@ export function ExportPanel({
         )}
       </div>
       <DesignAppSendPanel canvas={getOutputCanvas()} imageName={stem} />
+      <SpoutOutputPanel canvasRef={canvasRef} />
     </div>
   );
 }

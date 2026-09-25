@@ -51,7 +51,7 @@ describe('change workflow tooling', () => {
   it('accepts historical sequential IDs but requires dated IDs for new changes', () => {
     expect(validateChangeId('CHANGE-001', '2026-07-27-docdd-current-and-change-specs')).toBeNull();
     expect(validateChangeId('CHANGE-054', 'CHANGE-054-export-format-select')).toBeNull();
-    expect(validateChangeId('CHANGE-055', 'CHANGE-055-next')).toContain('reserved for history');
+    expect(validateChangeId('CHANGE-057', 'CHANGE-057-next')).toContain('reserved for history');
     expect(validateChangeId('CHANGE-20260925-export-format', 'CHANGE-20260925-export-format')).toBeNull();
   });
 
