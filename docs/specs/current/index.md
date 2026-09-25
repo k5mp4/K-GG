@@ -20,6 +20,7 @@ title: 現行仕様
 | CURRENT-AFTER-EFFECTS-INTEGRATION | [After Effects連携](./after-effects-integration) | current |
 | CURRENT-DESIGN-APP-CONNECTORS | [Design App Direct Send](./design-app-connectors) | current |
 | CURRENT-APP-STARTUP | [起動とスプラッシュスクリーン](./app-startup) | current |
+| CURRENT-REALTIME-OUTPUT | [リアルタイム映像出力（Spout）](./realtime-output) | current |
 
 ## 読み方
 

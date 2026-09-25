@@ -19,3 +19,4 @@ Active ChangeはDesigned ChangeのPR中だけに置きます。mainへマージ�
 | CHANGE-053 | [Glass Organic／RippleとGlassTile Faceted・屈折率・色分散サンプル数](./CHANGE-053-glass-ior-dispersion/proposal) | draft |
 | CHANGE-054 | [書き出し形式のInputDrum化とFFmpeg動画形式の追加](./CHANGE-054-export-format-select/proposal) | review |
 | CHANGE-055 | [起動スプラッシュとEffect Stack Shaderの事前準備](./CHANGE-055-startup-splash-shader-warmup/proposal) | review |
+| CHANGE-056 | [Windows Desktop版のSpout出力](./CHANGE-056-spout-output/proposal) | review |
