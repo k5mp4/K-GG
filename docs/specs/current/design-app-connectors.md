@@ -5,10 +5,10 @@ title: Design App Direct Send
 status: current
 owners: [maintainer]
 created: 2026-09-21
-updated: 2026-09-25
+updated: 2026-09-24
 requirement_ids: [CONN-001, CONN-002, CONN-003, CONN-004, CONN-005, CONN-006]
 related_adrs: [ADR-0020, ADR-0021]
-related_changes: [CHANGE-050, CHANGE-052, CHANGE-054]
+related_changes: [CHANGE-050, CHANGE-052]
 related_code: [packages/kgg-image/src, src/integrations/connectors, src/components/DesignAppSendPanel.tsx, src/components/ExportPanel.tsx, src-tauri/src/design_app_bridge.rs, src-tauri/src/lib.rs, src-tauri/capabilities/default.json, connectors/figma, connectors/affinity]
 related_tests: []
 ---
@@ -23,7 +23,7 @@ K-GG Desktopで描画中のPNGをFigmaへ直接送る。ExportパネルにはAff
 
 ### CONN-001 接続
 
-K-GG DesktopはIPv4/IPv6 loopback上の`localhost:43127`でデザインアプリ用のローカル接続を開始する。利用者はFigma Pluginから接続をリクエストし、静止画Exportパネルで許可する。bridgeはブラウザからの要求をFigma Plugin UI（`null` origin）、K-GG Desktopのアプリorigin、Development用のK-GG Vite originに限定し、それ以外のOriginを持つ要求を状態変更前に403で拒否する。CORS応答は許可したOriginだけに返す。bridgeの同時接続数は32までとする。Affinityの接続許可は停止状態とし、Affinity向けbridge endpointは503応答を返す。
+K-GG DesktopはIPv4/IPv6 loopback上の`localhost:43127`でデザインアプリ用のローカル接続を開始する。利用者はFigma Pluginから接続をリクエストし、静止画Exportパネルで許可する。Affinityの接続許可は停止状態とし、Affinity向けbridge endpointは503応答を返す。
 
 ### CONN-002 K-GGから送信
 
@@ -51,9 +51,7 @@ Affinity送信先はExportパネルにグレー表示の「準備中」ボタン
 
 ### CONN-006 接続状態
 
-K-GGはFigmaの接続リクエスト、接続、送信待ち、送信完了、受信失敗の状態を表示する。利用者がK-GG上で接続を許可した後、アプリ別session tokenで送信先を識別する。
-
-接続リクエストごとに新しいリクエストIDと6桁の確認コードを発行し、リクエストIDは要求元へだけ返す。未許可のリクエストがある間に新しいリクエストが届いた場合は新しいリクエストで置き換え、古いIDではsession tokenを取得できない。許可済みでtoken受け取り待ちのリクエストは置き換えず、409応答を返す。K-GGの許可表示とFigma Pluginは同じ確認コードを表示し、利用者はコードが一致する場合だけ許可する。送信データはloopback接続内で扱う。Affinityは固定の準備中状態を表示する。
+K-GGはFigmaの接続リクエスト、接続、送信待ち、送信完了、受信失敗の状態を表示する。利用者がK-GG上で接続を許可した後、アプリ別session tokenで送信先を識別する。送信データはloopback接続内で扱う。Affinityは固定の準備中状態を表示する。
 
 未許可のFigma接続リクエストは2分で期限切れとなる。接続許可後、受信アプリは30秒以内にsession tokenを取得する。Figma送信は45秒以内に受信結果が届かない場合に失敗として終了する。
 

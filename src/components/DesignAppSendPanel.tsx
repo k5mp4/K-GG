@@ -283,13 +283,7 @@ function ConnectionRow({
       </div>
       {connection.connectionRequest && (
         <div className="mt-2 flex items-center gap-2 border-t border-panel-border/70 pt-2">
-          <div className="min-w-0 flex-1">
-            <p className="truncate text-[10px] text-k-text/80">{connection.connectionRequest.displayName} から接続リクエスト</p>
-            <p className="mt-0.5 text-[10px] text-deep">
-              確認コード <span className="font-mono font-semibold tracking-widest text-k-text">{connection.connectionRequest.verificationCode}</span>
-              <span> · 受信アプリの表示と一致する場合だけ許可</span>
-            </p>
-          </div>
+          <p className="min-w-0 flex-1 truncate text-[10px] text-k-text/80">{connection.connectionRequest.displayName} から接続リクエスト</p>
           <button
             type="button"
             onClick={() => onApprove(target, connection.connectionRequest!.id)}

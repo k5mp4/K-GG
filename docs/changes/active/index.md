@@ -17,4 +17,3 @@ Active ChangeはDesigned ChangeのPR中だけに置きます。mainへマージ�
 | CHANGE-051 | [配布時のライセンス表示と外部入力の安全性](./CHANGE-051-release-safety/proposal) | review |
 | CHANGE-052 | [macOSデスクトップ版の試験ビルドと配布](./CHANGE-052-macos-desktop-support/proposal) | review |
 | CHANGE-053 | [Glass Organic／RippleとGlassTile Faceted・屈折率・色分散サンプル数](./CHANGE-053-glass-ior-dispersion/proposal) | draft |
-| CHANGE-054 | [デザインアプリ接続bridgeの接続横取り対策](./CHANGE-054-design-app-bridge-hardening/proposal) | review |

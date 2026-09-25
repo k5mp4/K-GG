@@ -4,7 +4,6 @@ use std::fs;
 use std::io::{Read, Write};
 use std::net::{TcpListener, TcpStream};
 use std::path::PathBuf;
-use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex};
 use std::thread;
 use std::time::{Duration, Instant};
@@ -17,18 +16,6 @@ const BRIDGE_URL: &str = "http://localhost:43127";
 const AFFINITY_CONNECTOR_PAUSED_MESSAGE: &str =
     "Affinity連携はAffinity公式のスクリプト登録手順を確認後に再開します。";
 const ALLOWED_HOSTS: [&str; 3] = ["localhost:43127", BRIDGE_IPV4_ADDRESS, BRIDGE_IPV6_ADDRESS];
-/// ブラウザからの要求はOriginで送信元を限定する。Figma PluginのUI iframeは
-/// `null` originで動作し、K-GG本体はTauriのアプリoriginまたはdev serverで動作する。
-/// Originを持たない要求は同じPC上のブラウザ外プロセスとして扱う。
-const ALLOWED_ORIGINS: [&str; 6] = [
-    "null",
-    "tauri://localhost",
-    "http://tauri.localhost",
-    "https://tauri.localhost",
-    "http://127.0.0.1:5173",
-    "http://localhost:5173",
-];
-const MAX_ACTIVE_CONNECTIONS: usize = 32;
 const MAX_PNG_BYTES: usize = 20 * 1024 * 1024;
 const MAX_DIMENSION: u32 = 4096;
 const MAX_PIXELS: u64 = 16_777_216;
@@ -68,7 +55,6 @@ struct ClientSession {
 struct ConnectionRequest {
     id: String,
     display_name: String,
-    verification_code: String,
     created_at: Instant,
     approved_at: Option<Instant>,
     token: Option<String>,
@@ -79,7 +65,6 @@ struct ConnectionRequest {
 struct ConnectionRequestStatus {
     id: String,
     display_name: String,
-    verification_code: String,
 }
 
 struct Transfer {
@@ -229,11 +214,6 @@ fn new_secret() -> String {
     Uuid::new_v4().to_string()
 }
 
-/// 受信アプリとK-GGの許可画面に同じ値を表示し、利用者が接続元を照合できるようにする。
-fn new_verification_code() -> String {
-    format!("{:06}", Uuid::new_v4().as_u128() % 1_000_000)
-}
-
 fn expire_connection_request(request: &mut Option<ConnectionRequest>) {
     if request.as_ref().is_some_and(|request| {
         request.approved_at.map_or_else(
@@ -262,7 +242,6 @@ fn connector_status(
             request.token.is_none().then(|| ConnectionRequestStatus {
                 id: request.id.clone(),
                 display_name: request.display_name.clone(),
-                verification_code: request.verification_code.clone(),
             })
         }),
         last_transfer: last_transfer.clone(),
@@ -460,50 +439,14 @@ pub fn dismiss_design_app_connection_request(
     state.dismiss_connection(&target, &request_id)
 }
 
-static ACTIVE_CONNECTIONS: AtomicUsize = AtomicUsize::new(0);
-
-struct ConnectionSlot;
-
-impl ConnectionSlot {
-    fn acquire() -> Option<Self> {
-        ACTIVE_CONNECTIONS
-            .fetch_update(Ordering::AcqRel, Ordering::Acquire, |active| {
-                (active < MAX_ACTIVE_CONNECTIONS).then_some(active + 1)
-            })
-            .ok()
-            .map(|_| Self)
-    }
-}
-
-impl Drop for ConnectionSlot {
-    fn drop(&mut self) {
-        ACTIVE_CONNECTIONS.fetch_sub(1, Ordering::AcqRel);
-    }
-}
-
 fn serve(listener: TcpListener, state: Arc<Mutex<BridgeState>>) {
     for connection in listener.incoming() {
         match connection {
-            Ok(mut stream) => {
-                // 同時接続数を制限し、大量接続でスレッドとメモリを使い切られないようにする。
-                let Some(slot) = ConnectionSlot::acquire() else {
-                    let _ = write_response(
-                        &mut stream,
-                        json_response(
-                            429,
-                            &serde_json::json!({ "error": "Too many connections." }),
-                        ),
-                        None,
-                    );
-                    continue;
-                };
+            Ok(stream) => {
                 let state = Arc::clone(&state);
                 let _ = thread::Builder::new()
                     .name("kgg-design-app-request".to_string())
-                    .spawn(move || {
-                        let _slot = slot;
-                        handle_connection(stream, state);
-                    });
+                    .spawn(move || handle_connection(stream, state));
             }
             Err(_) => thread::sleep(Duration::from_millis(20)),
         }
@@ -520,7 +463,6 @@ fn handle_connection(mut stream: TcpStream, state: Arc<Mutex<BridgeState>>) {
             let _ = write_response(
                 &mut stream,
                 json_response(error.status, &serde_json::json!({ "error": error.message })),
-                None,
             );
             return;
         }
@@ -533,33 +475,17 @@ fn handle_connection(mut stream: TcpStream, state: Arc<Mutex<BridgeState>>) {
                 403,
                 &serde_json::json!({ "error": "Local host is not allowed." }),
             ),
-            None,
         );
         return;
     }
 
-    let cors_origin = match request_origin(&request) {
-        Ok(origin) => origin,
-        Err(()) => {
-            let _ = write_response(
-                &mut stream,
-                json_response(
-                    403,
-                    &serde_json::json!({ "error": "Request origin is not allowed." }),
-                ),
-                None,
-            );
-            return;
-        }
-    };
-
     if request.method == "OPTIONS" {
-        let _ = write_response(&mut stream, empty_response(204), cors_origin.as_deref());
+        let _ = write_response(&mut stream, empty_response(204));
         return;
     }
 
     let response = route_request(request, &state);
-    let _ = write_response(&mut stream, response, cors_origin.as_deref());
+    let _ = write_response(&mut stream, response);
 }
 
 fn read_request(stream: &mut TcpStream) -> Result<HttpRequest, HttpRequestError> {
@@ -665,16 +591,6 @@ fn read_request(stream: &mut TcpStream) -> Result<HttpRequest, HttpRequestError>
     })
 }
 
-/// 許可済みOriginならCORS応答に返すOriginを返す。Originなしは`Ok(None)`、
-/// 許可外のブラウザOriginは`Err(())`として状態変更前に拒否する。
-fn request_origin(request: &HttpRequest) -> Result<Option<String>, ()> {
-    match request.headers.get("origin") {
-        None => Ok(None),
-        Some(origin) if ALLOWED_ORIGINS.contains(&origin.as_str()) => Ok(Some(origin.clone())),
-        Some(_) => Err(()),
-    }
-}
-
 fn valid_host(request: &HttpRequest) -> bool {
     request.headers.get("host").is_some_and(|host| {
         ALLOWED_HOSTS
@@ -768,34 +684,31 @@ fn request_connection(
         );
     };
     state.expire_connection_requests();
-    let slot = match target {
-        ConnectorTarget::Figma => &mut state.figma_connection_request,
-        ConnectorTarget::Affinity => &mut state.affinity_connection_request,
+    let existing = match target {
+        ConnectorTarget::Figma => state.figma_connection_request.as_ref(),
+        ConnectorTarget::Affinity => state.affinity_connection_request.as_ref(),
     };
-    // 許可済みでsession token受け取り待ちの要求は、別の要求で置き換えない。
-    if slot.as_ref().is_some_and(|request| request.token.is_some()) {
-        return json_response(
-            409,
-            &serde_json::json!({ "error": "Another connection is being completed. Retry shortly." }),
-        );
-    }
-    // 要求IDはtoken取得に使う秘密値なので、既存要求のIDを別の要求元へ返さない。
-    // 未許可の要求は新しい要求で置き換え、許可画面には最新の要求だけを表示する。
-    let request = ConnectionRequest {
-        id: new_secret(),
-        display_name: display_name.to_string(),
-        verification_code: new_verification_code(),
-        created_at: Instant::now(),
-        approved_at: None,
-        token: None,
+    let id = if let Some(request) = existing {
+        request.id.clone()
+    } else {
+        let request = ConnectionRequest {
+            id: new_secret(),
+            display_name: display_name.to_string(),
+            created_at: Instant::now(),
+            approved_at: None,
+            token: None,
+        };
+        let id = request.id.clone();
+        match target {
+            ConnectorTarget::Figma => state.figma_connection_request = Some(request),
+            ConnectorTarget::Affinity => state.affinity_connection_request = Some(request),
+        }
+        id
     };
-    let response = serde_json::json!({
-        "id": request.id,
-        "verificationCode": request.verification_code,
-        "status": "approval-required",
-    });
-    *slot = Some(request);
-    json_response(202, &response)
+    json_response(
+        202,
+        &serde_json::json!({ "id": id, "status": "approval-required" }),
+    )
 }
 
 fn connection_status(
@@ -1320,11 +1233,7 @@ fn status_text(status: u16) -> &'static str {
     }
 }
 
-fn write_response(
-    stream: &mut TcpStream,
-    response: HttpResponse,
-    cors_origin: Option<&str>,
-) -> std::io::Result<()> {
+fn write_response(stream: &mut TcpStream, response: HttpResponse) -> std::io::Result<()> {
     write!(
         stream,
         "HTTP/1.1 {} {}\r\n",
@@ -1335,10 +1244,7 @@ fn write_response(
     write!(stream, "Content-Length: {}\r\n", response.body.len())?;
     write!(stream, "Connection: close\r\n")?;
     write!(stream, "Cache-Control: no-store\r\n")?;
-    write!(stream, "Vary: Origin\r\n")?;
-    if let Some(origin) = cors_origin {
-        write!(stream, "Access-Control-Allow-Origin: {origin}\r\n")?;
-    }
+    write!(stream, "Access-Control-Allow-Origin: *\r\n")?;
     write!(
         stream,
         "Access-Control-Allow-Methods: GET, POST, OPTIONS\r\n"
@@ -1356,109 +1262,4 @@ fn write_response(
     write!(stream, "\r\n")?;
     stream.write_all(&response.body)?;
     stream.flush()
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    fn shared_state() -> Arc<Mutex<BridgeState>> {
-        Arc::new(Mutex::new(BridgeState::new()))
-    }
-
-    fn body_json(response: &HttpResponse) -> serde_json::Value {
-        serde_json::from_slice(&response.body).expect("response body should be JSON")
-    }
-
-    fn request_with_origin(origin: Option<&str>) -> HttpRequest {
-        let mut headers = HashMap::new();
-        headers.insert("host".to_string(), "localhost:43127".to_string());
-        if let Some(origin) = origin {
-            headers.insert("origin".to_string(), origin.to_string());
-        }
-        HttpRequest {
-            method: "POST".to_string(),
-            path_and_query: "/api/connect/figma".to_string(),
-            headers,
-            body: Vec::new(),
-        }
-    }
-
-    #[test]
-    fn accepts_only_allowed_browser_origins() {
-        assert_eq!(request_origin(&request_with_origin(None)), Ok(None));
-        assert_eq!(
-            request_origin(&request_with_origin(Some("null"))),
-            Ok(Some("null".to_string()))
-        );
-        assert_eq!(
-            request_origin(&request_with_origin(Some("http://tauri.localhost"))),
-            Ok(Some("http://tauri.localhost".to_string()))
-        );
-        assert_eq!(
-            request_origin(&request_with_origin(Some("https://example.com"))),
-            Err(())
-        );
-    }
-
-    #[test]
-    fn issues_a_new_request_id_to_each_requester() {
-        let shared = shared_state();
-        let first = body_json(&request_connection(
-            "Figma",
-            ConnectorTarget::Figma,
-            &shared,
-        ));
-        let second = body_json(&request_connection(
-            "Figma",
-            ConnectorTarget::Figma,
-            &shared,
-        ));
-        let first_id = first["id"].as_str().expect("first id");
-        let second_id = second["id"].as_str().expect("second id");
-
-        assert_ne!(first_id, second_id);
-        let code = second["verificationCode"]
-            .as_str()
-            .expect("verification code");
-        assert_eq!(code.len(), 6);
-        assert!(code.chars().all(|character| character.is_ascii_digit()));
-
-        let mut query = HashMap::new();
-        query.insert("id".to_string(), first_id.to_string());
-        let replaced = connection_status(&query, ConnectorTarget::Figma, &shared);
-        assert_eq!(
-            replaced.status, 404,
-            "a replaced request id must not stay valid"
-        );
-    }
-
-    #[test]
-    fn returns_the_session_token_only_to_the_approved_request_id() {
-        let shared = shared_state();
-        let bridge = DesignAppConnectorBridge {
-            inner: Arc::clone(&shared),
-        };
-        let created = body_json(&request_connection(
-            "Figma",
-            ConnectorTarget::Figma,
-            &shared,
-        ));
-        let id = created["id"].as_str().expect("request id").to_string();
-        bridge
-            .approve_connection("figma", &id)
-            .expect("approve pending request");
-
-        let late = request_connection("Figma", ConnectorTarget::Figma, &shared);
-        assert_eq!(
-            late.status, 409,
-            "an approved request waiting for token pickup must not be replaced"
-        );
-
-        let mut query = HashMap::new();
-        query.insert("id".to_string(), id);
-        let status = connection_status(&query, ConnectorTarget::Figma, &shared);
-        assert_eq!(status.status, 200);
-        assert!(body_json(&status)["token"].is_string());
-    }
 }

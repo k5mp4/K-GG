@@ -11,7 +11,7 @@ export type DesignAppConnectionStatus = {
   connected: boolean;
   displayName: string | null;
   pending: boolean;
-  connectionRequest: { id: string; displayName: string; verificationCode: string } | null;
+  connectionRequest: { id: string; displayName: string } | null;
   lastTransfer: { id: string; status: 'queued' | 'delivered' | 'failed'; message: string | null } | null;
 };
 
