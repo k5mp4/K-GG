@@ -1,6 +1,6 @@
 ---
 type: change
-id: CHANGE-054
+id: CHANGE-055
 title: 起動スプラッシュとEffect Stack Shaderの事前準備
 status: review
 change_kind: F
@@ -14,7 +14,7 @@ related_tests: [src/lib/webglCompilePolicy.test.ts, src/lib/shaderWarmup.test.ts
 human_review: required
 ---
 
-# CHANGE-054 起動スプラッシュとEffect Stack Shaderの事前準備
+# CHANGE-055 起動スプラッシュとEffect Stack Shaderの事前準備
 
 ## 背景・問題
 

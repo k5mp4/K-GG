@@ -275,6 +275,13 @@ fn is_within(base: &Path, candidate: &Path) -> bool {
     candidate == base || candidate.strip_prefix(base).is_ok()
 }
 
+/// ネイティブ動画成果物として保存できる拡張子。After Effects送信可能な形式より広い。
+const NATIVE_VIDEO_SAVE_EXTENSIONS: [&str; 4] = ["mov", "mp4", "gif", "webm"];
+
+fn is_native_video_save_extension(extension: &str) -> bool {
+    NATIVE_VIDEO_SAVE_EXTENSIONS.contains(&extension.to_ascii_lowercase().as_str())
+}
+
 fn validate_input_path(
     path: &Path,
     extension: &str,
@@ -284,6 +291,13 @@ fn validate_input_path(
     if !matches!(extension.as_str(), "png" | "mov" | "mp4") {
         return Err("PNG、MOV、MP4以外の送信形式は許可されていません。".to_string());
     }
+    validate_input_file(path, allow_authorized_export)
+}
+
+fn validate_input_file(
+    path: &Path,
+    allow_authorized_export: bool,
+) -> Result<(PathBuf, u64), String> {
     if is_link_or_reparse_point(path)? {
         return Err("リンクまたは再解析ポイントの入力は許可されていません。".to_string());
     }
@@ -314,8 +328,8 @@ fn validate_input_path(
 
 fn validate_native_video_output_path(path: &Path, extension: &str) -> Result<PathBuf, String> {
     let extension = extension.to_ascii_lowercase();
-    if !matches!(extension.as_str(), "mov" | "mp4") {
-        return Err("MOVまたはMP4の保存先だけを指定できます。".to_string());
+    if !is_native_video_save_extension(&extension) {
+        return Err("MOV、MP4、GIF、WebMの保存先だけを指定できます。".to_string());
     }
     let file_name = path
         .file_name()
@@ -351,7 +365,18 @@ fn save_native_video_artifact_sync(
         .extension()
         .and_then(|value| value.to_str())
         .ok_or_else(|| "Exportファイルの拡張子がありません。".to_string())?;
-    let (source, source_size) = validate_input_path(input_path, extension, false)?;
+    if !is_native_video_save_extension(extension) {
+        return Err("MOV、MP4、GIF、WebM以外の動画は保存できません。".to_string());
+    }
+    let source_extension = input_path
+        .extension()
+        .and_then(|value| value.to_str())
+        .map(str::to_ascii_lowercase)
+        .ok_or_else(|| "送信元ファイルの拡張子がありません。".to_string())?;
+    if source_extension != extension.to_ascii_lowercase() {
+        return Err("送信元ファイルの拡張子が保存形式と一致しません。".to_string());
+    }
+    let (source, source_size) = validate_input_file(input_path, false)?;
     let target = validate_native_video_output_path(Path::new(&request.output_path), extension)?;
     let target = fs::canonicalize(target.parent().expect("validated parent"))
         .map_err(|err| format!("Export先フォルダーを正規化できませんでした: {err}"))?
@@ -1520,6 +1545,66 @@ mod tests {
             .lock()
             .expect("lock authorized export paths")
             .remove(&canonical_target);
+        let _ = std::fs::remove_dir_all(&workspace);
+    }
+
+    #[test]
+    fn native_video_save_accepts_gif_and_webm_but_rejects_mismatched_extensions() {
+        let workspace = temp_root().join(format!("test-native-save-formats-{}", Uuid::new_v4()));
+        let output_dir = workspace.join("exports");
+        std::fs::create_dir_all(&output_dir).expect("create native save fixture");
+        let mut registered = Vec::new();
+
+        for extension in ["gif", "webm"] {
+            let source = workspace.join(format!("output.{extension}"));
+            let target = output_dir.join(format!("gradient.{extension}"));
+            std::fs::write(&source, extension.as_bytes()).expect("write native video fixture");
+            let saved = save_native_video_artifact_sync(
+                NativeVideoSaveRequest {
+                    input_path: source.to_string_lossy().to_string(),
+                    output_path: target.to_string_lossy().to_string(),
+                },
+                |_| true,
+            )
+            .expect("GIF / WebM save should succeed");
+            assert_eq!(std::fs::read(&target).unwrap(), extension.as_bytes());
+            registered.push(PathBuf::from(saved));
+        }
+
+        let mismatched = save_native_video_artifact_sync(
+            NativeVideoSaveRequest {
+                input_path: workspace.join("output.gif").to_string_lossy().to_string(),
+                output_path: output_dir
+                    .join("gradient.mp4")
+                    .to_string_lossy()
+                    .to_string(),
+            },
+            |_| true,
+        );
+        assert!(mismatched.is_err());
+
+        let unsupported_source = workspace.join("output.avi");
+        std::fs::write(&unsupported_source, b"avi").expect("write unsupported fixture");
+        let unsupported = save_native_video_artifact_sync(
+            NativeVideoSaveRequest {
+                input_path: unsupported_source.to_string_lossy().to_string(),
+                output_path: output_dir
+                    .join("gradient.avi")
+                    .to_string_lossy()
+                    .to_string(),
+            },
+            |_| true,
+        );
+        assert!(unsupported.is_err());
+        assert!(validate_input_path(&workspace.join("output.gif"), "gif", false).is_err());
+
+        let mut authorized = AUTHORIZED_EXPORT_PATHS
+            .lock()
+            .expect("lock authorized export paths");
+        for path in registered {
+            authorized.remove(&path);
+        }
+        drop(authorized);
         let _ = std::fs::remove_dir_all(&workspace);
     }
 }

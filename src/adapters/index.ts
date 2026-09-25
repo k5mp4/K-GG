@@ -40,10 +40,11 @@ export type {
   ExportService,
   Mp4QualityPreset,
   NativeVideoArtifact,
+  NativeVideoFormat,
   NativeFfmpegStatus,
   PresetRepository,
   VideoExportConfig,
   VideoExportFrameRenderer,
   VideoExportService,
 } from './types';
-export { MP4_QUALITY_PRESETS } from './types';
+export { GIF_MAX_FILE_MB, MP4_QUALITY_PRESETS } from './types';
