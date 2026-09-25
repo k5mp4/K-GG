@@ -39,8 +39,7 @@ pub fn run() {
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
-            encode_qtrle_mov,
-            encode_h264_rgb_mp4,
+            encode_native_video,
             get_native_ffmpeg_status,
             open_native_ffmpeg_folder,
             open_figma_connector_folder,
@@ -75,6 +74,8 @@ struct NativeFfmpegStatus {
     folder_path: Option<String>,
     ffprobe_path: Option<String>,
     ffprobe_version: Option<String>,
+    /// 検出したFFmpegで書き出せる動画形式ID（`NativeVideoFormat::id`）。
+    video_formats: Vec<&'static str>,
 }
 
 #[derive(Debug)]
@@ -88,6 +89,7 @@ struct CommandResult {
 struct ValidatedFfmpeg {
     path: PathBuf,
     version: String,
+    video_formats: Vec<&'static str>,
 }
 
 struct CandidateSelection<T> {
@@ -297,6 +299,103 @@ fn mp4_crf_for_quality(quality: &str) -> Result<u8, String> {
     }
 }
 
+fn webm_crf_for_quality(quality: &str) -> Result<u8, String> {
+    match quality {
+        "high" => Ok(24),
+        "balanced" => Ok(31),
+        "small" => Ok(38),
+        _ => Err(format!("WebM品質設定が不正です: {quality}")),
+    }
+}
+
+/// FFmpegで書き出す動画形式の登録表。
+///
+/// 形式を追加する場合は、列挙子・ID・エンコーダー・出力ファイル名・FFmpeg引数を
+/// ここへ追加し、フロントエンドの`src/lib/videoExportFormats.ts`へ同じIDを登録する。
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum NativeVideoFormat {
+    Mov,
+    Mp4,
+    Gif,
+    Webm,
+}
+
+impl NativeVideoFormat {
+    const ALL: [NativeVideoFormat; 4] = [
+        NativeVideoFormat::Mov,
+        NativeVideoFormat::Mp4,
+        NativeVideoFormat::Gif,
+        NativeVideoFormat::Webm,
+    ];
+
+    fn parse(value: &str) -> Result<Self, String> {
+        Self::ALL
+            .into_iter()
+            .find(|format| format.id() == value)
+            .ok_or_else(|| format!("動画書き出し形式が不正です: {value}"))
+    }
+
+    fn id(self) -> &'static str {
+        match self {
+            NativeVideoFormat::Mov => "mov",
+            NativeVideoFormat::Mp4 => "mp4",
+            NativeVideoFormat::Gif => "gif",
+            NativeVideoFormat::Webm => "webm",
+        }
+    }
+
+    fn encoder(self) -> &'static str {
+        match self {
+            NativeVideoFormat::Mov => "qtrle",
+            NativeVideoFormat::Mp4 => "libx264",
+            NativeVideoFormat::Gif => "gif",
+            NativeVideoFormat::Webm => "libvpx-vp9",
+        }
+    }
+
+    /// FFmpegを利用可能と判定するために必須のエンコーダーか。
+    /// 任意形式はエンコーダーがあるビルドだけで選択肢に出す。
+    fn required(self) -> bool {
+        matches!(self, NativeVideoFormat::Mov | NativeVideoFormat::Mp4)
+    }
+
+    fn output_filename(self) -> &'static str {
+        match self {
+            NativeVideoFormat::Mov => "output.mov",
+            NativeVideoFormat::Mp4 => "output.mp4",
+            NativeVideoFormat::Gif => "output.gif",
+            NativeVideoFormat::Webm => "output.webm",
+        }
+    }
+
+    fn ffmpeg_args(
+        self,
+        input_pattern: &Path,
+        output_path: &Path,
+        fps: u32,
+        quality: &str,
+    ) -> Result<Vec<String>, String> {
+        match self {
+            NativeVideoFormat::Mov => Ok(qtrle_ffmpeg_args(input_pattern, output_path, fps)),
+            NativeVideoFormat::Mp4 => {
+                h264_rgb_ffmpeg_args(input_pattern, output_path, fps, quality)
+            }
+            NativeVideoFormat::Gif => Ok(gif_ffmpeg_args(input_pattern, output_path, fps)),
+            NativeVideoFormat::Webm => {
+                vp9_webm_ffmpeg_args(input_pattern, output_path, fps, quality)
+            }
+        }
+    }
+}
+
+fn available_video_formats(encoders: &str) -> Vec<&'static str> {
+    NativeVideoFormat::ALL
+        .into_iter()
+        .filter(|format| encoder_list_has(encoders, format.encoder()))
+        .map(NativeVideoFormat::id)
+        .collect()
+}
+
 fn validate_ffmpeg(path: &Path) -> Result<ValidatedFfmpeg, String> {
     if !path.is_file() {
         return Err("ファイルが見つかりません。".to_string());
@@ -328,13 +427,11 @@ fn validate_ffmpeg(path: &Path) -> Result<ValidatedFfmpeg, String> {
         return Err("FFmpegのエンコーダー一覧を取得できませんでした。".to_string());
     }
     let encoders = format!("{}\n{}", encoders_output.stdout, encoders_output.stderr);
-    let mut missing = Vec::new();
-    if !encoder_list_has(&encoders, "qtrle") {
-        missing.push("qtrle");
-    }
-    if !encoder_list_has(&encoders, "libx264") {
-        missing.push("libx264");
-    }
+    let missing = NativeVideoFormat::ALL
+        .into_iter()
+        .filter(|format| format.required() && !encoder_list_has(&encoders, format.encoder()))
+        .map(NativeVideoFormat::encoder)
+        .collect::<Vec<_>>();
     if !missing.is_empty() {
         return Err(format!(
             "必要なエンコーダーがありません: {}",
@@ -345,6 +442,7 @@ fn validate_ffmpeg(path: &Path) -> Result<ValidatedFfmpeg, String> {
     Ok(ValidatedFfmpeg {
         path: path.to_path_buf(),
         version,
+        video_formats: available_video_formats(&encoders),
     })
 }
 
@@ -558,6 +656,7 @@ fn status_from_validated(
             .as_ref()
             .map(|(path, _)| path.to_string_lossy().into_owned()),
         ffprobe_version: ffprobe.map(|(_, version)| version),
+        video_formats: validated.video_formats,
     }
 }
 
@@ -577,6 +676,7 @@ fn native_ffmpeg_status(app: &tauri::AppHandle) -> NativeFfmpegStatus {
             folder_path: None,
             ffprobe_path: None,
             ffprobe_version: None,
+            video_formats: Vec::new(),
         };
     }
 
@@ -656,6 +756,7 @@ fn native_ffmpeg_status(app: &tauri::AppHandle) -> NativeFfmpegStatus {
             .as_ref()
             .map(|(path, _)| path.to_string_lossy().into_owned()),
         ffprobe_version: ffprobe.map(|(_, version)| version),
+        video_formats: Vec::new(),
     }
 }
 
@@ -1086,23 +1187,15 @@ fn validate_video_export_path(
 }
 
 fn qtrle_ffmpeg_args(input_pattern: &Path, output_path: &Path, fps: u32) -> Vec<String> {
-    vec![
-        "-y".to_string(),
-        "-hide_banner".to_string(),
-        "-loglevel".to_string(),
-        "error".to_string(),
-        "-framerate".to_string(),
-        fps.to_string(),
-        "-start_number".to_string(),
-        "0".to_string(),
-        "-i".to_string(),
-        input_pattern.to_string_lossy().into_owned(),
+    let mut args = image_sequence_input_args(input_pattern, fps);
+    args.extend([
         "-c:v".to_string(),
         "qtrle".to_string(),
         "-pix_fmt".to_string(),
         "rgb24".to_string(),
         output_path.to_string_lossy().into_owned(),
-    ]
+    ]);
+    args
 }
 
 fn h264_rgb_ffmpeg_args(
@@ -1111,17 +1204,8 @@ fn h264_rgb_ffmpeg_args(
     fps: u32,
     quality: &str,
 ) -> Result<Vec<String>, String> {
-    Ok(vec![
-        "-y".to_string(),
-        "-hide_banner".to_string(),
-        "-loglevel".to_string(),
-        "error".to_string(),
-        "-framerate".to_string(),
-        fps.to_string(),
-        "-start_number".to_string(),
-        "0".to_string(),
-        "-i".to_string(),
-        input_pattern.to_string_lossy().into_owned(),
+    let mut args = image_sequence_input_args(input_pattern, fps);
+    args.extend([
         "-c:v".to_string(),
         "libx264".to_string(),
         "-crf".to_string(),
@@ -1145,23 +1229,102 @@ fn h264_rgb_ffmpeg_args(
         "-movflags".to_string(),
         "+faststart".to_string(),
         output_path.to_string_lossy().into_owned(),
-    ])
+    ]);
+    Ok(args)
 }
 
-fn encode_qtrle_mov_blocking(
+fn image_sequence_input_args(input_pattern: &Path, fps: u32) -> Vec<String> {
+    vec![
+        "-y".to_string(),
+        "-hide_banner".to_string(),
+        "-loglevel".to_string(),
+        "error".to_string(),
+        "-framerate".to_string(),
+        fps.to_string(),
+        "-start_number".to_string(),
+        "0".to_string(),
+        "-i".to_string(),
+        input_pattern.to_string_lossy().into_owned(),
+    ]
+}
+
+fn gif_ffmpeg_args(input_pattern: &Path, output_path: &Path, fps: u32) -> Vec<String> {
+    let mut args = image_sequence_input_args(input_pattern, fps);
+    args.extend([
+        // 全フレームから256色パレットを生成し、同じ入力へ適用する2段フィルター。
+        "-filter_complex".to_string(),
+        "[0:v]split[a][b];[a]palettegen=stats_mode=diff[p];[b][p]paletteuse=dither=sierra2_4a:diff_mode=rectangle".to_string(),
+        "-c:v".to_string(),
+        "gif".to_string(),
+        "-loop".to_string(),
+        "0".to_string(),
+        output_path.to_string_lossy().into_owned(),
+    ]);
+    args
+}
+
+fn vp9_webm_ffmpeg_args(
+    input_pattern: &Path,
+    output_path: &Path,
+    fps: u32,
+    quality: &str,
+) -> Result<Vec<String>, String> {
+    let mut args = image_sequence_input_args(input_pattern, fps);
+    args.extend([
+        "-c:v".to_string(),
+        "libvpx-vp9".to_string(),
+        "-crf".to_string(),
+        webm_crf_for_quality(quality)?.to_string(),
+        "-b:v".to_string(),
+        "0".to_string(),
+        "-deadline".to_string(),
+        "good".to_string(),
+        "-cpu-used".to_string(),
+        "2".to_string(),
+        "-row-mt".to_string(),
+        "1".to_string(),
+        "-vf".to_string(),
+        "pad=ceil(iw/2)*2:ceil(ih/2)*2:0:0,format=yuv420p,setsar=1".to_string(),
+        "-pix_fmt".to_string(),
+        "yuv420p".to_string(),
+        "-color_range".to_string(),
+        "tv".to_string(),
+        "-colorspace".to_string(),
+        "bt709".to_string(),
+        "-color_primaries".to_string(),
+        "bt709".to_string(),
+        "-color_trc".to_string(),
+        "bt709".to_string(),
+        output_path.to_string_lossy().into_owned(),
+    ]);
+    Ok(args)
+}
+
+fn encode_native_video_blocking(
     app: tauri::AppHandle,
+    format: String,
     input_pattern: String,
     output_path: String,
     fps: u32,
+    quality: String,
 ) -> Result<(), String> {
-    let ffmpeg_path = native_ffmpeg_status(&app)
+    let format = NativeVideoFormat::parse(&format)?;
+    let status = native_ffmpeg_status(&app);
+    let ffmpeg_path = status
         .path
         .ok_or_else(|| "利用可能なFFmpegが見つかりません。".to_string())?;
+    if !status.video_formats.contains(&format.id()) {
+        return Err(format!(
+            "検出したFFmpegは{}エンコーダーに対応していません。",
+            format.encoder()
+        ));
+    }
     let input_pattern =
         validate_video_export_path(&input_pattern, "frame_%04d.png", "入力パターン")?;
-    let output_path = validate_video_export_path(&output_path, "output.mov", "出力ファイル")?;
+    let output_path =
+        validate_video_export_path(&output_path, format.output_filename(), "出力ファイル")?;
     let mut command = Command::new(&ffmpeg_path);
-    command.args(qtrle_ffmpeg_args(&input_pattern, &output_path, fps));
+    command.args(format.ffmpeg_args(&input_pattern, &output_path, fps, &quality)?);
     configure_hidden_command(&mut command);
     let output = command
         .output()
@@ -1173,73 +1336,27 @@ fn encode_qtrle_mov_blocking(
 
     let stderr = String::from_utf8_lossy(&output.stderr);
     Err(if stderr.trim().is_empty() {
-        "FFmpeg エンコードに失敗しました。".to_string()
-    } else {
-        stderr.trim().to_string()
-    })
-}
-
-fn encode_h264_rgb_mp4_blocking(
-    app: tauri::AppHandle,
-    input_pattern: String,
-    output_path: String,
-    fps: u32,
-    quality: String,
-) -> Result<(), String> {
-    let ffmpeg_path = native_ffmpeg_status(&app)
-        .path
-        .ok_or_else(|| "利用可能なFFmpegが見つかりません。".to_string())?;
-    let input_pattern =
-        validate_video_export_path(&input_pattern, "frame_%04d.png", "入力パターン")?;
-    let output_path = validate_video_export_path(&output_path, "output.mp4", "出力ファイル")?;
-    let mut command = Command::new(&ffmpeg_path);
-    command.args(h264_rgb_ffmpeg_args(
-        &input_pattern,
-        &output_path,
-        fps,
-        &quality,
-    )?);
-    configure_hidden_command(&mut command);
-    let output = command
-        .output()
-        .map_err(|err| format!("FFmpeg の起動に失敗しました: {err}"))?;
-
-    if output.status.success() {
-        return Ok(());
-    }
-
-    let stderr = String::from_utf8_lossy(&output.stderr);
-    Err(if stderr.trim().is_empty() {
-        "FFmpeg MP4 エンコードに失敗しました。".to_string()
+        format!(
+            "FFmpeg {} エンコードに失敗しました。",
+            format.id().to_ascii_uppercase()
+        )
     } else {
         stderr.trim().to_string()
     })
 }
 
 #[tauri::command]
-async fn encode_qtrle_mov(
+async fn encode_native_video(
     app: tauri::AppHandle,
+    format: String,
     input_pattern: String,
     output_path: String,
     fps: u32,
+    quality: Option<String>,
 ) -> Result<(), String> {
+    let quality = quality.unwrap_or_else(|| "high".to_string());
     tauri::async_runtime::spawn_blocking(move || {
-        encode_qtrle_mov_blocking(app, input_pattern, output_path, fps)
-    })
-    .await
-    .map_err(|err| format!("FFmpeg処理スレッドが終了しました: {err}"))?
-}
-
-#[tauri::command]
-async fn encode_h264_rgb_mp4(
-    app: tauri::AppHandle,
-    input_pattern: String,
-    output_path: String,
-    fps: u32,
-    quality: String,
-) -> Result<(), String> {
-    tauri::async_runtime::spawn_blocking(move || {
-        encode_h264_rgb_mp4_blocking(app, input_pattern, output_path, fps, quality)
+        encode_native_video_blocking(app, format, input_pattern, output_path, fps, quality)
     })
     .await
     .map_err(|err| format!("FFmpeg処理スレッドが終了しました: {err}"))?
@@ -1248,10 +1365,11 @@ async fn encode_h264_rgb_mp4(
 #[cfg(test)]
 mod tests {
     use super::{
-        append_ffmpeg_candidates_from_path_value, backup_path, choose_candidate, encoder_list_has,
-        h264_rgb_ffmpeg_args, migrate_legacy_presets, mp4_crf_for_quality, qtrle_ffmpeg_args,
-        recover_interrupted_write, replace_presets_file, validate_video_export_path,
-        VIDEO_EXPORT_TEMP_DIR,
+        append_ffmpeg_candidates_from_path_value, available_video_formats, backup_path,
+        choose_candidate, encoder_list_has, gif_ffmpeg_args, h264_rgb_ffmpeg_args,
+        migrate_legacy_presets, mp4_crf_for_quality, qtrle_ffmpeg_args, recover_interrupted_write,
+        replace_presets_file, validate_video_export_path, vp9_webm_ffmpeg_args,
+        webm_crf_for_quality, NativeVideoFormat, VIDEO_EXPORT_TEMP_DIR,
     };
     use std::path::{Path, PathBuf};
     use std::time::{SystemTime, UNIX_EPOCH};
@@ -1352,6 +1470,82 @@ mod tests {
         assert!(has_pair(&args, "-movflags", "+faststart"));
         assert_eq!(args.last().map(String::as_str), Some("C:\\kgg\\output.mp4"));
         assert!(h264_rgb_ffmpeg_args(Path::new("in"), Path::new("out"), 24, "invalid").is_err());
+    }
+
+    #[test]
+    fn registers_native_video_formats_with_unique_ids_and_output_names() {
+        for format in NativeVideoFormat::ALL {
+            assert_eq!(NativeVideoFormat::parse(format.id()).unwrap(), format);
+            assert_eq!(
+                format.output_filename(),
+                format!("output.{}", format.id()),
+                "output filename must use the format id as extension"
+            );
+        }
+        assert!(NativeVideoFormat::parse("avi").is_err());
+        assert!(NativeVideoFormat::Mov.required());
+        assert!(NativeVideoFormat::Mp4.required());
+        assert!(!NativeVideoFormat::Gif.required());
+        assert!(!NativeVideoFormat::Webm.required());
+    }
+
+    #[test]
+    fn lists_only_video_formats_whose_encoder_is_available() {
+        let output =
+            " V....D qtrle   QuickTime Animation\n V....D libx264   H.264\n V....D gif   GIF";
+        assert_eq!(available_video_formats(output), vec!["mov", "mp4", "gif"]);
+        let with_vp9 = format!("{output}\n V....D libvpx-vp9   libvpx VP9");
+        assert_eq!(
+            available_video_formats(&with_vp9),
+            vec!["mov", "mp4", "gif", "webm"]
+        );
+    }
+
+    #[test]
+    fn builds_gif_arguments_with_generated_palette_and_infinite_loop() {
+        let args = gif_ffmpeg_args(
+            Path::new("C:\\kgg\\frame_%04d.png"),
+            Path::new("C:\\kgg\\output.gif"),
+            30,
+        );
+
+        assert!(has_pair(&args, "-framerate", "30"));
+        assert!(has_pair(&args, "-start_number", "0"));
+        assert!(has_pair(&args, "-c:v", "gif"));
+        assert!(has_pair(&args, "-loop", "0"));
+        let filter = args
+            .windows(2)
+            .find(|pair| pair[0] == "-filter_complex")
+            .map(|pair| pair[1].as_str())
+            .expect("GIF export must use a palette filter graph");
+        assert!(filter.contains("palettegen"));
+        assert!(filter.contains("paletteuse"));
+        assert_eq!(args.last().map(String::as_str), Some("C:\\kgg\\output.gif"));
+    }
+
+    #[test]
+    fn builds_vp9_webm_arguments_with_quality_and_color_metadata() {
+        assert_eq!(webm_crf_for_quality("high").unwrap(), 24);
+        assert_eq!(webm_crf_for_quality("balanced").unwrap(), 31);
+        assert_eq!(webm_crf_for_quality("small").unwrap(), 38);
+        let args = vp9_webm_ffmpeg_args(
+            Path::new("C:\\kgg\\frame_%04d.png"),
+            Path::new("C:\\kgg\\output.webm"),
+            24,
+            "small",
+        )
+        .expect("small quality should be accepted");
+
+        assert!(has_pair(&args, "-c:v", "libvpx-vp9"));
+        assert!(has_pair(&args, "-crf", "38"));
+        assert!(has_pair(&args, "-b:v", "0"));
+        assert!(has_pair(&args, "-pix_fmt", "yuv420p"));
+        assert!(has_pair(&args, "-colorspace", "bt709"));
+        assert_eq!(
+            args.last().map(String::as_str),
+            Some("C:\\kgg\\output.webm")
+        );
+        assert!(vp9_webm_ffmpeg_args(Path::new("in"), Path::new("out"), 24, "invalid").is_err());
     }
 
     #[test]

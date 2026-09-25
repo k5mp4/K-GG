@@ -11,7 +11,7 @@ webアプリケーション版: https://kagaribi15-grad.ke-goworks.com/
 - Node.js 22.12.0 or later / Node.js 22.12.0 以上
 - npm 10.9.0 or later / npm 10.9.0 以上
 - Rust toolchain, only when building the Tauri desktop app / Tauri デスクトップ版をビルドする場合のみ Rust toolchain
-- FFmpeg, required for MOV/MP4 video export in the Tauri desktop app / Tauri デスクトップ版で MOV/MP4 動画を書き出す場合は FFmpeg
+- FFmpeg, required for MOV/MP4/WebM/GIF video export in the Tauri desktop app / Tauri デスクトップ版で MOV/MP4/WebM/GIF 動画を書き出す場合は FFmpeg
 
 FFmpeg must be available as the `ffmpeg` command in your PATH. PNG sequence ZIP export does not require FFmpeg.
 
@@ -139,6 +139,6 @@ Third-party notices are summarized in `NOTICE`. Current npm and Cargo dependency
 
 第三者ライセンスの要点は `NOTICE` にまとめています。現在の npm / Cargo 依存関係では MIT、Apache-2.0、BSD、ISC 系が中心で、Tauri/Rust 依存ツリーに MPL-2.0 のコンポーネントが含まれます。MPL-2.0 は該当する第三者コンポーネントに適用され、K-GG 本体の Apache-2.0 ライセンスを変更するものではありません。
 
-K-GG does not bundle FFmpeg. The desktop app calls the user's externally installed `ffmpeg` command for MOV/MP4 export. FFmpeg licensing depends on the installed build; see the FFmpeg legal page before redistributing any FFmpeg binary with K-GG.
+K-GG does not bundle FFmpeg. The desktop app calls the user's externally installed `ffmpeg` command for MOV/MP4/WebM/GIF export. FFmpeg licensing depends on the installed build; see the FFmpeg legal page before redistributing any FFmpeg binary with K-GG.
 
-K-GG は FFmpeg を同梱していません。デスクトップ版は MOV/MP4 書き出し時に、利用者環境へ別途インストールされた `ffmpeg` コマンドを呼び出します。将来 FFmpeg バイナリを同梱して配布する場合は、配布する FFmpeg ビルドのライセンスを個別に確認してください。
+K-GG は FFmpeg を同梱していません。デスクトップ版は MOV/MP4/WebM/GIF 書き出し時に、利用者環境へ別途インストールされた `ffmpeg` コマンドを呼び出します。将来 FFmpeg バイナリを同梱して配布する場合は、配布する FFmpeg ビルドのライセンスを個別に確認してください。

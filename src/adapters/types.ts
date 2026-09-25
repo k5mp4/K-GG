@@ -32,10 +32,14 @@ export type AeVideoImportOptions = {
 
 export type AeRuntime = 'browser-bridge' | 'tauri-native';
 
+/** FFmpegで生成するネイティブ動画形式。Rust側`NativeVideoFormat::id`と一致させる。 */
+export type NativeVideoFormat = 'mov' | 'mp4' | 'gif' | 'webm';
+
 export type NativeVideoArtifact = {
   kind: 'native-path';
   path: string;
-  mimeType: 'video/quicktime' | 'video/mp4';
+  format: NativeVideoFormat;
+  mimeType: 'video/quicktime' | 'video/mp4' | 'image/gif' | 'video/webm';
   release(): Promise<void>;
 };
 
@@ -158,11 +162,12 @@ export type NativeFfmpegStatus = {
   folderPath: string | null;
   ffprobePath: string | null;
   ffprobeVersion: string | null;
+  /** 検出したFFmpegで書き出せる形式。未報告の場合はMOV・MP4のみとみなす。 */
+  videoFormats?: NativeVideoFormat[];
 };
 
 export interface VideoExportService {
-  exportLosslessMOV(config: VideoExportConfig): Promise<NativeVideoArtifact>;
-  exportHighQualityMP4(config: VideoExportConfig): Promise<NativeVideoArtifact>;
+  exportNativeVideo(format: NativeVideoFormat, config: VideoExportConfig): Promise<NativeVideoArtifact>;
   exportFrameZip(config: VideoExportConfig): Promise<Blob>;
   nativeFfmpegSupported?(): boolean;
   getNativeFfmpegStatus?(): Promise<NativeFfmpegStatus>;

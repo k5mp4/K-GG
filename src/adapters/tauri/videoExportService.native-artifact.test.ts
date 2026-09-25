@@ -3,7 +3,8 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 type NativeVideoArtifact = {
   kind: 'native-path';
   path: string;
-  mimeType: 'video/quicktime' | 'video/mp4';
+  format: 'mov' | 'mp4' | 'gif' | 'webm';
+  mimeType: 'video/quicktime' | 'video/mp4' | 'image/gif' | 'video/webm';
   release(): Promise<void>;
 };
 
@@ -43,27 +44,16 @@ vi.mock('./exportService', () => ({ isTauriRuntime: vi.fn(() => true) }));
 
 const { tauriVideoExportService } = await import('./videoExportService');
 
-type NativeExportMethod = 'exportLosslessMOV' | 'exportHighQualityMP4';
 type NativeExportCase = {
-  method: NativeExportMethod;
-  command: string;
-  extension: 'mov' | 'mp4';
+  format: NativeVideoArtifact['format'];
   mimeType: NativeVideoArtifact['mimeType'];
 };
 
 const nativeExportCases: NativeExportCase[] = [
-  {
-    method: 'exportLosslessMOV',
-    command: 'encode_qtrle_mov',
-    extension: 'mov',
-    mimeType: 'video/quicktime',
-  },
-  {
-    method: 'exportHighQualityMP4',
-    command: 'encode_h264_rgb_mp4',
-    extension: 'mp4',
-    mimeType: 'video/mp4',
-  },
+  { format: 'mov', mimeType: 'video/quicktime' },
+  { format: 'mp4', mimeType: 'video/mp4' },
+  { format: 'gif', mimeType: 'image/gif' },
+  { format: 'webm', mimeType: 'video/webm' },
 ];
 
 function exportConfig() {
@@ -75,9 +65,11 @@ function exportConfig() {
   };
 }
 
-function encodedRequest(command: string): { outputPath: string } {
-  const call = mocks.invoke.mock.calls.find(([name]) => name === command);
-  return call?.[1] as { outputPath: string };
+type EncodeRequest = { format: string; outputPath: string; quality: string };
+
+function encodedRequest(): EncodeRequest {
+  const call = mocks.invoke.mock.calls.find(([name]) => name === 'encode_native_video');
+  return call?.[1] as EncodeRequest;
 }
 
 beforeEach(() => {
@@ -91,29 +83,31 @@ beforeEach(() => {
 
 describe('tauriVideoExportService native video artifact contract', () => {
   it.each(nativeExportCases)(
-    '$method returns a native path artifact without reading the encoded movie into WebView memory',
-    async ({ method, command, extension, mimeType }) => {
-      const result = await tauriVideoExportService[method](exportConfig());
+    '$format returns a native path artifact without reading the encoded movie into WebView memory',
+    async ({ format, mimeType }) => {
+      const result = await tauriVideoExportService.exportNativeVideo(format, exportConfig());
       const artifact = result as unknown as Partial<NativeVideoArtifact>;
-      const request = encodedRequest(command);
+      const request = encodedRequest();
 
       expect.soft(mocks.readFile).not.toHaveBeenCalled();
+      expect.soft(request.format).toBe(format);
       expect.soft(artifact).toMatchObject({
         kind: 'native-path',
         path: request.outputPath,
+        format,
         mimeType,
       });
       expect.soft(typeof artifact.release).toBe('function');
-      expect.soft(request.outputPath).toMatch(new RegExp(`output\\.${extension}$`));
+      expect.soft(request.outputPath).toMatch(new RegExp(`output\\.${format}$`));
     },
   );
 
   it.each(nativeExportCases)(
-    '$method keeps its workspace until release and release is safe to call more than once',
-    async ({ method, command }) => {
-      const result = await tauriVideoExportService[method](exportConfig());
+    '$format keeps its workspace until release and release is safe to call more than once',
+    async ({ format }) => {
+      const result = await tauriVideoExportService.exportNativeVideo(format, exportConfig());
       const artifact = result as unknown as Partial<NativeVideoArtifact>;
-      const request = encodedRequest(command);
+      const request = encodedRequest();
 
       expect.soft(typeof artifact.release).toBe('function');
       expect.soft(mocks.remove).not.toHaveBeenCalled();
@@ -122,7 +116,7 @@ describe('tauriVideoExportService native video artifact contract', () => {
         await artifact.release();
         expect.soft(mocks.remove).toHaveBeenCalledTimes(1);
         expect.soft(mocks.remove).toHaveBeenCalledWith(
-          expect.stringContaining(request.outputPath.replace(/[/\\]output\.(mov|mp4)$/, '')),
+          expect.stringContaining(request.outputPath.replace(/[/\\]output\.(mov|mp4|gif|webm)$/, '')),
           { recursive: true },
         );
 
@@ -133,15 +127,15 @@ describe('tauriVideoExportService native video artifact contract', () => {
   );
 
   it.each(nativeExportCases)(
-    '$method removes its workspace when encoding fails',
-    async ({ method, extension }) => {
+    '$format removes its workspace when encoding fails',
+    async ({ format }) => {
       mocks.invoke.mockRejectedValueOnce(new Error('encoder failed'));
 
-      await expect(tauriVideoExportService[method](exportConfig())).rejects.toThrow('encoder failed');
+      await expect(tauriVideoExportService.exportNativeVideo(format, exportConfig())).rejects.toThrow('encoder failed');
 
       expect(mocks.remove).toHaveBeenCalledTimes(1);
       expect(mocks.remove).toHaveBeenCalledWith(
-        expect.stringMatching(new RegExp(`${extension}-`)),
+        expect.stringMatching(new RegExp(`${format}-`)),
         { recursive: true },
       );
       expect(mocks.readFile).not.toHaveBeenCalled();
@@ -149,7 +143,7 @@ describe('tauriVideoExportService native video artifact contract', () => {
   );
 
   it('allows release cleanup to be retried after a transient failure', async () => {
-    const artifact = await tauriVideoExportService.exportLosslessMOV(exportConfig());
+    const artifact = await tauriVideoExportService.exportNativeVideo('mov', exportConfig());
     mocks.remove
       .mockRejectedValueOnce(new Error('temporary lock'))
       .mockResolvedValueOnce(undefined);
@@ -161,17 +155,17 @@ describe('tauriVideoExportService native video artifact contract', () => {
   });
 
   it.each(nativeExportCases)(
-    '$method removes its workspace when export is already cancelled',
-    async ({ method, command }) => {
+    '$format removes its workspace when export is already cancelled',
+    async ({ format }) => {
       const controller = new AbortController();
       controller.abort();
 
-      await expect(tauriVideoExportService[method]({
+      await expect(tauriVideoExportService.exportNativeVideo(format, {
         ...exportConfig(),
         signal: controller.signal,
       })).rejects.toMatchObject({ name: 'AbortError' });
 
-      expect.soft(mocks.invoke.mock.calls.some(([name]) => name === command)).toBe(false);
+      expect.soft(mocks.invoke.mock.calls.some(([name]) => name === 'encode_native_video')).toBe(false);
       expect.soft(mocks.remove).toHaveBeenCalledTimes(1);
     },
   );

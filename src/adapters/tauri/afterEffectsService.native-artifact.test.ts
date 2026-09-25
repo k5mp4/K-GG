@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 type NativeVideoArtifact = {
   kind: 'native-path';
   path: string;
+  format: 'mov' | 'mp4';
   mimeType: 'video/quicktime' | 'video/mp4';
   release(): Promise<void>;
 };
@@ -56,6 +57,7 @@ describe('tauriAfterEffectsService native video artifact contract', () => {
       const artifact = {
         kind: 'native-path',
         path: artifactPath,
+        format: extension,
         mimeType,
         release: vi.fn().mockResolvedValue(undefined),
         // A legacy Blob conversion must never be attempted for a native artifact.
@@ -82,6 +84,7 @@ describe('tauriAfterEffectsService native video artifact contract', () => {
     const artifact = {
       kind: 'native-path',
       path: 'C:/Temp/kagaribi-grad/export/output.mov',
+      format: 'mov',
       mimeType: 'video/quicktime',
       release: vi.fn().mockResolvedValue(undefined),
     } as NativeVideoArtifact;

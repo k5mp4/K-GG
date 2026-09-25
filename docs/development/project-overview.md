@@ -13,7 +13,7 @@ K-GGは、KAGARIBI関連のビジュアル制作を主用途とするグラデ�
 ## 提供形態
 
 - Webアプリケーション: ブラウザ内で編集し、PNG、JPG、WebP、スリット画像、PNG連番ZIPを出力する。
-- Tauriデスクトップアプリケーション: Web版の機能に加え、外部FFmpegを利用してMOVとMP4を出力し、アプリ更新機能を提供する。
+- Tauriデスクトップアプリケーション: Web版の機能に加え、外部FFmpegを利用してMOV、MP4、WebM、GIFを出力し、アプリ更新機能を提供する。
 
 ## 主要な機能領域
 
@@ -24,7 +24,7 @@ K-GGは、KAGARIBI関連のビジュアル制作を主用途とするグラデ�
 | 描画 | 状態を評価し、WebGL2とGLSLでフレームを生成 | `src/lib/sceneEvaluation.ts`, `src/lib/webgl.ts`, `src/shaders/` |
 | アニメーション | Auto/Keys、タイムライン、イージング、フレーム評価 | `src/lib/animation.ts`, `src/lib/sceneEvaluation.ts`, `src/components/TimelineBar.tsx` |
 | プリセット | 編集状態の保存、読込、JSON入出力 | `src/lib/presets.ts`, `src/adapters/*/presetRepository.ts` |
-| エクスポート | 静止画、スリット画像、連番ZIP、MOV、MP4 | `src/components/ExportPanel.tsx`, `src/lib/export*.ts` |
+| エクスポート | 静止画、スリット画像、連番ZIP、MOV、MP4、WebM、GIF | `src/components/ExportPanel.tsx`, `src/lib/export*.ts` |
 | デスクトップ連携 | プリセット永続化、FFmpeg呼出し、更新 | `src-tauri/src/lib.rs`, `src/features/updater/` |
 
 ## 技術スタック
@@ -42,7 +42,7 @@ K-GGは、KAGARIBI関連のビジュアル制作を主用途とするグラデ�
 
 - WebGL2が描画の前提である。
 - ブラウザ版とTauri版では、保存先と動画出力能力が異なる。
-- Tauri版のMOV/MP4出力には、利用者環境の`ffmpeg`コマンドが必要である。
+- Tauri版のMOV/MP4/WebM/GIF出力には、利用者環境の`ffmpeg`コマンドが必要である。
 - 描画結果、プレビュー、エクスポートで同じ時刻評価を共有し、見た目の差異を防ぐ必要がある。
 - プリセット形式には後方互換処理があるため、フィールドの削除や改名は移行方針なしに行わない。
 

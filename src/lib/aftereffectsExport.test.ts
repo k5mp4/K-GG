@@ -59,6 +59,7 @@ describe('browserAfterEffectsService', () => {
     await expect(browserAfterEffectsService.importVideo({
       kind: 'native-path',
       path: 'C:/Temp/kagaribi-grad/output.mov',
+      format: 'mov',
       mimeType: 'video/quicktime',
       release: vi.fn().mockResolvedValue(undefined),
     }, 'mov')).resolves.toBe('unsupported');
