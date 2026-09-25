@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef, type MutableRefObject, type RefObject } from 'react';
 import { Toggle } from './Toggle';
 import { CustomSelect } from './CustomSelect';
+import { InputDrum, InputNumber } from 'tweeq';
 import { useGradientStore } from '../store/gradientStore';
 import { useRecorder } from '../hooks/useRecorder';
 import {
@@ -20,7 +21,7 @@ import {
   aePing, aeImportImage, aeImportVideo, aeBridgeAvailable, aePlatformSupported as checkAePlatformSupported, aeRuntime,
   aeGetSaveDir, aeChooseSaveDir, aeClearSaveDir,
 } from '../lib/aftereffectsExport';
-import { MP4_QUALITY_PRESETS } from '../adapters';
+import { GIF_MAX_FILE_MB, MP4_QUALITY_PRESETS } from '../adapters';
 import type {
   ExportDirectoryHandle,
   ExportStage,
@@ -118,6 +119,7 @@ export function ExportPanel({
   const [exportProgress, setExportProgress] = useState(0);
   const [exportStage, setExportStage] = useState<ExportStage>('preparing');
   const [mp4Quality, setMp4Quality] = useState<Mp4QualityPreset>('high');
+  const [gifMaxFileMb, setGifMaxFileMb] = useState<number>(GIF_MAX_FILE_MB.default);
   const [imageFormat, setImageFormat] = useState<ImageExportFormat>('png');
   const [videoFormat, setVideoFormat] = useState<VideoExportFormat>(
     () => nativeFfmpegSupported() ? 'mov' : FRAME_ZIP_FORMAT,
@@ -367,13 +369,13 @@ export function ExportPanel({
   const nativeVideoFormats = nativeVideoEncodeReady
     ? availableNativeVideoFormats(ffmpegStatus)
     : REQUIRED_NATIVE_VIDEO_FORMATS;
-  const videoFormatOptions = [
-    ...nativeVideoFormats.map(format => ({ value: format, label: nativeVideoFormatDefinition(format).label })),
-    { value: FRAME_ZIP_FORMAT, label: t('export.imageSequenceZip') },
-  ];
-  const selectedVideoFormat: VideoExportFormat = videoFormatOptions.some(option => option.value === videoFormat)
+  const videoFormatOptions: VideoExportFormat[] = [...nativeVideoFormats, FRAME_ZIP_FORMAT];
+  const videoFormatLabels = videoFormatOptions.map(format => isNativeVideoFormat(format)
+    ? nativeVideoFormatDefinition(format).shortLabel
+    : t('export.imageSequenceShort'));
+  const selectedVideoFormat: VideoExportFormat = videoFormatOptions.includes(videoFormat)
     ? videoFormat
-    : videoFormatOptions[0].value;
+    : videoFormatOptions[0];
   const selectedNativeVideoFormat = isNativeVideoFormat(selectedVideoFormat)
     ? nativeVideoFormatDefinition(selectedVideoFormat)
     : null;
@@ -436,6 +438,7 @@ export function ExportPanel({
         speed: animation.speed,
         easing: animation.easing,
         mp4Quality: definition.supportsQuality ? mp4Quality : undefined,
+        gifMaxFileMb: format === 'gif' ? gifMaxFileMb : undefined,
         signal: controller.signal,
         onProgress: reportProgress,
         onStage: reportStage,
@@ -651,14 +654,17 @@ export function ExportPanel({
       {/* 静止画 */}
       <div className="space-y-2">
         <p className="text-xs text-deep">{t('export.stillImage')}</p>
-        <CustomSelect
-          value={imageFormat}
-          options={[...IMAGE_EXPORT_FORMATS]}
-          onChange={(value) => setImageFormat(value as ImageExportFormat)}
-          label={t('export.format')}
-          localizeLabel={false}
-          localizeOptions={false}
-        />
+        <div>
+          <p className="text-xs mb-1 text-deep font-display uppercase tracking-wider">{t('export.format')}</p>
+          <InputDrum
+            value={imageFormat}
+            options={IMAGE_EXPORT_FORMATS.map(format => format.value)}
+            labels={IMAGE_EXPORT_FORMATS.map(format => format.label)}
+            onChange={(format) => format !== undefined && setImageFormat(format)}
+            aria-label={t('export.format')}
+            className="w-full"
+          />
+        </div>
         <button
           onClick={handleSaveImage}
           className="w-full py-2 bg-fire hover:brightness-110 disabled:opacity-40 disabled:cursor-not-allowed rounded-none text-sm font-display font-semibold text-k-text uppercase tracking-wider"
@@ -774,14 +780,17 @@ export function ExportPanel({
 
         {/* オフライン書き出し */}
         <div className="space-y-1.5">
-          <CustomSelect
-            value={selectedVideoFormat}
-            options={videoFormatOptions}
-            onChange={(value) => setVideoFormat(value as VideoExportFormat)}
-            label={t('export.format')}
-            localizeLabel={false}
-            localizeOptions={false}
-          />
+          <div>
+            <p className="text-xs mb-1 text-deep font-display uppercase tracking-wider">{t('export.format')}</p>
+            <InputDrum
+              value={selectedVideoFormat}
+              options={videoFormatOptions}
+              labels={videoFormatLabels}
+              onChange={(format) => format !== undefined && setVideoFormat(format)}
+              aria-label={t('export.format')}
+              className="w-full"
+            />
+          </div>
           <p className="text-[10px] leading-relaxed text-tab-inactive">
             {selectedNativeVideoFormat
               ? selectedNativeVideoFormat.description
@@ -802,6 +811,34 @@ export function ExportPanel({
               localizeLabel={false}
               localizeOptions={false}
             />
+          )}
+
+          {selectedNativeVideoFormat?.value === 'gif' && (
+            <div>
+              <p className="text-xs mb-1 text-deep font-display uppercase tracking-wider">{t('export.gifMaxFileSize')}</p>
+              <div className="tq-input-number-shell w-full">
+                <InputNumber
+                  className="tq-input-number w-full"
+                  value={gifMaxFileMb}
+                  min={GIF_MAX_FILE_MB.min}
+                  max={GIF_MAX_FILE_MB.max}
+                  step={1}
+                  precision={0}
+                  suffix=" MB"
+                  bar={false}
+                  clampMin
+                  clampMax
+                  default={GIF_MAX_FILE_MB.default}
+                  aria-label={t('export.gifMaxFileSize')}
+                  onChange={(value) => {
+                    if (Number.isFinite(value)) {
+                      setGifMaxFileMb(Math.min(GIF_MAX_FILE_MB.max, Math.max(GIF_MAX_FILE_MB.min, Math.round(value))));
+                    }
+                  }}
+                />
+              </div>
+              <p className="mt-1 text-[10px] leading-relaxed text-tab-inactive">{t('export.gifMaxFileSizeDescription')}</p>
+            </div>
           )}
 
           {selectedNativeVideoFormat && !nativeFfmpegAvailable && (

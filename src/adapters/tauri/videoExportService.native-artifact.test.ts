@@ -65,7 +65,7 @@ function exportConfig() {
   };
 }
 
-type EncodeRequest = { format: string; outputPath: string; quality: string };
+type EncodeRequest = { format: string; outputPath: string; quality: string; gifMaxFileMb: number | null };
 
 function encodedRequest(): EncodeRequest {
   const call = mocks.invoke.mock.calls.find(([name]) => name === 'encode_native_video');
@@ -82,6 +82,19 @@ beforeEach(() => {
 });
 
 describe('tauriVideoExportService native video artifact contract', () => {
+  it('sends the GIF max file size only for GIF, defaulting to 15MB', async () => {
+    await tauriVideoExportService.exportNativeVideo('gif', exportConfig());
+    expect(encodedRequest().gifMaxFileMb).toBe(15);
+
+    mocks.invoke.mockClear();
+    await tauriVideoExportService.exportNativeVideo('gif', { ...exportConfig(), gifMaxFileMb: 8 });
+    expect(encodedRequest().gifMaxFileMb).toBe(8);
+
+    mocks.invoke.mockClear();
+    await tauriVideoExportService.exportNativeVideo('mp4', { ...exportConfig(), gifMaxFileMb: 8 });
+    expect(encodedRequest().gifMaxFileMb).toBeNull();
+  });
+
   it.each(nativeExportCases)(
     '$format returns a native path artifact without reading the encoded movie into WebView memory',
     async ({ format, mimeType }) => {

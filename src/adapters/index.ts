@@ -47,4 +47,4 @@ export type {
   VideoExportFrameRenderer,
   VideoExportService,
 } from './types';
-export { MP4_QUALITY_PRESETS } from './types';
+export { GIF_MAX_FILE_MB, MP4_QUALITY_PRESETS } from './types';

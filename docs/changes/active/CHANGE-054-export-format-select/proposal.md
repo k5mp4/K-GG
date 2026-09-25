@@ -1,7 +1,7 @@
 ---
 type: change
 id: CHANGE-054
-title: 書き出し形式のCustomSelect化とFFmpeg動画形式の追加
+title: 書き出し形式のInputDrum化とFFmpeg動画形式の追加
 status: review
 change_kind: F
 owners: [maintainer]
@@ -12,9 +12,9 @@ related_adrs: []
 human_review: required
 ---
 
-# 書き出し形式のCustomSelect化とFFmpeg動画形式の追加
+# 書き出し形式のInputDrum化とFFmpeg動画形式の追加
 
-Request source: Direct request。画像・動画の書き出し形式を形式ごとのボタンではなく`CustomSelect`で選び、選択した拡張子で書き出す。動画はFFmpegの引数を登録するだけで形式を追加できる構造にし、GIFなどを追加する。
+Request source: Direct request。画像・動画の書き出し形式を形式ごとのボタンではなくTweeqの`InputDrum`で選び（選択肢が3〜5件のため一覧で見渡せる形にする）、選択した拡張子で書き出す。動画はFFmpegの引数を登録するだけで形式を追加できる構造にし、GIFなどを追加する。
 
 ## 変更理由
 
@@ -22,8 +22,9 @@ Request source: Direct request。画像・動画の書き出し形式を形式�
 
 ## 変更内容と受け入れ条件
 
-- 静止画は`CustomSelect`でPNG／JPG／WebPを選び、1つの保存ボタンで選択形式を保存する。JPG／WebPの品質は従来どおり0.92。
-- 動画は`CustomSelect`でMOV／MP4／WebM／GIF／PNG連番（ZIP）を選び、1つの書き出しボタンで選択形式を出力する。MP4とWebMでは品質プリセットを`CustomSelect`で選べる。
+- 静止画は`InputDrum`でPNG／JPG／WebPを選び、1つの保存ボタンで選択形式を保存する。JPG／WebPの品質は従来どおり0.92。
+- 動画は`InputDrum`でMOV／MP4／WebM／GIF／PNG連番（ZIP）を選び、1つの書き出しボタンで選択形式を出力する。MP4とWebMでは品質プリセットを`CustomSelect`で選べる。
+- GIFは最大ファイルサイズ（MB、1MB = 1,000,000 bytes、既定15MB、1〜1000MB）を指定でき、書き出し結果がこの値以上の場合は解像度を縮小（面積比の平方根×0.92）して再エンコードする。最大6回試行しても収まらない場合、または5%まで縮小しても収まらない場合はエラーとする。Rust側でも範囲を検証する。
 - Tauriは単一の`encode_native_video` commandで形式IDを受け取り、Rustの`NativeVideoFormat`登録表からFFmpeg引数・出力ファイル名・必要エンコーダーを決定する。
 - GIFはFFmpeg標準の`gif`エンコーダーで、全フレームから生成した256色パレット（`palettegen`／`paletteuse`）を使い、無限ループで出力する。
 - WebMは`libvpx-vp9`、YUV 4:2:0、BT.709メタデータで出力する。

@@ -374,13 +374,16 @@ impl NativeVideoFormat {
         output_path: &Path,
         fps: u32,
         quality: &str,
+        gif_scale: f64,
     ) -> Result<Vec<String>, String> {
         match self {
             NativeVideoFormat::Mov => Ok(qtrle_ffmpeg_args(input_pattern, output_path, fps)),
             NativeVideoFormat::Mp4 => {
                 h264_rgb_ffmpeg_args(input_pattern, output_path, fps, quality)
             }
-            NativeVideoFormat::Gif => Ok(gif_ffmpeg_args(input_pattern, output_path, fps)),
+            NativeVideoFormat::Gif => {
+                Ok(gif_ffmpeg_args(input_pattern, output_path, fps, gif_scale))
+            }
             NativeVideoFormat::Webm => {
                 vp9_webm_ffmpeg_args(input_pattern, output_path, fps, quality)
             }
@@ -1248,12 +1251,43 @@ fn image_sequence_input_args(input_pattern: &Path, fps: u32) -> Vec<String> {
     ]
 }
 
-fn gif_ffmpeg_args(input_pattern: &Path, output_path: &Path, fps: u32) -> Vec<String> {
+/// GIFの最大ファイルサイズとして受け付ける範囲（MB、1MB = 1,000,000 bytes）。
+const GIF_MAX_FILE_MB_RANGE: std::ops::RangeInclusive<u32> = 1..=1000;
+/// 上限を超えた場合に縮小して再エンコードする最大回数（初回を含む）。
+const GIF_SIZE_FIT_MAX_ATTEMPTS: usize = 6;
+/// これ以上は縮小しない下限倍率。
+const GIF_MIN_SCALE: f64 = 0.05;
+
+fn gif_max_file_bytes(max_file_mb: Option<u32>) -> Result<Option<u64>, String> {
+    match max_file_mb {
+        None => Ok(None),
+        Some(mb) if GIF_MAX_FILE_MB_RANGE.contains(&mb) => Ok(Some(u64::from(mb) * 1_000_000)),
+        Some(mb) => Err(format!("GIFの最大ファイルサイズが不正です: {mb}MB")),
+    }
+}
+
+/// GIFのサイズは画素数にほぼ比例するため、面積比の平方根に余裕を掛けて次の倍率を決める。
+/// 下限倍率まで縮小済みならNoneを返す。
+fn next_gif_scale(scale: f64, actual_bytes: u64, limit_bytes: u64) -> Option<f64> {
+    if scale <= GIF_MIN_SCALE {
+        return None;
+    }
+    let ratio = (limit_bytes as f64 / actual_bytes as f64).sqrt() * 0.92;
+    Some((scale * ratio).clamp(GIF_MIN_SCALE, scale * 0.95))
+}
+
+fn gif_ffmpeg_args(input_pattern: &Path, output_path: &Path, fps: u32, scale: f64) -> Vec<String> {
     let mut args = image_sequence_input_args(input_pattern, fps);
+    // 最大ファイルサイズに収めるための縮小は、パレット生成より前に行う。
+    let scale_filter = if scale < 1.0 {
+        format!("scale=iw*{scale:.4}:-1:flags=lanczos,")
+    } else {
+        String::new()
+    };
     args.extend([
         // 全フレームから256色パレットを生成し、同じ入力へ適用する2段フィルター。
         "-filter_complex".to_string(),
-        "[0:v]split[a][b];[a]palettegen=stats_mode=diff[p];[b][p]paletteuse=dither=sierra2_4a:diff_mode=rectangle".to_string(),
+        format!("[0:v]{scale_filter}split[a][b];[a]palettegen=stats_mode=diff[p];[b][p]paletteuse=dither=sierra2_4a:diff_mode=rectangle"),
         "-c:v".to_string(),
         "gif".to_string(),
         "-loop".to_string(),
@@ -1307,8 +1341,14 @@ fn encode_native_video_blocking(
     output_path: String,
     fps: u32,
     quality: String,
+    gif_max_file_mb: Option<u32>,
 ) -> Result<(), String> {
     let format = NativeVideoFormat::parse(&format)?;
+    let gif_limit_bytes = if format == NativeVideoFormat::Gif {
+        gif_max_file_bytes(gif_max_file_mb)?
+    } else {
+        None
+    };
     let status = native_ffmpeg_status(&app);
     let ffmpeg_path = status
         .path
@@ -1323,8 +1363,42 @@ fn encode_native_video_blocking(
         validate_video_export_path(&input_pattern, "frame_%04d.png", "入力パターン")?;
     let output_path =
         validate_video_export_path(&output_path, format.output_filename(), "出力ファイル")?;
-    let mut command = Command::new(&ffmpeg_path);
-    command.args(format.ffmpeg_args(&input_pattern, &output_path, fps, &quality)?);
+
+    let mut scale = 1.0;
+    for attempt in 1..=GIF_SIZE_FIT_MAX_ATTEMPTS {
+        let args = format.ffmpeg_args(&input_pattern, &output_path, fps, &quality, scale)?;
+        run_ffmpeg(&ffmpeg_path, args, format)?;
+        let Some(limit_bytes) = gif_limit_bytes else {
+            return Ok(());
+        };
+        let actual_bytes = std::fs::metadata(&output_path)
+            .map_err(|err| format!("書き出したGIFのサイズを確認できません: {err}"))?
+            .len();
+        if actual_bytes < limit_bytes {
+            return Ok(());
+        }
+        match next_gif_scale(scale, actual_bytes, limit_bytes) {
+            Some(next) if attempt < GIF_SIZE_FIT_MAX_ATTEMPTS => scale = next,
+            _ => {
+                return Err(format!(
+                    "GIFを{}MB未満に収められませんでした（{:.0}%に縮小して{:.1}MB）。長さやFPSを減らすか、最大ファイルサイズを上げてください。",
+                    limit_bytes / 1_000_000,
+                    scale * 100.0,
+                    actual_bytes as f64 / 1_000_000.0,
+                ));
+            }
+        }
+    }
+    unreachable!("GIF size fitting loop always returns");
+}
+
+fn run_ffmpeg(
+    ffmpeg_path: &str,
+    args: Vec<String>,
+    format: NativeVideoFormat,
+) -> Result<(), String> {
+    let mut command = Command::new(ffmpeg_path);
+    command.args(args);
     configure_hidden_command(&mut command);
     let output = command
         .output()
@@ -1353,10 +1427,19 @@ async fn encode_native_video(
     output_path: String,
     fps: u32,
     quality: Option<String>,
+    gif_max_file_mb: Option<u32>,
 ) -> Result<(), String> {
     let quality = quality.unwrap_or_else(|| "high".to_string());
     tauri::async_runtime::spawn_blocking(move || {
-        encode_native_video_blocking(app, format, input_pattern, output_path, fps, quality)
+        encode_native_video_blocking(
+            app,
+            format,
+            input_pattern,
+            output_path,
+            fps,
+            quality,
+            gif_max_file_mb,
+        )
     })
     .await
     .map_err(|err| format!("FFmpeg処理スレッドが終了しました: {err}"))?
@@ -1366,10 +1449,11 @@ async fn encode_native_video(
 mod tests {
     use super::{
         append_ffmpeg_candidates_from_path_value, available_video_formats, backup_path,
-        choose_candidate, encoder_list_has, gif_ffmpeg_args, h264_rgb_ffmpeg_args,
-        migrate_legacy_presets, mp4_crf_for_quality, qtrle_ffmpeg_args, recover_interrupted_write,
-        replace_presets_file, validate_video_export_path, vp9_webm_ffmpeg_args,
-        webm_crf_for_quality, NativeVideoFormat, VIDEO_EXPORT_TEMP_DIR,
+        choose_candidate, encoder_list_has, gif_ffmpeg_args, gif_max_file_bytes,
+        h264_rgb_ffmpeg_args, migrate_legacy_presets, mp4_crf_for_quality, next_gif_scale,
+        qtrle_ffmpeg_args, recover_interrupted_write, replace_presets_file,
+        validate_video_export_path, vp9_webm_ffmpeg_args, webm_crf_for_quality, NativeVideoFormat,
+        GIF_MIN_SCALE, VIDEO_EXPORT_TEMP_DIR,
     };
     use std::path::{Path, PathBuf};
     use std::time::{SystemTime, UNIX_EPOCH};
@@ -1507,6 +1591,7 @@ mod tests {
             Path::new("C:\\kgg\\frame_%04d.png"),
             Path::new("C:\\kgg\\output.gif"),
             30,
+            1.0,
         );
 
         assert!(has_pair(&args, "-framerate", "30"));
@@ -1520,7 +1605,46 @@ mod tests {
             .expect("GIF export must use a palette filter graph");
         assert!(filter.contains("palettegen"));
         assert!(filter.contains("paletteuse"));
+        assert!(!filter.contains("scale="));
         assert_eq!(args.last().map(String::as_str), Some("C:\\kgg\\output.gif"));
+    }
+
+    #[test]
+    fn scales_gif_before_palette_generation_when_downsizing() {
+        let args = gif_ffmpeg_args(
+            Path::new("C:\\kgg\\frame_%04d.png"),
+            Path::new("C:\\kgg\\output.gif"),
+            30,
+            0.5,
+        );
+        let filter = args
+            .windows(2)
+            .find(|pair| pair[0] == "-filter_complex")
+            .map(|pair| pair[1].as_str())
+            .expect("GIF export must use a palette filter graph");
+        assert!(filter.starts_with("[0:v]scale=iw*0.5000:-1:flags=lanczos,split"));
+    }
+
+    #[test]
+    fn validates_gif_max_file_size() {
+        assert_eq!(gif_max_file_bytes(None).unwrap(), None);
+        assert_eq!(gif_max_file_bytes(Some(15)).unwrap(), Some(15_000_000));
+        assert!(gif_max_file_bytes(Some(0)).is_err());
+        assert!(gif_max_file_bytes(Some(1001)).is_err());
+    }
+
+    #[test]
+    fn shrinks_gif_scale_towards_size_limit() {
+        // 4倍のサイズなら面積を1/4にするため、倍率は約半分（余裕込みで0.46）になる。
+        let next = next_gif_scale(1.0, 60_000_000, 15_000_000).unwrap();
+        assert!((next - 0.46).abs() < 1e-9);
+        // わずかな超過でも少なくとも5%は縮小する。
+        assert!(next_gif_scale(1.0, 15_000_001, 15_000_000).unwrap() <= 0.95);
+        assert_eq!(
+            next_gif_scale(0.3, 1_000_000_000, 1_000_000),
+            Some(GIF_MIN_SCALE)
+        );
+        assert_eq!(next_gif_scale(GIF_MIN_SCALE, 2_000_000, 1_000_000), None);
     }
 
     #[test]

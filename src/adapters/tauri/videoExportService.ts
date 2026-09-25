@@ -4,6 +4,7 @@ import { mkdir, remove, writeFile } from '@tauri-apps/plugin-fs';
 import { browserVideoExportService } from '../browser/videoExportService';
 import { needsTiledRender } from '../../lib/tileRender';
 import { renderAndCaptureExportFrame, withExportSession } from '../../lib/videoExportFrames';
+import { GIF_MAX_FILE_MB } from '../types';
 import type {
   NativeFfmpegStatus,
   NativeVideoArtifact,
@@ -111,6 +112,7 @@ export const tauriVideoExportService: VideoExportService = {
         outputPath,
         fps: config.fps,
         quality: config.mp4Quality ?? 'high',
+        gifMaxFileMb: format === 'gif' ? config.gifMaxFileMb ?? GIF_MAX_FILE_MB.default : null,
       });
       config.onProgress?.(0.95);
       config.onStage?.('saving');

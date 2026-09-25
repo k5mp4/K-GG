@@ -65,6 +65,8 @@ export const MP4_QUALITY_PRESETS = [
   { value: 'small', label: 'Small', crf: 27, description: 'サイズ優先' },
 ] as const;
 export type Mp4QualityPreset = (typeof MP4_QUALITY_PRESETS)[number]['value'];
+/** GIFの最大ファイルサイズ（MB、1MB = 1,000,000 bytes）。範囲はRust側の検証と揃える。 */
+export const GIF_MAX_FILE_MB = { default: 15, min: 1, max: 1000 } as const;
 export type ExportStage = 'preparing' | 'rendering' | 'encoding' | 'saving';
 
 /**
@@ -145,6 +147,8 @@ export type VideoExportConfig = {
   speed: number;
   easing?: AnimationEasing;
   mp4Quality?: Mp4QualityPreset;
+  /** GIFをこのサイズ未満に収める。超えた場合は解像度を下げて再エンコードする。 */
+  gifMaxFileMb?: number;
   signal?: AbortSignal;
   onProgress?: (p: number) => void;
   onStage?: (stage: ExportStage) => void;

@@ -77,7 +77,7 @@ Windows x64はアプリローカルデータの`ffmpeg/ffmpeg.exe`を優先し�
 
 ### EXPORT-012 書き出し形式の選択
 
-静止画と動画の書き出し形式は`CustomSelect`で選択し、単一の保存／書き出しボタンで選択形式を出力する。静止画はPNG／JPG／WebP（JPG・WebPの品質は0.92）を選択できる。動画は検出したFFmpegで利用可能なネイティブ形式とPNG連番（ZIP）を選択肢とし、FFmpeg未検出時とBrowser版ではMOV／MP4を無効な書き出しボタンとともに表示する。Browser版の既定値はPNG連番（ZIP）、Tauri版の既定値はMOVとする。MP4とWebMでは品質プリセット（High／Balanced／Small）を選択できる。
+静止画と動画の書き出し形式はTweeqの`InputDrum`で選択し、単一の保存／書き出しボタンで選択形式を出力する。静止画はPNG／JPG／WebP（JPG・WebPの品質は0.92）を選択できる。動画は検出したFFmpegで利用可能なネイティブ形式とPNG連番（ZIP）を選択肢とし、FFmpeg未検出時とBrowser版ではMOV／MP4を無効な書き出しボタンとともに表示する。Browser版の既定値はPNG連番（ZIP）、Tauri版の既定値はMOVとする。MP4とWebMでは品質プリセット（High／Balanced／Small）を選択できる。
 
 保存ファイル名はMOVが`{stem}.mov`、MP4が`{stem}_h264rgb.mp4`、WebMが`{stem}.webm`、GIFが`{stem}.gif`、PNG連番が`{stem}_frames.zip`とする。
 
@@ -90,9 +90,11 @@ Tauri版のネイティブ動画形式は、Rustの形式登録表（`NativeVide
 | MOV | `qtrle` | `rgb24`のロスレスQuickTime Animation |
 | MP4 | `libx264` | EXPORT-009のH.264／`yuv420p`／BT.709 |
 | WebM | `libvpx-vp9` | CRF（High 24／Balanced 31／Small 38）、`-b:v 0`、`yuv420p`、BT.709メタデータ、奇数寸法は右端・下端を1px以内でpadding |
-| GIF | `gif` | 全フレームから生成した256色パレット（`palettegen`／`paletteuse`）、無限ループ |
+| GIF | `gif` | 全フレームから生成した256色パレット（`palettegen`／`paletteuse`）、無限ループ、最大ファイルサイズに合わせた縮小 |
 
 FFmpegの利用可否は従来どおり`qtrle`と`libx264`で判定し、FFmpeg状態は検出したエンコーダーから利用可能な形式を`videoFormats`として返す。WebMとGIFは該当エンコーダーを持つFFmpegでだけ選択肢に表示し、Rust側でも利用できない形式のencode要求を拒否する。GIFの1フレームの表示時間は1/100秒単位のため、60fpsの出力は多くのビューアーで約50fpsとして再生される。
+
+GIFは最大ファイルサイズ（MB、1MB = 1,000,000 bytes、既定15MB、1〜1000MB）を指定でき、書き出し結果がこの値以上の場合は解像度を縮小（面積比の平方根×0.92）して再エンコードする。最大6回試行しても収まらない場合、または5%まで縮小しても収まらない場合はエラーとする。Rust側でも範囲を検証する。
 
 ### EXPORT-021 Flow Gradientの論理フレーム
 
@@ -110,7 +112,7 @@ Flow Gradientを有効にした出力は、Seed、正規化時刻、設定、Ren
 - [SPEC-005 動画出力表示名とファイル名](../SPEC-005-video-export-naming)
 - [SPEC-023 動画書き出しUXとMP4品質](../SPEC-023-video-export-ux-and-mp4-quality)
 - [SPEC-024 動画書き出しFFmpeg待機の応答性](../SPEC-024-video-export-encode-responsiveness)
-- [CHANGE-054 書き出し形式のCustomSelect化とFFmpeg動画形式の追加](../../changes/active/CHANGE-054-export-format-select/proposal)
+- [CHANGE-054 書き出し形式のInputDrum化とFFmpeg動画形式の追加](../../changes/active/CHANGE-054-export-format-select/proposal)
 
 ## 未確認・今後の現行仕様化
 
