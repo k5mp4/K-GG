@@ -38,10 +38,6 @@ export default defineConfig({
       name: 'licenses',
       testMatch: '**/licenses.spec.ts',
     },
-    {
-      name: 'smoke',
-      testMatch: '**/smoke.spec.ts',
-    },
   ],
   use: {
     baseURL,

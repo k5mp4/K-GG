@@ -23,6 +23,8 @@ async function openExportPanel(page: Parameters<typeof waitForWebGLReady>[0]) {
     height: Number(await canvas.getAttribute('height')),
   };
   expect(diagnostics.canvas).toEqual(dimensions);
+  expect(diagnostics.webgl.rendererReady).toBe(true);
+  expect(diagnostics.webgl.contextLost).toBe(false);
   await page.getByRole('button', { name: /^Export$/i }).first().click();
   return { canvas, dimensions };
 }
