@@ -10,8 +10,8 @@ ReleaseはMergeとは別の判断です。CIのMerge Gateが成功しても、GP
 
 - Windows x64 Tauri installerが起動する。
 - Windows x64 Tauri installerにFigma Connectorのmanifest、実行JS、UI HTMLが含まれ、K-GG Exportパネルからmanifestの場所を開ける。
-- GitHub ActionsのmacOS arm64（`macos-15`）とIntel（`macos-15-intel`）jobが、`ffmpeg`/`ffprobe`のPATH確認、Rust/frontend検証、`.app`/`.dmg`生成を完了する。
-- macOS DMGはExperimental、未署名・未公証、GitHub Releasesからの手動更新であることをRelease本文に明記する。
+- GitHub ActionsのmacOS arm64（`macos-15`）とIntel（`macos-15-intel`）jobが、`ffmpeg`/`ffprobe`のPATH確認、Rust/frontend検証、Ad-hoc署名、`.app`/`.dmg`生成を完了する。
+- macOS DMGはExperimental、Ad-hoc署名済み・未公証、GitHub Releasesからの手動更新であることをRelease本文に明記する。
 - updater署名、`latest.json`、draft Release assetが整合する。
 - FFmpegが未導入・導入済みの両方でMOV/MP4出力を確認する。
 - After Effects連携を対象バージョンで確認する。

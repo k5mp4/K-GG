@@ -75,9 +75,9 @@ npm run tauri:build:macos
 
 ## Desktop platform status / デスクトップ版の対応状況
 
-Windows x64 is the supported production target. macOS arm64 and Intel builds are Experimental: GitHub Actions builds and tests them, but the developer has not verified them on physical macOS hardware. The DMGs are currently unsigned and not notarized, so Gatekeeper may show a warning. macOS video export uses `ffmpeg` and `ffprobe` from PATH; install them with Homebrew (`brew install ffmpeg`) or another suitable method. After Effects automation remains unavailable on macOS. Figma loopback direct send is available, including opening the bundled connector folder.
+Windows x64 is the supported production target. macOS arm64 and Intel builds are Experimental: GitHub Actions builds and verifies their ad-hoc signatures, but the developer has not verified them on physical macOS hardware. The DMGs are not notarized, so Gatekeeper may still show a warning. macOS video export uses `ffmpeg` and `ffprobe` from PATH; install them with Homebrew (`brew install ffmpeg`) or another suitable method. After Effects automation remains unavailable on macOS. Figma loopback direct send is available, including opening the bundled connector folder.
 
-Windows x64は本番対応ターゲットです。macOS arm64・Intel版はExperimentalです。GitHub Actions上でビルドと自動テストを行っていますが、開発者によるmacOS実機での動作確認は行っていません。DMGには現在コード署名・公証を行っていないため、Gatekeeperの警告が表示される場合があります。macOSの動画書き出しはPATH上の`ffmpeg`と`ffprobe`を使うため、Homebrew（`brew install ffmpeg`）など適切な方法で導入してください。After Effects自動連携はmacOSでは利用できません。Figmaのloopback直接送信と、同梱Connectorフォルダーを開く操作は利用できます。
+Windows x64は本番対応ターゲットです。macOS arm64・Intel版はExperimentalです。GitHub Actions上でビルドし、Ad-hoc署名とDMG内アプリの署名検証を行っていますが、開発者によるmacOS実機での動作確認は行っていません。DMGは公証を行っていないため、Gatekeeperの警告が表示される場合があります。macOSの動画書き出しはPATH上の`ffmpeg`と`ffprobe`を使うため、Homebrew（`brew install ffmpeg`）など適切な方法で導入してください。After Effects自動連携はmacOSでは利用できません。Figmaのloopback直接送信と、同梱Connectorフォルダーを開く操作は利用できます。
 
 Run all branch checks / ブランチ検証を一括実行:
 

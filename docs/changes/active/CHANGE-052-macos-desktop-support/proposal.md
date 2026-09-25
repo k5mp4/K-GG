@@ -6,7 +6,7 @@ status: review
 change_kind: A
 owners: [maintainer]
 created: 2026-09-24
-updated: 2026-09-24
+updated: 2026-09-25
 current_specs: [CURRENT-VIDEO-EXPORT, CURRENT-AFTER-EFFECTS-INTEGRATION, CURRENT-DESIGN-APP-CONNECTORS]
 related_adrs: [ADR-0002, ADR-0021]
 human_review: required
@@ -23,16 +23,16 @@ Request source: Direct request。既存Windows版の動作・リリースフロ�
 ## 変更内容と受け入れ条件
 
 - Windows x64のNSIS、Tauri updater署名、専用FFmpegフォルダー優先、After Effects連携を変更しない。
-- macOS arm64（`macos-15`）とIntel（`macos-15-intel`）でTauri DMGを生成し、Draft Releaseへ追加する。macOS updater artifactは生成せず、DMGは未署名・未公証の試験配布と明示する。
+- macOS arm64（`macos-15`）とIntel（`macos-15-intel`）でTauri DMGを生成し、Ad-hoc署名された`.app`を含むDMGをDraft Releaseへ追加する。macOS updater artifactは生成せず、未公証の試験配布と明示する。CIは生成物とDMG内の`.app`を署名検証する。
 - macOSはPATH上の`ffmpeg`と`ffprobe`を検出し、FFmpegのqtrle/libx264を検証する。`ffprobe`はCI smoke gateでも動画メタデータを確認する。K-GGはFFmpegを同梱・ダウンロード・PATH変更しない。
 - macOSのFFmpeg UIはHomebrew導入とPATH設定を案内し、Windows専用フォルダー操作を表示しない。
 - Figma connectorフォルダーと外部URLはTauri Openerへ委譲し、loopback通信とmacOSシステムフォント探索は既存契約を継続する。
 - After EffectsのmacOS操作は実装せず、利用不可を既存ステータスで表示する。
-- CIにmacOS native checkとFFmpeg smoke、ReleaseにWindows後のarm64/Intel jobを追加する。
+- CIにmacOS native checkとFFmpeg smoke、Ad-hoc署名検証、ReleaseにWindows後のarm64/Intel jobを追加する。
 
 ## 対象外
 
-macOSコード署名、notarization、macOS updaterの自動更新、After Effects自動操作、Homebrew自体の導入、commit・push・Pull Request・GitHub設定変更は対象外とする。
+Apple Developer証明書、notarization、macOS updaterの自動更新、After Effects自動操作、Homebrew自体の導入、commit・push・Pull Request・GitHub設定変更は対象外とする。Ad-hoc署名とそのCI検証は対象に含める。
 
 ## 互換性
 

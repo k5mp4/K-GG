@@ -5,11 +5,11 @@ title: 動画・連番フレーム出力
 status: current
 owners: [maintainer]
 created: 2026-07-31
-updated: 2026-09-24
+updated: 2026-09-25
 requirement_ids: [EXPORT-001, EXPORT-002, EXPORT-003, EXPORT-004, EXPORT-005, EXPORT-006, EXPORT-007, EXPORT-008, EXPORT-009, EXPORT-010, EXPORT-011, EXPORT-021]
 related_adrs: [ADR-0004, ADR-0005, ADR-0018, ADR-0021]
 related_changes: [CHANGE-011, CHANGE-024, CHANGE-025, CHANGE-027, CHANGE-030, CHANGE-031, CHANGE-032, CHANGE-037, CHANGE-038, CHANGE-048, CHANGE-051, CHANGE-052]
-related_code: [src/adapters/browser/videoExportService.ts, src/adapters/tauri/videoExportService.ts, src/adapters/browser/exportService.ts, src/adapters/tauri/exportService.ts, src/adapters/tauri/afterEffectsService.ts, src/adapters/types.ts, src/lib/export.ts, src/lib/exportSlits.ts, src/lib/exportVideo.ts, src/lib/aftereffectsExport.ts, src/lib/aeStatusController.ts, src/lib/videoExportLifecycle.ts, src/lib/renderBridge.ts, src/lib/renderSceneAtTime.ts, src/lib/flowGradientRenderer.ts, src/lib/flowSimulation.ts, src/lib/videoExportFrames.ts, src/lib/tileRender.ts, src/lib/webgl.ts, src/lib/clothGradientRenderer.ts, src/lib/coneSeam.ts, src/components/GradientCanvas.tsx, src/components/ClothCanvas.tsx, src/components/ConeApexEditor.tsx, src/components/ExportPanel.tsx, src-tauri/src/lib.rs, tools/ffmpeg-native-smoke.mjs]
+related_code: [src/adapters/browser/videoExportService.ts, src/adapters/tauri/videoExportService.ts, src/adapters/browser/exportService.ts, src/adapters/tauri/exportService.ts, src/adapters/tauri/afterEffectsService.ts, src/adapters/types.ts, src/lib/export.ts, src/lib/exportSlits.ts, src/lib/exportVideo.ts, src/lib/aftereffectsExport.ts, src/lib/aeStatusController.ts, src/lib/videoExportLifecycle.ts, src/lib/renderBridge.ts, src/lib/renderSceneAtTime.ts, src/lib/flowGradientRenderer.ts, src/lib/flowSimulation.ts, src/lib/videoExportFrames.ts, src/lib/tileRender.ts, src/lib/webgl.ts, src/lib/clothGradientRenderer.ts, src/lib/coneSeam.ts, src/components/GradientCanvas.tsx, src/components/ClothCanvas.tsx, src/components/ConeApexEditor.tsx, src/components/ExportPanel.tsx, src-tauri/src/lib.rs, tools/ffmpeg-native-smoke.mjs, tools/verify-macos-signing.sh, tools/tauri-build-macos-verified.sh]
 related_tests: [src/lib/renderBridge.test.ts, src/lib/effectPipeline.test.ts, src/lib/renderFrame.test.ts, src/lib/flowSimulation.test.ts, src/lib/flowGradientPreset.test.ts, src/lib/webglExportPrograms.test.ts, src/lib/webglShaderSources.test.ts, src/lib/glass.test.ts, src/lib/videoExportFrames.test.ts, src/lib/coneView.test.ts, src/lib/coneSeam.test.ts, src/lib/coneViewRenderer.test.ts, src/lib/webglPerformance.test.ts, src/lib/aftereffectsExport.test.ts, src/lib/aeStatusController.test.ts, src/lib/videoExportLifecycle.test.ts, src/adapters/tauri/exportService.test.ts, src/adapters/tauri/videoExportService.native-artifact.test.ts, src/adapters/tauri/exportService.native-artifact.test.ts, src/adapters/tauri/afterEffectsService.native-artifact.test.ts]
 ---
 
@@ -69,7 +69,7 @@ Rustで保存先を正規化し、Tauri filesystem scopeに含まれることを
 
 ### EXPORT-010 デスクトップ版プラットフォーム
 
-Tauriデスクトップ版の動画出力はWindows x64とmacOS arm64/Intelで提供する。WindowsはNSISと既存のTauri updaterを使用する。macOSはDMGを試験配布し、現時点ではコード署名・公証・自動更新を提供しない。Browser版のPNG連番ZIPと静止画出力はこの区分に依存しない。
+Tauriデスクトップ版の動画出力はWindows x64とmacOS arm64/Intelで提供する。WindowsはNSISと既存のTauri updaterを使用する。macOSはAd-hoc署名した`.app`を含むDMGを試験配布し、公証・自動更新は提供しない。CIは生成した`.app`とDMG内の`.app`を検証する。Browser版のPNG連番ZIPと静止画出力はこの区分に依存しない。
 
 ### EXPORT-011 外部FFmpegの検出
 

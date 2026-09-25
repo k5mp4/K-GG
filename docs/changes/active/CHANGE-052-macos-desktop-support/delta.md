@@ -4,7 +4,7 @@
 
 ### EXPORT-010 desktop platform support
 
-Tauri desktop video export is available for Windows x64 and macOS arm64/Intel. Windows keeps NSIS and signed updater artifacts. macOS produces an experimental unsigned and/notarized DMG without automatic updater artifacts.
+Tauri desktop video export is available for Windows x64 and macOS arm64/Intel. Windows keeps NSIS and signed updater artifacts. macOS produces an experimental Ad-hoc-signed, non-notarized DMG without automatic updater artifacts; CI verifies the standalone `.app` and the `.app` embedded in the DMG.
 
 ### EXPORT-011 external FFmpeg detection
 

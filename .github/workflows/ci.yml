@@ -231,3 +231,7 @@ jobs:
         run: |
           test -d src-tauri/target/release/bundle/macos/*.app
           find src-tauri/target/release/bundle/dmg -maxdepth 1 -name '*.dmg' -print -quit | grep -q .
+
+      - name: Verify macOS ad-hoc signature
+        shell: bash
+        run: bash tools/verify-macos-signing.sh src-tauri/target

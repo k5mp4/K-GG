@@ -57,7 +57,7 @@ jobs:
           releaseName: K-GG v__VERSION__
           releaseBody: |
             Windows x64 release candidate.
-            macOS arm64 and Intel builds are Experimental. GitHub Actions builds and tests them, but they have not been verified by the developer on physical macOS hardware. The DMGs are unsigned and not notarized.
+            macOS arm64 and Intel builds are Experimental. GitHub Actions builds, ad-hoc signs, and verifies them, but they have not been verified by the developer on physical macOS hardware. The DMGs are not notarized.
 
             Review the Windows installer, updater signatures, macOS DMGs, latest.json, and release notes before publishing this draft.
           releaseDraft: true
@@ -119,7 +119,9 @@ jobs:
         uses: tauri-apps/tauri-action@944946e3e4cac6603d1fe8f514171e9ecd3c78aa # v1
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAURI_TARGET: ${{ matrix.target }}
         with:
+          tauriScript: bash tools/tauri-build-macos-verified.sh
           tagName: ${{ github.ref_name }}
           releaseDraft: true
           prerelease: false
