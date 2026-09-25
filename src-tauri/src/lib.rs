@@ -10,6 +10,8 @@ use tauri_plugin_opener::OpenerExt;
 
 mod after_effects;
 mod design_app_bridge;
+mod spout_output;
+mod spout_shared_frames;
 
 #[cfg(windows)]
 use std::os::windows::process::CommandExt;
@@ -31,6 +33,8 @@ pub fn run() {
         .plugin(tauri_plugin_updater::Builder::new().build())
         .setup(|app| {
             app.manage(design_app_bridge::DesignAppConnectorBridge::start());
+            app.manage(spout_output::SpoutOutputState::new());
+            app.manage(spout_shared_frames::SpoutSharedFrames::new());
             if native_ffmpeg_supported_target() && cfg!(target_os = "windows") {
                 if let Err(err) = ensure_ffmpeg_dir(app.handle()) {
                     eprintln!("K-GG専用FFmpegフォルダを作成できませんでした: {err}");
@@ -55,10 +59,25 @@ pub fn run() {
             design_app_bridge::get_design_app_connector_state,
             design_app_bridge::disconnect_design_app_connector,
             design_app_bridge::approve_design_app_connection,
-            design_app_bridge::dismiss_design_app_connection_request
+            design_app_bridge::dismiss_design_app_connection_request,
+            spout_output::get_spout_output_status,
+            spout_output::start_spout_output,
+            spout_output::send_spout_output_frame,
+            spout_output::stop_spout_output,
+            spout_shared_frames::create_spout_frame_buffers,
+            spout_shared_frames::send_spout_shared_frame,
+            spout_shared_frames::release_spout_frame_buffers
         ])
-        .run(tauri::generate_context!())
-        .expect("error while running KAGARIBI Grad");
+        .build(tauri::generate_context!())
+        .expect("error while building KAGARIBI Grad")
+        .run(|app, event| {
+            if let tauri::RunEvent::Exit = event {
+                // Unregister the Spout sender so receivers do not keep a dead source.
+                if let Some(spout) = app.try_state::<spout_output::SpoutOutputState>() {
+                    spout.shutdown();
+                }
+            }
+        });
 }
 
 #[derive(Clone, Debug, Serialize)]
