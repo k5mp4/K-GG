@@ -69,10 +69,9 @@ if ($proc) { Write-Output $proc.Path } else { Write-Output "" }
  */
 function runAeScript(aePath: string, jsxPath: string): Promise<number> {
   return new Promise((resolve) => {
-    const ps = spawn('powershell.exe', [
-      '-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass',
-      '-Command', `& "${aePath}" -r "${jsxPath}"`,
-    ], { windowsHide: true });
+    // PowerShellのコマンド文字列を組み立てず、AfterFX.exeへ引数として直接渡す。
+    const ps = spawn(aePath, ['-r', jsxPath], { windowsHide: true });
+    ps.on('error', () => resolve(1));
     ps.on('close', (code) => resolve(code ?? 0));
   });
 }
@@ -107,6 +106,28 @@ function readBody(req: IncomingMessage): Promise<Buffer> {
   });
 }
 
+const ALLOWED_VIDEO_EXTENSIONS = new Set(['mov', 'mp4']);
+
+function isLoopbackAddress(address: string | undefined): boolean {
+  return address === '127.0.0.1' || address === '::1' || address === '::ffff:127.0.0.1';
+}
+
+/**
+ * `npm run dev:lan`などでdev serverがLANへ公開されても、AE操作は同じPCの
+ * 同一オリジン画面からだけ受け付ける。他サイトからのCSRFもOriginで拒否する。
+ */
+function isTrustedAeRequest(req: IncomingMessage): boolean {
+  if (!isLoopbackAddress(req.socket.remoteAddress)) return false;
+  const origin = req.headers.origin;
+  if (origin === undefined) return true;
+  return origin === `http://${req.headers.host ?? ''}`;
+}
+
+/** JSXへ埋め込むパスは文字列リテラルとしてエスケープする。 */
+function jsxImportFootage(path: string): string {
+  return `var footage = app.project.importFile(new ImportOptions(File(${JSON.stringify(path)})));\n${ADD_TO_COMP_JSX}`;
+}
+
 function json(res: ServerResponse, status: number, body: object) {
   const payload = JSON.stringify(body);
   res.writeHead(status, {
@@ -124,6 +145,10 @@ export function aeBridgePlugin(): Plugin {
     configureServer(server) {
       server.middlewares.use(async (req: IncomingMessage, res: ServerResponse, next: () => void) => {
         const url = req.url ?? '';
+        if (url.startsWith('/api/ae/') && !isTrustedAeRequest(req)) {
+          json(res, 403, { status: 'forbidden' });
+          return;
+        }
 
         // ── GET /api/ae/ping ──────────────────────────────────────────────
         if (req.method === 'GET' && url === '/api/ae/ping') {
@@ -154,7 +179,7 @@ export function aeBridgePlugin(): Plugin {
             const imgPath = join(tmpdir(), `${name}_${ts}.png`).replace(/\\/g, '/');
             await writeFile(imgPath, body);
             const jsxPath = join(tmpdir(), 'kagaribi_import_image.jsx').replace(/\\/g, '/');
-            await writeFile(jsxPath, `var footage = app.project.importFile(new ImportOptions(File("${imgPath}")));\n${ADD_TO_COMP_JSX}`, 'utf8');
+            await writeFile(jsxPath, jsxImportFootage(imgPath), 'utf8');
             await queueAeScript(aePath, jsxPath);
             json(res, 200, { status: 'ok', path: imgPath });
           } catch (e) {
@@ -166,6 +191,12 @@ export function aeBridgePlugin(): Plugin {
 
         // ── POST /api/ae/import-video ─────────────────────────────────────
         if (req.method === 'POST' && url.startsWith('/api/ae/import-video')) {
+          const vparams = new URL(url, 'http://localhost').searchParams;
+          const ext = (vparams.get('ext') ?? 'mov').toLowerCase();
+          if (!ALLOWED_VIDEO_EXTENSIONS.has(ext)) {
+            json(res, 400, { status: 'error', message: 'Unsupported video extension.' });
+            return;
+          }
           const aePath = await findRunningAe();
           if (!aePath) {
             json(res, 503, { status: 'not-running' });
@@ -173,14 +204,12 @@ export function aeBridgePlugin(): Plugin {
           }
           try {
             const body = await readBody(req);
-            const vparams = new URL(url, 'http://localhost').searchParams;
-            const ext = vparams.get('ext') ?? 'mov';
             const vname = (vparams.get('name') ?? 'kagaribi').replace(/[^\w-]/g, '_');
             const vts = Date.now();
             const vidPath = join(tmpdir(), `${vname}_${vts}.${ext}`).replace(/\\/g, '/');
             await writeFile(vidPath, body);
             const jsxPath = join(tmpdir(), 'kagaribi_import_video.jsx').replace(/\\/g, '/');
-            await writeFile(jsxPath, `var footage = app.project.importFile(new ImportOptions(File("${vidPath}")));\n${ADD_TO_COMP_JSX}`, 'utf8');
+            await writeFile(jsxPath, jsxImportFootage(vidPath), 'utf8');
             await queueAeScript(aePath, jsxPath);
             json(res, 200, { status: 'ok', path: vidPath });
           } catch (e) {
