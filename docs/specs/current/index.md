@@ -19,6 +19,7 @@ title: 現行仕様
 | CURRENT-MCP-DEVELOPER-INTERFACE | [MCP Developer Interface](./mcp-developer-interface) | current |
 | CURRENT-AFTER-EFFECTS-INTEGRATION | [After Effects連携](./after-effects-integration) | current |
 | CURRENT-DESIGN-APP-CONNECTORS | [Design App Direct Send](./design-app-connectors) | current |
+| CURRENT-REALTIME-OUTPUT | [リアルタイム映像出力（Spout）](./realtime-output) | current |
 
 ## 読み方
 
