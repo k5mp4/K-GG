@@ -5,7 +5,7 @@ export type VoronoiFeature = 'f1' | 'f2' | 'distance_to_edge';
 
 export type NoiseDistortionConfig = {
   enabled: boolean;
-  type: 'simplex' | 'fbm' | 'voronoi' | 'curl' | 'fast_curl' | 'domain_warp_anim' | 'seamless' | 'ridged_fbm' | 'ae_fractal' | 'caustics' | 'phasor';
+  type: 'simplex' | 'fbm' | 'voronoi' | 'curl' | 'fast_curl' | 'domain_warp_anim' | 'seamless' | 'ridged_fbm' | 'ae_fractal' | 'caustics' | 'phasor' | 'perlin';
   amount: number;
   scale: number;
   octaves: number;
@@ -42,6 +42,13 @@ export type NoiseDistortionConfig = {
   ridgePersistence: number;  // 0.1–1.0: 振幅倍率（大→高周波が支配的で複雑, 小→低周波が支配的）
   ridgeOffset: number;       // 0.0–2.0: 稜線位置オフセット（1.0=ゼロ交差, <1=収縮, >1=太く）
   ridgeWarp: number;         // 0.0–4.0: ドメインワープ量（simplex格子の規則性を破壊してランダムに）
+  // Perlin 3D 専用パラメータ (XY=画面, Z=時間。Material Maker Folded FBM → Invert → Tonality / AEにじみ相当)
+  perlinRoughness: number;   // 0.0–1.0: 主レイヤーのオクターブ振幅倍率（小→なめらか, 大→細い線が増える）
+  perlinSharpness: number;   // 1.0–8.0: Tonality相当のカーブ強度（大→暗部が広く光の筋が細い）
+  perlinLayerMix: number;    // 0.0–1.0: 2枚目レイヤーのLighten不透明度（淡い副次的な筋）
+  perlinAngle: number;       // 0–360°: UVを押し出す方向
+  perlinDimension: '3d' | '4d'; // 3d=XY+時間Z, 4d=XY+時間を円周ZW（Loop Periodで完全に一周するシームレスループ）
+  perlinLoopWobble: number;  // 0.0–1.0: 4D Loop軌道のうねり（0=真円, 大→場所ごとに位相がずれ速度・半径・位置が揺らぐ）
   // AE Fractal Noise 専用パラメータ
   aeFractalType: 'basic' | 'turbulent'; // basic=標準fbm, turbulent=abs()で全値正化
   aeSubInfluence: number;    // 0.01–1.0: オクターブ振幅倍率 (AE: Sub Influence)
