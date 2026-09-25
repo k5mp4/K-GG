@@ -45,7 +45,7 @@ Bの不具合では再現テストまたは再現手順を残します。Fの観
 
 ## Current Specの更新
 
-Current Specは履歴を時系列で追記せず、現在の契約になるよう編集します。変更後はRequirement ID、関連ADR、関連Change、関連コード/テストを同期します。意味的な内容の更新は人間またはAIが行い、`docs:check`はmetadata、参照、heading、index、リンクの整合を検査します。
+Current Specは履歴を時系列で追記せず、現在の契約になるよう編集します。変更後はRequirement ID、関連ADR、関連コード/テストを同期します。ChangeとCurrent Specの関係はChangeの`current_specs`を正本とし、並列PRの衝突を避けるためCurrent Specの`related_changes`へは追記しません（既存値は履歴として残します）。意味的な内容の更新は人間またはAIが行い、`docs:check`はmetadata、参照、heading、index、リンクの整合を検査します。
 
 対象領域にCurrent Specがない場合は、Legacy SPEC、コード、テストから次の3つを分けて調査します。
 
@@ -63,7 +63,7 @@ Current Specは履歴を時系列で追記せず、現在の契約になるよ�
 npm run docs:check
 npm run docs:build
 npm run change:check
-npm run change:finalize CHANGE-###
+npm run change:finalize <CHANGE-ID>
 ```
 
 ## 禁止事項

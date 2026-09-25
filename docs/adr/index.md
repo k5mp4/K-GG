@@ -8,35 +8,13 @@ ADRは、複数の機能や将来の実装を拘束する重要な技術判断�
 
 ## 一覧
 
-| ID | 判断 | 状態 |
-| --- | --- | --- |
-| ADR-0001 | [リポジトリ内文書を開発の一次情報とする](./0001-documentation-source-of-truth.md) | accepted |
-| ADR-0002 | [K-GG専用フォルダを優先してPATHからもFFmpegを検出する](./0002-ffmpeg-discovery-locations.md) | accepted |
-| ADR-0003 | [画像グラデーションのアンカー影響を永続設定として分離する](./0003-image-gradient-anchor-influence.md) | accepted |
-| ADR-0004 | [Postprocess Stackをping-pong FBOで描画する](./0004-postprocess-stack-rendering.md) | accepted |
-| ADR-0005 | [Unified Effect Stack V2を段階別ping-pong FBOで描画する](./0005-unified-effect-stack-v2.md) | accepted |
-| ADR-0006 | [Tweeqを共通入力コントロールとして採用する](./0006-tweeq-ui-controls.md) | superseded |
-| ADR-0007 | [プリセットライブラリの仮想フォルダとZIP交換形式](./0007-preset-library-storage-format.md) | accepted |
-| ADR-0008 | [プリセットサムネイルを描画結果から生成する](./0008-preset-rendered-thumbnails.md) | accepted |
-| ADR-0009 | [パラメータ制限を共有レジストリで管理する](./0009-unified-parameter-limits.md) | accepted |
-| ADR-0010 | [Image Gradient Sourceは画像テクスチャと色場を分離して描画する](./0010-image-gradient-color-field-rendering.md) | accepted |
-| ADR-0011 | [Tweeq vendorを固定上流ソースから最小構成で生成する](./0011-tweeq-vendor-source-and-api.md) | accepted |
-| ADR-0012 | [型付き辞書と意味的アイコンをUI表記の基盤とする](./0012-typed-localization-and-icon-semantics.md) | accepted |
-| ADR-0013 | [Mesh Gradationを単一Coons Patchの構造化データとして保持する](./0013-mesh-gradient-data-model.md) | accepted |
-| ADR-0014 | [承認済み変更パッケージをコミット単位の基本にする](./0014-commit-centered-change-workflow.md) | superseded |
-| ADR-0015 | [開発専用WebGL観測層を既存Canvasへ接続する](./0015-development-webgl-observability.md) | accepted |
-| ADR-0016 | [MCPをControl APIとloopback Runtime Bridgeへ分離し、公開前tarballで配布する](./0016-mcp-control-api-and-local-distribution.md) | accepted |
-| ADR-0017 | [V2の解析的Gradient Prefixを最初のtexture境界で固定する](./0017-analytic-gradient-prefix.md) | accepted |
-| ADR-0018 | [TauriからAfter Effectsへ固定JSXと一時ファイルで接続する](./0018-tauri-after-effects-connector.md) | accepted |
-| ADR-0019 | [Request-first開発ライフサイクルとValidation Gate分離](./0019-request-first-development-lifecycle.md) | accepted |
-| ADR-0020 | [デザインアプリへPNGをloopback経由で直接送る](./0020-design-app-direct-send.md) | accepted |
-| ADR-0021 | [macOSデスクトップ版を外部FFmpegとDMGで試験配布する](./0021-macos-desktop-distribution.md) | accepted |
-| ADR-0022 | [スプラッシュの演出をアダプターで分離し、Shader準備をPreview contextで優先度付きに行う](./0022-startup-splash-and-shader-warmup.md) | proposed |
-| ADR-0023 | [Spout出力をCPU readback・WebView2共有メモリ・静的リンクしたSpoutDXで実装する](./0023-spout-output-cpu-readback.md) | accepted |
+この一覧は各ADRのfrontmatterからドキュメントのビルド時に生成します。並列PRの衝突を避けるため、このファイルへ行を追記しません。
+
+<AdrIndex />
 
 ## 作成基準
 
-次のいずれかに該当する場合は、[ADRテンプレート](./_template.md)から作成します。
+次のいずれかに該当する場合は、`npm run adr:new -- <slug> --title="判断のタイトル"`で[ADRテンプレート](./_template.md)から作成します。新しいADRのIDは`ADR-YYYYMMDD-slug`、ファイル名は`YYYYMMDD-slug.md`です。`ADR-0001`〜`ADR-0023`は連番時代の履歴IDとして有効なまま残し、新しい連番は採番しません。
 
 - 主要ライブラリ、フレームワーク、描画方式の採否
 - データ形式や永続化方式の変更

@@ -1,5 +1,5 @@
 ---
-id: ADR-XXXX
+id: ADR-YYYYMMDD-slug
 title: 判断のタイトル
 status: proposed
 date: YYYY-MM-DD
@@ -8,7 +8,7 @@ related_specs: []
 supersedes: []
 ---
 
-# ADR-XXXX: 判断のタイトル
+# ADR-YYYYMMDD-slug: 判断のタイトル
 
 ## コンテキスト
 
