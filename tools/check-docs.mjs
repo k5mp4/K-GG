@@ -2,6 +2,7 @@ import { existsSync, readFileSync } from 'node:fs';
 import { readFile, readdir } from 'node:fs/promises';
 import path from 'node:path';
 import process from 'node:process';
+import { validateChangeId } from './change-workflow.mjs';
 
 const root = process.cwd();
 const docsDir = path.join(root, 'docs');
@@ -287,7 +288,8 @@ function validateChanges(changes, currentById, adrs, errors) {
     requireFields(proposal, ['type', 'id', 'title', 'status', 'change_kind', 'owners', 'created', 'updated', 'current_specs', 'related_adrs', 'human_review'], errors);
     for (const field of ['owners', 'current_specs', 'related_adrs']) requireList(proposal, field, errors);
     if (change.data.type !== 'change') errors.push(`${file}: type must be change`);
-    if (!/^CHANGE-\d{3}$/.test(change.data.id ?? '')) errors.push(`${file}: invalid change id "${change.data.id}"`);
+    const idError = validateChangeId(change.data.id, change.directory);
+    if (idError) errors.push(`${file}: ${idError}`);
     if (changeById.has(change.data.id)) errors.push(`${file}: duplicate change id "${change.data.id}"`);
     changeById.set(change.data.id, change);
     if (!allowedChangeStatuses.has(change.data.status)) errors.push(`${file}: invalid status "${change.data.status}"`);
@@ -406,26 +408,14 @@ function validateIndexes(currentSpecs, changes, errors) {
     );
   }
 
+  // Change一覧はVitePressのdata loaderがproposal.mdから描画する。
+  // index.mdへ行を持たせないことで、並列PRが同じ表へ追記して衝突するのを避ける。
   for (const bucket of ['active', 'archive']) {
     const indexPath = path.join(changeDir, bucket, 'index.md');
     const index = existsSync(indexPath) ? readFileSync(indexPath, 'utf8') : '';
     if (!index) errors.push(`docs/changes/${bucket}/index.md: index is missing`);
-    for (const change of changes.filter(candidate => candidate.bucket === bucket)) {
-      if (!index.includes(change.directory)) errors.push(`docs/changes/${bucket}/index.md: missing change link for ${change.directory}`);
-    }
-    if (index) {
-      validateIndexEntries(
-        `docs/changes/${bucket}/index.md`,
-        index,
-        changes.filter(candidate => candidate.bucket === bucket).map(change => ({
-          name: 'proposal.md',
-          relativePath: `${change.relativeDirectory}/proposal.md`,
-          data: change.data,
-        })),
-        document => `./${path.basename(path.dirname(document.relativePath))}/proposal`,
-        errors,
-      );
-    }
+    else if (!index.includes(`<ChangeIndex bucket="${bucket}"`)) errors.push(`docs/changes/${bucket}/index.md: must render <ChangeIndex bucket="${bucket}" /> instead of a hand-maintained table`);
+    else if (parseIndexTableRows(index).some(row => /^CHANGE-/.test(row.id))) errors.push(`docs/changes/${bucket}/index.md: remove hand-maintained CHANGE rows; the list is generated at build time`);
   }
 }
 

@@ -1,9 +1,12 @@
 import { describe, expect, it } from 'vitest';
 import {
+  buildNewProposal,
   findBrokenMarkdownLinks,
   hasMergeGatePass,
   parseFrontmatter,
+  newChangeId,
   updateFrontmatter,
+  validateChangeId,
 } from './change-workflow.mjs';
 
 describe('change workflow tooling', () => {
@@ -43,5 +46,31 @@ describe('change workflow tooling', () => {
   it('finds broken local links while ignoring external URLs', () => {
     const file = 'docs/development/workflow.md';
     expect(findBrokenMarkdownLinks(file, '[ok](./validation) [bad](./missing) [web](https://example.com)')).toEqual(['./missing']);
+  });
+
+  it('accepts historical sequential IDs but requires dated IDs for new changes', () => {
+    expect(validateChangeId('CHANGE-001', '2026-07-27-docdd-current-and-change-specs')).toBeNull();
+    expect(validateChangeId('CHANGE-054', 'CHANGE-054-export-format-select')).toBeNull();
+    expect(validateChangeId('CHANGE-055', 'CHANGE-055-next')).toContain('reserved for history');
+    expect(validateChangeId('CHANGE-20260925-export-format', 'CHANGE-20260925-export-format')).toBeNull();
+  });
+
+  it('rejects malformed dated IDs and directories that do not match the ID', () => {
+    expect(validateChangeId('CHANGE-20260230-bad-date', 'CHANGE-20260230-bad-date')).toContain('invalid date');
+    expect(validateChangeId('CHANGE-20260925-Upper_Case', 'CHANGE-20260925-Upper_Case')).toContain('invalid change id');
+    expect(validateChangeId('CHANGE-20260925-export', 'CHANGE-20260925-export-format')).toContain('directory name');
+  });
+
+  it('creates a proposal from the template with a dated ID', () => {
+    const id = newChangeId('export-format', '2026-09-25');
+    const proposal = buildNewProposal(
+      `---\nid: CHANGE-YYYYMMDD-slug\ntitle: 変更の短い名前\ncreated: YYYY-MM-DD\nupdated: YYYY-MM-DD\n---\n\n# 変更の短い名前\n\n[spec](../../specs/current/)\n`,
+      { id, title: '書き出し形式', date: '2026-09-25' },
+    );
+
+    expect(id).toBe('CHANGE-20260925-export-format');
+    expect(parseFrontmatter(proposal).data).toMatchObject({ id, title: '書き出し形式', created: '2026-09-25', updated: '2026-09-25' });
+    expect(proposal).toContain('# 書き出し形式');
+    expect(proposal).toContain('[spec](../../../specs/current/)');
   });
 });

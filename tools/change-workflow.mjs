@@ -1,5 +1,5 @@
 import { existsSync, readFileSync } from 'node:fs';
-import { readdir, readFile, rename, writeFile } from 'node:fs/promises';
+import { mkdir, readdir, readFile, rename, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import process from 'node:process';
 import { execFileSync } from 'node:child_process';
@@ -24,6 +24,10 @@ const allowedOutcomes = new Set([
   'cancelled',
   'superseded',
 ]);
+// CHANGE-001〜CHANGE-054は連番時代のIDとして有効なまま残す。
+// 新しいChangeは並列ブランチで衝突しない日付+slug IDを使う。
+const legacyChangeIdMax = 54;
+const datedChangeIdPattern = /^CHANGE-(\d{4})(\d{2})(\d{2})-([a-z0-9]+(?:-[a-z0-9]+)*)$/;
 const knownChangeFiles = new Set([
   'proposal.md',
   'delta.md',
@@ -31,6 +35,35 @@ const knownChangeFiles = new Set([
   'tasks.md',
   'validation.md',
 ]);
+
+export function validateChangeId(id, directory) {
+  const legacy = /^CHANGE-(\d{3})$/.exec(id ?? '');
+  if (legacy) {
+    return Number(legacy[1]) <= legacyChangeIdMax
+      ? null
+      : `sequential change id "${id}" is reserved for history; use CHANGE-YYYYMMDD-slug (npm run change:new)`;
+  }
+  const dated = datedChangeIdPattern.exec(id ?? '');
+  if (!dated) return `invalid change id "${id ?? ''}"; use CHANGE-YYYYMMDD-slug`;
+  const [, year, month, day] = dated;
+  const date = new Date(`${year}-${month}-${day}T00:00:00Z`);
+  if (Number.isNaN(date.getTime()) || date.toISOString().slice(0, 10) !== `${year}-${month}-${day}`) {
+    return `invalid date in change id "${id}"`;
+  }
+  if (directory !== undefined && directory !== id) return `directory name must equal change id "${id}"`;
+  return null;
+}
+
+export function newChangeId(slug, date = currentDate()) {
+  return `CHANGE-${date.replaceAll('-', '')}-${slug}`;
+}
+
+export function buildNewProposal(template, { id, title, date }) {
+  // _template/からactive/<id>/へ1階層深くなるため、親方向の相対リンクを補正する。
+  return updateFrontmatter(template, { id, title, created: date, updated: date })
+    .replace(/^# 変更の短い名前$/m, `# ${title}`)
+    .replaceAll('](../', '](../../');
+}
 
 function parseList(value) {
   const trimmed = value.trim();
@@ -115,6 +148,10 @@ function parseOptions(argv) {
       options.followUp = argument.slice('--follow-up='.length);
     } else if (argument === '--follow-up') {
       options.followUp = argv[++index];
+    } else if (argument.startsWith('--title=')) {
+      options.title = argument.slice('--title='.length);
+    } else if (argument === '--title') {
+      options.title = argv[++index];
     } else if (argument === '--help' || argument === '-h') {
       options.help = true;
     } else {
@@ -189,7 +226,8 @@ async function loadChange(bucket, directory) {
     }
   }
   if (data.type !== 'change') errors.push(`${relativeDirectory}/proposal.md: type must be change`);
-  if (!/^CHANGE-\d{3}$/.test(data.id ?? '')) errors.push(`${relativeDirectory}/proposal.md: invalid change id "${data.id ?? ''}"`);
+  const idError = validateChangeId(data.id, directory);
+  if (idError) errors.push(`${relativeDirectory}/proposal.md: ${idError}`);
   if (!allowedStatuses.has(data.status)) errors.push(`${relativeDirectory}/proposal.md: invalid status "${data.status ?? ''}"`);
   if (!allowedKinds.has(data.change_kind)) errors.push(`${relativeDirectory}/proposal.md: invalid change_kind "${data.change_kind ?? ''}"`);
   if (!['required', 'completed'].includes(data.human_review)) errors.push(`${relativeDirectory}/proposal.md: human_review must be required or completed`);
@@ -248,14 +286,6 @@ async function loadCurrentSpecs() {
     }
   }
   return specs;
-}
-
-function parseIndexRows(content) {
-  return content.split(/\r?\n/).flatMap(line => {
-    const match = line.match(/^\|\s*([^|]+?)\s*\|\s*\[([^\]]+)\]\(([^)]+)\)\s*\|\s*([^|]+?)\s*\|$/);
-    if (!match) return [];
-    return [{ id: match[1].trim(), title: match[2].trim(), link: match[3].trim(), status: match[4].trim() }];
-  });
 }
 
 export function hasMergeGatePass(content) {
@@ -319,53 +349,24 @@ async function validateLinks(errors) {
   }
 }
 
-function validateIndexes(changes, errors) {
-  for (const bucket of ['active', 'archive']) {
-    const indexPath = path.join(changeDir, bucket, 'index.md');
-    if (!existsSync(indexPath)) {
-      errors.push(`docs/changes/${bucket}/index.md: index is missing`);
-      continue;
-    }
-    const rows = parseIndexRows(readFileSync(indexPath, 'utf8'));
-    const entries = changes.filter(change => change.bucket === bucket && change.data.id);
-    const expected = new Map(entries.map(change => [change.data.id, {
-      title: change.data.title,
-      link: `./${change.directory}/proposal`,
-      status: change.data.status,
-    }]));
-    const seen = new Set();
-    for (const row of rows) {
-      if (seen.has(row.id)) errors.push(`docs/changes/${bucket}/index.md: duplicate index entry "${row.id}"`);
-      seen.add(row.id);
-      if (/^CHANGE-\d{3}$/.test(row.id) && !expected.has(row.id)) errors.push(`docs/changes/${bucket}/index.md: stale index entry "${row.id}"`);
-      const expectedRow = expected.get(row.id);
-      if (expectedRow && (row.title !== expectedRow.title || row.link !== expectedRow.link || row.status !== expectedRow.status)) {
-        errors.push(`docs/changes/${bucket}/index.md: entry for ${row.id} does not match proposal metadata`);
-      }
-    }
-    for (const [id, expectedRow] of expected) {
-      if (!seen.has(id)) errors.push(`docs/changes/${bucket}/index.md: missing index entry for ${id}`);
-      if (!expectedRow.title) errors.push(`docs/changes/${bucket}/${id}: title is empty`);
-    }
+function validateUniqueIds(changes, errors) {
+  const seen = new Map();
+  for (const change of changes) {
+    if (!change.data.id) continue;
+    const previous = seen.get(change.data.id);
+    if (previous) errors.push(`${change.relativeDirectory}/proposal.md: duplicate change id "${change.data.id}" (also ${previous})`);
+    else seen.set(change.data.id, change.relativeDirectory);
   }
 }
 
-async function validateCurrentSpecReferences(changes, errors, warnings) {
+async function validateCurrentSpecReferences(changes, errors) {
+  // Changeの`current_specs`を正本とし、Current Specの`related_changes`への逆参照追記は要求しない。
+  // 並列PRが同じ1行リストへ追記して衝突するのを避けるため。
   const specs = await loadCurrentSpecs();
   for (const change of changes) {
     if (!change.data.id || !Array.isArray(change.data.current_specs)) continue;
     for (const specId of change.data.current_specs) {
-      const spec = specs.get(specId);
-      if (!spec) {
-        errors.push(`${change.relativeDirectory}/proposal.md: unknown current specification "${specId}"`);
-        continue;
-      }
-      const related = Array.isArray(spec.data.related_changes) ? spec.data.related_changes : [];
-      if (!related.includes(change.data.id)) {
-        const message = `${spec.relativePath}: related_changes does not include ${change.data.id}`;
-        if (change.data.outcome) errors.push(message);
-        else warnings.push(message);
-      }
+      if (!specs.has(specId)) errors.push(`${change.relativeDirectory}/proposal.md: unknown current specification "${specId}"`);
     }
   }
 }
@@ -374,33 +375,14 @@ export async function inspectRepository({ requireEmptyActive = false } = {}) {
   const changes = await loadChanges();
   const errors = changes.flatMap(change => change.errors ?? []);
   const warnings = [];
-  await validateCurrentSpecReferences(changes, errors, warnings);
-  validateIndexes(changes, errors);
+  await validateCurrentSpecReferences(changes, errors);
+  validateUniqueIds(changes, errors);
   await validateLinks(errors);
   const active = changes.filter(change => change.bucket === 'active' && change.data.id);
   if (requireEmptyActive && active.length > 0) {
     errors.push(`main must not contain Active Changes (${active.map(change => change.data.id).join(', ')})`);
   }
   return { changes, active, archive: changes.filter(change => change.bucket === 'archive' && change.data.id), errors, warnings };
-}
-
-function changeIndexContent(bucket, changes) {
-  const rows = changes
-    .filter(change => change.bucket === bucket && change.data.id)
-    .sort((a, b) => a.data.id.localeCompare(b.data.id, 'en'))
-    .map(change => `| ${change.data.id} | [${change.data.title}](./${change.directory}/proposal) | ${change.data.status} |`);
-  const body = rows.length > 0 ? rows.join('\n') : '| なし | Active Changeはありません | - |';
-  if (bucket === 'active') {
-    return `---\ntitle: 進行中の変更\n---\n\n# 進行中の変更\n\nActive ChangeはDesigned ChangeのPR中だけに置きます。mainへマージする前にCurrent Spec/ADRを同期し、\`npm run change:finalize CHANGE-###\`でArchiveへ移動してください。Quick ChangeにはChange directoryを作りません。\n\n| ID | 変更 | 状態 |\n| --- | --- | --- |\n${body}\n`;
-  }
-  return `---\ntitle: 完了済み変更\n---\n\n# 完了済み変更\n\nArchiveは過去の変更履歴です。現在の動作を確認するときは先に[現行仕様](../../specs/current/)を読みます。\`outcome: follow-up\`の記録は、未完了AC、Release Gate、ObservationなどをIssueへ移すための追跡情報です。\n\n| ID | 変更 | 状態 |\n| --- | --- | --- |\n${body}\n`;
-}
-
-async function rebuildIndexes() {
-  const changes = await loadChanges();
-  for (const bucket of ['active', 'archive']) {
-    await writeFile(path.join(changeDir, bucket, 'index.md'), changeIndexContent(bucket, changes));
-  }
 }
 
 function appendFinalization(content, { outcome, followUp, migration }) {
@@ -420,7 +402,7 @@ function findChangeById(changes, id) {
 }
 
 async function finalizeChange(id, options) {
-  if (!/^CHANGE-\d{3}$/.test(id ?? '')) throw new Error(`usage: change:finalize CHANGE-### [--migration --outcome=... --follow-up=...]`);
+  if (!id || validateChangeId(id)) throw new Error(`usage: change:finalize <CHANGE-ID> [--migration --outcome=... --follow-up=...]`);
   const changes = await loadChanges();
   const change = findChangeById(changes, id);
   if (!change) {
@@ -444,12 +426,6 @@ async function finalizeChange(id, options) {
     if (!change.files['validation.md'] || !hasMergeGatePass(change.files['validation.md'])) {
       throw new Error(`${id} requires a passing ## Merge Gate in validation.md before normal finalize`);
     }
-    const specs = await loadCurrentSpecs();
-    for (const specId of change.data.current_specs ?? []) {
-      const spec = specs.get(specId);
-      if (!spec) throw new Error(`${id} references unknown current specification ${specId}`);
-      if (!(spec.data.related_changes ?? []).includes(id)) throw new Error(`${spec.relativePath} must include ${id} in related_changes before finalize`);
-    }
   }
 
   const followUp = options.followUp ?? change.data.follow_up;
@@ -468,8 +444,21 @@ async function finalizeChange(id, options) {
   await writeFile(proposalPath, proposal);
 
   await rename(change.absoluteDirectory, archiveDirectory);
-  await rebuildIndexes();
   console.log(`${id} finalized to docs/changes/archive/${change.directory} (${outcome}).`);
+}
+
+async function createChange(slug, options) {
+  if (!slug) throw new Error('usage: change:new <slug> [--title="変更の短い名前"]');
+  const date = currentDate();
+  const id = newChangeId(slug, date);
+  const idError = validateChangeId(id, id);
+  if (idError) throw new Error(`${idError} (slug must be lowercase kebab-case)`);
+  const target = path.join(changeDir, 'active', id);
+  if (existsSync(target) || existsSync(path.join(changeDir, 'archive', id))) throw new Error(`${id} already exists`);
+  const template = await readFile(path.join(changeDir, '_template', 'proposal.md'), 'utf8');
+  await mkdir(target, { recursive: true });
+  await writeFile(path.join(target, 'proposal.md'), buildNewProposal(template, { id, title: options.title ?? slug, date }));
+  console.log(`${id} created at docs/changes/active/${id}/proposal.md. Copy delta/design/tasks/validation from docs/changes/_template only when needed.`);
 }
 
 function printCheck(result, requireEmpty) {
@@ -487,7 +476,7 @@ function printCheck(result, requireEmpty) {
 }
 
 function printHelp() {
-  console.log(`Usage:\n  npm run change:check [-- --require-empty]\n  npm run change:finalize CHANGE-###\n  npm run change:finalize CHANGE-### -- --migration --outcome=follow-up --follow-up="issue-needed: ..."`);
+  console.log(`Usage:\n  npm run change:new -- <slug> --title="変更の短い名前"\n  npm run change:check [-- --require-empty]\n  npm run change:finalize <CHANGE-ID>\n  npm run change:finalize <CHANGE-ID> -- --migration --outcome=follow-up --follow-up="issue-needed: ..."`);
 }
 
 export async function main(argv = process.argv.slice(2)) {
@@ -500,6 +489,10 @@ export async function main(argv = process.argv.slice(2)) {
   if (command === 'check') {
     const result = await inspectRepository({ requireEmptyActive: shouldRequireEmpty(options) });
     return printCheck(result, shouldRequireEmpty(options)) ? 0 : 1;
+  }
+  if (command === 'new') {
+    await createChange(options.positional[0], options);
+    return 0;
   }
   if (command === 'finalize') {
     await finalizeChange(options.positional[0], options);

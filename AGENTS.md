@@ -24,7 +24,9 @@ K-GGはRequest-firstの開発フローとDocsDDを採用します。利用者向
 
 - Change CapsuleはDesigned Changeなど複雑な変更に限定し、必要なファイルだけ作る。Quick Changeでは作らない。
 - `docs/changes/active/`はfeature branch/PR上の一時領域であり、`main`上は原則0件にする。
-- Merge前にCurrent Spec/ADRを同期し、`npm run change:check`で構造・参照・indexを確認してから`npm run change:finalize CHANGE-###`を実行する。
+- Change Capsuleは`npm run change:new -- <slug> --title="..."`で作り、IDは日付+slugの`CHANGE-YYYYMMDD-slug`を使う。`CHANGE-001`〜`CHANGE-054`は履歴用で、新しい連番を採番しない。
+- 並列PRで衝突しないよう、Change一覧のindex.mdへ行を追記せず、Current Specの`related_changes`へも追記しない（一覧と逆参照はproposalのfrontmatterから生成する）。
+- Merge前にCurrent Spec/ADRを同期し、`npm run change:check`で構造・参照を確認してから`npm run change:finalize <CHANGE-ID>`を実行する。
 - 手動・GPU・Tauri・FFmpeg・After Effects確認はRelease GateまたはObservationとして記録する。未確認だけを理由にActiveへ残さず、必要な継続作業はIssueへ移す。
 - Archiveは現在仕様の根拠ではない。Current Specへdeltaを統合し、Archiveには経緯と検証証拠を残す。
 
@@ -38,7 +40,7 @@ npm run check:merge
 npm run check:render     # Shader / WebGL / Render Plan変更時
 npm run check:native     # src-tauri / Rust変更時
 npm run release:check    # version / updater設定
-npm run change:finalize CHANGE-###
+npm run change:finalize <CHANGE-ID>
 ```
 
 `npm run check:fast`はtypecheck、unit/component、lint、frontend build、docs check/buildを含みます。既存互換の`npm run verify`はrelease設定・fast・nativeをまとめて実行します。警告はエラーと区別し、実行していない手動確認をpassにしない。

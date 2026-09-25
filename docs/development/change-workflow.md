@@ -38,13 +38,37 @@ Capsuleに含めるファイルは必要最小限にします。
 
 `tasks.md`はIssue/PR checklistの代替ではありません。`validation.md`はCIログの複製場所ではなく、Merge Gate、Release Gate、Observationの判断を記録する場所です。
 
+## 作成とID
+
+Capsuleは次のコマンドで作成します。
+
+```sh
+npm run change:new -- export-format --title="書き出し形式の追加"
+```
+
+`docs/changes/active/CHANGE-YYYYMMDD-slug/proposal.md`がテンプレートから作られます。`delta.md`などは必要な場合だけ`docs/changes/_template/`からコピーします。
+
+IDとdirectory名は同じ`CHANGE-YYYYMMDD-slug`にします。slugは小文字英数字とハイフンです。連番は並列ブランチが同じ「次の番号」を取り合って衝突するため、新しいChangeには使いません。`CHANGE-001`〜`CHANGE-054`は履歴IDとして有効なまま残します（[ADR-0022](../adr/0022-conflict-free-change-metadata.md)）。
+
+## 並列開発で衝突させない規則
+
+複数のPRが同じ共有ファイルへ追記しないよう、Changeは自分のdirectoryだけで完結させます。
+
+| 共有されていた情報 | 現在の正本 | PRで編集しないもの |
+| --- | --- | --- |
+| Active/Archive一覧 | 各`proposal.md`のfrontmatter（VitePressがビルド時に描画） | `docs/changes/active/index.md`、`docs/changes/archive/index.md` |
+| Change ID | 日付+slug | 他Changeとの連番調整 |
+| ChangeとCurrent Specの関係 | Changeの`current_specs` | Current Specの`related_changes`への追記 |
+
+Current Specの本文・要件の変更は同じ領域を触る並列PR同士で衝突し得ます。それは意味的な競合なので、機械的に回避せずPRで解消します。
+
 ## metadata
 
-既存の`proposal.md`は次のfrontmatterを使います。
+`proposal.md`は次のfrontmatterを使います。
 
 ```yaml
 type: change
-id: CHANGE-###
+id: CHANGE-YYYYMMDD-slug
 title: 変更の短い名前
 status: draft
 change_kind: F
@@ -80,30 +104,31 @@ draft → review → approved → implemented → archived
 
 ```sh
 npm run change:check
-npm run change:finalize CHANGE-###
+npm run change:finalize <CHANGE-ID>
 npm run change:check -- --require-empty
 ```
 
 `change:finalize`は次を自動化します。
 
 - proposal metadataとChange IDの検査
-- Current Specの`related_changes`逆参照の検査
-- Change内とindexの相対リンク検査
-- Active/Archiveの構造確認
+- `current_specs`が既存Current Specを指すことの検査
+- Change内の相対リンク検査
+- Active/Archiveの構造とID重複の確認
 - proposalの`status: archived`と`outcome`の記録
 - Archive directoryへの安全な移動
-- active/archive indexの再生成
+
+indexはビルド時に生成されるため、finalizeはChange directory以外のファイルを変更しません。
 
 Current Spec本文の意味的な書換え、ADRの判断、GitHub Issue作成は自動化しません。Issueが必要な場合は人間が作成し、Archiveの`follow_up`またはPRから追跡できるようにします。
 
 通常のfinalizeは`status: implemented`とMerge Gate成功を要求します。既存Activeの整理など、実装完了と移行を区別する必要がある場合だけ次を使います。
 
 ```sh
-npm run change:finalize CHANGE-### -- --migration --outcome=follow-up --follow-up="issue-needed: 残作業"
+npm run change:finalize <CHANGE-ID> -- --migration --outcome=follow-up --follow-up="issue-needed: 残作業"
 ```
 
 Migration modeはMerge Gateの成功を捏造せず、元のValidationを保ったまま履歴をArchiveへ移します。新しい実装に通常利用しません。
 
 ## mainの境界
 
-`docs/changes/active/`はPR中の一時成果物です。mainへマージするPRでは、実装、Current Spec/ADR同期、finalize、index更新を同じPRへ含めます。手動・GPU・Tauri・FFmpeg・After Effects確認が残る場合も、Release Gate/ObservationとしてArchive後にIssueで追跡し、mainにActiveを残しません。
+`docs/changes/active/`はPR中の一時成果物です。mainへマージするPRでは、実装、Current Spec/ADR同期、finalizeを同じPRへ含めます。手動・GPU・Tauri・FFmpeg・After Effects確認が残る場合も、Release Gate/ObservationとしてArchive後にIssueで追跡し、mainにActiveを残しません。

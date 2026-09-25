@@ -2,11 +2,13 @@
 import DefaultTheme from 'vitepress/theme'
 import './custom.css'
 import CldImage from './components/CldImage.vue'
+import ChangeIndex from './components/ChangeIndex.vue'
 
 export default {
   extends: DefaultTheme,
   enhanceApp({ app }) {
     // CldImage という名前でコンポーネントを登録
     app.component('CldImage', CldImage)
+    app.component('ChangeIndex', ChangeIndex)
   }
 }
