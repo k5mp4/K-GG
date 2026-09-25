@@ -85,6 +85,15 @@ async function invokeTransfer(
 export const tauriAfterEffectsService: AfterEffectsService = {
   runtime: 'tauri-native',
 
+  async isPlatformSupported(): Promise<boolean> {
+    try {
+      const status = await invoke<NativeStatus>('get_after_effects_status');
+      return status.supported;
+    } catch {
+      return false;
+    }
+  },
+
   async isAvailable(): Promise<boolean> {
     try {
       const status = await invoke<NativeStatus>('get_after_effects_status');

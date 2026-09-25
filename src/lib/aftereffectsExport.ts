@@ -17,6 +17,11 @@ export type { AeSaveDirStatus, AeStatus } from '../adapters';
 
 export const aeRuntime = adapters.afterEffectsService.runtime;
 
+/** Tauri版のOS境界をUIへ伝える。Browser版Bridgeは利用可能とする。 */
+export async function aePlatformSupported(): Promise<boolean> {
+  return adapters.afterEffectsService.isPlatformSupported();
+}
+
 /** After EffectsまたはWeb版Bridgeが利用可能かを確認する。 */
 export async function aeBridgeAvailable(): Promise<boolean> {
   return adapters.afterEffectsService.isAvailable();

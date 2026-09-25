@@ -15,3 +15,4 @@ Active ChangeはDesigned ChangeのPR中だけに置きます。mainへマージ�
 | CHANGE-049 | [Color Palette GeneratorをGradient Generatorに整理](./CHANGE-049-gradient-generator-controls/proposal) | draft |
 | CHANGE-050 | [K-GGからデザインアプリへPNGを直接送信](./CHANGE-050-design-app-direct-send/proposal) | draft |
 | CHANGE-051 | [配布時のライセンス表示と外部入力の安全性](./CHANGE-051-release-safety/proposal) | review |
+| CHANGE-052 | [macOSデスクトップ版の試験ビルドと配布](./CHANGE-052-macos-desktop-support/proposal) | review |

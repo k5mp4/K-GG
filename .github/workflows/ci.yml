@@ -182,3 +182,56 @@ jobs:
 
       - name: Run native Merge Gate
         run: npm run check:native
+
+  macos-native-check:
+    name: macos-native-check
+    needs: changes
+    if: needs.changes.outputs.native == 'true'
+    runs-on: macos-15
+    timeout-minutes: 45
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+
+      - name: Install FFmpeg
+        run: brew install ffmpeg
+
+      - name: Set up Rust
+        uses: dtolnay/rust-toolchain@4be7066ada62dd38de10e7b70166bc74ed198c30
+        with:
+          toolchain: stable
+          targets: aarch64-apple-darwin
+
+      - name: Cache Rust build
+        uses: Swatinem/rust-cache@42dc69e1aa15d09112580998cf2ef0119e2e91ae # v2
+        with:
+          workspaces: src-tauri -> target
+
+      - name: Install frontend dependencies
+        run: npm ci
+
+      - name: Run macOS FFmpeg smoke gate
+        run: npm run check:ffmpeg
+
+      - name: Run macOS native checks
+        run: npm run check:native
+
+      - name: Build macOS app and DMG
+        run: npm run tauri:build:macos
+
+      - name: Verify macOS bundle outputs
+        shell: bash
+        run: |
+          test -d src-tauri/target/release/bundle/macos/*.app
+          find src-tauri/target/release/bundle/dmg -maxdepth 1 -name '*.dmg' -print -quit | grep -q .
+
+      - name: Verify macOS ad-hoc signature
+        shell: bash
+        run: bash tools/verify-macos-signing.sh src-tauri/target

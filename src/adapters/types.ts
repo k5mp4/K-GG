@@ -41,6 +41,7 @@ export type NativeVideoArtifact = {
 
 export interface AfterEffectsService {
   runtime: AeRuntime;
+  isPlatformSupported(): Promise<boolean>;
   isAvailable(): Promise<boolean>;
   ping(): Promise<AeStatus>;
   getSaveDir(): Promise<AeSaveDirStatus>;
@@ -146,6 +147,7 @@ export type VideoExportConfig = {
 };
 
 export type NativeFfmpegStatus = {
+  platform: 'windows' | 'macos' | 'unknown';
   supported: boolean;
   available: boolean;
   source: 'app-data-folder' | 'system-path' | null;
@@ -154,6 +156,8 @@ export type NativeFfmpegStatus = {
   error: string | null;
   warning: string | null;
   folderPath: string | null;
+  ffprobePath: string | null;
+  ffprobeVersion: string | null;
 };
 
 export interface VideoExportService {

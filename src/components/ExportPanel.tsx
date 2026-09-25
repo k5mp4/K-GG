@@ -17,7 +17,7 @@ import {
 } from '../lib/export';
 import { exportSlits } from '../lib/exportSlits';
 import {
-  aePing, aeImportImage, aeImportVideo, aeBridgeAvailable, aeRuntime,
+  aePing, aeImportImage, aeImportVideo, aeBridgeAvailable, aePlatformSupported as checkAePlatformSupported, aeRuntime,
   aeGetSaveDir, aeChooseSaveDir, aeClearSaveDir,
 } from '../lib/aftereffectsExport';
 import { MP4_QUALITY_PRESETS } from '../adapters';
@@ -111,6 +111,7 @@ export function ExportPanel({
 
   // After Effects 連携
   const [aeStatus, setAeStatus] = useState<AeStatus | 'idle' | 'sending'>('idle');
+  const [aePlatformSupported, setAePlatformSupported] = useState(true);
   const [sendToAe, setSendToAe] = useState(false);
   const [aeVideoSendMode, setAeVideoSendMode] = useState<AeVideoSendMode>('export');
   const [pendingAeVideoSends, setPendingAeVideoSends] = useState(0);
@@ -122,6 +123,18 @@ export function ExportPanel({
     aeStatusControllerRef.current = createAeStatusController(setAeStatus);
   }
   const aeStatusController = aeStatusControllerRef.current;
+
+  useEffect(() => {
+    let cancelled = false;
+    void checkAePlatformSupported().then((supported) => {
+      if (cancelled) return;
+      setAePlatformSupported(supported);
+      if (!supported) setAeStatus('unsupported');
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   useEffect(() => {
     if (!bridgeAvailable) {
@@ -761,17 +774,19 @@ export function ExportPanel({
                 Check
               </button>
             </div>
-            <button
-              type="button"
-              onClick={() => {
-                void openNativeFfmpegFolder().catch((error) => {
-                  setExportError(error instanceof Error ? error.message : String(error));
-                });
-              }}
-              className="mt-2 text-[10px] text-fire underline underline-offset-2 hover:text-cream"
-            >
-              Open K-GG FFmpeg folder
-            </button>
+            {ffmpegStatus?.folderPath && (
+              <button
+                type="button"
+                onClick={() => {
+                  void openNativeFfmpegFolder().catch((error) => {
+                    setExportError(error instanceof Error ? error.message : String(error));
+                  });
+                }}
+                className="mt-2 text-[10px] text-fire underline underline-offset-2 hover:text-cream"
+              >
+                Open K-GG FFmpeg folder
+              </button>
+            )}
           </div>
         )}
 
@@ -888,7 +903,11 @@ export function ExportPanel({
           <p className="text-xs text-red-400">{t('export.aeError')}</p>
         )}
 
-        {bridgeAvailable ? (
+        {!aePlatformSupported ? (
+          <div className="rounded-none bg-k-bg border border-panel-border border-panel px-3 py-2 space-y-1">
+            <p className="text-xs text-red-400">{t('export.aeUnsupported')}</p>
+          </div>
+        ) : bridgeAvailable ? (
           <>
             <div className="space-y-1.5">
               <p className="text-xs text-tab-inactive">{t('export.aeVideoDestination')}</p>
