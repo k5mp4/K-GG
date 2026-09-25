@@ -1,8 +1,14 @@
 import { test, expect } from './fixtures';
+import { pauseAnimation, waitForE2EBridge, waitForWebGLReady } from './support/bridge';
 
 test('Licenses display locally and preset import runs in a real Worker', async ({ page, browserErrors: _browserErrors }, testInfo) => {
   await page.addInitScript(() => localStorage.setItem('kgg.ui-language', 'en'));
   await page.goto('/', { waitUntil: 'domcontentloaded' });
+  // Software WebGL preview rendering can saturate the CI main thread; this
+  // test covers dialog UI and the import Worker, so stop the animation first.
+  await waitForE2EBridge(page);
+  await waitForWebGLReady(page);
+  await pauseAnimation(page);
   await page.getByRole('button', { name: 'Help', exact: true }).click();
   await page.getByRole('button', { name: 'Third-party licenses', exact: true }).click();
   const search = page.getByRole('searchbox');

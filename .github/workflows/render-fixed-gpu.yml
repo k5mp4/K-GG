@@ -25,7 +25,6 @@ jobs:
       BASE_SHA_INPUT: ${{ inputs.base_sha }}
       HEAD_SHA_INPUT: ${{ inputs.head_sha }}
       KGG_E2E_GPU: '1'
-      KGG_CAPTURE_RUNNER_ID: ${{ runner.name }}
       KGG_CAPTURE_RUNNER_INVENTORY: test-results/fixed-gpu-runner.json
 
     steps:
@@ -89,6 +88,7 @@ jobs:
           }
           $details | ConvertTo-Json -Depth 8 | Set-Content -Path test-results/fixed-gpu-runner.json -Encoding utf8
           "KGG_CAPTURE_RUNNER_FINGERPRINT=$fingerprint" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+          "KGG_CAPTURE_RUNNER_ID=$env:RUNNER_NAME" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
 
       - name: Snapshot fixed GPU gate tooling
         shell: pwsh

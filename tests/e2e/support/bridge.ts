@@ -32,6 +32,14 @@ export async function waitForWebGLReady(page: Page): Promise<KggE2EDiagnostics> 
   }, timeoutMs);
 }
 
+export async function pauseAnimation(page: Page): Promise<void> {
+  await page.evaluate(() => {
+    const bridge = window.__KGG_E2E__;
+    if (!bridge) throw new Error('K-GG E2E bridge is not available');
+    bridge.pauseAnimation();
+  });
+}
+
 export async function setNormalizedTime(page: Page, normalizedTime: number): Promise<KggE2ECapture> {
   return page.evaluate(async value => {
     const bridge = window.__KGG_E2E__;
