@@ -31,6 +31,7 @@ ADRは、複数の機能や将来の実装を拘束する重要な技術判断�
 | ADR-0019 | [Request-first開発ライフサイクルとValidation Gate分離](./0019-request-first-development-lifecycle.md) | accepted |
 | ADR-0020 | [デザインアプリへPNGをloopback経由で直接送る](./0020-design-app-direct-send.md) | accepted |
 | ADR-0021 | [macOSデスクトップ版を外部FFmpegとDMGで試験配布する](./0021-macos-desktop-distribution.md) | accepted |
+| ADR-0022 | [スプラッシュの演出をアダプターで分離し、Shader準備をPreview contextで優先度付きに行う](./0022-startup-splash-and-shader-warmup.md) | proposed |
 
 ## 作成基準
 

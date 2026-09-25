@@ -88,6 +88,54 @@ describe('WebGL lazy compile policy', () => {
     expect(maximumActive).toBe(1);
   });
 
+  it('starts waiting demand compiles before idle warmup, FIFO within a priority', async () => {
+    const queue = createSerialAsyncQueue();
+    const order: string[] = [];
+    let releaseFirst: () => void = () => undefined;
+    const first = queue.enqueue(() => new Promise<void>((resolve) => {
+      order.push('running-warmup');
+      releaseFirst = resolve;
+    }), { priority: 'warmup', id: 'running-warmup' });
+    await Promise.resolve();
+
+    const task = (name: string) => async () => {
+      order.push(name);
+    };
+    const queued = [
+      queue.enqueue(task('warmup-a'), { priority: 'warmup', id: 'warmup-a' }),
+      queue.enqueue(task('warmup-b'), { priority: 'warmup', id: 'warmup-b' }),
+      queue.enqueue(task('prefetch'), { priority: 'prefetch', id: 'prefetch' }),
+      queue.enqueue(task('demand-1'), { priority: 'demand', id: 'demand-1' }),
+      queue.enqueue(task('demand-2')),
+    ];
+    // A user request for a program already waiting as warmup jumps ahead.
+    queue.promote('warmup-b', 'demand');
+    // Promotion never lowers a priority.
+    queue.promote('demand-1', 'warmup');
+
+    releaseFirst();
+    await Promise.all([first, ...queued]);
+    expect(order).toEqual(['running-warmup', 'demand-1', 'demand-2', 'warmup-b', 'prefetch', 'warmup-a']);
+  });
+
+  it('keeps running later tasks after a failed compile', async () => {
+    const queue = createSerialAsyncQueue();
+    const failed = queue.enqueue(async () => {
+      throw new Error('link failed');
+    });
+    const next = queue.enqueue(async () => 'ok');
+
+    await expect(failed).rejects.toThrow('link failed');
+    await expect(next).resolves.toBe('ok');
+  });
+
+  it('promotes an in-flight warmup compile when the render path requests it', () => {
+    const source = functionSource('requestLazyProgram');
+
+    expect(source).toContain('ctx.lazyProgramCompileQueue.promote(key, priority)');
+    expect(source).toContain("priority: LazyCompilePriority = 'demand'");
+  });
+
   it('routes lazy program requests through the context-local compile queue', () => {
     const source = functionSource('requestLazyProgram');
 

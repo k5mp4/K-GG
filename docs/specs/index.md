@@ -19,6 +19,7 @@ title: 仕様一覧
 | CURRENT-MCP-DEVELOPER-INTERFACE | [MCP Developer Interface](./current/mcp-developer-interface) | current |
 | CURRENT-AFTER-EFFECTS-INTEGRATION | [After Effects連携](./current/after-effects-integration) | current |
 | CURRENT-DESIGN-APP-CONNECTORS | [Design App Direct Send](./current/design-app-connectors) | current |
+| CURRENT-APP-STARTUP | [起動とスプラッシュスクリーン](./current/app-startup) | current |
 
 変更の経緯は[完了済み変更](../changes/archive/)と、下記のLegacy Change Specificationsから確認できます。現行仕様を読む際にLegacy SPECを必須資料にしないでください。
 

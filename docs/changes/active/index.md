@@ -18,3 +18,4 @@ Active ChangeはDesigned ChangeのPR中だけに置きます。mainへマージ�
 | CHANGE-052 | [macOSデスクトップ版の試験ビルドと配布](./CHANGE-052-macos-desktop-support/proposal) | review |
 | CHANGE-053 | [Glass Organic／RippleとGlassTile Faceted・屈折率・色分散サンプル数](./CHANGE-053-glass-ior-dispersion/proposal) | draft |
 | CHANGE-054 | [書き出し形式のInputDrum化とFFmpeg動画形式の追加](./CHANGE-054-export-format-select/proposal) | review |
+| CHANGE-055 | [起動スプラッシュとEffect Stack Shaderの事前準備](./CHANGE-055-startup-splash-shader-warmup/proposal) | review |
