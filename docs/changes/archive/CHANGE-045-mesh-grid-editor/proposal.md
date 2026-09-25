@@ -2,16 +2,19 @@
 type: change
 id: CHANGE-045
 title: Mesh Gradationのグリッド化・直接編集UI・ベジエ操作修正
-status: draft
+status: archived
 change_kind: F
 owners: [maintainer]
 created: 2026-09-06
-updated: 2026-09-06
+updated: 2026-09-25
 current_specs: [CURRENT-GRADIENT]
 related_adrs: [ADR-0013]
 related_code: [src/types/gradient.ts, src/lib/meshGradientField.ts, src/lib/webgl.ts, src/lib/presetPreview.ts, src/lib/sceneEvaluation.ts, src/lib/animationRegistry.ts, src/store/documentSlice.ts, src/store/documentActions.ts, src/application/commands.ts, src/components/MeshGradientEditor.tsx, src/components/GradientAnchorEditor.tsx, packages/kgg-control/src/controls.ts, src/lib/kggControlRuntime.ts, src/lib/presetModel.ts, src/i18n/messages.ts, src/i18n/uiLabels.ts, src/docs/help.md]
 related_tests: [src/types/gradient.test.ts, src/lib/meshGradient.test.ts, src/lib/webglShaderSources.test.ts, src/lib/kggControlRuntime.test.ts]
 human_review: required
+outcome: follow-up
+migration: historical
+follow_up: "issue-needed: 実GPUでのテッセレーション品質・性能とMesh/Ramp stop対応の手動確認"
 ---
 
 # CHANGE-045 Mesh Gradationのグリッド化・直接編集UI・ベジエ操作修正
@@ -79,3 +82,10 @@ Mesh Gradationは `rows:2/columns:2` 固定の単一Coonsパッチのみです�
 - グリッド寸法の上限と既定値（実装時: 2..8の範囲を想定、既定2で旧互換）。
 - グリッド寸法変更時の色・ハンドルの再配置方針。
 - 旧 `colorPositions` スライダーUIの撤去範囲（新UIへ置換し、旧データ読込互換のみ残す）。
+
+## Finalization
+
+- Finalized: 2026-09-25
+- Outcome: `follow-up`
+- Mode: historical migration; this move does not claim that every acceptance criterion passed.
+- Follow-up: issue-needed: 実GPUでのテッセレーション品質・性能とMesh/Ramp stop対応の手動確認

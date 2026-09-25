@@ -1,8 +1,8 @@
 {
   "schemaVersion": 1,
   "inputs": {
-    "package-lock.json": "8cdcc8c86196603f43ef9ec3648d543e8ae7b952cf6a1c6e57e6000caa976df7",
-    "src-tauri/Cargo.lock": "68ca3a9aa2a95c7dc67265675b9e5ab263a8c565eae5ef6e142dcf3e7cf6a3e1",
+    "package-lock.json": "70f319d4b26a467463c2235de9fc50cf21fc813bb67bc7edb0eed208a14a85be",
+    "src-tauri/Cargo.lock": "c643a33c5033aac6335608bba659c1ad41fe8c941e93a8e7671f2990a7a115c6",
     "vendor/tweeq/package.json": "43fe53c3801af7528e7e1d71c70b4a88f6ae3b6fbe0b28fc1671c09e7c3ffed5",
     "vendor/tweeq/index.es.js": "4b68974dd3f6fa958383de573a2e9a8eb17a1da71b514e4a00a7a5e9a7a3e43e",
     "vendor/tweeq/index.cjs": "a02e0b77b1f049e63198d5460281b180afbab13e3c5f6b1e404382ca99f2bedc",
