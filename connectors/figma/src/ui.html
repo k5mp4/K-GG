@@ -88,9 +88,9 @@
             cache: 'no-store',
           });
           const result = await response.json();
-          if (response.status !== 202 || typeof result.id !== 'string') throw new Error(result.error || '接続をリクエストできませんでした。');
+          if (response.status !== 202 || typeof result.id !== 'string' || typeof result.verificationCode !== 'string' || !/^\d{6}$/.test(result.verificationCode)) throw new Error(result.error || '接続をリクエストできませんでした。');
           connectionRequestId = result.id;
-          setStatus('info', 'K-GG Desktopで接続を許可してください。');
+          setStatus('info', `K-GG Desktopで確認コード ${result.verificationCode} が表示されていることを確かめてから許可してください。`);
         } catch (error) {
           setStatus('error', error instanceof Error ? error.message : 'K-GG Desktopへの接続に失敗しました。');
         } finally {

@@ -43,7 +43,7 @@ K-GG側は通常のアプリビルドに含まれます。開発中に起動す�
 
 1. K-GG DesktopとFigma Desktopを起動します。
 2. 登録済みのFigma Plugin「K-GG Direct Send」を起動します。初回登録は「Figmaへ送る」を参照してください。
-3. K-GGの静止画Exportパネルに接続リクエストが表示されたら、送信先を確認して「許可」を押します。
+3. K-GGの静止画Exportパネルに接続リクエストが表示されたら、送信先と6桁の確認コードを確認します。Figma Pluginに表示されたコードと一致する場合だけ「許可」を押します。
 4. K-GGの送信欄で対象アプリが接続中になったことを確認します。
 5. 「Figmaに送信」を押します。
 
@@ -55,7 +55,7 @@ Figma Pluginを閉じて再び起動した場合は、K-GGで新しい接続リ�
 2. 初回はK-GGの静止画Exportパネルで「manifest.jsonの場所を開く」を押します。
 3. Figma Desktopの`Plugins > Development > Import plugin from manifest...`を選び、開いたフォルダー内の`manifest.json`を指定します。
 4. `Plugins > Development > K-GG Direct Send`を起動します。
-5. K-GGの静止画Exportパネルに表示された接続リクエストで「許可」を押します。
+5. K-GGの静止画Exportパネルに表示された接続リクエストの確認コードが、Figma Pluginに表示されたコードと一致することを確かめて「許可」を押します。
 6. 接続中になったら「Figmaに送信」を押します。
 7. PNG画像がFigmaのviewport中央に配置され、選択状態になります。
 
@@ -83,6 +83,8 @@ PNGは20 MiB以下、各辺4096 px以下、総16,777,216 px以下です。K-GG�
 | Figmaで配置結果が返るまで45秒を越えた場合 | Pluginを再起動して接続を許可し、もう一度送信します。 |
 
 ローカル接続先は`localhost:43127`です。Figma manifestの許可先も`http://localhost:43127`です。接続の状態メッセージはExportパネルに表示されます。
+
+K-GGは接続リクエストごとに新しいリクエストIDと確認コードを発行し、IDは要求した受信アプリだけへ返します。未許可のリクエスト中に別の接続リクエストが届いた場合は新しい方に置き換わるため、確認コードが一致しない場合は許可せず、Pluginから接続し直してください。Webページなど、Figma Plugin・K-GG本体以外のブラウザoriginからの要求は拒否します。
 
 ## 参考資料
 
