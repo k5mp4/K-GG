@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 type NativeVideoArtifact = {
   kind: 'native-path';
   path: string;
+  format: 'mov' | 'mp4';
   mimeType: 'video/quicktime' | 'video/mp4';
   release(): Promise<void>;
 };
@@ -52,6 +53,7 @@ describe('tauriExportService native video artifact contract', () => {
     const artifact = {
       kind: 'native-path',
       path: artifactPath,
+      format: 'mov',
       mimeType: 'video/quicktime',
       release: vi.fn().mockResolvedValue(undefined),
       // A legacy Blob conversion must never be attempted for a native artifact.
@@ -81,6 +83,7 @@ describe('tauriExportService native video artifact contract', () => {
     const result = await tauriExportService.saveNativeVideoArtifact?.({
       kind: 'native-path',
       path: 'C:/Temp/kagaribi-grad/export/output.mov',
+      format: 'mov',
       mimeType: 'video/quicktime',
       release: vi.fn().mockResolvedValue(undefined),
     }, 'gradient.mov', null);
@@ -93,6 +96,7 @@ describe('tauriExportService native video artifact contract', () => {
     await expect(tauriExportService.saveNativeVideoArtifact?.({
       kind: 'native-path',
       path: 'C:/Temp/kagaribi-grad/export/output.mov',
+      format: 'mov',
       mimeType: 'video/quicktime',
       release: vi.fn().mockResolvedValue(undefined),
     }, 'gradient.mov', { name: 'browser-directory' } as FileSystemDirectoryHandle)).rejects.toThrow(
@@ -108,6 +112,7 @@ describe('tauriExportService native video artifact contract', () => {
     await expect(tauriExportService.saveNativeVideoArtifact?.({
       kind: 'native-path',
       path: 'C:/Temp/kagaribi-grad/export/output.mov',
+      format: 'mov',
       mimeType: 'video/quicktime',
       release: vi.fn().mockResolvedValue(undefined),
     }, 'gradient.mov', 'C:/Exports')).rejects.toThrow('copy failed');
@@ -118,6 +123,7 @@ describe('tauriExportService native video artifact contract', () => {
     const artifact = {
       kind: 'native-path',
       path: artifactPath,
+      format: 'mov',
       mimeType: 'video/quicktime',
       release: vi.fn().mockResolvedValue(undefined),
     } as NativeVideoArtifact;

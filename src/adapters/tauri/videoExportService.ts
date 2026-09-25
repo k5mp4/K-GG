@@ -4,9 +4,11 @@ import { mkdir, remove, writeFile } from '@tauri-apps/plugin-fs';
 import { browserVideoExportService } from '../browser/videoExportService';
 import { needsTiledRender } from '../../lib/tileRender';
 import { renderAndCaptureExportFrame, withExportSession } from '../../lib/videoExportFrames';
+import { GIF_MAX_FILE_MB } from '../types';
 import type {
   NativeFfmpegStatus,
   NativeVideoArtifact,
+  NativeVideoFormat,
   VideoExportConfig,
   VideoExportService,
 } from '../types';
@@ -51,16 +53,24 @@ async function writePngSequenceToTempDir(
   });
 }
 
+const NATIVE_VIDEO_MIME_TYPES: Record<NativeVideoFormat, NativeVideoArtifact['mimeType']> = {
+  mov: 'video/quicktime',
+  mp4: 'video/mp4',
+  gif: 'image/gif',
+  webm: 'video/webm',
+};
+
 function nativeVideoArtifact(
   path: string,
   workspace: string,
-  mimeType: NativeVideoArtifact['mimeType'],
+  format: NativeVideoFormat,
 ): NativeVideoArtifact {
   let releasePromise: Promise<void> | null = null;
   return {
     kind: 'native-path',
     path,
-    mimeType,
+    format,
+    mimeType: NATIVE_VIDEO_MIME_TYPES[format],
     release(): Promise<void> {
       releasePromise ??= remove(workspace, { recursive: true }).catch((error: unknown) => {
         releasePromise = null;
@@ -83,11 +93,11 @@ export const tauriVideoExportService: VideoExportService = {
   async openFfmpegBuildsPage(): Promise<void> {
     await invoke('open_ffmpeg_builds_page');
   },
-  async exportLosslessMOV(config: VideoExportConfig): Promise<NativeVideoArtifact> {
+  async exportNativeVideo(format: NativeVideoFormat, config: VideoExportConfig): Promise<NativeVideoArtifact> {
     const totalFrames = Math.ceil(config.fps * config.duration);
     const rootTemp = await join(await tempDir(), 'kagaribi-grad');
-    const exportTemp = await join(rootTemp, `mov-${Date.now()}-${Math.random().toString(36).slice(2)}`);
-    const outputPath = await join(exportTemp, 'output.mov');
+    const exportTemp = await join(rootTemp, `${format}-${Date.now()}-${Math.random().toString(36).slice(2)}`);
+    const outputPath = await join(exportTemp, `output.${format}`);
 
     await mkdir(exportTemp, { recursive: true });
 
@@ -96,42 +106,17 @@ export const tauriVideoExportService: VideoExportService = {
       await writePngSequenceToTempDir(config, exportTemp, totalFrames);
       config.onProgress?.(0.7);
       config.onStage?.('encoding');
-      await invoke('encode_qtrle_mov', {
-        inputPattern: await join(exportTemp, 'frame_%04d.png'),
-        outputPath,
-        fps: config.fps,
-      });
-      config.onProgress?.(0.95);
-      config.onStage?.('saving');
-      const artifact = nativeVideoArtifact(outputPath, exportTemp, 'video/quicktime');
-      retained = true;
-      return artifact;
-    } finally {
-      if (!retained) await remove(exportTemp, { recursive: true }).catch(() => undefined);
-    }
-  },
-  async exportHighQualityMP4(config: VideoExportConfig): Promise<NativeVideoArtifact> {
-    const totalFrames = Math.ceil(config.fps * config.duration);
-    const rootTemp = await join(await tempDir(), 'kagaribi-grad');
-    const exportTemp = await join(rootTemp, `mp4-${Date.now()}-${Math.random().toString(36).slice(2)}`);
-    const outputPath = await join(exportTemp, 'output.mp4');
-
-    await mkdir(exportTemp, { recursive: true });
-
-    let retained = false;
-    try {
-      await writePngSequenceToTempDir(config, exportTemp, totalFrames);
-      config.onProgress?.(0.7);
-      config.onStage?.('encoding');
-      await invoke('encode_h264_rgb_mp4', {
+      await invoke('encode_native_video', {
+        format,
         inputPattern: await join(exportTemp, 'frame_%04d.png'),
         outputPath,
         fps: config.fps,
         quality: config.mp4Quality ?? 'high',
+        gifMaxFileMb: format === 'gif' ? config.gifMaxFileMb ?? GIF_MAX_FILE_MB.default : null,
       });
       config.onProgress?.(0.95);
       config.onStage?.('saving');
-      const artifact = nativeVideoArtifact(outputPath, exportTemp, 'video/mp4');
+      const artifact = nativeVideoArtifact(outputPath, exportTemp, format);
       retained = true;
       return artifact;
     } finally {

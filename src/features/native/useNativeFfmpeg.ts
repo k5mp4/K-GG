@@ -20,6 +20,7 @@ function statusAfterError(error: unknown, current: NativeFfmpegStatus | null): N
     folderPath: current?.folderPath ?? null,
     ffprobePath: current?.ffprobePath ?? null,
     ffprobeVersion: current?.ffprobeVersion ?? null,
+    videoFormats: current?.videoFormats,
   };
 }
 

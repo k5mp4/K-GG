@@ -3,6 +3,7 @@ import {
   type ExportDirectoryHandle,
   type NativeFfmpegStatus,
   type NativeVideoArtifact,
+  type NativeVideoFormat,
   type VideoExportConfig,
 } from '../adapters';
 
@@ -20,12 +21,11 @@ function isFfmpegMissingDebugEnabled(): boolean {
   );
 }
 
-export async function exportLosslessMOV(config: ExportConfig): Promise<NativeVideoArtifact> {
-  return await adapters.videoExportService.exportLosslessMOV(config);
-}
-
-export async function exportHighQualityMP4(config: ExportConfig): Promise<NativeVideoArtifact> {
-  return await adapters.videoExportService.exportHighQualityMP4(config);
+export async function exportNativeVideo(
+  format: NativeVideoFormat,
+  config: ExportConfig,
+): Promise<NativeVideoArtifact> {
+  return await adapters.videoExportService.exportNativeVideo(format, config);
 }
 
 export async function saveNativeVideoArtifact(
@@ -60,6 +60,7 @@ export async function getNativeFfmpegStatus(): Promise<NativeFfmpegStatus> {
       folderPath: null,
       ffprobePath: null,
       ffprobeVersion: null,
+      videoFormats: [],
     };
   }
   if (adapters.videoExportService.getNativeFfmpegStatus) {
@@ -72,11 +73,12 @@ export async function getNativeFfmpegStatus(): Promise<NativeFfmpegStatus> {
     source: null,
     path: null,
     version: null,
-    error: 'MOV / MP4 エクスポートにはTauriデスクトップ版と外部FFmpegが必要です。',
+    error: 'MOV / MP4 / GIF / WebM エクスポートにはTauriデスクトップ版と外部FFmpegが必要です。',
     warning: null,
     folderPath: null,
     ffprobePath: null,
     ffprobeVersion: null,
+    videoFormats: [],
   };
 }
 
