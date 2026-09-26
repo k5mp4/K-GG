@@ -78,6 +78,17 @@ export type NoiseDistortionConfig = {
 export type DiffuseDitherMode = 'pattern_dither';
 export type DiffuseMode = 'block' | 'smooth' | 'dither' | 'halftone' | 'ascii' | 'legacy';
 export type DiffuseHalftoneShape = 'circle' | 'square';
+/**
+ * How Block/Smooth Diffuse relates to an enabled Noise layer.
+ * noiseLinked: composed at the Noise position as I(N(x) + D(x)).
+ * uniform: applied at its own stack position as a uniform screen-space scatter.
+ */
+export type DiffuseApplyMode = 'noiseLinked' | 'uniform';
+export const DIFFUSE_APPLY_MODES = ['noiseLinked', 'uniform'] as const satisfies readonly DiffuseApplyMode[];
+
+export function normalizeDiffuseApplyMode(value: unknown): DiffuseApplyMode {
+  return value === 'uniform' ? value : 'noiseLinked';
+}
 export type DiffuseAdaptiveChannel = 'luminance' | 'hue' | 'saturation';
 export const DEFAULT_DIFFUSE_ASCII_CHARSET = ' .:-=+*#%@';
 export const DEFAULT_DIFFUSE_BACKGROUND_COLOR = '#000000';
@@ -93,6 +104,8 @@ export type DiffuseConfig = {
   enabled: boolean;
   mode: DiffuseMode; // block=矩形ノイズ, smooth=有機的ドットノイズ, dither=ディザパターン, halftone=網点, ascii=文字組版, legacy=旧Stipple
   ditherMode: DiffuseDitherMode;
+  /** Block/Smooth only. Missing values in older presets mean `noiseLinked`. */
+  applyMode?: DiffuseApplyMode;
   scatter: number;  // 0–300  ピクセル単位の最大変位量
   grain: number;    // 0.01–5 グレインサイズ（px単位）
   seed: number;     // 0–99   ハッシュシード
