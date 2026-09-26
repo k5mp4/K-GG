@@ -38,6 +38,10 @@ export default defineConfig({
       name: 'licenses',
       testMatch: '**/licenses.spec.ts',
     },
+    {
+      name: 'shaders',
+      testMatch: '**/shaders.spec.ts',
+    },
   ],
   use: {
     baseURL,

@@ -18,7 +18,6 @@ jobs:
     name: Determine validation scope
     runs-on: ubuntu-latest
     outputs:
-      render: ${{ steps.scope.outputs.render }}
       native: ${{ steps.scope.outputs.native }}
       e2e: ${{ steps.scope.outputs.e2e }}
 
@@ -42,14 +41,12 @@ jobs:
             base="$(git rev-list --max-parents=0 HEAD)"
           fi
 
-          render=false
           native=false
           e2e=false
           while IFS= read -r file; do
             echo "$file"
             case "$file" in
               src/shaders/*|src/rendering/*|src/lib/webgl*|src/lib/effect*|src/lib/render*|src/lib/export*|src/lib/tile*|src/lib/*Renderer*|src/components/*Canvas*)
-                render=true
                 e2e=true
                 ;;
               src-tauri/*|src-tauri/Cargo.toml|src-tauri/Cargo.lock|Cargo.toml|Cargo.lock|vendor/spout2/*|connectors/figma/*|package.json|package-lock.json)
@@ -61,7 +58,6 @@ jobs:
             esac
           done < <(git diff --name-only "$base" "$GITHUB_SHA")
 
-          echo "render=$render" >> "$GITHUB_OUTPUT"
           echo "native=$native" >> "$GITHUB_OUTPUT"
           echo "e2e=$e2e" >> "$GITHUB_OUTPUT"
 
@@ -89,28 +85,6 @@ jobs:
       - name: Run fast Merge Gate
         run: npm run check:fast
 
-  render-check:
-    name: render-check
-    needs: changes
-    if: needs.changes.outputs.render == 'true'
-    runs-on: windows-latest
-    timeout-minutes: 30
-
-    steps:
-      - name: Check out repository
-        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
-
-      - name: Set up Node.js
-        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
-        with:
-          node-version-file: .nvmrc
-          cache: npm
-
-      - name: Install frontend dependencies
-        run: npm ci
-
-      - name: Run focused render checks
-        run: npm run check:render
 
   e2e-check:
     name: e2e-check

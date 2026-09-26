@@ -35,7 +35,7 @@
     "check:docs": "npm run docs:check && npm run docs:build",
     "check:fast": "npm run check:docs && npm test && npm run lint && npm run build",
     "check:merge": "npm run check:fast",
-    "check:render": "vitest run src/lib/effectPipeline.test.ts src/lib/effectShaderParity.test.ts src/lib/webglExportPrograms.test.ts src/lib/webglShaderSources.test.ts src/lib/webglNormalMapParity.test.ts src/lib/webglPerformance.test.ts src/lib/tileRender.test.ts",
+    "check:render": "playwright test --config=playwright.config.ts --project=shaders",
     "check:native": "npm run build:figma-connector && cargo test --manifest-path src-tauri/Cargo.toml && cargo check --manifest-path src-tauri/Cargo.toml",
     "check:release": "npm run change:check -- --require-empty && npm run release:check && npm run check:fast && npm run check:native",
     "verify": "npm run check:release",

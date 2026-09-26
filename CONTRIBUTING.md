@@ -39,7 +39,7 @@ S/B/F/A/Xは補助分類です。Sは外部から観測できる契約を変え�
 | --- | --- |
 | 文書、workflow、template、tooling | `npm run docs:check`、`npm run docs:build`、`npm run change:check` |
 | TypeScript/React | `npm run check:merge` |
-| Shader/WebGL/render/export | 上記 + `npm run check:render` + 可能な範囲のPreview/Export |
+| Shader/WebGL/render/export | 上記 + `npm run check:render`（全WebGL programの実コンパイル） + 可能な範囲のPreview/Export |
 | Preset/保存形式 | 旧データ読込、新規保存、再読込、Browser/Tauri差分 |
 | Rust/Tauri | `npm run check:native` + 対象デスクトップ操作 |
 | Release | `npm run check:release` + installer/updater/FFmpeg/AEのRelease Gate |

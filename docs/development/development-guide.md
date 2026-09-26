@@ -82,7 +82,7 @@ K-GGは生成AIによる開発参加を歓迎するため、変更の一次情�
 | --- | --- |
 | 文書・workflow・template・tooling | `npm run docs:check`, `npm run docs:build`, `npm run change:check` |
 | TypeScript/React | `npm run check:merge` |
-| 描画・GLSL | 上記に加えて`npm run check:render`、対象機能のプレビューと代表的なエクスポート |
+| 描画・GLSL | 上記に加えて`npm run check:render`（全WebGL programの実コンパイル）、対象機能のプレビューと代表的なエクスポート |
 | プリセット形式 | 旧データ読込、新規保存、再読込、ブラウザ/Tauri差分 |
 | Rust/Tauri | `npm run check:native`、対象デスクトップ操作。実FFmpegは`npm run check:ffmpeg`、Tauri UIは`native-validation.md`のWebDriver Release Gate |
 | リリース/更新 | `npm run check:release`に加えてリリース設定・更新ワークフローと配布環境でのWindows版起動・更新確認 |

@@ -9,8 +9,8 @@ updated: 2026-09-25
 requirement_ids: [PERF-001, PERF-002, PERF-003, PERF-004, PERF-005, PERF-006, PERF-007, PERF-008, PERF-009, PERF-010, PERF-011]
 related_adrs: [ADR-0005, ADR-0015, ADR-0022]
 related_changes: [CHANGE-028, CHANGE-038, CHANGE-055]
-related_code: [src/lib/webglPerformance.ts, src/lib/webgl.ts, src/lib/gpuDiagnostics.ts, src/hooks/useWebGL.ts, src/components/WebGLPerformancePanel.tsx, src/components/GradientCanvas.tsx, src/lib/coneViewRenderer.ts, src/lib/clothGradientRenderer.ts, src/lib/shaderWarmup.ts, src/lib/shaderWarmupHost.ts, src/components/PostprocessStackPanel.tsx]
-related_tests: [src/lib/webglPerformance.test.ts, src/lib/webglPerformanceBenchmark.test.ts, src/lib/webglCompilePolicy.test.ts, src/lib/webglShaderSources.test.ts, src/lib/coneViewRenderer.test.ts, src/lib/shaderWarmup.test.ts]
+related_code: [src/lib/webglPerformance.ts, src/lib/webgl.ts, src/lib/gpuDiagnostics.ts, src/hooks/useWebGL.ts, src/components/WebGLPerformancePanel.tsx, src/components/GradientCanvas.tsx, src/lib/clothGradientRenderer.ts, src/lib/shaderWarmup.ts, src/lib/shaderWarmupHost.ts, src/components/PostprocessStackPanel.tsx]
+related_tests: [src/lib/webglPerformance.test.ts, src/lib/webglPerformanceBenchmark.test.ts, src/lib/webglCompilePolicy.test.ts, src/lib/webglShaderSources.test.ts, src/lib/shaderWarmup.test.ts]
 ---
 
 # WebGL Performance Debug / Profiler
