@@ -29,6 +29,8 @@ import { useLanguage } from '../i18n/LanguageProvider';
 import { localizeUiLabel } from '../i18n/uiLabels';
 import { InputNumber, InputShuffle } from 'tweeq';
 import { applicationCommands } from '../application/commands';
+import { isTauriRuntime } from '../adapters/tauri/exportService';
+import { openGradientRampEditorWindow } from '../adapters/tauri/gradientRampEditorWindow';
 import { clampParameter, getParameterLimit } from '../lib/parameterLimits';
 
 const BAR_H = RAMP_BAR_H;
@@ -487,9 +489,13 @@ function AnimatedOpacityControls({ visible, children }: { visible: boolean; chil
 
 type GradientRampProps = {
   showHeader?: boolean;
+  /** `window` renders only the editor, filling a dedicated native window. */
+  variant?: 'panel' | 'window';
+  onUndo?: () => void;
+  onRedo?: () => void;
 };
 
-export function GradientRamp({ showHeader = true }: GradientRampProps = {}) {
+export function GradientRamp({ showHeader = true, variant = 'panel', onUndo = undo, onRedo = redo }: GradientRampProps = {}) {
   const { t, language } = useLanguage();
   const { gradient, isSlitAdjusting, selectedStops, selectedGradientAnchors, keyframeTracks, currentTime } = useGradientStore();
   const { setGradient, resetMeshGradient, straightenMeshHandles, setMeshGridSize, setMeshColorMode, setSelectedStops, setSelectedGradientAnchors, setKeyframeTracks, addKeyframe, setKeyframe } = applicationCommands;
@@ -559,6 +565,17 @@ export function GradientRamp({ showHeader = true }: GradientRampProps = {}) {
     window.addEventListener('kagaribi15_color_palettes_changed', refreshPalettes);
     return () => window.removeEventListener('kagaribi15_color_palettes_changed', refreshPalettes);
   }, []);
+
+  const openEditor = () => {
+    if (!isTauriRuntime()) {
+      setIsModalOpen(true);
+      return;
+    }
+    openGradientRampEditorWindow().catch((error: unknown) => {
+      console.warn('[gradient-ramp-editor] native window unavailable; using the inline editor', error);
+      setIsModalOpen(true);
+    });
+  };
 
   const [floatPos, setFloatPos] = useState(() => ({
     x: Math.max(20, Math.round((window.innerWidth - 700) / 2)),
@@ -1675,6 +1692,219 @@ export function GradientRamp({ showHeader = true }: GradientRampProps = {}) {
     );
   };
 
+  const historyButtons = (
+    <>
+      <button
+        onClick={(e) => { e.stopPropagation(); onUndo(); }}
+        onTouchEnd={(e) => runTouchAction(e, onUndo)}
+        className="w-7 h-7 p-0 flex items-center justify-center bg-white/5 hover:bg-white/10 text-white/70 hover:text-white transition-all border border-white/5"
+        title={`${t('common.undo')} (Ctrl+Z)`}
+      >
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ pointerEvents: 'none' }}>
+          <path d="M9 14L4 9L9 4"></path>
+          <path d="M20 20v-7a4 4 0 0 0-4-4H4"></path>
+        </svg>
+      </button>
+      <button
+        onClick={(e) => { e.stopPropagation(); onRedo(); }}
+        onTouchEnd={(e) => runTouchAction(e, onRedo)}
+        className="w-7 h-7 p-0 flex items-center justify-center bg-white/5 hover:bg-white/10 text-white/70 hover:text-white transition-all border border-white/5"
+        title={`${t('common.redo')} (Ctrl+Y)`}
+      >
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ pointerEvents: 'none' }}>
+          <path d="M15 14l5-5-5-5"></path>
+          <path d="M4 20v-7a4 4 0 0 1 4-4h12"></path>
+        </svg>
+      </button>
+    </>
+  );
+
+  const editorBody = (
+    <div className="flex flex-col gap-4 p-5 overflow-y-auto flex-1">
+      <p className="text-xs text-tab-inactive">
+        {t('gradient.editInstructionsCompact')}
+      </p>
+
+      <div className="relative space-y-1">
+        <AnimatedOpacityControls visible={showOpacityControls}>
+          {opacityActionButtons}
+          {opacitySliderControls}
+        </AnimatedOpacityControls>
+
+        {/* キャンバス */}
+        <canvas
+          ref={mCanvasCallbackRef}
+          onPointerDown={mHandlePointerDown}
+          onPointerMove={mHandlePointerMove}
+          onPointerUp={mHandlePointerUp}
+          onPointerLeave={clearRampHover}
+          onClick={mHandleClick}
+          className="w-full rounded-none cursor-crosshair touch-none"
+          style={{ height: MODAL_BAR_H + HANDLE_AREA + OPACITY_HANDLE_AREA, touchAction: 'none' }}
+        />
+        {mesh && (
+          mesh.colorMode === 'ramp' ? (
+            <MeshRampMapping
+              mesh={mesh}
+              stops={gradient.stops}
+              interpolation={interpolation}
+              colorMode={colorMode}
+              variable={rampVariable}
+              repeat={rampRepeat}
+              mirror={gradient.rampMirror ?? false}
+              selectedPointIndices={selectedGradientAnchors}
+              onSelectPoint={(index) => setSelectedGradientAnchors([index])}
+            />
+          ) : (
+            <div
+              role="note"
+              aria-label="Direct mesh colors are independent from the gradient ramp."
+              style={{ padding: '7px 8px', border: '1px solid rgba(240,234,217,.2)', borderRadius: 3, background: 'rgba(20,20,28,.56)', color: 'rgba(240,234,217,.72)', fontSize: 8, lineHeight: 1.3 }}
+            >
+              <strong style={{ color: '#f0ead9', fontSize: 9, letterSpacing: '.08em' }}>MESH POINT COLORS</strong>
+              <div style={{ marginTop: 3 }}>Direct mode: each canvas point owns its color. This ramp does not drive the mesh.</div>
+            </div>
+          )
+        )}
+        {renderRampHover('modal')}
+      </div>
+
+      {/* Mirror モード */}
+      <div className="flex items-center justify-between">
+        <span className="text-xs text-tab-inactive">{t('gradient.mirror')}</span>
+        <button
+          onClick={toggleRampMirror}
+          onTouchEnd={(e) => runTouchAction(e, toggleRampMirror)}
+          className={`text-xs px-2 py-1 rounded-none transition-colors ${
+            gradient.rampMirror
+              ? 'bg-fire/30 text-fire border border-fire/50'
+              : 'bg-k-muted text-k-text border border-transparent hover:bg-k-muted/70'
+          }`}
+          title={t('gradient.mirrorDescription')}
+        >
+          {t('gradient.mirror')}
+        </button>
+      </div>
+
+      <div className="max-w-md">
+        <SliderField
+          label={t('gradient.repeat')}
+          value={rampRepeat}
+          onChange={(value) => setGradient({ rampRepeat: Math.round(value) })}
+          format={(value) => `${Math.round(value)}x`}
+          limitKey="gradient.rampRepeat"
+        />
+      </div>
+
+      {/* カラーピッカー＋ストップ操作（横並び） */}
+      <div className="flex gap-4 items-start flex-wrap">
+        {selectedIdxs.size > 0 && (
+          <div style={{ width: 280, flexShrink: 0 }}>
+            <ColorPicker
+              color={pickerColor}
+              onChange={onColorChange}
+              onClose={() => {
+                const empty = new Set<number>();
+                updateSelectedStops(empty);
+                selectedIdxsRef.current = empty;
+              }}
+            />
+          </div>
+        )}
+        <div className="flex flex-col gap-2 justify-start pt-1">
+          {stopOpButtons}
+        </div>
+      </div>
+
+      {/* プリセット */}
+      <div className="space-y-2">
+        <div className="flex gap-1 max-w-md">
+          <input
+            type="text"
+            value={paletteName}
+            onChange={(e) => setPaletteName(e.target.value)}
+            onKeyDown={(e) => { if (e.key === 'Enter') handleSavePalette(); }}
+            placeholder={t('gradient.paletteName')}
+            className="min-w-0 flex-1 bg-k-surface text-k-text text-xs rounded-none px-2 py-1 border border-cream/30 focus:border-fire focus:outline-none"
+          />
+          <button
+            onClick={handleSavePalette}
+            onTouchEnd={(e) => runTouchAction(e, handleSavePalette)}
+            disabled={!paletteName.trim()}
+            className="text-xs bg-fire hover:brightness-110 disabled:opacity-40 text-k-text px-3 py-1 rounded-none shrink-0 font-bold"
+          >
+            {t('common.save')}
+          </button>
+        </div>
+
+        <div className="space-y-1">
+          <p className="text-[10px] font-bold text-tab-inactive uppercase tracking-widest">{t('gradient.builtInPresets')}</p>
+          <div className="flex gap-1 flex-wrap">
+            {Object.entries(gradientRampPresets).map(([name, stops]) => (
+              <button
+                key={name}
+                onClick={() => applyColorPalette(stops)}
+                onTouchEnd={(e) => runTouchAction(e, () => applyColorPalette(stops))}
+                style={{ background: stopsToGradient(stops) }}
+                className="text-xs px-2 py-1 rounded-none capitalize font-medium text-k-text"
+                title={`${name} (built-in)`}
+              >
+                <span style={{ filter: 'drop-shadow(0 0 2px rgba(0,0,0,0.9)) drop-shadow(0 0 4px rgba(0,0,0,0.6))' }}>
+                  {name}
+                </span>
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {userPalettes.length > 0 && (
+          <div className="space-y-1">
+            <p className="text-[10px] font-bold text-tab-inactive uppercase tracking-widest">User Palettes</p>
+            <div className="flex gap-1 flex-wrap">
+              {userPalettes.map((palette) => (
+                <div key={palette.id} className="inline-flex items-stretch border border-cream/20 bg-k-surface">
+                  <button
+                    onClick={() => applyColorPalette(palette.stops)}
+                    onTouchEnd={(e) => runTouchAction(e, () => applyColorPalette(palette.stops))}
+                    style={{ background: stopsToGradient(palette.stops) }}
+                    className="text-xs px-2 py-1 rounded-none capitalize font-medium text-k-text border-0"
+                    title={palette.name}
+                  >
+                    <span style={{ filter: 'drop-shadow(0 0 2px rgba(0,0,0,0.9)) drop-shadow(0 0 4px rgba(0,0,0,0.6))' }}>
+                      {palette.name}
+                    </span>
+                  </button>
+                  <button
+                    onClick={() => handleDeletePalette(palette.id)}
+                    onTouchEnd={(e) => runTouchAction(e, () => handleDeletePalette(palette.id))}
+                    className="w-6 px-0 py-1 text-[11px] text-red-300 hover:text-red-100 hover:bg-red-900/40 rounded-none border-0"
+                    title="Delete user palette"
+                  >
+                    ×
+                  </button>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+
+  if (variant === 'window') {
+    return (
+      <div className="h-screen flex flex-col bg-k-surface text-k-text k-touch-controls">
+        <div className="flex items-center justify-between px-3 py-2 border-b border-cream/15 select-none shrink-0">
+          <span className="font-semibold text-sm tracking-wide">Gradient Ramp</span>
+          <div className="flex items-center gap-1.5">
+            {historyButtons}
+          </div>
+        </div>
+        {editorBody}
+      </div>
+    );
+  }
+
   return (
     <>
       <div
@@ -1690,8 +1920,8 @@ export function GradientRamp({ showHeader = true }: GradientRampProps = {}) {
               <IconButton
                 icon="expand"
                 label={t('gradient.openEditor')}
-                onClick={() => setIsModalOpen(true)}
-                onTouchEnd={(e) => runTouchAction(e, () => setIsModalOpen(true))}
+                onClick={openEditor}
+                onTouchEnd={(e) => runTouchAction(e, openEditor)}
                 className="flex items-center justify-center w-7 h-7 p-0 bg-[#2A2A2A] border border-white/10 text-[#F0EAD9] hover:bg-[#3A3A3A] hover:border-white/20 transition-all duration-200"
               />
           </div>
@@ -2102,28 +2332,7 @@ export function GradientRamp({ showHeader = true }: GradientRampProps = {}) {
             <span className="font-semibold text-sm tracking-wide">Gradient Ramp</span>
             
             <div className="flex items-center gap-1.5 ml-auto mr-4">
-              <button 
-                onClick={(e) => { e.stopPropagation(); undo(); }}
-                onTouchEnd={(e) => runTouchAction(e, undo)}
-                className="w-7 h-7 p-0 flex items-center justify-center bg-white/5 hover:bg-white/10 text-white/70 hover:text-white transition-all border border-white/5"
-                title={`${t('common.undo')} (Ctrl+Z)`}
-              >
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ pointerEvents: 'none' }}>
-                  <path d="M9 14L4 9L9 4"></path>
-                  <path d="M20 20v-7a4 4 0 0 0-4-4H4"></path>
-                </svg>
-              </button>
-              <button 
-                onClick={(e) => { e.stopPropagation(); redo(); }}
-                onTouchEnd={(e) => runTouchAction(e, redo)}
-                className="w-7 h-7 p-0 flex items-center justify-center bg-white/5 hover:bg-white/10 text-white/70 hover:text-white transition-all border border-white/5"
-                title={`${t('common.redo')} (Ctrl+Y)`}
-              >
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ pointerEvents: 'none' }}>
-                  <path d="M15 14l5-5-5-5"></path>
-                  <path d="M4 20v-7a4 4 0 0 1 4-4h12"></path>
-                </svg>
-              </button>
+              {historyButtons}
             </div>
 
             <IconButton
@@ -2140,175 +2349,7 @@ export function GradientRamp({ showHeader = true }: GradientRampProps = {}) {
           </div>
 
           {/* コンテンツ */}
-          <div className="flex flex-col gap-4 p-5 overflow-y-auto flex-1">
-            <p className="text-xs text-tab-inactive">
-              {t('gradient.editInstructionsCompact')}
-            </p>
-
-            <div className="relative space-y-1">
-              <AnimatedOpacityControls visible={showOpacityControls}>
-                {opacityActionButtons}
-                {opacitySliderControls}
-              </AnimatedOpacityControls>
-
-              {/* キャンバス */}
-              <canvas
-                ref={mCanvasCallbackRef}
-                onPointerDown={mHandlePointerDown}
-                onPointerMove={mHandlePointerMove}
-                onPointerUp={mHandlePointerUp}
-                onPointerLeave={clearRampHover}
-                onClick={mHandleClick}
-                className="w-full rounded-none cursor-crosshair touch-none"
-                style={{ height: MODAL_BAR_H + HANDLE_AREA + OPACITY_HANDLE_AREA, touchAction: 'none' }}
-              />
-              {mesh && (
-                mesh.colorMode === 'ramp' ? (
-                  <MeshRampMapping
-                    mesh={mesh}
-                    stops={gradient.stops}
-                    interpolation={interpolation}
-                    colorMode={colorMode}
-                    variable={rampVariable}
-                    repeat={rampRepeat}
-                    mirror={gradient.rampMirror ?? false}
-                    selectedPointIndices={selectedGradientAnchors}
-                    onSelectPoint={(index) => setSelectedGradientAnchors([index])}
-                  />
-                ) : (
-                  <div
-                    role="note"
-                    aria-label="Direct mesh colors are independent from the gradient ramp."
-                    style={{ padding: '7px 8px', border: '1px solid rgba(240,234,217,.2)', borderRadius: 3, background: 'rgba(20,20,28,.56)', color: 'rgba(240,234,217,.72)', fontSize: 8, lineHeight: 1.3 }}
-                  >
-                    <strong style={{ color: '#f0ead9', fontSize: 9, letterSpacing: '.08em' }}>MESH POINT COLORS</strong>
-                    <div style={{ marginTop: 3 }}>Direct mode: each canvas point owns its color. This ramp does not drive the mesh.</div>
-                  </div>
-                )
-              )}
-              {renderRampHover('modal')}
-            </div>
-
-            {/* Mirror モード */}
-            <div className="flex items-center justify-between">
-              <span className="text-xs text-tab-inactive">{t('gradient.mirror')}</span>
-              <button
-                onClick={toggleRampMirror}
-                onTouchEnd={(e) => runTouchAction(e, toggleRampMirror)}
-                className={`text-xs px-2 py-1 rounded-none transition-colors ${
-                  gradient.rampMirror
-                    ? 'bg-fire/30 text-fire border border-fire/50'
-                    : 'bg-k-muted text-k-text border border-transparent hover:bg-k-muted/70'
-                }`}
-                title={t('gradient.mirrorDescription')}
-              >
-                {t('gradient.mirror')}
-              </button>
-            </div>
-
-            <div className="max-w-md">
-              <SliderField
-                label={t('gradient.repeat')}
-                value={rampRepeat}
-                onChange={(value) => setGradient({ rampRepeat: Math.round(value) })}
-                format={(value) => `${Math.round(value)}x`}
-                limitKey="gradient.rampRepeat"
-              />
-            </div>
-
-            {/* カラーピッカー＋ストップ操作（横並び） */}
-            <div className="flex gap-4 items-start flex-wrap">
-              {selectedIdxs.size > 0 && (
-                <div style={{ width: 280, flexShrink: 0 }}>
-                  <ColorPicker
-                    color={pickerColor}
-                    onChange={onColorChange}
-                    onClose={() => {
-                      const empty = new Set<number>();
-                      updateSelectedStops(empty);
-                      selectedIdxsRef.current = empty;
-                    }}
-                  />
-                </div>
-              )}
-              <div className="flex flex-col gap-2 justify-start pt-1">
-                {stopOpButtons}
-              </div>
-            </div>
-
-            {/* プリセット */}
-            <div className="space-y-2">
-              <div className="flex gap-1 max-w-md">
-                <input
-                  type="text"
-                  value={paletteName}
-                  onChange={(e) => setPaletteName(e.target.value)}
-                  onKeyDown={(e) => { if (e.key === 'Enter') handleSavePalette(); }}
-                  placeholder={t('gradient.paletteName')}
-                  className="min-w-0 flex-1 bg-k-surface text-k-text text-xs rounded-none px-2 py-1 border border-cream/30 focus:border-fire focus:outline-none"
-                />
-                <button
-                  onClick={handleSavePalette}
-                  onTouchEnd={(e) => runTouchAction(e, handleSavePalette)}
-                  disabled={!paletteName.trim()}
-                  className="text-xs bg-fire hover:brightness-110 disabled:opacity-40 text-k-text px-3 py-1 rounded-none shrink-0 font-bold"
-                >
-                  {t('common.save')}
-                </button>
-              </div>
-
-              <div className="space-y-1">
-                <p className="text-[10px] font-bold text-tab-inactive uppercase tracking-widest">{t('gradient.builtInPresets')}</p>
-                <div className="flex gap-1 flex-wrap">
-                  {Object.entries(gradientRampPresets).map(([name, stops]) => (
-                    <button
-                      key={name}
-                      onClick={() => applyColorPalette(stops)}
-                      onTouchEnd={(e) => runTouchAction(e, () => applyColorPalette(stops))}
-                      style={{ background: stopsToGradient(stops) }}
-                      className="text-xs px-2 py-1 rounded-none capitalize font-medium text-k-text"
-                      title={`${name} (built-in)`}
-                    >
-                      <span style={{ filter: 'drop-shadow(0 0 2px rgba(0,0,0,0.9)) drop-shadow(0 0 4px rgba(0,0,0,0.6))' }}>
-                        {name}
-                      </span>
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              {userPalettes.length > 0 && (
-                <div className="space-y-1">
-                  <p className="text-[10px] font-bold text-tab-inactive uppercase tracking-widest">User Palettes</p>
-                  <div className="flex gap-1 flex-wrap">
-                    {userPalettes.map((palette) => (
-                      <div key={palette.id} className="inline-flex items-stretch border border-cream/20 bg-k-surface">
-                        <button
-                          onClick={() => applyColorPalette(palette.stops)}
-                          onTouchEnd={(e) => runTouchAction(e, () => applyColorPalette(palette.stops))}
-                          style={{ background: stopsToGradient(palette.stops) }}
-                          className="text-xs px-2 py-1 rounded-none capitalize font-medium text-k-text border-0"
-                          title={palette.name}
-                        >
-                          <span style={{ filter: 'drop-shadow(0 0 2px rgba(0,0,0,0.9)) drop-shadow(0 0 4px rgba(0,0,0,0.6))' }}>
-                            {palette.name}
-                          </span>
-                        </button>
-                        <button
-                          onClick={() => handleDeletePalette(palette.id)}
-                          onTouchEnd={(e) => runTouchAction(e, () => handleDeletePalette(palette.id))}
-                          className="w-6 px-0 py-1 text-[11px] text-red-300 hover:text-red-100 hover:bg-red-900/40 rounded-none border-0"
-                          title="Delete user palette"
-                        >
-                          ×
-                        </button>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-            </div>
-          </div>
+          {editorBody}
 
           {/* リサイズハンドル（右下角） */}
           <div

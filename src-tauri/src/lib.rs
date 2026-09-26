@@ -10,6 +10,7 @@ use tauri_plugin_opener::OpenerExt;
 
 mod after_effects;
 mod design_app_bridge;
+mod gradient_ramp_editor;
 mod spout_output;
 mod spout_shared_frames;
 
@@ -42,6 +43,7 @@ pub fn run() {
             }
             Ok(())
         })
+        .on_window_event(gradient_ramp_editor::handle_window_event)
         .invoke_handler(tauri::generate_handler![
             encode_native_video,
             get_native_ffmpeg_status,
@@ -55,6 +57,7 @@ pub fn run() {
             after_effects::ping_after_effects,
             after_effects::save_native_video_artifact,
             after_effects::send_after_effects_asset,
+            gradient_ramp_editor::open_gradient_ramp_editor_window,
             design_app_bridge::get_design_app_connector_state,
             design_app_bridge::disconnect_design_app_connector,
             design_app_bridge::approve_design_app_connection,

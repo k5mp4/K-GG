@@ -6,11 +6,11 @@ status: current
 owners: [maintainer]
 created: 2026-07-28
 updated: 2026-09-26
-requirement_ids: [UI-001, UI-002, UI-003, UI-004, UI-005, UI-006, UI-007, UI-008, UI-009, UI-010, UI-011, UI-012, UI-013, UI-014, UI-015, UI-019, UI-021, UI-022, UI-023, UI-024, UI-025, UI-026, UI-027, UI-028]
-related_adrs: [ADR-0009, ADR-0011, ADR-0012]
+requirement_ids: [UI-001, UI-002, UI-003, UI-004, UI-005, UI-006, UI-007, UI-008, UI-009, UI-010, UI-011, UI-012, UI-013, UI-014, UI-015, UI-019, UI-021, UI-022, UI-023, UI-024, UI-025, UI-026, UI-027, UI-028, UI-029]
+related_adrs: [ADR-0009, ADR-0011, ADR-0012, ADR-20260926-native-secondary-windows]
 related_changes: [CHANGE-010, CHANGE-012, CHANGE-013, CHANGE-014, CHANGE-015, CHANGE-018, CHANGE-019, CHANGE-024, CHANGE-025, CHANGE-026, CHANGE-027, CHANGE-030, CHANGE-031, CHANGE-032, CHANGE-034, CHANGE-037, CHANGE-038, CHANGE-039, CHANGE-041, CHANGE-046, CHANGE-047, CHANGE-048, CHANGE-051, CHANGE-053]
-related_code: [src/App.tsx, src/App.css, src/types/coneView.ts, src/components/CustomSelect.tsx, src/components/GradientRamp.tsx, src/components/SliderField.tsx, src/components/NoiseDistortionPanel.tsx, src/components/BlockNoisePanel.tsx, src/components/DiffuseCurveEditor.tsx, src/components/SlitScanPanel.tsx, src/components/StretchPanel.tsx, src/components/TimelineBar.tsx, src/components/NormalMapPanel.tsx, src/components/SandboxPanel.tsx, src/components/FlowGradientPanel.tsx, src/components/ClothGradientPanel.tsx, src/components/ClothCanvas.tsx, src/components/ConeApexEditor.tsx, src/components/ConeViewPanel.tsx, src/components/PostprocessPanel.tsx, src/components/PostprocessStackPanel.tsx, src/components/PresetPanel.tsx, src/components/Toggle.tsx, src/lib/effectPipeline.ts, src/lib/parameterLimits.ts, src/lib/voronoi.ts, src/lib/glass.ts, src/lib/glassTile.ts, src/lib/webgl.ts, src/lib/webglShaderSources.ts, src/store/documentModel.ts, src/store/documentActions.ts, packages/kgg-control/src/parameterLimits.ts, packages/kgg-control/src/parameters.ts, src/types/flowGradient.ts, src/types/distortion.ts, src/i18n/uiLabels.ts, src/i18n/messages.ts, src/components/VideoMotionPanel.tsx, src/types/videoMotion.ts, src/lib/noiseSeed.ts]
-related_tests: [src/lib/tweeqAngle.test.ts, src/lib/effectPipeline.test.ts, src/lib/parameterLimits.test.ts, src/lib/animationDirection.test.ts, src/lib/effectShaderParity.test.ts, src/lib/glass.test.ts, src/lib/postprocessAnimation.test.ts, src/store/gradientStore.glass.test.ts, src/lib/flowSimulation.test.ts, src/lib/flowGradientPreset.test.ts, src/lib/presetThumbnail.test.ts, src/types/coneView.test.ts, src/lib/coneView.test.ts, src/lib/coneSeam.test.ts, src/lib/webglShaderSources.test.ts, src/components/CustomSelect.test.tsx, src/components/ConeApexEditor.test.tsx, src/components/NoiseDistortionPanel.test.tsx, 'manual: Cone Effect Stack ordering and SANDBOX controls browser check', 'manual: Cone background coverage and color check', src/components/PostprocessPanel.test.tsx, src/components/PostprocessStackPanel.test.tsx, src/components/SandboxPanel.test.tsx]
+related_code: [src/App.tsx, src/App.css, src/types/coneView.ts, src/components/CustomSelect.tsx, src/components/GradientRamp.tsx, src/features/gradientRampEditor/GradientRampEditorWindowApp.tsx, src/features/gradientRampEditor/useGradientRampEditorHost.ts, src/adapters/tauri/gradientRampEditorWindow.ts, src/main.tsx, src-tauri/src/gradient_ramp_editor.rs, src-tauri/capabilities/gradient-ramp-editor.json, src/components/SliderField.tsx, src/components/NoiseDistortionPanel.tsx, src/components/BlockNoisePanel.tsx, src/components/DiffuseCurveEditor.tsx, src/components/SlitScanPanel.tsx, src/components/StretchPanel.tsx, src/components/TimelineBar.tsx, src/components/NormalMapPanel.tsx, src/components/SandboxPanel.tsx, src/components/FlowGradientPanel.tsx, src/components/ClothGradientPanel.tsx, src/components/ClothCanvas.tsx, src/components/ConeApexEditor.tsx, src/components/ConeViewPanel.tsx, src/components/PostprocessPanel.tsx, src/components/PostprocessStackPanel.tsx, src/components/PresetPanel.tsx, src/components/Toggle.tsx, src/lib/effectPipeline.ts, src/lib/parameterLimits.ts, src/lib/voronoi.ts, src/lib/glass.ts, src/lib/glassTile.ts, src/lib/webgl.ts, src/lib/webglShaderSources.ts, src/store/documentModel.ts, src/store/documentActions.ts, packages/kgg-control/src/parameterLimits.ts, packages/kgg-control/src/parameters.ts, src/types/flowGradient.ts, src/types/distortion.ts, src/i18n/uiLabels.ts, src/i18n/messages.ts, src/components/VideoMotionPanel.tsx, src/types/videoMotion.ts, src/lib/noiseSeed.ts]
+related_tests: [src/adapters/tauri/gradientRampEditorWindow.test.ts, 'manual: Gradient Ramp editor native window on Tauri (WebView2)', src/lib/tweeqAngle.test.ts, src/lib/effectPipeline.test.ts, src/lib/parameterLimits.test.ts, src/lib/animationDirection.test.ts, src/lib/effectShaderParity.test.ts, src/lib/glass.test.ts, src/lib/postprocessAnimation.test.ts, src/store/gradientStore.glass.test.ts, src/lib/flowSimulation.test.ts, src/lib/flowGradientPreset.test.ts, src/lib/presetThumbnail.test.ts, src/types/coneView.test.ts, src/lib/coneView.test.ts, src/lib/coneSeam.test.ts, src/lib/webglShaderSources.test.ts, src/components/CustomSelect.test.tsx, src/components/ConeApexEditor.test.tsx, src/components/NoiseDistortionPanel.test.tsx, 'manual: Cone Effect Stack ordering and SANDBOX controls browser check', 'manual: Cone background coverage and color check', src/components/PostprocessPanel.test.tsx, src/components/PostprocessStackPanel.test.tsx, src/components/SandboxPanel.test.tsx]
 ---
 
 # UI入力コントロール
@@ -71,7 +71,7 @@ PostprocessのEdit LayerからGlassTileを選択できます。PatternとEdge Mo
 
 ### UI-009 Effect Stackの表示形態
 
-Effect Stackは常にワークスペース内のインライン表示のみで提供します。別ウィンドウ化（Document Picture-in-Picture、ポップアップ、TauriネイティブWebviewWindow）は行いません。TauriのWebView2環境では別ウィンドウ化が安定動作しないため、操作ボタン自体を表示しません。ブラウザーでも同様に別ウィンドウ操作は提供せず、インライン表示に統一します。
+Effect Stackは常にワークスペース内のインライン表示のみで提供します。別ウィンドウ化（Document Picture-in-Picture、ポップアップ、TauriネイティブWebviewWindow）は行わず、操作ボタン自体を表示しません。ブラウザーでも同様に別ウィンドウ操作は提供せず、インライン表示に統一します。Gradient Ramp editorの表示形態はUI-029で定めます。
 
 ### UI-010 トップバーとSANDBOXのモジュール入口
 
@@ -123,6 +123,14 @@ Noise Typeの候補は、`Fast Curl`、`Curl (Legacy)`、`Simplex`、`Perlin`、
 ### UI-025 数値入力範囲と既定値の共有
 
 共通レジストリのキーを持つ数値入力は、そのキーに登録された範囲、step、整数指定、角度単位、既定値を使います。対応する保存データは同じ範囲へ正規化され、各数値入力のリセット値も登録済みの既定値を使います。パラメータの保存キーと型は維持します。旧Presetに範囲外の数値がある場合は読込時に登録範囲へ正規化します。
+
+### UI-029 Gradient Ramp editorの表示形態
+
+右サイドバーのGradient Rampにある`Open Gradient Ramp editor`ボタンでエディタを開きます。Tauri版ではK-GGのメインウィンドウとは別のネイティブウィンドウ（タイトル`Gradient Ramp - KAGARIBI Grad`、初期760×600、最小460×360、サイズ変更可）として開き、キャンバスを覆わずに編集できます。すでに開いている場合は新しく作らず、最小化を解除して前面へ出します。エディタウィンドウはメインウィンドウに従属し、メインウィンドウを閉じると一緒に閉じます。
+
+エディタウィンドウには、タイトルバーのUndo／Redo、拡大したRampキャンバス、Mesh対応表示、Mirror、Repeat、カラーピッカーとストップ操作、パレットの保存・内蔵プリセット・ユーザーパレットを表示します。編集内容はメインウィンドウのGradient Ramp、キャンバス、キーフレームへ即時に反映され、メインウィンドウ側の変更やUndo／Redoもエディタへ反映されます。選択中のストップとGradientアンカーは両ウィンドウで共有します。Undo／Redo（ボタンとCtrl+Z／Ctrl+Y／Ctrl+Shift+Z）はメインウィンドウの履歴を操作します。
+
+ブラウザー版、またはTauriでネイティブウィンドウを作成できなかった場合は、従来どおりワークスペース上にドラッグ・リサイズ可能なフローティングエディタを表示します。Preset形式と描画結果は変更しません。
 
 ### UI-026 Postprocess Voronoiの入力
 
