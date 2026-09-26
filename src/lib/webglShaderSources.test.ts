@@ -44,7 +44,6 @@ describe('webglShaderSources', () => {
     expect(source.fragment).not.toContain('\r');
     expect(source.fragment).not.toContain('float simplex3D(');
     expect(source.fragment).not.toContain('vec2 fastCurlField(');
-    expect(source.fragment).toContain('#if !defined(KGG_BOOTSTRAP)\n    if (u_iridEnabled');
 
     const generator = getProgramSource('generator');
     expect(generator.fragment).toContain('float simplex3D(');

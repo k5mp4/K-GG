@@ -251,23 +251,6 @@ export const STORE_DEFAULTS = {
   seamless: { ...DEFAULT_SEAMLESS },
   flowGradient: { ...FLOW_GRADIENT_DEFAULTS },
   videoMotion: { ...VIDEO_MOTION_DEFAULTS },
-  radon: {
-    enabled: false,
-    strength: getParameterDefault('radon.strength'),
-    freq: getParameterDefault('radon.freq'),
-    radius: getParameterDefault('radon.radius'),
-    angle: getParameterDefault('radon.angle'),
-    blur: getParameterDefault('radon.blur'),
-    evolution: getParameterDefault('radon.evolution'),
-    speed: getParameterDefault('radon.speed'),
-  },
-  iridescence: {
-    enabled: false,
-    strength: getParameterDefault('iridescence.strength'),
-    speed: getParameterDefault('iridescence.speed'),
-    frequency: getParameterDefault('iridescence.frequency'),
-    angle: getParameterDefault('iridescence.angle'),
-  },
   manualDistort: {
     enabled: false,
     mode: 'warp' as const,
@@ -407,9 +390,6 @@ export const STORE_DEFAULTS = {
     maxDisplacement: 1.0,
   },
   effectPipeline: createDefaultEffectPipeline(),
-  matcap: {
-    enabled: false,
-  },
   histogram: {
     enabled: true,
     showRampDistribution: true,
@@ -687,7 +667,7 @@ export function normalizePostprocessConfig(
 }
 
 type AutoTrackState = Pick<DocumentState,
-  'noiseDistortion' | 'diffuse' | 'slitScan' | 'stretch' | 'radon' | 'iridescence' | 'postprocess' | 'effectPipeline' | 'animation'
+  'noiseDistortion' | 'diffuse' | 'slitScan' | 'stretch' | 'postprocess' | 'effectPipeline' | 'animation'
 >;
 
 export function ensureAutoTrack(
@@ -711,8 +691,6 @@ export function ensureDefaultAutoTracks(
 ): Record<string, PropertyTrack> {
   let tracks = source;
   if (state.noiseDistortion.enabled) tracks = ensureAutoTrack(tracks, 'noiseDistortion.evolution');
-  if (state.radon.enabled) tracks = ensureAutoTrack(tracks, 'radon.evolution');
-  if (state.iridescence.enabled) tracks = ensureAutoTrack(tracks, 'iridescence.__time');
   if (state.slitScan.enabled && state.animation.affectSlit) {
     tracks = ensureAutoTrack(tracks, 'slitScan.offset');
   }

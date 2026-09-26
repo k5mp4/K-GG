@@ -13,12 +13,9 @@ export type ControlGroup =
   | 'coneView'
   | 'seamless'
   | 'flowGradient'
-  | 'radon'
-  | 'iridescence'
   | 'manualDistort'
   | 'postprocess'
   | 'effectPipeline'
-  | 'matcap'
   | 'histogram'
   | 'keyframeTracks'
   | 'ui';
@@ -87,12 +84,9 @@ export const CONTROL_GROUP_DEFINITIONS: readonly ControlGroupDefinition[] = [
   ['coneView', 'Cone', 'Cone projection, camera, and apex controls.'],
   ['seamless', 'Seamless', 'Seamless tiling controls.'],
   ['flowGradient', 'Flow', 'Flow simulation, particles, ribbons, and vector-field controls.'],
-  ['radon', 'Radon', 'Radon transform controls.'],
-  ['iridescence', 'Iridescence', 'Iridescence material and motion controls.'],
   ['manualDistort', 'Manual Distort', 'Manual displacement map, brush, and mask controls.'],
   ['postprocess', 'Postprocess', 'Postprocess effect stack, distortion, glass, particles, and color controls.'],
   ['effectPipeline', 'Effect Pipeline', 'Unified effect stack order and layer settings.'],
-  ['matcap', 'Matcap', 'Matcap material and lighting controls.'],
   ['histogram', 'Histogram', 'Histogram display and color-analysis controls.'],
   ['keyframeTracks', 'Keyframes', 'Animation property tracks and keyframes.'],
   ['ui', 'UI', 'Canvas, panels, timeline, view mode, overlay, and viewport state.'],

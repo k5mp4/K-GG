@@ -3,7 +3,7 @@ import { createEmptyManualDistortMap, createEmptyManualSmoothMask, STORE_DEFAULT
 import { applicationCommands } from '../application/commands';
 import { applyMirrorT, applyRampRepeatT, getColorAtPosition } from '../lib/gradientRampUtils';
 import type { ColorStop, RampColorMode, RampInterpolation } from '../types/gradient';
-import type { GlassSurfaceType, ManualDistortConfig, PostprocessParticleEmitterType } from '../types/distortion';
+import type { GlassSurfaceType, ManualDistortConfig, PostprocessParticleEmitterType, PostprocessStackKind } from '../types/distortion';
 import { Collapsible } from './Collapsible';
 import { CustomSelect } from './CustomSelect';
 import { SliderField } from './SliderField';
@@ -16,6 +16,7 @@ import { ConeViewPanel } from './ConeViewPanel';
 import { getDiffuseGrainParameterLimitKey } from '../lib/parameterLimits';
 import { VORONOI_FEATURES, VORONOI_METRICS } from '../lib/voronoi';
 import { VideoMotionPanel } from './VideoMotionPanel';
+import { StretchPanel } from './StretchPanel';
 
 const D = STORE_DEFAULTS.manualDistort;
 const GLASS_COLOR_INPUT_CLASS = 'tq-color-input w-[132px] min-w-0 flex-none border border-panel-border bg-k-bg/50';
@@ -360,9 +361,14 @@ export function PostprocessPanel({ sandboxMode, embedded = false }: PostprocessP
     && effectPipeline.version === 'stack-v2'
     && effectPipeline.selectedKind === 'videoMotion';
   const selectedCone = !sandboxMode && effectPipeline.selectedKind === 'cone';
+  const selectedStretch = !sandboxMode
+    && effectPipeline.version === 'stack-v2'
+    && effectPipeline.selectedKind === 'stretch';
   const activeEffectMode = sandboxMode ?? (
     selectedVideoMotion
       ? 'videoMotion'
+      : selectedStretch
+      ? 'stretch'
       : postprocess.effectMode === 'prism' || postprocess.effectMode === 'particles'
       ? 'distort'
       : postprocess.effectMode
@@ -414,6 +420,7 @@ export function PostprocessPanel({ sandboxMode, embedded = false }: PostprocessP
           label="Edit Layer"
           value={activeEffectMode}
           options={[
+            { value: 'stretch', label: 'Stretch' },
             { value: 'distort', label: 'Distort' },
             { value: 'mirror', label: 'Mirror' },
             { value: 'kaleidoscope', label: 'Kaleidoscope' },
@@ -423,10 +430,14 @@ export function PostprocessPanel({ sandboxMode, embedded = false }: PostprocessP
             { value: 'videoMotion', label: 'Video Motion' },
           ]}
           onChange={(value) => {
-            if (value === 'videoMotion') {
-              setEffectPipeline({ selectedKind: 'videoMotion' });
+            if (value === 'videoMotion' || value === 'stretch') {
+              setEffectPipeline({ selectedKind: value });
             } else {
-              setEffectMode(value as typeof postprocess.effectMode);
+              const effectMode = value as Exclude<PostprocessStackKind, 'prism'>;
+              setEffectMode(effectMode);
+              // Keep the stack selection in step so a previously selected
+              // Video Motion / Stretch layer no longer pins the module.
+              setEffectPipeline({ selectedKind: effectMode === 'glassV2' ? 'glass' : effectMode });
             }
           }}
         />
@@ -440,7 +451,12 @@ export function PostprocessPanel({ sandboxMode, embedded = false }: PostprocessP
           <div data-cone-settings={selectedCone ? 'shown' : 'hidden'} hidden={!selectedCone}>
             <ConeViewPanel />
           </div>
-          {activeEffectMode !== 'videoMotion' && !selectedCone && (
+          {activeEffectMode === 'stretch' && !selectedCone && (
+            <div data-stretch-settings>
+              <StretchPanel showEnabledToggle={false} />
+            </div>
+          )}
+          {activeEffectMode !== 'videoMotion' && activeEffectMode !== 'stretch' && !selectedCone && (
           <>
           {isDistort ? (
             <ManualDistortControls

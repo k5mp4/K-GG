@@ -7,7 +7,6 @@
   uniform float u_normalMapAngle;
   uniform float u_normalMapBevelSize;
   uniform bool u_normalMapInvert;
-  uniform bool u_matcapEnabled;
 
   void main() {
     vec2 uv = gl_FragCoord.xy / u_resolution;
@@ -31,12 +30,4 @@
     float rdy = dx * sinA + dy * cosA;
     vec3 normal = normalize(vec3(-rdx, -rdy, 1.0));
     gl_FragColor = vec4(normal * 0.5 + 0.5, 1.0);
-
-    // Matcap: 円形アルファマスク（メインシェーダーと同じ挙動を維持）
-    if (u_matcapEnabled) {
-      vec2 centered = gl_FragCoord.xy / u_resolution * 2.0 - 1.0;
-      float dist = length(centered);
-      float alpha = 1.0 - smoothstep(0.97, 1.0, dist);
-      gl_FragColor = vec4(gl_FragColor.rgb * alpha, alpha);
-    }
   }

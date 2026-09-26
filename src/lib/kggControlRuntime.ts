@@ -254,12 +254,9 @@ function serializeStore(state: StoreState): SerializableStore {
     coneView: state.coneView,
     seamless: state.seamless,
     videoMotion: state.videoMotion,
-    radon: state.radon,
-    iridescence: state.iridescence,
     manualDistort: state.manualDistort,
     postprocess: state.postprocess,
     effectPipeline: state.effectPipeline,
-    matcap: state.matcap,
     histogram: state.histogram,
     keyframeTracks: state.keyframeTracks,
     selectedStops: state.selectedStops,
@@ -519,8 +516,6 @@ export class KggControlRuntime {
       stretch: applicationCommands.setStretch,
       animation: applicationCommands.setAnimation,
       normalMap: applicationCommands.setNormalMap,
-      radon: applicationCommands.setRadon,
-      iridescence: applicationCommands.setIridescence,
       postprocess: applicationCommands.setPostprocess,
     }[definition.target];
     if (!setter) return error('unsupported_parameter', `Parameter target is not writable: ${definition.target}`);
@@ -590,12 +585,9 @@ export class KggControlRuntime {
       coneView: applicationCommands.setConeView,
       seamless: applicationCommands.setSeamless,
       flowGradient: applicationCommands.setFlowGradient as ((value: never) => void),
-      radon: applicationCommands.setRadon,
-      iridescence: applicationCommands.setIridescence,
       manualDistort: applicationCommands.setManualDistort,
       postprocess: applicationCommands.setPostprocess,
       effectPipeline: applicationCommands.setEffectPipeline,
-      matcap: applicationCommands.setMatcap,
       histogram: applicationCommands.setHistogram,
     };
     const setter = setters[groupValue];
@@ -1321,12 +1313,9 @@ export class KggControlRuntime {
     setIfPresent('clothGradient', applicationCommands.setClothGradient);
     setIfPresent('coneView', applicationCommands.setConeView);
     setIfPresent('seamless', applicationCommands.setSeamless);
-    setIfPresent('radon', applicationCommands.setRadon);
-    setIfPresent('iridescence', applicationCommands.setIridescence);
     setIfPresent('manualDistort', applicationCommands.setManualDistort);
     setIfPresent('postprocess', applicationCommands.setPostprocess);
     setIfPresent('effectPipeline', applicationCommands.setEffectPipeline);
-    setIfPresent('matcap', applicationCommands.setMatcap);
     setIfPresent('histogram', applicationCommands.setHistogram);
     if (isRecord(store.keyframeTracks)) applicationCommands.setKeyframeTracks(store.keyframeTracks as never);
     if (Array.isArray(store.selectedStops)) applicationCommands.setSelectedStops(store.selectedStops as number[]);

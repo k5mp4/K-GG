@@ -39,7 +39,7 @@ MCP ServerとK-GG WebViewは別processで動くため、MCP Serverはloopback HT
 
 ### MCP-012 Semantic Control Registry
 
-`kgg_list_controls`は、Gradient、Noise、Diffuse、Image Gradient、Slit Scan、Stretch、Animation、Normal Map、Cloth、Cone、Seamless、Flow、Radon、Iridescence、Manual Distort、Postprocess、Effect Pipeline、Matcap、Histogram、Keyframe、UIのgroupと、allowlist済みoperation id、入力schema、`scenarioSafe`、`requiresApproval`、`requiresNativeCapability`を返す。`kgg_get_control_state`はgroupのcanonical stateを読み取り、`kgg_execute_control`はRegistryに存在するoperationだけを実行する。
+`kgg_list_controls`は、Gradient、Noise、Diffuse、Image Gradient、Slit Scan、Stretch、Animation、Normal Map、Cloth、Cone、Seamless、Flow、Manual Distort、Postprocess、Effect Pipeline、Histogram、Keyframe、UIのgroupと、allowlist済みoperation id、入力schema、`scenarioSafe`、`requiresApproval`、`requiresNativeCapability`を返す。`kgg_get_control_state`はgroupのcanonical stateを読み取り、`kgg_execute_control`はRegistryに存在するoperationだけを実行する。
 
 Gradient/Opacity Stop、Anchor、Mesh corner/handle/color position、Animation transport、Keyframe、Canvas/View、Preset/Paletteはsemantic inputで操作する。`set_group`は既知groupの既知top-level fieldだけをpartial patchし、`keyframeTracks`は専用operationに限定する。入力はJSONのみで、reserved object key、非有限値、payload上限を拒否する。
 

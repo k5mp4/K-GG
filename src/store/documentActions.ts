@@ -385,31 +385,6 @@ export function createDocumentActions(set: DocumentStoreSet, defaults: DocumentD
       : s.effectPipeline;
     return { videoMotion, effectPipeline };
   }),
-  setRadon: (v) => set((s) => {
-    const radon = { ...s.radon, ...v };
-    radon.strength = clampParameter(radon.strength, s.radon.strength, getParameterLimit('radon.strength'));
-    radon.freq = clampParameter(radon.freq, s.radon.freq, getParameterLimit('radon.freq'));
-    radon.radius = clampParameter(radon.radius, s.radon.radius, getParameterLimit('radon.radius'));
-    radon.blur = clampParameter(radon.blur, s.radon.blur, getParameterLimit('radon.blur'));
-    radon.angle = clampParameter(radon.angle, s.radon.angle, getParameterLimit('radon.angle'));
-    radon.evolution = clampParameter(radon.evolution, s.radon.evolution, getParameterLimit('radon.evolution'));
-    radon.speed = clampParameter(radon.speed, s.radon.speed, getParameterLimit('radon.speed'));
-    const keyframeTracks = s.animation.enabled && radon.enabled
-      ? ensureAutoTrack(s.keyframeTracks, 'radon.evolution')
-      : s.keyframeTracks;
-    return { radon, keyframeTracks };
-  }),
-  setIridescence: (v) => set((s) => {
-    const iridescence = { ...s.iridescence, ...v };
-    iridescence.strength = clampParameter(iridescence.strength, s.iridescence.strength, getParameterLimit('iridescence.strength'));
-    iridescence.frequency = clampParameter(iridescence.frequency, s.iridescence.frequency, getParameterLimit('iridescence.frequency'));
-    iridescence.speed = clampParameter(iridescence.speed, s.iridescence.speed, getParameterLimit('iridescence.speed'));
-    iridescence.angle = clampParameter(iridescence.angle, s.iridescence.angle, getParameterLimit('iridescence.angle'));
-    const keyframeTracks = s.animation.enabled && iridescence.enabled
-      ? ensureAutoTrack(s.keyframeTracks, 'iridescence.__time')
-      : s.keyframeTracks;
-    return { iridescence, keyframeTracks };
-  }),
   setManualDistort: (v) => set((s) => {
     const resolution = v.mapResolution ?? s.manualDistort.mapResolution;
     const displacement = v.displacement
@@ -526,7 +501,6 @@ export function createDocumentActions(set: DocumentStoreSet, defaults: DocumentD
       keyframeTracks,
     };
   }),
-  setMatcap: (v) => set((s) => ({ matcap: { ...s.matcap, ...v } })),
   setKeyframeTracks: (v) => set((s) => ({
     keyframeTracks: migratePropertyTracks(typeof v === 'function' ? v(s.keyframeTracks) : v),
   })),

@@ -21,11 +21,8 @@ export type RenderFrameRequest = {
   slitScan: LatestState['slitScan'];
   stretch: LatestState['stretch'];
   normalMap: LatestState['normalMap'];
-  radon: LatestState['radon'];
-  iridescence: LatestState['iridescence'];
   manualDistort: LatestState['manualDistort'];
   postprocess: LatestState['postprocess'];
-  matcap: LatestState['matcap'];
   width: LatestState['width'];
   height: LatestState['height'];
   time?: number;

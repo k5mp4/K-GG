@@ -7,13 +7,10 @@ import type { GradientConfig, MeshEdge, Vec2Tuple } from '../types/gradient';
 import type {
   DiffuseConfig,
   EffectPipelineConfig,
-  IridescenceConfig,
   ManualDistortConfig,
-  MatcapConfig,
   NoiseDistortionConfig,
   NormalMapConfig,
   PostprocessConfig,
-  RadonConfig,
   SlitScanConfig,
   StretchConfig,
 } from '../types/distortion';
@@ -40,12 +37,9 @@ export type DocumentState = {
   seamless: SeamlessConfig;
   flowGradient: FlowGradientConfig;
   videoMotion: VideoMotionConfig;
-  radon: RadonConfig;
-  iridescence: IridescenceConfig;
   manualDistort: ManualDistortConfig;
   postprocess: PostprocessConfig;
   effectPipeline: EffectPipelineConfig;
-  matcap: MatcapConfig;
   keyframeTracks: Record<string, PropertyTrack>;
 };
 
@@ -79,12 +73,9 @@ export type DocumentActions = {
   setSeamless: (value: Partial<SeamlessConfig>) => void;
   setFlowGradient: (value: Partial<FlowGradientConfig>) => void;
   setVideoMotion: (value: Partial<VideoMotionConfig>) => void;
-  setRadon: (value: Partial<RadonConfig>) => void;
-  setIridescence: (value: Partial<IridescenceConfig>) => void;
   setManualDistort: (value: Partial<ManualDistortConfig>) => void;
   setPostprocess: (value: Partial<PostprocessConfig>) => void;
   setEffectPipeline: (value: Partial<EffectPipelineConfig>) => void;
-  setMatcap: (value: Partial<MatcapConfig>) => void;
   setKeyframeTracks: (value: Record<string, PropertyTrack> | ((previous: Record<string, PropertyTrack>) => Record<string, PropertyTrack>)) => void;
   setTrackMode: (trackId: string, mode: AnimationMode, options?: { label?: string; value?: number; time?: number }) => void;
   setKeyframe: (trackId: string, keyframe: Partial<Keyframe> & { id: string }) => void;
@@ -118,8 +109,6 @@ export function createDocumentState(defaults: DocumentDefaults): DocumentState {
     seamless: { ...defaults.seamless },
     flowGradient: { ...defaults.flowGradient },
     videoMotion: { ...defaults.videoMotion },
-    radon: { ...defaults.radon },
-    iridescence: { ...defaults.iridescence },
     manualDistort: {
       ...defaults.manualDistort,
       displacement: [...defaults.manualDistort.displacement],
@@ -135,7 +124,6 @@ export function createDocumentState(defaults: DocumentDefaults): DocumentState {
       ...defaults.effectPipeline,
       effectStack: defaults.effectPipeline.effectStack.map(layer => ({ ...layer })),
     },
-    matcap: { ...defaults.matcap },
     keyframeTracks: {},
   };
 }

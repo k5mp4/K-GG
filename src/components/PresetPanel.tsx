@@ -324,8 +324,6 @@ export function PresetPanel({ canvasW, canvasH, setCanvasW, setCanvasH, aspectRa
     }
     if (s.stretch) applicationCommands.setStretch(s.stretch);
     if (s.normalMap) applicationCommands.setNormalMap(s.normalMap);
-    applicationCommands.setRadon({ ...STORE_DEFAULTS.radon, ...s.radon, enabled: false });
-    applicationCommands.setIridescence({ ...STORE_DEFAULTS.iridescence, ...s.iridescence, enabled: false });
     const loadedPostprocess = normalizePostprocessConfig(
       s.postprocess ?? s.postprocessDistort,
       s.manualDistort,
@@ -356,7 +354,6 @@ export function PresetPanel({ canvasW, canvasH, setCanvasW, setCanvasH, aspectRa
     applicationCommands.setEffectPipeline(s.effectPipeline
       ? normalizeEffectPipelineConfig(s.effectPipeline)
       : createDefaultEffectPipeline());
-    if (s.matcap) applicationCommands.setMatcap(s.matcap);
     applicationCommands.setKeyframeTracks(s.keyframeTracks ?? {});
     if (s.animation) applicationCommands.setAnimation({ ...s.animation, previewLoop: s.animation.previewLoop ?? true });
     if (s.colorPalettes) mergeUserColorPalettes(s.colorPalettes);
@@ -376,11 +373,11 @@ export function PresetPanel({ canvasW, canvasH, setCanvasW, setCanvasH, aspectRa
   async function handleSave() {
     const trimmed = name.trim();
     if (!trimmed) return;
-    const { gradient, noiseDistortion, diffuse, imageGradient, slitScan, stretch, animation, normalMap, clothGradient, coneView, seamless, flowGradient, videoMotion, radon, iridescence, manualDistort, postprocess, effectPipeline, matcap, keyframeTracks } = store;
+    const { gradient, noiseDistortion, diffuse, imageGradient, slitScan, stretch, animation, normalMap, clothGradient, coneView, seamless, flowGradient, videoMotion, manualDistort, postprocess, effectPipeline, keyframeTracks } = store;
     const state = createPresetSaveState({
       gradient, noiseDistortion, diffuse, imageGradient, slitScan, stretch,
       animation, normalMap, clothGradient, coneView, seamless, flowGradient, videoMotion,
-      radon, iridescence, manualDistort, postprocess, effectPipeline, matcap,
+      manualDistort, postprocess, effectPipeline,
       keyframeTracks,
     }, loadUserColorPalettes(), { width: canvasW, height: canvasH });
     setSaving(true);
