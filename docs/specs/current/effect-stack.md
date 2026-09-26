@@ -224,7 +224,9 @@ Effect Stack V2で有効なDiffuseの直後に有効なSlitがある場合、Dif
 
 ### EFFECT-026 Noise→Diffuseの旧Generator UV合成
 
-Effect Stack V2で有効な`Noise`より後ろに有効な`Diffuse`があり、DiffuseがBlockまたはSmoothの場合、NoiseとDiffuseの間に他の有効レイヤーがあるかどうかにかかわらず、Noiseの位置で同じ入力textureからNoiseのUV変換を一度行った後にDiffuseのグローバル座標変位を加え、`I(N(x) + D(x))`として一度だけサンプリングします。これによりDiffuseの変位がNoiseの歪みで増幅・引き伸ばされず、間にレイヤーがない場合と同じかかり方になります。間にあるレイヤーはこの合成結果を入力として処理し、Diffuseの本来の位置では再適用しません。NoiseとDiffuseのglobalCoord、seed、time、subpixel Grain、Scatter、Tile offset、full resolutionは既存の各レイヤー契約に従います。先頭の解析可能なNoiseは、後続のDiffuseを含めて既存Generatorで一度だけ評価します。`Diffuse → Noise`、直後に`Slit`がある`Diffuse`、Dither／Halftone／ASCII／Stippleおよびその他の非対象モードはこの合成を使わず、既存のTexture StackまたはSlit出力座標評価を使います。Preview、Thumbnail、静止画、連番、動画、Tileは同じRender Planを使います。
+Effect Stack V2で有効な`Noise`より後ろに有効な`Diffuse`があり、DiffuseがBlockまたはSmoothで適用方式（`diffuse.applyMode`）が`noiseLinked`の場合、NoiseとDiffuseの間に他の有効レイヤーがあるかどうかにかかわらず、Noiseの位置で同じ入力textureからNoiseのUV変換を一度行った後にDiffuseのグローバル座標変位を加え、`I(N(x) + D(x))`として一度だけサンプリングします。これによりDiffuseの変位がNoiseの歪みで増幅・引き伸ばされず、間にレイヤーがない場合と同じかかり方になります。間にあるレイヤーはこの合成結果を入力として処理し、Diffuseの本来の位置では再適用しません。NoiseとDiffuseのglobalCoord、seed、time、subpixel Grain、Scatter、Tile offset、full resolutionは既存の各レイヤー契約に従います。先頭の解析可能なNoiseは、後続のDiffuseを含めて既存Generatorで一度だけ評価します。`Diffuse → Noise`、直後に`Slit`がある`Diffuse`、Dither／Halftone／ASCII／Stippleおよびその他の非対象モードはこの合成を使わず、既存のTexture StackまたはSlit出力座標評価を使います。Preview、Thumbnail、静止画、連番、動画、Tileは同じRender Planを使います。
+
+Block／SmoothのDiffuseは適用方式`diffuse.applyMode`を持ち、値は`noiseLinked`（既定）と`uniform`です。Presetに値がない、または未知の値の場合は`noiseLinked`として扱います。`uniform`はNoiseとの合成を行わず、Diffuseのスタック位置で直前のtextureを`T(x + D(x))`として画面空間で均一に散らします。Noiseより前のレイヤーは粒を変形せず、後ろのレイヤーは粒ごと変形します。NoiseがなくDiffuseだけが先頭にある場合は既存Generatorで評価します。Dither／Halftone／ASCII／Stippleでは適用方式を使いません。
 
 ### EFFECT-017 Slitのduration基準ループ
 

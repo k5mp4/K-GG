@@ -51,6 +51,7 @@ Web 版は `index.html` で Google Fonts から Noto Sans JP、Open Sans を読�
 - グラデーションへ決定的な拡散を加え、V2では画像系処理の最終段に固定されます。
 - **SmoothはKV背景を基準にした、格子感を抑えた拡散方式です。**
 - `Scatter` で拡散量、`Grain` で粒の細かさ、`Seed` で分布を調整します。
+- Block/Smoothでは `Apply` でNoiseとの関係を選べます。`Noise Linked`（既定）はNoiseと合成され、Noiseより後ろのどこに置いても同じ見た目です。`Uniform` はStack上の位置でそれまでの画像を均一に散らします。
 
 ### Noise (ノイズ歪み)
 - 各種ノイズを用いて、グラデーションを複雑に歪ませる

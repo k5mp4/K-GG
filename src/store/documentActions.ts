@@ -11,7 +11,7 @@ import {
 import { evaluateMeshPatch } from '../lib/meshGradientField';
 import { applyMirrorT, applyRampRepeatT, getColorAtPosition } from '../lib/gradientRampUtils';
 import { stripSlitPhaseMotionFields, type NoiseDistortionConfig } from '../types/distortion';
-import { DEFAULT_DIFFUSE_ASCII_CHARSET, DEFAULT_DIFFUSE_BACKGROUND_COLOR } from '../types/distortion';
+import { DEFAULT_DIFFUSE_ASCII_CHARSET, DEFAULT_DIFFUSE_BACKGROUND_COLOR, normalizeDiffuseApplyMode } from '../types/distortion';
 import { normalizeClothGradientConfig } from '../types/clothGradient';
 import { normalizeConeViewConfig } from '../types/coneView';
 import { normalizeSeamlessConfig } from '../types/seamless';
@@ -271,6 +271,7 @@ export function createDocumentActions(set: DocumentStoreSet, defaults: DocumentD
       ? diffuse.adaptiveChannel
       : 'luminance';
     diffuse.halftoneShape = diffuse.halftoneShape === 'square' ? 'square' : 'circle';
+    diffuse.applyMode = normalizeDiffuseApplyMode(diffuse.applyMode);
     diffuse.asciiCharset = typeof diffuse.asciiCharset === 'string' && diffuse.asciiCharset.length > 0
       ? diffuse.asciiCharset.slice(0, 64)
       : DEFAULT_DIFFUSE_ASCII_CHARSET;

@@ -5,7 +5,7 @@ import { SliderField } from './SliderField';
 import { Collapsible } from './Collapsible';
 import { AnimatedButton } from './AnimatedButton';
 import { Toggle } from './Toggle';
-import type { DiffuseConfig } from '../types/distortion';
+import { DIFFUSE_APPLY_MODES, normalizeDiffuseApplyMode, type DiffuseConfig } from '../types/distortion';
 import { Icon } from './Icon';
 import { DiffuseCurveEditor } from './DiffuseCurveEditor';
 import { IDENTITY_DIFFUSE_BEZIER } from '../lib/diffuseCurve';
@@ -33,6 +33,11 @@ const DIFFUSE_MODES: Array<{ value: DiffuseConfig['mode']; label: string }> = [
 const DIFFUSE_MODE_VALUES = DIFFUSE_MODES.map(mode => mode.value);
 const ADAPTIVE_CHANNELS = ['luminance', 'hue', 'saturation'] as const;
 const ADAPTIVE_CHANNEL_LABELS = ['Luminance', 'Hue', 'Saturation'] as const;
+const DIFFUSE_APPLY_MODE_LABELS = ['Noise Linked', 'Uniform'] as const;
+const DIFFUSE_APPLY_MODE_HINTS: Record<(typeof DIFFUSE_APPLY_MODES)[number], string> = {
+  noiseLinked: 'Composed with Noise; stack position after Noise does not matter',
+  uniform: 'Uniform scatter at this stack position',
+};
 const HALFTONE_SHAPES = ['circle', 'square'] as const;
 const HALFTONE_SHAPE_LABELS = ['Circle', 'Square'] as const;
 const GENERIC_FONT_OPTIONS = ['monospace', 'serif', 'sans-serif', 'cursive', 'fantasy'];
@@ -111,6 +116,23 @@ export function DiffusePanel() {
                 className="w-full"
               />
             </div>
+
+            {(diffuse.mode === 'block' || diffuse.mode === 'smooth') && (
+              <div>
+                <p className="mb-1 text-xs text-deep">Apply</p>
+                <InputRadio
+                  value={normalizeDiffuseApplyMode(diffuse.applyMode)}
+                  options={DIFFUSE_APPLY_MODES}
+                  labels={DIFFUSE_APPLY_MODE_LABELS}
+                  onChange={(applyMode) => applyMode !== undefined && setDiffuse({ applyMode })}
+                  aria-label="Diffuse apply mode"
+                  className="w-full"
+                />
+                <p className="mt-1 text-[9px] text-tab-inactive">
+                  {DIFFUSE_APPLY_MODE_HINTS[normalizeDiffuseApplyMode(diffuse.applyMode)]}
+                </p>
+              </div>
+            )}
 
             {diffuse.mode !== 'dither' && diffuse.mode !== 'halftone' && diffuse.mode !== 'ascii' && (
               <SliderField

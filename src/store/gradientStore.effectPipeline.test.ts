@@ -82,6 +82,17 @@ describe('Gradient store Effect Pipeline V2 synchronization', () => {
     expect(useGradientStore.getState().postprocess.diffuseBackgroundColor).toBe('#ABCDEF');
   });
 
+  it('defaults and normalizes the Diffuse apply mode', () => {
+    const store = useGradientStore.getState();
+    expect(STORE_DEFAULTS.diffuse.applyMode).toBe('noiseLinked');
+
+    store.setDiffuse({ applyMode: 'uniform' });
+    expect(useGradientStore.getState().diffuse.applyMode).toBe('uniform');
+
+    store.setDiffuse({ applyMode: 'invalid' as never });
+    expect(useGradientStore.getState().diffuse.applyMode).toBe('noiseLinked');
+  });
+
   it('keeps Diffuse panel parameters as the V2 source instead of legacy postprocess values', () => {
     const store = useGradientStore.getState();
     store.setPostprocess({

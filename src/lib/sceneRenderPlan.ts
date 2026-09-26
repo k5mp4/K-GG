@@ -59,6 +59,7 @@ export function getSceneRenderPlanInput(
     noiseType: state.noiseDistortion?.type,
     noiseLoopMode: state.noiseDistortion?.noiseLoopMode,
     diffuseMode: state.diffuse?.mode,
+    diffuseApplyMode: state.diffuse?.applyMode,
   };
 }
 

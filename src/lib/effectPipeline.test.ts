@@ -251,6 +251,81 @@ describe('effectPipeline', () => {
       expect(plan.programs.noiseStack).toBe(true);
     });
 
+    describe('Diffuse apply mode', () => {
+      const noiseMirrorDiffuse = [
+        { kind: 'noise' as const, enabled: true },
+        { kind: 'mirror' as const, enabled: true },
+        { kind: 'diffuse' as const, enabled: true },
+      ];
+
+      it('treats a missing or unknown apply mode as noiseLinked', () => {
+        const pipeline = createDefaultEffectPipeline();
+        for (const diffuseApplyMode of [undefined, 'unknown']) {
+          const plan = getV2RenderPlan(
+            { ...pipeline, effectStack: noiseMirrorDiffuse },
+            analyticPlanOptions({ diffuseApplyMode: diffuseApplyMode as never }),
+          );
+          expect(plan.analyticPrefix.consumedLayers).toEqual(['noise', 'diffuse']);
+        }
+      });
+
+      it.each([
+        ['adjacent', [
+          { kind: 'noise' as const, enabled: true },
+          { kind: 'diffuse' as const, enabled: true },
+        ], 1],
+        ['separated', noiseMirrorDiffuse, 1],
+      ] as const)('keeps a %s uniform Diffuse as a texture pass after an analytic Noise', (_label, stack, firstTextureLayerIndex) => {
+        const pipeline = createDefaultEffectPipeline();
+        const plan = getV2RenderPlan(
+          { ...pipeline, effectStack: [...stack] },
+          analyticPlanOptions({ diffuseApplyMode: 'uniform' }),
+        );
+
+        expect(plan.analyticPrefix).toEqual({
+          enabled: true,
+          consumedLayers: ['noise'],
+          firstTextureLayerIndex,
+          reason: 'enabled',
+        });
+        expect(plan.framebufferAllocationMode).toBe('core');
+        expect(plan.programs.noiseDiffuseStack).toBe(false);
+      });
+
+      it('disables the texture Noise + Diffuse composition for uniform Diffuse', () => {
+        const pipeline = createDefaultEffectPipeline();
+        const plan = getV2RenderPlan({
+          ...pipeline,
+          effectStack: [{ kind: 'glass', enabled: true }, ...noiseMirrorDiffuse],
+        }, analyticPlanOptions({ diffuseApplyMode: 'uniform' }));
+
+        expect(plan.noiseDiffuseComposition.reason).toBe('apply-mode');
+        expect(plan.programs.noiseDiffuseStack).toBe(false);
+        expect(plan.programs.noiseStack).toBe(true);
+      });
+
+      it('keeps a Diffuse-only prefix in the Generator for uniform Diffuse', () => {
+        const pipeline = createDefaultEffectPipeline();
+        const plan = getV2RenderPlan(pipeline, analyticPlanOptions({ diffuseApplyMode: 'uniform' }));
+
+        expect(plan.analyticPrefix.consumedLayers).toEqual(['diffuse']);
+        expect(plan.framebufferAllocationMode).toBe('direct');
+      });
+
+      it('keeps a uniform Diffuse before Noise in the Generator prefix order check', () => {
+        const pipeline = createDefaultEffectPipeline();
+        const plan = getV2RenderPlan({
+          ...pipeline,
+          effectStack: [
+            { kind: 'diffuse', enabled: true },
+            { kind: 'noise', enabled: true },
+          ],
+        }, analyticPlanOptions({ diffuseApplyMode: 'uniform' }));
+
+        expect(plan.analyticPrefix.reason).toBe('invalid-order');
+      });
+    });
+
     it('keeps a later Diffuse before Slit out of the Noise composition', () => {
       const pipeline = createDefaultEffectPipeline();
       const reordered = [
