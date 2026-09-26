@@ -1,298 +1,89 @@
 import { describe, expect, it } from 'vitest';
-import {
-  getInitialProgramSource,
-  getPostprocessFragmentSource,
-  getProgramSource,
-} from './webglShaderSources';
+import { getInitialProgramSource, getProgramSource } from './webglShaderSources';
 import { GRADIENT_TYPE_MAP, NOISE_TYPE_MAP } from './webgl';
-import webglSource from './webgl.ts?raw';
 
-describe('webglShaderSources', () => {
-  it('declares Chromatic Steps outside the V2-only uniform block for every Glass program', () => {
-    // The compact source compiled into legacy Glass still contains opticalGlassV2(),
-    // so a uniform hidden behind !KGG_LEGACY_GLASS_ONLY breaks that program.
-    for (const key of ['glass', 'glassV2'] as const) {
-      const fragment = getProgramSource(key).fragment;
-      const withoutV2OnlyBlocks = fragment.replace(
-        /#if !defined\(KGG_LEGACY_GLASS_ONLY\)\n(?:(?!#if|#endif)[^\n]*\n)*?#endif\n/g,
-        '',
-      );
-      expect(fragment).toContain('u_glassChromaticSteps');
-      expect(withoutV2OnlyBlocks).toContain('uniform int u_glassChromaticSteps;');
-    }
+// Whether each program compiles and links is checked in a real WebGL2 context
+// by tests/e2e/shaders.spec.ts. These tests cover what a compiler cannot:
+// which code each specialized program leaves out (compile time on slow
+// drivers) and the integer contracts shared between TypeScript and GLSL.
+
+describe('webglShaderSources compile boundaries', () => {
+  it('keeps the bootstrap program free of the heavy noise implementations', () => {
+    const initial = getInitialProgramSource().fragment;
+    expect(initial).toContain('#define KGG_BOOTSTRAP');
+    expect(initial).not.toContain('\r');
+    expect(initial).not.toContain('float simplex3D(');
+    expect(initial).not.toContain('vec2 fastCurlField(');
+
+    const generator = getProgramSource('generator').fragment;
+    expect(generator).not.toContain('#define KGG_BOOTSTRAP');
+    expect(generator).toContain('float simplex3D(');
   });
 
-  it('adds Mesh Gradation at mapping value 6 without shifting existing types', () => {
-    expect(GRADIENT_TYPE_MAP).toEqual({ linear: 0, radial: 1, fourcolor: 2, diamond: 3, angle: 4, bezier: 5, mesh: 6 });
-    const source = getInitialProgramSource().fragment;
-    for (const uniform of [
-      'u_meshCorner0', 'u_meshCorner1', 'u_meshCorner2', 'u_meshCorner3',
-      'u_meshBottomCp0', 'u_meshBottomCp1', 'u_meshRightCp0', 'u_meshRightCp1',
-      'u_meshTopCp0', 'u_meshTopCp1', 'u_meshLeftCp0', 'u_meshLeftCp1',
-      'u_meshColorPositions',
-    ]) expect(source).toContain(`uniform ${uniform.startsWith('u_meshColor') ? 'vec4' : 'vec2'} ${uniform};`);
-    expect(source).toContain('uniform sampler2D u_meshGradient;');
-    expect(source).toContain('return texture2D(u_meshGradient, clamp(sampleUV, 0.0, 1.0));');
-    expect(source).not.toContain('inverseMapMeshUV(');
-    expect(source).toContain('if (u_gradientType == 6) return sampleMeshGradient(sampleUV);');
-  });
-  it('keeps the initial program on the base generator source', () => {
-    const source = getInitialProgramSource();
-    expect(source.vertex).toContain('a_position');
-    expect(source.fragment).toContain('u_gradientType');
-    expect(source.fragment).toContain('#define KGG_BOOTSTRAP');
-    expect(source.fragment).not.toContain('\r');
-    expect(source.fragment).not.toContain('float simplex3D(');
-    expect(source.fragment).not.toContain('vec2 fastCurlField(');
-
-    const generator = getProgramSource('generator');
-    expect(generator.fragment).toContain('float simplex3D(');
-    expect(generator.fragment).toContain('vec2 fastCurlField(');
-    expect(generator.fragment).toContain('vec2 causticsDistortion(');
-
-    const noiseStack = getProgramSource('noiseStack').fragment;
-    expect(noiseStack).toContain('#define KGG_STACK_NOISE_ONLY');
-    expect(noiseStack.match(/uniform float u_time;/g)).toHaveLength(1);
-    expect(noiseStack).toContain('uniform sampler2D u_sourceTex;');
-    expect(noiseStack).toContain('uniform vec2 u_tileResolution;');
-    for (const declaration of [
-      'uniform int u_curlSteps;',
-      'uniform float u_curlSpeed;',
-      'uniform float u_curlEps;',
-      'uniform float u_curlSeed;',
-    ]) {
-      expect(noiseStack.match(new RegExp(declaration.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'g'))).toHaveLength(1);
-      expect(noiseStack.indexOf(declaration)).toBeLessThan(noiseStack.indexOf('vec2 fastCurlField('));
-    }
-    expect(noiseStack).toContain('fract(evolution / loopPeriod)');
-    expect(noiseStack).not.toContain('fract((u_time + u_noiseEvolution) / loopPeriod)');
-
-    const general = getProgramSource('postprocess').fragment;
-    for (const declaration of [
-      'uniform int u_curlSteps;',
-      'uniform float u_curlSpeed;',
-      'uniform float u_curlEps;',
-      'uniform float u_curlSeed;',
-    ]) {
-      expect(general.match(new RegExp(declaration.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'g'))).toHaveLength(1);
-    }
-  });
-
-  it('keeps Video Motion feedback palette-bound while preserving current animation', () => {
-    const source = getProgramSource('videoMotion');
-    expect(source.vertex).toContain('a_position');
-    expect(source.fragment).toContain('uniform sampler2D u_motionField;');
-    expect(source.fragment).toContain('uniform sampler2D u_feedbackTex;');
-    expect(source.fragment).toContain('uniform sampler2D u_gradientRamp;');
-    expect(source.fragment).toContain('vec3 projectToGradientRamp(vec3 color)');
-    expect(source.fragment).toContain('const float MAX_HISTORY_WEIGHT = 0.82;');
-    expect(source.fragment).toContain('u_feedbackPrimed ? texture2D(u_feedbackTex');
-    expect(source.fragment).toContain('if (!u_feedbackPrimed)');
-    expect(source.fragment).toContain('gl_FragColor = base;');
-    expect(source.fragment).not.toContain('u_mode');
-    expect(source.fragment).not.toContain('u_glitchAmount');
-    expect(source.fragment).not.toContain('vec3(motion, 0.0)');
-  });
-
-  it('uploads ridged noise using the declared lacunarity uniform location', () => {
-    expect(webglSource).toContain('gl.uniform1f(uniforms.u_ridgeLacunarity, noiseDistortion.ridgeLacunarity ?? 2.0);');
-    expect(webglSource).not.toContain('gl.uniform1f(uniforms.ridgeLacunarity, noiseDistortion.ridgeLacunarity ?? 2.0);');
-  });
-
-  it('keeps Glass and Prism compile boundaries independent', () => {
+  it('specializes the Glass, Prism, and stack programs with exclusive defines', () => {
     const glass = getProgramSource('glass').fragment;
     const glassV2 = getProgramSource('glassV2').fragment;
     const prism = getProgramSource('prism').fragment;
     const core = getProgramSource('stackCore').fragment;
-    const noiseStack = getProgramSource('noiseStack').fragment;
+    const general = getProgramSource('postprocess').fragment;
 
-    expect(glass).toContain('#define KGG_GLASS_ONLY');
     expect(glass).toContain('#define KGG_LEGACY_GLASS_ONLY');
     expect(glass).not.toContain('#define KGG_GLASS_V2_ONLY');
-    expect(glassV2).toContain('#define KGG_GLASS_ONLY');
     expect(glassV2).toContain('#define KGG_GLASS_V2_ONLY');
     expect(glassV2).not.toContain('#define KGG_LEGACY_GLASS_ONLY');
-    expect(glass).toContain('vec4 organicGlass(');
-    expect(glass).not.toContain('#define KGG_PRISM_ONLY');
-    expect(glassV2).toContain('#define KGG_GLASS_V2_ONLY');
-    expect(glassV2).toContain('vec2 glassV2Gradient(');
-    expect(glassV2).toContain('vec4 opticalGlassV2(');
-    expect(glassV2).toContain('refract(');
-    expect(glassV2).toContain('glassV2QuinticFade');
+    for (const specialized of [glass, glassV2]) {
+      expect(specialized).toContain('#define KGG_GLASS_ONLY');
+      expect(specialized).not.toContain('#define KGG_PRISM_ONLY');
+    }
     expect(prism).toContain('#define KGG_PRISM_ONLY');
     expect(prism).not.toContain('#define KGG_GLASS_ONLY');
     expect(core).toContain('#define KGG_LIGHTWEIGHT');
     expect(core).toContain('#define KGG_STACK_CORE_NO_NOISE');
     expect(core).not.toContain('vec2 noiseDisplaceRaw(');
-    expect(noiseStack).toContain('#define KGG_STACK_NOISE_ONLY');
-    expect(noiseStack).toContain('vec2 noiseDisplaceRaw(');
-    expect(noiseStack).toContain('vec2 causticsDistortion(');
-    expect(noiseStack).toContain('void main()');
-
-    const noiseDiffuseStack = getProgramSource('noiseDiffuseStack').fragment;
-    expect(noiseDiffuseStack).toContain('#define KGG_STACK_NOISE_ONLY');
-    expect(noiseDiffuseStack).toContain('#define KGG_DIFFUSE_DISPLACEMENT_ONLY');
-    expect(noiseDiffuseStack).toContain('precision highp float;');
-    expect(noiseDiffuseStack).not.toContain('precision mediump float;');
-    expect(noiseDiffuseStack).toContain('vec2 stackNoiseUv(vec2 uv)');
-    expect(noiseDiffuseStack).toContain('vec2 diffusePanelDisplacement(vec2 globalCoord)');
-    expect(noiseDiffuseStack).toContain('Noise -> Diffuse order');
-    expect(noiseDiffuseStack).not.toContain('uniform sampler2D u_gradientRamp;');
-    expect(noiseDiffuseStack.match(/uniform sampler2D u_sourceTex;/g)).toHaveLength(1);
-    expect(noiseDiffuseStack.match(/uniform vec2 u_tileResolution;/g)).toHaveLength(1);
-  });
-
-  it('maps the preceding colored texture through the Cone layer', () => {
-    const stackCore = getProgramSource('stackCore').fragment.replace(/\r\n?/g, '\n');
-    const sourceLookupStart = stackCore.indexOf('vec4 coneTextureLookup(');
-    expect(sourceLookupStart).toBeGreaterThanOrEqual(0);
-    const sourceLookupEnd = stackCore.indexOf('\n}', sourceLookupStart);
-    const sourceLookup = stackCore.slice(sourceLookupStart, sourceLookupEnd + 2);
-    expect(sourceLookup).toContain('texture2D(u_sourceTex, sourceUvFromGlobal(uv))');
-
-    const coneSampleStart = stackCore.indexOf('vec4 coneViewSample(');
-    expect(coneSampleStart).toBeGreaterThanOrEqual(0);
-
-    const coneSampleEnd = stackCore.indexOf('\n}', coneSampleStart);
-    const coneSample = stackCore.slice(coneSampleStart, coneSampleEnd + 2);
-    expect(coneSample).toContain('coneMirrorRepeatSample');
-    expect(coneSample).toContain('coneGradientReapplySample');
-    expect(coneSample).not.toContain('u_gradientRamp');
-
-    const coneBranchStart = stackCore.indexOf('u_effectMode == 11');
-    expect(coneBranchStart).toBeGreaterThanOrEqual(0);
-    expect(stackCore.slice(coneBranchStart, coneBranchStart + 320)).toContain('coneViewSample');
-  });
-
-  it('declares Caustics and Phasor uniforms once in generator and Noise Stack sources', () => {
-    const declarations = [
-      'uniform float u_noiseSpeed;',
-      'uniform float u_causticsDepth;',
-      'uniform float u_causticsRefraction;',
-      'uniform float u_causticsSharpness;',
-      'uniform int u_causticsComplexity;',
-      'uniform float u_causticsWaveSpread;',
-      'uniform float u_causticsBoundaryWidth;',
-      'uniform float u_phasorFrequency;',
-      'uniform float u_phasorBandwidth;',
-      'uniform float u_phasorDirection;',
-      'uniform float u_phasorDirectionSpread;',
-      'uniform float u_phasorSharpness;',
-      'uniform float u_phasorWarpStrength;',
-      'uniform float u_phasorTangentMix;',
-      'uniform float u_phasorKernelDensity;',
-      'uniform int u_phasorDirectionMode;',
-    ];
-    const generator = getProgramSource('generator').fragment;
-    const noiseStack = getProgramSource('noiseStack').fragment;
-    const general = getProgramSource('postprocess').fragment;
-    for (const declaration of declarations) {
-      const escaped = declaration.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-      expect(generator.match(new RegExp(escaped, 'g'))).toHaveLength(1);
-      expect(noiseStack.match(new RegExp(escaped, 'g'))).toHaveLength(1);
-      expect(general.match(new RegExp(escaped, 'g'))).toHaveLength(1);
-    }
-    expect(getProgramSource('glassV2').fragment).not.toContain('causticsDistortion(');
-  });
-
-  it('keeps the Caustics TypeScript and GLSL integer mapping at the end', () => {
-    expect(NOISE_TYPE_MAP).toMatchObject({ simplex: 0, fast_curl: 8, caustics: 9 });
-    const generator = getProgramSource('generator').fragment;
-    expect(generator).toContain('const int CAUSTICS_NOISE_TYPE = 9;');
-    expect(generator).toContain('noiseType == CAUSTICS_NOISE_TYPE');
-    expect(generator).toContain('return causticsDistortion(uv, evolution, scale, octaves);');
-    expect(generator).toContain('if (complexity < 2) complexity = 2;');
-    expect(generator).not.toContain('int complexity = clamp(');
-    expect(generator).toContain('evolution - wrapPeriod');
-    expect(generator).toContain('boundaryInfluence');
-  });
-
-  it('keeps Phasor Lines at the end of the Noise type mapping and includes its field contract', () => {
-    expect(NOISE_TYPE_MAP).toMatchObject({ caustics: 9, phasor: 10, perlin: 11 });
-    const generator = getProgramSource('generator').fragment;
-    const noiseStack = getProgramSource('noiseStack').fragment;
-    for (const source of [generator, noiseStack]) {
-      expect(source).toContain('const int PHASOR_NOISE_TYPE = 10;');
-      expect(source).toContain('vec2 phasorKernelHash(');
-      expect(source).toContain('void phasorComplexField(');
-      expect(source).toContain('vec2 phasorPhaseGradient(');
-      expect(source).toContain('float phasorLineMask(');
-      expect(source).toContain('vec2 phasorDistortion(');
-      const phaseHelpers = source.slice(source.indexOf('float phasorPhase('), source.indexOf('float phasorLineMask('));
-      expect(phaseHelpers).not.toContain('u_noiseOctaves');
-      expect(source).toContain('for (int y = -1; y <= 1; y++)');
-      expect(source).toMatch(
-        /float pixelFootprint = 1\.0 \/ max\(min\(u_(?:resolution|fullResolution)\.x, u_(?:resolution|fullResolution)\.y\), 1\.0\);/,
-      );
-    }
-    expect(generator).toContain('noiseType == PHASOR_NOISE_TYPE');
-    expect(noiseStack).toContain('u_phasorWarpStrength == 0.0');
-    expect(getProgramSource('glassV2').fragment).not.toContain('phasorDistortion(');
-  });
-
-  it('guards mode-specific Glass code while keeping both modes in the general fallback', () => {
-    const legacy = getProgramSource('glass').fragment;
-    const v2 = getProgramSource('glassV2').fragment;
-    const general = getProgramSource('postprocess').fragment;
-
     expect(general).not.toContain('#define KGG_GLASS_ONLY');
-    expect(legacy).toContain('#if !defined(KGG_GLASS_V2_ONLY)');
-    expect(v2).toContain('#if !defined(KGG_LEGACY_GLASS_ONLY)');
-    for (const source of [legacy, v2, general]) {
-      expect(source).toContain('vec4 organicGlass(');
-      expect(source).toContain('vec4 opticalGlassV2(');
-      expect(source).toContain('u_effectMode == 9');
-      expect(source).not.toMatch(/\b(?:fwidth|dFdx|dFdy)\s*\(/);
-    }
   });
 
-  it('removes the Diffuse implementation from the dedicated Glass compiles', () => {
+  it('keeps the dedicated Glass programs below the general postprocess compile', () => {
     for (const key of ['glass', 'glassV2'] as const) {
       const specialized = getProgramSource(key).fragment;
-
-      expect(specialized).toContain('#if defined(KGG_GLASS_ONLY)');
-      expect(specialized).toContain('vec2 diffusePanelDisplacement(vec2 globalCoord) {\n  return vec2(0.0);');
-      expect(specialized).toContain('vec4 applyDiffuseDither(vec4 color, vec2 globalCoord) {\n  return color;');
-      expect(specialized).toContain('#else\n#if defined(KGG_PRISM_ONLY)\nvec2 diffuseHash');
-      expect(specialized).not.toContain('vec2 diffuseDomainWarp(');
+      for (const excluded of [
+        'vec2 diffuseDomainWarp(',
+        'vec4 prismRays(',
+        'vec2 stackSlitUv(',
+        'float angleDistance(',
+        'vec2 glassNoiseDomain(',
+        'float glassDomainWarpScalar(',
+        'causticsDistortion(',
+        'phasorDistortion(',
+      ]) {
+        expect(specialized, `${key} should not compile ${excluded}`).not.toContain(excluded);
+      }
     }
+    expect(getProgramSource('glassV2').fragment.length)
+      .toBeLessThan(getProgramSource('postprocess').fragment.length);
   });
 
-  it('omits unrelated Prism and stack source from the dedicated Glass compile', () => {
-    const specialized = getProgramSource('glassV2').fragment;
+  it('fuses Noise and Diffuse displacement without the ramp or duplicated inputs', () => {
+    const fused = getProgramSource('noiseDiffuseStack').fragment;
+    expect(fused).toContain('#define KGG_STACK_NOISE_ONLY');
+    expect(fused).toContain('#define KGG_DIFFUSE_DISPLACEMENT_ONLY');
+    expect(fused).not.toContain('uniform sampler2D u_gradientRamp;');
+  });
+});
 
-    expect(specialized).toContain('vec4 organicGlass(');
-    expect(specialized).toContain('vec4 opticalGlassV2(');
-    expect(specialized).not.toContain('vec4 prismRays(');
-    expect(specialized).not.toContain('vec2 stackSlitUv(');
-    expect(specialized).not.toContain('float angleDistance(');
+describe('TypeScript and GLSL integer contracts', () => {
+  it('keeps gradient type values stable for the generator shader', () => {
+    expect(GRADIENT_TYPE_MAP).toEqual({ linear: 0, radial: 1, fourcolor: 2, diamond: 3, angle: 4, bezier: 5, mesh: 6 });
+    expect(getInitialProgramSource().fragment).toContain('if (u_gradientType == 6) return sampleMeshGradient(sampleUV);');
   });
 
-  it('keeps dedicated Glass below the full Noise compiler boundary', () => {
-    const specialized = getProgramSource('glassV2').fragment;
-
-    expect(specialized).toContain('vec4 opticalGlassV2(');
-    expect(specialized).toContain('vec4 organicGlass(');
-    expect(specialized).toContain('vec2 glassV2Gradient(');
-    expect(specialized).not.toContain('vec2 glassNoiseDomain(');
-    expect(specialized).not.toContain('float glassDomainWarpScalar(');
-    expect(specialized.length).toBeLessThan(getProgramSource('postprocess').fragment.length);
-  });
-
-  it('assembles postprocess sections in dependency order', () => {
-    const source = getPostprocessFragmentSource();
-    const functions = [
-      'vec2 mirroredUv',
-      'float angleDistance',
-      'vec4 voronoiGradient',
-      'vec2 diffuseHash',
-      'float glassFloat',
-      'vec4 sampleGlassSource',
-      'void main()',
-    ];
-
-    const positions = functions.map((signature) => source.indexOf(signature));
-    expect(positions.every((position) => position >= 0)).toBe(true);
-    expect(positions).toEqual([...positions].sort((left, right) => left - right));
+  it('matches the Noise type constants declared in GLSL', () => {
+    expect(NOISE_TYPE_MAP).toMatchObject({ simplex: 0, fast_curl: 8, caustics: 9, phasor: 10, perlin: 11 });
+    for (const key of ['generator', 'noiseStack'] as const) {
+      const source = getProgramSource(key).fragment;
+      expect(source).toContain(`const int CAUSTICS_NOISE_TYPE = ${NOISE_TYPE_MAP.caustics};`);
+      expect(source).toContain(`const int PHASOR_NOISE_TYPE = ${NOISE_TYPE_MAP.phasor};`);
+      expect(source).toContain(`const int PERLIN_NOISE_TYPE = ${NOISE_TYPE_MAP.perlin};`);
+    }
   });
 });

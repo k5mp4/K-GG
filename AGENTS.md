@@ -38,7 +38,7 @@ Merge Gate、Release Gate、Observationを分離する。変更範囲に応じ�
 ```sh
 npm run change:check
 npm run check:merge
-npm run check:render     # Shader / WebGL / Render Plan変更時
+npm run check:render     # Shader / WebGL変更時（全programをWebGL2で実コンパイル）
 npm run check:native     # src-tauri / Rust変更時
 npm run release:check    # version / updater設定
 npm run change:finalize <CHANGE-ID>

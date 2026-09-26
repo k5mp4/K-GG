@@ -37,7 +37,7 @@ npm run verify:windows
 現状のリポジトリには`main`のbranch protection/rulesetがなく、merged branch自動削除も無効です。少人数開発の最小設定として、管理者が次を検討します。
 
 - `main`へのPull Request必須
-- required status checksに`Determine validation scope`と`fast-check`を登録し、変更時の`render-check`/`native-check`もrequired checkとして扱えることを確認
+- required status checksに`Determine validation scope`と`fast-check`を登録し、変更時の`e2e-check`/`native-check`もrequired checkとして扱えることを確認
 - force push禁止
 - stale approvalの扱いを明示
 - merged branch自動削除を有効化

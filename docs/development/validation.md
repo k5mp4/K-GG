@@ -28,13 +28,13 @@ title: ValidationとCI
 | WebGL context loss/restore E2E（Observation） | `npm run check:e2e:lifecycle` |
 | Canvas RGBA capture | `npm run capture:render:rgba` |
 | RGBA再現性 / base-head比較 | `npm run compare:render:rgba` |
-| Shader / Render Plan focused | `npm run check:render` |
+| 全WebGL programの実コンパイル・リンク | `npm run check:render` |
 | Tauri / Rust（Figma Connectorのビルドを含む） | `npm run check:native` |
 | 実FFmpeg / ffprobe smoke | `npm run check:ffmpeg` |
 | Release設定 | `npm run release:check` または `npm run check:release` |
 | Change Capsule | `npm run change:check` |
 
-`check:fast`にはfrontendのunit/component testが含まれます。描画変更では`check:render`を追加し、Tauri/Rust変更では`check:native`を追加します。`npm run verify`は互換性のために、release設定・fast・nativeをまとめて実行する入口として残します。
+`check:fast`にはfrontendのunit/component testが含まれます。描画変更では`check:render`を追加し、全WebGL programをPlaywright ChromiumのWebGL2（SwiftShader）で実際にコンパイル・リンクします。GLSLの構文・宣言・`#if`境界の誤りはここで検出し、unit testではソース文字列の一致を確認しません。Tauri/Rust変更では`check:native`を追加します。`npm run verify`は互換性のために、release設定・fast・nativeをまとめて実行する入口として残します。
 
 `check:e2e`はBrowser Canvas/Exportを必要とする変更向けの独立した追加Merge Gateです。`check:fast`/`check:merge`からは自動連鎖させず、`changes` jobが対象パスを検出した場合にCIの条件付きjobとして実行します。
 
@@ -66,7 +66,7 @@ Fast checkは全PRで実行します。次の変更がある場合だけ追加jo
 
 | 変更パス | 追加検証 |
 | --- | --- |
-| `src/shaders/**`、`src/lib/webgl*`、`src/lib/effect*`、`src/lib/render*`、`src/lib/export*` | render-check |
+| `src/shaders/**`、`src/lib/webgl*`、`src/lib/effect*`、`src/lib/render*`、`src/lib/export*` | e2e-check（全WebGL programのコンパイルE2Eを含む） |
 | `src-tauri/**`、`Cargo.toml`、`Cargo.lock`、Tauri設定 | native-check。Release時は実FFmpeg/Tauri buildをNative Release Gate |
 | `src/App.tsx`、`src/components/**`、`src/features/workspace/**`、`src/adapters/**`、`src/hooks/useWebGL.ts`、Browser E2E、Playwright、render/export/webgl tooling、workflow | e2e-check |
 | `docs/**`、`AGENTS.md`、テンプレート、workflow | fast-check内のdocs check/build。`change:check`も実行 |
