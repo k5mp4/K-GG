@@ -14,8 +14,6 @@ function createSnapshot(): StoreSnapshot {
     stretch: { ...STORE_DEFAULTS.stretch },
     animation: { ...STORE_DEFAULTS.animation },
     normalMap: { ...STORE_DEFAULTS.normalMap },
-    radon: { ...STORE_DEFAULTS.radon },
-    iridescence: { ...STORE_DEFAULTS.iridescence },
     manualDistort: {
       ...STORE_DEFAULTS.manualDistort,
       displacement: [...STORE_DEFAULTS.manualDistort.displacement],
@@ -23,7 +21,6 @@ function createSnapshot(): StoreSnapshot {
     },
     postprocess: { ...STORE_DEFAULTS.postprocess },
     effectPipeline: { ...STORE_DEFAULTS.effectPipeline },
-    matcap: { ...STORE_DEFAULTS.matcap },
     flowGradient: { ...FLOW_GRADIENT_DEFAULTS },
   };
 }

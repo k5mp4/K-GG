@@ -18,8 +18,6 @@ function createGlassState(glassMotion: number): LatestState {
     stretch: { ...STORE_DEFAULTS.stretch },
     normalMap: { ...STORE_DEFAULTS.normalMap },
     coneView: { ...STORE_DEFAULTS.coneView },
-    radon: { ...STORE_DEFAULTS.radon },
-    iridescence: { ...STORE_DEFAULTS.iridescence },
     manualDistort: { ...STORE_DEFAULTS.manualDistort },
     postprocess: {
       ...STORE_DEFAULTS.postprocess,
@@ -36,7 +34,6 @@ function createGlassState(glassMotion: number): LatestState {
         { enabled: true },
       ),
     },
-    matcap: { ...STORE_DEFAULTS.matcap },
     animation: { ...STORE_DEFAULTS.animation, enabled: true },
     keyframeTracks: {},
     width: 1920,

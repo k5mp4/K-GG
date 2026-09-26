@@ -3,13 +3,10 @@ import { stripSlitPhaseMotionFields } from '../types/distortion';
 import type {
   DiffuseConfig,
   EffectPipelineConfig,
-  IridescenceConfig,
   ManualDistortConfig,
-  MatcapConfig,
   NoiseDistortionConfig,
   NormalMapConfig,
   PostprocessConfig,
-  RadonConfig,
   SlitScanConfig,
   StretchConfig,
 } from '../types/distortion';
@@ -46,14 +43,11 @@ export type StoreSnapshot = {
   seamless?: SeamlessConfig;
   flowGradient?: FlowGradientConfig;
   videoMotion?: VideoMotionConfig;
-  radon: RadonConfig;
-  iridescence?: IridescenceConfig;
   manualDistort?: ManualDistortConfig;
   postprocess?: Partial<PostprocessConfig>;
   /** Omitted by presets saved before SPEC-012; those load through Legacy v1. */
   effectPipeline?: EffectPipelineConfig;
   postprocessDistort?: Partial<PostprocessConfig>; // Backward compatibility for older preset files.
-  matcap?: MatcapConfig;
   keyframeTracks?: Record<string, PropertyTrack>;
   selectedStops?: number[];
   colorPalettes?: UserColorPalette[];
@@ -102,11 +96,21 @@ export type Preset = {
   thumbnail?: string;
 };
 
+/** State groups of removed effects (Radon, Iridescence, Matcap) that older preset files may still carry. */
+const REMOVED_STATE_KEYS: ReadonlySet<string> = new Set(['radon', 'iridescence', 'matcap']);
+
+function withoutRemovedStateKeys(state: StoreSnapshot): StoreSnapshot {
+  return Object.fromEntries(
+    Object.entries(state).filter(([key]) => !REMOVED_STATE_KEYS.has(key)),
+  ) as StoreSnapshot;
+}
+
 export function makePreset(
   name: string,
-  state: StoreSnapshot,
+  sourceState: StoreSnapshot,
   metadata: { folderId?: string | null; order?: number; thumbnail?: string } = {},
 ): Preset {
+  const state = withoutRemovedStateKeys(sourceState);
   const diffuse = {
     ...state.diffuse,
     luminanceBezier: resolveDiffuseBezier(state.diffuse.luminanceBezier, state.diffuse.luminanceCurve),

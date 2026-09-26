@@ -19,7 +19,6 @@
   uniform vec2 u_meshLeftCp0;
   uniform vec2 u_meshLeftCp1;
   uniform vec4 u_meshColorPositions;
-  uniform vec2 u_gradDir; // 正規化グラデーション方向（ベジェワープ・Radon用）
 
   uniform bool u_noiseEnabled;
   uniform int u_noiseType;
@@ -95,31 +94,12 @@
   uniform bool u_slitNoiseAfter; // false=Slit -> Noise, true=Noise -> Slit
   uniform bool u_slitPixelPerfect; // true=スリット位置・サンプル移動をキャンバス1px単位に丸める
 
-  uniform bool u_radonEnabled;
-  uniform float u_radonStrength;
-  uniform float u_radonFreq;
-  uniform float u_radonRadius;
-  uniform float u_radonAngle;
-  uniform float u_radonBlur;
-  uniform float u_radonEvolution;
-  uniform float u_radonSpeed;
-
-  // Fluid Warp
-  uniform bool u_iridEnabled;
-  uniform float u_iridAngle;
-  uniform float u_iridSpeed;
-  uniform float u_iridFreq;
-  uniform float u_iridStrength;
-
   // Manual Distort
   uniform bool u_manualDistortEnabled;
   uniform sampler2D u_manualDistortMap;
   uniform float u_manualDistortMaxDisplacement;
   uniform float u_manualDistortSmoothStrength;
   uniform float u_manualDistortSmoothRadius;
-
-  // Matcap
-  uniform bool u_matcapEnabled;
 
   // タイルレンダリング用: タイル単位で描画する際、gl_FragCoord に加算して
   // u_resolution（最終出力サイズ）空間でのグローバル座標を得る。
@@ -748,25 +728,6 @@
       uv += distortOffset;
     }
 
-    // Fluid Warp UV Warp (Early) - 画像全体を歪ませる。
-    // Bootstrap は重い fbm 群を含めないため、完全 generator が準備できる
-    // まで旧 Iridescence の分岐もコンパイル対象から外す。
-#if !defined(KGG_BOOTSTRAP)
-    if (u_iridEnabled && !rawSourceActive) {
-      float iTime = u_time * 0.1 * u_iridSpeed;
-      vec2 flowDir = vec2(cos(u_iridAngle), sin(u_iridAngle));
-      float f = fbm(uv * u_iridFreq + flowDir * iTime, 3);
-      float warpAmt = 0.15 * u_iridStrength;
-      uv += vec2(cos(f * 6.28), sin(f * 6.28)) * warpAmt;
-    }
-#endif
-
-    if (u_radonEnabled && !rawSourceActive) {
-      float rEvo = u_radonEvolution + u_time * u_radonSpeed;
-      float rTheta = uv.x * u_radonFreq * 3.14159265 + u_radonAngle + rEvo;
-      float rT = (uv.y - 0.5) * u_radonRadius;
-      uv = mix(uv, vec2(0.5) + rT * vec2(cos(rTheta), sin(rTheta)), u_radonStrength);
-    }
     // ── Slit scan (新動作: Noise 前) ──────────────────────────────────────────
     // u_slitNoiseAfter=false のとき: スリット UV シフトを先に行い、
     // 各スリット内に一貫したノイズ質感が乗るようにする。
@@ -946,30 +907,6 @@
     }
     vec3 color = rampColor.rgb;
     float rampAlpha = rampColor.a;
-    if (u_radonEnabled && !u_imageGradientEnabled) {
-      float radonEvo = u_radonEvolution + u_time * u_radonSpeed;
-      vec2 rv = globalCoord / u_resolution;
-      float radonTheta = rv.x * u_radonFreq * 3.14159265 + u_radonAngle + radonEvo;
-      float radonT = (rv.y - 0.5) * u_radonRadius;
-      vec2 perpDir = vec2(cos(radonTheta), sin(radonTheta));
-      vec2 lineDir = vec2(-sin(radonTheta), cos(radonTheta));
-      vec2 foot = vec2(0.5) + radonT * perpDir;
-      vec2 gradDir = u_gradDir;
-      vec4 lineColor = vec4(0.0);
-      float nS = 16.0;
-      for (int ri = 0; ri < 16; ri++) {
-        float rs = (float(ri) / (nS - 1.0) - 0.5) * u_radonBlur;
-        vec2 sp = foot + rs * lineDir;
-        float gt = applyRampRepeatT(dot(sp - 0.5, gradDir) + 0.5);
-        vec4 sc = meshGradient
-          ? sampleMeshGradient(sp)
-          : texture2D(u_gradientRamp, vec2(gt, 0.5));
-        lineColor += sc;
-      }
-      lineColor /= nS;
-      color = mix(color, lineColor.rgb, u_radonStrength);
-      rampAlpha = mix(rampAlpha, lineColor.a, u_radonStrength);
-    }
     if (usePatternDither) {
       float paletteT = meshGradient
         ? dot(clamp(color, 0.0, 1.0), vec3(0.299, 0.587, 0.114))
@@ -983,13 +920,5 @@
     }
 
     gl_FragColor = vec4(color, useCellPattern ? 1.0 : rampAlpha * sourceAlpha);
-
-    // Matcap: 円形アルファマスク
-    if (u_matcapEnabled) {
-      vec2 centered = globalCoord / u_resolution * 2.0 - 1.0;
-      float dist = length(centered);
-      float alpha = 1.0 - smoothstep(0.97, 1.0, dist);
-      gl_FragColor = vec4(gl_FragColor.rgb * alpha, gl_FragColor.a * alpha);
-    }
     gl_FragColor = applyImageMask(gl_FragColor, globalCoord);
   }

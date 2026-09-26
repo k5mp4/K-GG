@@ -7,12 +7,10 @@ import { debounce } from './debounce';
 type StoreState = ReturnType<typeof useGradientStore.getState>;
 type HistorySnapshot = Omit<
   PresetStoreSnapshot,
-  'iridescence' | 'manualDistort' | 'postprocess' | 'matcap' | 'keyframeTracks' | 'selectedStops'
+  'manualDistort' | 'postprocess' | 'keyframeTracks' | 'selectedStops'
 > & {
-  iridescence: StoreState['iridescence'];
   manualDistort: StoreState['manualDistort'];
   postprocess: StoreState['postprocess'];
-  matcap: StoreState['matcap'];
   keyframeTracks: StoreState['keyframeTracks'];
   selectedStops: StoreState['selectedStops'];
 };
@@ -27,11 +25,8 @@ function extractSnapshot(s: StoreState): HistorySnapshot {
     animation: s.animation,
     normalMap: s.normalMap,
     seamless: s.seamless,
-    radon: s.radon,
-    iridescence: s.iridescence,
     manualDistort: s.manualDistort,
     postprocess: s.postprocess,
-    matcap: s.matcap,
     keyframeTracks: s.keyframeTracks,
     selectedStops: s.selectedStops, // 追加
   };
@@ -68,11 +63,8 @@ class HistoryManager {
         state.animation !== prev.animation ||
         state.normalMap !== prev.normalMap ||
         state.seamless !== prev.seamless ||
-        state.radon !== prev.radon ||
-        state.iridescence !== prev.iridescence ||
         state.manualDistort !== prev.manualDistort ||
         state.postprocess !== prev.postprocess ||
-        state.matcap !== prev.matcap ||
         state.keyframeTracks !== prev.keyframeTracks ||
         state.selectedStops !== prev.selectedStops; // 追加
 
@@ -96,11 +88,8 @@ class HistoryManager {
       animation: snap.animation,
       normalMap: snap.normalMap,
       seamless: snap.seamless ?? useGradientStore.getState().seamless,
-      radon: snap.radon,
-      iridescence: snap.iridescence ?? useGradientStore.getState().iridescence,
       manualDistort: snap.manualDistort ?? useGradientStore.getState().manualDistort,
       postprocess: snap.postprocess ?? useGradientStore.getState().postprocess,
-      matcap: snap.matcap ?? useGradientStore.getState().matcap,
       keyframeTracks: snap.keyframeTracks ?? useGradientStore.getState().keyframeTracks,
       selectedStops: (snap as any).selectedStops ?? [], // 追加
     });

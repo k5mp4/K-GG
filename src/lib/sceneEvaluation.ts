@@ -1,9 +1,7 @@
 import type { LatestState } from '../types/latestState';
 import type {
   DiffuseConfig,
-  IridescenceConfig,
   PostprocessConfig,
-  RadonConfig,
   SlitScanConfig,
   StretchConfig,
   NoiseDistortionConfig,
@@ -31,8 +29,6 @@ export type EvaluatedScene = {
   stretch: StretchConfig;
   normalMap: NormalMapConfig;
   clothGradient: ClothGradientConfig;
-  radon: RadonConfig;
-  iridescence: IridescenceConfig;
   postprocess: PostprocessConfig;
   renderTime: number;
   /** Cloth Gradient 専用の時間。アニメーション有効時のみ進む秒単位の値。 */
@@ -274,8 +270,6 @@ function propertyOwnerEnabled(state: LatestState, propertyId: string): boolean {
   if (propertyId.startsWith('diffuse.')) return state.diffuse.enabled;
   if (propertyId.startsWith('slitScan.')) return state.slitScan.enabled;
   if (propertyId.startsWith('stretch.')) return state.stretch.enabled;
-  if (propertyId.startsWith('radon.')) return state.radon.enabled;
-  if (propertyId.startsWith('iridescence.')) return state.iridescence.enabled;
   if (propertyId === 'postprocess.__time') {
     return isPostprocessTimeAnimationActive(state.postprocess, state.effectPipeline);
   }
@@ -303,7 +297,7 @@ export function hasActiveAnimation(state: LatestState): boolean {
       && getTrackMode(track) !== 'static'
   ))) return true;
   return (
-    (state.animation.affectNoise && (state.noiseDistortion.enabled || state.radon.enabled || state.iridescence.enabled)) ||
+    (state.animation.affectNoise && state.noiseDistortion.enabled) ||
     (state.slitScan.enabled && hasSlitOwnAnimation(state.slitScan)) ||
     (state.animation.affectSlit && state.slitScan.enabled) ||
     (state.animation.affectStretch && state.stretch.enabled) ||
@@ -320,8 +314,6 @@ export function evaluateSceneAtTime(state: LatestState, normalizedTime: number):
   const tracks = state.keyframeTracks;
 
   const noiseMode = trackMode(state, 'noiseDistortion.evolution', animation.affectNoise && state.noiseDistortion.enabled);
-  const radonMode = trackMode(state, 'radon.evolution', animation.affectNoise && state.radon.enabled);
-  const iridescenceMode = trackMode(state, 'iridescence.__time', animation.affectNoise && state.iridescence.enabled);
   const rawSlitOffsetMode = trackMode(state, 'slitScan.offset', animation.affectSlit && state.slitScan.enabled);
   const slitTrackAnimationActive = rawSlitOffsetMode === 'auto';
   const slitOwnAnimationActive = animation.enabled && hasSlitOwnAnimation(state.slitScan);
@@ -336,30 +328,18 @@ export function evaluateSceneAtTime(state: LatestState, normalizedTime: number):
 
   const anySharedAuto = (
     noiseMode === 'auto' ||
-    radonMode === 'auto' ||
-    iridescenceMode === 'auto' ||
     postprocessMode === 'auto'
   );
-  const iridescenceKeyTime = keyedTrackValue(state, 'iridescence.__time', time);
   const postprocessKeyTime = keyedTrackValue(state, 'postprocess.__time', time);
-  const keyedSharedTime = postprocessKeyTime ?? iridescenceKeyTime;
   const renderTime = animation.enabled
     ? anySharedAuto
       ? autoTime * animation.speed * animation.duration
-      : (keyedSharedTime ?? 0) * animation.duration
+      : (postprocessKeyTime ?? 0) * animation.duration
     : 0;
 
   let noiseDistortion = applyObjectTracks(
     'noiseDistortion',
     { ...state.noiseDistortion },
-    tracks,
-    time,
-    animation.previewLoop ?? true,
-  );
-  let radon = applyObjectTracks('radon', { ...state.radon }, tracks, time, animation.previewLoop ?? true);
-  let iridescence = applyObjectTracks(
-    'iridescence',
-    { ...state.iridescence },
     tracks,
     time,
     animation.previewLoop ?? true,
@@ -383,16 +363,6 @@ export function evaluateSceneAtTime(state: LatestState, normalizedTime: number):
       evolution: noiseDistortion.evolution - renderTime,
       curlSpeed: 0,
     };
-  }
-  if (radonMode !== 'auto') radon = { ...radon, speed: 0 };
-  if (iridescenceMode === 'keys' && iridescenceKeyTime !== null) {
-    const desiredTime = iridescenceKeyTime * animation.duration;
-    iridescence = {
-      ...iridescence,
-      speed: Math.abs(renderTime) < 1e-6 ? 0 : iridescence.speed * desiredTime / renderTime,
-    };
-  } else if (iridescenceMode !== 'auto') {
-    iridescence = { ...iridescence, speed: 0 };
   }
 
   let slitScan = applyObjectTracks(
@@ -447,8 +417,6 @@ export function evaluateSceneAtTime(state: LatestState, normalizedTime: number):
     stretch,
     normalMap: state.normalMap,
     clothGradient,
-    radon,
-    iridescence,
     postprocess,
     renderTime,
     clothTime: animation.enabled

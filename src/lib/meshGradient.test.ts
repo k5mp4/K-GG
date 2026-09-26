@@ -21,12 +21,9 @@ function snapshot(): StoreSnapshot {
     stretch: { ...STORE_DEFAULTS.stretch },
     animation: { ...STORE_DEFAULTS.animation },
     normalMap: { ...STORE_DEFAULTS.normalMap },
-    radon: { ...STORE_DEFAULTS.radon },
-    iridescence: { ...STORE_DEFAULTS.iridescence },
     manualDistort: { ...STORE_DEFAULTS.manualDistort, displacement: [...STORE_DEFAULTS.manualDistort.displacement], smoothMask: [...STORE_DEFAULTS.manualDistort.smoothMask] },
     postprocess: { ...STORE_DEFAULTS.postprocess },
     effectPipeline: { ...STORE_DEFAULTS.effectPipeline, effectStack: STORE_DEFAULTS.effectPipeline.effectStack.map(layer => ({ ...layer })) },
-    matcap: { ...STORE_DEFAULTS.matcap },
     keyframeTracks: {},
   };
 }
@@ -86,11 +83,9 @@ describe('Mesh Gradation preset and preview', () => {
       coneView: source.coneView ?? STORE_DEFAULTS.coneView,
       imageGradient: source.imageGradient ?? STORE_DEFAULTS.imageGradient,
       stretch: source.stretch ?? STORE_DEFAULTS.stretch,
-      iridescence: source.iridescence ?? STORE_DEFAULTS.iridescence,
       manualDistort: source.manualDistort ?? STORE_DEFAULTS.manualDistort,
       postprocess: normalizePostprocessConfig(source.postprocess),
       effectPipeline: source.effectPipeline ?? STORE_DEFAULTS.effectPipeline,
-      matcap: source.matcap ?? STORE_DEFAULTS.matcap,
       animation: { ...source.animation, enabled: true, previewLoop: false },
       keyframeTracks: {
         'mesh.corner.0.x': {
@@ -120,11 +115,9 @@ describe('Mesh Gradation preset and preview', () => {
       coneView: source.coneView ?? STORE_DEFAULTS.coneView,
       imageGradient: source.imageGradient ?? STORE_DEFAULTS.imageGradient,
       stretch: source.stretch ?? STORE_DEFAULTS.stretch,
-      iridescence: source.iridescence ?? STORE_DEFAULTS.iridescence,
       manualDistort: source.manualDistort ?? STORE_DEFAULTS.manualDistort,
       postprocess: normalizePostprocessConfig(source.postprocess),
       effectPipeline: source.effectPipeline ?? STORE_DEFAULTS.effectPipeline,
-      matcap: source.matcap ?? STORE_DEFAULTS.matcap,
       animation: { ...source.animation, enabled: true, previewLoop: false },
       keyframeTracks: {
         'mesh.point.0.x': {
@@ -160,11 +153,9 @@ describe('Mesh Gradation preset and preview', () => {
       coneView: source.coneView ?? STORE_DEFAULTS.coneView,
       imageGradient: source.imageGradient ?? STORE_DEFAULTS.imageGradient,
       stretch: source.stretch ?? STORE_DEFAULTS.stretch,
-      iridescence: source.iridescence ?? STORE_DEFAULTS.iridescence,
       manualDistort: source.manualDistort ?? STORE_DEFAULTS.manualDistort,
       postprocess: normalizePostprocessConfig(source.postprocess),
       effectPipeline: source.effectPipeline ?? STORE_DEFAULTS.effectPipeline,
-      matcap: source.matcap ?? STORE_DEFAULTS.matcap,
       animation: { ...source.animation, enabled: true, previewLoop: false },
       keyframeTracks: {
         'mesh.point.1.r': {
@@ -195,11 +186,9 @@ describe('Mesh Gradation preset and preview', () => {
       coneView: source.coneView ?? STORE_DEFAULTS.coneView,
       imageGradient: source.imageGradient ?? STORE_DEFAULTS.imageGradient,
       stretch: source.stretch ?? STORE_DEFAULTS.stretch,
-      iridescence: source.iridescence ?? STORE_DEFAULTS.iridescence,
       manualDistort: source.manualDistort ?? STORE_DEFAULTS.manualDistort,
       postprocess: normalizePostprocessConfig(source.postprocess),
       effectPipeline: source.effectPipeline ?? STORE_DEFAULTS.effectPipeline,
-      matcap: source.matcap ?? STORE_DEFAULTS.matcap,
       animation: { ...source.animation, enabled: true, previewLoop: false },
       keyframeTracks: {
         'mesh.point.1.r': {
@@ -232,11 +221,9 @@ describe('Mesh Gradation preset and preview', () => {
       coneView: source.coneView ?? STORE_DEFAULTS.coneView,
       imageGradient: source.imageGradient ?? STORE_DEFAULTS.imageGradient,
       stretch: source.stretch ?? STORE_DEFAULTS.stretch,
-      iridescence: source.iridescence ?? STORE_DEFAULTS.iridescence,
       manualDistort: source.manualDistort ?? STORE_DEFAULTS.manualDistort,
       postprocess: normalizePostprocessConfig(source.postprocess),
       effectPipeline: source.effectPipeline ?? STORE_DEFAULTS.effectPipeline,
-      matcap: source.matcap ?? STORE_DEFAULTS.matcap,
       animation: { ...source.animation, enabled: true, previewLoop: false },
       keyframeTracks: {
         'bezierControl.0.x': {

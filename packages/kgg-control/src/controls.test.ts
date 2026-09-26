@@ -8,7 +8,7 @@ import {
 
 describe('K-GG semantic control registry', () => {
   it('advertises every renderer group and the semantic mutation operations', () => {
-    expect(CONTROL_GROUP_DEFINITIONS).toHaveLength(21);
+    expect(CONTROL_GROUP_DEFINITIONS).toHaveLength(18);
     expect(getControlOperationDefinition('set_group')).toMatchObject({ scenarioSafe: true, requiresNativeCapability: false });
     expect(getControlOperationDefinition('delete_preset')).toMatchObject({ requiresApproval: true });
     expect(getControlOperationDefinition('export_preset_package')).toMatchObject({ requiresNativeCapability: true });

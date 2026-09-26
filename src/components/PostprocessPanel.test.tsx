@@ -5,13 +5,13 @@ import { updateEffectStackLayer } from '../lib/effectPipeline';
 import { useGradientStore } from '../store/gradientStore';
 import { PostprocessPanel } from './PostprocessPanel';
 
-function renderPostprocessPanelWithConeSelected() {
+function renderPostprocessPanelWithLayerSelected(kind: 'cone' | 'stretch') {
   const initialState = useGradientStore.getInitialState();
   const previousEffectPipeline = initialState.effectPipeline;
   initialState.effectPipeline = {
     ...previousEffectPipeline,
-    selectedKind: 'cone',
-    effectStack: updateEffectStackLayer(previousEffectPipeline.effectStack, 'cone', { enabled: true }),
+    selectedKind: kind,
+    effectStack: updateEffectStackLayer(previousEffectPipeline.effectStack, kind, { enabled: true }),
   };
   try {
     return renderToStaticMarkup(
@@ -66,13 +66,27 @@ describe('PostprocessPanel Video Motion integration', () => {
   });
 
   it('keeps the existing Cone controls available in the Postprocess property surface', () => {
-    const markup = renderPostprocessPanelWithConeSelected();
+    const markup = renderPostprocessPanelWithLayerSelected('cone');
 
     expect(markup).toContain('data-cone-settings="shown"');
     expect(markup).toContain('data-cone-view-panel');
     expect(markup).toContain('Mapping');
     expect(markup).toContain('Flow Cycles');
     expect(markup).not.toContain('data-postprocess-master-toggle');
+  });
+
+  it('shows the Stretch parameters when Stretch is selected in the Effect Stack', () => {
+    const markup = renderPostprocessPanelWithLayerSelected('stretch');
+
+    expect(markup).toContain('data-stretch-settings');
+    for (const label of ['Stretch', 'Scan Position', 'Band Height', 'Height Variance', 'Variation', 'Seed', 'Glow Intensity']) {
+      expect(markup).toContain(label);
+    }
+    expect(markup).toContain('Edit Layer');
+    // Stretch is a Postprocess layer: the Effect Stack owns its ON/OFF, so the
+    // module shows the Postprocess master switch and no per-layer switch.
+    expect(markup).toContain('data-postprocess-master-toggle');
+    expect(markup.match(/role="switch"/g) ?? []).toHaveLength(2); // master + Glow
   });
 
   it('exposes Glass IOR and refinable Chromatic Steps in Optics', () => {

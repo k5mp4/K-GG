@@ -32,7 +32,7 @@ export function useCanvasSize(defaultW = DEFAULT_CANVAS_SIZE.width, defaultH = D
   useEffect(() => { canvasHRef.current = canvasH; }, [canvasH]);
   useEffect(() => { lockAspectRef.current = lockAspect; }, [lockAspect]);
 
-  // 外部から canvasW/H が変わったとき（プリセットロード・ボタン・matcap切替など）にドラフトも同期
+  // 外部から canvasW/H が変わったとき（プリセットロード・ボタンなど）にドラフトも同期
   useEffect(() => { setWDraft(String(canvasW)); }, [canvasW]);
   useEffect(() => { setHDraft(String(canvasH)); }, [canvasH]);
 

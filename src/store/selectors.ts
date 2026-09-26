@@ -37,12 +37,9 @@ export const selectDocumentState = (state: GradientStore): DocumentState => ({
   seamless: state.seamless,
   flowGradient: state.flowGradient,
   videoMotion: state.videoMotion,
-  radon: state.radon,
-  iridescence: state.iridescence,
   manualDistort: state.manualDistort,
   postprocess: state.postprocess,
   effectPipeline: state.effectPipeline,
-  matcap: state.matcap,
   keyframeTracks: state.keyframeTracks,
 });
 

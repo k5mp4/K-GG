@@ -122,7 +122,6 @@ describe('Preset Roundtrip', () => {
       slitScan: {} as unknown as StoreSnapshot['slitScan'],
       animation: {} as unknown as StoreSnapshot['animation'],
       normalMap: {} as unknown as StoreSnapshot['normalMap'],
-      radon: {} as unknown as StoreSnapshot['radon'],
       clothGradient: {
         enabled: true,
         amplitude1: 0.8,
