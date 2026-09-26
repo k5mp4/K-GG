@@ -190,7 +190,7 @@ describe('effectPipeline', () => {
       expect(plan.programs.stackCore).toBe(true);
     });
 
-    it('does not fuse a non-adjacent Noise and Diffuse pair', () => {
+    it('lets the analytic Generator compose a later Diffuse with a leading Noise', () => {
       const pipeline = createDefaultEffectPipeline();
       const reordered = [
         { kind: 'noise' as const, enabled: true },
@@ -199,12 +199,70 @@ describe('effectPipeline', () => {
       ];
       const plan = getV2RenderPlan({ ...pipeline, effectStack: reordered }, analyticPlanOptions());
 
+      expect(plan.analyticPrefix).toEqual({
+        enabled: true,
+        consumedLayers: ['noise', 'diffuse'],
+        firstTextureLayerIndex: 1,
+        reason: 'enabled',
+      });
+      expect(plan.noiseDiffuseComposition.reason).toBe('analytic-prefix');
+      expect(plan.programs.noiseDiffuseStack).toBe(false);
+      expect(plan.programs.noiseStack).toBe(false);
+    });
+
+    it('plans one-pass Noise + Diffuse composition across intermediate texture layers', () => {
+      const pipeline = createDefaultEffectPipeline();
+      const reordered = [
+        { kind: 'glass' as const, enabled: true },
+        { kind: 'noise' as const, enabled: true },
+        { kind: 'mirror' as const, enabled: true },
+        { kind: 'stretch' as const, enabled: true },
+        { kind: 'diffuse' as const, enabled: true },
+      ];
+      const plan = getV2RenderPlan({ ...pipeline, effectStack: reordered }, analyticPlanOptions());
+
+      expect(plan.noiseDiffuseComposition).toEqual({
+        enabled: true,
+        noiseLayerIndex: 1,
+        diffuseLayerIndex: 4,
+        reason: 'enabled',
+      });
+      expect(plan.programs.noiseDiffuseStack).toBe(true);
+      expect(plan.programs.noiseStack).toBe(false);
+    });
+
+    it('does not compose Diffuse that precedes Noise', () => {
+      const pipeline = createDefaultEffectPipeline();
+      const reordered = [
+        { kind: 'glass' as const, enabled: true },
+        { kind: 'diffuse' as const, enabled: true },
+        { kind: 'mirror' as const, enabled: true },
+        { kind: 'noise' as const, enabled: true },
+      ];
+      const plan = getV2RenderPlan({ ...pipeline, effectStack: reordered }, analyticPlanOptions());
+
       expect(plan.noiseDiffuseComposition).toEqual({
         enabled: false,
-        noiseLayerIndex: 0,
-        diffuseLayerIndex: 2,
-        reason: 'not-adjacent',
+        noiseLayerIndex: 3,
+        diffuseLayerIndex: 1,
+        reason: 'diffuse-before-noise',
       });
+      expect(plan.programs.noiseDiffuseStack).toBe(false);
+      expect(plan.programs.noiseStack).toBe(true);
+    });
+
+    it('keeps a later Diffuse before Slit out of the Noise composition', () => {
+      const pipeline = createDefaultEffectPipeline();
+      const reordered = [
+        { kind: 'noise' as const, enabled: true },
+        { kind: 'glass' as const, enabled: true },
+        { kind: 'diffuse' as const, enabled: true },
+        { kind: 'slit' as const, enabled: true },
+      ];
+      const plan = getV2RenderPlan({ ...pipeline, effectStack: reordered }, analyticPlanOptions());
+
+      expect(plan.analyticPrefix.consumedLayers).toEqual(['noise']);
+      expect(plan.noiseDiffuseComposition.reason).toBe('diffuse-before-slit');
       expect(plan.programs.noiseDiffuseStack).toBe(false);
     });
 
@@ -298,7 +356,7 @@ describe('effectPipeline', () => {
 
     it.each([
       ['Diffuse → Glass', ['diffuse', 'glass'], ['diffuse'], 1],
-      ['Noise → Glass → Diffuse', ['noise', 'glass', 'diffuse'], ['noise'], 1],
+      ['Noise → Glass → Diffuse', ['noise', 'glass', 'diffuse'], ['noise', 'diffuse'], 1],
       ['Glass → Noise → Diffuse', ['glass', 'noise', 'diffuse'], [], 0],
     ] as const)('selects the expected prefix boundary for %s', (_label, kinds, consumedLayers, firstTextureLayerIndex) => {
       const pipeline = createDefaultEffectPipeline();
