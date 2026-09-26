@@ -39,6 +39,12 @@ body {
   background-attachment: fixed;
 }
 
+/* Native tool windows (e.g. the Effect Stack) can be narrower than the main
+   window's 320px minimum; keep their content inside the window. */
+html[data-tool-window] body {
+  min-width: 0;
+}
+
 input,
 textarea,
 [contenteditable="true"] {

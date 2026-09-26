@@ -9,8 +9,8 @@ created: 2026-09-26
 updated: 2026-09-26
 current_specs: [CURRENT-UI-CONTROLS]
 related_adrs: [ADR-20260926-native-secondary-windows]
-related_code: [src/components/GradientRamp.tsx, src/adapters/tauri/gradientRampEditorWindow.ts, src/features/gradientRampEditor/GradientRampEditorWindowApp.tsx, src/features/gradientRampEditor/useGradientRampEditorHost.ts, src/features/workspace/useWorkspaceController.ts, src/main.tsx, src-tauri/src/gradient_ramp_editor.rs, src-tauri/src/lib.rs, src-tauri/capabilities/gradient-ramp-editor.json]
-related_tests: [src/adapters/tauri/gradientRampEditorWindow.test.ts]
+related_code: [src/components/GradientRamp.tsx, src/adapters/tauri/gradientRampEditorWindow.ts, src/features/gradientRampEditor/GradientRampEditorWindowApp.tsx, src/features/gradientRampEditor/useGradientRampEditorHost.ts, src/features/workspace/useWorkspaceController.ts, src/main.tsx, src-tauri/src/tool_windows.rs, src-tauri/src/lib.rs, src-tauri/capabilities/tool-windows.json, src/adapters/tauri/toolWindows.ts]
+related_tests: [src/adapters/tauri/toolWindows.test.ts]
 human_review: required
 ---
 

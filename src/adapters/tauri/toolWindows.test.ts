@@ -2,50 +2,52 @@ import { describe, expect, it, vi } from 'vitest';
 import { create } from 'zustand';
 import {
   createSyncChannel,
-  pickChangedSyncSlice,
-  sanitizeSyncPatch,
-  type GradientRampSyncMessage,
-} from './gradientRampEditorWindow';
-import type { GradientStore } from '../../store/gradientStore';
+  pickChangedSlice,
+  sanitizePatch,
+  type SyncMessage,
+} from './toolWindows';
 
-type TestState = Pick<GradientStore, 'gradient' | 'keyframeTracks' | 'selectedStops' | 'selectedGradientAnchors' | 'currentTime'> & {
+type TestState = {
+  gradient: { stops: unknown[] };
+  selectedStops: number[];
+  currentTime: number;
   presetName: string;
 };
 
+const KEYS = ['gradient', 'selectedStops', 'currentTime'] as const;
+type Key = typeof KEYS[number];
+
 function createTestStore() {
   return create<TestState>(() => ({
-    gradient: { stops: [] } as unknown as GradientStore['gradient'],
-    keyframeTracks: {},
+    gradient: { stops: [] },
     selectedStops: [],
-    selectedGradientAnchors: [],
     currentTime: 0,
     presetName: 'a',
   }));
 }
 
-type SyncStoreArg = Parameters<typeof createSyncChannel>[0];
-
-describe('gradient ramp editor window sync', () => {
+describe('tool window store sync', () => {
   it('picks only synced keys whose references changed', () => {
-    const prev = { gradient: {}, selectedStops: [], currentTime: 0, presetName: 'a' } as unknown as GradientStore;
-    const next = { ...prev, selectedStops: [1], presetName: 'b' } as unknown as GradientStore;
-    expect(pickChangedSyncSlice(next, prev)).toEqual({ selectedStops: [1] });
-    expect(pickChangedSyncSlice(prev, prev)).toBeNull();
+    const prev: TestState = { gradient: { stops: [] }, selectedStops: [], currentTime: 0, presetName: 'a' };
+    const next: TestState = { ...prev, selectedStops: [1], presetName: 'b' };
+    expect(pickChangedSlice(next, prev, KEYS)).toEqual({ selectedStops: [1] });
+    expect(pickChangedSlice(prev, prev, KEYS)).toBeNull();
   });
 
   it('drops unknown keys and non-object payloads', () => {
-    expect(sanitizeSyncPatch({ selectedStops: [2], presetName: 'x' })).toEqual({ selectedStops: [2] });
-    expect(sanitizeSyncPatch({ presetName: 'x' })).toBeNull();
-    expect(sanitizeSyncPatch('nope')).toBeNull();
-    expect(sanitizeSyncPatch(null)).toBeNull();
+    expect(sanitizePatch<TestState, Key>({ selectedStops: [2], presetName: 'x' }, KEYS)).toEqual({ selectedStops: [2] });
+    expect(sanitizePatch<TestState, Key>({ presetName: 'x' }, KEYS)).toBeNull();
+    expect(sanitizePatch<TestState, Key>('nope', KEYS)).toBeNull();
+    expect(sanitizePatch<TestState, Key>(null, KEYS)).toBeNull();
   });
 
-  function createChannel(options: Parameters<typeof createSyncChannel>[2] = {}) {
+  function createChannel(options: Parameters<typeof createSyncChannel>[3] = {}) {
     const store = createTestStore();
-    const sent: GradientRampSyncMessage[] = [];
+    const sent: SyncMessage<TestState, Key>[] = [];
     const acks: number[] = [];
-    const channel = createSyncChannel(
-      store as unknown as SyncStoreArg,
+    const channel = createSyncChannel<TestState, Key>(
+      store,
+      KEYS,
       { send: message => sent.push(message), ack: seq => acks.push(seq) },
       { afterApply: callback => callback(), ...options },
     );
@@ -115,8 +117,10 @@ describe('gradient ramp editor window sync', () => {
     expect(sent).toEqual([{ seq: 1, patch: { currentTime: 2 } }]);
 
     channel.reset();
-    channel.sendSnapshot({ selectedStops: [0] });
-    expect(sent[1]).toEqual({ seq: 2, patch: { selectedStops: [0] } });
+    store.setState({ selectedStops: [0] }, false);
+    channel.reset();
+    channel.sendSnapshot();
+    expect(sent.at(-1)?.patch).toEqual({ gradient: { stops: [] }, selectedStops: [0], currentTime: 2 });
   });
 
   it('ignores malformed remote messages', () => {

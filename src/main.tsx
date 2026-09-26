@@ -1,34 +1,22 @@
-import { StrictMode, lazy, Suspense } from 'react'
+import { StrictMode, Suspense } from 'react'
 import { createRoot } from 'react-dom/client'
-import { Viewport } from 'tweeq'
 import 'tweeq/style.css'
 import './index.css'
 import { LanguageProvider } from './i18n/LanguageProvider'
 import { SplashScreen } from './features/splash/SplashScreen'
-import { isGradientRampEditorWindow } from './adapters/tauri/gradientRampEditorWindow'
+import { currentToolWindow } from './adapters/tauri/toolWindows'
+import { WindowRoot } from './WindowRoot'
 
-// The Gradient Ramp editor window must not load the renderer and workspace,
-// so each window loads only its own root module.
-const App = lazy(() => import('./App.tsx'))
-const GradientRampEditorWindowApp = lazy(() => import('./features/gradientRampEditor/GradientRampEditorWindowApp').then(m => ({ default: m.GradientRampEditorWindowApp })))
-
-const isEditorWindow = isGradientRampEditorWindow()
+const toolWindow = currentToolWindow()
+if (toolWindow) document.documentElement.dataset.toolWindow = toolWindow
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
     <LanguageProvider>
       <Suspense fallback={null}>
-        {isEditorWindow ? (
-          <Viewport appId="k-gg-gradient-ramp-editor">
-            <GradientRampEditorWindowApp />
-          </Viewport>
-        ) : (
-          <Viewport appId="k-gg">
-            <App />
-          </Viewport>
-        )}
+        <WindowRoot toolWindow={toolWindow} />
       </Suspense>
-      {!isEditorWindow && <SplashScreen />}
+      {!toolWindow && <SplashScreen />}
     </LanguageProvider>
   </StrictMode>,
 )
