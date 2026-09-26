@@ -23,7 +23,7 @@
 
 - Current Spec: <!-- CURRENT-* または「なし / 変更不要」 -->
 - Requirement IDs: <!-- 例: GRAD-* / EFFECT-*。なければ「なし」 -->
-- 関連ADR: <!-- ADR-NNNN または「なし」 -->
+- 関連ADR: <!-- ADR-YYYYMMDD-slug / ADR-NNNN または「なし」 -->
 - Change Capsule: <!-- docs/changes/archive/... / PR内active path / 「なし」 -->
 - 同期メモ: <!-- Current Spec/ADR/利用者文書を更新したか、不要な理由 -->
 

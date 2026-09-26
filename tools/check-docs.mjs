@@ -2,6 +2,7 @@ import { existsSync, readFileSync } from 'node:fs';
 import { readFile, readdir } from 'node:fs/promises';
 import path from 'node:path';
 import process from 'node:process';
+import { validateAdrId, validateChangeId } from './doc-ids.mjs';
 
 const root = process.cwd();
 const docsDir = path.join(root, 'docs');
@@ -185,9 +186,11 @@ function validateLegacySpecifications(specs, adrs, errors) {
       for (const field of ['deciders', 'related_specs', 'supersedes']) requireList(document, field, errors);
     }
 
-    const expectedPattern = document.kind === 'spec' ? /^SPEC-\d{3}$/ : /^ADR-\d{4}$/;
-    if (!expectedPattern.test(document.data.id ?? '')) {
-      errors.push(`${document.relativePath}: invalid ${document.kind} id "${document.data.id}"`);
+    if (document.kind === 'spec') {
+      if (!/^SPEC-\d{3}$/.test(document.data.id ?? '')) errors.push(`${document.relativePath}: invalid spec id "${document.data.id}"`);
+    } else {
+      const idError = validateAdrId(document.data.id, document.name);
+      if (idError) errors.push(`${document.relativePath}: ${idError}`);
     }
     if (ids.has(document.data.id)) {
       errors.push(`${document.relativePath}: duplicate id "${document.data.id}" also used by ${ids.get(document.data.id)}`);
@@ -195,9 +198,8 @@ function validateLegacySpecifications(specs, adrs, errors) {
       ids.set(document.data.id, document.relativePath);
     }
 
-    const expectedFilePrefix = document.kind === 'spec' ? document.data.id : document.data.id?.replace('ADR-', '');
-    if (!document.name.startsWith(expectedFilePrefix ?? '')) {
-      errors.push(`${document.relativePath}: filename must start with "${expectedFilePrefix}"`);
+    if (document.kind === 'spec' && !document.name.startsWith(document.data.id ?? '')) {
+      errors.push(`${document.relativePath}: filename must start with "${document.data.id}"`);
     }
 
     if (document.kind === 'spec') {
@@ -287,7 +289,8 @@ function validateChanges(changes, currentById, adrs, errors) {
     requireFields(proposal, ['type', 'id', 'title', 'status', 'change_kind', 'owners', 'created', 'updated', 'current_specs', 'related_adrs', 'human_review'], errors);
     for (const field of ['owners', 'current_specs', 'related_adrs']) requireList(proposal, field, errors);
     if (change.data.type !== 'change') errors.push(`${file}: type must be change`);
-    if (!/^CHANGE-\d{3}$/.test(change.data.id ?? '')) errors.push(`${file}: invalid change id "${change.data.id}"`);
+    const idError = validateChangeId(change.data.id, change.directory);
+    if (idError) errors.push(`${file}: ${idError}`);
     if (changeById.has(change.data.id)) errors.push(`${file}: duplicate change id "${change.data.id}"`);
     changeById.set(change.data.id, change);
     if (!allowedChangeStatuses.has(change.data.status)) errors.push(`${file}: invalid status "${change.data.status}"`);
@@ -406,27 +409,21 @@ function validateIndexes(currentSpecs, changes, errors) {
     );
   }
 
+  // Change一覧はVitePressのdata loaderがproposal.mdから描画する。
+  // index.mdへ行を持たせないことで、並列PRが同じ表へ追記して衝突するのを避ける。
   for (const bucket of ['active', 'archive']) {
     const indexPath = path.join(changeDir, bucket, 'index.md');
     const index = existsSync(indexPath) ? readFileSync(indexPath, 'utf8') : '';
     if (!index) errors.push(`docs/changes/${bucket}/index.md: index is missing`);
-    for (const change of changes.filter(candidate => candidate.bucket === bucket)) {
-      if (!index.includes(change.directory)) errors.push(`docs/changes/${bucket}/index.md: missing change link for ${change.directory}`);
-    }
-    if (index) {
-      validateIndexEntries(
-        `docs/changes/${bucket}/index.md`,
-        index,
-        changes.filter(candidate => candidate.bucket === bucket).map(change => ({
-          name: 'proposal.md',
-          relativePath: `${change.relativeDirectory}/proposal.md`,
-          data: change.data,
-        })),
-        document => `./${path.basename(path.dirname(document.relativePath))}/proposal`,
-        errors,
-      );
-    }
+    else if (!index.includes(`<ChangeIndex bucket="${bucket}"`)) errors.push(`docs/changes/${bucket}/index.md: must render <ChangeIndex bucket="${bucket}" /> instead of a hand-maintained table`);
+    else if (parseIndexTableRows(index).some(row => /^CHANGE-/.test(row.id))) errors.push(`docs/changes/${bucket}/index.md: remove hand-maintained CHANGE rows; the list is generated at build time`);
   }
+
+  const adrIndexPath = path.join(adrDir, 'index.md');
+  const adrIndex = existsSync(adrIndexPath) ? readFileSync(adrIndexPath, 'utf8') : '';
+  if (!adrIndex) errors.push('docs/adr/index.md: index is missing');
+  else if (!adrIndex.includes('<AdrIndex')) errors.push('docs/adr/index.md: must render <AdrIndex /> instead of a hand-maintained table');
+  else if (parseIndexTableRows(adrIndex).some(row => /^ADR-/.test(row.id))) errors.push('docs/adr/index.md: remove hand-maintained ADR rows; the list is generated at build time');
 }
 
 const legacySpecs = await loadDirectMarkdown(specDir, 'specs', 'spec');

@@ -1,6 +1,6 @@
 ---
 type: change
-id: CHANGE-XXX
+id: CHANGE-YYYYMMDD-slug
 title: 変更の短い名前
 status: draft
 change_kind: F
@@ -14,9 +14,9 @@ related_tests: []
 human_review: required
 ---
 
-# CHANGE-XXX 変更の短い名前
+# 変更の短い名前
 
-このテンプレートはDesigned Change用です。Quick ChangeはPRだけ、Tracked ChangeはIssueとPRだけで開始できるため、必要がない場合はChange Capsuleを作成しません。
+このテンプレートはDesigned Change用です。`npm run change:new -- <slug> --title="変更の短い名前"`で日付+slugのIDとdirectoryを作成します。Quick ChangeはPRだけ、Tracked ChangeはIssueとPRだけで開始できるため、必要がない場合はChange Capsuleを作成しません。
 
 ## 背景・問題
 

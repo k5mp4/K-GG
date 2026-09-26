@@ -74,11 +74,11 @@ CapsuleはDesigned Changeなど複雑な変更の一時的な実装契約です�
 - `tasks.md`: PR checklistと重複しない作業分解が必要な場合
 - `validation.md`: Change固有の判断、Gate、未確認事項を残す場合。CIログの全文転記には使わない
 
-構造とindexは`npm run change:check`で確認し、完了時は次を実行します。
+Capsuleは`npm run change:new -- <slug> --title="..."`で作成します。IDは並列ブランチで衝突しない`CHANGE-YYYYMMDD-slug`です。構造と参照は`npm run change:check`で確認し、完了時は次を実行します。
 
 ```sh
 npm run change:check
-npm run change:finalize CHANGE-###
+npm run change:finalize <CHANGE-ID>
 ```
 
 `change:finalize`はCurrent Specの意味的な内容を生成しません。人間またはAIが同期した後、toolingが参照・構造・リンクを確認してArchiveへ移動します。既存履歴の整理には`--migration --outcome=follow-up`を使い、実装完了と移行を混同しません。

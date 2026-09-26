@@ -47,7 +47,7 @@ Development Request / Issue / PR
 ```sh
 npm run change:check
 npm run check:merge
-npm run change:finalize CHANGE-###
+npm run change:finalize <CHANGE-ID>
 ```
 
 ChangeがないQuick Changeでは`change:finalize`は実行せず、PRに分類、対象外、検証、未確認事項を記載します。Changeがある場合は、Archiveへ移動した後に`npm run change:check -- --require-empty`を実行します。
