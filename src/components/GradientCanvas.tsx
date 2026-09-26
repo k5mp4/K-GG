@@ -45,7 +45,7 @@ export function GradientCanvas({ width = 800, height = 800, animLoopRef, seekVer
     staticRenderSchedulerRef.current = new LatestFrameScheduler();
   }
 
-  const { gradient, noiseDistortion, diffuse, imageGradient, slitScan, stretch, animation, normalMap, radon, iridescence, manualDistort, postprocess, effectPipeline, matcap, keyframeTracks, currentTime, clothGradient, coneView, seamless, flowGradient, videoMotion } = useGradientStore(useShallow(selectRenderState));
+  const { gradient, noiseDistortion, diffuse, imageGradient, slitScan, stretch, animation, normalMap, manualDistort, postprocess, effectPipeline, keyframeTracks, currentTime, clothGradient, coneView, seamless, flowGradient, videoMotion } = useGradientStore(useShallow(selectRenderState));
   const clothGradientForCanvas = disableClothBase
     ? { ...clothGradient, enabled: false }
     : clothGradient;
@@ -112,7 +112,7 @@ export function GradientCanvas({ width = 800, height = 800, animLoopRef, seekVer
 
   // latestRef を毎レンダー更新（ブラウザ描画前に同期更新し、RAFループが即座に最新値を参照できるようにする）
   useLayoutEffect(() => {
-    latestRef.current = { gradient, noiseDistortion, diffuse, imageGradient, slitScan, stretch, normalMap, radon, iridescence, manualDistort, postprocess, effectPipeline, matcap, animation, keyframeTracks, width, height, animDirection: animation.direction, sourceImageCanvas, imageGradientSource, imageMaskSource, imageMaskEnabled, clothGradient: clothGradientForCanvas, coneView, seamless, flowGradient, videoMotion };
+    latestRef.current = { gradient, noiseDistortion, diffuse, imageGradient, slitScan, stretch, normalMap, manualDistort, postprocess, effectPipeline, animation, keyframeTracks, width, height, animDirection: animation.direction, sourceImageCanvas, imageGradientSource, imageMaskSource, imageMaskEnabled, clothGradient: clothGradientForCanvas, coneView, seamless, flowGradient, videoMotion };
   });
 
   // 静止レンダリング（アニメーション停止中の状態変化に反応）
@@ -136,7 +136,7 @@ export function GradientCanvas({ width = 800, height = 800, animLoopRef, seekVer
         publishProcessedCanvasFrame(normalizedTime);
       });
     });
-  }, [gradient, noiseDistortion, diffuse, imageGradient, slitScan, stretch, normalMap, radon, iridescence, manualDistort, postprocess, effectPipeline, clothGradient, coneView, seamless, flowGradient, videoMotion, disableClothBase, width, height, animation.enabled, animation.speed, animation.direction, animation.easing, animation.affectNoise, animation.affectSlit, animation.affectRamp, animation.affectStretch, keyframeTracks, currentTime, lazyProgramReadyCount, seekVersion, isWebGLReady, sourceImageCanvas, imageGradientSource, imageMaskSource, imageMaskEnabled]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [gradient, noiseDistortion, diffuse, imageGradient, slitScan, stretch, normalMap, manualDistort, postprocess, effectPipeline, clothGradient, coneView, seamless, flowGradient, videoMotion, disableClothBase, width, height, animation.enabled, animation.speed, animation.direction, animation.easing, animation.affectNoise, animation.affectSlit, animation.affectRamp, animation.affectStretch, keyframeTracks, currentTime, lazyProgramReadyCount, seekVersion, isWebGLReady, sourceImageCanvas, imageGradientSource, imageMaskSource, imageMaskEnabled]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // アニメーションループの管理
   useEffect(() => {
@@ -214,7 +214,7 @@ export function GradientCanvas({ width = 800, height = 800, animLoopRef, seekVer
         loop.stop();
       }
     };
-  }, [animation.enabled, animation.duration, animation.previewLoop, animation.speed, animation.fps, keyframeTracks, noiseDistortion.enabled, iridescence.enabled, radon.enabled, slitScan.enabled, stretch.enabled, diffuse.enabled, diffuse.seedAnimEnabled, postprocess.enabled, postprocess.effectMode, postprocess.effectStack, postprocess.glassMotion, effectPipeline, clothGradient, coneView, seamless, flowGradient, disableClothBase, isWebGLReady]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [animation.enabled, animation.duration, animation.previewLoop, animation.speed, animation.fps, keyframeTracks, noiseDistortion.enabled, slitScan.enabled, stretch.enabled, diffuse.enabled, diffuse.seedAnimEnabled, postprocess.enabled, postprocess.effectMode, postprocess.effectStack, postprocess.glassMotion, effectPipeline, clothGradient, coneView, seamless, flowGradient, disableClothBase, isWebGLReady]); // eslint-disable-line react-hooks/exhaustive-deps
 
   return (
     <div style={{ position: 'relative', width: '100%', height: '100%', isolation: 'isolate' }}>
@@ -284,7 +284,7 @@ export function GradientCanvas({ width = 800, height = 800, animLoopRef, seekVer
           height: '100%',
           backgroundColor: '#3a3a3a',
           backgroundImage: 'repeating-conic-gradient(#555 0% 25%, #333 0% 50%)',
-          backgroundSize: matcap.enabled ? '20px 20px' : '24px 24px',
+          backgroundSize: '24px 24px',
         }}
       />
       <WebGLPerformancePanel

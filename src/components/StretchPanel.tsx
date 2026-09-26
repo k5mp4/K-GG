@@ -17,7 +17,12 @@ const isStretchDirty = (value: StretchConfig) =>
     return JSON.stringify(value[typedKey as keyof StretchConfig]) !== JSON.stringify(D[typedKey]);
   });
 
-export function StretchPanel() {
+type StretchPanelProps = {
+  /** Hidden inside the Postprocess module, where the Effect Stack owns the layer's ON/OFF state. */
+  showEnabledToggle?: boolean;
+};
+
+export function StretchPanel({ showEnabledToggle = true }: StretchPanelProps = {}) {
   const { t } = useLanguage();
   const { stretch } = useGradientStore();
   const { setStretch } = applicationCommands;
@@ -26,7 +31,7 @@ export function StretchPanel() {
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
-        <h2 className="font-semibold text-sm">{t('effect.stretch')}</h2>
+        <h2 className="font-semibold text-sm text-k-text">{t('effect.stretch')}</h2>
         <div className="flex items-center gap-2">
           <button
             onClick={() => setStretch({ ...D, enabled: stretch.enabled })}
@@ -38,11 +43,13 @@ export function StretchPanel() {
           >
             <Icon name="restart" className="text-[14px]" />
           </button>
-          <Toggle variant="switch" checked={stretch.enabled} onChange={(v) => setStretch({ enabled: v })} />
+          {showEnabledToggle && (
+            <Toggle variant="switch" checked={stretch.enabled} onChange={(v) => setStretch({ enabled: v })} />
+          )}
         </div>
       </div>
 
-      <Collapsible isOpen={stretch.enabled}>
+      <Collapsible isOpen={!showEnabledToggle || stretch.enabled}>
         <div className="space-y-4 pt-2">
           <div className="flex items-center justify-between border-b border-panel-border/30 pb-3">
             <div>

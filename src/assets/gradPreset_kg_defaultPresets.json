@@ -140,16 +140,6 @@
         "angle": 0,
         "bevelSize": 1,
         "invert": false
-      },
-      "radon": {
-        "enabled": false,
-        "strength": 1,
-        "freq": 1,
-        "radius": 1.2,
-        "angle": 0,
-        "blur": 1,
-        "evolution": 0,
-        "speed": 0.2
       }
     }
   },
@@ -294,16 +284,6 @@
         "angle": 0,
         "bevelSize": 1,
         "invert": false
-      },
-      "radon": {
-        "enabled": false,
-        "strength": 1,
-        "freq": 1,
-        "radius": 1.2,
-        "angle": 0,
-        "blur": 1,
-        "evolution": 0,
-        "speed": 0.2
       }
     }
   },
@@ -448,16 +428,6 @@
         "angle": 0,
         "bevelSize": 1,
         "invert": false
-      },
-      "radon": {
-        "enabled": false,
-        "strength": 1,
-        "freq": 1,
-        "radius": 1.2,
-        "angle": 0,
-        "blur": 1,
-        "evolution": 0,
-        "speed": 0.2
       }
     }
   }

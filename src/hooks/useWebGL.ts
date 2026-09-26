@@ -82,9 +82,7 @@ export function useWebGL(
     const stale = webglRef.current !== null && (
       webglRef.current.gl.canvas !== canvas ||
       webglRef.current.uniforms['u_imageGradientEnabled'] === undefined ||
-      webglRef.current.uniforms['u_iridEnabled'] === undefined ||
       webglRef.current.uniforms['u_manualDistortEnabled'] === undefined ||
-      webglRef.current.uniforms['u_matcapEnabled'] === undefined ||
       webglRef.current.stretchProgram === undefined ||
       webglRef.current.postprocessProgram === undefined ||
       webglRef.current.blurProgram === undefined ||

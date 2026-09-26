@@ -2,13 +2,10 @@ import type { AnimationConfig } from './animation';
 import type {
   DiffuseConfig,
   EffectPipelineConfig,
-  IridescenceConfig,
   ManualDistortConfig,
   PostprocessConfig,
-  MatcapConfig,
   NoiseDistortionConfig,
   NormalMapConfig,
-  RadonConfig,
   SlitScanConfig,
   StretchConfig,
 } from './distortion';
@@ -34,12 +31,9 @@ export type LatestState = {
   seamless?: SeamlessConfig;
   flowGradient?: FlowGradientConfig;
   videoMotion?: VideoMotionConfig;
-  radon: RadonConfig;
-  iridescence: IridescenceConfig;
   manualDistort: ManualDistortConfig;
   postprocess: PostprocessConfig;
   effectPipeline: EffectPipelineConfig;
-  matcap: MatcapConfig;
   animation: AnimationConfig;
   keyframeTracks: Record<string, PropertyTrack>;
   width: number;

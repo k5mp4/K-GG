@@ -29,12 +29,9 @@ export type ApplicationCommands = Pick<GradientStore,
   | 'setSeamless'
   | 'setFlowGradient'
   | 'setVideoMotion'
-  | 'setRadon'
-  | 'setIridescence'
   | 'setManualDistort'
   | 'setPostprocess'
   | 'setEffectPipeline'
-  | 'setMatcap'
   | 'setHistogram'
   | 'setKeyframeTracks'
   | 'setTrackMode'
@@ -74,12 +71,9 @@ const APPLICATION_COMMAND_KEYS = [
   'setSeamless',
   'setFlowGradient',
   'setVideoMotion',
-  'setRadon',
-  'setIridescence',
   'setManualDistort',
   'setPostprocess',
   'setEffectPipeline',
-  'setMatcap',
   'setHistogram',
   'setKeyframeTracks',
   'setTrackMode',
@@ -130,12 +124,9 @@ export function createApplicationCommands(
     setSeamless: value => getState().setSeamless(value),
     setFlowGradient: value => getState().setFlowGradient(value),
     setVideoMotion: value => getState().setVideoMotion(value),
-    setRadon: value => getState().setRadon(value),
-    setIridescence: value => getState().setIridescence(value),
     setManualDistort: value => getState().setManualDistort(value),
     setPostprocess: value => getState().setPostprocess(value),
     setEffectPipeline: value => getState().setEffectPipeline(value),
-    setMatcap: value => getState().setMatcap(value),
     setHistogram: value => getState().setHistogram(value),
     setKeyframeTracks: value => getState().setKeyframeTracks(value),
     setTrackMode: (trackId, mode, options) => getState().setTrackMode(trackId, mode, options),

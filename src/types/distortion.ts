@@ -170,25 +170,6 @@ export type NormalMapConfig = {
   invert: boolean;   // true=凹凸反転
 };
 
-export type RadonConfig = {
-  enabled: boolean;
-  strength: number;   // 0.0–1.0: ベースグラデーションとのmix比率
-  freq: number;       // 0.25–4.0: 投影角度の周波数（横幅でπ×freq ラジアン回転）
-  radius: number;     // 0.1–3.0: サイノグラムt軸スケール（投影距離）
-  angle: number;      // 0–360°: ベース角度オフセット（度）
-  blur: number;       // 0–2: ライン積分幅（0=点サンプル, 1=フル積分）
-  evolution: number;  // 0–10: 静的位相オフセット
-  speed: number;      // 0–2: アニメーション速度
-};
-
-export type IridescenceConfig = {
-  enabled: boolean;
-  strength: number;      // 0.0-1.0: 歪み全体の強度
-  speed: number;         // アニメーション速度
-  frequency: number;     // 波の細かさ（スケール）
-  angle: number;         // 歪みの方向（度）
-};
-
 export type ManualDistortConfig = {
   enabled: boolean;
   mode: 'warp' | 'swirl' | 'spiky';
@@ -222,7 +203,7 @@ export type PostprocessStackLayer = {
 /**
  * Unified Effect Stack V2 の主スタックに含める効果。
  *
- * Surface (Normal/Matcap)、Prism、Particles は主スタック外の固定段階なので、
+ * Surface (Normal)、Prism、Particles は主スタック外の固定段階なので、
  * ここには含めない。
  */
 export type EffectStackKind =
@@ -377,10 +358,6 @@ export type PostprocessConfig = ManualDistortConfig & {
   diffuseGrain: number;
   diffuseSeed: number;
   diffuseDitherThreshold: number;
-};
-
-export type MatcapConfig = {
-  enabled: boolean;
 };
 
 export type HistogramConfig = {

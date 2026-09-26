@@ -121,8 +121,6 @@ const RAW_CONTROL_PARAMETER_DEFINITIONS: readonly ParameterDefinition[] = [
   numberParameter('stretch.glowRadius', 'stretch', 'glowRadius', 'Stretch glow radius'),
 
   numberParameter('normalMap.angle', 'normalMap', 'angle', 'Normal-map light direction'),
-  numberParameter('radon.angle', 'radon', 'angle', 'Radon direction'),
-  numberParameter('iridescence.angle', 'iridescence', 'angle', 'Iridescence direction'),
   numberParameter('postprocess.kaleidoscopeRotation', 'postprocess', 'kaleidoscopeRotation', 'Kaleidoscope rotation'),
   enumParameter('postprocess.voronoiDistMetric', 'postprocess', 'voronoiDistMetric', getEnumParameterLimit('postprocess.voronoiDistMetric').values, 'Postprocess Voronoi distance metric', { defaultValue: getEnumParameterDefault('postprocess.voronoiDistMetric') }),
   numberParameter('postprocess.voronoiMinkowskiExp', 'postprocess', 'voronoiMinkowskiExp', 'Postprocess Voronoi Minkowski exponent'),

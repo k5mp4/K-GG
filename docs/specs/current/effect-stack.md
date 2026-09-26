@@ -43,7 +43,7 @@ Effect Stack V2で`Mirror`または`Kaleidoscope`を選択し、そのレイヤ�
 
 ### EFFECT-003 固定段と描画順
 
-V2の全体順序は `Base → Surface → Main Stack → Prism → Flow Gradient → Particles` です。Normal/MatcapはSurface、PrismはGlowを含む専用段、Flow GradientはGPU密度・Temporal TrailをGradient Rampへ合成する固定段、Particlesは最終2Dオーバーレイとして扱い、これらを主スタックの並べ替え対象には含めません。ConeはMain Stack内の通常レイヤーであり、配置された位置で前段textureを円錐面へ投影し、その描画結果を後段へ出力します。Video Motionと同じくConeもdrag、randomize、solo、選択、永続化、render planの対象です。Coneを含む通常レイヤーはSANDBOXの固定段ではありません。Flow Gradientを無効にした場合は、Flow Gradientを除いたParticlesまでの経路を使用します。
+V2の全体順序は `Base → Surface → Main Stack → Prism → Flow Gradient → Particles` です。NormalはSurface、PrismはGlowを含む専用段、Flow GradientはGPU密度・Temporal TrailをGradient Rampへ合成する固定段、Particlesは最終2Dオーバーレイとして扱い、これらを主スタックの並べ替え対象には含めません。ConeはMain Stack内の通常レイヤーであり、配置された位置で前段textureを円錐面へ投影し、その描画結果を後段へ出力します。Video Motionと同じくConeもdrag、randomize、solo、選択、永続化、render planの対象です。Coneを含む通常レイヤーはSANDBOXの固定段ではありません。Flow Gradientを無効にした場合は、Flow Gradientを除いたParticlesまでの経路を使用します。
 
 有効な主スタックレイヤーは前段の結果を次段の入力として処理します。レイヤーが0件の場合の直接描画、軽量な主スタック、追加の中間バッファが必要な構成は描画計画として一貫して決定されます。
 

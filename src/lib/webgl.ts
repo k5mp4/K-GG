@@ -16,7 +16,7 @@ import {
   normalizeConeViewConfig,
   type ConeViewConfig,
 } from '../types/coneView';
-import type { NoiseDistortionConfig, DiffuseConfig, SlitScanConfig, StretchConfig, NormalMapConfig, RadonConfig, IridescenceConfig, ManualDistortConfig, PostprocessConfig, MatcapConfig, PostprocessStackKind, EffectPipelineConfig } from '../types/distortion';
+import type { NoiseDistortionConfig, DiffuseConfig, SlitScanConfig, StretchConfig, NormalMapConfig, ManualDistortConfig, PostprocessConfig, PostprocessStackKind, EffectPipelineConfig } from '../types/distortion';
 import { DEFAULT_DIFFUSE_ASCII_CHARSET, DEFAULT_DIFFUSE_BACKGROUND_COLOR } from '../types/distortion';
 import { IMAGE_GRADIENT_DEFAULTS, type ImageGradientConfig } from '../types/imageGradient';
 import { GRADIENT_ANCHOR_DEFAULTS, defaultBezierControlsForAnchors } from '../store/documentModel';
@@ -720,25 +720,11 @@ export async function initWebGL(canvas: HTMLCanvasElement): Promise<WebGLContext
     u_dwDist2: gl.getUniformLocation(program, 'u_dwDist2'),
     u_dwDist3: gl.getUniformLocation(program, 'u_dwDist3'),
     u_dwDriftAngle: gl.getUniformLocation(program, 'u_dwDriftAngle'),
-    u_radonEnabled: gl.getUniformLocation(program, 'u_radonEnabled'),
-    u_radonStrength: gl.getUniformLocation(program, 'u_radonStrength'),
-    u_radonFreq: gl.getUniformLocation(program, 'u_radonFreq'),
-    u_radonRadius: gl.getUniformLocation(program, 'u_radonRadius'),
-    u_radonAngle: gl.getUniformLocation(program, 'u_radonAngle'),
-    u_radonBlur: gl.getUniformLocation(program, 'u_radonBlur'),
-    u_radonEvolution: gl.getUniformLocation(program, 'u_radonEvolution'),
-    u_radonSpeed: gl.getUniformLocation(program, 'u_radonSpeed'),
-    u_iridEnabled: gl.getUniformLocation(program, 'u_iridEnabled'),
-    u_iridAngle: gl.getUniformLocation(program, 'u_iridAngle'),
-    u_iridSpeed: gl.getUniformLocation(program, 'u_iridSpeed'),
-    u_iridFreq: gl.getUniformLocation(program, 'u_iridFreq'),
-    u_iridStrength: gl.getUniformLocation(program, 'u_iridStrength'),
     u_manualDistortEnabled: gl.getUniformLocation(program, 'u_manualDistortEnabled'),
     u_manualDistortMap: gl.getUniformLocation(program, 'u_manualDistortMap'),
     u_manualDistortMaxDisplacement: gl.getUniformLocation(program, 'u_manualDistortMaxDisplacement'),
     u_manualDistortSmoothStrength: gl.getUniformLocation(program, 'u_manualDistortSmoothStrength'),
     u_manualDistortSmoothRadius: gl.getUniformLocation(program, 'u_manualDistortSmoothRadius'),
-    u_matcapEnabled: gl.getUniformLocation(program, 'u_matcapEnabled'),
     u_gradAnchor0: gl.getUniformLocation(program, 'u_gradAnchor0'),
     u_gradAnchor1: gl.getUniformLocation(program, 'u_gradAnchor1'),
     u_gradAnchor2: gl.getUniformLocation(program, 'u_gradAnchor2'),
@@ -758,7 +744,6 @@ export async function initWebGL(canvas: HTMLCanvasElement): Promise<WebGLContext
     u_meshLeftCp0: gl.getUniformLocation(program, 'u_meshLeftCp0'),
     u_meshLeftCp1: gl.getUniformLocation(program, 'u_meshLeftCp1'),
     u_meshColorPositions: gl.getUniformLocation(program, 'u_meshColorPositions'),
-    u_gradDir: gl.getUniformLocation(program, 'u_gradDir'),
     u_tileOffset: gl.getUniformLocation(program, 'u_tileOffset'),
     u_tileSize: gl.getUniformLocation(program, 'u_tileSize'),
   };
@@ -1137,7 +1122,6 @@ function getNormalMapUniforms(gl: WebGL2RenderingContext, program: WebGLProgram)
     u_normalMapAngle: gl.getUniformLocation(program, 'u_normalMapAngle'),
     u_normalMapBevelSize: gl.getUniformLocation(program, 'u_normalMapBevelSize'),
     u_normalMapInvert: gl.getUniformLocation(program, 'u_normalMapInvert'),
-    u_matcapEnabled: gl.getUniformLocation(program, 'u_matcapEnabled'),
   };
 }
 
@@ -3438,11 +3422,8 @@ export function render(
   slitScan: SlitScanConfig,
   stretch: StretchConfig,
   normalMap: NormalMapConfig,
-  radon: RadonConfig,
-  iridescence: IridescenceConfig,
   manualDistort: ManualDistortConfig,
   postprocess: PostprocessConfig,
-  matcap: MatcapConfig,
   width: number,
   height: number,
   time = 0,
@@ -3535,8 +3516,6 @@ export function render(
     offsetAngle: clampParameter(slitScan.offsetAngle, 90, getParameterLimit('slit.offsetAngle')),
   };
   normalMap = { ...normalMap, angle: clampParameter(normalMap.angle, 0, getParameterLimit('normalMap.angle')) };
-  radon = { ...radon, angle: clampParameter(radon.angle, 0, getParameterLimit('radon.angle')) };
-  iridescence = { ...iridescence, angle: clampParameter(iridescence.angle, 0, getParameterLimit('iridescence.angle')) };
   postprocess = {
     ...postprocess,
     kaleidoscopeRotation: clampParameter(postprocess.kaleidoscopeRotation, 0, getParameterLimit('postprocess.kaleidoscopeRotation')),
@@ -3622,18 +3601,6 @@ export function render(
   gl.uniform2f(uniforms.u_gradBezierCp1, bezierControls[1][0], bezierControls[1][1]);
   applyMeshGradientUniforms(gl, uniforms, gradient.mesh);
 
-  // グラデーション方向ベクトル（ベジェワープ・Radon用）
-  let gradDirX: number, gradDirY: number;
-  if ((gradient.gradientType ?? 'linear') === 'linear') {
-    const dx = anchors[1][0] - anchors[0][0];
-    const dy = anchors[1][1] - anchors[0][1];
-    const len = Math.sqrt(dx * dx + dy * dy) || 1;
-    gradDirX = dx / len; gradDirY = dy / len;
-  } else {
-    const rad = (gradient.angle * Math.PI) / 180;
-    gradDirX = Math.sin(rad); gradDirY = -Math.cos(rad);
-  }
-  gl.uniform2f(uniforms.u_gradDir, gradDirX, gradDirY);
   gl.uniform2f(uniforms.u_resolution, width, height);
   const generatorLegacyColorFieldEnabled = !isV2Pipeline || imageGradientProtected;
   const analyticNoiseConsumed = renderPlan?.analyticPrefix.consumedLayers.includes('noise') === true;
@@ -3864,21 +3831,6 @@ export function render(
   setUniform1i(gl, uniforms.u_slitNoiseAfter, 0);
   setUniform1i(gl, uniforms.u_slitPixelPerfect, _pp ? 1 : 0);
   // Stretch is applied later as a post-process that samples the rendered texture.
-  setUniform1i(gl, uniforms.u_radonEnabled, generatorLegacyColorFieldEnabled && radon.enabled ? 1 : 0);
-  gl.uniform1f(uniforms.u_radonStrength, radon.strength);
-  gl.uniform1f(uniforms.u_radonFreq, radon.freq);
-  gl.uniform1f(uniforms.u_radonRadius, radon.radius);
-  gl.uniform1f(uniforms.u_radonAngle, (radon.angle * Math.PI) / 180);
-  gl.uniform1f(uniforms.u_radonBlur, radon.blur);
-  gl.uniform1f(uniforms.u_radonEvolution, radon.evolution);
-  gl.uniform1f(uniforms.u_radonSpeed, radon.speed);
-  
-  // Fluid Warp
-  setUniform1i(gl, uniforms.u_iridEnabled, generatorLegacyColorFieldEnabled && iridescence.enabled ? 1 : 0);
-  gl.uniform1f(uniforms.u_iridAngle, (iridescence.angle * Math.PI) / 180);
-  gl.uniform1f(uniforms.u_iridSpeed, iridescence.speed);
-  gl.uniform1f(uniforms.u_iridFreq, iridescence.frequency);
-  gl.uniform1f(uniforms.u_iridStrength, iridescence.strength);
   uploadManualDistortMap(ctx, manualDistort);
   gl.activeTexture(gl.TEXTURE5);
   gl.bindTexture(gl.TEXTURE_2D, ctx.manualDistortTexture);
@@ -3931,7 +3883,6 @@ export function render(
         setUniform1i(gl, uniforms.u_diffuseEnabled, diffuseLayerEnabled ? 1 : 0);
       }
       setUniform1i(gl, uniforms.u_diffuseEnabled, diffuseLayerEnabled ? 1 : 0);
-      setUniform1i(gl, uniforms.u_matcapEnabled, matcap.enabled ? 1 : 0);
       gl.bindFramebuffer(gl.FRAMEBUFFER, null);
       drawArrays(ctx, 'Base', gl.TRIANGLES, 0, 6);
       ctx.hasPresentedFrame = true;
@@ -3992,7 +3943,6 @@ export function render(
       // anchor and parameter edits remain visible instead of freezing the
       // first frame that happened to be presented.
       setUniform1i(gl, uniforms.u_diffuseEnabled, diffuseLayerEnabled ? 1 : 0);
-      setUniform1i(gl, uniforms.u_matcapEnabled, matcap.enabled ? 1 : 0);
       gl.bindFramebuffer(gl.FRAMEBUFFER, null);
       drawArrays(ctx, 'Base', gl.TRIANGLES, 0, 6);
       ctx.hasPresentedFrame = true;
@@ -4010,7 +3960,6 @@ export function render(
         presentClothGradTextureToScreen(ctx, gradient, width, height, vpW, vpH, tileOx, tileOy);
         return;
       }
-      setUniform1i(gl, uniforms.u_matcapEnabled, matcap.enabled ? 1 : 0);
       gl.bindFramebuffer(gl.FRAMEBUFFER, null);
       drawArrays(ctx, 'Base', gl.TRIANGLES, 0, 6);
       return;
@@ -4031,7 +3980,6 @@ export function render(
     }
 
     if (!clothRenderSuccess) {
-      setUniform1i(gl, uniforms.u_matcapEnabled, normalRequested ? 0 : (matcap.enabled ? 1 : 0));
       gl.bindFramebuffer(gl.FRAMEBUFFER, ctx.gradFbo);
       drawArrays(ctx, 'Base', gl.TRIANGLES, 0, 6);
     }
@@ -4045,7 +3993,6 @@ export function render(
       gl.uniform1f(ctx.normalMapUniforms.u_normalMapAngle, (normalMap.angle * Math.PI) / 180);
       gl.uniform1f(ctx.normalMapUniforms.u_normalMapBevelSize, normalMap.bevelSize);
       setUniform1i(gl, ctx.normalMapUniforms.u_normalMapInvert, normalMap.invert ? 1 : 0);
-      setUniform1i(gl, ctx.normalMapUniforms.u_matcapEnabled, matcap.enabled ? 1 : 0);
       gl.activeTexture(gl.TEXTURE2);
       gl.bindTexture(gl.TEXTURE_2D, ctx.gradTexture);
       setUniform1i(gl, ctx.normalMapUniforms.u_gradientTex, 2);
@@ -4329,9 +4276,8 @@ export function render(
     // タイルモードでは FBO サイズを viewport サイズに合わせる（タイル境界に継ぎ目が出る可能性あり）
     const fboW = vpW;
     const fboH = vpH;
-    // Pass 1: グラデーションを gradFbo にレンダリング（matcapなし、ノーマル計算のため）
+    // Pass 1: グラデーションを gradFbo にレンダリング（ノーマル計算のため）
     ensureRenderTargets(ctx, FULL_RENDER_TARGETS, fboW, fboH);
-    setUniform1i(gl, uniforms.u_matcapEnabled, 0);
     gl.bindFramebuffer(gl.FRAMEBUFFER, ctx.gradFbo);
     drawArrays(ctx, 'Base', gl.TRIANGLES, 0, 6);
 
@@ -4343,7 +4289,6 @@ export function render(
     gl.uniform1f(ctx.normalMapUniforms.u_normalMapAngle, (normalMap.angle * Math.PI) / 180);
     gl.uniform1f(ctx.normalMapUniforms.u_normalMapBevelSize, normalMap.bevelSize);
     setUniform1i(gl, ctx.normalMapUniforms.u_normalMapInvert, normalMap.invert ? 1 : 0);
-    setUniform1i(gl, ctx.normalMapUniforms.u_matcapEnabled, matcap.enabled ? 1 : 0);
     gl.activeTexture(gl.TEXTURE2);
     gl.bindTexture(gl.TEXTURE_2D, ctx.gradTexture);
     setUniform1i(gl, ctx.normalMapUniforms.u_gradientTex, 2);
@@ -4409,7 +4354,6 @@ export function render(
     }
   } else {
     // ノーマルマップ無効: stretch有効時は一度FBOへ描いて、その画素を参照する
-    setUniform1i(gl, uniforms.u_matcapEnabled, matcap.enabled ? 1 : 0);
     gl.bindFramebuffer(gl.FRAMEBUFFER, (stretchActive || postprocessActive || particleActive || seamlessActive || flowActive || videoMotionActive) ? ctx.gradFbo : null);
     drawArrays(ctx, 'Base', gl.TRIANGLES, 0, 6);
     if (stretchActive) {

@@ -53,6 +53,7 @@ const EFFECT_STACK_TAB_MAP: Partial<Record<EffectStackKind, LeftTab>> = {
   diffuse: 'diffuse',
   noise: 'noise',
   slit: 'slit',
+  stretch: 'postprocess',
   videoMotion: 'postprocess',
   cone: 'postprocess',
 };
@@ -90,7 +91,6 @@ type WorkspaceControllerOptions = {
 
 export function useWorkspaceController({ translate }: WorkspaceControllerOptions) {
   const store = useGradientStore(useShallow(state => ({
-    matcap: state.matcap,
     animation: state.animation,
     clothGradient: state.clothGradient,
     noiseDistortion: state.noiseDistortion,
@@ -105,7 +105,6 @@ export function useWorkspaceController({ translate }: WorkspaceControllerOptions
   })));
   const updater = useAppUpdater();
   const {
-    matcap,
     animation,
     clothGradient,
     noiseDistortion,
@@ -192,22 +191,6 @@ export function useWorkspaceController({ translate }: WorkspaceControllerOptions
     setHDraft(String(nextH));
     aspectRatioRef.current = nextW / nextH;
   }
-
-  const prevSizeRef = useRef<{ w: number; h: number } | null>(null);
-  useEffect(() => {
-    if (matcap.enabled) {
-      prevSizeRef.current = { w: canvasW, h: canvasH };
-      setCanvasW(1024);
-      setCanvasH(1024);
-      aspectRatioRef.current = 1;
-    } else if (prevSizeRef.current) {
-      const { w, h } = prevSizeRef.current;
-      setCanvasW(w);
-      setCanvasH(h);
-      aspectRatioRef.current = w / h;
-      prevSizeRef.current = null;
-    }
-  }, [matcap.enabled]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const {
     viewportRef,

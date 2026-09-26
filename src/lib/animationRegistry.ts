@@ -17,20 +17,6 @@ const DEFINITIONS: AnimationPropertyDefinition[] = [
     defaultAuto: { kind: 'loop', speed: 1, direction: 0, phase: 0 },
   },
   {
-    propertyId: 'radon.evolution',
-    label: 'Evolution',
-    group: 'Radon Warp',
-    autoCapable: true,
-    defaultAuto: { kind: 'loop', speed: 1, direction: 0, phase: 0 },
-  },
-  {
-    propertyId: 'iridescence.__time',
-    label: 'Motion Phase',
-    group: 'Iridescence',
-    autoCapable: true,
-    defaultAuto: { kind: 'loop', speed: 1, direction: 0, phase: 0 },
-  },
-  {
     propertyId: 'slitScan.offset',
     label: 'Offset Motion',
     group: 'Slit Scan',
@@ -70,8 +56,11 @@ export function isAutoCapableProperty(propertyId: string): boolean {
   return getAnimationDefinition(propertyId)?.autoCapable ?? false;
 }
 
+/** Tracks for properties or effects that no longer exist; dropped when presets load. */
 export function isRemovedAnimationProperty(propertyId: string): boolean {
-  return propertyId === 'slitScan.slitPhase';
+  return propertyId === 'slitScan.slitPhase'
+    || propertyId.startsWith('radon.')
+    || propertyId.startsWith('iridescence.');
 }
 
 export function getAnimationGroup(propertyId: string, fallback = 'Properties'): string {
@@ -86,8 +75,6 @@ export function getAnimationGroup(propertyId: string, fallback = 'Properties'): 
     noiseDistortion: 'Noise Distortion',
     slitScan: 'Slit Scan',
     stretch: 'Stretch',
-    radon: 'Radon Warp',
-    iridescence: 'Iridescence',
     diffuse: 'Diffuse',
     postprocess: 'Postprocess',
   };

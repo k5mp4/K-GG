@@ -161,19 +161,6 @@ export const PARAMETER_LIMITS = {
 
   'seamless.blendWidth': { min: 0.02, max: 0.5, step: 0.01, defaultValue: 0.25 },
 
-  'radon.strength': { min: 0, max: 1, step: 0.01, defaultValue: 1 },
-  'radon.freq': { min: 0.25, max: 4, step: 0.05, defaultValue: 1 },
-  'radon.radius': { min: 0.1, max: 3, step: 0.05, defaultValue: 1.2 },
-  'radon.blur': { min: 0, max: 2, step: 0.05, defaultValue: 1 },
-  'radon.angle': { min: 0, max: 360, step: 1, defaultValue: 0, angleUnit: 'degrees', wrapAngle: true },
-  'radon.evolution': { min: 0, max: 10, step: 0.01, defaultValue: 0 },
-  'radon.speed': { min: 0, max: 2, step: 0.01, defaultValue: 0.2 },
-
-  'iridescence.angle': { min: 0, max: 360, step: 1, defaultValue: 45, angleUnit: 'degrees', wrapAngle: true },
-  'iridescence.strength': { min: 0, max: 2, step: 0.01, defaultValue: 0.3 },
-  'iridescence.frequency': { min: 0.1, max: 20, step: 0.1, defaultValue: 3 },
-  'iridescence.speed': { min: 0, max: 5, step: 0.01, defaultValue: 1 },
-
   'manualDistort.brushSize': { min: 8, max: 640, step: 1, defaultValue: 120, integer: true },
   'manualDistort.strength': { min: 0.05, max: 4, step: 0.01, defaultValue: 1 },
   'manualDistort.falloff': { min: 0.25, max: 5, step: 0.05, defaultValue: 1.8 },
@@ -397,8 +384,6 @@ const TRACK_LIMIT_KEYS: Record<string, ParameterLimitKey> = {
   'slitScan.angle': 'slit.angle',
   'slitScan.offsetAngle': 'slit.offsetAngle',
   'normalMap.angle': 'normalMap.angle',
-  'radon.angle': 'radon.angle',
-  'iridescence.angle': 'iridescence.angle',
   'postprocess.kaleidoscopeRotation': 'postprocess.kaleidoscopeRotation',
   'postprocess.voronoiAngle': 'postprocess.voronoiAngle',
   'postprocess.glassRotation': 'postprocess.glassRotation',
