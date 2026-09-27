@@ -32,7 +32,7 @@ const LABELS: Record<EffectStackKind, string> = {
   glass: 'Glass',
   glassTile: 'GlassTile',
   videoMotion: 'Video Motion',
-  cone: 'Cone',
+  cone: '3D',
 };
 
 type DragState = Omit<EffectStackDragState, 'kind' | 'phase'> & {

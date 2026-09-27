@@ -38,7 +38,7 @@ const uiTerms = [
   ['Wave Height', '波の高さ'], ['Wave Type', '波形'], ['Width', '幅'], ['Zoom', 'ズーム'],
   ['Diffuse', '拡散'], ['Noise', 'ノイズ'], ['Slit', 'スリット'], ['Distort', '歪み'],
   ['Mirror', 'ミラー'], ['Kaleidoscope', '万華鏡'], ['Voronoi', 'Voronoi'], ['Glass', 'ガラス'], ['Glass V2', 'ガラス V2'],
-  ['Prism', 'プリズム'], ['Particles', 'パーティクル'], ['Cone', 'コーン'],
+  ['Prism', 'プリズム'], ['Particles', 'パーティクル'], ['3D', '3D'],
   ['Linear', 'リニア'], ['Radial', '放射'], ['4-color', '4色'], ['Diamond', 'ひし形'], ['Angle', '角度'],
   ['Bezier', 'ベジェ'], ['Ease', 'イーズ'], ['Cardinal', 'カーディナル'], ['Constant', '一定'],
   ['Analogous', '類似色'], ['Complementary', '補色'], ['Split-Complementary', '分割補色'], ['Triad', 'トライアド'],

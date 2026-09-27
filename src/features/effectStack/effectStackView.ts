@@ -14,7 +14,7 @@ import type { EffectPipelineConfig, EffectStackKind } from '../../types/distorti
  * receives it as-is and renders the same panel from it.
  */
 
-export type LazyProgramKey = 'stackCore' | 'noiseStack' | 'glassV2' | 'glassTile' | 'videoMotion' | 'stretch' | 'prism' | 'prismComposite' | 'normalMap' | 'blur' | 'particles';
+export type LazyProgramKey = 'stackCore' | 'noiseStack' | 'glassV2' | 'glassTile' | 'videoMotion' | 'threeD' | 'stretch' | 'prism' | 'prismComposite' | 'normalMap' | 'blur' | 'particles';
 export type LazyProgramStatus = 'loading' | 'ready' | 'failed' | 'fallback';
 
 export type EffectStackLayerStatus = { labelKey: MessageKey; className: string };

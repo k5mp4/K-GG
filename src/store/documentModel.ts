@@ -2,7 +2,7 @@ import { DEFAULT_CLOTH_GRADIENT } from '../types/clothGradient';
 import { DEFAULT_CONE_VIEW } from '../types/coneView';
 import { DEFAULT_SEAMLESS } from '../types/seamless';
 import { DEFAULT_DIFFUSE_ASCII_CHARSET, DEFAULT_DIFFUSE_BACKGROUND_COLOR } from '../types/distortion';
-import type { DiffuseAdaptiveChannel, DiffuseConfig, DiffuseHalftoneShape, ManualDistortConfig, NoiseDistortionConfig, PostprocessConfig } from '../types/distortion';
+import type { DiffuseAdaptiveChannel, DiffuseApplyMode, DiffuseConfig, DiffuseHalftoneShape, ManualDistortConfig, NoiseDistortionConfig, PostprocessConfig } from '../types/distortion';
 import { IMAGE_GRADIENT_DEFAULTS } from '../types/imageGradient';
 import { gradientRampPresets } from '../lib/gradientRampUtils';
 import type { PropertyTrack } from '../types/keyframe';
@@ -161,6 +161,7 @@ export const STORE_DEFAULTS = {
     enabled: true,
     mode: 'smooth' as const,
     ditherMode: 'pattern_dither' as const,
+    applyMode: 'noiseLinked' as DiffuseApplyMode,
     scatter: getParameterDefault('diffuse.scatter'),
     grain: getParameterDefault('diffuse.grain'),
     seed: getParameterDefault('diffuse.seed'),

@@ -14,7 +14,7 @@ describe('PostprocessStackPanel Cone layer', () => {
     useGradientStore.setState(useGradientStore.getInitialState(), true);
   });
 
-  it('shows Cone as a normal draggable Effect Stack layer', () => {
+  it('shows the Cone layer as a normal draggable Effect Stack layer labeled 3D', () => {
     const markup = renderToStaticMarkup(
       <LanguageProvider>
         <PostprocessStackPanel />
@@ -22,7 +22,8 @@ describe('PostprocessStackPanel Cone layer', () => {
     );
 
     expect(markup).toContain('data-effect-stack-panel');
-    expect(markup).toContain('aria-label="Drag Cone"');
+    expect(markup).toContain('aria-label="Drag 3D"');
+    expect(markup).not.toContain('aria-label="Drag Cone"');
     expect(markup).not.toContain('data-effect-stack-output-stage="cone"');
     expect(markup).not.toContain('Cone output');
   });
