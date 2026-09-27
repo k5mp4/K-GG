@@ -14,6 +14,7 @@ uniform vec2 u_tileResolution;
 
 uniform int u_threeDShape;
 uniform int u_threeDMapping;
+uniform int u_threeDProjection;
 uniform float u_threeDFog;
 uniform float u_threeDShade;
 uniform float u_threeDTravel;
@@ -46,6 +47,8 @@ uniform float u_latticeThickness;
 uniform int u_roomShape;
 uniform int u_roomBounces;
 uniform float u_roomReflectivity;
+
+uniform bool u_sphereInside;
 uniform int u_roomCanvasFaces;
 
 const float PI = 3.141592653589793;
@@ -55,6 +58,7 @@ const int SHAPE_CONE = 0;
 const int SHAPE_TORUS = 1;
 const int SHAPE_LATTICE = 2;
 const int SHAPE_MIRROR_ROOM = 3;
+const int SHAPE_SPHERE = 4;
 
 const int MAPPING_UV = 0;
 const int MAPPING_TRIPLANAR = 1;
@@ -133,10 +137,30 @@ vec4 threeDSampleUnwrapped(vec2 unwrappedUv) {
 // ---------------------------------------------------------------------------
 // Camera. Camera-local rays use x = right, y = up, and -z = forward.
 
+// Perspective uses the Cone's 60 degree vertical field of view. Fisheye is an
+// equidistant 180 degree dome master inscribed in the shorter side, with the
+// view direction at its center; pixels outside the circle stay black.
+// Equirect covers the full sphere: longitude across x and latitude across y.
 vec3 threeDProjectedRay(vec2 globalUv, out bool valid) {
   valid = true;
   float aspect = u_fullResolution.x / max(u_fullResolution.y, 1.0);
   vec2 ndc = globalUv * 2.0 - 1.0;
+  if (u_threeDProjection == 1) {
+    vec2 circle = aspect >= 1.0 ? vec2(ndc.x * aspect, ndc.y) : vec2(ndc.x, ndc.y / aspect);
+    float radius = length(circle);
+    if (radius > 1.0) {
+      valid = false;
+      return vec3(0.0, 0.0, -1.0);
+    }
+    float theta = radius * 0.5 * PI;
+    vec2 direction = radius > 0.000001 ? circle / radius : vec2(0.0);
+    return vec3(direction * sin(theta), -cos(theta));
+  }
+  if (u_threeDProjection == 2) {
+    float longitude = (globalUv.x - 0.5) * TAU;
+    float latitude = (globalUv.y - 0.5) * PI;
+    return vec3(cos(latitude) * sin(longitude), sin(latitude), -cos(latitude) * cos(longitude));
+  }
   return normalize(vec3(ndc.x * aspect * u_coneTangentHalfFov, ndc.y * u_coneTangentHalfFov, -1.0));
 }
 
@@ -502,6 +526,48 @@ vec4 mirrorRoomColor(vec3 localRay, out float firstDistance) {
 }
 
 // ---------------------------------------------------------------------------
+// Sphere: a unit sphere seen from its center (Inside, a 360 degree room for
+// dome and VR output) or from Distance outside (a planet). The canvas wraps
+// in longitude and latitude; Flow turns the longitude by whole tiles.
+
+ThreeDHit sphereHit(vec3 localRay) {
+  ThreeDHit result = threeDMiss();
+  vec3 forward = vec3(0.0, 0.0, -1.0);
+  vec3 up = vec3(0.0, 1.0, 0.0);
+  threeDSetCameraBasis(forward, up);
+  vec3 rayDirection = threeDWorldDirection(localRay, forward, up);
+  vec3 right = normalize(cross(forward, up));
+  vec2 offset = threeDRollMatrix() * u_cameraOffset;
+  vec3 rayOrigin;
+  if (u_sphereInside) {
+    rayOrigin = (right * offset.x + up * offset.y) * 0.6;
+  } else {
+    float cameraDistance = max(u_threeDDistance, 1.2);
+    rayOrigin = vec3(0.0, 0.0, cameraDistance) + (right * offset.x + up * offset.y) * cameraDistance * 0.4;
+  }
+  float b = dot(rayOrigin, rayDirection);
+  float c = dot(rayOrigin, rayOrigin) - 1.0;
+  float discriminant = b * b - c;
+  result.rayDirection = rayDirection;
+  if (discriminant < 0.0) return result;
+  float root = sqrt(discriminant);
+  float distance = u_sphereInside ? -b + root : -b - root;
+  if (distance <= 0.0) return result;
+  vec3 position = rayOrigin + rayDirection * distance;
+  result.hit = true;
+  result.position = position;
+  result.normal = u_sphereInside ? -position : position;
+  result.uv = vec2(
+    atan(position.x, -position.z) / TAU + 0.5,
+    asin(clamp(position.y, -1.0, 1.0)) / PI + 0.5
+  );
+  result.hasUv = true;
+  result.distance = distance;
+  result.mapScale = 0.5;
+  return result;
+}
+
+// ---------------------------------------------------------------------------
 // Mapping, shading, and fog.
 
 vec4 threeDTriplanarSample(vec3 position, vec3 normal, float mapScale) {
@@ -579,6 +645,9 @@ void main() {
   if (u_threeDShape == SHAPE_LATTICE) {
     hit = latticeHit(localRay);
     fogScale = 1.0 / max(u_latticeScale, 0.1);
+  } else if (u_threeDShape == SHAPE_SPHERE) {
+    hit = sphereHit(localRay);
+    fogScale = 0.5;
   } else {
     hit = torusHit(localRay);
   }

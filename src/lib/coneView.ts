@@ -5,6 +5,7 @@ import {
   LATTICE_TYPES,
   ROOM_CANVAS_FACES,
   ROOM_SHAPE_INDEX,
+  THREE_D_PROJECTIONS,
   THREE_D_SURFACE_MAPPING_INDEX,
   type ConeViewConfig,
   type ConeSeamMode,
@@ -272,6 +273,9 @@ export function getThreeDCamera(config: ConeViewConfig, normalizedTime = 0): Thr
 export type ThreeDRenderParams = {
   shape: number;
   surfaceMapping: number;
+  projection: number;
+  /** Camera distance of the shapes seen from outside. */
+  distance: number;
   fog: number;
   shade: number;
   /** Loop-normalized geometric motion (in shape-specific units), 0 when fixed. */
@@ -304,6 +308,7 @@ export type ThreeDRenderParams = {
     reflectivity: number;
     canvasFaces: number;
   };
+  sphereInside: boolean;
 };
 
 /**
@@ -326,12 +331,19 @@ export function getThreeDRenderParams(
   return {
     shape: getConeShapeIndex(config),
     surfaceMapping: THREE_D_SURFACE_MAPPING_INDEX[config.surfaceMapping] ?? 0,
+    projection: Math.max(0, THREE_D_PROJECTIONS.indexOf(config.projection)),
+    distance: config.depth * 0.5,
     fog: clamp(safeFinite(config.fog, 0), 0, 1),
     shade: clamp(safeFinite(config.shade, 0), 0, 1),
     travel: geometryMotion ? transform.offsetV : 0,
     tangentHalfFov: Math.tan(CONE_CAMERA_FOV * Math.PI / 360),
     textureRepeat: transform.repeatU,
-    textureOffset: geometryMotion ? [0, 0] : [transform.offsetU, transform.offsetV],
+    // The sphere's Flow turns its longitude, so the offset moves along u.
+    textureOffset: geometryMotion
+      ? [0, 0]
+      : config.shape === 'sphere'
+        ? [transform.offsetV, 0]
+        : [transform.offsetU, transform.offsetV],
     seamBlend: transform.seamBlend,
     seamMode: CONE_SEAM_MODE_INDEX[transform.seamMode],
     // The Cone keeps Rotation as a texture offset, so it does not roll.
@@ -358,6 +370,7 @@ export function getThreeDRenderParams(
       reflectivity: config.roomReflectivity,
       canvasFaces: ROOM_CANVAS_FACES.indexOf(config.roomCanvasFaces),
     },
+    sphereInside: config.sphereView === 'inside',
   };
 }
 

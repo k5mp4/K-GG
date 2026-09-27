@@ -2,19 +2,40 @@ import { clampParameter, getParameterDefault, getParameterLimit } from '../lib/p
 
 export type ConeMappingMode = 'flow' | 'projection';
 /** Geometry of the 3D layer. The layer kind and preset key stay `cone` for compatibility. */
-export type ConeShape = 'cone' | 'torus' | 'lattice' | 'mirrorRoom';
-export const CONE_SHAPES = ['cone', 'torus', 'lattice', 'mirrorRoom'] as const satisfies readonly ConeShape[];
+export type ConeShape = 'cone' | 'torus' | 'lattice' | 'mirrorRoom' | 'sphere';
+export const CONE_SHAPES = ['cone', 'torus', 'lattice', 'mirrorRoom', 'sphere'] as const satisfies readonly ConeShape[];
 export const CONE_SHAPE_INDEX = {
   cone: 0,
   torus: 1,
   lattice: 2,
   mirrorRoom: 3,
+  sphere: 4,
 } as const satisfies Record<ConeShape, number>;
 export const CONE_SHAPE_OPTIONS: { value: ConeShape; label: string }[] = [
   { value: 'cone', label: 'Cone' },
   { value: 'torus', label: 'Torus · Tunnel' },
   { value: 'lattice', label: 'Lattice · Gyroid tunnel' },
   { value: 'mirrorRoom', label: 'Mirror Room · Polyhedron' },
+  { value: 'sphere', label: 'Sphere · Dome / Planet' },
+];
+
+/**
+ * Camera projection of every shape except the Cone. Fisheye is a 180 degree
+ * dome master and Equirect a full 360 x 180 degree panorama for VR.
+ */
+export type ThreeDProjection = 'perspective' | 'fisheye' | 'equirect';
+export const THREE_D_PROJECTIONS = ['perspective', 'fisheye', 'equirect'] as const satisfies readonly ThreeDProjection[];
+export const THREE_D_PROJECTION_OPTIONS: { value: ThreeDProjection; label: string }[] = [
+  { value: 'perspective', label: 'Perspective' },
+  { value: 'fisheye', label: 'Fisheye · Dome master 180°' },
+  { value: 'equirect', label: 'Equirect · 360° panorama' },
+];
+
+export type SphereView = 'inside' | 'outside';
+export const SPHERE_VIEWS = ['inside', 'outside'] as const satisfies readonly SphereView[];
+export const SPHERE_VIEW_OPTIONS: { value: SphereView; label: string }[] = [
+  { value: 'inside', label: 'Inside · 360° room' },
+  { value: 'outside', label: 'Outside · Planet' },
 ];
 
 /** Triply periodic minimal surfaces used by the Lattice shape. */
@@ -107,6 +128,8 @@ export type ConeViewConfig = {
   mappingMode: ConeMappingMode;
   /** Not used by the Cone shape, which keeps its original unlit UV mapping. */
   surfaceMapping: ThreeDSurfaceMapping;
+  /** Not used by the Cone shape. */
+  projection: ThreeDProjection;
   /** Fades distant surfaces to black. */
   fog: number;
   /** Mixes in a head light; 0 keeps the surface unlit. */
@@ -147,6 +170,8 @@ export type ConeViewConfig = {
   roomReflectivity: number;
   /** Mirror Room only: which walls show the canvas. */
   roomCanvasFaces: RoomCanvasFaces;
+  /** Sphere only: camera at the center or outside at Depth / 2. */
+  sphereView: SphereView;
 };
 
 /** Normalized apex movement limit; ±2 reaches 50% of the canvas outside its edge. */
@@ -170,6 +195,7 @@ export const DEFAULT_CONE_VIEW: ConeViewConfig = {
   seamMode: DEFAULT_CONE_SEAM_MODE,
   mappingMode: 'flow',
   surfaceMapping: 'uv',
+  projection: 'perspective',
   fog: getParameterDefault('cone.fog'),
   shade: getParameterDefault('cone.shade'),
   torusBend: getParameterDefault('cone.torusBend'),
@@ -190,6 +216,7 @@ export const DEFAULT_CONE_VIEW: ConeViewConfig = {
   roomBounces: getParameterDefault('cone.roomBounces'),
   roomReflectivity: getParameterDefault('cone.roomReflectivity'),
   roomCanvasFaces: 'alternate',
+  sphereView: 'inside',
 };
 
 function normalizeOption<T extends string>(value: unknown, options: readonly T[], fallback: T): T {
@@ -217,6 +244,7 @@ export function normalizeConeViewConfig(value: unknown): ConeViewConfig {
     seamMode: normalizeSeamMode(raw.seamMode),
     mappingMode: raw.mappingMode === 'projection' ? 'projection' : DEFAULT_CONE_VIEW.mappingMode,
     surfaceMapping: normalizeOption(raw.surfaceMapping, THREE_D_SURFACE_MAPPINGS, DEFAULT_CONE_VIEW.surfaceMapping),
+    projection: normalizeOption(raw.projection, THREE_D_PROJECTIONS, DEFAULT_CONE_VIEW.projection),
     fog: clampParameter(raw.fog, DEFAULT_CONE_VIEW.fog, getParameterLimit('cone.fog')),
     shade: clampParameter(raw.shade, DEFAULT_CONE_VIEW.shade, getParameterLimit('cone.shade')),
     torusBend: clampParameter(raw.torusBend, DEFAULT_CONE_VIEW.torusBend, getParameterLimit('cone.torusBend')),
@@ -237,5 +265,6 @@ export function normalizeConeViewConfig(value: unknown): ConeViewConfig {
     roomBounces: clampParameter(raw.roomBounces, DEFAULT_CONE_VIEW.roomBounces, getParameterLimit('cone.roomBounces')),
     roomReflectivity: clampParameter(raw.roomReflectivity, DEFAULT_CONE_VIEW.roomReflectivity, getParameterLimit('cone.roomReflectivity')),
     roomCanvasFaces: normalizeOption(raw.roomCanvasFaces, ROOM_CANVAS_FACES, DEFAULT_CONE_VIEW.roomCanvasFaces),
+    sphereView: normalizeOption(raw.sphereView, SPHERE_VIEWS, DEFAULT_CONE_VIEW.sphereView),
   };
 }

@@ -13,6 +13,8 @@ import {
   LATTICE_TYPE_OPTIONS,
   ROOM_CANVAS_FACE_OPTIONS,
   ROOM_SHAPE_OPTIONS,
+  SPHERE_VIEW_OPTIONS,
+  THREE_D_PROJECTION_OPTIONS,
   THREE_D_SURFACE_MAPPING_OPTIONS,
   type CameraWigglePreset,
   type ConeSeamMode,
@@ -21,6 +23,8 @@ import {
   type LatticeType,
   type RoomCanvasFaces,
   type RoomShape,
+  type SphereView,
+  type ThreeDProjection,
   type ThreeDSurfaceMapping,
 } from '../types/coneView';
 import { CustomSelect } from './CustomSelect';
@@ -38,6 +42,7 @@ const SHAPE_TEXT: Record<ConeShape, { title: MessageKey; description: MessageKey
   torus: { title: 'cone.torusSurface', description: 'cone.torusDescription', hint: 'cone.torusHint' },
   lattice: { title: 'cone.latticeSurface', description: 'cone.latticeDescription', hint: 'cone.latticeHint' },
   mirrorRoom: { title: 'cone.roomSurface', description: 'cone.roomDescription', hint: 'cone.roomHint' },
+  sphere: { title: 'cone.sphereSurface', description: 'cone.sphereDescription', hint: 'cone.sphereHint' },
 };
 
 function toCameraPositionInput(x: number, y: number): [number, number] {
@@ -82,6 +87,27 @@ function ShapeControls({ coneView, setConeView }: { coneView: ConeViewConfig; se
           value={coneView.latticeThickness}
           limitKey="cone.latticeThickness"
           onChange={(latticeThickness) => setConeView({ latticeThickness })}
+        />
+      </>
+    );
+  }
+  if (coneView.shape === 'sphere') {
+    return (
+      <>
+        <CustomSelect
+          label="View"
+          value={coneView.sphereView}
+          localizeLabel={false}
+          localizeOptions={false}
+          options={[...SPHERE_VIEW_OPTIONS]}
+          onChange={(sphereView) => setConeView({ sphereView: sphereView as SphereView })}
+        />
+        <SliderField
+          label="Distance"
+          value={coneView.depth}
+          limitKey="cone.depth"
+          disabled={coneView.sphereView === 'inside'}
+          onChange={(depth) => setConeView({ depth })}
         />
       </>
     );
@@ -206,6 +232,14 @@ function SurfaceControls({ coneView, setConeView }: { coneView: ConeViewConfig; 
 function CameraControls({ coneView, setConeView, resetLabel }: { coneView: ConeViewConfig; setConeView: SetConeView; resetLabel: string }) {
   return (
     <>
+      <CustomSelect
+        label="Projection"
+        value={coneView.projection}
+        localizeLabel={false}
+        localizeOptions={false}
+        options={[...THREE_D_PROJECTION_OPTIONS]}
+        onChange={(projection) => setConeView({ projection: projection as ThreeDProjection })}
+      />
       <SliderField
         label="Camera Roll"
         value={coneView.rotation}

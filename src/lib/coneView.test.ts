@@ -136,6 +136,17 @@ describe('3D render parameters', () => {
     expect(getThreeDRenderParams({ ...config, mappingMode: 'projection' }, 0.5, 1).travel).toBe(0);
   });
 
+  it('turns the sphere longitude with Flow and places the outside camera at half the depth', () => {
+    const sphere = { ...DEFAULT_CONE_VIEW, shape: 'sphere' as const, flowCycles: 2, depth: 8, projection: 'fisheye' as const };
+    const params = getThreeDRenderParams(sphere, 0.25, 1);
+    expect(params.textureOffset).toEqual([0.5, 0]);
+    expect(params.travel).toBe(0);
+    expect(params.distance).toBe(4);
+    expect(params.projection).toBe(1);
+    expect(params.sphereInside).toBe(true);
+    expect(getThreeDRenderParams({ ...sphere, sphereView: 'outside' }, 0, 1).sphereInside).toBe(false);
+  });
+
   it('maps the lattice and room options to shader indices', () => {
     const params = getThreeDRenderParams({
       ...DEFAULT_CONE_VIEW,

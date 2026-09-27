@@ -48,6 +48,7 @@ describe('cone view configuration', () => {
       seamMode: 'mirror',
       mappingMode: 'flow',
       surfaceMapping: 'uv',
+      projection: 'perspective',
       fog: 0,
       shade: 0,
       torusBend: 0.9,
@@ -68,6 +69,7 @@ describe('cone view configuration', () => {
       roomBounces: 6,
       roomReflectivity: 0.65,
       roomCanvasFaces: 'alternate',
+      sphereView: 'inside',
     });
   });
 
@@ -107,6 +109,18 @@ describe('cone view configuration', () => {
       shape: 'mirrorRoom',
       roomBounces: 5,
       roomReflectivity: 0.95,
+    });
+  });
+
+  it('normalizes the projection and sphere view', () => {
+    expect(normalizeConeViewConfig({ shape: 'sphere', projection: 'equirect', sphereView: 'outside' })).toMatchObject({
+      shape: 'sphere',
+      projection: 'equirect',
+      sphereView: 'outside',
+    });
+    expect(normalizeConeViewConfig({ projection: 'orthographic', sphereView: 'edge' })).toMatchObject({
+      projection: 'perspective',
+      sphereView: 'inside',
     });
   });
 

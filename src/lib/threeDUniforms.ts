@@ -25,6 +25,8 @@ export function uploadThreeDUniforms(
   };
   int('u_threeDShape', params.shape);
   int('u_threeDMapping', params.surfaceMapping);
+  int('u_threeDProjection', params.projection);
+  float('u_threeDDistance', params.distance);
   float('u_threeDFog', params.fog);
   float('u_threeDShade', params.shade);
   float('u_threeDTravel', params.travel);
@@ -51,4 +53,5 @@ export function uploadThreeDUniforms(
   int('u_roomBounces', params.room.bounces);
   float('u_roomReflectivity', params.room.reflectivity);
   int('u_roomCanvasFaces', params.room.canvasFaces);
+  int('u_sphereInside', params.sphereInside ? 1 : 0);
 }
