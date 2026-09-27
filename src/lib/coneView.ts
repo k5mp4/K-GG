@@ -318,6 +318,10 @@ export type ThreeDRenderParams = {
     height: number;
     gap: number;
   };
+  ribbon: {
+    halfTwists: number;
+    width: number;
+  };
 };
 
 /**
@@ -344,13 +348,18 @@ export function getThreeDRenderParams(
     distance: config.depth * 0.5,
     fog: clamp(safeFinite(config.fog, 0), 0, 1),
     shade: clamp(safeFinite(config.shade, 0), 0, 1),
-    travel: geometryMotion ? transform.offsetV : 0,
+    // The ribbon slides its texture with Flow and turns the band by Spin.
+    travel: geometryMotion
+      ? transform.offsetV
+      : config.shape === 'ribbon'
+        ? Math.round(config.spin) * Math.max(0, Math.min(1, safeFinite(normalizedTime, 0)))
+        : 0,
     tangentHalfFov: Math.tan(CONE_CAMERA_FOV * Math.PI / 360),
     textureRepeat: transform.repeatU,
     // The sphere's Flow turns its longitude, so the offset moves along u.
     textureOffset: geometryMotion
       ? [0, 0]
-      : config.shape === 'sphere'
+      : config.shape === 'sphere' || config.shape === 'ribbon'
         ? [transform.offsetV, 0]
         : [transform.offsetU, transform.offsetV],
     seamBlend: transform.seamBlend,
@@ -388,6 +397,10 @@ export function getThreeDRenderParams(
       cells: Math.round(config.extrudeCells),
       height: config.extrudeHeight,
       gap: config.extrudeGap,
+    },
+    ribbon: {
+      halfTwists: Math.round(config.ribbonHalfTwists),
+      width: config.ribbonWidth,
     },
   };
 }

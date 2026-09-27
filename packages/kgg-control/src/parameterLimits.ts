@@ -169,6 +169,8 @@ export const PARAMETER_LIMITS = {
   'cone.extrudeCells': { min: 4, max: 128, step: 1, defaultValue: 32, integer: true },
   'cone.extrudeHeight': { min: 0, max: 2, step: 0.01, defaultValue: 0.8 },
   'cone.extrudeGap': { min: 0, max: 0.8, step: 0.01, defaultValue: 0.15 },
+  'cone.ribbonHalfTwists': { min: 0, max: 12, step: 1, defaultValue: 1, integer: true },
+  'cone.ribbonWidth': { min: 0.05, max: 0.6, step: 0.01, defaultValue: 0.25 },
   'cone.torusBend': { min: 0.05, max: 0.9, step: 0.01, defaultValue: 0.3 },
   'cone.ringRepeat': { min: 1, max: 64, step: 1, defaultValue: 12, integer: true },
   'cone.cameraX': { min: -0.8, max: 0.8, step: 0.01, defaultValue: 0 },

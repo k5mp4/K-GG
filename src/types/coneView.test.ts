@@ -75,6 +75,8 @@ describe('cone view configuration', () => {
       extrudeCells: 32,
       extrudeHeight: 0.8,
       extrudeGap: 0.15,
+      ribbonHalfTwists: 1,
+      ribbonWidth: 0.25,
     });
   });
 
@@ -146,6 +148,14 @@ describe('cone view configuration', () => {
       extrudeGap: 0.8,
     });
     expect(normalizeConeViewConfig({ shape: 'extrusion', extrudeCells: 12.6 })).toMatchObject({ shape: 'extrusion', extrudeCells: 13 });
+  });
+
+  it('rounds the ribbon twist and clamps its width', () => {
+    expect(normalizeConeViewConfig({ shape: 'ribbon', ribbonHalfTwists: 2.6, ribbonWidth: 3 })).toMatchObject({
+      shape: 'ribbon',
+      ribbonHalfTwists: 3,
+      ribbonWidth: 0.6,
+    });
   });
 
   it('normalizes the torus wiggle settings', () => {

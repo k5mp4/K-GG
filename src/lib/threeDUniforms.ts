@@ -59,4 +59,6 @@ export function uploadThreeDUniforms(
   float('u_extrudeCells', params.extrusion.cells);
   float('u_extrudeHeight', params.extrusion.height);
   float('u_extrudeGap', params.extrusion.gap);
+  float('u_ribbonHalfTwists', params.ribbon.halfTwists);
+  float('u_ribbonWidth', params.ribbon.width);
 }

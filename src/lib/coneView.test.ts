@@ -162,6 +162,16 @@ describe('3D render parameters', () => {
     expect(params.extrusion).toEqual({ cells: 48, height: 1.5, gap: 0.3 });
   });
 
+  it('slides the ribbon texture with Flow and turns the band by whole Spin turns', () => {
+    const ribbon = { ...DEFAULT_CONE_VIEW, shape: 'ribbon' as const, flowCycles: 2, spin: 3, ribbonHalfTwists: 5 };
+    const quarter = getThreeDRenderParams(ribbon, 0.25, 1);
+    expect(quarter.shape).toBe(7);
+    expect(quarter.textureOffset).toEqual([0.5, 0]);
+    expect(quarter.travel).toBeCloseTo(0.75, 10);
+    expect(quarter.ribbon).toEqual({ halfTwists: 5, width: 0.25 });
+    expect(getThreeDRenderParams(ribbon, 1, 1).travel).toBe(3);
+  });
+
   it('maps the lattice and room options to shader indices', () => {
     const params = getThreeDRenderParams({
       ...DEFAULT_CONE_VIEW,

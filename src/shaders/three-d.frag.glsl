@@ -56,6 +56,9 @@ uniform float u_terrainAltitude;
 uniform float u_extrudeCells;
 uniform float u_extrudeHeight;
 uniform float u_extrudeGap;
+
+uniform float u_ribbonHalfTwists;
+uniform float u_ribbonWidth;
 uniform int u_roomCanvasFaces;
 
 const float PI = 3.141592653589793;
@@ -68,6 +71,7 @@ const int SHAPE_MIRROR_ROOM = 3;
 const int SHAPE_SPHERE = 4;
 const int SHAPE_TERRAIN = 5;
 const int SHAPE_EXTRUSION = 6;
+const int SHAPE_RIBBON = 7;
 
 const int MAPPING_UV = 0;
 const int MAPPING_TRIPLANAR = 1;
@@ -766,6 +770,76 @@ ThreeDHit extrusionHit(vec3 localRay) {
 }
 
 // ---------------------------------------------------------------------------
+// Ribbon: a flat band swept around a unit circle in the XZ plane. Its cross
+// section turns by Half Twists / 2 turns per revolution, so an odd count
+// makes a Mobius band; the rectangle's symmetry keeps the surface continuous
+// where the ring angle wraps. The texture runs along the band in Ring Repeat
+// tiles and slides with Flow; Spin turns the whole band per loop.
+
+float ribbonDistance(vec3 position, out vec2 bandUv) {
+  float ringAngle = atan(position.z, position.x);
+  vec2 section = vec2(length(position.xz) - 1.0, position.y);
+  float twist = u_ribbonHalfTwists * 0.5 * ringAngle;
+  float c = cos(twist);
+  float s = sin(twist);
+  section = vec2(c * section.x + s * section.y, -s * section.x + c * section.y);
+  float halfWidth = max(u_ribbonWidth, 0.01);
+  bandUv = vec2(ringAngle / TAU * max(u_ringRepeat, 1.0), section.x / (2.0 * halfWidth) + 0.5);
+  vec2 d = abs(section) - vec2(halfWidth, 0.012);
+  // The twist stretches distances away from the ring, so step conservatively.
+  return (length(max(d, 0.0)) + min(max(d.x, d.y), 0.0)) * 0.5;
+}
+
+ThreeDHit ribbonHit(vec3 localRay) {
+  ThreeDHit result = threeDMiss();
+  float elevation = 0.45;
+  float cameraDistance = max(u_threeDDistance * 0.8, 1.6);
+  vec3 cameraPosition = vec3(0.0, sin(elevation), cos(elevation)) * cameraDistance;
+  vec3 forward = normalize(-cameraPosition);
+  vec3 up = vec3(0.0, 1.0, 0.0);
+  threeDSetCameraBasis(forward, up);
+  float angle = -u_threeDTravel * TAU;
+  vec3 right = normalize(cross(forward, up));
+  vec2 offset = threeDRollMatrix() * u_cameraOffset * cameraDistance * 0.3;
+  vec3 rayDirection = roomRotate(threeDWorldDirection(localRay, forward, up), angle);
+  vec3 rayOrigin = roomRotate(cameraPosition + right * offset.x + cross(right, forward) * offset.y, angle);
+  g_cameraRight = roomRotate(g_cameraRight, angle);
+  g_cameraUp = roomRotate(g_cameraUp, angle);
+  g_cameraForward = roomRotate(g_cameraForward, angle);
+  result.rayDirection = rayDirection;
+  float distance = 0.0;
+  bool hit = false;
+  vec2 bandUv = vec2(0.0);
+  for (int i = 0; i < 180; i++) {
+    float surfaceDistance = ribbonDistance(rayOrigin + rayDirection * distance, bandUv);
+    if (surfaceDistance < 0.0004) {
+      hit = true;
+      break;
+    }
+    distance += surfaceDistance;
+    if (distance > cameraDistance + 3.0) break;
+  }
+  if (!hit) return result;
+  vec3 position = rayOrigin + rayDirection * distance;
+  vec2 unusedUv;
+  float epsilon = 0.001;
+  vec3 gradient = vec3(
+    ribbonDistance(position + vec3(epsilon, 0.0, 0.0), unusedUv) - ribbonDistance(position - vec3(epsilon, 0.0, 0.0), unusedUv),
+    ribbonDistance(position + vec3(0.0, epsilon, 0.0), unusedUv) - ribbonDistance(position - vec3(0.0, epsilon, 0.0), unusedUv),
+    ribbonDistance(position + vec3(0.0, 0.0, epsilon), unusedUv) - ribbonDistance(position - vec3(0.0, 0.0, epsilon), unusedUv)
+  );
+  result.hit = true;
+  result.position = position;
+  result.normal = normalize(gradient);
+  result.uv = bandUv;
+  result.hasUv = true;
+  result.uvTiled = true;
+  result.distance = distance;
+  result.mapScale = 0.5;
+  return result;
+}
+
+// ---------------------------------------------------------------------------
 // Mapping, shading, and fog.
 
 vec4 threeDTriplanarSample(vec3 position, vec3 normal, float mapScale) {
@@ -855,6 +929,9 @@ void main() {
     fogScale = 0.15;
   } else if (u_threeDShape == SHAPE_EXTRUSION) {
     hit = extrusionHit(localRay);
+    fogScale = 0.3;
+  } else if (u_threeDShape == SHAPE_RIBBON) {
+    hit = ribbonHit(localRay);
     fogScale = 0.3;
   } else {
     hit = torusHit(localRay);

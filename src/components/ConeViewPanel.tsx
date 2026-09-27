@@ -45,6 +45,7 @@ const SHAPE_TEXT: Record<ConeShape, { title: MessageKey; description: MessageKey
   sphere: { title: 'cone.sphereSurface', description: 'cone.sphereDescription', hint: 'cone.sphereHint' },
   terrain: { title: 'cone.terrainSurface', description: 'cone.terrainDescription', hint: 'cone.terrainHint' },
   extrusion: { title: 'cone.extrusionSurface', description: 'cone.extrusionDescription', hint: 'cone.extrusionHint' },
+  ribbon: { title: 'cone.ribbonSurface', description: 'cone.ribbonDescription', hint: 'cone.ribbonHint' },
 };
 
 function toCameraPositionInput(x: number, y: number): [number, number] {
@@ -89,6 +90,44 @@ function ShapeControls({ coneView, setConeView }: { coneView: ConeViewConfig; se
           value={coneView.latticeThickness}
           limitKey="cone.latticeThickness"
           onChange={(latticeThickness) => setConeView({ latticeThickness })}
+        />
+      </>
+    );
+  }
+  if (coneView.shape === 'ribbon') {
+    return (
+      <>
+        <SliderField
+          label="Half Twists"
+          value={coneView.ribbonHalfTwists}
+          limitKey="cone.ribbonHalfTwists"
+          format={(value) => `${Math.round(value)}`}
+          onChange={(ribbonHalfTwists) => setConeView({ ribbonHalfTwists })}
+        />
+        <SliderField
+          label="Width"
+          value={coneView.ribbonWidth}
+          limitKey="cone.ribbonWidth"
+          onChange={(ribbonWidth) => setConeView({ ribbonWidth })}
+        />
+        <SliderField
+          label="Ring Repeat"
+          value={coneView.ringRepeat}
+          limitKey="cone.ringRepeat"
+          onChange={(ringRepeat) => setConeView({ ringRepeat })}
+        />
+        <SliderField
+          label="Spin"
+          value={coneView.spin}
+          limitKey="cone.spin"
+          format={(value) => `${Math.round(value)}`}
+          onChange={(spin) => setConeView({ spin })}
+        />
+        <SliderField
+          label="Distance"
+          value={coneView.depth}
+          limitKey="cone.depth"
+          onChange={(depth) => setConeView({ depth })}
         />
       </>
     );

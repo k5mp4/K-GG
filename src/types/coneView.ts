@@ -2,8 +2,8 @@ import { clampParameter, getParameterDefault, getParameterLimit } from '../lib/p
 
 export type ConeMappingMode = 'flow' | 'projection';
 /** Geometry of the 3D layer. The layer kind and preset key stay `cone` for compatibility. */
-export type ConeShape = 'cone' | 'torus' | 'lattice' | 'mirrorRoom' | 'sphere' | 'terrain' | 'extrusion';
-export const CONE_SHAPES = ['cone', 'torus', 'lattice', 'mirrorRoom', 'sphere', 'terrain', 'extrusion'] as const satisfies readonly ConeShape[];
+export type ConeShape = 'cone' | 'torus' | 'lattice' | 'mirrorRoom' | 'sphere' | 'terrain' | 'extrusion' | 'ribbon';
+export const CONE_SHAPES = ['cone', 'torus', 'lattice', 'mirrorRoom', 'sphere', 'terrain', 'extrusion', 'ribbon'] as const satisfies readonly ConeShape[];
 export const CONE_SHAPE_INDEX = {
   cone: 0,
   torus: 1,
@@ -12,6 +12,7 @@ export const CONE_SHAPE_INDEX = {
   sphere: 4,
   terrain: 5,
   extrusion: 6,
+  ribbon: 7,
 } as const satisfies Record<ConeShape, number>;
 export const CONE_SHAPE_OPTIONS: { value: ConeShape; label: string }[] = [
   { value: 'cone', label: 'Cone' },
@@ -21,6 +22,7 @@ export const CONE_SHAPE_OPTIONS: { value: ConeShape; label: string }[] = [
   { value: 'sphere', label: 'Sphere · Dome / Planet' },
   { value: 'terrain', label: 'Terrain · Heightfield flyover' },
   { value: 'extrusion', label: 'Extrusion · Pixel city' },
+  { value: 'ribbon', label: 'Ribbon · Twisted band' },
 ];
 
 /**
@@ -186,6 +188,10 @@ export type ConeViewConfig = {
   extrudeHeight: number;
   /** Extrusion only: share of each cell left empty between columns. */
   extrudeGap: number;
+  /** Ribbon only: half turns of the band per revolution; odd values make a Mobius band. */
+  ribbonHalfTwists: number;
+  /** Ribbon only: half width of the band relative to the unit ring radius. */
+  ribbonWidth: number;
 };
 
 /** Normalized apex movement limit; ±2 reaches 50% of the canvas outside its edge. */
@@ -236,6 +242,8 @@ export const DEFAULT_CONE_VIEW: ConeViewConfig = {
   extrudeCells: getParameterDefault('cone.extrudeCells'),
   extrudeHeight: getParameterDefault('cone.extrudeHeight'),
   extrudeGap: getParameterDefault('cone.extrudeGap'),
+  ribbonHalfTwists: getParameterDefault('cone.ribbonHalfTwists'),
+  ribbonWidth: getParameterDefault('cone.ribbonWidth'),
 };
 
 function normalizeOption<T extends string>(value: unknown, options: readonly T[], fallback: T): T {
@@ -290,5 +298,7 @@ export function normalizeConeViewConfig(value: unknown): ConeViewConfig {
     extrudeCells: clampParameter(raw.extrudeCells, DEFAULT_CONE_VIEW.extrudeCells, getParameterLimit('cone.extrudeCells')),
     extrudeHeight: clampParameter(raw.extrudeHeight, DEFAULT_CONE_VIEW.extrudeHeight, getParameterLimit('cone.extrudeHeight')),
     extrudeGap: clampParameter(raw.extrudeGap, DEFAULT_CONE_VIEW.extrudeGap, getParameterLimit('cone.extrudeGap')),
+    ribbonHalfTwists: clampParameter(raw.ribbonHalfTwists, DEFAULT_CONE_VIEW.ribbonHalfTwists, getParameterLimit('cone.ribbonHalfTwists')),
+    ribbonWidth: clampParameter(raw.ribbonWidth, DEFAULT_CONE_VIEW.ribbonWidth, getParameterLimit('cone.ribbonWidth')),
   };
 }
