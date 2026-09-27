@@ -29,17 +29,13 @@
 }
 
 .effect-stack-row__drag-handle {
-  @apply flex h-7 w-6 cursor-grab touch-none items-center justify-center text-cream/50 transition-colors hover:text-fire active:cursor-grabbing;
+  @apply flex h-7 w-6 shrink-0 cursor-grab touch-none items-center justify-center text-cream/50 transition-colors hover:text-fire active:cursor-grabbing;
 }
 
 .effect-stack-row__title {
-  @apply flex items-center gap-1.5 truncate font-display text-[10px] font-bold uppercase tracking-wider;
-}
-
-.effect-stack-row__category {
-  @apply rounded border border-cream/20 px-1 text-[7px] font-medium tracking-normal text-cream/60;
+  @apply truncate font-display text-[10px] font-bold uppercase tracking-wider;
 }
 
 .effect-stack-row__status {
-  @apply text-[8px] font-medium uppercase tracking-wide;
+  @apply truncate text-[8px] font-medium uppercase tracking-wide;
 }

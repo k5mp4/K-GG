@@ -5,6 +5,7 @@ import { useGradientStore } from '../../store/gradientStore';
 import { useViewportControl } from '../../hooks/useViewportControl';
 import { useCanvasSize } from '../../hooks/useCanvasSize';
 import { useKeyboardShortcuts } from '../../hooks/useKeyboardShortcuts';
+import { useGradientRampEditorHost } from '../gradientRampEditor/useGradientRampEditorHost';
 import { applicationCommands } from '../../application/commands';
 import type { GpuDiagnostics } from '../../lib/gpuDiagnostics';
 import type { ExportStage, VideoExportFrameRenderer } from '../../adapters';
@@ -201,6 +202,7 @@ export function useWorkspaceController({ translate }: WorkspaceControllerOptions
   } = useViewportControl();
 
   useKeyboardShortcuts();
+  useGradientRampEditorHost();
 
   useEffect(() => {
     const handleGpuDiagnostics = (event: WindowEventMap['kagaribi:gpu-diagnostics']) => {

@@ -1,0 +1,10 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "tool-windows",
+  "description": "Native tool windows (Gradient Ramp editor, Effect Stack): sync events with the main window and closing themselves only",
+  "windows": ["gradient-ramp-editor", "effect-stack"],
+  "permissions": [
+    "core:event:default",
+    "core:window:allow-close"
+  ]
+}

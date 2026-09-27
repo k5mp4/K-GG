@@ -1,12 +1,14 @@
 import { useCallback, useLayoutEffect, useRef, useState, type RefObject } from 'react';
 import { ColorHistogram } from './ColorHistogram';
 import { PostprocessStackPanel } from './PostprocessStackPanel';
+import { EFFECT_STACK_PANEL_WIDTH } from './EffectStackPanelView';
 import type { EffectStackKind } from '../types/distortion';
 import { useLanguage } from '../i18n/LanguageProvider';
+import { useEffectStackWindowHost } from '../features/effectStack/useEffectStackWindowHost';
 
 const WORKSPACE_ORDER_KEY = 'kgg.effect-stack-workspace.order';
 const STACK_SLOT_X = 0;
-const HISTOGRAM_SLOT_X = 248;
+const HISTOGRAM_SLOT_X = EFFECT_STACK_PANEL_WIDTH + 16;
 
 type WorkspaceOrder = 'stack-first' | 'histogram-first';
 
@@ -35,6 +37,8 @@ export function EffectStackWorkspace({
   const [order, setOrder] = useState<WorkspaceOrder>(readWorkspaceOrder);
   const stackRef = useRef<HTMLDivElement>(null);
   const histogramRef = useRef<HTMLDivElement>(null);
+  const stackWindow = useEffectStackWindowHost(onSelectEffectStack);
+  const stackDetached = stackWindow.isOpen;
 
   const swapOrder = useCallback(() => {
     setOrder(current => current === 'stack-first' ? 'histogram-first' : 'stack-first');
@@ -42,7 +46,8 @@ export function EffectStackWorkspace({
 
   useLayoutEffect(() => {
     const stackX = order === 'stack-first' ? STACK_SLOT_X : HISTOGRAM_SLOT_X;
-    const histogramX = order === 'stack-first' ? HISTOGRAM_SLOT_X : STACK_SLOT_X;
+    // While the stack lives in its own window the histogram takes the first slot.
+    const histogramX = order === 'stack-first' && !stackDetached ? HISTOGRAM_SLOT_X : STACK_SLOT_X;
     const nodes = [
       [stackRef.current, stackX],
       [histogramRef.current, histogramX],
@@ -54,7 +59,7 @@ export function EffectStackWorkspace({
         ? 'none' : 'transform 420ms cubic-bezier(0.65, 0, 0.35, 1)';
       node.style.transform = `translateX(${x}px)`;
     });
-  }, [order]);
+  }, [order, stackDetached]);
 
   useLayoutEffect(() => {
     try {
@@ -72,10 +77,13 @@ export function EffectStackWorkspace({
     >
       <div className="relative h-full min-w-[480px]">
         <div ref={stackRef} className={`absolute left-0 top-0 ${hidden ? 'pointer-events-none' : 'pointer-events-auto'}`}>
-          <PostprocessStackPanel
-            onSwapWorkspace={swapOrder}
-            onSelectEffectStack={onSelectEffectStack}
-          />
+          {!stackDetached && (
+            <PostprocessStackPanel
+              onSwapWorkspace={swapOrder}
+              onSelectEffectStack={onSelectEffectStack}
+              onPopOut={stackWindow.supported ? stackWindow.open : undefined}
+            />
+          )}
         </div>
         <div ref={histogramRef} className={`absolute left-0 top-0 ${hidden ? 'pointer-events-none' : 'pointer-events-auto'}`}>
           <ColorHistogram sourceCanvasRef={sourceCanvasRef} />
