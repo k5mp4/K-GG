@@ -26,7 +26,7 @@ test('every WebGL program compiles and links in a real WebGL2 context', async ({
         'generator', 'blur', 'normalMap', 'stretch', 'stackCore', 'noiseStack',
         'noiseDiffuseStack', 'glass', 'glassV2', 'glassTile', 'prism', 'postprocess',
         'prismComposite', 'particles', 'seamless', 'flowSplat', 'flowTrail',
-        'flowComposite', 'videoMotion',
+        'flowComposite', 'videoMotion', 'threeD',
       ].map(key => [key, getProgramSource(key)] as [string, { vertex: string; fragment: string }]),
     ];
 
@@ -66,5 +66,5 @@ test('every WebGL program compiles and links in a real WebGL2 context', async ({
   for (const result of results) console.log(`[shader] ${result.program}: ${result.ok ? 'ok' : 'FAILED'} (${result.ms}ms)`);
   const failures = results.filter(result => !result.ok);
   expect(failures, JSON.stringify(failures, null, 2)).toEqual([]);
-  expect(results).toHaveLength(20);
+  expect(results).toHaveLength(21);
 });

@@ -427,6 +427,7 @@ describe('effectPipeline', () => {
         prismComposite: true,
         particles: true,
         videoMotion: false,
+        threeD: false,
       });
       expect(plan.capabilities).toEqual({
         required: ['webgl2', 'rgba8-framebuffer'],

@@ -1,199 +1,289 @@
+import type { ReactNode } from 'react';
 import { useLanguage } from '../i18n/LanguageProvider';
+import type { MessageKey } from '../i18n/messages';
 import { useGradientStore } from '../store/gradientStore';
 import { applicationCommands } from '../application/commands';
 import { InputPosition } from 'tweeq';
 import { getParameterLimit } from '../lib/parameterLimits';
 import {
+  CAMERA_WIGGLE_PRESET_OPTIONS,
   CONE_SEAM_MODE_OPTIONS,
+  CONE_SHAPE_OPTIONS,
   DEFAULT_CONE_VIEW,
-  TORUS_WIGGLE_PRESET_OPTIONS,
+  THREE_D_SURFACE_MAPPING_OPTIONS,
+  type CameraWigglePreset,
   type ConeSeamMode,
   type ConeShape,
-  type TorusWigglePreset,
+  type ConeViewConfig,
+  type ThreeDSurfaceMapping,
 } from '../types/coneView';
 import { CustomSelect } from './CustomSelect';
 import { SliderField } from './SliderField';
 
 // Tweeq's InputPosition adds pointer pixels to the value and grows Y downward.
-// Edit the offset in hundredths of a tube radius with Y flipped so a drag
-// moves the camera the same way on screen.
+// Edit the offset in hundredths with Y flipped so a drag moves the camera the
+// same way on screen.
 const CAMERA_POSITION_SCALE = 100;
-const CAMERA_X_LIMIT = getParameterLimit('cone.torusCameraX');
-const CAMERA_Y_LIMIT = getParameterLimit('cone.torusCameraY');
+const CAMERA_X_LIMIT = getParameterLimit('cone.cameraX');
+const CAMERA_Y_LIMIT = getParameterLimit('cone.cameraY');
+
+const SHAPE_TEXT: Record<ConeShape, { title: MessageKey; description: MessageKey; hint?: MessageKey }> = {
+  cone: { title: 'cone.surface', description: 'cone.description' },
+  torus: { title: 'cone.torusSurface', description: 'cone.torusDescription', hint: 'cone.torusHint' },
+};
 
 function toCameraPositionInput(x: number, y: number): [number, number] {
   return [x * CAMERA_POSITION_SCALE, -y * CAMERA_POSITION_SCALE];
+}
+
+function formatDegrees(value: number): string {
+  return `${Math.round(value)}°`;
+}
+
+function Section({ title, children }: { title: string; children: ReactNode }) {
+  return (
+    <div className="space-y-3 border border-cream/25 bg-k-surface/35 p-3">
+      <span className="block font-display text-[9px] font-semibold uppercase tracking-[0.14em] text-cream/60">{title}</span>
+      {children}
+    </div>
+  );
+}
+
+type SetConeView = (value: Partial<ConeViewConfig>) => void;
+
+function ShapeControls({ coneView, setConeView }: { coneView: ConeViewConfig; setConeView: SetConeView }) {
+  if (coneView.shape === 'torus') {
+    return (
+      <>
+        <SliderField
+          label="Bend"
+          value={coneView.torusBend}
+          limitKey="cone.torusBend"
+          onChange={(torusBend) => setConeView({ torusBend })}
+        />
+        <SliderField
+          label="Ring Repeat"
+          value={coneView.ringRepeat}
+          limitKey="cone.ringRepeat"
+          onChange={(ringRepeat) => setConeView({ ringRepeat })}
+        />
+        <SliderField
+          label="Twist"
+          value={coneView.torusTwist}
+          limitKey="cone.torusTwist"
+          format={(value) => value.toFixed(2)}
+          onChange={(torusTwist) => setConeView({ torusTwist })}
+        />
+        <SliderField
+          label="Spin"
+          value={coneView.spin}
+          limitKey="cone.spin"
+          format={(value) => `${Math.round(value)}`}
+          onChange={(spin) => setConeView({ spin })}
+        />
+      </>
+    );
+  }
+  return (
+    <>
+      <SliderField
+        label="Depth"
+        value={coneView.depth}
+        limitKey="cone.depth"
+        onChange={(depth) => setConeView({ depth })}
+      />
+      <SliderField
+        label="Rotation"
+        value={coneView.rotation}
+        limitKey="cone.rotation"
+        control="angle"
+        format={formatDegrees}
+        onChange={(rotation) => setConeView({ rotation })}
+      />
+    </>
+  );
+}
+
+function SurfaceControls({ coneView, setConeView }: { coneView: ConeViewConfig; setConeView: SetConeView }) {
+  return (
+    <>
+      <CustomSelect
+        label="Surface Mapping"
+        value={coneView.surfaceMapping}
+        localizeLabel={false}
+        localizeOptions={false}
+        options={[...THREE_D_SURFACE_MAPPING_OPTIONS]}
+        onChange={(surfaceMapping) => setConeView({ surfaceMapping: surfaceMapping as ThreeDSurfaceMapping })}
+      />
+      <SliderField
+        label="Shade"
+        value={coneView.shade}
+        limitKey="cone.shade"
+        format={(value) => `${Math.round(value * 100)}%`}
+        onChange={(shade) => setConeView({ shade })}
+      />
+      <SliderField
+        label="Fog"
+        value={coneView.fog}
+        limitKey="cone.fog"
+        format={(value) => `${Math.round(value * 100)}%`}
+        onChange={(fog) => setConeView({ fog })}
+      />
+    </>
+  );
+}
+
+function CameraControls({ coneView, setConeView, resetLabel }: { coneView: ConeViewConfig; setConeView: SetConeView; resetLabel: string }) {
+  return (
+    <>
+      <SliderField
+        label="Camera Roll"
+        value={coneView.rotation}
+        limitKey="cone.rotation"
+        control="angle"
+        format={formatDegrees}
+        onChange={(rotation) => setConeView({ rotation })}
+      />
+      <SliderField
+        label="Camera Yaw"
+        value={coneView.cameraYaw}
+        limitKey="cone.cameraYaw"
+        control="angle"
+        format={formatDegrees}
+        onChange={(cameraYaw) => setConeView({ cameraYaw })}
+      />
+      <SliderField
+        label="Camera Pitch"
+        value={coneView.cameraPitch}
+        limitKey="cone.cameraPitch"
+        control="angle"
+        format={formatDegrees}
+        onChange={(cameraPitch) => setConeView({ cameraPitch })}
+      />
+      <div className="space-y-1" data-three-d-camera-position>
+        <div className="flex items-center justify-between gap-2">
+          <span className="text-xs text-deep">Camera Position</span>
+          <button
+            type="button"
+            className="text-[9px] text-cream/55 transition-colors hover:text-fire disabled:opacity-0"
+            disabled={coneView.cameraX === DEFAULT_CONE_VIEW.cameraX && coneView.cameraY === DEFAULT_CONE_VIEW.cameraY}
+            onClick={() => setConeView({ cameraX: DEFAULT_CONE_VIEW.cameraX, cameraY: DEFAULT_CONE_VIEW.cameraY })}
+          >
+            {resetLabel}
+          </button>
+        </div>
+        <InputPosition
+          value={toCameraPositionInput(coneView.cameraX, coneView.cameraY)}
+          min={toCameraPositionInput(CAMERA_X_LIMIT.min, CAMERA_Y_LIMIT.max)}
+          max={toCameraPositionInput(CAMERA_X_LIMIT.max, CAMERA_Y_LIMIT.min)}
+          step={1}
+          onChange={([x, y]) => setConeView({
+            cameraX: x / CAMERA_POSITION_SCALE,
+            cameraY: -y / CAMERA_POSITION_SCALE,
+          })}
+        />
+      </div>
+      <CustomSelect
+        label="Camera Wiggle"
+        value={coneView.wigglePreset}
+        localizeLabel={false}
+        localizeOptions={false}
+        options={[...CAMERA_WIGGLE_PRESET_OPTIONS]}
+        onChange={(wigglePreset) => setConeView({ wigglePreset: wigglePreset as CameraWigglePreset })}
+      />
+      <SliderField
+        label="Wiggle Amount"
+        value={coneView.wiggleAmount}
+        limitKey="cone.wiggleAmount"
+        disabled={coneView.wigglePreset === 'off'}
+        format={(value) => `${Math.round(value * 100)}%`}
+        onChange={(wiggleAmount) => setConeView({ wiggleAmount })}
+      />
+      <SliderField
+        label="Wiggle Speed"
+        value={coneView.wiggleSpeed}
+        limitKey="cone.wiggleSpeed"
+        disabled={coneView.wigglePreset === 'off'}
+        format={(value) => `×${Math.round(value)}`}
+        onChange={(wiggleSpeed) => setConeView({ wiggleSpeed })}
+      />
+    </>
+  );
 }
 
 export function ConeViewPanel() {
   const { t } = useLanguage();
   const { coneView } = useGradientStore();
   const { setConeView } = applicationCommands;
-  const isTorus = coneView.shape === 'torus';
+  const isCone = coneView.shape === 'cone';
+  const shapeText = SHAPE_TEXT[coneView.shape];
 
   return (
     <div className="space-y-3 text-[11px]" data-cone-view-panel>
       <div className="border border-cyan-200/25 bg-cyan-300/[0.04] p-3">
         <div className="flex items-center justify-between gap-3">
           <span className="font-display text-[10px] font-semibold uppercase tracking-[0.16em] text-cyan-100">
-            {t(isTorus ? 'cone.torusSurface' : 'cone.surface')}
+            {t(shapeText.title)}
           </span>
-          <span className="border border-cyan-200/25 bg-k-bg/45 px-2 py-1 font-display text-[8px] font-bold uppercase tracking-[0.13em] text-cyan-100/75">
-            {t('cone.unlit')}
-          </span>
+          {isCone && (
+            <span className="border border-cyan-200/25 bg-k-bg/45 px-2 py-1 font-display text-[8px] font-bold uppercase tracking-[0.13em] text-cyan-100/75">
+              {t('cone.unlit')}
+            </span>
+          )}
         </div>
-        <p className="mt-2 text-[10px] leading-relaxed text-cream/65">{t(isTorus ? 'cone.torusDescription' : 'cone.description')}</p>
+        <p className="mt-2 text-[10px] leading-relaxed text-cream/65">{t(shapeText.description)}</p>
       </div>
 
-      <div className="space-y-3 border border-cream/25 bg-k-surface/35 p-3">
+      <Section title="Shape">
         <CustomSelect
           label="Shape"
           value={coneView.shape}
           localizeLabel={false}
           localizeOptions={false}
-          options={[
-            { value: 'cone', label: 'Cone' },
-            { value: 'torus', label: 'Torus · Tunnel' },
-          ]}
+          options={[...CONE_SHAPE_OPTIONS]}
           onChange={(shape) => setConeView({ shape: shape as ConeShape })}
         />
+        <ShapeControls coneView={coneView} setConeView={setConeView} />
+        {isCone && (
+          <div className="flex items-center justify-between gap-3 border border-cyan-200/20 bg-cyan-300/[0.04] px-2.5 py-2">
+            <div className="min-w-0">
+              <span className="block font-display text-[9px] font-semibold uppercase tracking-[0.12em] text-cyan-100">{t('cone.apexPosition')}</span>
+              <span className="mt-1 block text-[9px] text-cream/55">{t('cone.apexHint')}</span>
+            </div>
+            <button
+              type="button"
+              className="shrink-0 border border-cream/25 px-2 py-1 font-display text-[9px] font-semibold uppercase tracking-[0.08em] text-cream/75 transition-colors hover:border-fire/60 hover:bg-fire/10 hover:text-fire focus:outline-none focus-visible:ring-2 focus-visible:ring-fire"
+              onClick={() => setConeView({ apexX: DEFAULT_CONE_VIEW.apexX, apexY: DEFAULT_CONE_VIEW.apexY })}
+            >
+              {t('cone.resetPosition')}
+            </button>
+          </div>
+        )}
+      </Section>
+
+      {!isCone && (
+        <Section title="Surface">
+          <SurfaceControls coneView={coneView} setConeView={setConeView} />
+        </Section>
+      )}
+
+      {!isCone && (
+        <Section title="Camera">
+          <CameraControls coneView={coneView} setConeView={setConeView} resetLabel={t('cone.resetPosition')} />
+        </Section>
+      )}
+
+      <Section title="Texture & Motion">
         <CustomSelect
           label="Mapping"
           value={coneView.mappingMode}
           localizeOptions={false}
           options={[
-            { value: 'flow', label: 'Flow · Apex → Opening' },
+            { value: 'flow', label: 'Flow · Animated' },
             { value: 'projection', label: 'Direct Projection · Fixed' },
           ]}
           onChange={(mappingMode) => setConeView({ mappingMode: mappingMode as 'flow' | 'projection' })}
         />
-        {isTorus ? (
-          <>
-            <SliderField
-              label="Bend"
-              value={coneView.torusBend}
-              limitKey="cone.torusBend"
-              onChange={(torusBend) => setConeView({ torusBend })}
-            />
-            <SliderField
-              label="Ring Repeat"
-              value={coneView.torusRingRepeat}
-              limitKey="cone.torusRingRepeat"
-              onChange={(torusRingRepeat) => setConeView({ torusRingRepeat })}
-            />
-            <SliderField
-              label="Twist"
-              value={coneView.torusTwist}
-              limitKey="cone.torusTwist"
-              format={(value) => value.toFixed(2)}
-              onChange={(torusTwist) => setConeView({ torusTwist })}
-            />
-            <SliderField
-              label="Spin"
-              value={coneView.torusSpin}
-              limitKey="cone.torusSpin"
-              format={(value) => `${Math.round(value)}`}
-              onChange={(torusSpin) => setConeView({ torusSpin })}
-            />
-          </>
-        ) : (
-          <SliderField
-            label="Depth"
-            value={coneView.depth}
-            limitKey="cone.depth"
-            onChange={(depth) => setConeView({ depth })}
-          />
-        )}
-        <SliderField
-          label={isTorus ? 'Camera Roll' : 'Rotation'}
-          value={coneView.rotation}
-          limitKey="cone.rotation"
-          control="angle"
-          format={(value) => `${Math.round(value)}°`}
-          onChange={(rotation) => setConeView({ rotation })}
-        />
-        {isTorus && (
-          <>
-            <SliderField
-              label="Camera Yaw"
-              value={coneView.torusCameraYaw}
-              limitKey="cone.torusCameraYaw"
-              control="angle"
-              format={(value) => `${Math.round(value)}°`}
-              onChange={(torusCameraYaw) => setConeView({ torusCameraYaw })}
-            />
-            <SliderField
-              label="Camera Pitch"
-              value={coneView.torusCameraPitch}
-              limitKey="cone.torusCameraPitch"
-              control="angle"
-              format={(value) => `${Math.round(value)}°`}
-              onChange={(torusCameraPitch) => setConeView({ torusCameraPitch })}
-            />
-            <div className="space-y-1" data-torus-camera-position>
-              <div className="flex items-center justify-between gap-2">
-                <span className="text-xs text-deep">Camera Position</span>
-                <button
-                  type="button"
-                  className="text-[9px] text-cream/55 transition-colors hover:text-fire disabled:opacity-0"
-                  disabled={coneView.torusCameraX === DEFAULT_CONE_VIEW.torusCameraX && coneView.torusCameraY === DEFAULT_CONE_VIEW.torusCameraY}
-                  onClick={() => setConeView({ torusCameraX: DEFAULT_CONE_VIEW.torusCameraX, torusCameraY: DEFAULT_CONE_VIEW.torusCameraY })}
-                >
-                  {t('cone.resetPosition')}
-                </button>
-              </div>
-              <InputPosition
-                value={toCameraPositionInput(coneView.torusCameraX, coneView.torusCameraY)}
-                min={toCameraPositionInput(CAMERA_X_LIMIT.min, CAMERA_Y_LIMIT.max)}
-                max={toCameraPositionInput(CAMERA_X_LIMIT.max, CAMERA_Y_LIMIT.min)}
-                step={1}
-                onChange={([x, y]) => setConeView({
-                  torusCameraX: x / CAMERA_POSITION_SCALE,
-                  torusCameraY: -y / CAMERA_POSITION_SCALE,
-                })}
-              />
-            </div>
-            <CustomSelect
-              label="Camera Wiggle"
-              value={coneView.torusWigglePreset}
-              localizeLabel={false}
-              localizeOptions={false}
-              options={[...TORUS_WIGGLE_PRESET_OPTIONS]}
-              onChange={(torusWigglePreset) => setConeView({ torusWigglePreset: torusWigglePreset as TorusWigglePreset })}
-            />
-            <SliderField
-              label="Wiggle Amount"
-              value={coneView.torusWiggleAmount}
-              limitKey="cone.torusWiggleAmount"
-              disabled={coneView.torusWigglePreset === 'off'}
-              format={(value) => `${Math.round(value * 100)}%`}
-              onChange={(torusWiggleAmount) => setConeView({ torusWiggleAmount })}
-            />
-            <SliderField
-              label="Wiggle Speed"
-              value={coneView.torusWiggleSpeed}
-              limitKey="cone.torusWiggleSpeed"
-              disabled={coneView.torusWigglePreset === 'off'}
-              format={(value) => `×${Math.round(value)}`}
-              onChange={(torusWiggleSpeed) => setConeView({ torusWiggleSpeed })}
-            />
-          </>
-        )}
-        {!isTorus && (
-        <div className="flex items-center justify-between gap-3 border border-cyan-200/20 bg-cyan-300/[0.04] px-2.5 py-2">
-          <div className="min-w-0">
-            <span className="block font-display text-[9px] font-semibold uppercase tracking-[0.12em] text-cyan-100">{t('cone.apexPosition')}</span>
-            <span className="mt-1 block text-[9px] text-cream/55">{t('cone.apexHint')}</span>
-          </div>
-          <button
-            type="button"
-            className="shrink-0 border border-cream/25 px-2 py-1 font-display text-[9px] font-semibold uppercase tracking-[0.08em] text-cream/75 transition-colors hover:border-fire/60 hover:bg-fire/10 hover:text-fire focus:outline-none focus-visible:ring-2 focus-visible:ring-fire"
-            onClick={() => setConeView({ apexX: DEFAULT_CONE_VIEW.apexX, apexY: DEFAULT_CONE_VIEW.apexY })}
-          >
-            {t('cone.resetPosition')}
-          </button>
-        </div>
-        )}
         <SliderField
           label="Texture Repeat"
           value={coneView.textureRepeat}
@@ -222,14 +312,14 @@ export function ConeViewPanel() {
           disabled={coneView.mappingMode === 'projection'}
           onChange={(flowCycles) => setConeView({ flowCycles })}
         />
-      </div>
+      </Section>
 
       <p className="px-1 text-[9px] leading-relaxed text-cream/55">
         {coneView.mappingMode === 'projection'
-          ? 'Direct Projection keeps the processed 2D frame fixed on the cone and does not advance Flow Cycles.'
+          ? 'Direct Projection keeps the processed 2D frame fixed on the surface and does not advance Flow Cycles.'
           : t('cone.flowHint')}
       </p>
-      {isTorus && <p className="px-1 text-[9px] leading-relaxed text-cream/55">{t('cone.torusHint')}</p>}
+      {shapeText.hint && <p className="px-1 text-[9px] leading-relaxed text-cream/55">{t(shapeText.hint)}</p>}
       <p className="px-1 text-[9px] leading-relaxed text-cream/55">{t('cone.seamHint')}</p>
     </div>
   );

@@ -35,7 +35,7 @@ describe('cone view configuration', () => {
       apexY: -99,
       seamBlend: 2,
       torusBend: 5,
-      torusRingRepeat: 7.4,
+      ringRepeat: 7.4,
     })).toEqual({
       shape: 'cone',
       depth: 30,
@@ -47,17 +47,20 @@ describe('cone view configuration', () => {
       seamBlend: 0.5,
       seamMode: 'mirror',
       mappingMode: 'flow',
+      surfaceMapping: 'uv',
+      fog: 0,
+      shade: 0,
       torusBend: 0.9,
-      torusRingRepeat: 7,
+      ringRepeat: 7,
       torusTwist: 0,
-      torusSpin: 0,
-      torusCameraX: 0,
-      torusCameraY: 0,
-      torusCameraYaw: 0,
-      torusCameraPitch: 0,
-      torusWigglePreset: 'off',
-      torusWiggleAmount: 1,
-      torusWiggleSpeed: 1,
+      spin: 0,
+      cameraX: 0,
+      cameraY: 0,
+      cameraYaw: 0,
+      cameraPitch: 0,
+      wigglePreset: 'off',
+      wiggleAmount: 1,
+      wiggleSpeed: 1,
     });
   });
 
@@ -65,34 +68,40 @@ describe('cone view configuration', () => {
     expect(DEFAULT_CONE_VIEW.shape).toBe('cone');
     expect(normalizeConeViewConfig({ depth: 8 }).shape).toBe('cone');
     expect(normalizeConeViewConfig({ shape: 'torus' }).shape).toBe('torus');
-    expect(normalizeConeViewConfig({ shape: 'sphere' }).shape).toBe('cone');
+    expect(normalizeConeViewConfig({ shape: 'pyramid' }).shape).toBe('cone');
+    expect(normalizeConeViewConfig({ surfaceMapping: 'matcap', fog: 3, shade: -1 })).toMatchObject({
+      surfaceMapping: 'matcap',
+      fog: 1,
+      shade: 0,
+    });
+    expect(normalizeConeViewConfig({ surfaceMapping: 'cubemap' }).surfaceMapping).toBe('uv');
     expect(normalizeConeViewConfig({ torusBend: 0 }).torusBend).toBe(0.05);
-    expect(normalizeConeViewConfig({ torusRingRepeat: 0 }).torusRingRepeat).toBe(1);
+    expect(normalizeConeViewConfig({ ringRepeat: 0 }).ringRepeat).toBe(1);
   });
 
   it('clamps Twist and rounds Spin to whole turns', () => {
-    expect(normalizeConeViewConfig({ torusTwist: 9, torusSpin: 2.4 })).toMatchObject({ torusTwist: 4, torusSpin: 2 });
-    expect(normalizeConeViewConfig({ torusTwist: -9, torusSpin: -99 })).toMatchObject({ torusTwist: -4, torusSpin: -8 });
+    expect(normalizeConeViewConfig({ torusTwist: 9, spin: 2.4 })).toMatchObject({ torusTwist: 4, spin: 2 });
+    expect(normalizeConeViewConfig({ torusTwist: -9, spin: -99 })).toMatchObject({ torusTwist: -4, spin: -8 });
   });
 
   it('normalizes the torus wiggle settings', () => {
-    expect(normalizeConeViewConfig({ torusWigglePreset: 'handheld' }).torusWigglePreset).toBe('handheld');
-    expect(normalizeConeViewConfig({ torusWigglePreset: 'earthquake' }).torusWigglePreset).toBe('off');
-    expect(normalizeConeViewConfig({ torusWiggleAmount: 9, torusWiggleSpeed: 2.6 })).toMatchObject({
-      torusWiggleAmount: 2,
-      torusWiggleSpeed: 3,
+    expect(normalizeConeViewConfig({ wigglePreset: 'handheld' }).wigglePreset).toBe('handheld');
+    expect(normalizeConeViewConfig({ wigglePreset: 'earthquake' }).wigglePreset).toBe('off');
+    expect(normalizeConeViewConfig({ wiggleAmount: 9, wiggleSpeed: 2.6 })).toMatchObject({
+      wiggleAmount: 2,
+      wiggleSpeed: 3,
     });
   });
 
   it('wraps rotation-like angles and clamps the torus camera offset', () => {
     expect(normalizeConeViewConfig({ rotation: -90 }).rotation).toBe(270);
-    expect(normalizeConeViewConfig({ torusCameraYaw: 390, torusCameraPitch: -30 })).toMatchObject({
-      torusCameraYaw: 30,
-      torusCameraPitch: 330,
+    expect(normalizeConeViewConfig({ cameraYaw: 390, cameraPitch: -30 })).toMatchObject({
+      cameraYaw: 30,
+      cameraPitch: 330,
     });
-    expect(normalizeConeViewConfig({ torusCameraX: 2, torusCameraY: -2 })).toMatchObject({
-      torusCameraX: 0.8,
-      torusCameraY: -0.8,
+    expect(normalizeConeViewConfig({ cameraX: 2, cameraY: -2 })).toMatchObject({
+      cameraX: 0.8,
+      cameraY: -0.8,
     });
   });
 

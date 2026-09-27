@@ -2,9 +2,10 @@ import {
   CONE_APEX_LIMIT,
   CONE_SEAM_MODE_INDEX,
   CONE_SHAPE_INDEX,
+  THREE_D_SURFACE_MAPPING_INDEX,
   type ConeViewConfig,
   type ConeSeamMode,
-  type TorusWigglePreset,
+  type CameraWigglePreset,
 } from '../types/coneView';
 
 export const CONE_CAMERA_DISTANCE = 1.25;
@@ -92,7 +93,7 @@ export function getConeTextureTransform(
   const rotationTurns = config.rotation / 360;
   return {
     repeatU: config.textureRepeat,
-    // Torus uses Rotation as a camera roll (see getTorusCamera) so the
+    // Torus uses Rotation as a camera roll (see getThreeDCamera) so the
     // tunnel's bend direction can be chosen. Its texture turns around the tube
     // only through Spin, in whole turns per loop.
     offsetU: config.shape === 'torus'
@@ -111,7 +112,7 @@ export function getConeShapeIndex(config: ConeViewConfig): number {
 }
 
 function getTorusSpinOffset(config: ConeViewConfig, normalizedTime: number): number {
-  const turns = Math.round(safeFinite(config.torusSpin, 0)) * normalizedTime;
+  const turns = Math.round(safeFinite(config.spin, 0)) * normalizedTime;
   return turns - Math.floor(turns);
 }
 
@@ -121,7 +122,7 @@ function getTorusSpinOffset(config: ConeViewConfig, normalizedTime: number): num
  * ring angle wraps.
  */
 export function getTorusTwistTurns(config: ConeViewConfig): number {
-  const ringRepeat = Math.max(1, Math.round(safeFinite(config.torusRingRepeat, 1)));
+  const ringRepeat = Math.max(1, Math.round(safeFinite(config.ringRepeat, 1)));
   return Math.round(safeFinite(config.torusTwist, 0) * ringRepeat);
 }
 
@@ -130,7 +131,7 @@ export function getTorusMajorRadius(config: ConeViewConfig): number {
   return 1 / Math.max(0.01, Math.min(0.95, safeFinite(config.torusBend, 0.3)));
 }
 
-export type TorusCamera = {
+export type ThreeDCamera = {
   /** Offset inside the tube cross-section in camera-right/up tube radii, before roll. */
   offsetX: number;
   offsetY: number;
@@ -141,7 +142,7 @@ export type TorusCamera = {
 };
 
 /** Keeps the camera clear of the tube wall (radius 1) regardless of direction. */
-export const TORUS_CAMERA_MAX_OFFSET = 0.8;
+export const CAMERA_MAX_OFFSET = 0.8;
 
 type WiggleChannel = 'yaw' | 'pitch' | 'roll' | 'x' | 'y';
 
@@ -166,7 +167,7 @@ type WiggleSpin = {
   turns: number;
 };
 
-const TORUS_WIGGLE_TERMS: Record<TorusWigglePreset, readonly WiggleTerm[]> = {
+const CAMERA_WIGGLE_TERMS: Record<CameraWigglePreset, readonly WiggleTerm[]> = {
   off: [],
   // A slow look-around: one wide sweep per loop with a lazy second harmonic.
   drift: [
@@ -213,11 +214,11 @@ const TORUS_WIGGLE_TERMS: Record<TorusWigglePreset, readonly WiggleTerm[]> = {
   ],
 };
 
-const TORUS_WIGGLE_SPINS: Partial<Record<TorusWigglePreset, readonly WiggleSpin[]>> = {
+const CAMERA_WIGGLE_SPINS: Partial<Record<CameraWigglePreset, readonly WiggleSpin[]>> = {
   lookAround: [{ channel: 'yaw', turns: 1 }],
 };
 
-export type TorusWiggle = Record<WiggleChannel, number>;
+export type CameraWiggle = Record<WiggleChannel, number>;
 
 /**
  * Evaluates the wiggle preset at a loop-normalized time. Amplitudes are
@@ -225,12 +226,12 @@ export type TorusWiggle = Record<WiggleChannel, number>;
  * 1 give identical values (angles modulo a full turn) and the camera motion
  * loops seamlessly.
  */
-export function getTorusWiggle(config: ConeViewConfig, normalizedTime: number): TorusWiggle {
-  const wiggle: TorusWiggle = { yaw: 0, pitch: 0, roll: 0, x: 0, y: 0 };
-  const terms = TORUS_WIGGLE_TERMS[config.torusWigglePreset] ?? TORUS_WIGGLE_TERMS.off;
-  const spins = TORUS_WIGGLE_SPINS[config.torusWigglePreset] ?? [];
-  const amount = Math.max(0, safeFinite(config.torusWiggleAmount, 1));
-  const speed = Math.max(1, Math.round(safeFinite(config.torusWiggleSpeed, 1)));
+export function getCameraWiggle(config: ConeViewConfig, normalizedTime: number): CameraWiggle {
+  const wiggle: CameraWiggle = { yaw: 0, pitch: 0, roll: 0, x: 0, y: 0 };
+  const terms = CAMERA_WIGGLE_TERMS[config.wigglePreset] ?? CAMERA_WIGGLE_TERMS.off;
+  const spins = CAMERA_WIGGLE_SPINS[config.wigglePreset] ?? [];
+  const amount = Math.max(0, safeFinite(config.wiggleAmount, 1));
+  const speed = Math.max(1, Math.round(safeFinite(config.wiggleSpeed, 1)));
   const time = safeFinite(normalizedTime, 0);
   for (const spin of spins) {
     // Keep the angle in [0, 360) so the end of the loop equals its start.
@@ -245,22 +246,85 @@ export function getTorusWiggle(config: ConeViewConfig, normalizedTime: number): 
   return wiggle;
 }
 
-export function getTorusCamera(config: ConeViewConfig, normalizedTime = 0): TorusCamera {
-  const wiggle = getTorusWiggle(config, normalizedTime);
-  let offsetX = safeFinite(config.torusCameraX, 0) + wiggle.x;
-  let offsetY = safeFinite(config.torusCameraY, 0) + wiggle.y;
+export function getThreeDCamera(config: ConeViewConfig, normalizedTime = 0): ThreeDCamera {
+  const wiggle = getCameraWiggle(config, normalizedTime);
+  let offsetX = safeFinite(config.cameraX, 0) + wiggle.x;
+  let offsetY = safeFinite(config.cameraY, 0) + wiggle.y;
   const length = Math.hypot(offsetX, offsetY);
-  if (length > TORUS_CAMERA_MAX_OFFSET) {
-    offsetX *= TORUS_CAMERA_MAX_OFFSET / length;
-    offsetY *= TORUS_CAMERA_MAX_OFFSET / length;
+  if (length > CAMERA_MAX_OFFSET) {
+    offsetX *= CAMERA_MAX_OFFSET / length;
+    offsetY *= CAMERA_MAX_OFFSET / length;
   }
   const degrees = Math.PI / 180;
   return {
     offsetX,
     offsetY,
-    yawRadians: (safeFinite(config.torusCameraYaw, 0) + wiggle.yaw) * degrees,
-    pitchRadians: (safeFinite(config.torusCameraPitch, 0) + wiggle.pitch) * degrees,
+    yawRadians: (safeFinite(config.cameraYaw, 0) + wiggle.yaw) * degrees,
+    pitchRadians: (safeFinite(config.cameraPitch, 0) + wiggle.pitch) * degrees,
     rollRadians: (safeFinite(config.rotation, 0) + wiggle.roll) * degrees,
+  };
+}
+
+/** Every uniform value of the dedicated 3D program, independent of WebGL. */
+export type ThreeDRenderParams = {
+  shape: number;
+  surfaceMapping: number;
+  fog: number;
+  shade: number;
+  /** Loop-normalized geometric motion (in shape-specific units), 0 when fixed. */
+  travel: number;
+  tangentHalfFov: number;
+  textureRepeat: number;
+  textureOffset: [number, number];
+  seamBlend: number;
+  seamMode: number;
+  camera: ThreeDCamera;
+  cone: {
+    cameraDistance: number;
+    depth: number;
+    apertureRadius: number;
+    apexOffset: [number, number];
+  };
+  torus: {
+    majorRadius: number;
+    ringRepeat: number;
+    twistTurns: number;
+  };
+};
+
+export function getThreeDRenderParams(
+  config: ConeViewConfig,
+  normalizedTime: number,
+  aspect: number,
+): ThreeDRenderParams {
+  const transform = getConeTextureTransform(config, normalizedTime);
+  const safeAspect = Math.max(0.001, safeFinite(aspect, 1));
+  const apexOffset = getConeApexOffset(CONE_CAMERA_DISTANCE, config.depth, safeAspect, config.apexX, config.apexY);
+  const camera = getThreeDCamera(config, normalizedTime);
+  return {
+    shape: getConeShapeIndex(config),
+    surfaceMapping: THREE_D_SURFACE_MAPPING_INDEX[config.surfaceMapping] ?? 0,
+    fog: clamp(safeFinite(config.fog, 0), 0, 1),
+    shade: clamp(safeFinite(config.shade, 0), 0, 1),
+    travel: 0,
+    tangentHalfFov: Math.tan(CONE_CAMERA_FOV * Math.PI / 360),
+    textureRepeat: transform.repeatU,
+    textureOffset: [transform.offsetU, transform.offsetV],
+    seamBlend: transform.seamBlend,
+    seamMode: CONE_SEAM_MODE_INDEX[transform.seamMode],
+    // The Cone keeps Rotation as a texture offset, so it does not roll.
+    camera: config.shape === 'cone' ? { ...camera, rollRadians: 0 } : camera,
+    cone: {
+      cameraDistance: CONE_CAMERA_DISTANCE,
+      depth: config.depth,
+      apertureRadius: getConeApertureRadius(CONE_CAMERA_DISTANCE, safeAspect),
+      apexOffset: [apexOffset.x, apexOffset.y],
+    },
+    torus: {
+      majorRadius: getTorusMajorRadius(config),
+      ringRepeat: config.ringRepeat,
+      twistTurns: getTorusTwistTurns(config),
+    },
   };
 }
 

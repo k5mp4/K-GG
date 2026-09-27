@@ -25,217 +25,14 @@ import flowSplatFragmentGLSL from '../shaders/flow-splat.frag.glsl?raw';
 import flowTrailFragmentGLSL from '../shaders/flow-trail.frag.glsl?raw';
 import flowGradientFragmentGLSL from '../shaders/flow-gradient.frag.glsl?raw';
 import videoMotionGLSL from '../shaders/video-motion.frag.glsl?raw';
+import threeDGLSL from '../shaders/three-d.frag.glsl?raw';
 import { CONE_GRADIENT_REAPPLY_SHADER } from './coneSeam';
-
-// The orderable Cone layer projects the preceding stack texture onto the same
-// open cone surface used by ConeViewRenderer. Keeping this shader beside the
-// seam reference preserves the existing input-texture mapping instead of
-// synthesizing a separate color ramp.
-const coneStackGLSL = `
-#if !defined(KGG_STACK_NOISE_ONLY)
-vec4 coneTextureLookup(vec2 uv) {
-  return texture2D(u_sourceTex, sourceUvFromGlobal(uv));
-}
-
-float coneSeamWeight(float coordinate, float blendWidth) {
-  float distanceToSeam = min(coordinate, 1.0 - coordinate);
-  return 1.0 - smoothstep(0.0, max(blendWidth, 0.00001), distanceToSeam);
-}
-
-vec2 coneMirrorRepeatUv(vec2 uv) {
-  return abs(fract(uv) * 2.0 - 1.0);
-}
-
-vec4 coneMirrorRepeatSample(vec2 uv, float blendWidth) {
-  vec2 tiledUv = fract(uv);
-  float seamWeight = max(coneSeamWeight(tiledUv.x, blendWidth), coneSeamWeight(tiledUv.y, blendWidth));
-  vec4 normal = coneTextureLookup(tiledUv);
-  if (seamWeight <= 0.0) return normal;
-  vec4 mirrored = coneTextureLookup(coneMirrorRepeatUv(uv));
-  return mix(normal, mirrored, seamWeight);
-}
-
-vec4 coneEdgeWeldSample(vec2 uv, float blendWidth) {
-  float seamX = coneSeamWeight(uv.x, blendWidth);
-  float seamY = coneSeamWeight(uv.y, blendWidth);
-  vec4 center = coneTextureLookup(uv);
-  vec4 welded = center;
-  if (seamX > 0.0) {
-    vec4 edgeX = 0.5 * (
-      coneTextureLookup(vec2(0.0, uv.y)) +
-      coneTextureLookup(vec2(1.0, uv.y))
-    );
-    welded = mix(welded, edgeX, seamX);
-  }
-  if (seamY > 0.0) {
-    vec4 edgeY = 0.5 * (
-      coneTextureLookup(vec2(uv.x, 0.0)) +
-      coneTextureLookup(vec2(uv.x, 1.0))
-    );
-    welded = mix(welded, edgeY, seamY);
-  }
-  if (seamX > 0.0 && seamY > 0.0) {
-    vec4 corners = 0.25 * (
-      coneTextureLookup(vec2(0.0, 0.0)) +
-      coneTextureLookup(vec2(1.0, 0.0)) +
-      coneTextureLookup(vec2(0.0, 1.0)) +
-      coneTextureLookup(vec2(1.0, 1.0))
-    );
-    welded = mix(welded, corners, seamX * seamY);
-  }
-  return welded;
-}
-
-${CONE_GRADIENT_REAPPLY_SHADER}
-
-vec2 coneMappedUv(vec2 globalUv, out bool hitCone) {
-  float aspect = u_fullResolution.x / max(u_fullResolution.y, 1.0);
-  vec2 ndc = globalUv * 2.0 - 1.0;
-  vec3 rayDirection = vec3(
-    ndc.x * aspect * u_coneTangentHalfFov,
-    ndc.y * u_coneTangentHalfFov,
-    -1.0
-  );
-  float depth = max(u_coneDepth, 0.001);
-  float cameraDistance = max(u_coneCameraDistance, 0.001);
-  vec2 apexOffset = u_coneApexOffset;
-  vec2 rayFromBase = rayDirection.xy - apexOffset / depth;
-  vec2 baseOffset = apexOffset * cameraDistance / depth;
-  float radiusSlope = u_coneApertureRadius / depth;
-  float radiusIntercept = u_coneApertureRadius * (cameraDistance + depth) / depth;
-  float qa = dot(rayFromBase, rayFromBase) - radiusSlope * radiusSlope;
-  float qb = 2.0 * dot(rayFromBase, baseOffset) + 2.0 * radiusSlope * radiusIntercept;
-  float qc = dot(baseOffset, baseOffset) - radiusIntercept * radiusIntercept;
-  hitCone = false;
-  float minDistance = cameraDistance;
-  float maxDistance = cameraDistance + depth;
-  float distance = maxDistance + 1.0;
-  if (abs(qa) < 0.000001) {
-    if (abs(qb) < 0.000001) return vec2(0.0);
-    float linearDistance = -qc / qb;
-    if (linearDistance >= minDistance && linearDistance <= maxDistance) distance = linearDistance;
-  } else {
-    float discriminant = qb * qb - 4.0 * qa * qc;
-    if (discriminant < 0.0) return vec2(0.0);
-    float root = sqrt(max(discriminant, 0.0));
-    float firstDistance = (-qb - root) / (2.0 * qa);
-    float secondDistance = (-qb + root) / (2.0 * qa);
-    if (firstDistance >= minDistance && firstDistance <= maxDistance) distance = firstDistance;
-    if (secondDistance >= minDistance && secondDistance <= maxDistance) distance = min(distance, secondDistance);
-  }
-  if (distance < minDistance || distance > maxDistance) return vec2(0.0);
-  vec2 surfacePoint = rayDirection.xy * distance;
-  float depthFraction = (distance - cameraDistance) / depth;
-  vec2 radialPoint = surfacePoint - apexOffset * depthFraction;
-  float u = fract(atan(radialPoint.x, radialPoint.y) / 6.283185307179586);
-  float v = clamp((distance - cameraDistance) / depth, 0.0, 1.0);
-  hitCone = true;
-  return vec2(u, v);
-}
-
-// Torus tunnel: the camera sits on the ring's center line inside a tube of
-// radius 1 and looks along the ring tangent. The ring lies in the XZ plane
-// with its center at (-R, 0, 0), so the tube bends toward -X; u_coneRoll rolls
-// the camera to choose the bend direction on screen. The camera yaws into the
-// bend so the screen center aims at the farthest center-line point whose line
-// of sight still clears the tube wall by half its radius: sagitta
-// R * (1 - cos(yaw)) = 0.5, keeping the tunnel's far end near the center. The texture wraps around
-// the tube (u) and along the ring (v, in tiles); rotating the ring past a
-// fixed camera is equivalent to advancing v, which the caller does through
-// u_coneTextureOffset.y.
-float torusInteriorDistance(vec3 p, float majorRadius) {
-  vec3 q = p + vec3(majorRadius, 0.0, 0.0);
-  return 1.0 - length(vec2(length(q.xz) - majorRadius, q.y));
-}
-
-vec2 torusMappedUv(vec2 globalUv, out bool hitTorus) {
-  float aspect = u_fullResolution.x / max(u_fullResolution.y, 1.0);
-  vec2 ndc = globalUv * 2.0 - 1.0;
-  vec2 screenRay = vec2(ndc.x * aspect, ndc.y) * u_coneTangentHalfFov;
-  // Camera orientation: user pitch and yaw in the camera frame, then roll
-  // around the forward axis, then the automatic aim into the bend. Applying
-  // the user look first keeps yaw horizontal and pitch vertical on screen
-  // whatever the roll is.
-  vec3 cameraRay = vec3(screenRay, -1.0);
-  float pitchCos = cos(u_torusCameraPitch);
-  float pitchSin = sin(u_torusCameraPitch);
-  cameraRay = vec3(
-    cameraRay.x,
-    cameraRay.y * pitchCos - cameraRay.z * pitchSin,
-    cameraRay.y * pitchSin + cameraRay.z * pitchCos
-  );
-  float lookCos = cos(u_torusCameraYaw);
-  float lookSin = sin(u_torusCameraYaw);
-  cameraRay = vec3(
-    cameraRay.x * lookCos + cameraRay.z * lookSin,
-    cameraRay.y,
-    -cameraRay.x * lookSin + cameraRay.z * lookCos
-  );
-  float rollCos = cos(u_coneRoll);
-  float rollSin = sin(u_coneRoll);
-  mat2 roll = mat2(rollCos, rollSin, -rollSin, rollCos);
-  cameraRay.xy = roll * cameraRay.xy;
-  float majorRadius = max(u_torusMajorRadius, 1.05);
-  // Looking backward, the tunnel behind bends the same way, so the aim into
-  // the bend flips sign; looking sideways at the wall needs none. Scaling by
-  // cos(yaw) keeps the far end in view while the user yaw turns a full circle.
-  float yaw = acos(clamp(1.0 - 0.5 / majorRadius, -1.0, 1.0)) * cos(u_torusCameraYaw);
-  float yawCos = cos(yaw);
-  float yawSin = sin(yaw);
-  vec3 rayDirection = normalize(vec3(
-    cameraRay.x * yawCos + cameraRay.z * yawSin,
-    cameraRay.y,
-    -cameraRay.x * yawSin + cameraRay.z * yawCos
-  ));
-  // The camera moves inside the tube cross-section at its ring position, so
-  // the offset follows the roll but not the look direction.
-  vec3 rayOrigin = vec3(roll * u_torusCameraOffset, 0.0);
-  // Sphere tracing from inside the tube: the interior distance is the exact
-  // distance to the wall, so each step stays inside and converges on the hit.
-  float distance = 0.0;
-  float wallDistance = 1.0;
-  for (int i = 0; i < 96; i++) {
-    wallDistance = torusInteriorDistance(rayOrigin + rayDirection * distance, majorRadius);
-    if (wallDistance < 0.0005 * (1.0 + distance)) break;
-    distance += wallDistance;
-  }
-  // A ray that starts inside the closed tube always meets the wall. Grazing
-  // rays near the vanishing point may run out of steps; their last point is
-  // already close to the wall, so keep it instead of drawing a hole.
-  hitTorus = true;
-  vec3 q = rayOrigin + rayDirection * distance + vec3(majorRadius, 0.0, 0.0);
-  // The forward (-Z) direction is the positive ring angle.
-  float ringAngle = atan(-q.z, q.x);
-  float tubeAngle = atan(q.y, length(q.xz) - majorRadius);
-  float ringTurns = ringAngle / 6.283185307179586;
-  // Twist turns the texture around the tube along the ring. Combined with the
-  // Flow offset on v, the pattern spirals toward the camera like a vortex.
-  float u = fract(tubeAngle / 6.283185307179586 + 0.25 + u_torusTwistTurns * ringTurns);
-  float v = ringTurns * max(u_torusRingRepeat, 1.0);
-  return vec2(u, v);
-}
-
-vec4 coneViewSample(vec2 globalUv) {
-  bool hitCone;
-  vec2 mappedUv = u_coneShape == 1
-    ? torusMappedUv(globalUv, hitCone)
-    : coneMappedUv(globalUv, hitCone);
-  if (!hitCone) return vec4(0.0, 0.0, 0.0, 1.0);
-  vec2 unwrappedUv = mappedUv * vec2(u_coneTextureRepeat, 1.0) + u_coneTextureOffset;
-  vec2 sampleUv = fract(unwrappedUv);
-  if (u_coneSeamMode == 0) return coneMirrorRepeatSample(unwrappedUv, u_coneSeamBlend);
-  if (u_coneSeamMode == 1) return coneEdgeWeldSample(sampleUv, u_coneSeamBlend);
-  return coneGradientReapplySample(sampleUv, u_coneSeamBlend);
-}
-#endif
-`;
 
 const postprocessGLSL = [
   postprocessUniformsGLSL,
   postprocessSharedGLSL,
   postprocessPrismGLSL,
   postprocessStackGLSL,
-  coneStackGLSL,
   postprocessDiffuseGLSL,
   postprocessGlassFieldGLSL,
   postprocessGlassOpticsGLSL,
@@ -262,7 +59,8 @@ export type LazyProgramKey =
   | 'flowSplat'
   | 'flowTrail'
   | 'flowComposite'
-  | 'videoMotion';
+  | 'videoMotion'
+  | 'threeD';
 
 export type ProgramSource = {
   vertex: string;
@@ -376,6 +174,7 @@ export const SHADER_VERSION = (
   + flowTrailFragmentGLSL.length * 59
   + flowGradientFragmentGLSL.length * 53
   + videoMotionGLSL.length * 47
+  + threeDGLSL.length * 43
 ) | 0;
 
 // Keep these symbols in the dedicated Glass sources explicitly instead of
@@ -429,6 +228,12 @@ function createSpecializedPostprocessSource(
   );
 }
 
+// The 3D layer's seam modes share the Gradient Reapply implementation with
+// the CPU reference in coneSeam.ts; splice it into the dedicated program.
+function createThreeDSource(): string {
+  return threeDGLSL.replace('// KGG_CONE_GRADIENT_REAPPLY_SHADER', CONE_GRADIENT_REAPPLY_SHADER);
+}
+
 function createStackCoreSource(): string {
   // The ordinary stack never evaluates Noise. Keeping its large procedural
   // implementation out of this program is important on ANGLE, where merely
@@ -440,7 +245,6 @@ function createStackCoreSource(): string {
     'vec2 diffuseHash(vec2 p) {\n  vec3 p3 = fract(vec3(p.xyx) * vec3(0.1031, 0.1030, 0.0973));\n  p3 += dot(p3, p3.yzx + 33.33);\n  return fract((p3.xx + p3.yz) * p3.zy) * 2.0 - 1.0;\n}\n',
     postprocessSharedGLSL,
     postprocessStackGLSL,
-    coneStackGLSL,
     postprocessDiffuseGLSL,
     postprocessMainGLSL,
   ].join('');
@@ -518,6 +322,7 @@ export function getProgramSource(key: LazyProgramKey): ProgramSource {
   if (key === 'flowTrail') return { vertex: vertexGLSL, fragment: flowTrailFragmentGLSL };
   if (key === 'flowComposite') return { vertex: vertexGLSL, fragment: flowGradientFragmentGLSL };
   if (key === 'videoMotion') return { vertex: vertexGLSL, fragment: videoMotionGLSL };
+  if (key === 'threeD') return { vertex: vertexGLSL, fragment: createThreeDSource() };
   return { vertex: particlesVertexGLSL, fragment: particlesFragmentGLSL };
 }
 

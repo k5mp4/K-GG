@@ -11,7 +11,6 @@ import {
 } from './flowGradientRenderer';
 import type { GradientConfig } from '../types/gradient';
 import {
-  CONE_SEAM_MODE_INDEX,
   DEFAULT_CONE_VIEW,
   normalizeConeViewConfig,
   type ConeViewConfig,
@@ -81,17 +80,8 @@ import { installWebGLResourceLedger, type WebGLResourceLedger } from './webglRes
 import { normalizeVideoMotionConfig, type VideoMotionConfig } from '../types/videoMotion';
 import { getVideoMotionRuntime } from './videoMotionRuntime';
 import { VIDEO_MOTION_FIELD_HEIGHT, VIDEO_MOTION_FIELD_WIDTH } from './videoMotionSource';
-import {
-  CONE_CAMERA_DISTANCE,
-  CONE_CAMERA_FOV,
-  getConeApertureRadius,
-  getConeApexOffset,
-  getConeShapeIndex,
-  getConeTextureTransform,
-  getTorusCamera,
-  getTorusMajorRadius,
-  getTorusTwistTurns,
-} from './coneView';
+import { getThreeDRenderParams } from './coneView';
+import { uploadThreeDUniforms } from './threeDUniforms';
 
 export type { TileRenderOptions } from '../types/rendering';
 
@@ -100,7 +90,7 @@ export { SHADER_VERSION };
 type ShaderCompileExt = { COMPLETION_STATUS_KHR: number } | null;
 const PARALLEL_SHADER_COMPILE_TIMEOUT_MS = 30_000;
 const GLASS_PARALLEL_SHADER_COMPILE_TIMEOUT_MS = Number.POSITIVE_INFINITY;
-type TextureStackKind = PostprocessStackKind | 'diffuse' | 'noise' | 'slit' | 'cone';
+type TextureStackKind = PostprocessStackKind | 'diffuse' | 'noise' | 'slit';
 type LazyProgramState = {
   promise: Promise<void> | null;
   failed: boolean;
@@ -296,6 +286,8 @@ export type WebGLContext = {
   particleInstanceSeed: number;
   videoMotionProgram: WebGLProgram | null;
   videoMotionUniforms: Record<string, WebGLUniformLocation | null>;
+  threeDProgram: WebGLProgram | null;
+  threeDUniforms: Record<string, WebGLUniformLocation | null>;
   videoMotionFieldTexture: WebGLTexture;
   videoMotionFeedbackTexture: WebGLTexture;
   videoMotionFeedbackSize: [number, number];
@@ -849,7 +841,7 @@ export async function initWebGL(canvas: HTMLCanvasElement): Promise<WebGLContext
   ownedFlowGradient = flowGradient;
   const transitionTextureFrom = ownTexture(createTexture(gl));
   const transitionTextureTo = ownTexture(createTexture(gl));
-  const ctx: WebGLContext = { gl, performanceProfiler, gpuDiagnostics, renderOptimization, program, uniforms, geometryBuffer, transitionGeometryBuffer, generatorProgram: null, generatorUniforms: {}, gradientRampTexture, meshGradientTexture, meshGradientTextureSignature: '', diffuseCurveTexture, diffuseCurveSignature: '', diffuseAsciiTexture, diffuseAsciiSignature: '', diffuseAsciiCount: 1, diffuseAsciiRows: ASCII_ATLAS_MAX_ROWS, diffuseHistogramAt: 0, manualDistortTexture, manualDistortDisplacement: null, manualDistortSmoothMask: null, manualDistortMapResolution: 0, sourceImageTexture, sourceImageCanvas: null, imageGradientTexture, imageGradientSource: null, imageMaskTexture, imageMaskSource: null, normalMapProgram: null, normalMapUniforms: {}, videoMotionProgram: null, videoMotionUniforms: {}, videoMotionFieldTexture, videoMotionFeedbackTexture, videoMotionFeedbackSize: [0, 0], videoMotionFeedbackPrimed: false, videoMotionFeedbackResetVersion: 0, gradFbo, gradTexture, blurProgram: null, blurUniforms: {}, stretchProgram: null, stretchUniforms: {}, seamlessProgram: null, seamlessUniforms: {}, postprocessProgram: null, postprocessUniforms: {}, stackCoreProgram: null, stackCoreUniforms: {}, noiseStackProgram: null, noiseStackUniforms: {}, noiseDiffuseStackProgram: null, noiseDiffuseStackUniforms: {}, glassProgram: null, glassUniforms: {}, glassFallbackActive: false, glassV2Program: null, glassV2Uniforms: {}, glassV2FallbackActive: false, glassTileProgram: null, glassTileUniforms: {}, glassTileFallbackActive: false, prismProgram: null, prismUniforms: {}, prismCompositeProgram: null, prismCompositeUniforms: {}, particleProgram: null, particleUniforms: {}, particleVao: null, particleQuadBuffer: null, particleInstanceBuffer: null, particleInstanceCount: 0, particleInstanceSeed: Number.NaN, flowGradient, normalFbo, normalTexture, hBlurFbo, hBlurTexture, postprocessFboA, postprocessTextureA, postprocessFboB, postprocessTextureB, prismScratchFbo, prismScratchTexture, prismBlurFbo, prismBlurTexture, prismGlowFbo, prismGlowTexture, shaderCompileExt, lazyProgramState: createLazyProgramState(), lazyProgramCompileQueue: createSerialAsyncQueue(), resourceLedger, hasPresentedFrame: false, disposed: false };
+  const ctx: WebGLContext = { gl, performanceProfiler, gpuDiagnostics, renderOptimization, program, uniforms, geometryBuffer, transitionGeometryBuffer, generatorProgram: null, generatorUniforms: {}, gradientRampTexture, meshGradientTexture, meshGradientTextureSignature: '', diffuseCurveTexture, diffuseCurveSignature: '', diffuseAsciiTexture, diffuseAsciiSignature: '', diffuseAsciiCount: 1, diffuseAsciiRows: ASCII_ATLAS_MAX_ROWS, diffuseHistogramAt: 0, manualDistortTexture, manualDistortDisplacement: null, manualDistortSmoothMask: null, manualDistortMapResolution: 0, sourceImageTexture, sourceImageCanvas: null, imageGradientTexture, imageGradientSource: null, imageMaskTexture, imageMaskSource: null, normalMapProgram: null, normalMapUniforms: {}, videoMotionProgram: null, videoMotionUniforms: {}, threeDProgram: null, threeDUniforms: {}, videoMotionFieldTexture, videoMotionFeedbackTexture, videoMotionFeedbackSize: [0, 0], videoMotionFeedbackPrimed: false, videoMotionFeedbackResetVersion: 0, gradFbo, gradTexture, blurProgram: null, blurUniforms: {}, stretchProgram: null, stretchUniforms: {}, seamlessProgram: null, seamlessUniforms: {}, postprocessProgram: null, postprocessUniforms: {}, stackCoreProgram: null, stackCoreUniforms: {}, noiseStackProgram: null, noiseStackUniforms: {}, noiseDiffuseStackProgram: null, noiseDiffuseStackUniforms: {}, glassProgram: null, glassUniforms: {}, glassFallbackActive: false, glassV2Program: null, glassV2Uniforms: {}, glassV2FallbackActive: false, glassTileProgram: null, glassTileUniforms: {}, glassTileFallbackActive: false, prismProgram: null, prismUniforms: {}, prismCompositeProgram: null, prismCompositeUniforms: {}, particleProgram: null, particleUniforms: {}, particleVao: null, particleQuadBuffer: null, particleInstanceBuffer: null, particleInstanceCount: 0, particleInstanceSeed: Number.NaN, flowGradient, normalFbo, normalTexture, hBlurFbo, hBlurTexture, postprocessFboA, postprocessTextureA, postprocessFboB, postprocessTextureB, prismScratchFbo, prismScratchTexture, prismBlurFbo, prismBlurTexture, prismGlowFbo, prismGlowTexture, shaderCompileExt, lazyProgramState: createLazyProgramState(), lazyProgramCompileQueue: createSerialAsyncQueue(), resourceLedger, hasPresentedFrame: false, disposed: false };
   initializedContext = ctx;
   effectStackTransitionResources.set(ctx, {
     program: transitionProgram,
@@ -918,6 +910,7 @@ export function disposeWebGL(ctx: WebGLContext): void {
     ctx.prismCompositeProgram,
     ctx.particleProgram,
     ctx.videoMotionProgram,
+    ctx.threeDProgram,
   ];
   const uniquePrograms = new Set(programs.filter((program): program is WebGLProgram => Boolean(program)));
   for (const program of uniquePrograms) gl.deleteProgram(program);
@@ -1105,6 +1098,7 @@ function createLazyProgramState(): Record<LazyProgramKey, LazyProgramState> {
     flowTrail: { promise: null, failed: false, timedOut: false, fallback: false },
     flowComposite: { promise: null, failed: false, timedOut: false, fallback: false },
     videoMotion: { promise: null, failed: false, timedOut: false, fallback: false },
+    threeD: { promise: null, failed: false, timedOut: false, fallback: false },
   };
 }
 
@@ -1439,6 +1433,9 @@ function installLazyProgram(ctx: WebGLContext, key: LazyProgramKey, program: Web
   } else if (key === 'videoMotion') {
     ctx.videoMotionProgram = program;
     ctx.videoMotionUniforms = getVideoMotionUniforms(gl, program);
+  } else if (key === 'threeD') {
+    ctx.threeDProgram = program;
+    ctx.threeDUniforms = getPostprocessUniforms(gl, program);
   } else {
     const uniforms = getParticleUniforms(gl, program);
     ctx.particleProgram = program;
@@ -1532,6 +1529,7 @@ function lazyProgramReady(ctx: WebGLContext, key: LazyProgramKey): boolean {
     blur: [ctx.blurProgram, ctx.blurUniforms],
     normalMap: [ctx.normalMapProgram, ctx.normalMapUniforms],
     videoMotion: [ctx.videoMotionProgram, ctx.videoMotionUniforms],
+    threeD: [ctx.threeDProgram, ctx.threeDUniforms],
     stretch: [ctx.stretchProgram, ctx.stretchUniforms],
     seamless: [ctx.seamlessProgram, ctx.seamlessUniforms],
     stackCore: [ctx.stackCoreProgram, ctx.stackCoreUniforms],
@@ -2305,8 +2303,6 @@ type DrawPostprocessPassOptions = {
   useV2Programs?: boolean;
   diffuseAfterSlit?: boolean;
   useNoiseDiffuseStack?: boolean;
-  coneView?: ConeViewConfig;
-  coneNormalizedTime?: number;
 };
 
 function drawPostprocessPass(
@@ -2336,8 +2332,6 @@ function drawPostprocessPass(
     useV2Programs = false,
     diffuseAfterSlit = false,
     useNoiseDiffuseStack = false,
-    coneView = DEFAULT_CONE_VIEW,
-    coneNormalizedTime = 0,
   } = options;
   const { gl } = ctx;
   if (
@@ -2358,7 +2352,6 @@ function drawPostprocessPass(
     || effectMode === 'kaleidoscope'
     || effectMode === 'voronoi'
     || effectMode === 'diffuse'
-    || effectMode === 'cone'
   );
   const glassProgram = effectMode === 'glassV2'
     ? ctx.glassV2Program
@@ -2460,43 +2453,9 @@ function drawPostprocessPass(
       gl.uniform2f(ctx.postprocessUniforms.u_gradAnchor1, anchors[1][0], anchors[1][1]);
       gl.uniform1f(ctx.postprocessUniforms.u_maxDisplacement, postprocess.maxDisplacement);
       setUniform1i(gl, ctx.postprocessUniforms.u_effectEnabled, 1);
-      const effectModeMap = { distort: 0, mirror: 1, kaleidoscope: 2, prism: 3, voronoi: 4, glass: 5, diffuse: 6, noise: 7, slit: 8, glassV2: 9, glassTile: 10, cone: 11, particles: 0 } as const;
+      const effectModeMap = { distort: 0, mirror: 1, kaleidoscope: 2, prism: 3, voronoi: 4, glass: 5, diffuse: 6, noise: 7, slit: 8, glassV2: 9, glassTile: 10, particles: 0 } as const;
       setUniform1i(gl, ctx.postprocessUniforms.u_effectMode, effectModeMap[effectMode]);
       setUniform1i(gl, ctx.postprocessUniforms.u_stackSlitDiffuseAfter, diffuseAfterSlit ? 1 : 0);
-    }
-    if (effectMode === 'cone') {
-      const normalizedConeView = normalizeConeViewConfig(coneView);
-      const textureTransform = getConeTextureTransform(normalizedConeView, coneNormalizedTime);
-      const aspect = Math.max(0.001, fullWidth / Math.max(fullHeight, 1));
-      const apertureRadius = getConeApertureRadius(CONE_CAMERA_DISTANCE, aspect);
-      const apexOffset = getConeApexOffset(
-        CONE_CAMERA_DISTANCE,
-        normalizedConeView.depth,
-        aspect,
-        normalizedConeView.apexX,
-        normalizedConeView.apexY,
-      );
-      gl.uniform1f(ctx.postprocessUniforms.u_coneCameraDistance, CONE_CAMERA_DISTANCE);
-      gl.uniform1f(ctx.postprocessUniforms.u_coneTangentHalfFov, Math.tan(CONE_CAMERA_FOV * Math.PI / 360));
-      gl.uniform1f(ctx.postprocessUniforms.u_coneDepth, normalizedConeView.depth);
-      gl.uniform1f(ctx.postprocessUniforms.u_coneApertureRadius, apertureRadius);
-      gl.uniform2f(ctx.postprocessUniforms.u_coneApexOffset, apexOffset.x, apexOffset.y);
-      gl.uniform1f(ctx.postprocessUniforms.u_coneTextureRepeat, textureTransform.repeatU);
-      gl.uniform2f(ctx.postprocessUniforms.u_coneTextureOffset, textureTransform.offsetU, textureTransform.offsetV);
-      gl.uniform1f(ctx.postprocessUniforms.u_coneSeamBlend, textureTransform.seamBlend);
-      setUniform1i(gl, ctx.postprocessUniforms.u_coneSeamMode, CONE_SEAM_MODE_INDEX[textureTransform.seamMode]);
-      setUniform1i(gl, ctx.postprocessUniforms.u_coneShape, getConeShapeIndex(normalizedConeView));
-      gl.uniform1f(ctx.postprocessUniforms.u_torusMajorRadius, getTorusMajorRadius(normalizedConeView));
-      gl.uniform1f(ctx.postprocessUniforms.u_torusRingRepeat, normalizedConeView.torusRingRepeat);
-      gl.uniform1f(ctx.postprocessUniforms.u_torusTwistTurns, getTorusTwistTurns(normalizedConeView));
-      const torusCamera = getTorusCamera(normalizedConeView, coneNormalizedTime);
-      gl.uniform1f(
-        ctx.postprocessUniforms.u_coneRoll,
-        normalizedConeView.shape === 'torus' ? torusCamera.rollRadians : 0,
-      );
-      gl.uniform2f(ctx.postprocessUniforms.u_torusCameraOffset, torusCamera.offsetX, torusCamera.offsetY);
-      gl.uniform1f(ctx.postprocessUniforms.u_torusCameraYaw, torusCamera.yawRadians);
-      gl.uniform1f(ctx.postprocessUniforms.u_torusCameraPitch, torusCamera.pitchRadians);
     }
   setUniform1i(gl, ctx.postprocessUniforms.u_noiseEnabled, noiseDistortion.enabled ? 1 : 0);
   setUniform1i(gl, ctx.postprocessUniforms.u_noiseType, NOISE_TYPE_MAP[noiseDistortion.type]);
@@ -3297,6 +3256,43 @@ function drawVideoMotionPass(
   return true;
 }
 
+function drawThreeDPass(
+  ctx: WebGLContext,
+  sourceTexture: WebGLTexture,
+  coneView: ConeViewConfig,
+  normalizedTime: number,
+  width: number,
+  height: number,
+  fullWidth: number,
+  fullHeight: number,
+  offsetX: number,
+  offsetY: number,
+  targetFramebuffer: WebGLFramebuffer | null,
+): boolean {
+  if (!ctx.threeDProgram) return false;
+  const { gl } = ctx;
+  const uniforms = ctx.threeDUniforms;
+  const params = getThreeDRenderParams(
+    normalizeConeViewConfig(coneView),
+    normalizedTime,
+    fullWidth / Math.max(fullHeight, 1),
+  );
+  gl.useProgram(ctx.threeDProgram);
+  gl.viewport(0, 0, width, height);
+  gl.disable(gl.BLEND);
+  gl.bindFramebuffer(gl.FRAMEBUFFER, targetFramebuffer);
+  gl.activeTexture(gl.TEXTURE3);
+  gl.bindTexture(gl.TEXTURE_2D, sourceTexture);
+  setUniform1i(gl, uniforms.u_sourceTex, 3);
+  gl.uniform2f(uniforms.u_fullResolution, fullWidth, fullHeight);
+  gl.uniform2f(uniforms.u_tileOffset, offsetX, offsetY);
+  gl.uniform2f(uniforms.u_tileResolution, width, height);
+  uploadThreeDUniforms(gl, uniforms, params);
+  drawArrays(ctx, '3D', gl.TRIANGLES, 0, 6);
+  if (targetFramebuffer === null) ctx.hasPresentedFrame = true;
+  return true;
+}
+
 function copyVideoMotionFeedback(ctx: WebGLContext, sourceTexture: WebGLTexture, width: number, height: number): void {
   const sourceFramebuffer = getFramebufferForTexture(ctx, sourceTexture);
   if (!sourceFramebuffer) return;
@@ -3486,6 +3482,11 @@ export function render(
     : false;
   const videoMotionRequested = (isV2Pipeline ? videoMotionStackEnabled : videoMotion.enabled) && !tile;
   const videoMotionActive = videoMotionRequested && requestLazyProgram(ctx, 'videoMotion');
+  const threeDRequested = isV2Pipeline && effectPipeline
+    ? isEffectStackLayerEnabled(effectPipeline, 'cone')
+    : false;
+  const threeDActive = threeDRequested && requestLazyProgram(ctx, 'threeD');
+  const threeDPending = threeDRequested && !threeDActive && !ctx.lazyProgramState.threeD.failed;
   const { gl, program, uniforms, gradientRampTexture, meshGradientTexture, sourceImageTexture, imageGradientTexture, imageMaskTexture } = ctx;
   gradient = { ...gradient, angle: clampParameter(gradient.angle, 0, getParameterLimit('gradient.angle')) };
   noiseDistortion = {
@@ -3945,7 +3946,7 @@ export function render(
 
     // Lazy programs compile asynchronously. Keep a usable base frame until every
     // requested V2 stage is available instead of presenting a partial stack.
-    if (!generatorReady || !stackCoreReady || !noiseDiffuseCompositionReady || !normalReady || !stretchReady || !prismReady || !particlesReady || !seamlessReady || !flowProgramsReady || (videoMotionRequested && !videoMotionActive)) {
+    if (!generatorReady || !stackCoreReady || !noiseDiffuseCompositionReady || !normalReady || !stretchReady || !prismReady || !particlesReady || !seamlessReady || !flowProgramsReady || (videoMotionRequested && !videoMotionActive) || threeDPending) {
       // Cloth is a Base generator and does not depend on the stack programs:
       // present the cloth frame even while they compile.
       const clothReady = clothGradient?.enabled
@@ -4132,6 +4133,16 @@ export function render(
         }
         continue;
       }
+      if (layer.kind === 'cone') {
+        // The 3D layer has its own lazily compiled program. If that program
+        // failed, leave the layer out instead of freezing the stack.
+        if (!threeDActive) continue;
+        const target = choosePostprocessTarget(ctx, currentTexture);
+        if (drawThreeDPass(ctx, currentTexture, coneView, flowNormalizedTime, vpW, vpH, width, height, tileOx, tileOy, target.fbo)) {
+          currentTexture = target.texture;
+        }
+        continue;
+      }
       // A Diffuse immediately before Slit is evaluated in Slit's destination
       // space. This prevents the slit sampler from stretching the already
       // diffused grid into stripes while keeping the layer order visible.
@@ -4164,8 +4175,6 @@ export function render(
             slitAnimTimeOverride,
             useV2Programs: true,
             diffuseAfterSlit,
-            coneView,
-            coneNormalizedTime: flowNormalizedTime,
           },
         );
       }
