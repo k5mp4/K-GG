@@ -3,7 +3,7 @@ import { createDefaultEffectStack, updateEffectStackLayer } from '../lib/effectP
 import { optimizeNoiseDistortion, type RenderOptimization } from '../lib/gpuDiagnostics';
 import { normalizeNoiseDistortionConfig, normalizePostprocessConfig, STORE_DEFAULTS, useGradientStore } from './gradientStore';
 
-function layerEnabled(kind: 'diffuse' | 'noise' | 'slit' | 'distort' | 'videoMotion'): boolean {
+function layerEnabled(kind: 'diffuse' | 'noise' | 'slit' | 'distort' | 'datamosh'): boolean {
   return useGradientStore.getState().effectPipeline.effectStack
     .find(layer => layer.kind === kind)?.enabled ?? false;
 }
@@ -39,20 +39,21 @@ describe('Gradient store Effect Pipeline V2 synchronization', () => {
     expect(layerEnabled('slit')).toBe(true);
   });
 
-  it('keeps Video Motion config and the canonical stack layer synchronized', () => {
+  it('keeps the Datamosh config and its Effect Stack layer synchronized', () => {
     const store = useGradientStore.getState();
 
-    store.setVideoMotion({ enabled: true });
-    expect(layerEnabled('videoMotion')).toBe(true);
+    store.setDatamosh({ enabled: true, blockSize: 400 });
+    expect(layerEnabled('datamosh')).toBe(true);
+    expect(useGradientStore.getState().datamosh.blockSize).toBe(128);
 
     store.setEffectPipeline({
       effectStack: updateEffectStackLayer(
         useGradientStore.getState().effectPipeline.effectStack,
-        'videoMotion',
+        'datamosh',
         { enabled: false },
       ),
     });
-    expect(useGradientStore.getState().videoMotion.enabled).toBe(false);
+    expect(useGradientStore.getState().datamosh.enabled).toBe(false);
   });
 
   it('includes the orderable Cone layer in the Postprocess enabled-state summary', () => {

@@ -13,7 +13,7 @@ import { renderBridge } from '../lib/renderBridge';
 import { LatestFrameScheduler } from '../lib/latestFrameScheduler';
 import { publishProcessedCanvasFrame } from '../lib/processedCanvasClock';
 import { syncVideoMotionToTimeline } from '../lib/videoMotionRuntime';
-import { isEffectStackLayerEnabled } from '../lib/effectPipeline';
+import { getDatamoshVideoFieldOptions, isDatamoshVideoSourceActive } from '../types/datamosh';
 import { useLanguage } from '../i18n/LanguageProvider';
 import { WebGLPerformancePanel } from './WebGLPerformancePanel';
 import type { KggControlProjectAdapter, KggControlUiAdapter } from '../lib/kggControlRuntime';
@@ -45,7 +45,7 @@ export function GradientCanvas({ width = 800, height = 800, animLoopRef, seekVer
     staticRenderSchedulerRef.current = new LatestFrameScheduler();
   }
 
-  const { gradient, noiseDistortion, diffuse, imageGradient, slitScan, stretch, animation, normalMap, manualDistort, postprocess, effectPipeline, keyframeTracks, currentTime, clothGradient, coneView, seamless, flowGradient, videoMotion } = useGradientStore(useShallow(selectRenderState));
+  const { gradient, noiseDistortion, diffuse, imageGradient, slitScan, stretch, animation, normalMap, manualDistort, postprocess, effectPipeline, keyframeTracks, currentTime, clothGradient, coneView, seamless, flowGradient, datamosh } = useGradientStore(useShallow(selectRenderState));
   const clothGradientForCanvas = disableClothBase
     ? { ...clothGradient, enabled: false }
     : clothGradient;
@@ -55,14 +55,11 @@ export function GradientCanvas({ width = 800, height = 800, animLoopRef, seekVer
   const [lazyProgramReadyCount, setLazyProgramReadyCount] = useState(0);
 
   const syncVideoMotionFrame = (frameState: LatestState, normalizedTime: number, timelinePlaying: boolean) => {
-    const enabled = frameState.effectPipeline.version === 'stack-v2'
-      ? isEffectStackLayerEnabled(frameState.effectPipeline, 'videoMotion')
-      : frameState.videoMotion?.enabled === true;
-    if (!enabled || !frameState.videoMotion) return;
+    if (!frameState.datamosh || !isDatamoshVideoSourceActive(frameState.datamosh)) return;
     syncVideoMotionToTimeline(
       normalizedTime,
       frameState.animation.duration,
-      frameState.videoMotion,
+      getDatamoshVideoFieldOptions(frameState.datamosh),
       { timelinePlaying, timelineControlled: frameState.animation.enabled },
     );
   };
@@ -112,7 +109,7 @@ export function GradientCanvas({ width = 800, height = 800, animLoopRef, seekVer
 
   // latestRef を毎レンダー更新（ブラウザ描画前に同期更新し、RAFループが即座に最新値を参照できるようにする）
   useLayoutEffect(() => {
-    latestRef.current = { gradient, noiseDistortion, diffuse, imageGradient, slitScan, stretch, normalMap, manualDistort, postprocess, effectPipeline, animation, keyframeTracks, width, height, animDirection: animation.direction, sourceImageCanvas, imageGradientSource, imageMaskSource, imageMaskEnabled, clothGradient: clothGradientForCanvas, coneView, seamless, flowGradient, videoMotion };
+    latestRef.current = { gradient, noiseDistortion, diffuse, imageGradient, slitScan, stretch, normalMap, manualDistort, postprocess, effectPipeline, animation, keyframeTracks, width, height, animDirection: animation.direction, sourceImageCanvas, imageGradientSource, imageMaskSource, imageMaskEnabled, clothGradient: clothGradientForCanvas, coneView, seamless, flowGradient, datamosh };
   });
 
   // 静止レンダリング（アニメーション停止中の状態変化に反応）
@@ -136,7 +133,7 @@ export function GradientCanvas({ width = 800, height = 800, animLoopRef, seekVer
         publishProcessedCanvasFrame(normalizedTime);
       });
     });
-  }, [gradient, noiseDistortion, diffuse, imageGradient, slitScan, stretch, normalMap, manualDistort, postprocess, effectPipeline, clothGradient, coneView, seamless, flowGradient, videoMotion, disableClothBase, width, height, animation.enabled, animation.speed, animation.direction, animation.easing, animation.affectNoise, animation.affectSlit, animation.affectRamp, animation.affectStretch, keyframeTracks, currentTime, lazyProgramReadyCount, seekVersion, isWebGLReady, sourceImageCanvas, imageGradientSource, imageMaskSource, imageMaskEnabled]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [gradient, noiseDistortion, diffuse, imageGradient, slitScan, stretch, normalMap, manualDistort, postprocess, effectPipeline, clothGradient, coneView, seamless, flowGradient, datamosh, disableClothBase, width, height, animation.enabled, animation.speed, animation.direction, animation.easing, animation.affectNoise, animation.affectSlit, animation.affectRamp, animation.affectStretch, keyframeTracks, currentTime, lazyProgramReadyCount, seekVersion, isWebGLReady, sourceImageCanvas, imageGradientSource, imageMaskSource, imageMaskEnabled]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // アニメーションループの管理
   useEffect(() => {

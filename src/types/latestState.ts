@@ -16,7 +16,7 @@ import type { ClothGradientConfig } from './clothGradient';
 import type { ConeViewConfig } from './coneView';
 import type { SeamlessConfig } from './seamless';
 import type { FlowGradientConfig } from './flowGradient';
-import type { VideoMotionConfig } from './videoMotion';
+import type { DatamoshConfig } from './datamosh';
 
 export type LatestState = {
   gradient: GradientConfig;
@@ -30,7 +30,7 @@ export type LatestState = {
   coneView: ConeViewConfig;
   seamless?: SeamlessConfig;
   flowGradient?: FlowGradientConfig;
-  videoMotion?: VideoMotionConfig;
+  datamosh?: DatamoshConfig;
   manualDistort: ManualDistortConfig;
   postprocess: PostprocessConfig;
   effectPipeline: EffectPipelineConfig;

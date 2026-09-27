@@ -5,11 +5,11 @@ title: Preset System
 status: current
 owners: [maintainer]
 created: 2026-07-27
-updated: 2026-09-26
+updated: 2026-09-27
 requirement_ids: [PRESET-001, PRESET-002, PRESET-003, PRESET-004, PRESET-005, PRESET-006, PRESET-007, PRESET-008, PRESET-009, PRESET-011, PRESET-012, PRESET-013, PRESET-014, PRESET-016, PRESET-017, PRESET-018]
-related_adrs: [ADR-0007, ADR-0008]
+related_adrs: [ADR-0007, ADR-0008, ADR-20260927-datamosh-feedback-layer]
 related_changes: [CHANGE-001, CHANGE-012, CHANGE-013, CHANGE-018, CHANGE-024, CHANGE-025, CHANGE-026, CHANGE-027, CHANGE-030, CHANGE-031, CHANGE-032, CHANGE-034, CHANGE-037, CHANGE-039, CHANGE-046, CHANGE-048, CHANGE-051]
-related_code: [src/lib/presetModel.ts, src/lib/presetLibrary.ts, src/lib/presets.ts, src/lib/presetPreview.ts, src/lib/presetThumbnail.ts, src/lib/flowGradientRenderer.ts, src/types/flowGradient.ts, src/types/videoMotion.ts, src/lib/effectPipeline.ts, src/lib/glass.ts, src/lib/postprocessStack.ts, src/store/gradientStore.ts, src/components/PresetPanel.tsx, src/components/FlowGradientPanel.tsx, src/components/VideoMotionPanel.tsx, src/components/PresetPreview.tsx, src/components/ClothCanvas.tsx, src/types/coneView.ts, src/adapters/types.ts, src/adapters/browser/presetRepository.ts, src/adapters/tauri/presetRepository.ts, src-tauri/src/lib.rs]
+related_code: [src/lib/presetModel.ts, src/lib/presetLibrary.ts, src/lib/presets.ts, src/lib/presetPreview.ts, src/lib/presetThumbnail.ts, src/lib/flowGradientRenderer.ts, src/types/flowGradient.ts, src/types/datamosh.ts, src/lib/effectPipeline.ts, src/lib/glass.ts, src/lib/postprocessStack.ts, src/store/gradientStore.ts, src/components/PresetPanel.tsx, src/components/FlowGradientPanel.tsx, src/components/DatamoshPanel.tsx, src/components/PresetPreview.tsx, src/components/ClothCanvas.tsx, src/types/coneView.ts, src/adapters/types.ts, src/adapters/browser/presetRepository.ts, src/adapters/tauri/presetRepository.ts, src-tauri/src/lib.rs]
 related_tests: [src/lib/presetLibrary.test.ts, src/lib/presetModel.diffuse.test.ts, src/lib/presetModel.slit.test.ts, src/lib/presetModel.removedEffects.test.ts, src/lib/flowGradientPreset.test.ts, src/lib/presetPreview.test.ts, src/lib/presetThumbnail.test.ts, src/lib/glass.test.ts, src/lib/postprocessStack.test.ts, src/store/gradientStore.glass.test.ts, src/store/gradientStore.postprocessStack.test.ts, src/store/gradientStore.animation.test.ts, src/types/coneView.test.ts, src/lib/effectPipeline.test.ts]
 ---
 
@@ -93,11 +93,11 @@ Presetは`effectPipeline.flowGradientEnabled`と`flowGradient`のFlow設定を�
 
 ### PRESET-017 SANDBOX設定の完全保存
 
-Preset保存時のスナップショットには、Cloth、Cone、Normal、Prism、Particles、Flow Gradient、Seamlessの永続化対象設定を含めます。Clothは`clothGradient`、Coneは`coneView`と`effectPipeline.effectStack`、Normal／Prism／Particlesは`normalMap`と`effectPipeline`、Flow Gradientは`flowGradient`と`effectPipeline.flowGradientEnabled`、Seamlessは`seamless`として保存・復元します。旧Presetで欠落している任意設定は各normalizerの既定値へ補完します。Canvas／Clothの一時表示面、SANDBOXの選択中Edit Layer、GPU資源は保存しません。
+Preset保存時のスナップショットには、Cloth、Cone、Normal、Prism、Particles、Flow Gradient、Datamosh、Seamlessの永続化対象設定を含めます。Clothは`clothGradient`、Coneは`coneView`と`effectPipeline.effectStack`、Normal／Prism／Particlesは`normalMap`と`effectPipeline`、Flow Gradientは`flowGradient`と`effectPipeline.flowGradientEnabled`、Datamoshは`datamosh`と`effectPipeline.effectStack`、Seamlessは`seamless`として保存・復元します。旧Presetで欠落している任意設定は各normalizerの既定値へ補完します。Canvas／Clothの一時表示面、SANDBOXの選択中Edit Layer、GPU資源は保存しません。
 
-### PRESET-018 Video Motion設定の保存互換
+### PRESET-018 Datamosh設定とVideo Motionの保存互換
 
-PresetはVideo Motionの固定Mode `feedback`とFeedback設定を`videoMotion`として保存・復元します。開発中の旧Mode値は`feedback`へ正規化し、削除済みMode固有値は保存しません。動画ファイル、Object URL、HTMLVideoElement、motion fieldの履歴は保存しません。Video Motion設定を持たない旧Presetは無効な既定値へ正規化し、動画未接続時も既存のGradient描画を継続します。
+PresetはDatamoshレイヤーのmotion source、Mix Mode、各パラメータを`datamosh`として、有効状態と順序を`effectPipeline.effectStack`として保存・復元し、範囲外の値は各パラメータの範囲へ、未知のmotion source／Mix Modeは既定値へ正規化します。動画ファイル、Object URL、HTMLVideoElement、motion field、Datamoshの履歴textureは保存しません。Effect Stackの`videoMotion`レイヤーは同じ位置の`datamosh`レイヤーへ、`datamosh`を持たない旧Presetの`videoMotion`設定は`Video Motion` source・`Ramp Lock`のDatamosh設定へ、読み込み時に移行します（CURRENT-EFFECT-STACKのDATAMOSH-005）。保存時は`videoMotion`を書き出しません。どちらも持たない旧Presetは無効な既定値へ正規化し、動画未接続時も既存のGradient描画を継続します。
 
 ## 他領域との関係
 

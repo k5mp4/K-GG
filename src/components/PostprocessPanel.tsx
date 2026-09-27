@@ -13,9 +13,9 @@ import { useLanguage } from '../i18n/LanguageProvider';
 import { InputColor, InputDrum, InputRadio, InputString } from 'tweeq';
 import { hasEnabledPostprocessEffectStack } from '../lib/effectPipeline';
 import { ConeViewPanel } from './ConeViewPanel';
+import { DatamoshPanel } from './DatamoshPanel';
 import { getDiffuseGrainParameterLimitKey } from '../lib/parameterLimits';
 import { VORONOI_FEATURES, VORONOI_METRICS } from '../lib/voronoi';
-import { VideoMotionPanel } from './VideoMotionPanel';
 import { StretchPanel } from './StretchPanel';
 
 const D = STORE_DEFAULTS.manualDistort;
@@ -357,16 +357,16 @@ export function PostprocessPanel({ sandboxMode, embedded = false }: PostprocessP
   const { t } = useLanguage();
   const { gradient, postprocess, effectPipeline } = useGradientStore();
   const { setGradient, setPostprocess, setEffectPipeline } = applicationCommands;
-  const selectedVideoMotion = !sandboxMode
-    && effectPipeline.version === 'stack-v2'
-    && effectPipeline.selectedKind === 'videoMotion';
   const selectedCone = !sandboxMode && effectPipeline.selectedKind === 'cone';
   const selectedStretch = !sandboxMode
     && effectPipeline.version === 'stack-v2'
     && effectPipeline.selectedKind === 'stretch';
+  const selectedDatamosh = !sandboxMode
+    && effectPipeline.version === 'stack-v2'
+    && effectPipeline.selectedKind === 'datamosh';
   const activeEffectMode = sandboxMode ?? (
-    selectedVideoMotion
-      ? 'videoMotion'
+    selectedDatamosh
+      ? 'datamosh'
       : selectedStretch
       ? 'stretch'
       : postprocess.effectMode === 'prism' || postprocess.effectMode === 'particles'
@@ -427,16 +427,16 @@ export function PostprocessPanel({ sandboxMode, embedded = false }: PostprocessP
             { value: 'voronoi', label: 'Voronoi' },
             { value: 'glassV2', label: 'Glass' },
             { value: 'glassTile', label: 'GlassTile' },
-            { value: 'videoMotion', label: 'Video Motion' },
+            { value: 'datamosh', label: 'Datamosh' },
           ]}
           onChange={(value) => {
-            if (value === 'videoMotion' || value === 'stretch') {
+            if (value === 'datamosh' || value === 'stretch') {
               setEffectPipeline({ selectedKind: value });
             } else {
               const effectMode = value as Exclude<PostprocessStackKind, 'prism'>;
               setEffectMode(effectMode);
               // Keep the stack selection in step so a previously selected
-              // Video Motion / Stretch layer no longer pins the module.
+              // Datamosh / Stretch layer no longer pins the module.
               setEffectPipeline({ selectedKind: effectMode === 'glassV2' ? 'glass' : effectMode });
             }
           }}
@@ -445,8 +445,9 @@ export function PostprocessPanel({ sandboxMode, embedded = false }: PostprocessP
 
       <Collapsible isOpen>
         <div className="space-y-4 pt-2">
-          <div hidden={activeEffectMode !== 'videoMotion'}>
-            <VideoMotionPanel />
+          {/* Stays mounted so a loaded video survives layer switches. */}
+          <div hidden={activeEffectMode !== 'datamosh'}>
+            <DatamoshPanel />
           </div>
           <div data-cone-settings={selectedCone ? 'shown' : 'hidden'} hidden={!selectedCone}>
             <ConeViewPanel />
@@ -456,7 +457,7 @@ export function PostprocessPanel({ sandboxMode, embedded = false }: PostprocessP
               <StretchPanel showEnabledToggle={false} />
             </div>
           )}
-          {activeEffectMode !== 'videoMotion' && activeEffectMode !== 'stretch' && !selectedCone && (
+          {activeEffectMode !== 'datamosh' && activeEffectMode !== 'stretch' && !selectedCone && (
           <>
           {isDistort ? (
             <ManualDistortControls

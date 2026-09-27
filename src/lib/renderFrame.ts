@@ -40,7 +40,7 @@ export function renderFrame(ctx: WebGLContext, request: RenderFrameRequest): voi
     request.flowNormalizedTime ?? 0,
     request.flowLoopEnabled ?? true,
     request.flowSessionId ?? 'preview',
-    request.videoMotion,
+    request.datamosh,
     request.coneView,
   );
 }

@@ -230,7 +230,7 @@ export type EffectStackKind =
   | 'voronoi'
   | 'glass'
   | 'glassTile'
-  | 'videoMotion'
+  | 'datamosh'
   | 'cone';
 
 export type EffectStackLayer = {

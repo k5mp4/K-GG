@@ -15,7 +15,7 @@ import type {
   StretchConfig,
 } from '../types/distortion';
 import type { SeamlessConfig } from '../types/seamless';
-import type { VideoMotionConfig } from '../types/videoMotion';
+import type { DatamoshConfig } from '../types/datamosh';
 import type { WorkspaceSlice } from './workspaceSlice';
 
 /**
@@ -36,7 +36,7 @@ export type DocumentState = {
   coneView: ConeViewConfig;
   seamless: SeamlessConfig;
   flowGradient: FlowGradientConfig;
-  videoMotion: VideoMotionConfig;
+  datamosh: DatamoshConfig;
   manualDistort: ManualDistortConfig;
   postprocess: PostprocessConfig;
   effectPipeline: EffectPipelineConfig;
@@ -72,7 +72,7 @@ export type DocumentActions = {
   setConeView: (value: Partial<ConeViewConfig>) => void;
   setSeamless: (value: Partial<SeamlessConfig>) => void;
   setFlowGradient: (value: Partial<FlowGradientConfig>) => void;
-  setVideoMotion: (value: Partial<VideoMotionConfig>) => void;
+  setDatamosh: (value: Partial<DatamoshConfig>) => void;
   setManualDistort: (value: Partial<ManualDistortConfig>) => void;
   setPostprocess: (value: Partial<PostprocessConfig>) => void;
   setEffectPipeline: (value: Partial<EffectPipelineConfig>) => void;
@@ -108,7 +108,7 @@ export function createDocumentState(defaults: DocumentDefaults): DocumentState {
     coneView: { ...defaults.coneView },
     seamless: { ...defaults.seamless },
     flowGradient: { ...defaults.flowGradient },
-    videoMotion: { ...defaults.videoMotion },
+    datamosh: { ...defaults.datamosh },
     manualDistort: {
       ...defaults.manualDistort,
       displacement: [...defaults.manualDistort.displacement],

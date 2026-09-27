@@ -32,7 +32,7 @@ import {
 import { normalizeDiffuseBezier, resolveDiffuseBezier } from '../lib/diffuseCurve';
 import { clampParameter, getParameterLimit, normalizeTrackValue } from '../lib/parameterLimits';
 import { normalizeFlowGradientConfig } from '../types/flowGradient';
-import { normalizeVideoMotionConfig } from '../types/videoMotion';
+import { normalizeDatamoshConfig } from '../types/datamosh';
 import {
   getBeatSyncDurationSeconds,
 } from '../lib/animationConfig';
@@ -376,15 +376,15 @@ export function createDocumentActions(set: DocumentStoreSet, defaults: DocumentD
   setFlowGradient: (v) => set((s) => ({
     flowGradient: normalizeFlowGradientConfig({ ...s.flowGradient, ...v }),
   })),
-  setVideoMotion: (v) => set((s) => {
-    const videoMotion = normalizeVideoMotionConfig({ ...s.videoMotion, ...v });
+  setDatamosh: (v) => set((s) => {
+    const datamosh = normalizeDatamoshConfig({ ...s.datamosh, ...v });
     const effectPipeline = v.enabled !== undefined && s.effectPipeline.version === 'stack-v2'
       ? {
         ...s.effectPipeline,
-        effectStack: updateEffectStackLayer(s.effectPipeline.effectStack, 'videoMotion', { enabled: v.enabled }),
+        effectStack: updateEffectStackLayer(s.effectPipeline.effectStack, 'datamosh', { enabled: v.enabled }),
       }
       : s.effectPipeline;
-    return { videoMotion, effectPipeline };
+    return { datamosh, effectPipeline };
   }),
   setManualDistort: (v) => set((s) => {
     const resolution = v.mapResolution ?? s.manualDistort.mapResolution;
@@ -459,27 +459,21 @@ export function createDocumentActions(set: DocumentStoreSet, defaults: DocumentD
   }),
   setEffectPipeline: (v) => set((s) => {
     const rawEffectStack = v.effectStack ?? s.effectPipeline.effectStack;
-    const rawHasVideoMotionLayer = Array.isArray(rawEffectStack)
-      && rawEffectStack.some(layer => (
-        typeof layer === 'object'
-        && layer !== null
-        && (layer as { kind?: unknown }).kind === 'videoMotion'
-      ));
+    const rawHasDatamoshLayer = Array.isArray(rawEffectStack)
+      && rawEffectStack.some(layer => {
+        const kind = typeof layer === 'object' && layer !== null ? (layer as { kind?: unknown }).kind : undefined;
+        return kind === 'datamosh' || kind === 'videoMotion';
+      });
     const effectPipeline = normalizeEffectPipelineConfig({
       ...s.effectPipeline,
       ...v,
       effectStack: rawEffectStack,
     });
     if (effectPipeline.version !== 'stack-v2') return { effectPipeline };
-    // Presets written before Video Motion became a stack layer may carry an
-    // enabled standalone config but no layer. Preserve that source while the
-    // normalized pipeline acquires its canonical layer.
-    if (!rawHasVideoMotionLayer && s.videoMotion.enabled) {
-      effectPipeline.effectStack = updateEffectStackLayer(
-        effectPipeline.effectStack,
-        'videoMotion',
-        { enabled: true },
-      );
+    // Documents written before Video Motion became a stack layer carry an
+    // enabled standalone config but no layer; keep that source enabled.
+    if (!rawHasDatamoshLayer && s.datamosh.enabled) {
+      effectPipeline.effectStack = updateEffectStackLayer(effectPipeline.effectStack, 'datamosh', { enabled: true });
     }
     const enabled = (kind: import('../types/distortion').EffectStackKind) => (
       effectPipeline.effectStack.some(layer => layer.kind === kind && layer.enabled)
@@ -495,7 +489,7 @@ export function createDocumentActions(set: DocumentStoreSet, defaults: DocumentD
       diffuse: { ...s.diffuse, enabled: enabled('diffuse') },
       slitScan: { ...s.slitScan, enabled: enabled('slit') },
       stretch: { ...s.stretch, enabled: enabled('stretch') },
-      videoMotion: { ...s.videoMotion, enabled: enabled('videoMotion') },
+      datamosh: { ...s.datamosh, enabled: enabled('datamosh') },
       ...(postprocessEnabledSignatureChanged
         ? { postprocess: { ...s.postprocess, enabled: hasEnabledPostprocessEffectStack(effectPipeline) } }
         : {}),

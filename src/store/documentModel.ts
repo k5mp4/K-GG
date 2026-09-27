@@ -17,7 +17,7 @@ import type { ParameterLimitKey } from '../lib/parameterLimits';
 import { GLASS_V2_COLOR_DEFAULTS, normalizeGlassV2ColorParameters } from '../lib/glass';
 import { GLASS_TILE_DEFAULTS, normalizeGlassTileRenderParameters } from '../lib/glassTile';
 import { FLOW_GRADIENT_DEFAULTS } from '../types/flowGradient';
-import { VIDEO_MOTION_DEFAULTS } from '../types/videoMotion';
+import { DATAMOSH_DEFAULTS } from '../types/datamosh';
 import type { DocumentState } from './documentSlice';
 
 /** グラデーションタイプ別のデフォルトアンカーポイント（UV空間: y=0が底辺） */
@@ -251,7 +251,7 @@ export const STORE_DEFAULTS = {
   coneView: { ...DEFAULT_CONE_VIEW },
   seamless: { ...DEFAULT_SEAMLESS },
   flowGradient: { ...FLOW_GRADIENT_DEFAULTS },
-  videoMotion: { ...VIDEO_MOTION_DEFAULTS },
+  datamosh: { ...DATAMOSH_DEFAULTS },
   manualDistort: {
     enabled: false,
     mode: 'warp' as const,

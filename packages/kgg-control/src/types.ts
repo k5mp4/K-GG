@@ -33,8 +33,8 @@ export type EffectKind =
   | 'glass'
   | 'glassTile'
   | 'diffuse'
-  | 'cone'
-  | 'videoMotion';
+  | 'datamosh'
+  | 'cone';
 
 export type EffectState = {
   kind: EffectKind;

@@ -26,8 +26,8 @@ import { normalizeSeamlessConfig } from '../types/seamless';
 import type { FlowGradientConfig } from '../types/flowGradient';
 import { normalizeFlowGradientConfig } from '../types/flowGradient';
 import { isRemovedAnimationProperty } from './animationRegistry';
-import type { VideoMotionConfig } from '../types/videoMotion';
-import { normalizeVideoMotionConfig } from '../types/videoMotion';
+import type { DatamoshConfig } from '../types/datamosh';
+import { resolvePersistedDatamosh } from '../types/datamosh';
 
 export type StoreSnapshot = {
   gradient: GradientConfig;
@@ -42,7 +42,12 @@ export type StoreSnapshot = {
   coneView?: ConeViewConfig;
   seamless?: SeamlessConfig;
   flowGradient?: FlowGradientConfig;
-  videoMotion?: VideoMotionConfig;
+  datamosh?: DatamoshConfig;
+  /**
+   * Removed Effect Stack Video Motion settings. Only read to migrate older
+   * presets into `datamosh`; never written.
+   */
+  videoMotion?: unknown;
   manualDistort?: ManualDistortConfig;
   postprocess?: Partial<PostprocessConfig>;
   /** Omitted by presets saved before SPEC-012; those load through Legacy v1. */
@@ -110,7 +115,7 @@ export function makePreset(
   sourceState: StoreSnapshot,
   metadata: { folderId?: string | null; order?: number; thumbnail?: string } = {},
 ): Preset {
-  const state = withoutRemovedStateKeys(sourceState);
+  const { videoMotion: _legacyVideoMotion, ...state } = withoutRemovedStateKeys(sourceState);
   const diffuse = {
     ...state.diffuse,
     luminanceBezier: resolveDiffuseBezier(state.diffuse.luminanceBezier, state.diffuse.luminanceCurve),
@@ -142,7 +147,7 @@ export function makePreset(
       coneView: normalizeConeViewConfig(state.coneView),
       seamless: normalizeSeamlessConfig(state.seamless),
       flowGradient: normalizeFlowGradientConfig(state.flowGradient),
-      videoMotion: normalizeVideoMotionConfig(state.videoMotion),
+      datamosh: resolvePersistedDatamosh(sourceState),
       effectPipeline: state.effectPipeline
         ? normalizeEffectPipelineConfig(state.effectPipeline)
         : createDefaultEffectPipeline(),

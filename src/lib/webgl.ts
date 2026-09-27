@@ -77,7 +77,7 @@ import {
   type RenderTargetKey,
 } from './effectPipeline';
 import { installWebGLResourceLedger, type WebGLResourceLedger } from './webglResourceLedger';
-import { normalizeVideoMotionConfig, type VideoMotionConfig } from '../types/videoMotion';
+import { normalizeDatamoshConfig, type DatamoshConfig } from '../types/datamosh';
 import { getVideoMotionRuntime } from './videoMotionRuntime';
 import { VIDEO_MOTION_FIELD_HEIGHT, VIDEO_MOTION_FIELD_WIDTH } from './videoMotionSource';
 import { getThreeDRenderParams } from './coneView';
@@ -284,15 +284,15 @@ export type WebGLContext = {
   particleInstanceBuffer: WebGLBuffer | null;
   particleInstanceCount: number;
   particleInstanceSeed: number;
-  videoMotionProgram: WebGLProgram | null;
-  videoMotionUniforms: Record<string, WebGLUniformLocation | null>;
+  datamoshProgram: WebGLProgram | null;
+  datamoshUniforms: Record<string, WebGLUniformLocation | null>;
   threeDProgram: WebGLProgram | null;
   threeDUniforms: Record<string, WebGLUniformLocation | null>;
   videoMotionFieldTexture: WebGLTexture;
-  videoMotionFeedbackTexture: WebGLTexture;
-  videoMotionFeedbackSize: [number, number];
-  videoMotionFeedbackPrimed: boolean;
-  videoMotionFeedbackResetVersion: number;
+  /** Ping-pong pair: one holds the previous Datamosh output, the other receives this frame. */
+  datamoshHistoryFbos: [WebGLFramebuffer, WebGLFramebuffer];
+  datamoshHistoryTextures: [WebGLTexture, WebGLTexture];
+  datamoshHistory: DatamoshHistoryState;
   flowGradient: FlowGradientResources;
   normalFbo: WebGLFramebuffer;      // ノーマルマップ出力 (ブラー前)
   normalTexture: WebGLTexture;
@@ -821,13 +821,6 @@ export async function initWebGL(canvas: HTMLCanvasElement): Promise<WebGLContext
   gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
   gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
   gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
-  const videoMotionFeedbackTexture = createOwnedTexture();
-  gl.bindTexture(gl.TEXTURE_2D, videoMotionFeedbackTexture);
-  gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, 1, 1, 0, gl.RGBA, gl.UNSIGNED_BYTE, new Uint8Array([0, 0, 0, 255]));
-  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
-  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
-  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
-  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
   gl.useProgram(program);
   const { fbo: normalFbo, tex: normalTexture } = ownFramebufferPair();
   const { fbo: hBlurFbo, tex: hBlurTexture } = ownFramebufferPair();
@@ -837,11 +830,13 @@ export async function initWebGL(canvas: HTMLCanvasElement): Promise<WebGLContext
   const { fbo: prismScratchFbo, tex: prismScratchTexture } = ownFramebufferPair();
   const { fbo: prismBlurFbo, tex: prismBlurTexture } = ownFramebufferPair();
   const { fbo: prismGlowFbo, tex: prismGlowTexture } = ownFramebufferPair();
+  const { fbo: datamoshHistoryFboA, tex: datamoshHistoryTextureA } = ownFramebufferPair();
+  const { fbo: datamoshHistoryFboB, tex: datamoshHistoryTextureB } = ownFramebufferPair();
   const flowGradient = createFlowGradientResources(gl);
   ownedFlowGradient = flowGradient;
   const transitionTextureFrom = ownTexture(createTexture(gl));
   const transitionTextureTo = ownTexture(createTexture(gl));
-  const ctx: WebGLContext = { gl, performanceProfiler, gpuDiagnostics, renderOptimization, program, uniforms, geometryBuffer, transitionGeometryBuffer, generatorProgram: null, generatorUniforms: {}, gradientRampTexture, meshGradientTexture, meshGradientTextureSignature: '', diffuseCurveTexture, diffuseCurveSignature: '', diffuseAsciiTexture, diffuseAsciiSignature: '', diffuseAsciiCount: 1, diffuseAsciiRows: ASCII_ATLAS_MAX_ROWS, diffuseHistogramAt: 0, manualDistortTexture, manualDistortDisplacement: null, manualDistortSmoothMask: null, manualDistortMapResolution: 0, sourceImageTexture, sourceImageCanvas: null, imageGradientTexture, imageGradientSource: null, imageMaskTexture, imageMaskSource: null, normalMapProgram: null, normalMapUniforms: {}, videoMotionProgram: null, videoMotionUniforms: {}, threeDProgram: null, threeDUniforms: {}, videoMotionFieldTexture, videoMotionFeedbackTexture, videoMotionFeedbackSize: [0, 0], videoMotionFeedbackPrimed: false, videoMotionFeedbackResetVersion: 0, gradFbo, gradTexture, blurProgram: null, blurUniforms: {}, stretchProgram: null, stretchUniforms: {}, seamlessProgram: null, seamlessUniforms: {}, postprocessProgram: null, postprocessUniforms: {}, stackCoreProgram: null, stackCoreUniforms: {}, noiseStackProgram: null, noiseStackUniforms: {}, noiseDiffuseStackProgram: null, noiseDiffuseStackUniforms: {}, glassProgram: null, glassUniforms: {}, glassFallbackActive: false, glassV2Program: null, glassV2Uniforms: {}, glassV2FallbackActive: false, glassTileProgram: null, glassTileUniforms: {}, glassTileFallbackActive: false, prismProgram: null, prismUniforms: {}, prismCompositeProgram: null, prismCompositeUniforms: {}, particleProgram: null, particleUniforms: {}, particleVao: null, particleQuadBuffer: null, particleInstanceBuffer: null, particleInstanceCount: 0, particleInstanceSeed: Number.NaN, flowGradient, normalFbo, normalTexture, hBlurFbo, hBlurTexture, postprocessFboA, postprocessTextureA, postprocessFboB, postprocessTextureB, prismScratchFbo, prismScratchTexture, prismBlurFbo, prismBlurTexture, prismGlowFbo, prismGlowTexture, shaderCompileExt, lazyProgramState: createLazyProgramState(), lazyProgramCompileQueue: createSerialAsyncQueue(), resourceLedger, hasPresentedFrame: false, disposed: false };
+  const ctx: WebGLContext = { gl, performanceProfiler, gpuDiagnostics, renderOptimization, program, uniforms, geometryBuffer, transitionGeometryBuffer, generatorProgram: null, generatorUniforms: {}, gradientRampTexture, meshGradientTexture, meshGradientTextureSignature: '', diffuseCurveTexture, diffuseCurveSignature: '', diffuseAsciiTexture, diffuseAsciiSignature: '', diffuseAsciiCount: 1, diffuseAsciiRows: ASCII_ATLAS_MAX_ROWS, diffuseHistogramAt: 0, manualDistortTexture, manualDistortDisplacement: null, manualDistortSmoothMask: null, manualDistortMapResolution: 0, sourceImageTexture, sourceImageCanvas: null, imageGradientTexture, imageGradientSource: null, imageMaskTexture, imageMaskSource: null, normalMapProgram: null, normalMapUniforms: {}, datamoshProgram: null, datamoshUniforms: {}, threeDProgram: null, threeDUniforms: {}, videoMotionFieldTexture, datamoshHistoryFbos: [datamoshHistoryFboA, datamoshHistoryFboB], datamoshHistoryTextures: [datamoshHistoryTextureA, datamoshHistoryTextureB], datamoshHistory: createDatamoshHistoryState(), gradFbo, gradTexture, blurProgram: null, blurUniforms: {}, stretchProgram: null, stretchUniforms: {}, seamlessProgram: null, seamlessUniforms: {}, postprocessProgram: null, postprocessUniforms: {}, stackCoreProgram: null, stackCoreUniforms: {}, noiseStackProgram: null, noiseStackUniforms: {}, noiseDiffuseStackProgram: null, noiseDiffuseStackUniforms: {}, glassProgram: null, glassUniforms: {}, glassFallbackActive: false, glassV2Program: null, glassV2Uniforms: {}, glassV2FallbackActive: false, glassTileProgram: null, glassTileUniforms: {}, glassTileFallbackActive: false, prismProgram: null, prismUniforms: {}, prismCompositeProgram: null, prismCompositeUniforms: {}, particleProgram: null, particleUniforms: {}, particleVao: null, particleQuadBuffer: null, particleInstanceBuffer: null, particleInstanceCount: 0, particleInstanceSeed: Number.NaN, flowGradient, normalFbo, normalTexture, hBlurFbo, hBlurTexture, postprocessFboA, postprocessTextureA, postprocessFboB, postprocessTextureB, prismScratchFbo, prismScratchTexture, prismBlurFbo, prismBlurTexture, prismGlowFbo, prismGlowTexture, shaderCompileExt, lazyProgramState: createLazyProgramState(), lazyProgramCompileQueue: createSerialAsyncQueue(), resourceLedger, hasPresentedFrame: false, disposed: false };
   initializedContext = ctx;
   effectStackTransitionResources.set(ctx, {
     program: transitionProgram,
@@ -909,7 +904,7 @@ export function disposeWebGL(ctx: WebGLContext): void {
     ctx.prismProgram,
     ctx.prismCompositeProgram,
     ctx.particleProgram,
-    ctx.videoMotionProgram,
+    ctx.datamoshProgram,
     ctx.threeDProgram,
   ];
   const uniquePrograms = new Set(programs.filter((program): program is WebGLProgram => Boolean(program)));
@@ -925,7 +920,7 @@ export function disposeWebGL(ctx: WebGLContext): void {
     ctx.imageGradientTexture,
     ctx.imageMaskTexture,
     ctx.videoMotionFieldTexture,
-    ctx.videoMotionFeedbackTexture,
+    ...ctx.datamoshHistoryTextures,
     ctx.gradTexture,
     ctx.normalTexture,
     ctx.hBlurTexture,
@@ -946,6 +941,7 @@ export function disposeWebGL(ctx: WebGLContext): void {
     ctx.prismScratchFbo,
     ctx.prismBlurFbo,
     ctx.prismGlowFbo,
+    ...ctx.datamoshHistoryFbos,
   ];
   for (const framebuffer of framebuffers) gl.deleteFramebuffer(framebuffer);
 
@@ -1097,7 +1093,7 @@ function createLazyProgramState(): Record<LazyProgramKey, LazyProgramState> {
     flowSplat: { promise: null, failed: false, timedOut: false, fallback: false },
     flowTrail: { promise: null, failed: false, timedOut: false, fallback: false },
     flowComposite: { promise: null, failed: false, timedOut: false, fallback: false },
-    videoMotion: { promise: null, failed: false, timedOut: false, fallback: false },
+    datamosh: { promise: null, failed: false, timedOut: false, fallback: false },
     threeD: { promise: null, failed: false, timedOut: false, fallback: false },
   };
 }
@@ -1272,21 +1268,15 @@ function getFlowCompositeUniforms(gl: WebGL2RenderingContext, program: WebGLProg
   };
 }
 
-function getVideoMotionUniforms(gl: WebGL2RenderingContext, program: WebGLProgram): Record<string, WebGLUniformLocation | null> {
-  return {
-    u_sourceTex: gl.getUniformLocation(program, 'u_sourceTex'),
-    u_motionField: gl.getUniformLocation(program, 'u_motionField'),
-    u_feedbackTex: gl.getUniformLocation(program, 'u_feedbackTex'),
-    u_gradientRamp: gl.getUniformLocation(program, 'u_gradientRamp'),
-    u_resolution: gl.getUniformLocation(program, 'u_resolution'),
-    u_effectStrength: gl.getUniformLocation(program, 'u_effectStrength'),
-    u_blendAmount: gl.getUniformLocation(program, 'u_blendAmount'),
-    u_feedbackAmount: gl.getUniformLocation(program, 'u_feedbackAmount'),
-    u_decay: gl.getUniformLocation(program, 'u_decay'),
-    u_smearLength: gl.getUniformLocation(program, 'u_smearLength'),
-    u_stabilization: gl.getUniformLocation(program, 'u_stabilization'),
-    u_feedbackPrimed: gl.getUniformLocation(program, 'u_feedbackPrimed'),
-  };
+const DATAMOSH_UNIFORM_NAMES = [
+  'u_currentTex', 'u_historyTex', 'u_motionField', 'u_gradientRamp', 'u_resolution', 'u_time',
+  'u_frameSeed', 'u_historyPrimed', 'u_motionSource', 'u_mixMode', 'u_strength', 'u_refresh',
+  'u_feedback', 'u_blockSize', 'u_blockVariance', 'u_lumaStretch', 'u_saturationStretch', 'u_motionScale', 'u_motionSpeed', 'u_glitchAmount',
+  'u_glitchThreshold', 'u_neighborMix', 'u_jitter', 'u_colorDrift',
+] as const;
+
+function getDatamoshUniforms(gl: WebGL2RenderingContext, program: WebGLProgram): Record<string, WebGLUniformLocation | null> {
+  return Object.fromEntries(DATAMOSH_UNIFORM_NAMES.map(name => [name, gl.getUniformLocation(program, name)]));
 }
 
 /**
@@ -1430,9 +1420,9 @@ function installLazyProgram(ctx: WebGLContext, key: LazyProgramKey, program: Web
   } else if (key === 'flowComposite') {
     ctx.flowGradient.compositeProgram = program;
     ctx.flowGradient.compositeUniforms = getFlowCompositeUniforms(gl, program);
-  } else if (key === 'videoMotion') {
-    ctx.videoMotionProgram = program;
-    ctx.videoMotionUniforms = getVideoMotionUniforms(gl, program);
+  } else if (key === 'datamosh') {
+    ctx.datamoshProgram = program;
+    ctx.datamoshUniforms = getDatamoshUniforms(gl, program);
   } else if (key === 'threeD') {
     ctx.threeDProgram = program;
     ctx.threeDUniforms = getPostprocessUniforms(gl, program);
@@ -1528,7 +1518,7 @@ function lazyProgramReady(ctx: WebGLContext, key: LazyProgramKey): boolean {
     generator: [ctx.generatorProgram, ctx.generatorUniforms],
     blur: [ctx.blurProgram, ctx.blurUniforms],
     normalMap: [ctx.normalMapProgram, ctx.normalMapUniforms],
-    videoMotion: [ctx.videoMotionProgram, ctx.videoMotionUniforms],
+    datamosh: [ctx.datamoshProgram, ctx.datamoshUniforms],
     threeD: [ctx.threeDProgram, ctx.threeDUniforms],
     stretch: [ctx.stretchProgram, ctx.stretchUniforms],
     seamless: [ctx.seamlessProgram, ctx.seamlessUniforms],
@@ -2938,19 +2928,21 @@ function getFramebufferForTexture(ctx: WebGLContext, texture: WebGLTexture): Web
   if (texture === ctx.prismScratchTexture) return ctx.prismScratchFbo;
   if (texture === ctx.prismBlurTexture) return ctx.prismBlurFbo;
   if (texture === ctx.prismGlowTexture) return ctx.prismGlowFbo;
+  if (texture === ctx.datamoshHistoryTextures[0]) return ctx.datamoshHistoryFbos[0];
+  if (texture === ctx.datamoshHistoryTextures[1]) return ctx.datamoshHistoryFbos[1];
   return null;
 }
 
 function copyTextureToFramebuffer(
   ctx: WebGLContext,
   sourceTexture: WebGLTexture,
-  targetFramebuffer: WebGLFramebuffer,
+  targetFramebuffer: WebGLFramebuffer | null,
   width: number,
   height: number,
 ): void {
   const sourceFramebuffer = getFramebufferForTexture(ctx, sourceTexture);
-  if (!sourceFramebuffer) throw new Error('Seamless particle composition received an unknown source texture');
-  if (sourceFramebuffer === targetFramebuffer) throw new Error('Seamless particle composition cannot copy into its source framebuffer');
+  if (!sourceFramebuffer) throw new Error('Texture copy received an unknown source texture');
+  if (sourceFramebuffer === targetFramebuffer) throw new Error('Texture copy cannot target its source framebuffer');
 
   const { gl } = ctx;
   gl.bindFramebuffer(gl.READ_FRAMEBUFFER, sourceFramebuffer);
@@ -3192,14 +3184,46 @@ function drawParticleOverlay(
   gl.bindVertexArray(null);
 }
 
-function ensureVideoMotionFeedbackStorage(ctx: WebGLContext, width: number, height: number): void {
-  if (ctx.videoMotionFeedbackSize[0] === width && ctx.videoMotionFeedbackSize[1] === height) return;
-  const { gl } = ctx;
-  gl.bindTexture(gl.TEXTURE_2D, ctx.videoMotionFeedbackTexture);
-  gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, width, height, 0, gl.RGBA, gl.UNSIGNED_BYTE, null);
-  ctx.videoMotionFeedbackSize = [width, height];
-  ctx.videoMotionFeedbackPrimed = false;
+type DatamoshHistoryState = {
+  /** Index of the texture holding the previous frame's output. */
+  historyIndex: 0 | 1;
+  /** True once `historyIndex` holds a rendered frame. */
+  primed: boolean;
+  /** Key of the frame last written into the other texture, or null. */
+  frameKey: string | null;
+  frameIndex: number;
+  sessionId: string | null;
+  motionSource: DatamoshConfig['motionSource'] | null;
+  videoResetVersion: number;
+};
+
+function createDatamoshHistoryState(): DatamoshHistoryState {
+  return {
+    historyIndex: 0,
+    primed: false,
+    frameKey: null,
+    frameIndex: 0,
+    sessionId: null,
+    motionSource: null,
+    videoResetVersion: 0,
+  };
 }
+
+function resetDatamoshHistory(history: DatamoshHistoryState): void {
+  history.primed = false;
+  history.frameKey = null;
+  history.frameIndex = 0;
+}
+
+const DATAMOSH_MIX_MODE_MAP = { mix: 0, lighten: 1, difference: 2, rampLock: 3 } as const;
+
+type DatamoshFrame = {
+  /** Shader time shared with Noise; drives the procedural motion field. */
+  time: number;
+  /** Timeline position; a new value is a new logical frame. */
+  normalizedTime: number;
+  sessionId: string;
+};
 
 function uploadVideoMotionField(ctx: WebGLContext): void {
   const { gl } = ctx;
@@ -3209,51 +3233,110 @@ function uploadVideoMotionField(ctx: WebGLContext): void {
   gl.texSubImage2D(gl.TEXTURE_2D, 0, 0, 0, field.width, field.height, gl.RGBA, gl.UNSIGNED_BYTE, field.data);
 }
 
-function drawVideoMotionPass(
+/**
+ * Advances the ping-pong history only when the logical frame changes, so a
+ * re-render of the same frame (parameter edits while paused) re-evaluates
+ * from the same history instead of smearing further. Freeze keeps the
+ * current history texture as the reference until it is released.
+ */
+function advanceDatamoshHistory(
   ctx: WebGLContext,
-  sourceTexture: WebGLTexture,
-  config: VideoMotionConfig,
+  config: DatamoshConfig,
+  frame: DatamoshFrame,
   width: number,
   height: number,
-  targetFramebuffer: WebGLFramebuffer | null,
-): boolean {
-  if (!ctx.videoMotionProgram) return false;
+): DatamoshHistoryState {
   const { gl } = ctx;
-  const normalized = normalizeVideoMotionConfig(config);
+  const history = ctx.datamoshHistory;
   const runtime = getVideoMotionRuntime();
-  ensureVideoMotionFeedbackStorage(ctx, width, height);
-  uploadVideoMotionField(ctx);
-  if (!runtime.source.field.hasFrame || ctx.videoMotionFeedbackResetVersion !== runtime.feedbackResetVersion) {
-    ctx.videoMotionFeedbackPrimed = false;
-    ctx.videoMotionFeedbackResetVersion = runtime.feedbackResetVersion;
+  const videoSource = config.motionSource === 'video';
+  let resized = ensureWebGLTargetStorage(gl, ctx.datamoshHistoryTextures[0], width, height);
+  resized = ensureWebGLTargetStorage(gl, ctx.datamoshHistoryTextures[1], width, height) || resized;
+  if (resized) {
+    gl.bindTexture(gl.TEXTURE_2D, null);
+    reportIncompleteFramebuffer(gl, 'datamoshHistoryA', ctx.datamoshHistoryFbos[0]);
+    reportIncompleteFramebuffer(gl, 'datamoshHistoryB', ctx.datamoshHistoryFbos[1]);
   }
+  if (
+    resized
+    || history.sessionId !== frame.sessionId
+    || history.motionSource !== config.motionSource
+    || (videoSource && history.videoResetVersion !== runtime.feedbackResetVersion)
+    || (videoSource && !runtime.source.field.hasFrame)
+  ) {
+    resetDatamoshHistory(history);
+  }
+  history.sessionId = frame.sessionId;
+  history.motionSource = config.motionSource;
+  history.videoResetVersion = runtime.feedbackResetVersion;
 
-  gl.useProgram(ctx.videoMotionProgram);
+  const frameKey = `${frame.normalizedTime}|${frame.time}|${videoSource ? runtime.source.frameCount : 0}`;
+  if (frameKey !== history.frameKey) {
+    if (history.frameKey !== null && (!config.freeze || !history.primed)) {
+      history.historyIndex = history.historyIndex === 0 ? 1 : 0;
+      history.primed = true;
+      history.frameIndex += 1;
+    }
+    history.frameKey = frameKey;
+  }
+  return history;
+}
+
+/** Renders one Datamosh frame and returns the texture holding its output. */
+function drawDatamoshPass(
+  ctx: WebGLContext,
+  sourceTexture: WebGLTexture,
+  config: DatamoshConfig,
+  frame: DatamoshFrame,
+  width: number,
+  height: number,
+): WebGLTexture | null {
+  if (!ctx.datamoshProgram) return null;
+  const { gl } = ctx;
+  const uniforms = ctx.datamoshUniforms;
+  const history = advanceDatamoshHistory(ctx, config, frame, width, height);
+  const writeIndex = history.historyIndex === 0 ? 1 : 0;
+  if (config.motionSource === 'video') uploadVideoMotionField(ctx);
+
+  gl.useProgram(ctx.datamoshProgram);
   gl.viewport(0, 0, width, height);
-  gl.bindFramebuffer(gl.FRAMEBUFFER, targetFramebuffer);
+  gl.disable(gl.BLEND);
+  gl.bindFramebuffer(gl.FRAMEBUFFER, ctx.datamoshHistoryFbos[writeIndex]);
   gl.activeTexture(gl.TEXTURE3);
   gl.bindTexture(gl.TEXTURE_2D, sourceTexture);
-  setUniform1i(gl, ctx.videoMotionUniforms.u_sourceTex, 3);
+  setUniform1i(gl, uniforms.u_currentTex, 3);
+  gl.activeTexture(gl.TEXTURE11);
+  gl.bindTexture(gl.TEXTURE_2D, ctx.datamoshHistoryTextures[history.historyIndex]);
+  setUniform1i(gl, uniforms.u_historyTex, 11);
   gl.activeTexture(gl.TEXTURE10);
   gl.bindTexture(gl.TEXTURE_2D, ctx.videoMotionFieldTexture);
-  setUniform1i(gl, ctx.videoMotionUniforms.u_motionField, 10);
-  gl.activeTexture(gl.TEXTURE11);
-  gl.bindTexture(gl.TEXTURE_2D, ctx.videoMotionFeedbackTexture);
-  setUniform1i(gl, ctx.videoMotionUniforms.u_feedbackTex, 11);
+  setUniform1i(gl, uniforms.u_motionField, 10);
   gl.activeTexture(gl.TEXTURE1);
   gl.bindTexture(gl.TEXTURE_2D, ctx.gradientRampTexture);
-  setUniform1i(gl, ctx.videoMotionUniforms.u_gradientRamp, 1);
-  gl.uniform2f(ctx.videoMotionUniforms.u_resolution, width, height);
-  gl.uniform1f(ctx.videoMotionUniforms.u_effectStrength, normalized.effectStrength);
-  gl.uniform1f(ctx.videoMotionUniforms.u_blendAmount, normalized.blendAmount);
-  gl.uniform1f(ctx.videoMotionUniforms.u_feedbackAmount, normalized.feedbackAmount);
-  gl.uniform1f(ctx.videoMotionUniforms.u_decay, normalized.decay);
-  gl.uniform1f(ctx.videoMotionUniforms.u_smearLength, normalized.smearLength);
-  gl.uniform1f(ctx.videoMotionUniforms.u_stabilization, normalized.stabilization);
-  setUniform1i(gl, ctx.videoMotionUniforms.u_feedbackPrimed, ctx.videoMotionFeedbackPrimed ? 1 : 0);
-  drawArrays(ctx, 'Video Motion', gl.TRIANGLES, 0, 6);
-  if (targetFramebuffer === null) ctx.hasPresentedFrame = true;
-  return true;
+  setUniform1i(gl, uniforms.u_gradientRamp, 1);
+  gl.uniform2f(uniforms.u_resolution, width, height);
+  gl.uniform1f(uniforms.u_time, frame.time);
+  // Keep the hash input small so float precision does not collapse the rolls.
+  gl.uniform1f(uniforms.u_frameSeed, history.frameIndex % 4096);
+  setUniform1i(gl, uniforms.u_historyPrimed, history.primed ? 1 : 0);
+  setUniform1i(gl, uniforms.u_motionSource, config.motionSource === 'video' ? 1 : 0);
+  setUniform1i(gl, uniforms.u_mixMode, DATAMOSH_MIX_MODE_MAP[config.mixMode]);
+  gl.uniform1f(uniforms.u_strength, config.strength);
+  gl.uniform1f(uniforms.u_refresh, config.refresh);
+  gl.uniform1f(uniforms.u_feedback, config.feedback);
+  gl.uniform1f(uniforms.u_blockSize, config.blockSize);
+  gl.uniform1f(uniforms.u_blockVariance, config.blockVariance);
+  gl.uniform1f(uniforms.u_lumaStretch, config.lumaStretch);
+  gl.uniform1f(uniforms.u_saturationStretch, config.saturationStretch);
+  gl.uniform1f(uniforms.u_motionScale, config.motionScale);
+  gl.uniform1f(uniforms.u_motionSpeed, config.motionSpeed);
+  gl.uniform1f(uniforms.u_glitchAmount, config.glitchAmount);
+  gl.uniform1f(uniforms.u_glitchThreshold, config.glitchThreshold);
+  gl.uniform1f(uniforms.u_neighborMix, config.neighborMix);
+  gl.uniform1f(uniforms.u_jitter, config.jitter);
+  setUniform1i(gl, uniforms.u_colorDrift, config.useColorDrift ? 1 : 0);
+  drawArrays(ctx, 'Datamosh', gl.TRIANGLES, 0, 6);
+  return ctx.datamoshHistoryTextures[writeIndex];
 }
 
 function drawThreeDPass(
@@ -3291,26 +3374,6 @@ function drawThreeDPass(
   drawArrays(ctx, '3D', gl.TRIANGLES, 0, 6);
   if (targetFramebuffer === null) ctx.hasPresentedFrame = true;
   return true;
-}
-
-function copyVideoMotionFeedback(ctx: WebGLContext, sourceTexture: WebGLTexture, width: number, height: number): void {
-  const sourceFramebuffer = getFramebufferForTexture(ctx, sourceTexture);
-  if (!sourceFramebuffer) return;
-  const { gl } = ctx;
-  gl.bindFramebuffer(gl.READ_FRAMEBUFFER, sourceFramebuffer);
-  gl.bindTexture(gl.TEXTURE_2D, ctx.videoMotionFeedbackTexture);
-  gl.copyTexSubImage2D(gl.TEXTURE_2D, 0, 0, 0, 0, 0, width, height);
-  gl.bindFramebuffer(gl.FRAMEBUFFER, null);
-  ctx.videoMotionFeedbackPrimed = true;
-}
-
-function copyScreenToVideoMotionFeedback(ctx: WebGLContext, width: number, height: number): void {
-  const { gl } = ctx;
-  gl.bindFramebuffer(gl.READ_FRAMEBUFFER, null);
-  gl.bindTexture(gl.TEXTURE_2D, ctx.videoMotionFeedbackTexture);
-  gl.copyTexSubImage2D(gl.TEXTURE_2D, 0, 0, 0, 0, 0, width, height);
-  gl.bindFramebuffer(gl.FRAMEBUFFER, null);
-  ctx.videoMotionFeedbackPrimed = true;
 }
 
 function drawFlowGradientPass(
@@ -3459,7 +3522,7 @@ export function render(
   flowNormalizedTime = 0,
   flowLoopEnabled = true,
   flowSessionId = 'preview',
-  videoMotion: VideoMotionConfig = normalizeVideoMotionConfig(undefined),
+  datamosh: DatamoshConfig = normalizeDatamoshConfig(undefined),
   coneView: ConeViewConfig = DEFAULT_CONE_VIEW,
 ): void {
   seamless = normalizeSeamlessConfig(seamless);
@@ -3476,12 +3539,15 @@ export function render(
     requestLazyProgram(ctx, 'flowComposite')
   );
   let flowActive = flowRequested && flowProgramsReady && normalizedFlowGradient != null;
-  videoMotion = normalizeVideoMotionConfig(videoMotion);
-  const videoMotionStackEnabled = isV2Pipeline && effectPipeline
-    ? isEffectStackLayerEnabled(effectPipeline, 'videoMotion')
-    : false;
-  const videoMotionRequested = (isV2Pipeline ? videoMotionStackEnabled : videoMotion.enabled) && !tile;
-  const videoMotionActive = videoMotionRequested && requestLazyProgram(ctx, 'videoMotion');
+  datamosh = normalizeDatamoshConfig(datamosh);
+  // V2 keeps the on/off state in the Effect Stack layer. Datamosh feeds whole
+  // frames back, so tiled export cannot reproduce it.
+  const datamoshLayerEnabled = isV2Pipeline && effectPipeline
+    ? isEffectStackLayerEnabled(effectPipeline, 'datamosh')
+    : datamosh.enabled;
+  const datamoshRequested = datamoshLayerEnabled && !tile;
+  const datamoshActive = datamoshRequested && requestLazyProgram(ctx, 'datamosh');
+  const datamoshFrame = { time, normalizedTime: flowNormalizedTime, sessionId: flowSessionId };
   const threeDRequested = isV2Pipeline && effectPipeline
     ? isEffectStackLayerEnabled(effectPipeline, 'cone')
     : false;
@@ -3891,9 +3957,9 @@ export function render(
       && !renderPlan.particlesRequested
       && !seamlessRequested
       && !protectedCone
-      && !videoMotionActive;
+      && !datamoshActive;
     const generatorReady = !analyticPrefixEnabled || requestLazyProgram(ctx, 'generator');
-    if ((renderPlan.framebufferAllocationMode === 'direct' || protectedDirect) && !flowActive && !videoMotionActive && generatorReady) {
+    if ((renderPlan.framebufferAllocationMode === 'direct' || protectedDirect) && !flowActive && !datamoshActive && generatorReady) {
       if (imageGradientProtected) {
         setUniform1i(gl, uniforms.u_noiseEnabled, protectedLayerEnabled('noise') && noiseDistortion.enabled ? 1 : 0);
         setUniform1i(gl, uniforms.u_slitEnabled, protectedLayerEnabled('slit') && slitScan.enabled ? 1 : 0);
@@ -3946,7 +4012,7 @@ export function render(
 
     // Lazy programs compile asynchronously. Keep a usable base frame until every
     // requested V2 stage is available instead of presenting a partial stack.
-    if (!generatorReady || !stackCoreReady || !noiseDiffuseCompositionReady || !normalReady || !stretchReady || !prismReady || !particlesReady || !seamlessReady || !flowProgramsReady || (videoMotionRequested && !videoMotionActive) || threeDPending) {
+    if (!generatorReady || !stackCoreReady || !noiseDiffuseCompositionReady || !normalReady || !stretchReady || !prismReady || !particlesReady || !seamlessReady || !flowProgramsReady || (datamoshRequested && !datamoshActive) || threeDPending) {
       // Cloth is a Base generator and does not depend on the stack programs:
       // present the cloth frame even while they compile.
       const clothReady = clothGradient?.enabled
@@ -3981,9 +4047,7 @@ export function render(
       drawArrays(ctx, 'Base', gl.TRIANGLES, 0, 6);
       return;
     }
-    const targets = videoMotionActive
-      ? FULL_RENDER_TARGETS
-      : flowActive && renderPlan.framebufferAllocationMode === 'direct'
+    const targets = flowActive && renderPlan.framebufferAllocationMode === 'direct'
       ? CORE_RENDER_TARGETS
       : renderPlan.framebufferTargets;
     ensureRenderTargets(ctx, targets, vpW, vpH);
@@ -4084,7 +4148,7 @@ export function render(
           && !flowActive
           && !seamlessRequested
           && !particlesRequested
-          && !videoMotionActive;
+          && !datamoshActive;
         const target = canPresentNoiseDiffuseDirectly ? null : choosePostprocessTarget(ctx, currentTexture);
         const layerNoise = { ...noiseDistortion, enabled: true };
         const passRendered = drawPostprocessPass(
@@ -4128,16 +4192,12 @@ export function render(
       if (layer.kind === 'noise' && !noiseStackReady) continue;
       if (layer.kind === 'glass' && (glassIdentity || !glassV2Ready)) continue;
       if (layer.kind === 'glassTile' && (glassTileIdentity || !glassTileReady)) continue;
-      if (layer.kind === 'videoMotion') {
-        // Video Motion is a normal reorderable texture layer. Always render
-        // into the ping-pong target so a following layer samples its output;
-        // this also keeps feedback at this layer's position in the stack.
-        if (!videoMotionActive) continue;
-        const target = choosePostprocessTarget(ctx, currentTexture);
-        if (drawVideoMotionPass(ctx, currentTexture, videoMotion, vpW, vpH, target.fbo)) {
-          currentTexture = target.texture;
-          copyVideoMotionFeedback(ctx, currentTexture, vpW, vpH);
-        }
+      if (layer.kind === 'datamosh') {
+        // Datamosh renders into its own ping-pong history target, which the
+        // following layer samples directly. Tiles skip it (no full frame).
+        if (!datamoshActive) continue;
+        const moshedTexture = drawDatamoshPass(ctx, currentTexture, datamosh, datamoshFrame, vpW, vpH);
+        if (moshedTexture) currentTexture = moshedTexture;
         continue;
       }
       if (layer.kind === 'cone') {
@@ -4272,7 +4332,7 @@ export function render(
   const stretchSeed = stretchScanOverride != null
     ? stretch.seed + (1 - Math.cos(stretchScan * Math.PI * 2)) * 0.5
     : stretch.seed;
-  if (stretchActive || postprocessActive || particleActive || seamlessActive || flowActive || videoMotionActive) {
+  if (stretchActive || postprocessActive || particleActive || seamlessActive || flowActive || datamoshActive) {
     ensureRenderTargets(ctx, FULL_RENDER_TARGETS, vpW, vpH);
   }
   let particleSourceTexture: WebGLTexture | null = null;
@@ -4295,7 +4355,7 @@ export function render(
       time,
       noiseLoopPeriod,
       animationSpeed,
-      particleActive || seamlessActive || flowActive || videoMotionActive,
+      particleActive || seamlessActive || flowActive || datamoshActive,
     );
     if (stackTexture) legacyCurrentTexture = stackTexture;
     if (particleActive) particleSourceTexture = stackTexture ?? sourceTexture;
@@ -4345,38 +4405,41 @@ export function render(
       drawArrays(ctx, 'Normal Blur', gl.TRIANGLES, 0, 6);
       gl.bindTexture(gl.TEXTURE_2D, ctx.hBlurTexture);
       gl.uniform2f(ctx.blurUniforms.u_blurDir, 0.0, 1.0);
-      gl.bindFramebuffer(gl.FRAMEBUFFER, (stretchActive || postprocessActive || particleActive || seamlessActive || flowActive || videoMotionActive) ? ctx.gradFbo : null);
+      gl.bindFramebuffer(gl.FRAMEBUFFER, (stretchActive || postprocessActive || particleActive || seamlessActive || flowActive || datamoshActive) ? ctx.gradFbo : null);
       drawArrays(ctx, 'Normal Blur', gl.TRIANGLES, 0, 6);
       if (stretchActive) {
-        drawStretchPass(ctx, ctx.gradTexture, stretch, stretchScan, stretchSeed, fboW, fboH, (postprocessActive || particleActive || seamlessActive || flowActive) ? ctx.normalFbo : null);
+        drawStretchPass(ctx, ctx.gradTexture, stretch, stretchScan, stretchSeed, fboW, fboH, (postprocessActive || particleActive || seamlessActive || flowActive || datamoshActive) ? ctx.normalFbo : null);
         if (postprocessActive) applyPostprocessStack(ctx.normalTexture, fboW, fboH);
         else if (particleActive) particleSourceTexture = ctx.normalTexture;
         else if (seamlessActive) seamlessSourceTexture = ctx.normalTexture;
-        else if (videoMotionActive) legacyCurrentTexture = ctx.normalTexture;
+        else if (datamoshActive) legacyCurrentTexture = ctx.normalTexture;
       } else if (postprocessActive) {
         applyPostprocessStack(ctx.gradTexture, fboW, fboH);
       } else if (particleActive) {
         particleSourceTexture = ctx.gradTexture;
       } else if (seamlessActive) {
         seamlessSourceTexture = ctx.gradTexture;
-      } else if (videoMotionActive) {
+      } else if (datamoshActive) {
         legacyCurrentTexture = ctx.gradTexture;
       }
     } else {
       // ブラーなし: stretch有効時はノーマル結果をテクスチャ化してからポスト処理
-      gl.bindFramebuffer(gl.FRAMEBUFFER, (stretchActive || postprocessActive || particleActive || seamlessActive || flowActive) ? ctx.normalFbo : null);
+      gl.bindFramebuffer(gl.FRAMEBUFFER, (stretchActive || postprocessActive || particleActive || seamlessActive || flowActive || datamoshActive) ? ctx.normalFbo : null);
       drawArrays(ctx, 'Normal', gl.TRIANGLES, 0, 6);
       if (stretchActive) {
-        drawStretchPass(ctx, ctx.normalTexture, stretch, stretchScan, stretchSeed, fboW, fboH, (postprocessActive || particleActive || seamlessActive || flowActive) ? ctx.gradFbo : null);
+        drawStretchPass(ctx, ctx.normalTexture, stretch, stretchScan, stretchSeed, fboW, fboH, (postprocessActive || particleActive || seamlessActive || flowActive || datamoshActive) ? ctx.gradFbo : null);
         if (postprocessActive) applyPostprocessStack(ctx.gradTexture, fboW, fboH);
         else if (particleActive) particleSourceTexture = ctx.gradTexture;
         else if (seamlessActive) seamlessSourceTexture = ctx.gradTexture;
+        else if (datamoshActive) legacyCurrentTexture = ctx.gradTexture;
       } else if (postprocessActive) {
         applyPostprocessStack(ctx.normalTexture, fboW, fboH);
       } else if (particleActive) {
         particleSourceTexture = ctx.normalTexture;
       } else if (seamlessActive) {
         seamlessSourceTexture = ctx.normalTexture;
+      } else if (datamoshActive) {
+        legacyCurrentTexture = ctx.normalTexture;
       }
     }
     if (flowActive && flowSourceTexture == null) {
@@ -4386,21 +4449,21 @@ export function render(
     }
   } else {
     // ノーマルマップ無効: stretch有効時は一度FBOへ描いて、その画素を参照する
-    gl.bindFramebuffer(gl.FRAMEBUFFER, (stretchActive || postprocessActive || particleActive || seamlessActive || flowActive || videoMotionActive) ? ctx.gradFbo : null);
+    gl.bindFramebuffer(gl.FRAMEBUFFER, (stretchActive || postprocessActive || particleActive || seamlessActive || flowActive || datamoshActive) ? ctx.gradFbo : null);
     drawArrays(ctx, 'Base', gl.TRIANGLES, 0, 6);
     if (stretchActive) {
-      drawStretchPass(ctx, ctx.gradTexture, stretch, stretchScan, stretchSeed, vpW, vpH, (postprocessActive || particleActive || seamlessActive || flowActive) ? ctx.normalFbo : null);
+      drawStretchPass(ctx, ctx.gradTexture, stretch, stretchScan, stretchSeed, vpW, vpH, (postprocessActive || particleActive || seamlessActive || flowActive || datamoshActive) ? ctx.normalFbo : null);
       if (postprocessActive) applyPostprocessStack(ctx.normalTexture, vpW, vpH);
       else if (particleActive) particleSourceTexture = ctx.normalTexture;
       else if (seamlessActive) seamlessSourceTexture = ctx.normalTexture;
-      else if (videoMotionActive) legacyCurrentTexture = ctx.normalTexture;
+      else if (datamoshActive) legacyCurrentTexture = ctx.normalTexture;
     } else if (postprocessActive) {
       applyPostprocessStack(ctx.gradTexture, vpW, vpH);
     } else if (particleActive) {
       particleSourceTexture = ctx.gradTexture;
     } else if (seamlessActive) {
       seamlessSourceTexture = ctx.gradTexture;
-    } else if (videoMotionActive) {
+    } else if (datamoshActive) {
       legacyCurrentTexture = ctx.gradTexture;
     }
     if (flowActive && flowSourceTexture == null) {
@@ -4413,7 +4476,7 @@ export function render(
       ?? seamlessSourceTexture
       ?? particleSourceTexture
       ?? ctx.gradTexture;
-    const flowNeedsTexture = particleActive || seamlessActive || videoMotionActive;
+    const flowNeedsTexture = particleActive || seamlessActive || datamoshActive;
     const target = flowNeedsTexture ? choosePostprocessTarget(ctx, sourceTexture) : null;
     const rendered = drawFlowGradientPass(
       ctx,
@@ -4433,21 +4496,21 @@ export function render(
     if (rendered && target) {
       if (particleActive) particleSourceTexture = target.texture;
       if (seamlessActive) seamlessSourceTexture = target.texture;
-      if (videoMotionActive) legacyCurrentTexture = target.texture;
+      if (datamoshActive) legacyCurrentTexture = target.texture;
     }
   }
 
-  if (videoMotionActive) {
-    const needsTexture = seamlessActive || particleActive;
-    const target = needsTexture ? choosePostprocessTarget(ctx, legacyCurrentTexture) : null;
-    if (drawVideoMotionPass(ctx, legacyCurrentTexture, videoMotion, vpW, vpH, target?.fbo ?? null)) {
-      if (target) {
-        legacyCurrentTexture = target.texture;
-        if (seamlessActive) seamlessSourceTexture = target.texture;
-        if (particleActive) particleSourceTexture = target.texture;
-        copyVideoMotionFeedback(ctx, legacyCurrentTexture, vpW, vpH);
-      } else {
-        copyScreenToVideoMotionFeedback(ctx, vpW, vpH);
+  if (datamoshActive) {
+    // Seamless/Particles track the latest texture in their own slots.
+    const datamoshSource = seamlessSourceTexture ?? particleSourceTexture ?? legacyCurrentTexture;
+    const moshedTexture = drawDatamoshPass(ctx, datamoshSource, datamosh, datamoshFrame, vpW, vpH);
+    if (moshedTexture) {
+      legacyCurrentTexture = moshedTexture;
+      if (seamlessActive) seamlessSourceTexture = moshedTexture;
+      if (particleActive) particleSourceTexture = moshedTexture;
+      if (!seamlessActive && !particleActive) {
+        copyTextureToFramebuffer(ctx, moshedTexture, null, vpW, vpH);
+        ctx.hasPresentedFrame = true;
       }
     }
   }

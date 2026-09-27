@@ -559,7 +559,7 @@ describe('effectPipeline', () => {
         prism: true,
         prismComposite: true,
         particles: true,
-        videoMotion: false,
+        datamosh: false,
         threeD: false,
       });
       expect(plan.capabilities).toEqual({
@@ -589,7 +589,7 @@ describe('effectPipeline', () => {
         { kind: 'glass', enabled: false },
         { kind: 'glassTile', enabled: false },
         { kind: 'diffuse', enabled: true },
-        { kind: 'videoMotion', enabled: false },
+        { kind: 'datamosh', enabled: false },
         { kind: 'cone', enabled: false },
       ],
       selectedKind: 'diffuse',
@@ -616,7 +616,7 @@ describe('effectPipeline', () => {
       { kind: 'voronoi', enabled: false },
       { kind: 'glassTile', enabled: false },
       { kind: 'diffuse', enabled: false },
-      { kind: 'videoMotion', enabled: false },
+      { kind: 'datamosh', enabled: false },
       { kind: 'cone', enabled: false },
     ]);
   });
@@ -672,7 +672,7 @@ describe('effectPipeline', () => {
       'kaleidoscope',
       'voronoi',
       'glassTile',
-      'videoMotion',
+      'datamosh',
       'cone',
     ]);
     expect(Object.fromEntries(normalized.map(layer => [layer.kind, layer.enabled]))).toEqual({
@@ -686,7 +686,7 @@ describe('effectPipeline', () => {
       kaleidoscope: false,
       voronoi: true,
       glassTile: false,
-      videoMotion: false,
+      datamosh: false,
       cone: false,
     });
   });
@@ -717,7 +717,7 @@ describe('effectPipeline', () => {
       'voronoi',
       'glassTile',
       'diffuse',
-      'videoMotion',
+      'datamosh',
       'cone',
     ]);
 
@@ -754,12 +754,12 @@ describe('effectPipeline', () => {
       'glass',
       'glassTile',
       'diffuse',
-      'videoMotion',
+      'datamosh',
       'cone',
       'noise',
     ]);
     expect(movedPastDiffuse.at(-4)).toEqual({ kind: 'diffuse', enabled: true });
-    expect(movedPastDiffuse.at(-3)).toEqual({ kind: 'videoMotion', enabled: false });
+    expect(movedPastDiffuse.at(-3)).toEqual({ kind: 'datamosh', enabled: false });
     expect(movedPastDiffuse.at(-2)).toEqual({ kind: 'cone', enabled: false });
     expect(movedPastDiffuse.at(-1)).toEqual({ kind: 'noise', enabled: true });
   });
@@ -813,24 +813,30 @@ describe('effectPipeline', () => {
     expect(isEffectStackLayerTemporarilyHidden('glass', true, 'glass', previousEnabledState)).toBe(false);
   });
 
-  it('keeps Video Motion as a first-class V2 stack layer and render program', () => {
-    const stack = createDefaultEffectStack();
-    expect(stack.map(layer => layer.kind)).toContain('videoMotion');
-
+  it('migrates removed Video Motion layers into Datamosh at the same position', () => {
     const normalized = normalizeEffectStack([
+      { kind: 'glass', enabled: true },
       { kind: 'videoMotion', enabled: true },
+      { kind: 'noise', enabled: false },
     ]);
-    expect(normalized.find(layer => layer.kind === 'videoMotion')).toEqual({
-      kind: 'videoMotion',
-      enabled: true,
-    });
+    expect(normalized.map(layer => layer.kind as string)).not.toContain('videoMotion');
+    expect(normalized.slice(0, 3)).toEqual([
+      { kind: 'glass', enabled: true },
+      { kind: 'datamosh', enabled: true },
+      { kind: 'noise', enabled: false },
+    ]);
+    expect(normalizeEffectPipelineConfig({ version: 'stack-v2', selectedKind: 'videoMotion' }).selectedKind).toBe('datamosh');
+  });
 
+  it('renders Datamosh as an orderable texture-stack layer', () => {
     const pipeline = createDefaultEffectPipeline();
-    pipeline.effectStack = pipeline.effectStack.map(layer => (
-      layer.kind === 'videoMotion' ? { ...layer, enabled: true } : layer
-    ));
+    pipeline.effectStack = updateEffectStackLayer(pipeline.effectStack, 'datamosh', { enabled: true });
     const plan = getV2RenderPlan(pipeline, analyticPlanOptions());
-    expect((plan.programs as unknown as Record<string, unknown>).videoMotion).toBe(true);
+
+    expect(plan.programs.datamosh).toBe(true);
+    expect(plan.framebufferAllocationMode).not.toBe('direct');
+    expect(plan.programs.stackCore).toBe(true);
+    expect(getV2RenderPlan(createDefaultEffectPipeline(), analyticPlanOptions()).programs.datamosh).toBe(false);
   });
 
   it('normalizes and renders Cone as an orderable texture-stack layer', () => {

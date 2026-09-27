@@ -46,6 +46,6 @@ export type RenderFrameRequest = {
   flowNormalizedTime?: number;
   flowLoopEnabled?: boolean;
   flowSessionId?: string;
-  videoMotion?: LatestState['videoMotion'];
+  datamosh?: LatestState['datamosh'];
   coneView?: LatestState['coneView'];
 };
