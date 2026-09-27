@@ -176,7 +176,10 @@ vec2 torusMappedUv(vec2 globalUv, out bool hitTorus) {
   mat2 roll = mat2(rollCos, rollSin, -rollSin, rollCos);
   cameraRay.xy = roll * cameraRay.xy;
   float majorRadius = max(u_torusMajorRadius, 1.05);
-  float yaw = acos(clamp(1.0 - 0.5 / majorRadius, -1.0, 1.0));
+  // Looking backward, the tunnel behind bends the same way, so the aim into
+  // the bend flips sign; looking sideways at the wall needs none. Scaling by
+  // cos(yaw) keeps the far end in view while the user yaw turns a full circle.
+  float yaw = acos(clamp(1.0 - 0.5 / majorRadius, -1.0, 1.0)) * cos(u_torusCameraYaw);
   float yawCos = cos(yaw);
   float yawSin = sin(yaw);
   vec3 rayDirection = normalize(vec3(

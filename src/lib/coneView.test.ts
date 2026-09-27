@@ -7,14 +7,15 @@ import {
   getConeApertureRadius,
   getConeApexCanvasPoint,
   getConeApexOffset,
-  getConeRollRadians,
   getConeSeamModeIndex,
   getConeShapeIndex,
   getConeTextureTransform,
   getTorusCamera,
   getTorusMajorRadius,
+  getTorusWiggle,
   TORUS_CAMERA_MAX_OFFSET,
 } from './coneView';
+import { TORUS_WIGGLE_PRESETS } from '../types/coneView';
 
 describe('cone view geometry', () => {
   it.each([1, 16 / 9, 9 / 16])('covers every frustum corner for aspect %s', (aspect) => {
@@ -112,9 +113,8 @@ describe('torus tunnel', () => {
 
   it('uses Rotation as a camera roll instead of a texture offset', () => {
     const rotated = { ...torus, rotation: 90 };
-    expect(getConeRollRadians(rotated)).toBeCloseTo(Math.PI / 2, 10);
+    expect(getTorusCamera(rotated).rollRadians).toBeCloseTo(Math.PI / 2, 10);
     expect(getConeTextureTransform(rotated, 0).offsetU).toBe(0);
-    expect(getConeRollRadians({ ...DEFAULT_CONE_VIEW, rotation: 90 })).toBe(0);
     expect(getConeTextureTransform({ ...DEFAULT_CONE_VIEW, rotation: 90 }, 0).offsetU).toBeCloseTo(0.25, 10);
   });
 
@@ -134,6 +134,51 @@ describe('torus tunnel', () => {
     const corner = getTorusCamera({ ...torus, torusCameraX: 0.8, torusCameraY: 0.8 });
     expect(Math.hypot(corner.offsetX, corner.offsetY)).toBeCloseTo(TORUS_CAMERA_MAX_OFFSET, 10);
     expect(corner.offsetX).toBeCloseTo(corner.offsetY, 10);
+  });
+
+  it('adds the base roll to the torus camera', () => {
+    expect(getTorusCamera({ ...torus, rotation: 45 }).rollRadians).toBeCloseTo(Math.PI / 4, 10);
+  });
+
+  it('keeps the camera still when wiggle is off or its amount is zero', () => {
+    const still = { yaw: 0, pitch: 0, roll: 0, x: 0, y: 0 };
+    expect(getTorusWiggle(torus, 0.37)).toEqual(still);
+    expect(getTorusWiggle({ ...torus, torusWigglePreset: 'handheld', torusWiggleAmount: 0 }, 0.37)).toEqual(still);
+  });
+
+  it.each(TORUS_WIGGLE_PRESETS.filter(preset => preset !== 'off'))('moves the camera with %s and closes the loop', (preset) => {
+    for (const torusWiggleSpeed of [1, 3]) {
+      const config = { ...torus, torusWigglePreset: preset, torusWiggleSpeed };
+      const start = getTorusCamera(config, 0);
+      const end = getTorusCamera(config, 1);
+      for (const key of ['offsetX', 'offsetY'] as const) {
+        expect(end[key]).toBeCloseTo(start[key], 9);
+      }
+      for (const key of ['yawRadians', 'pitchRadians', 'rollRadians'] as const) {
+        // Angles close the loop modulo a full turn.
+        expect(Math.cos(end[key])).toBeCloseTo(Math.cos(start[key]), 9);
+        expect(Math.sin(end[key])).toBeCloseTo(Math.sin(start[key]), 9);
+      }
+      const middle = getTorusWiggle(config, 0.3);
+      expect(Object.values(middle).some(value => Math.abs(value) > 1e-6)).toBe(true);
+    }
+  });
+
+  it('turns the yaw a full circle per loop for Look Around, independent of Amount', () => {
+    const config = { ...torus, torusWigglePreset: 'lookAround' as const };
+    expect(getTorusWiggle(config, 0.25).yaw).toBeCloseTo(90, 9);
+    expect(getTorusWiggle({ ...config, torusWiggleAmount: 0 }, 0.5).yaw).toBeCloseTo(180, 9);
+    expect(getTorusWiggle({ ...config, torusWiggleAmount: 0 }, 0.5).pitch).toBe(0);
+    expect(getTorusWiggle({ ...config, torusWiggleSpeed: 2 }, 0.25).yaw).toBeCloseTo(180, 9);
+  });
+
+  it('scales the wiggle linearly with Amount and keeps the camera inside the tube', () => {
+    const base = { ...torus, torusWigglePreset: 'orbit' as const };
+    const single = getTorusWiggle(base, 0.2);
+    const double = getTorusWiggle({ ...base, torusWiggleAmount: 2 }, 0.2);
+    expect(double.x).toBeCloseTo(single.x * 2, 10);
+    const pushed = getTorusCamera({ ...base, torusWiggleAmount: 2, torusCameraX: 0.8 }, 0);
+    expect(Math.hypot(pushed.offsetX, pushed.offsetY)).toBeLessThanOrEqual(TORUS_CAMERA_MAX_OFFSET + 1e-12);
   });
 
   it('advances whole ring tiles over one loop so integer Flow Cycles loop seamlessly', () => {

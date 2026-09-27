@@ -1,9 +1,29 @@
 import { useLanguage } from '../i18n/LanguageProvider';
 import { useGradientStore } from '../store/gradientStore';
 import { applicationCommands } from '../application/commands';
-import { CONE_SEAM_MODE_OPTIONS, DEFAULT_CONE_VIEW, type ConeSeamMode, type ConeShape } from '../types/coneView';
+import { InputPosition } from 'tweeq';
+import { getParameterLimit } from '../lib/parameterLimits';
+import {
+  CONE_SEAM_MODE_OPTIONS,
+  DEFAULT_CONE_VIEW,
+  TORUS_WIGGLE_PRESET_OPTIONS,
+  type ConeSeamMode,
+  type ConeShape,
+  type TorusWigglePreset,
+} from '../types/coneView';
 import { CustomSelect } from './CustomSelect';
 import { SliderField } from './SliderField';
+
+// Tweeq's InputPosition adds pointer pixels to the value and grows Y downward.
+// Edit the offset in hundredths of a tube radius with Y flipped so a drag
+// moves the camera the same way on screen.
+const CAMERA_POSITION_SCALE = 100;
+const CAMERA_X_LIMIT = getParameterLimit('cone.torusCameraX');
+const CAMERA_Y_LIMIT = getParameterLimit('cone.torusCameraY');
+
+function toCameraPositionInput(x: number, y: number): [number, number] {
+  return [x * CAMERA_POSITION_SCALE, -y * CAMERA_POSITION_SCALE];
+}
 
 export function ConeViewPanel() {
   const { t } = useLanguage();
@@ -96,17 +116,52 @@ export function ConeViewPanel() {
               format={(value) => `${Math.round(value)}°`}
               onChange={(torusCameraPitch) => setConeView({ torusCameraPitch })}
             />
-            <SliderField
-              label="Camera X"
-              value={coneView.torusCameraX}
-              limitKey="cone.torusCameraX"
-              onChange={(torusCameraX) => setConeView({ torusCameraX })}
+            <div className="space-y-1" data-torus-camera-position>
+              <div className="flex items-center justify-between gap-2">
+                <span className="text-xs text-deep">Camera Position</span>
+                <button
+                  type="button"
+                  className="text-[9px] text-cream/55 transition-colors hover:text-fire disabled:opacity-0"
+                  disabled={coneView.torusCameraX === DEFAULT_CONE_VIEW.torusCameraX && coneView.torusCameraY === DEFAULT_CONE_VIEW.torusCameraY}
+                  onClick={() => setConeView({ torusCameraX: DEFAULT_CONE_VIEW.torusCameraX, torusCameraY: DEFAULT_CONE_VIEW.torusCameraY })}
+                >
+                  {t('cone.resetPosition')}
+                </button>
+              </div>
+              <InputPosition
+                value={toCameraPositionInput(coneView.torusCameraX, coneView.torusCameraY)}
+                min={toCameraPositionInput(CAMERA_X_LIMIT.min, CAMERA_Y_LIMIT.max)}
+                max={toCameraPositionInput(CAMERA_X_LIMIT.max, CAMERA_Y_LIMIT.min)}
+                step={1}
+                onChange={([x, y]) => setConeView({
+                  torusCameraX: x / CAMERA_POSITION_SCALE,
+                  torusCameraY: -y / CAMERA_POSITION_SCALE,
+                })}
+              />
+            </div>
+            <CustomSelect
+              label="Camera Wiggle"
+              value={coneView.torusWigglePreset}
+              localizeLabel={false}
+              localizeOptions={false}
+              options={[...TORUS_WIGGLE_PRESET_OPTIONS]}
+              onChange={(torusWigglePreset) => setConeView({ torusWigglePreset: torusWigglePreset as TorusWigglePreset })}
             />
             <SliderField
-              label="Camera Y"
-              value={coneView.torusCameraY}
-              limitKey="cone.torusCameraY"
-              onChange={(torusCameraY) => setConeView({ torusCameraY })}
+              label="Wiggle Amount"
+              value={coneView.torusWiggleAmount}
+              limitKey="cone.torusWiggleAmount"
+              disabled={coneView.torusWigglePreset === 'off'}
+              format={(value) => `${Math.round(value * 100)}%`}
+              onChange={(torusWiggleAmount) => setConeView({ torusWiggleAmount })}
+            />
+            <SliderField
+              label="Wiggle Speed"
+              value={coneView.torusWiggleSpeed}
+              limitKey="cone.torusWiggleSpeed"
+              disabled={coneView.torusWigglePreset === 'off'}
+              format={(value) => `×${Math.round(value)}`}
+              onChange={(torusWiggleSpeed) => setConeView({ torusWiggleSpeed })}
             />
           </>
         )}

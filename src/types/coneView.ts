@@ -24,6 +24,19 @@ export const CONE_SEAM_MODE_OPTIONS: { value: ConeSeamMode; label: string }[] = 
 ];
 export const DEFAULT_CONE_SEAM_MODE: ConeSeamMode = 'mirror';
 
+/** Procedural torus camera motion. Every preset is periodic over one loop. */
+export type TorusWigglePreset = 'off' | 'drift' | 'handheld' | 'float' | 'orbit' | 'sway' | 'lookAround';
+export const TORUS_WIGGLE_PRESETS = ['off', 'drift', 'handheld', 'float', 'orbit', 'sway', 'lookAround'] as const satisfies readonly TorusWigglePreset[];
+export const TORUS_WIGGLE_PRESET_OPTIONS: { value: TorusWigglePreset; label: string }[] = [
+  { value: 'off', label: 'Off' },
+  { value: 'drift', label: 'Drift · Slow look' },
+  { value: 'handheld', label: 'Handheld · Shake' },
+  { value: 'float', label: 'Float · Bobbing' },
+  { value: 'orbit', label: 'Orbit · Circle' },
+  { value: 'sway', label: 'Sway · Barrel roll' },
+  { value: 'lookAround', label: 'Look Around · 360° Yaw' },
+];
+
 export type ConeViewConfig = {
   shape: ConeShape;
   depth: number;
@@ -45,6 +58,11 @@ export type ConeViewConfig = {
   /** Torus only: look-direction adjustment in degrees, relative to the automatic aim into the bend. */
   torusCameraYaw: number;
   torusCameraPitch: number;
+  torusWigglePreset: TorusWigglePreset;
+  /** Scales the preset's amplitudes. */
+  torusWiggleAmount: number;
+  /** Integer multiplier of every wiggle frequency, so the motion still closes on the loop. */
+  torusWiggleSpeed: number;
 };
 
 /** Normalized apex movement limit; ±2 reaches 50% of the canvas outside its edge. */
@@ -73,6 +91,9 @@ export const DEFAULT_CONE_VIEW: ConeViewConfig = {
   torusCameraY: getParameterDefault('cone.torusCameraY'),
   torusCameraYaw: getParameterDefault('cone.torusCameraYaw'),
   torusCameraPitch: getParameterDefault('cone.torusCameraPitch'),
+  torusWigglePreset: 'off',
+  torusWiggleAmount: getParameterDefault('cone.torusWiggleAmount'),
+  torusWiggleSpeed: getParameterDefault('cone.torusWiggleSpeed'),
 };
 
 function normalizeSeamMode(value: unknown): ConeSeamMode {
@@ -101,5 +122,10 @@ export function normalizeConeViewConfig(value: unknown): ConeViewConfig {
     torusCameraY: clampParameter(raw.torusCameraY, DEFAULT_CONE_VIEW.torusCameraY, getParameterLimit('cone.torusCameraY')),
     torusCameraYaw: clampParameter(raw.torusCameraYaw, DEFAULT_CONE_VIEW.torusCameraYaw, getParameterLimit('cone.torusCameraYaw')),
     torusCameraPitch: clampParameter(raw.torusCameraPitch, DEFAULT_CONE_VIEW.torusCameraPitch, getParameterLimit('cone.torusCameraPitch')),
+    torusWigglePreset: typeof raw.torusWigglePreset === 'string' && TORUS_WIGGLE_PRESETS.includes(raw.torusWigglePreset as TorusWigglePreset)
+      ? raw.torusWigglePreset as TorusWigglePreset
+      : DEFAULT_CONE_VIEW.torusWigglePreset,
+    torusWiggleAmount: clampParameter(raw.torusWiggleAmount, DEFAULT_CONE_VIEW.torusWiggleAmount, getParameterLimit('cone.torusWiggleAmount')),
+    torusWiggleSpeed: clampParameter(raw.torusWiggleSpeed, DEFAULT_CONE_VIEW.torusWiggleSpeed, getParameterLimit('cone.torusWiggleSpeed')),
   };
 }

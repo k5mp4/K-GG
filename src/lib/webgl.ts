@@ -86,7 +86,6 @@ import {
   CONE_CAMERA_FOV,
   getConeApertureRadius,
   getConeApexOffset,
-  getConeRollRadians,
   getConeShapeIndex,
   getConeTextureTransform,
   getTorusCamera,
@@ -2486,10 +2485,13 @@ function drawPostprocessPass(
       gl.uniform1f(ctx.postprocessUniforms.u_coneSeamBlend, textureTransform.seamBlend);
       setUniform1i(gl, ctx.postprocessUniforms.u_coneSeamMode, CONE_SEAM_MODE_INDEX[textureTransform.seamMode]);
       setUniform1i(gl, ctx.postprocessUniforms.u_coneShape, getConeShapeIndex(normalizedConeView));
-      gl.uniform1f(ctx.postprocessUniforms.u_coneRoll, getConeRollRadians(normalizedConeView));
       gl.uniform1f(ctx.postprocessUniforms.u_torusMajorRadius, getTorusMajorRadius(normalizedConeView));
       gl.uniform1f(ctx.postprocessUniforms.u_torusRingRepeat, normalizedConeView.torusRingRepeat);
-      const torusCamera = getTorusCamera(normalizedConeView);
+      const torusCamera = getTorusCamera(normalizedConeView, coneNormalizedTime);
+      gl.uniform1f(
+        ctx.postprocessUniforms.u_coneRoll,
+        normalizedConeView.shape === 'torus' ? torusCamera.rollRadians : 0,
+      );
       gl.uniform2f(ctx.postprocessUniforms.u_torusCameraOffset, torusCamera.offsetX, torusCamera.offsetY);
       gl.uniform1f(ctx.postprocessUniforms.u_torusCameraYaw, torusCamera.yawRadians);
       gl.uniform1f(ctx.postprocessUniforms.u_torusCameraPitch, torusCamera.pitchRadians);

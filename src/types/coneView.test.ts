@@ -53,6 +53,9 @@ describe('cone view configuration', () => {
       torusCameraY: 0,
       torusCameraYaw: 0,
       torusCameraPitch: 0,
+      torusWigglePreset: 'off',
+      torusWiggleAmount: 1,
+      torusWiggleSpeed: 1,
     });
   });
 
@@ -63,6 +66,15 @@ describe('cone view configuration', () => {
     expect(normalizeConeViewConfig({ shape: 'sphere' }).shape).toBe('cone');
     expect(normalizeConeViewConfig({ torusBend: 0 }).torusBend).toBe(0.05);
     expect(normalizeConeViewConfig({ torusRingRepeat: 0 }).torusRingRepeat).toBe(1);
+  });
+
+  it('normalizes the torus wiggle settings', () => {
+    expect(normalizeConeViewConfig({ torusWigglePreset: 'handheld' }).torusWigglePreset).toBe('handheld');
+    expect(normalizeConeViewConfig({ torusWigglePreset: 'earthquake' }).torusWigglePreset).toBe('off');
+    expect(normalizeConeViewConfig({ torusWiggleAmount: 9, torusWiggleSpeed: 2.6 })).toMatchObject({
+      torusWiggleAmount: 2,
+      torusWiggleSpeed: 3,
+    });
   });
 
   it('wraps rotation-like angles and clamps the torus camera offset', () => {
