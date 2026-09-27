@@ -446,6 +446,7 @@ export type V2RenderPlan = {
     prismComposite: boolean;
     particles: boolean;
     videoMotion: boolean;
+    threeD: boolean;
   };
 };
 
@@ -713,6 +714,7 @@ export function getV2RenderPlan(
       prismComposite: prismRequested,
       particles: particlesRequested,
       videoMotion: enabledLayers.some(layer => layer.kind === 'videoMotion'),
+      threeD: enabledLayers.some(layer => layer.kind === 'cone'),
     },
   };
 }

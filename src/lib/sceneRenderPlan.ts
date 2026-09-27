@@ -101,6 +101,7 @@ export function getRequiredSceneProgramKeys(state: LatestState): LazyProgramKey[
     add('prismComposite', plan.programs.prismComposite);
     add('particles', plan.programs.particles);
     add('videoMotion', plan.programs.videoMotion);
+    add('threeD', plan.programs.threeD);
   } else {
     const layers = getActivePostprocessStackLayers(state.postprocess).filter(layer => (
       (layer.kind !== 'glass' && layer.kind !== 'glassV2' && layer.kind !== 'glassTile')
