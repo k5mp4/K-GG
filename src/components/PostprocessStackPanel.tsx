@@ -48,7 +48,7 @@ const LABELS: Record<EffectStackKind, string> = {
   glass: 'Glass',
   glassTile: 'GlassTile',
   videoMotion: 'Video Motion',
-  cone: 'Cone',
+  cone: '3D',
 };
 
 const CATEGORY: Record<EffectStackKind, MessageKey> = {

@@ -133,9 +133,93 @@ vec2 coneMappedUv(vec2 globalUv, out bool hitCone) {
   return vec2(u, v);
 }
 
+// Torus tunnel: the camera sits on the ring's center line inside a tube of
+// radius 1 and looks along the ring tangent. The ring lies in the XZ plane
+// with its center at (-R, 0, 0), so the tube bends toward -X; u_coneRoll rolls
+// the camera to choose the bend direction on screen. The camera yaws into the
+// bend so the screen center aims at the farthest center-line point whose line
+// of sight still clears the tube wall by half its radius: sagitta
+// R * (1 - cos(yaw)) = 0.5, keeping the tunnel's far end near the center. The texture wraps around
+// the tube (u) and along the ring (v, in tiles); rotating the ring past a
+// fixed camera is equivalent to advancing v, which the caller does through
+// u_coneTextureOffset.y.
+float torusInteriorDistance(vec3 p, float majorRadius) {
+  vec3 q = p + vec3(majorRadius, 0.0, 0.0);
+  return 1.0 - length(vec2(length(q.xz) - majorRadius, q.y));
+}
+
+vec2 torusMappedUv(vec2 globalUv, out bool hitTorus) {
+  float aspect = u_fullResolution.x / max(u_fullResolution.y, 1.0);
+  vec2 ndc = globalUv * 2.0 - 1.0;
+  vec2 screenRay = vec2(ndc.x * aspect, ndc.y) * u_coneTangentHalfFov;
+  // Camera orientation: user pitch and yaw in the camera frame, then roll
+  // around the forward axis, then the automatic aim into the bend. Applying
+  // the user look first keeps yaw horizontal and pitch vertical on screen
+  // whatever the roll is.
+  vec3 cameraRay = vec3(screenRay, -1.0);
+  float pitchCos = cos(u_torusCameraPitch);
+  float pitchSin = sin(u_torusCameraPitch);
+  cameraRay = vec3(
+    cameraRay.x,
+    cameraRay.y * pitchCos - cameraRay.z * pitchSin,
+    cameraRay.y * pitchSin + cameraRay.z * pitchCos
+  );
+  float lookCos = cos(u_torusCameraYaw);
+  float lookSin = sin(u_torusCameraYaw);
+  cameraRay = vec3(
+    cameraRay.x * lookCos + cameraRay.z * lookSin,
+    cameraRay.y,
+    -cameraRay.x * lookSin + cameraRay.z * lookCos
+  );
+  float rollCos = cos(u_coneRoll);
+  float rollSin = sin(u_coneRoll);
+  mat2 roll = mat2(rollCos, rollSin, -rollSin, rollCos);
+  cameraRay.xy = roll * cameraRay.xy;
+  float majorRadius = max(u_torusMajorRadius, 1.05);
+  // Looking backward, the tunnel behind bends the same way, so the aim into
+  // the bend flips sign; looking sideways at the wall needs none. Scaling by
+  // cos(yaw) keeps the far end in view while the user yaw turns a full circle.
+  float yaw = acos(clamp(1.0 - 0.5 / majorRadius, -1.0, 1.0)) * cos(u_torusCameraYaw);
+  float yawCos = cos(yaw);
+  float yawSin = sin(yaw);
+  vec3 rayDirection = normalize(vec3(
+    cameraRay.x * yawCos + cameraRay.z * yawSin,
+    cameraRay.y,
+    -cameraRay.x * yawSin + cameraRay.z * yawCos
+  ));
+  // The camera moves inside the tube cross-section at its ring position, so
+  // the offset follows the roll but not the look direction.
+  vec3 rayOrigin = vec3(roll * u_torusCameraOffset, 0.0);
+  // Sphere tracing from inside the tube: the interior distance is the exact
+  // distance to the wall, so each step stays inside and converges on the hit.
+  float distance = 0.0;
+  float wallDistance = 1.0;
+  for (int i = 0; i < 96; i++) {
+    wallDistance = torusInteriorDistance(rayOrigin + rayDirection * distance, majorRadius);
+    if (wallDistance < 0.0005 * (1.0 + distance)) break;
+    distance += wallDistance;
+  }
+  // A ray that starts inside the closed tube always meets the wall. Grazing
+  // rays near the vanishing point may run out of steps; their last point is
+  // already close to the wall, so keep it instead of drawing a hole.
+  hitTorus = true;
+  vec3 q = rayOrigin + rayDirection * distance + vec3(majorRadius, 0.0, 0.0);
+  // The forward (-Z) direction is the positive ring angle.
+  float ringAngle = atan(-q.z, q.x);
+  float tubeAngle = atan(q.y, length(q.xz) - majorRadius);
+  float ringTurns = ringAngle / 6.283185307179586;
+  // Twist turns the texture around the tube along the ring. Combined with the
+  // Flow offset on v, the pattern spirals toward the camera like a vortex.
+  float u = fract(tubeAngle / 6.283185307179586 + 0.25 + u_torusTwistTurns * ringTurns);
+  float v = ringTurns * max(u_torusRingRepeat, 1.0);
+  return vec2(u, v);
+}
+
 vec4 coneViewSample(vec2 globalUv) {
   bool hitCone;
-  vec2 mappedUv = coneMappedUv(globalUv, hitCone);
+  vec2 mappedUv = u_coneShape == 1
+    ? torusMappedUv(globalUv, hitCone)
+    : coneMappedUv(globalUv, hitCone);
   if (!hitCone) return vec4(0.0, 0.0, 0.0, 1.0);
   vec2 unwrappedUv = mappedUv * vec2(u_coneTextureRepeat, 1.0) + u_coneTextureOffset;
   vec2 sampleUv = fract(unwrappedUv);

@@ -8,8 +8,15 @@ import {
   getConeApexCanvasPoint,
   getConeApexOffset,
   getConeSeamModeIndex,
+  getConeShapeIndex,
   getConeTextureTransform,
+  getTorusCamera,
+  getTorusMajorRadius,
+  getTorusTwistTurns,
+  getTorusWiggle,
+  TORUS_CAMERA_MAX_OFFSET,
 } from './coneView';
+import { TORUS_WIGGLE_PRESETS } from '../types/coneView';
 
 describe('cone view geometry', () => {
   it.each([1, 16 / 9, 9 / 16])('covers every frustum corner for aspect %s', (aspect) => {
@@ -94,5 +101,106 @@ describe('cone texture flow', () => {
     expect(start.seamMode).toBe(seamMode);
     expect(end.seamMode).toBe(seamMode);
     expect(end.offsetV - start.offsetV).toBe(4);
+  });
+});
+
+describe('torus tunnel', () => {
+  const torus = { ...DEFAULT_CONE_VIEW, shape: 'torus' as const };
+
+  it('selects the torus shader branch and keeps the cone as the default branch', () => {
+    expect(getConeShapeIndex(DEFAULT_CONE_VIEW)).toBe(0);
+    expect(getConeShapeIndex(torus)).toBe(1);
+  });
+
+  it('uses Rotation as a camera roll instead of a texture offset', () => {
+    const rotated = { ...torus, rotation: 90 };
+    expect(getTorusCamera(rotated).rollRadians).toBeCloseTo(Math.PI / 2, 10);
+    expect(getConeTextureTransform(rotated, 0).offsetU).toBe(0);
+    expect(getConeTextureTransform({ ...DEFAULT_CONE_VIEW, rotation: 90 }, 0).offsetU).toBeCloseTo(0.25, 10);
+  });
+
+  it('derives the ring radius from Bend with a unit tube radius', () => {
+    expect(getTorusMajorRadius({ ...torus, torusBend: 0.25 })).toBeCloseTo(4, 10);
+    expect(getTorusMajorRadius({ ...torus, torusBend: Number.NaN })).toBeCloseTo(1 / 0.3, 10);
+    expect(getTorusMajorRadius({ ...torus, torusBend: 5 })).toBeGreaterThan(1);
+  });
+
+  it('converts the camera look angles and keeps the offset inside the tube', () => {
+    const camera = getTorusCamera({ ...torus, torusCameraYaw: 90, torusCameraPitch: 180, torusCameraX: 0.3, torusCameraY: -0.4 });
+    expect(camera.yawRadians).toBeCloseTo(Math.PI / 2, 10);
+    expect(camera.pitchRadians).toBeCloseTo(Math.PI, 10);
+    expect(camera.offsetX).toBeCloseTo(0.3, 10);
+    expect(camera.offsetY).toBeCloseTo(-0.4, 10);
+
+    const corner = getTorusCamera({ ...torus, torusCameraX: 0.8, torusCameraY: 0.8 });
+    expect(Math.hypot(corner.offsetX, corner.offsetY)).toBeCloseTo(TORUS_CAMERA_MAX_OFFSET, 10);
+    expect(corner.offsetX).toBeCloseTo(corner.offsetY, 10);
+  });
+
+  it('rounds Twist to whole texture turns over the ring', () => {
+    expect(getTorusTwistTurns({ ...torus, torusTwist: 0.5, torusRingRepeat: 12 })).toBe(6);
+    expect(getTorusTwistTurns({ ...torus, torusTwist: 0.3, torusRingRepeat: 5 })).toBe(2);
+    expect(getTorusTwistTurns({ ...torus, torusTwist: -1, torusRingRepeat: 12 })).toBe(-12);
+    expect(getTorusTwistTurns(torus)).toBe(0);
+  });
+
+  it('spins the torus texture by whole turns per loop', () => {
+    const spinning = { ...torus, torusSpin: 2 };
+    expect(getConeTextureTransform(spinning, 0).offsetU).toBe(0);
+    expect(getConeTextureTransform(spinning, 0.25).offsetU).toBeCloseTo(0.5, 10);
+    expect(getConeTextureTransform(spinning, 1).offsetU).toBe(0);
+    expect(getConeTextureTransform({ ...torus, torusSpin: -1 }, 0.25).offsetU).toBeCloseTo(0.75, 10);
+  });
+
+  it('adds the base roll to the torus camera', () => {
+    expect(getTorusCamera({ ...torus, rotation: 45 }).rollRadians).toBeCloseTo(Math.PI / 4, 10);
+  });
+
+  it('keeps the camera still when wiggle is off or its amount is zero', () => {
+    const still = { yaw: 0, pitch: 0, roll: 0, x: 0, y: 0 };
+    expect(getTorusWiggle(torus, 0.37)).toEqual(still);
+    expect(getTorusWiggle({ ...torus, torusWigglePreset: 'handheld', torusWiggleAmount: 0 }, 0.37)).toEqual(still);
+  });
+
+  it.each(TORUS_WIGGLE_PRESETS.filter(preset => preset !== 'off'))('moves the camera with %s and closes the loop', (preset) => {
+    for (const torusWiggleSpeed of [1, 3]) {
+      const config = { ...torus, torusWigglePreset: preset, torusWiggleSpeed };
+      const start = getTorusCamera(config, 0);
+      const end = getTorusCamera(config, 1);
+      for (const key of ['offsetX', 'offsetY'] as const) {
+        expect(end[key]).toBeCloseTo(start[key], 9);
+      }
+      for (const key of ['yawRadians', 'pitchRadians', 'rollRadians'] as const) {
+        // Angles close the loop modulo a full turn.
+        expect(Math.cos(end[key])).toBeCloseTo(Math.cos(start[key]), 9);
+        expect(Math.sin(end[key])).toBeCloseTo(Math.sin(start[key]), 9);
+      }
+      const middle = getTorusWiggle(config, 0.3);
+      expect(Object.values(middle).some(value => Math.abs(value) > 1e-6)).toBe(true);
+    }
+  });
+
+  it('turns the yaw a full circle per loop for Look Around, independent of Amount', () => {
+    const config = { ...torus, torusWigglePreset: 'lookAround' as const };
+    expect(getTorusWiggle(config, 0.25).yaw).toBeCloseTo(90, 9);
+    expect(getTorusWiggle({ ...config, torusWiggleAmount: 0 }, 0.5).yaw).toBeCloseTo(180, 9);
+    expect(getTorusWiggle({ ...config, torusWiggleAmount: 0 }, 0.5).pitch).toBe(0);
+    expect(getTorusWiggle({ ...config, torusWiggleSpeed: 2 }, 0.25).yaw).toBeCloseTo(180, 9);
+  });
+
+  it('scales the wiggle linearly with Amount and keeps the camera inside the tube', () => {
+    const base = { ...torus, torusWigglePreset: 'orbit' as const };
+    const single = getTorusWiggle(base, 0.2);
+    const double = getTorusWiggle({ ...base, torusWiggleAmount: 2 }, 0.2);
+    expect(double.x).toBeCloseTo(single.x * 2, 10);
+    const pushed = getTorusCamera({ ...base, torusWiggleAmount: 2, torusCameraX: 0.8 }, 0);
+    expect(Math.hypot(pushed.offsetX, pushed.offsetY)).toBeLessThanOrEqual(TORUS_CAMERA_MAX_OFFSET + 1e-12);
+  });
+
+  it('advances whole ring tiles over one loop so integer Flow Cycles loop seamlessly', () => {
+    const flowing = { ...torus, flowCycles: 3 };
+    expect(getConeTextureTransform(flowing, 0).offsetV).toBe(0);
+    expect(getConeTextureTransform(flowing, 1).offsetV).toBe(3);
+    expect(getConeTextureTransform({ ...flowing, mappingMode: 'projection' }, 0.5).offsetV).toBe(0);
   });
 });

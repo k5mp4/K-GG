@@ -28,7 +28,8 @@ export function ConeApexEditor({ width, height, visible = true }: Props) {
     draggingRef.current = false;
   }, []);
 
-  if (!visible) return null;
+  // The torus tunnel has no apex; its camera stays on the ring center line.
+  if (!visible || coneView.shape === 'torus') return null;
 
   const position = getConeApexCanvasPoint(width, height, coneView.apexX, coneView.apexY);
 
