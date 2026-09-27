@@ -49,6 +49,13 @@ uniform int u_roomBounces;
 uniform float u_roomReflectivity;
 
 uniform bool u_sphereInside;
+
+uniform float u_terrainHeight;
+uniform float u_terrainAltitude;
+
+uniform float u_extrudeCells;
+uniform float u_extrudeHeight;
+uniform float u_extrudeGap;
 uniform int u_roomCanvasFaces;
 
 const float PI = 3.141592653589793;
@@ -59,6 +66,8 @@ const int SHAPE_TORUS = 1;
 const int SHAPE_LATTICE = 2;
 const int SHAPE_MIRROR_ROOM = 3;
 const int SHAPE_SPHERE = 4;
+const int SHAPE_TERRAIN = 5;
+const int SHAPE_EXTRUSION = 6;
 
 const int MAPPING_UV = 0;
 const int MAPPING_TRIPLANAR = 1;
@@ -200,6 +209,11 @@ struct ThreeDHit {
   vec3 normal;
   vec2 uv;
   bool hasUv;
+  // The uv already includes Texture Repeat on both axes.
+  bool uvTiled;
+  // The shape resolved its own color (Extrusion cells and floor).
+  bool hasColor;
+  vec4 color;
   float distance;
   vec3 rayDirection;
   // Triplanar texture tiles per world unit.
@@ -213,6 +227,9 @@ ThreeDHit threeDMiss() {
   result.normal = vec3(0.0, 0.0, 1.0);
   result.uv = vec2(0.0);
   result.hasUv = false;
+  result.uvTiled = false;
+  result.hasColor = false;
+  result.color = vec4(0.0, 0.0, 0.0, 1.0);
   result.distance = 0.0;
   result.rayDirection = vec3(0.0, 0.0, -1.0);
   result.mapScale = 1.0;
@@ -568,6 +585,187 @@ ThreeDHit sphereHit(vec3 localRay) {
 }
 
 // ---------------------------------------------------------------------------
+// Terrain: the canvas luminance lifts a heightfield that repeats every tile
+// (4 / Texture Repeat world units). The camera glides forward at Altitude and
+// Flow advances it by whole tiles, so integer Flow Cycles loop seamlessly.
+
+float threeDLuminance(vec3 color) {
+  return dot(clamp(color, 0.0, 1.0), vec3(0.299, 0.587, 0.114));
+}
+
+// Heights follow the color seams: Mirror Repeat blends the same way the
+// color does, the other modes wrap with fract to keep the march cheap.
+float terrainHeightAt(vec2 xz) {
+  vec2 uv = xz * 0.25 * max(u_coneTextureRepeat, 1.0);
+  vec3 color = u_coneSeamMode == 0
+    ? coneMirrorRepeatSample(uv, u_coneSeamBlend).rgb
+    : coneTextureLookup(fract(uv)).rgb;
+  return max(u_terrainHeight, 0.0) * threeDLuminance(color);
+}
+
+ThreeDHit terrainHit(vec3 localRay) {
+  ThreeDHit result = threeDMiss();
+  vec3 forward = normalize(vec3(0.0, -0.3, -1.0));
+  vec3 up = vec3(0.0, 1.0, 0.0);
+  threeDSetCameraBasis(forward, up);
+  vec3 rayDirection = threeDWorldDirection(localRay, forward, up);
+  vec3 right = normalize(cross(forward, up));
+  vec2 offset = threeDRollMatrix() * u_cameraOffset;
+  float tileLength = 4.0 / max(u_coneTextureRepeat, 1.0);
+  vec3 rayOrigin = vec3(0.0, max(u_terrainAltitude, 0.05), -u_threeDTravel * tileLength)
+    + right * offset.x + up * offset.y;
+  float maxHeight = max(u_terrainHeight, 0.0);
+  result.rayDirection = rayDirection;
+  float previous = 0.0;
+  float distance = 0.02;
+  bool hit = false;
+  for (int i = 0; i < 200; i++) {
+    vec3 position = rayOrigin + rayDirection * distance;
+    float gap = position.y - terrainHeightAt(position.xz);
+    if (gap < 0.001 + 0.002 * distance) {
+      hit = true;
+      break;
+    }
+    // Rays above the highest peak that climb never come back down.
+    if (position.y > maxHeight && rayDirection.y >= 0.0) break;
+    previous = distance;
+    distance += max(gap * 0.4, 0.01 + 0.004 * distance);
+    if (distance > 40.0) break;
+  }
+  if (!hit) return result;
+  // Refine the crossing between the last point above and the first below.
+  float low = previous;
+  float high = distance;
+  for (int i = 0; i < 6; i++) {
+    float middle = 0.5 * (low + high);
+    vec3 position = rayOrigin + rayDirection * middle;
+    if (position.y - terrainHeightAt(position.xz) > 0.0) low = middle;
+    else high = middle;
+  }
+  distance = high;
+  vec3 position = rayOrigin + rayDirection * distance;
+  float epsilon = 0.02 * tileLength;
+  vec3 normal = normalize(vec3(
+    terrainHeightAt(position.xz - vec2(epsilon, 0.0)) - terrainHeightAt(position.xz + vec2(epsilon, 0.0)),
+    2.0 * epsilon,
+    terrainHeightAt(position.xz - vec2(0.0, epsilon)) - terrainHeightAt(position.xz + vec2(0.0, epsilon))
+  ));
+  result.hit = true;
+  result.position = position;
+  result.normal = normal;
+  result.uv = position.xz * 0.25 * max(u_coneTextureRepeat, 1.0);
+  result.hasUv = true;
+  result.uvTiled = true;
+  result.distance = distance;
+  result.mapScale = 0.25;
+  return result;
+}
+
+// ---------------------------------------------------------------------------
+// Extrusion: the canvas is split into Cells x Cells columns over [-1, 1]^2,
+// each raised by its cell color's luminance. A 2D DDA walks the cells along
+// the ray and tests each column box, so the first box hit is the nearest.
+// The camera orbits the city once per Flow Cycle.
+
+ThreeDHit extrusionHit(vec3 localRay) {
+  ThreeDHit result = threeDMiss();
+  float cells = max(floor(u_extrudeCells + 0.5), 1.0);
+  float cellSize = 2.0 / cells;
+  float maxHeight = max(u_extrudeHeight, 0.001);
+  float orbit = u_threeDTravel * TAU;
+  float elevation = 0.55;
+  // Frame the unit city tighter than the sphere at the same Distance.
+  float cameraDistance = max(u_threeDDistance * 0.7, 1.5);
+  vec3 cameraPosition = vec3(sin(orbit) * cos(elevation), sin(elevation), cos(orbit) * cos(elevation)) * cameraDistance;
+  vec3 forward = normalize(vec3(0.0, maxHeight * 0.15, 0.0) - cameraPosition);
+  vec3 up = vec3(0.0, 1.0, 0.0);
+  threeDSetCameraBasis(forward, up);
+  vec3 rayDirection = threeDWorldDirection(localRay, forward, up);
+  vec3 right = normalize(cross(forward, up));
+  vec2 offset = threeDRollMatrix() * u_cameraOffset * cameraDistance * 0.3;
+  vec3 rayOrigin = cameraPosition + right * offset.x + cross(right, forward) * offset.y;
+  result.rayDirection = rayDirection;
+
+  vec3 safeDirection = rayDirection + vec3(
+    abs(rayDirection.x) < 0.000001 ? 0.000001 : 0.0,
+    abs(rayDirection.y) < 0.000001 ? 0.000001 : 0.0,
+    abs(rayDirection.z) < 0.000001 ? 0.000001 : 0.0
+  );
+  vec3 inverse = 1.0 / safeDirection;
+  vec3 boxNear = (vec3(-1.0, 0.0, -1.0) - rayOrigin) * inverse;
+  vec3 boxFar = (vec3(1.0, maxHeight, 1.0) - rayOrigin) * inverse;
+  vec3 entry = min(boxNear, boxFar);
+  vec3 exit = max(boxNear, boxFar);
+  float enter = max(max(entry.x, entry.y), max(entry.z, 0.0));
+  float leave = min(min(exit.x, exit.y), exit.z);
+  bool found = false;
+  if (leave > enter) {
+    float distance = enter + 0.00001;
+    vec3 position = rayOrigin + rayDirection * distance;
+    vec2 cell = clamp(floor((position.xz + 1.0) / cellSize), vec2(0.0), vec2(cells - 1.0));
+    vec2 stepDirection = vec2(safeDirection.x >= 0.0 ? 1.0 : -1.0, safeDirection.z >= 0.0 ? 1.0 : -1.0);
+    vec2 boundary = (cell + max(stepDirection, vec2(0.0))) * cellSize - 1.0;
+    vec2 crossing = distance + (boundary - position.xz) * inverse.xz;
+    vec2 delta = cellSize * abs(inverse.xz);
+    float halfSize = 0.5 * cellSize * (1.0 - clamp(u_extrudeGap, 0.0, 0.95));
+    for (int i = 0; i < 280; i++) {
+      if (cell.x < 0.0 || cell.y < 0.0 || cell.x > cells - 1.0 || cell.y > cells - 1.0) break;
+      vec2 cellUv = (cell + 0.5) / cells;
+      vec4 cellColor = coneTextureLookup(cellUv);
+      float height = maxHeight * threeDLuminance(cellColor.rgb);
+      if (height > 0.0005) {
+        vec2 center = -1.0 + (cell + 0.5) * cellSize;
+        vec3 columnNear = (vec3(center.x - halfSize, 0.0, center.y - halfSize) - rayOrigin) * inverse;
+        vec3 columnFar = (vec3(center.x + halfSize, height, center.y + halfSize) - rayOrigin) * inverse;
+        vec3 columnEntry = min(columnNear, columnFar);
+        vec3 columnExit = max(columnNear, columnFar);
+        float columnEnter = max(max(columnEntry.x, columnEntry.y), columnEntry.z);
+        float columnLeave = min(min(columnExit.x, columnExit.y), columnExit.z);
+        if (columnLeave >= max(columnEnter, 0.0)) {
+          vec3 normal = columnEntry.x >= columnEntry.y && columnEntry.x >= columnEntry.z
+            ? vec3(-stepDirection.x, 0.0, 0.0)
+            : columnEntry.y >= columnEntry.z
+              ? vec3(0.0, safeDirection.y >= 0.0 ? -1.0 : 1.0, 0.0)
+              : vec3(0.0, 0.0, -stepDirection.y);
+          result.hit = true;
+          result.position = rayOrigin + rayDirection * columnEnter;
+          result.normal = normal;
+          result.uv = cellUv;
+          result.hasColor = true;
+          result.color = cellColor;
+          result.distance = columnEnter;
+          found = true;
+          break;
+        }
+      }
+      if (crossing.x < crossing.y) {
+        cell.x += stepDirection.x;
+        crossing.x += delta.x;
+      } else {
+        cell.y += stepDirection.y;
+        crossing.y += delta.y;
+      }
+    }
+  }
+  if (!found && rayDirection.y < 0.0) {
+    // The floor between the columns shows the canvas dimmed.
+    float floorDistance = -rayOrigin.y / rayDirection.y;
+    vec3 position = rayOrigin + rayDirection * floorDistance;
+    if (abs(position.x) <= 1.0 && abs(position.z) <= 1.0) {
+      result.hit = true;
+      result.position = position;
+      result.normal = vec3(0.0, 1.0, 0.0);
+      result.uv = (position.xz + 1.0) * 0.5;
+      result.hasColor = true;
+      result.color = vec4(coneTextureLookup(result.uv).rgb * 0.25, 1.0);
+      result.distance = floorDistance;
+    }
+  }
+  result.mapScale = 0.5;
+  return result;
+}
+
+// ---------------------------------------------------------------------------
 // Mapping, shading, and fog.
 
 vec4 threeDTriplanarSample(vec3 position, vec3 normal, float mapScale) {
@@ -594,6 +792,10 @@ vec4 threeDSurfaceColor(ThreeDHit hit) {
     color = threeDMatcapSample(normal);
   } else if (u_threeDMapping == MAPPING_TRIPLANAR || !hit.hasUv) {
     color = threeDTriplanarSample(hit.position, normal, hit.mapScale);
+  } else if (hit.hasColor) {
+    color = hit.color;
+  } else if (hit.uvTiled) {
+    color = threeDSampleUnwrapped(hit.uv + u_coneTextureOffset);
   } else {
     color = threeDSampleUnwrapped(hit.uv * vec2(u_coneTextureRepeat, 1.0) + u_coneTextureOffset);
   }
@@ -648,6 +850,12 @@ void main() {
   } else if (u_threeDShape == SHAPE_SPHERE) {
     hit = sphereHit(localRay);
     fogScale = 0.5;
+  } else if (u_threeDShape == SHAPE_TERRAIN) {
+    hit = terrainHit(localRay);
+    fogScale = 0.15;
+  } else if (u_threeDShape == SHAPE_EXTRUSION) {
+    hit = extrusionHit(localRay);
+    fogScale = 0.3;
   } else {
     hit = torusHit(localRay);
   }

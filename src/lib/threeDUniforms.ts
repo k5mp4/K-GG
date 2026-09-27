@@ -54,4 +54,9 @@ export function uploadThreeDUniforms(
   float('u_roomReflectivity', params.room.reflectivity);
   int('u_roomCanvasFaces', params.room.canvasFaces);
   int('u_sphereInside', params.sphereInside ? 1 : 0);
+  float('u_terrainHeight', params.terrain.height);
+  float('u_terrainAltitude', params.terrain.altitude);
+  float('u_extrudeCells', params.extrusion.cells);
+  float('u_extrudeHeight', params.extrusion.height);
+  float('u_extrudeGap', params.extrusion.gap);
 }

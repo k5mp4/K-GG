@@ -70,6 +70,11 @@ describe('cone view configuration', () => {
       roomReflectivity: 0.65,
       roomCanvasFaces: 'alternate',
       sphereView: 'inside',
+      terrainHeight: 0.6,
+      terrainAltitude: 1,
+      extrudeCells: 32,
+      extrudeHeight: 0.8,
+      extrudeGap: 0.15,
     });
   });
 
@@ -122,6 +127,25 @@ describe('cone view configuration', () => {
       projection: 'perspective',
       sphereView: 'inside',
     });
+  });
+
+  it('clamps the terrain and extrusion settings', () => {
+    expect(normalizeConeViewConfig({
+      shape: 'terrain',
+      terrainHeight: 9,
+      terrainAltitude: 0,
+      extrudeCells: 200.4,
+      extrudeHeight: -1,
+      extrudeGap: 2,
+    })).toMatchObject({
+      shape: 'terrain',
+      terrainHeight: 2,
+      terrainAltitude: 0.1,
+      extrudeCells: 128,
+      extrudeHeight: 0,
+      extrudeGap: 0.8,
+    });
+    expect(normalizeConeViewConfig({ shape: 'extrusion', extrudeCells: 12.6 })).toMatchObject({ shape: 'extrusion', extrudeCells: 13 });
   });
 
   it('normalizes the torus wiggle settings', () => {

@@ -127,7 +127,7 @@ describe('3D render parameters', () => {
     expect(torus.camera.rollRadians).toBeCloseTo(Math.PI / 2, 10);
   });
 
-  it.each(['lattice', 'mirrorRoom'] as const)('moves the %s geometry with Flow instead of the texture', (shape) => {
+  it.each(['lattice', 'mirrorRoom', 'terrain', 'extrusion'] as const)('moves the %s geometry with Flow instead of the texture', (shape) => {
     const config = { ...DEFAULT_CONE_VIEW, shape, flowCycles: 3 };
     const middle = getThreeDRenderParams(config, 0.5, 1);
     expect(middle.travel).toBeCloseTo(1.5, 10);
@@ -145,6 +145,21 @@ describe('3D render parameters', () => {
     expect(params.projection).toBe(1);
     expect(params.sphereInside).toBe(true);
     expect(getThreeDRenderParams({ ...sphere, sphereView: 'outside' }, 0, 1).sphereInside).toBe(false);
+  });
+
+  it('passes the terrain and extrusion settings through', () => {
+    const params = getThreeDRenderParams({
+      ...DEFAULT_CONE_VIEW,
+      shape: 'extrusion',
+      terrainHeight: 1.1,
+      terrainAltitude: 0.4,
+      extrudeCells: 48,
+      extrudeHeight: 1.5,
+      extrudeGap: 0.3,
+    }, 0, 1);
+    expect(params.shape).toBe(6);
+    expect(params.terrain).toEqual({ height: 1.1, altitude: 0.4 });
+    expect(params.extrusion).toEqual({ cells: 48, height: 1.5, gap: 0.3 });
   });
 
   it('maps the lattice and room options to shader indices', () => {

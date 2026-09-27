@@ -43,6 +43,8 @@ const SHAPE_TEXT: Record<ConeShape, { title: MessageKey; description: MessageKey
   lattice: { title: 'cone.latticeSurface', description: 'cone.latticeDescription', hint: 'cone.latticeHint' },
   mirrorRoom: { title: 'cone.roomSurface', description: 'cone.roomDescription', hint: 'cone.roomHint' },
   sphere: { title: 'cone.sphereSurface', description: 'cone.sphereDescription', hint: 'cone.sphereHint' },
+  terrain: { title: 'cone.terrainSurface', description: 'cone.terrainDescription', hint: 'cone.terrainHint' },
+  extrusion: { title: 'cone.extrusionSurface', description: 'cone.extrusionDescription', hint: 'cone.extrusionHint' },
 };
 
 function toCameraPositionInput(x: number, y: number): [number, number] {
@@ -87,6 +89,56 @@ function ShapeControls({ coneView, setConeView }: { coneView: ConeViewConfig; se
           value={coneView.latticeThickness}
           limitKey="cone.latticeThickness"
           onChange={(latticeThickness) => setConeView({ latticeThickness })}
+        />
+      </>
+    );
+  }
+  if (coneView.shape === 'terrain') {
+    return (
+      <>
+        <SliderField
+          label="Height"
+          value={coneView.terrainHeight}
+          limitKey="cone.terrainHeight"
+          onChange={(terrainHeight) => setConeView({ terrainHeight })}
+        />
+        <SliderField
+          label="Altitude"
+          value={coneView.terrainAltitude}
+          limitKey="cone.terrainAltitude"
+          onChange={(terrainAltitude) => setConeView({ terrainAltitude })}
+        />
+      </>
+    );
+  }
+  if (coneView.shape === 'extrusion') {
+    return (
+      <>
+        <SliderField
+          label="Cells"
+          value={coneView.extrudeCells}
+          limitKey="cone.extrudeCells"
+          format={(value) => `${Math.round(value)}`}
+          onChange={(extrudeCells) => setConeView({ extrudeCells })}
+        />
+        <SliderField
+          label="Height"
+          value={coneView.extrudeHeight}
+          limitKey="cone.extrudeHeight"
+          onChange={(extrudeHeight) => setConeView({ extrudeHeight })}
+        />
+        <SliderField
+          label="Gap"
+          value={coneView.extrudeGap}
+          limitKey="cone.extrudeGap"
+          format={(value) => `${Math.round(value * 100)}%`}
+          onChange={(extrudeGap) => setConeView({ extrudeGap })}
+        />
+        <SliderField
+          label="Distance"
+          value={coneView.depth}
+          limitKey="cone.depth"
+          onChange={(depth) => setConeView({ depth })}
         />
       </>
     );

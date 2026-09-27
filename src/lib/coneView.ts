@@ -309,6 +309,15 @@ export type ThreeDRenderParams = {
     canvasFaces: number;
   };
   sphereInside: boolean;
+  terrain: {
+    height: number;
+    altitude: number;
+  };
+  extrusion: {
+    cells: number;
+    height: number;
+    gap: number;
+  };
 };
 
 /**
@@ -316,7 +325,7 @@ export type ThreeDRenderParams = {
  * texture. Their loop-normalized travel is the Flow offset, and the texture
  * offset stays at zero.
  */
-const GEOMETRY_MOTION_SHAPES: ReadonlySet<ConeViewConfig['shape']> = new Set(['lattice', 'mirrorRoom']);
+const GEOMETRY_MOTION_SHAPES: ReadonlySet<ConeViewConfig['shape']> = new Set(['lattice', 'mirrorRoom', 'terrain', 'extrusion']);
 
 export function getThreeDRenderParams(
   config: ConeViewConfig,
@@ -371,6 +380,15 @@ export function getThreeDRenderParams(
       canvasFaces: ROOM_CANVAS_FACES.indexOf(config.roomCanvasFaces),
     },
     sphereInside: config.sphereView === 'inside',
+    terrain: {
+      height: config.terrainHeight,
+      altitude: config.terrainAltitude,
+    },
+    extrusion: {
+      cells: Math.round(config.extrudeCells),
+      height: config.extrudeHeight,
+      gap: config.extrudeGap,
+    },
   };
 }
 

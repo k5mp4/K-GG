@@ -2,14 +2,16 @@ import { clampParameter, getParameterDefault, getParameterLimit } from '../lib/p
 
 export type ConeMappingMode = 'flow' | 'projection';
 /** Geometry of the 3D layer. The layer kind and preset key stay `cone` for compatibility. */
-export type ConeShape = 'cone' | 'torus' | 'lattice' | 'mirrorRoom' | 'sphere';
-export const CONE_SHAPES = ['cone', 'torus', 'lattice', 'mirrorRoom', 'sphere'] as const satisfies readonly ConeShape[];
+export type ConeShape = 'cone' | 'torus' | 'lattice' | 'mirrorRoom' | 'sphere' | 'terrain' | 'extrusion';
+export const CONE_SHAPES = ['cone', 'torus', 'lattice', 'mirrorRoom', 'sphere', 'terrain', 'extrusion'] as const satisfies readonly ConeShape[];
 export const CONE_SHAPE_INDEX = {
   cone: 0,
   torus: 1,
   lattice: 2,
   mirrorRoom: 3,
   sphere: 4,
+  terrain: 5,
+  extrusion: 6,
 } as const satisfies Record<ConeShape, number>;
 export const CONE_SHAPE_OPTIONS: { value: ConeShape; label: string }[] = [
   { value: 'cone', label: 'Cone' },
@@ -17,6 +19,8 @@ export const CONE_SHAPE_OPTIONS: { value: ConeShape; label: string }[] = [
   { value: 'lattice', label: 'Lattice · Gyroid tunnel' },
   { value: 'mirrorRoom', label: 'Mirror Room · Polyhedron' },
   { value: 'sphere', label: 'Sphere · Dome / Planet' },
+  { value: 'terrain', label: 'Terrain · Heightfield flyover' },
+  { value: 'extrusion', label: 'Extrusion · Pixel city' },
 ];
 
 /**
@@ -172,6 +176,16 @@ export type ConeViewConfig = {
   roomCanvasFaces: RoomCanvasFaces;
   /** Sphere only: camera at the center or outside at Depth / 2. */
   sphereView: SphereView;
+  /** Terrain only: height of the brightest canvas color. */
+  terrainHeight: number;
+  /** Terrain only: camera height above the ground plane. */
+  terrainAltitude: number;
+  /** Extrusion only: columns per side. */
+  extrudeCells: number;
+  /** Extrusion only: height of the brightest cell. */
+  extrudeHeight: number;
+  /** Extrusion only: share of each cell left empty between columns. */
+  extrudeGap: number;
 };
 
 /** Normalized apex movement limit; ±2 reaches 50% of the canvas outside its edge. */
@@ -217,6 +231,11 @@ export const DEFAULT_CONE_VIEW: ConeViewConfig = {
   roomReflectivity: getParameterDefault('cone.roomReflectivity'),
   roomCanvasFaces: 'alternate',
   sphereView: 'inside',
+  terrainHeight: getParameterDefault('cone.terrainHeight'),
+  terrainAltitude: getParameterDefault('cone.terrainAltitude'),
+  extrudeCells: getParameterDefault('cone.extrudeCells'),
+  extrudeHeight: getParameterDefault('cone.extrudeHeight'),
+  extrudeGap: getParameterDefault('cone.extrudeGap'),
 };
 
 function normalizeOption<T extends string>(value: unknown, options: readonly T[], fallback: T): T {
@@ -266,5 +285,10 @@ export function normalizeConeViewConfig(value: unknown): ConeViewConfig {
     roomReflectivity: clampParameter(raw.roomReflectivity, DEFAULT_CONE_VIEW.roomReflectivity, getParameterLimit('cone.roomReflectivity')),
     roomCanvasFaces: normalizeOption(raw.roomCanvasFaces, ROOM_CANVAS_FACES, DEFAULT_CONE_VIEW.roomCanvasFaces),
     sphereView: normalizeOption(raw.sphereView, SPHERE_VIEWS, DEFAULT_CONE_VIEW.sphereView),
+    terrainHeight: clampParameter(raw.terrainHeight, DEFAULT_CONE_VIEW.terrainHeight, getParameterLimit('cone.terrainHeight')),
+    terrainAltitude: clampParameter(raw.terrainAltitude, DEFAULT_CONE_VIEW.terrainAltitude, getParameterLimit('cone.terrainAltitude')),
+    extrudeCells: clampParameter(raw.extrudeCells, DEFAULT_CONE_VIEW.extrudeCells, getParameterLimit('cone.extrudeCells')),
+    extrudeHeight: clampParameter(raw.extrudeHeight, DEFAULT_CONE_VIEW.extrudeHeight, getParameterLimit('cone.extrudeHeight')),
+    extrudeGap: clampParameter(raw.extrudeGap, DEFAULT_CONE_VIEW.extrudeGap, getParameterLimit('cone.extrudeGap')),
   };
 }
