@@ -207,8 +207,11 @@ vec2 torusMappedUv(vec2 globalUv, out bool hitTorus) {
   // The forward (-Z) direction is the positive ring angle.
   float ringAngle = atan(-q.z, q.x);
   float tubeAngle = atan(q.y, length(q.xz) - majorRadius);
-  float u = fract(tubeAngle / 6.283185307179586 + 0.25);
-  float v = ringAngle / 6.283185307179586 * max(u_torusRingRepeat, 1.0);
+  float ringTurns = ringAngle / 6.283185307179586;
+  // Twist turns the texture around the tube along the ring. Combined with the
+  // Flow offset on v, the pattern spirals toward the camera like a vortex.
+  float u = fract(tubeAngle / 6.283185307179586 + 0.25 + u_torusTwistTurns * ringTurns);
+  float v = ringTurns * max(u_torusRingRepeat, 1.0);
   return vec2(u, v);
 }
 

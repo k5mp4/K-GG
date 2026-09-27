@@ -90,6 +90,7 @@ import {
   getConeTextureTransform,
   getTorusCamera,
   getTorusMajorRadius,
+  getTorusTwistTurns,
 } from './coneView';
 
 export type { TileRenderOptions } from '../types/rendering';
@@ -2487,6 +2488,7 @@ function drawPostprocessPass(
       setUniform1i(gl, ctx.postprocessUniforms.u_coneShape, getConeShapeIndex(normalizedConeView));
       gl.uniform1f(ctx.postprocessUniforms.u_torusMajorRadius, getTorusMajorRadius(normalizedConeView));
       gl.uniform1f(ctx.postprocessUniforms.u_torusRingRepeat, normalizedConeView.torusRingRepeat);
+      gl.uniform1f(ctx.postprocessUniforms.u_torusTwistTurns, getTorusTwistTurns(normalizedConeView));
       const torusCamera = getTorusCamera(normalizedConeView, coneNormalizedTime);
       gl.uniform1f(
         ctx.postprocessUniforms.u_coneRoll,

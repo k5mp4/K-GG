@@ -164,6 +164,8 @@ export const PARAMETER_LIMITS = {
   'cone.torusCameraY': { min: -0.8, max: 0.8, step: 0.01, defaultValue: 0 },
   'cone.torusCameraYaw': { min: 0, max: 360, step: 1, defaultValue: 0, angleUnit: 'degrees', wrapAngle: true },
   'cone.torusCameraPitch': { min: 0, max: 360, step: 1, defaultValue: 0, angleUnit: 'degrees', wrapAngle: true },
+  'cone.torusTwist': { min: -4, max: 4, step: 0.05, defaultValue: 0 },
+  'cone.torusSpin': { min: -8, max: 8, step: 1, defaultValue: 0, integer: true },
   'cone.torusWiggleAmount': { min: 0, max: 2, step: 0.01, defaultValue: 1 },
   'cone.torusWiggleSpeed': { min: 1, max: 8, step: 1, defaultValue: 1, integer: true },
 

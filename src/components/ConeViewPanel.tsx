@@ -81,6 +81,20 @@ export function ConeViewPanel() {
               limitKey="cone.torusRingRepeat"
               onChange={(torusRingRepeat) => setConeView({ torusRingRepeat })}
             />
+            <SliderField
+              label="Twist"
+              value={coneView.torusTwist}
+              limitKey="cone.torusTwist"
+              format={(value) => value.toFixed(2)}
+              onChange={(torusTwist) => setConeView({ torusTwist })}
+            />
+            <SliderField
+              label="Spin"
+              value={coneView.torusSpin}
+              limitKey="cone.torusSpin"
+              format={(value) => `${Math.round(value)}`}
+              onChange={(torusSpin) => setConeView({ torusSpin })}
+            />
           </>
         ) : (
           <SliderField

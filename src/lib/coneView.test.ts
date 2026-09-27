@@ -12,6 +12,7 @@ import {
   getConeTextureTransform,
   getTorusCamera,
   getTorusMajorRadius,
+  getTorusTwistTurns,
   getTorusWiggle,
   TORUS_CAMERA_MAX_OFFSET,
 } from './coneView';
@@ -134,6 +135,21 @@ describe('torus tunnel', () => {
     const corner = getTorusCamera({ ...torus, torusCameraX: 0.8, torusCameraY: 0.8 });
     expect(Math.hypot(corner.offsetX, corner.offsetY)).toBeCloseTo(TORUS_CAMERA_MAX_OFFSET, 10);
     expect(corner.offsetX).toBeCloseTo(corner.offsetY, 10);
+  });
+
+  it('rounds Twist to whole texture turns over the ring', () => {
+    expect(getTorusTwistTurns({ ...torus, torusTwist: 0.5, torusRingRepeat: 12 })).toBe(6);
+    expect(getTorusTwistTurns({ ...torus, torusTwist: 0.3, torusRingRepeat: 5 })).toBe(2);
+    expect(getTorusTwistTurns({ ...torus, torusTwist: -1, torusRingRepeat: 12 })).toBe(-12);
+    expect(getTorusTwistTurns(torus)).toBe(0);
+  });
+
+  it('spins the torus texture by whole turns per loop', () => {
+    const spinning = { ...torus, torusSpin: 2 };
+    expect(getConeTextureTransform(spinning, 0).offsetU).toBe(0);
+    expect(getConeTextureTransform(spinning, 0.25).offsetU).toBeCloseTo(0.5, 10);
+    expect(getConeTextureTransform(spinning, 1).offsetU).toBe(0);
+    expect(getConeTextureTransform({ ...torus, torusSpin: -1 }, 0.25).offsetU).toBeCloseTo(0.75, 10);
   });
 
   it('adds the base roll to the torus camera', () => {

@@ -52,6 +52,13 @@ export type ConeViewConfig = {
   torusBend: number;
   /** Torus only: texture tiles around the ring. Integer values keep the ring seamless. */
   torusRingRepeat: number;
+  /**
+   * Torus only: turns of the texture around the tube per ring tile. The total
+   * over the ring is rounded to whole turns so the ring stays seamless.
+   */
+  torusTwist: number;
+  /** Torus only: whole turns of the texture around the tube per loop. */
+  torusSpin: number;
   /** Torus only: camera offset inside the tube cross-section, in tube radii (screen right/up). */
   torusCameraX: number;
   torusCameraY: number;
@@ -87,6 +94,8 @@ export const DEFAULT_CONE_VIEW: ConeViewConfig = {
   mappingMode: 'flow',
   torusBend: getParameterDefault('cone.torusBend'),
   torusRingRepeat: getParameterDefault('cone.torusRingRepeat'),
+  torusTwist: getParameterDefault('cone.torusTwist'),
+  torusSpin: getParameterDefault('cone.torusSpin'),
   torusCameraX: getParameterDefault('cone.torusCameraX'),
   torusCameraY: getParameterDefault('cone.torusCameraY'),
   torusCameraYaw: getParameterDefault('cone.torusCameraYaw'),
@@ -118,6 +127,8 @@ export function normalizeConeViewConfig(value: unknown): ConeViewConfig {
     mappingMode: raw.mappingMode === 'projection' ? 'projection' : DEFAULT_CONE_VIEW.mappingMode,
     torusBend: clampParameter(raw.torusBend, DEFAULT_CONE_VIEW.torusBend, getParameterLimit('cone.torusBend')),
     torusRingRepeat: clampParameter(raw.torusRingRepeat, DEFAULT_CONE_VIEW.torusRingRepeat, getParameterLimit('cone.torusRingRepeat')),
+    torusTwist: clampParameter(raw.torusTwist, DEFAULT_CONE_VIEW.torusTwist, getParameterLimit('cone.torusTwist')),
+    torusSpin: clampParameter(raw.torusSpin, DEFAULT_CONE_VIEW.torusSpin, getParameterLimit('cone.torusSpin')),
     torusCameraX: clampParameter(raw.torusCameraX, DEFAULT_CONE_VIEW.torusCameraX, getParameterLimit('cone.torusCameraX')),
     torusCameraY: clampParameter(raw.torusCameraY, DEFAULT_CONE_VIEW.torusCameraY, getParameterLimit('cone.torusCameraY')),
     torusCameraYaw: clampParameter(raw.torusCameraYaw, DEFAULT_CONE_VIEW.torusCameraYaw, getParameterLimit('cone.torusCameraYaw')),

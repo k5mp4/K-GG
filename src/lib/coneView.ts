@@ -93,8 +93,11 @@ export function getConeTextureTransform(
   return {
     repeatU: config.textureRepeat,
     // Torus uses Rotation as a camera roll (see getTorusCamera) so the
-    // tunnel's bend direction can be chosen; the texture itself stays put.
-    offsetU: config.shape === 'torus' ? 0 : rotationTurns - Math.floor(rotationTurns),
+    // tunnel's bend direction can be chosen. Its texture turns around the tube
+    // only through Spin, in whole turns per loop.
+    offsetU: config.shape === 'torus'
+      ? getTorusSpinOffset(config, time)
+      : rotationTurns - Math.floor(rotationTurns),
     // Direct Projection keeps the processed 2D frame fixed on the cone.
     // Flow mode is the only mode that advances the texture from apex to opening.
     offsetV: config.mappingMode === 'projection' ? 0 : time * config.flowCycles,
@@ -105,6 +108,21 @@ export function getConeTextureTransform(
 
 export function getConeShapeIndex(config: ConeViewConfig): number {
   return CONE_SHAPE_INDEX[config.shape];
+}
+
+function getTorusSpinOffset(config: ConeViewConfig, normalizedTime: number): number {
+  const turns = Math.round(safeFinite(config.torusSpin, 0)) * normalizedTime;
+  return turns - Math.floor(turns);
+}
+
+/**
+ * Whole texture turns around the tube over one full ring. Twist is set per
+ * ring tile; rounding the ring total keeps the texture continuous where the
+ * ring angle wraps.
+ */
+export function getTorusTwistTurns(config: ConeViewConfig): number {
+  const ringRepeat = Math.max(1, Math.round(safeFinite(config.torusRingRepeat, 1)));
+  return Math.round(safeFinite(config.torusTwist, 0) * ringRepeat);
 }
 
 /** Ring radius of the torus when its tube radius is 1. */

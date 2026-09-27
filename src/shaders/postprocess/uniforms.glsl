@@ -146,6 +146,7 @@ uniform int u_coneShape;
 uniform float u_coneRoll;
 uniform float u_torusMajorRadius;
 uniform float u_torusRingRepeat;
+uniform float u_torusTwistTurns;
 uniform vec2 u_torusCameraOffset;
 uniform float u_torusCameraYaw;
 uniform float u_torusCameraPitch;

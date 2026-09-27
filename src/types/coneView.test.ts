@@ -49,6 +49,8 @@ describe('cone view configuration', () => {
       mappingMode: 'flow',
       torusBend: 0.9,
       torusRingRepeat: 7,
+      torusTwist: 0,
+      torusSpin: 0,
       torusCameraX: 0,
       torusCameraY: 0,
       torusCameraYaw: 0,
@@ -66,6 +68,11 @@ describe('cone view configuration', () => {
     expect(normalizeConeViewConfig({ shape: 'sphere' }).shape).toBe('cone');
     expect(normalizeConeViewConfig({ torusBend: 0 }).torusBend).toBe(0.05);
     expect(normalizeConeViewConfig({ torusRingRepeat: 0 }).torusRingRepeat).toBe(1);
+  });
+
+  it('clamps Twist and rounds Spin to whole turns', () => {
+    expect(normalizeConeViewConfig({ torusTwist: 9, torusSpin: 2.4 })).toMatchObject({ torusTwist: 4, torusSpin: 2 });
+    expect(normalizeConeViewConfig({ torusTwist: -9, torusSpin: -99 })).toMatchObject({ torusTwist: -4, torusSpin: -8 });
   });
 
   it('normalizes the torus wiggle settings', () => {
