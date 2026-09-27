@@ -40,7 +40,7 @@ The web build loads Noto Sans JP and Open Sans from Google Fonts in `index.html`
 
 ### Diffuse
 
-Adds deterministic diffusion to the gradient. In V2 it is placed at the final image-processing stage by default. Smooth reduces the visible grid pattern. Adjust Scatter, Grain, and Seed. Adaptive Luminance maps input luminance through one cubic Bezier curve; its histogram is a read-only preview.
+Adds deterministic diffusion to the gradient. In V2 it is placed at the final image-processing stage by default. Smooth reduces the visible grid pattern. Adjust Scatter, Grain, and Seed. For Block and Smooth, Apply sets how Diffuse relates to Noise: Noise Linked (default) composes it with Noise so its position after Noise does not matter, and Uniform scatters the image uniformly at its own stack position. Adaptive Luminance maps input luminance through one cubic Bezier curve; its histogram is a read-only preview.
 
 ### Noise
 

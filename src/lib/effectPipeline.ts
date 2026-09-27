@@ -1,4 +1,5 @@
 import type {
+  DiffuseApplyMode,
   DiffuseMode,
   EffectPipelineConfig,
   EffectPipelineVersion,
@@ -6,6 +7,7 @@ import type {
   EffectStackLayer,
   NoiseDistortionConfig,
 } from '../types/distortion';
+import { normalizeDiffuseApplyMode } from '../types/distortion';
 import type { GradientType } from '../types/gradient';
 import { shouldRenderNormalMap } from './normalMap';
 
@@ -329,6 +331,8 @@ export type V2RenderPlanOptions = {
   noiseType?: NoiseDistortionConfig['type'];
   noiseLoopMode?: NoiseDistortionConfig['noiseLoopMode'];
   diffuseMode?: DiffuseMode;
+  /** Missing values mean `noiseLinked`, matching presets saved before the option existed. */
+  diffuseApplyMode?: DiffuseApplyMode;
 };
 
 export type AnalyticPrefixReason =
@@ -367,7 +371,8 @@ export type NoiseDiffuseCompositionReason =
   | 'image-gradient'
   | 'no-noise'
   | 'no-diffuse'
-  | 'not-adjacent'
+  | 'diffuse-before-noise'
+  | 'apply-mode'
   | 'analytic-prefix'
   | 'unsupported-diffuse'
   | 'diffuse-before-slit';
@@ -467,12 +472,15 @@ function disabledNoiseDiffuseComposition(
 }
 
 /**
- * Plans the one-pass fallback for an adjacent Noise -> Diffuse pair.
+ * Plans the one-pass Noise -> Diffuse composition.
  *
- * The analytic Generator already evaluates a leading pair in the historical
- * order. Every other adjacent pair must be evaluated from the same source
- * texture in one pass; two independent FBO passes would sample the Noise
- * result at the Diffuse-displaced coordinate and apply Noise twice in effect.
+ * Diffuse must look the same whether or not other layers sit between it and
+ * Noise: its displacement is added after the Noise UV transform, `I(N(x) + D(x))`.
+ * Evaluating Diffuse at its own later position would sample the Noise result
+ * at the Diffuse-displaced coordinate, so the Noise Jacobian would stretch the
+ * scatter. The pair is therefore evaluated once at the Noise position and the
+ * layers in between process the composed result. The analytic Generator
+ * handles the same pair when it consumes Noise.
  */
 function getNoiseDiffuseCompositionPlan(
   enabledLayers: EffectStackLayer[],
@@ -492,17 +500,16 @@ function getNoiseDiffuseCompositionPlan(
   if (!ANALYTIC_DIFFUSE_MODES.has(options.diffuseMode) || options.forceTextureDiffusePass) {
     return disabledNoiseDiffuseComposition('unsupported-diffuse', noiseLayerIndex, diffuseLayerIndex);
   }
-  if (diffuseLayerIndex !== noiseLayerIndex + 1) {
-    return disabledNoiseDiffuseComposition('not-adjacent', noiseLayerIndex, diffuseLayerIndex);
+  if (normalizeDiffuseApplyMode(options.diffuseApplyMode) !== 'noiseLinked') {
+    return disabledNoiseDiffuseComposition('apply-mode', noiseLayerIndex, diffuseLayerIndex);
+  }
+  if (diffuseLayerIndex < noiseLayerIndex) {
+    return disabledNoiseDiffuseComposition('diffuse-before-noise', noiseLayerIndex, diffuseLayerIndex);
   }
   if (enabledLayers[diffuseLayerIndex + 1]?.kind === 'slit') {
     return disabledNoiseDiffuseComposition('diffuse-before-slit', noiseLayerIndex, diffuseLayerIndex);
   }
-  const analyticPairConsumed = noiseLayerIndex === 0
-    && diffuseLayerIndex === 1
-    && analyticPrefix.consumedLayers.includes('noise')
-    && analyticPrefix.consumedLayers.includes('diffuse');
-  if (analyticPairConsumed) {
+  if (analyticPrefix.consumedLayers.includes('noise')) {
     return disabledNoiseDiffuseComposition('analytic-prefix', noiseLayerIndex, diffuseLayerIndex);
   }
   return {
@@ -539,14 +546,26 @@ export function getAnalyticGradientPrefixPlan(
   if (pipeline.prismEnabled) return disabledAnalyticPrefix('prism');
   if (pipeline.particlesEnabled) return disabledAnalyticPrefix('particles');
 
-  const firstTextureLayerIndex = enabledLayers.findIndex(layer => layer.kind !== 'noise' && layer.kind !== 'diffuse');
+  // Uniform Diffuse after Noise is evaluated at its own stack position, so the
+  // Generator must not fold it into the Noise UV. It becomes the texture
+  // boundary instead; a Diffuse without a preceding Noise is identical in both
+  // modes and stays analytic.
+  const applyMode = normalizeDiffuseApplyMode(options.diffuseApplyMode);
+  const enabledNoiseIndex = enabledLayers.findIndex(layer => layer.kind === 'noise');
+  const enabledDiffuseIndex = enabledLayers.findIndex(layer => layer.kind === 'diffuse');
+  const diffuseStaysTexture = applyMode === 'uniform'
+    && enabledNoiseIndex >= 0
+    && enabledNoiseIndex < enabledDiffuseIndex;
+  const isPrefixLayer = (layer: EffectStackLayer) => layer.kind === 'noise'
+    || (layer.kind === 'diffuse' && !diffuseStaysTexture);
+  const firstTextureLayerIndex = enabledLayers.findIndex(layer => !isPrefixLayer(layer));
   const prefixLayers = firstTextureLayerIndex < 0
     ? enabledLayers
     : enabledLayers.slice(0, firstTextureLayerIndex);
   if (prefixLayers.length === 0) {
     return disabledAnalyticPrefix(firstTextureLayerIndex === 0 ? 'texture-first' : 'no-prefix-layers', firstTextureLayerIndex < 0 ? null : firstTextureLayerIndex);
   }
-  if (prefixLayers.some(layer => layer.kind !== 'noise' && layer.kind !== 'diffuse')) {
+  if (prefixLayers.some(layer => !isPrefixLayer(layer))) {
     return disabledAnalyticPrefix('texture-first', firstTextureLayerIndex);
   }
 
@@ -578,6 +597,21 @@ export function getAnalyticGradientPrefixPlan(
   const consumedLayers = prefixLayers
     .filter((layer): layer is EffectStackLayer & { kind: 'noise' | 'diffuse' } => layer.kind === 'noise' || layer.kind === 'diffuse')
     .map(layer => layer.kind);
+  // A Diffuse after texture layers still composes with a consumed Noise, so
+  // the Generator evaluates it as if it directly followed Noise. Diffuse
+  // before Slit keeps its Slit destination-space evaluation instead.
+  const laterDiffuseIndex = enabledLayers.findIndex(layer => layer.kind === 'diffuse');
+  if (
+    applyMode === 'noiseLinked'
+    && noiseIndex >= 0
+    && diffuseIndex < 0
+    && laterDiffuseIndex > noiseIndex
+    && ANALYTIC_DIFFUSE_MODES.has(options.diffuseMode)
+    && !options.forceTextureDiffusePass
+    && enabledLayers[laterDiffuseIndex + 1]?.kind !== 'slit'
+  ) {
+    consumedLayers.push('diffuse');
+  }
   if (consumedLayers.length === 0) return disabledAnalyticPrefix('no-prefix-layers', firstTextureLayerIndex < 0 ? null : firstTextureLayerIndex);
   return {
     enabled: true,

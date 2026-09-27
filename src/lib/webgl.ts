@@ -4049,14 +4049,20 @@ export function render(
       ? { ...noiseDistortion, enabled: false }
       : noiseDistortion;
     let presentedToScreen = false;
+    // Set when the Noise pass also evaluated a later Diffuse layer.
+    let composedDiffuseLayerIndex: number | null = null;
     for (let layerIndex = 0; layerIndex < mainLayerEntries.length; layerIndex++) {
       const { layer, index: planLayerIndex } = mainLayerEntries[layerIndex];
+      if (planLayerIndex === composedDiffuseLayerIndex) continue;
+      const composedDiffuseIndex = renderPlan.noiseDiffuseComposition.diffuseLayerIndex;
       const useNoiseDiffusePair = renderPlan.programs.noiseDiffuseStack
         && noiseDiffuseStackUsable
         && planLayerIndex === renderPlan.noiseDiffuseComposition.noiseLayerIndex
-        && mainLayerEntries[layerIndex + 1]?.index === renderPlan.noiseDiffuseComposition.diffuseLayerIndex;
+        && mainLayerEntries.some(entry => entry.index === composedDiffuseIndex);
       if (useNoiseDiffusePair) {
-        const canPresentNoiseDiffuseDirectly = layerIndex + 2 === mainLayerEntries.length
+        const canPresentNoiseDiffuseDirectly = mainLayerEntries
+          .slice(layerIndex + 1)
+          .every(entry => entry.index === composedDiffuseIndex)
           && !prismRequested
           && !flowActive
           && !seamlessRequested
@@ -4083,8 +4089,9 @@ export function render(
           } else {
             currentTexture = target!.texture;
           }
-          // The combined pass consumed both adjacent logical layers.
-          layerIndex += 1;
+          // The combined pass consumed both logical layers. Layers between
+          // them process the composed result, so Diffuse is skipped later.
+          composedDiffuseLayerIndex = composedDiffuseIndex;
           continue;
         }
         // A successful compile does not guarantee that every driver accepts
