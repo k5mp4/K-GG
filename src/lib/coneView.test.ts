@@ -127,6 +127,27 @@ describe('3D render parameters', () => {
     expect(torus.camera.rollRadians).toBeCloseTo(Math.PI / 2, 10);
   });
 
+  it.each(['lattice', 'mirrorRoom'] as const)('moves the %s geometry with Flow instead of the texture', (shape) => {
+    const config = { ...DEFAULT_CONE_VIEW, shape, flowCycles: 3 };
+    const middle = getThreeDRenderParams(config, 0.5, 1);
+    expect(middle.travel).toBeCloseTo(1.5, 10);
+    expect(middle.textureOffset).toEqual([0, 0]);
+    expect(getThreeDRenderParams(config, 1, 1).travel).toBe(3);
+    expect(getThreeDRenderParams({ ...config, mappingMode: 'projection' }, 0.5, 1).travel).toBe(0);
+  });
+
+  it('maps the lattice and room options to shader indices', () => {
+    const params = getThreeDRenderParams({
+      ...DEFAULT_CONE_VIEW,
+      latticeType: 'schwarzP',
+      roomShape: 'dodecahedron',
+      roomCanvasFaces: 'front',
+      roomBounces: 9,
+    }, 0, 1);
+    expect(params.lattice.type).toBe(1);
+    expect(params.room).toMatchObject({ shape: 2, canvasFaces: 2, bounces: 9 });
+  });
+
   it('derives the Cone aperture and apex from the canvas aspect', () => {
     const wide = getThreeDRenderParams({ ...DEFAULT_CONE_VIEW, apexX: 1 }, 0, 2);
     const square = getThreeDRenderParams({ ...DEFAULT_CONE_VIEW, apexX: 1 }, 0, 1);

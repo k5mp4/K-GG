@@ -44,4 +44,11 @@ export function uploadThreeDUniforms(
   float('u_torusMajorRadius', params.torus.majorRadius);
   float('u_ringRepeat', params.torus.ringRepeat);
   float('u_torusTwistTurns', params.torus.twistTurns);
+  int('u_latticeType', params.lattice.type);
+  float('u_latticeScale', params.lattice.scale);
+  float('u_latticeThickness', params.lattice.thickness);
+  int('u_roomShape', params.room.shape);
+  int('u_roomBounces', params.room.bounces);
+  float('u_roomReflectivity', params.room.reflectivity);
+  int('u_roomCanvasFaces', params.room.canvasFaces);
 }

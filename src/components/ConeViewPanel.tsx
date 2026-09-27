@@ -10,11 +10,17 @@ import {
   CONE_SEAM_MODE_OPTIONS,
   CONE_SHAPE_OPTIONS,
   DEFAULT_CONE_VIEW,
+  LATTICE_TYPE_OPTIONS,
+  ROOM_CANVAS_FACE_OPTIONS,
+  ROOM_SHAPE_OPTIONS,
   THREE_D_SURFACE_MAPPING_OPTIONS,
   type CameraWigglePreset,
   type ConeSeamMode,
   type ConeShape,
   type ConeViewConfig,
+  type LatticeType,
+  type RoomCanvasFaces,
+  type RoomShape,
   type ThreeDSurfaceMapping,
 } from '../types/coneView';
 import { CustomSelect } from './CustomSelect';
@@ -30,6 +36,8 @@ const CAMERA_Y_LIMIT = getParameterLimit('cone.cameraY');
 const SHAPE_TEXT: Record<ConeShape, { title: MessageKey; description: MessageKey; hint?: MessageKey }> = {
   cone: { title: 'cone.surface', description: 'cone.description' },
   torus: { title: 'cone.torusSurface', description: 'cone.torusDescription', hint: 'cone.torusHint' },
+  lattice: { title: 'cone.latticeSurface', description: 'cone.latticeDescription', hint: 'cone.latticeHint' },
+  mirrorRoom: { title: 'cone.roomSurface', description: 'cone.roomDescription', hint: 'cone.roomHint' },
 };
 
 function toCameraPositionInput(x: number, y: number): [number, number] {
@@ -52,6 +60,68 @@ function Section({ title, children }: { title: string; children: ReactNode }) {
 type SetConeView = (value: Partial<ConeViewConfig>) => void;
 
 function ShapeControls({ coneView, setConeView }: { coneView: ConeViewConfig; setConeView: SetConeView }) {
+  if (coneView.shape === 'lattice') {
+    return (
+      <>
+        <CustomSelect
+          label="Lattice"
+          value={coneView.latticeType}
+          localizeLabel={false}
+          localizeOptions={false}
+          options={[...LATTICE_TYPE_OPTIONS]}
+          onChange={(latticeType) => setConeView({ latticeType: latticeType as LatticeType })}
+        />
+        <SliderField
+          label="Scale"
+          value={coneView.latticeScale}
+          limitKey="cone.latticeScale"
+          onChange={(latticeScale) => setConeView({ latticeScale })}
+        />
+        <SliderField
+          label="Thickness"
+          value={coneView.latticeThickness}
+          limitKey="cone.latticeThickness"
+          onChange={(latticeThickness) => setConeView({ latticeThickness })}
+        />
+      </>
+    );
+  }
+  if (coneView.shape === 'mirrorRoom') {
+    return (
+      <>
+        <CustomSelect
+          label="Room"
+          value={coneView.roomShape}
+          localizeLabel={false}
+          localizeOptions={false}
+          options={[...ROOM_SHAPE_OPTIONS]}
+          onChange={(roomShape) => setConeView({ roomShape: roomShape as RoomShape })}
+        />
+        <CustomSelect
+          label="Canvas Faces"
+          value={coneView.roomCanvasFaces}
+          localizeLabel={false}
+          localizeOptions={false}
+          options={[...ROOM_CANVAS_FACE_OPTIONS]}
+          onChange={(roomCanvasFaces) => setConeView({ roomCanvasFaces: roomCanvasFaces as RoomCanvasFaces })}
+        />
+        <SliderField
+          label="Bounces"
+          value={coneView.roomBounces}
+          limitKey="cone.roomBounces"
+          format={(value) => `${Math.round(value)}`}
+          onChange={(roomBounces) => setConeView({ roomBounces })}
+        />
+        <SliderField
+          label="Reflectivity"
+          value={coneView.roomReflectivity}
+          limitKey="cone.roomReflectivity"
+          format={(value) => `${Math.round(value * 100)}%`}
+          onChange={(roomReflectivity) => setConeView({ roomReflectivity })}
+        />
+      </>
+    );
+  }
   if (coneView.shape === 'torus') {
     return (
       <>

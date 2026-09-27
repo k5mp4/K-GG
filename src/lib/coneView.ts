@@ -2,6 +2,9 @@ import {
   CONE_APEX_LIMIT,
   CONE_SEAM_MODE_INDEX,
   CONE_SHAPE_INDEX,
+  LATTICE_TYPES,
+  ROOM_CANVAS_FACES,
+  ROOM_SHAPE_INDEX,
   THREE_D_SURFACE_MAPPING_INDEX,
   type ConeViewConfig,
   type ConeSeamMode,
@@ -290,7 +293,25 @@ export type ThreeDRenderParams = {
     ringRepeat: number;
     twistTurns: number;
   };
+  lattice: {
+    type: number;
+    scale: number;
+    thickness: number;
+  };
+  room: {
+    shape: number;
+    bounces: number;
+    reflectivity: number;
+    canvasFaces: number;
+  };
 };
+
+/**
+ * Shapes whose Flow moves the geometry or camera instead of sliding the
+ * texture. Their loop-normalized travel is the Flow offset, and the texture
+ * offset stays at zero.
+ */
+const GEOMETRY_MOTION_SHAPES: ReadonlySet<ConeViewConfig['shape']> = new Set(['lattice', 'mirrorRoom']);
 
 export function getThreeDRenderParams(
   config: ConeViewConfig,
@@ -301,15 +322,16 @@ export function getThreeDRenderParams(
   const safeAspect = Math.max(0.001, safeFinite(aspect, 1));
   const apexOffset = getConeApexOffset(CONE_CAMERA_DISTANCE, config.depth, safeAspect, config.apexX, config.apexY);
   const camera = getThreeDCamera(config, normalizedTime);
+  const geometryMotion = GEOMETRY_MOTION_SHAPES.has(config.shape);
   return {
     shape: getConeShapeIndex(config),
     surfaceMapping: THREE_D_SURFACE_MAPPING_INDEX[config.surfaceMapping] ?? 0,
     fog: clamp(safeFinite(config.fog, 0), 0, 1),
     shade: clamp(safeFinite(config.shade, 0), 0, 1),
-    travel: 0,
+    travel: geometryMotion ? transform.offsetV : 0,
     tangentHalfFov: Math.tan(CONE_CAMERA_FOV * Math.PI / 360),
     textureRepeat: transform.repeatU,
-    textureOffset: [transform.offsetU, transform.offsetV],
+    textureOffset: geometryMotion ? [0, 0] : [transform.offsetU, transform.offsetV],
     seamBlend: transform.seamBlend,
     seamMode: CONE_SEAM_MODE_INDEX[transform.seamMode],
     // The Cone keeps Rotation as a texture offset, so it does not roll.
@@ -324,6 +346,17 @@ export function getThreeDRenderParams(
       majorRadius: getTorusMajorRadius(config),
       ringRepeat: config.ringRepeat,
       twistTurns: getTorusTwistTurns(config),
+    },
+    lattice: {
+      type: LATTICE_TYPES.indexOf(config.latticeType),
+      scale: config.latticeScale,
+      thickness: config.latticeThickness,
+    },
+    room: {
+      shape: ROOM_SHAPE_INDEX[config.roomShape],
+      bounces: Math.round(config.roomBounces),
+      reflectivity: config.roomReflectivity,
+      canvasFaces: ROOM_CANVAS_FACES.indexOf(config.roomCanvasFaces),
     },
   };
 }

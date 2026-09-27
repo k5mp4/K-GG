@@ -2,15 +2,49 @@ import { clampParameter, getParameterDefault, getParameterLimit } from '../lib/p
 
 export type ConeMappingMode = 'flow' | 'projection';
 /** Geometry of the 3D layer. The layer kind and preset key stay `cone` for compatibility. */
-export type ConeShape = 'cone' | 'torus';
-export const CONE_SHAPES = ['cone', 'torus'] as const satisfies readonly ConeShape[];
+export type ConeShape = 'cone' | 'torus' | 'lattice' | 'mirrorRoom';
+export const CONE_SHAPES = ['cone', 'torus', 'lattice', 'mirrorRoom'] as const satisfies readonly ConeShape[];
 export const CONE_SHAPE_INDEX = {
   cone: 0,
   torus: 1,
+  lattice: 2,
+  mirrorRoom: 3,
 } as const satisfies Record<ConeShape, number>;
 export const CONE_SHAPE_OPTIONS: { value: ConeShape; label: string }[] = [
   { value: 'cone', label: 'Cone' },
   { value: 'torus', label: 'Torus · Tunnel' },
+  { value: 'lattice', label: 'Lattice · Gyroid tunnel' },
+  { value: 'mirrorRoom', label: 'Mirror Room · Polyhedron' },
+];
+
+/** Triply periodic minimal surfaces used by the Lattice shape. */
+export type LatticeType = 'gyroid' | 'schwarzP';
+export const LATTICE_TYPES = ['gyroid', 'schwarzP'] as const satisfies readonly LatticeType[];
+export const LATTICE_TYPE_OPTIONS: { value: LatticeType; label: string }[] = [
+  { value: 'gyroid', label: 'Gyroid' },
+  { value: 'schwarzP', label: 'Schwarz P' },
+];
+
+/** Convex polyhedra used by the Mirror Room shape. */
+export type RoomShape = 'cube' | 'octahedron' | 'dodecahedron';
+export const ROOM_SHAPES = ['cube', 'octahedron', 'dodecahedron'] as const satisfies readonly RoomShape[];
+export const ROOM_SHAPE_INDEX = {
+  cube: 0,
+  octahedron: 1,
+  dodecahedron: 2,
+} as const satisfies Record<RoomShape, number>;
+/** Which Mirror Room walls show the canvas; the others are mirrors. */
+export type RoomCanvasFaces = 'all' | 'alternate' | 'front';
+export const ROOM_CANVAS_FACES = ['all', 'alternate', 'front'] as const satisfies readonly RoomCanvasFaces[];
+export const ROOM_CANVAS_FACE_OPTIONS: { value: RoomCanvasFaces; label: string }[] = [
+  { value: 'alternate', label: 'Alternate · Kaleidoscope' },
+  { value: 'front', label: 'Front · Infinite corridor' },
+  { value: 'all', label: 'All · Blended' },
+];
+export const ROOM_SHAPE_OPTIONS: { value: RoomShape; label: string }[] = [
+  { value: 'cube', label: 'Cube' },
+  { value: 'octahedron', label: 'Octahedron' },
+  { value: 'dodecahedron', label: 'Dodecahedron' },
 ];
 export type ConeSeamMode = 'mirror' | 'weld' | 'reapply';
 
@@ -99,6 +133,20 @@ export type ConeViewConfig = {
   wiggleAmount: number;
   /** Integer multiplier of every wiggle frequency, so the motion still closes on the loop. */
   wiggleSpeed: number;
+  /** Lattice only: surface family. */
+  latticeType: LatticeType;
+  /** Lattice only: world length of one lattice period. */
+  latticeScale: number;
+  /** Lattice only: wall thickness in field units. */
+  latticeThickness: number;
+  /** Mirror Room only: polyhedron the camera sits in. */
+  roomShape: RoomShape;
+  /** Mirror Room only: reflections traced per pixel. */
+  roomBounces: number;
+  /** Mirror Room only: mirror strength; with All walls, the share each wall mirrors instead of showing the canvas. */
+  roomReflectivity: number;
+  /** Mirror Room only: which walls show the canvas. */
+  roomCanvasFaces: RoomCanvasFaces;
 };
 
 /** Normalized apex movement limit; ±2 reaches 50% of the canvas outside its edge. */
@@ -135,6 +183,13 @@ export const DEFAULT_CONE_VIEW: ConeViewConfig = {
   wigglePreset: 'off',
   wiggleAmount: getParameterDefault('cone.wiggleAmount'),
   wiggleSpeed: getParameterDefault('cone.wiggleSpeed'),
+  latticeType: 'gyroid',
+  latticeScale: getParameterDefault('cone.latticeScale'),
+  latticeThickness: getParameterDefault('cone.latticeThickness'),
+  roomShape: 'cube',
+  roomBounces: getParameterDefault('cone.roomBounces'),
+  roomReflectivity: getParameterDefault('cone.roomReflectivity'),
+  roomCanvasFaces: 'alternate',
 };
 
 function normalizeOption<T extends string>(value: unknown, options: readonly T[], fallback: T): T {
@@ -175,5 +230,12 @@ export function normalizeConeViewConfig(value: unknown): ConeViewConfig {
     wigglePreset: normalizeOption(raw.wigglePreset, CAMERA_WIGGLE_PRESETS, DEFAULT_CONE_VIEW.wigglePreset),
     wiggleAmount: clampParameter(raw.wiggleAmount, DEFAULT_CONE_VIEW.wiggleAmount, getParameterLimit('cone.wiggleAmount')),
     wiggleSpeed: clampParameter(raw.wiggleSpeed, DEFAULT_CONE_VIEW.wiggleSpeed, getParameterLimit('cone.wiggleSpeed')),
+    latticeType: normalizeOption(raw.latticeType, LATTICE_TYPES, DEFAULT_CONE_VIEW.latticeType),
+    latticeScale: clampParameter(raw.latticeScale, DEFAULT_CONE_VIEW.latticeScale, getParameterLimit('cone.latticeScale')),
+    latticeThickness: clampParameter(raw.latticeThickness, DEFAULT_CONE_VIEW.latticeThickness, getParameterLimit('cone.latticeThickness')),
+    roomShape: normalizeOption(raw.roomShape, ROOM_SHAPES, DEFAULT_CONE_VIEW.roomShape),
+    roomBounces: clampParameter(raw.roomBounces, DEFAULT_CONE_VIEW.roomBounces, getParameterLimit('cone.roomBounces')),
+    roomReflectivity: clampParameter(raw.roomReflectivity, DEFAULT_CONE_VIEW.roomReflectivity, getParameterLimit('cone.roomReflectivity')),
+    roomCanvasFaces: normalizeOption(raw.roomCanvasFaces, ROOM_CANVAS_FACES, DEFAULT_CONE_VIEW.roomCanvasFaces),
   };
 }

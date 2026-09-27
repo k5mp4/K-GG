@@ -61,6 +61,13 @@ describe('cone view configuration', () => {
       wigglePreset: 'off',
       wiggleAmount: 1,
       wiggleSpeed: 1,
+      latticeType: 'gyroid',
+      latticeScale: 2,
+      latticeThickness: 0.25,
+      roomShape: 'cube',
+      roomBounces: 6,
+      roomReflectivity: 0.65,
+      roomCanvasFaces: 'alternate',
     });
   });
 
@@ -82,6 +89,25 @@ describe('cone view configuration', () => {
   it('clamps Twist and rounds Spin to whole turns', () => {
     expect(normalizeConeViewConfig({ torusTwist: 9, spin: 2.4 })).toMatchObject({ torusTwist: 4, spin: 2 });
     expect(normalizeConeViewConfig({ torusTwist: -9, spin: -99 })).toMatchObject({ torusTwist: -4, spin: -8 });
+  });
+
+  it('normalizes the lattice and mirror room settings', () => {
+    expect(normalizeConeViewConfig({ shape: 'lattice', latticeType: 'schwarzP', latticeScale: 99, latticeThickness: 0 })).toMatchObject({
+      shape: 'lattice',
+      latticeType: 'schwarzP',
+      latticeScale: 8,
+      latticeThickness: 0.02,
+    });
+    expect(normalizeConeViewConfig({ latticeType: 'diamond', roomShape: 'sphere', roomCanvasFaces: 'none' })).toMatchObject({
+      latticeType: 'gyroid',
+      roomShape: 'cube',
+      roomCanvasFaces: 'alternate',
+    });
+    expect(normalizeConeViewConfig({ shape: 'mirrorRoom', roomBounces: 4.6, roomReflectivity: 2 })).toMatchObject({
+      shape: 'mirrorRoom',
+      roomBounces: 5,
+      roomReflectivity: 0.95,
+    });
   });
 
   it('normalizes the torus wiggle settings', () => {
