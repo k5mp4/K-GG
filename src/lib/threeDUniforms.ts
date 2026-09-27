@@ -26,6 +26,10 @@ export function uploadThreeDUniforms(
   int('u_threeDShape', params.shape);
   int('u_threeDMapping', params.surfaceMapping);
   int('u_threeDProjection', params.projection);
+  float('u_fisheyeHalfAngle', params.fisheyeHalfAngle);
+  float('u_lensDistortion', params.lensDistortion);
+  float('u_cameraDolly', params.camera.dolly);
+  float('u_torusAim', params.torusAim);
   float('u_threeDDistance', params.distance);
   float('u_threeDFog', params.fog);
   float('u_threeDShade', params.shade);

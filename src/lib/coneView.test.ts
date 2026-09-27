@@ -227,12 +227,51 @@ describe('torus tunnel', () => {
     expect(getConeTextureTransform({ ...torus, spin: -1 }, 0.25).offsetU).toBeCloseTo(0.75, 10);
   });
 
+  it('uses the camera FOV for every shape except the fixed Cone camera', () => {
+    const wide = getThreeDRenderParams({ ...torus, cameraFov: 90 }, 0, 1);
+    expect(wide.tangentHalfFov).toBeCloseTo(1, 10);
+    const cone = getThreeDRenderParams({ ...DEFAULT_CONE_VIEW, cameraFov: 90 }, 0, 1);
+    expect(cone.tangentHalfFov).toBeCloseTo(Math.tan(Math.PI / 6), 10);
+  });
+
+  it('converts the fisheye angle, lens, dolly, and aim settings', () => {
+    const params = getThreeDRenderParams({
+      ...torus,
+      fisheyeAngle: 270,
+      lensDistortion: -0.3,
+      cameraDolly: 0.4,
+      torusAim: 0.25,
+    }, 0, 1);
+    expect(params.fisheyeHalfAngle).toBeCloseTo(0.75 * Math.PI, 10);
+    expect(params.lensDistortion).toBe(-0.3);
+    expect(params.camera.dolly).toBe(0.4);
+    expect(params.torusAim).toBe(0.25);
+  });
+
+  it('pulses the field of view with Zoom Pulse', () => {
+    const pulse = { ...torus, wigglePreset: 'zoomPulse' as const };
+    expect(getThreeDCamera(pulse, 0.125).fovDegrees).toBeGreaterThan(60);
+    expect(getThreeDCamera(pulse, 0.375).fovDegrees).toBeLessThan(60);
+    expect(getThreeDCamera(pulse, 0.125).dolly).toBe(0);
+  });
+
+  it('keeps a unit-distance subject the same size during Vertigo', () => {
+    const vertigo = { ...torus, wigglePreset: 'vertigo' as const };
+    const base = Math.tan(Math.PI / 6);
+    for (const time of [0.1, 0.25, 0.6, 0.8]) {
+      const camera = getThreeDCamera(vertigo, time);
+      const distance = 1 - camera.dolly;
+      expect(distance * Math.tan(camera.fovDegrees * Math.PI / 360)).toBeCloseTo(base, 9);
+    }
+    expect(getThreeDCamera(vertigo, 0.25).fovDegrees).toBeCloseTo(85, 9);
+  });
+
   it('adds the base roll to the torus camera', () => {
     expect(getThreeDCamera({ ...torus, rotation: 45 }).rollRadians).toBeCloseTo(Math.PI / 4, 10);
   });
 
   it('keeps the camera still when wiggle is off or its amount is zero', () => {
-    const still = { yaw: 0, pitch: 0, roll: 0, x: 0, y: 0 };
+    const still = { yaw: 0, pitch: 0, roll: 0, x: 0, y: 0, fov: 0, dolly: 0 };
     expect(getCameraWiggle(torus, 0.37)).toEqual(still);
     expect(getCameraWiggle({ ...torus, wigglePreset: 'handheld', wiggleAmount: 0 }, 0.37)).toEqual(still);
   });
@@ -242,7 +281,7 @@ describe('torus tunnel', () => {
       const config = { ...torus, wigglePreset: preset, wiggleSpeed };
       const start = getThreeDCamera(config, 0);
       const end = getThreeDCamera(config, 1);
-      for (const key of ['offsetX', 'offsetY'] as const) {
+      for (const key of ['offsetX', 'offsetY', 'fovDegrees', 'dolly'] as const) {
         expect(end[key]).toBeCloseTo(start[key], 9);
       }
       for (const key of ['yawRadians', 'pitchRadians', 'rollRadians'] as const) {

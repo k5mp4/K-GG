@@ -141,12 +141,20 @@ export type ThreeDCamera = {
   pitchRadians: number;
   /** Base roll (Rotation) plus the wiggle roll. */
   rollRadians: number;
+  /** Perspective vertical field of view including the wiggle. */
+  fovDegrees: number;
+  /** Camera move along the view direction, in shape-relative units. */
+  dolly: number;
 };
+
+/** Keeps the animated field of view inside a usable perspective range. */
+export const CAMERA_FOV_MIN = 10;
+export const CAMERA_FOV_MAX = 170;
 
 /** Keeps the camera clear of the tube wall (radius 1) regardless of direction. */
 export const CAMERA_MAX_OFFSET = 0.8;
 
-type WiggleChannel = 'yaw' | 'pitch' | 'roll' | 'x' | 'y';
+type WiggleChannel = 'yaw' | 'pitch' | 'roll' | 'x' | 'y' | 'fov' | 'dolly';
 
 /**
  * One sinusoid of a wiggle preset. Angles are in degrees and offsets in tube
@@ -210,6 +218,16 @@ const CAMERA_WIGGLE_TERMS: Record<CameraWigglePreset, readonly WiggleTerm[]> = {
   ],
   // The look direction turns a full circle while nodding gently, so the
   // camera glances at the walls and behind before facing forward again.
+  // The field of view beats on the loop like a bass drum zoom.
+  zoomPulse: [
+    { channel: 'fov', amplitude: 10, harmonic: 2, phase: 0 },
+    { channel: 'fov', amplitude: 4, harmonic: 4, phase: Math.PI / 2 },
+  ],
+  // The field of view swings while the camera dollies to compensate, the
+  // Hitchcock dolly zoom: the subject keeps its size and the space warps.
+  vertigo: [
+    { channel: 'fov', amplitude: 25, harmonic: 1, phase: 0 },
+  ],
   lookAround: [
     { channel: 'pitch', amplitude: 6, harmonic: 2, phase: 0 },
     { channel: 'roll', amplitude: 3, harmonic: 1, phase: Math.PI / 2 },
@@ -229,7 +247,7 @@ export type CameraWiggle = Record<WiggleChannel, number>;
  * loops seamlessly.
  */
 export function getCameraWiggle(config: ConeViewConfig, normalizedTime: number): CameraWiggle {
-  const wiggle: CameraWiggle = { yaw: 0, pitch: 0, roll: 0, x: 0, y: 0 };
+  const wiggle: CameraWiggle = { yaw: 0, pitch: 0, roll: 0, x: 0, y: 0, fov: 0, dolly: 0 };
   const terms = CAMERA_WIGGLE_TERMS[config.wigglePreset] ?? CAMERA_WIGGLE_TERMS.off;
   const spins = CAMERA_WIGGLE_SPINS[config.wigglePreset] ?? [];
   const amount = Math.max(0, safeFinite(config.wiggleAmount, 1));
@@ -258,12 +276,22 @@ export function getThreeDCamera(config: ConeViewConfig, normalizedTime = 0): Thr
     offsetY *= CAMERA_MAX_OFFSET / length;
   }
   const degrees = Math.PI / 180;
+  const baseFov = clamp(safeFinite(config.cameraFov, 60), CAMERA_FOV_MIN, CAMERA_FOV_MAX);
+  const fovDegrees = clamp(baseFov + wiggle.fov, CAMERA_FOV_MIN, CAMERA_FOV_MAX);
+  // Vertigo keeps distance * tan(fov / 2) constant: a unit-distance subject
+  // stays the same size while the perspective around it stretches.
+  const vertigoDolly = config.wigglePreset === 'vertigo'
+    ? Math.tan(baseFov * degrees / 2) / Math.tan(fovDegrees * degrees / 2) - 1
+    : 0;
   return {
     offsetX,
     offsetY,
     yawRadians: (safeFinite(config.cameraYaw, 0) + wiggle.yaw) * degrees,
     pitchRadians: (safeFinite(config.cameraPitch, 0) + wiggle.pitch) * degrees,
     rollRadians: (safeFinite(config.rotation, 0) + wiggle.roll) * degrees,
+    fovDegrees,
+    // Positive dolly moves forward; pulling back is the vertigo compensation.
+    dolly: safeFinite(config.cameraDolly, 0) + wiggle.dolly - vertigoDolly,
   };
 }
 
@@ -272,6 +300,11 @@ export type ThreeDRenderParams = {
   shape: number;
   surfaceMapping: number;
   projection: number;
+  /** Half of the Fisheye angle in radians. */
+  fisheyeHalfAngle: number;
+  lensDistortion: number;
+  /** Torus only: 0..1 strength of the aim into the bend. */
+  torusAim: number;
   /** Camera distance of the shapes seen from outside. */
   distance: number;
   fog: number;
@@ -336,6 +369,9 @@ export function getThreeDRenderParams(
     shape: getConeShapeIndex(config),
     surfaceMapping: THREE_D_SURFACE_MAPPING_INDEX[config.surfaceMapping] ?? 0,
     projection: Math.max(0, THREE_D_PROJECTIONS.indexOf(config.projection)),
+    fisheyeHalfAngle: clamp(safeFinite(config.fisheyeAngle, 180), 90, 360) * Math.PI / 360,
+    lensDistortion: clamp(safeFinite(config.lensDistortion, 0), -0.5, 0.5),
+    torusAim: clamp(safeFinite(config.torusAim, 1), 0, 1),
     distance: config.depth * 0.5,
     fog: clamp(safeFinite(config.fog, 0), 0, 1),
     shade: clamp(safeFinite(config.shade, 0), 0, 1),
@@ -345,7 +381,8 @@ export function getThreeDRenderParams(
       : config.shape === 'ribbon'
         ? Math.round(config.spin) * Math.max(0, Math.min(1, safeFinite(normalizedTime, 0)))
         : 0,
-    tangentHalfFov: Math.tan(CONE_CAMERA_FOV * Math.PI / 360),
+    // The Cone keeps its fixed 60 degree camera; other shapes use the FOV.
+    tangentHalfFov: Math.tan((config.shape === 'cone' ? CONE_CAMERA_FOV : camera.fovDegrees) * Math.PI / 360),
     textureRepeat: transform.repeatU,
     // The ribbon's Flow slides along the band, so the offset moves along u.
     textureOffset: geometryMotion

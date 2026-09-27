@@ -77,8 +77,8 @@ export const CONE_SEAM_MODE_OPTIONS: { value: ConeSeamMode; label: string }[] = 
 export const DEFAULT_CONE_SEAM_MODE: ConeSeamMode = 'mirror';
 
 /** Procedural 3D camera motion. Every preset is periodic over one loop. */
-export type CameraWigglePreset = 'off' | 'drift' | 'handheld' | 'float' | 'orbit' | 'sway' | 'lookAround';
-export const CAMERA_WIGGLE_PRESETS = ['off', 'drift', 'handheld', 'float', 'orbit', 'sway', 'lookAround'] as const satisfies readonly CameraWigglePreset[];
+export type CameraWigglePreset = 'off' | 'drift' | 'handheld' | 'float' | 'orbit' | 'sway' | 'lookAround' | 'zoomPulse' | 'vertigo';
+export const CAMERA_WIGGLE_PRESETS = ['off', 'drift', 'handheld', 'float', 'orbit', 'sway', 'lookAround', 'zoomPulse', 'vertigo'] as const satisfies readonly CameraWigglePreset[];
 export const CAMERA_WIGGLE_PRESET_OPTIONS: { value: CameraWigglePreset; label: string }[] = [
   { value: 'off', label: 'Off' },
   { value: 'drift', label: 'Drift · Slow look' },
@@ -87,6 +87,8 @@ export const CAMERA_WIGGLE_PRESET_OPTIONS: { value: CameraWigglePreset; label: s
   { value: 'orbit', label: 'Orbit · Circle' },
   { value: 'sway', label: 'Sway · Barrel roll' },
   { value: 'lookAround', label: 'Look Around · 360° Yaw' },
+  { value: 'zoomPulse', label: 'Zoom Pulse · FOV beat' },
+  { value: 'vertigo', label: 'Vertigo · Dolly zoom' },
 ];
 
 export type ConeViewConfig = {
@@ -125,6 +127,16 @@ export type ConeViewConfig = {
   /** Look-direction adjustment in degrees, relative to each shape's base camera direction. */
   cameraYaw: number;
   cameraPitch: number;
+  /** Vertical field of view in degrees for the Perspective projection. */
+  cameraFov: number;
+  /** Full angle in degrees covered by the Fisheye circle; 180 is a dome master. */
+  fisheyeAngle: number;
+  /** Radial lens distortion of the Perspective projection: positive is barrel, negative pincushion. */
+  lensDistortion: number;
+  /** Moves the camera along its view direction, in shape-relative units. */
+  cameraDolly: number;
+  /** Torus only: how strongly the camera aims into the bend. */
+  torusAim: number;
   wigglePreset: CameraWigglePreset;
   /** Scales the preset's amplitudes. */
   wiggleAmount: number;
@@ -184,6 +196,11 @@ export const DEFAULT_CONE_VIEW: ConeViewConfig = {
   cameraY: getParameterDefault('cone.cameraY'),
   cameraYaw: getParameterDefault('cone.cameraYaw'),
   cameraPitch: getParameterDefault('cone.cameraPitch'),
+  cameraFov: getParameterDefault('cone.cameraFov'),
+  fisheyeAngle: getParameterDefault('cone.fisheyeAngle'),
+  lensDistortion: getParameterDefault('cone.lensDistortion'),
+  cameraDolly: getParameterDefault('cone.cameraDolly'),
+  torusAim: getParameterDefault('cone.torusAim'),
   wigglePreset: 'off',
   wiggleAmount: getParameterDefault('cone.wiggleAmount'),
   wiggleSpeed: getParameterDefault('cone.wiggleSpeed'),
@@ -235,6 +252,11 @@ export function normalizeConeViewConfig(value: unknown): ConeViewConfig {
     cameraY: clampParameter(raw.cameraY, DEFAULT_CONE_VIEW.cameraY, getParameterLimit('cone.cameraY')),
     cameraYaw: clampParameter(raw.cameraYaw, DEFAULT_CONE_VIEW.cameraYaw, getParameterLimit('cone.cameraYaw')),
     cameraPitch: clampParameter(raw.cameraPitch, DEFAULT_CONE_VIEW.cameraPitch, getParameterLimit('cone.cameraPitch')),
+    cameraFov: clampParameter(raw.cameraFov, DEFAULT_CONE_VIEW.cameraFov, getParameterLimit('cone.cameraFov')),
+    fisheyeAngle: clampParameter(raw.fisheyeAngle, DEFAULT_CONE_VIEW.fisheyeAngle, getParameterLimit('cone.fisheyeAngle')),
+    lensDistortion: clampParameter(raw.lensDistortion, DEFAULT_CONE_VIEW.lensDistortion, getParameterLimit('cone.lensDistortion')),
+    cameraDolly: clampParameter(raw.cameraDolly, DEFAULT_CONE_VIEW.cameraDolly, getParameterLimit('cone.cameraDolly')),
+    torusAim: clampParameter(raw.torusAim, DEFAULT_CONE_VIEW.torusAim, getParameterLimit('cone.torusAim')),
     wigglePreset: normalizeOption(raw.wigglePreset, CAMERA_WIGGLE_PRESETS, DEFAULT_CONE_VIEW.wigglePreset),
     wiggleAmount: clampParameter(raw.wiggleAmount, DEFAULT_CONE_VIEW.wiggleAmount, getParameterLimit('cone.wiggleAmount')),
     wiggleSpeed: clampParameter(raw.wiggleSpeed, DEFAULT_CONE_VIEW.wiggleSpeed, getParameterLimit('cone.wiggleSpeed')),

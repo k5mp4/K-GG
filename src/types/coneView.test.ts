@@ -59,6 +59,11 @@ describe('cone view configuration', () => {
       cameraY: 0,
       cameraYaw: 0,
       cameraPitch: 0,
+      cameraFov: 60,
+      fisheyeAngle: 180,
+      lensDistortion: 0,
+      cameraDolly: 0,
+      torusAim: 1,
       wigglePreset: 'off',
       wiggleAmount: 1,
       wiggleSpeed: 1,
@@ -136,6 +141,22 @@ describe('cone view configuration', () => {
       shape: 'ribbon',
       ribbonHalfTwists: 3,
       ribbonWidth: 0.6,
+    });
+  });
+
+  it('clamps the camera lens settings', () => {
+    expect(normalizeConeViewConfig({
+      cameraFov: 500,
+      fisheyeAngle: 10,
+      lensDistortion: 2,
+      cameraDolly: -5,
+      torusAim: 3,
+    })).toMatchObject({
+      cameraFov: 150,
+      fisheyeAngle: 90,
+      lensDistortion: 0.5,
+      cameraDolly: -1,
+      torusAim: 1,
     });
   });
 

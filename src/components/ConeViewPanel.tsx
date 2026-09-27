@@ -234,6 +234,49 @@ function CameraControls({ coneView, setConeView, resetLabel }: { coneView: ConeV
         options={[...THREE_D_PROJECTION_OPTIONS]}
         onChange={(projection) => setConeView({ projection: projection as ThreeDProjection })}
       />
+      {coneView.projection === 'perspective' && (
+        <>
+          <SliderField
+            label="FOV"
+            value={coneView.cameraFov}
+            limitKey="cone.cameraFov"
+            format={formatDegrees}
+            onChange={(cameraFov) => setConeView({ cameraFov })}
+          />
+          <SliderField
+            label="Lens Distortion"
+            value={coneView.lensDistortion}
+            limitKey="cone.lensDistortion"
+            format={(value) => `${value > 0 ? '+' : ''}${Math.round(value * 100)}%`}
+            onChange={(lensDistortion) => setConeView({ lensDistortion })}
+          />
+        </>
+      )}
+      {coneView.projection === 'fisheye' && (
+        <SliderField
+          label="Fisheye Angle"
+          value={coneView.fisheyeAngle}
+          limitKey="cone.fisheyeAngle"
+          format={formatDegrees}
+          onChange={(fisheyeAngle) => setConeView({ fisheyeAngle })}
+        />
+      )}
+      <SliderField
+        label="Dolly"
+        value={coneView.cameraDolly}
+        limitKey="cone.cameraDolly"
+        format={(value) => `${value > 0 ? '+' : ''}${value.toFixed(2)}`}
+        onChange={(cameraDolly) => setConeView({ cameraDolly })}
+      />
+      {coneView.shape === 'torus' && (
+        <SliderField
+          label="Aim Into Bend"
+          value={coneView.torusAim}
+          limitKey="cone.torusAim"
+          format={(value) => `${Math.round(value * 100)}%`}
+          onChange={(torusAim) => setConeView({ torusAim })}
+        />
+      )}
       <SliderField
         label="Camera Roll"
         value={coneView.rotation}

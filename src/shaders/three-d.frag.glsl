@@ -30,6 +30,10 @@ uniform float u_cameraRoll;
 uniform float u_cameraYaw;
 uniform float u_cameraPitch;
 uniform vec2 u_cameraOffset;
+uniform float u_cameraDolly;
+uniform float u_fisheyeHalfAngle;
+uniform float u_lensDistortion;
+uniform float u_torusAim;
 
 uniform float u_coneCameraDistance;
 uniform float u_coneDepth;
@@ -141,10 +145,12 @@ vec4 threeDSampleUnwrapped(vec2 unwrappedUv) {
 // ---------------------------------------------------------------------------
 // Camera. Camera-local rays use x = right, y = up, and -z = forward.
 
-// Perspective uses the Cone's 60 degree vertical field of view. Fisheye is an
-// equidistant 180 degree dome master inscribed in the shorter side, with the
-// view direction at its center; pixels outside the circle stay black.
-// Equirect covers the full sphere: longitude across x and latitude across y.
+// Perspective uses the camera's vertical field of view with an optional
+// radial lens distortion (positive is barrel). Fisheye is an equidistant
+// projection inscribed in the shorter side covering Fisheye Angle, with the
+// view direction at its center; 180 degrees is a dome master, and pixels
+// outside the circle stay black. Equirect covers the full sphere: longitude
+// across x and latitude across y.
 vec3 threeDProjectedRay(vec2 globalUv, out bool valid) {
   valid = true;
   float aspect = u_fullResolution.x / max(u_fullResolution.y, 1.0);
@@ -156,7 +162,7 @@ vec3 threeDProjectedRay(vec2 globalUv, out bool valid) {
       valid = false;
       return vec3(0.0, 0.0, -1.0);
     }
-    float theta = radius * 0.5 * PI;
+    float theta = radius * u_fisheyeHalfAngle;
     vec2 direction = radius > 0.000001 ? circle / radius : vec2(0.0);
     return vec3(direction * sin(theta), -cos(theta));
   }
@@ -165,7 +171,11 @@ vec3 threeDProjectedRay(vec2 globalUv, out bool valid) {
     float latitude = (globalUv.y - 0.5) * PI;
     return vec3(cos(latitude) * sin(longitude), sin(latitude), -cos(latitude) * cos(longitude));
   }
-  return normalize(vec3(ndc.x * aspect * u_coneTangentHalfFov, ndc.y * u_coneTangentHalfFov, -1.0));
+  vec2 screen = vec2(ndc.x * aspect, ndc.y);
+  // Distortion grows with the squared radius normalized to the frame corner.
+  float cornerRadius = dot(screen, screen) / (aspect * aspect + 1.0);
+  screen *= 1.0 + u_lensDistortion * cornerRadius;
+  return normalize(vec3(screen * u_coneTangentHalfFov, -1.0));
 }
 
 mat2 threeDRollMatrix() {
@@ -313,7 +323,7 @@ float torusInteriorDistance(vec3 p, float majorRadius) {
 ThreeDHit torusHit(vec3 localRay) {
   ThreeDHit result = threeDMiss();
   float majorRadius = max(u_torusMajorRadius, 1.05);
-  float aim = acos(clamp(1.0 - 0.5 / majorRadius, -1.0, 1.0)) * cos(u_cameraYaw);
+  float aim = acos(clamp(1.0 - 0.5 / majorRadius, -1.0, 1.0)) * cos(u_cameraYaw) * clamp(u_torusAim, 0.0, 1.0);
   vec3 forward = vec3(-sin(aim), 0.0, -cos(aim));
   vec3 up = vec3(0.0, 1.0, 0.0);
   threeDSetCameraBasis(forward, up);
@@ -321,6 +331,8 @@ ThreeDHit torusHit(vec3 localRay) {
   // The camera moves inside the tube cross-section at its ring position, so
   // the offset follows the roll but not the look direction.
   vec3 rayOrigin = vec3(threeDRollMatrix() * u_cameraOffset, 0.0);
+  // Dolly stays short so the camera remains inside the tube.
+  rayOrigin += g_cameraForward * u_cameraDolly * 0.6;
   // Sphere tracing from inside the tube: the interior distance is the exact
   // distance to the wall, so each step stays inside and converges on the hit.
   float distance = 0.0;
@@ -383,7 +395,8 @@ ThreeDHit latticeHit(vec3 localRay) {
   vec3 right = normalize(cross(forward, up));
   vec2 offset = threeDRollMatrix() * u_cameraOffset * period * 0.15;
   vec3 rayOrigin = vec3(u_threeDTravel * period, u_latticeType == 1 ? 0.0 : period * 0.25, 0.0)
-    + right * offset.x + up * offset.y;
+    + right * offset.x + up * offset.y
+    + g_cameraForward * u_cameraDolly * period * 0.5;
   float maxDistance = period * 12.0;
   float distance = 0.0;
   bool hit = false;
@@ -442,7 +455,8 @@ ThreeDHit terrainHit(vec3 localRay) {
   vec2 offset = threeDRollMatrix() * u_cameraOffset;
   float tileLength = 4.0 / max(u_coneTextureRepeat, 1.0);
   vec3 rayOrigin = vec3(0.0, max(u_terrainAltitude, 0.05), -u_threeDTravel * tileLength)
-    + right * offset.x + up * offset.y;
+    + right * offset.x + up * offset.y
+    + g_cameraForward * u_cameraDolly * 1.5;
   float maxHeight = max(u_terrainHeight, 0.0);
   result.rayDirection = rayDirection;
   float previous = 0.0;
@@ -512,7 +526,8 @@ ThreeDHit extrusionHit(vec3 localRay) {
   vec3 rayDirection = threeDWorldDirection(localRay, forward, up);
   vec3 right = normalize(cross(forward, up));
   vec2 offset = threeDRollMatrix() * u_cameraOffset * cameraDistance * 0.3;
-  vec3 rayOrigin = cameraPosition + right * offset.x + cross(right, forward) * offset.y;
+  vec3 rayOrigin = cameraPosition + right * offset.x + cross(right, forward) * offset.y
+    + g_cameraForward * u_cameraDolly * cameraDistance * 0.5;
   result.rayDirection = rayDirection;
 
   vec3 safeDirection = rayDirection + vec3(
@@ -640,6 +655,7 @@ ThreeDHit ribbonHit(vec3 localRay) {
   g_cameraRight = rotateAboutY(g_cameraRight, angle);
   g_cameraUp = rotateAboutY(g_cameraUp, angle);
   g_cameraForward = rotateAboutY(g_cameraForward, angle);
+  rayOrigin += g_cameraForward * u_cameraDolly * cameraDistance * 0.5;
   result.rayDirection = rayDirection;
   float distance = 0.0;
   bool hit = false;
