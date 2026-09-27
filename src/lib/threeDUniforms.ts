@@ -49,11 +49,6 @@ export function uploadThreeDUniforms(
   int('u_latticeType', params.lattice.type);
   float('u_latticeScale', params.lattice.scale);
   float('u_latticeThickness', params.lattice.thickness);
-  int('u_roomShape', params.room.shape);
-  int('u_roomBounces', params.room.bounces);
-  float('u_roomReflectivity', params.room.reflectivity);
-  int('u_roomCanvasFaces', params.room.canvasFaces);
-  int('u_sphereInside', params.sphereInside ? 1 : 0);
   float('u_terrainHeight', params.terrain.height);
   float('u_terrainAltitude', params.terrain.altitude);
   float('u_extrudeCells', params.extrusion.cells);

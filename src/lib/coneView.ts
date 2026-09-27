@@ -3,8 +3,6 @@ import {
   CONE_SEAM_MODE_INDEX,
   CONE_SHAPE_INDEX,
   LATTICE_TYPES,
-  ROOM_CANVAS_FACES,
-  ROOM_SHAPE_INDEX,
   THREE_D_PROJECTIONS,
   THREE_D_SURFACE_MAPPING_INDEX,
   type ConeViewConfig,
@@ -302,13 +300,6 @@ export type ThreeDRenderParams = {
     scale: number;
     thickness: number;
   };
-  room: {
-    shape: number;
-    bounces: number;
-    reflectivity: number;
-    canvasFaces: number;
-  };
-  sphereInside: boolean;
   terrain: {
     height: number;
     altitude: number;
@@ -329,7 +320,7 @@ export type ThreeDRenderParams = {
  * texture. Their loop-normalized travel is the Flow offset, and the texture
  * offset stays at zero.
  */
-const GEOMETRY_MOTION_SHAPES: ReadonlySet<ConeViewConfig['shape']> = new Set(['lattice', 'mirrorRoom', 'terrain', 'extrusion']);
+const GEOMETRY_MOTION_SHAPES: ReadonlySet<ConeViewConfig['shape']> = new Set(['lattice', 'terrain', 'extrusion']);
 
 export function getThreeDRenderParams(
   config: ConeViewConfig,
@@ -356,10 +347,10 @@ export function getThreeDRenderParams(
         : 0,
     tangentHalfFov: Math.tan(CONE_CAMERA_FOV * Math.PI / 360),
     textureRepeat: transform.repeatU,
-    // The sphere's Flow turns its longitude, so the offset moves along u.
+    // The ribbon's Flow slides along the band, so the offset moves along u.
     textureOffset: geometryMotion
       ? [0, 0]
-      : config.shape === 'sphere' || config.shape === 'ribbon'
+      : config.shape === 'ribbon'
         ? [transform.offsetV, 0]
         : [transform.offsetU, transform.offsetV],
     seamBlend: transform.seamBlend,
@@ -382,13 +373,6 @@ export function getThreeDRenderParams(
       scale: config.latticeScale,
       thickness: config.latticeThickness,
     },
-    room: {
-      shape: ROOM_SHAPE_INDEX[config.roomShape],
-      bounces: Math.round(config.roomBounces),
-      reflectivity: config.roomReflectivity,
-      canvasFaces: ROOM_CANVAS_FACES.indexOf(config.roomCanvasFaces),
-    },
-    sphereInside: config.sphereView === 'inside',
     terrain: {
       height: config.terrainHeight,
       altitude: config.terrainAltitude,

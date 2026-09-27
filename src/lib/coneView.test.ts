@@ -127,7 +127,7 @@ describe('3D render parameters', () => {
     expect(torus.camera.rollRadians).toBeCloseTo(Math.PI / 2, 10);
   });
 
-  it.each(['lattice', 'mirrorRoom', 'terrain', 'extrusion'] as const)('moves the %s geometry with Flow instead of the texture', (shape) => {
+  it.each(['lattice', 'terrain', 'extrusion'] as const)('moves the %s geometry with Flow instead of the texture', (shape) => {
     const config = { ...DEFAULT_CONE_VIEW, shape, flowCycles: 3 };
     const middle = getThreeDRenderParams(config, 0.5, 1);
     expect(middle.travel).toBeCloseTo(1.5, 10);
@@ -136,15 +136,10 @@ describe('3D render parameters', () => {
     expect(getThreeDRenderParams({ ...config, mappingMode: 'projection' }, 0.5, 1).travel).toBe(0);
   });
 
-  it('turns the sphere longitude with Flow and places the outside camera at half the depth', () => {
-    const sphere = { ...DEFAULT_CONE_VIEW, shape: 'sphere' as const, flowCycles: 2, depth: 8, projection: 'fisheye' as const };
-    const params = getThreeDRenderParams(sphere, 0.25, 1);
-    expect(params.textureOffset).toEqual([0.5, 0]);
-    expect(params.travel).toBe(0);
+  it('passes the projection and half the depth as the camera distance', () => {
+    const params = getThreeDRenderParams({ ...DEFAULT_CONE_VIEW, shape: 'ribbon', depth: 8, projection: 'fisheye' }, 0, 1);
     expect(params.distance).toBe(4);
     expect(params.projection).toBe(1);
-    expect(params.sphereInside).toBe(true);
-    expect(getThreeDRenderParams({ ...sphere, sphereView: 'outside' }, 0, 1).sphereInside).toBe(false);
   });
 
   it('passes the terrain and extrusion settings through', () => {
@@ -157,7 +152,7 @@ describe('3D render parameters', () => {
       extrudeHeight: 1.5,
       extrudeGap: 0.3,
     }, 0, 1);
-    expect(params.shape).toBe(6);
+    expect(params.shape).toBe(4);
     expect(params.terrain).toEqual({ height: 1.1, altitude: 0.4 });
     expect(params.extrusion).toEqual({ cells: 48, height: 1.5, gap: 0.3 });
   });
@@ -165,23 +160,15 @@ describe('3D render parameters', () => {
   it('slides the ribbon texture with Flow and turns the band by whole Spin turns', () => {
     const ribbon = { ...DEFAULT_CONE_VIEW, shape: 'ribbon' as const, flowCycles: 2, spin: 3, ribbonHalfTwists: 5 };
     const quarter = getThreeDRenderParams(ribbon, 0.25, 1);
-    expect(quarter.shape).toBe(7);
+    expect(quarter.shape).toBe(5);
     expect(quarter.textureOffset).toEqual([0.5, 0]);
     expect(quarter.travel).toBeCloseTo(0.75, 10);
     expect(quarter.ribbon).toEqual({ halfTwists: 5, width: 0.25 });
     expect(getThreeDRenderParams(ribbon, 1, 1).travel).toBe(3);
   });
 
-  it('maps the lattice and room options to shader indices', () => {
-    const params = getThreeDRenderParams({
-      ...DEFAULT_CONE_VIEW,
-      latticeType: 'schwarzP',
-      roomShape: 'dodecahedron',
-      roomCanvasFaces: 'front',
-      roomBounces: 9,
-    }, 0, 1);
-    expect(params.lattice.type).toBe(1);
-    expect(params.room).toMatchObject({ shape: 2, canvasFaces: 2, bounces: 9 });
+  it('maps the lattice type to its shader index', () => {
+    expect(getThreeDRenderParams({ ...DEFAULT_CONE_VIEW, latticeType: 'schwarzP' }, 0, 1).lattice.type).toBe(1);
   });
 
   it('derives the Cone aperture and apex from the canvas aspect', () => {

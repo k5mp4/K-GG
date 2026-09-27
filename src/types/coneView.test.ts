@@ -65,11 +65,6 @@ describe('cone view configuration', () => {
       latticeType: 'gyroid',
       latticeScale: 2,
       latticeThickness: 0.25,
-      roomShape: 'cube',
-      roomBounces: 6,
-      roomReflectivity: 0.65,
-      roomCanvasFaces: 'alternate',
-      sphereView: 'inside',
       terrainHeight: 0.6,
       terrainAltitude: 1,
       extrudeCells: 32,
@@ -100,35 +95,21 @@ describe('cone view configuration', () => {
     expect(normalizeConeViewConfig({ torusTwist: -9, spin: -99 })).toMatchObject({ torusTwist: -4, spin: -8 });
   });
 
-  it('normalizes the lattice and mirror room settings', () => {
+  it('normalizes the lattice settings', () => {
     expect(normalizeConeViewConfig({ shape: 'lattice', latticeType: 'schwarzP', latticeScale: 99, latticeThickness: 0 })).toMatchObject({
       shape: 'lattice',
       latticeType: 'schwarzP',
       latticeScale: 8,
       latticeThickness: 0.02,
     });
-    expect(normalizeConeViewConfig({ latticeType: 'diamond', roomShape: 'sphere', roomCanvasFaces: 'none' })).toMatchObject({
-      latticeType: 'gyroid',
-      roomShape: 'cube',
-      roomCanvasFaces: 'alternate',
-    });
-    expect(normalizeConeViewConfig({ shape: 'mirrorRoom', roomBounces: 4.6, roomReflectivity: 2 })).toMatchObject({
-      shape: 'mirrorRoom',
-      roomBounces: 5,
-      roomReflectivity: 0.95,
-    });
+    expect(normalizeConeViewConfig({ latticeType: 'diamond' }).latticeType).toBe('gyroid');
   });
 
-  it('normalizes the projection and sphere view', () => {
-    expect(normalizeConeViewConfig({ shape: 'sphere', projection: 'equirect', sphereView: 'outside' })).toMatchObject({
-      shape: 'sphere',
-      projection: 'equirect',
-      sphereView: 'outside',
-    });
-    expect(normalizeConeViewConfig({ projection: 'orthographic', sphereView: 'edge' })).toMatchObject({
-      projection: 'perspective',
-      sphereView: 'inside',
-    });
+  it('normalizes the projection and treats removed shapes as the Cone', () => {
+    expect(normalizeConeViewConfig({ projection: 'equirect' }).projection).toBe('equirect');
+    expect(normalizeConeViewConfig({ projection: 'orthographic' }).projection).toBe('perspective');
+    expect(normalizeConeViewConfig({ shape: 'sphere' }).shape).toBe('cone');
+    expect(normalizeConeViewConfig({ shape: 'mirrorRoom' }).shape).toBe('cone');
   });
 
   it('clamps the terrain and extrusion settings', () => {

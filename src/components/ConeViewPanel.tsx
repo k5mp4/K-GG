@@ -11,9 +11,6 @@ import {
   CONE_SHAPE_OPTIONS,
   DEFAULT_CONE_VIEW,
   LATTICE_TYPE_OPTIONS,
-  ROOM_CANVAS_FACE_OPTIONS,
-  ROOM_SHAPE_OPTIONS,
-  SPHERE_VIEW_OPTIONS,
   THREE_D_PROJECTION_OPTIONS,
   THREE_D_SURFACE_MAPPING_OPTIONS,
   type CameraWigglePreset,
@@ -21,9 +18,6 @@ import {
   type ConeShape,
   type ConeViewConfig,
   type LatticeType,
-  type RoomCanvasFaces,
-  type RoomShape,
-  type SphereView,
   type ThreeDProjection,
   type ThreeDSurfaceMapping,
 } from '../types/coneView';
@@ -41,8 +35,6 @@ const SHAPE_TEXT: Record<ConeShape, { title: MessageKey; description: MessageKey
   cone: { title: 'cone.surface', description: 'cone.description' },
   torus: { title: 'cone.torusSurface', description: 'cone.torusDescription', hint: 'cone.torusHint' },
   lattice: { title: 'cone.latticeSurface', description: 'cone.latticeDescription', hint: 'cone.latticeHint' },
-  mirrorRoom: { title: 'cone.roomSurface', description: 'cone.roomDescription', hint: 'cone.roomHint' },
-  sphere: { title: 'cone.sphereSurface', description: 'cone.sphereDescription', hint: 'cone.sphereHint' },
   terrain: { title: 'cone.terrainSurface', description: 'cone.terrainDescription', hint: 'cone.terrainHint' },
   extrusion: { title: 'cone.extrusionSurface', description: 'cone.extrusionDescription', hint: 'cone.extrusionHint' },
   ribbon: { title: 'cone.ribbonSurface', description: 'cone.ribbonDescription', hint: 'cone.ribbonHint' },
@@ -178,95 +170,6 @@ function ShapeControls({ coneView, setConeView }: { coneView: ConeViewConfig; se
           value={coneView.depth}
           limitKey="cone.depth"
           onChange={(depth) => setConeView({ depth })}
-        />
-      </>
-    );
-  }
-  if (coneView.shape === 'sphere') {
-    return (
-      <>
-        <CustomSelect
-          label="View"
-          value={coneView.sphereView}
-          localizeLabel={false}
-          localizeOptions={false}
-          options={[...SPHERE_VIEW_OPTIONS]}
-          onChange={(sphereView) => setConeView({ sphereView: sphereView as SphereView })}
-        />
-        <SliderField
-          label="Distance"
-          value={coneView.depth}
-          limitKey="cone.depth"
-          disabled={coneView.sphereView === 'inside'}
-          onChange={(depth) => setConeView({ depth })}
-        />
-      </>
-    );
-  }
-  if (coneView.shape === 'mirrorRoom') {
-    return (
-      <>
-        <CustomSelect
-          label="Room"
-          value={coneView.roomShape}
-          localizeLabel={false}
-          localizeOptions={false}
-          options={[...ROOM_SHAPE_OPTIONS]}
-          onChange={(roomShape) => setConeView({ roomShape: roomShape as RoomShape })}
-        />
-        <CustomSelect
-          label="Canvas Faces"
-          value={coneView.roomCanvasFaces}
-          localizeLabel={false}
-          localizeOptions={false}
-          options={[...ROOM_CANVAS_FACE_OPTIONS]}
-          onChange={(roomCanvasFaces) => setConeView({ roomCanvasFaces: roomCanvasFaces as RoomCanvasFaces })}
-        />
-        <SliderField
-          label="Bounces"
-          value={coneView.roomBounces}
-          limitKey="cone.roomBounces"
-          format={(value) => `${Math.round(value)}`}
-          onChange={(roomBounces) => setConeView({ roomBounces })}
-        />
-        <SliderField
-          label="Reflectivity"
-          value={coneView.roomReflectivity}
-          limitKey="cone.roomReflectivity"
-          format={(value) => `${Math.round(value * 100)}%`}
-          onChange={(roomReflectivity) => setConeView({ roomReflectivity })}
-        />
-      </>
-    );
-  }
-  if (coneView.shape === 'torus') {
-    return (
-      <>
-        <SliderField
-          label="Bend"
-          value={coneView.torusBend}
-          limitKey="cone.torusBend"
-          onChange={(torusBend) => setConeView({ torusBend })}
-        />
-        <SliderField
-          label="Ring Repeat"
-          value={coneView.ringRepeat}
-          limitKey="cone.ringRepeat"
-          onChange={(ringRepeat) => setConeView({ ringRepeat })}
-        />
-        <SliderField
-          label="Twist"
-          value={coneView.torusTwist}
-          limitKey="cone.torusTwist"
-          format={(value) => value.toFixed(2)}
-          onChange={(torusTwist) => setConeView({ torusTwist })}
-        />
-        <SliderField
-          label="Spin"
-          value={coneView.spin}
-          limitKey="cone.spin"
-          format={(value) => `${Math.round(value)}`}
-          onChange={(spin) => setConeView({ spin })}
         />
       </>
     );

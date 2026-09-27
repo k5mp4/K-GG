@@ -2,24 +2,20 @@ import { clampParameter, getParameterDefault, getParameterLimit } from '../lib/p
 
 export type ConeMappingMode = 'flow' | 'projection';
 /** Geometry of the 3D layer. The layer kind and preset key stay `cone` for compatibility. */
-export type ConeShape = 'cone' | 'torus' | 'lattice' | 'mirrorRoom' | 'sphere' | 'terrain' | 'extrusion' | 'ribbon';
-export const CONE_SHAPES = ['cone', 'torus', 'lattice', 'mirrorRoom', 'sphere', 'terrain', 'extrusion', 'ribbon'] as const satisfies readonly ConeShape[];
+export type ConeShape = 'cone' | 'torus' | 'lattice' | 'terrain' | 'extrusion' | 'ribbon';
+export const CONE_SHAPES = ['cone', 'torus', 'lattice', 'terrain', 'extrusion', 'ribbon'] as const satisfies readonly ConeShape[];
 export const CONE_SHAPE_INDEX = {
   cone: 0,
   torus: 1,
   lattice: 2,
-  mirrorRoom: 3,
-  sphere: 4,
-  terrain: 5,
-  extrusion: 6,
-  ribbon: 7,
+  terrain: 3,
+  extrusion: 4,
+  ribbon: 5,
 } as const satisfies Record<ConeShape, number>;
 export const CONE_SHAPE_OPTIONS: { value: ConeShape; label: string }[] = [
   { value: 'cone', label: 'Cone' },
   { value: 'torus', label: 'Torus · Tunnel' },
   { value: 'lattice', label: 'Lattice · Gyroid tunnel' },
-  { value: 'mirrorRoom', label: 'Mirror Room · Polyhedron' },
-  { value: 'sphere', label: 'Sphere · Dome / Planet' },
   { value: 'terrain', label: 'Terrain · Heightfield flyover' },
   { value: 'extrusion', label: 'Extrusion · Pixel city' },
   { value: 'ribbon', label: 'Ribbon · Twisted band' },
@@ -37,13 +33,6 @@ export const THREE_D_PROJECTION_OPTIONS: { value: ThreeDProjection; label: strin
   { value: 'equirect', label: 'Equirect · 360° panorama' },
 ];
 
-export type SphereView = 'inside' | 'outside';
-export const SPHERE_VIEWS = ['inside', 'outside'] as const satisfies readonly SphereView[];
-export const SPHERE_VIEW_OPTIONS: { value: SphereView; label: string }[] = [
-  { value: 'inside', label: 'Inside · 360° room' },
-  { value: 'outside', label: 'Outside · Planet' },
-];
-
 /** Triply periodic minimal surfaces used by the Lattice shape. */
 export type LatticeType = 'gyroid' | 'schwarzP';
 export const LATTICE_TYPES = ['gyroid', 'schwarzP'] as const satisfies readonly LatticeType[];
@@ -52,27 +41,6 @@ export const LATTICE_TYPE_OPTIONS: { value: LatticeType; label: string }[] = [
   { value: 'schwarzP', label: 'Schwarz P' },
 ];
 
-/** Convex polyhedra used by the Mirror Room shape. */
-export type RoomShape = 'cube' | 'octahedron' | 'dodecahedron';
-export const ROOM_SHAPES = ['cube', 'octahedron', 'dodecahedron'] as const satisfies readonly RoomShape[];
-export const ROOM_SHAPE_INDEX = {
-  cube: 0,
-  octahedron: 1,
-  dodecahedron: 2,
-} as const satisfies Record<RoomShape, number>;
-/** Which Mirror Room walls show the canvas; the others are mirrors. */
-export type RoomCanvasFaces = 'all' | 'alternate' | 'front';
-export const ROOM_CANVAS_FACES = ['all', 'alternate', 'front'] as const satisfies readonly RoomCanvasFaces[];
-export const ROOM_CANVAS_FACE_OPTIONS: { value: RoomCanvasFaces; label: string }[] = [
-  { value: 'alternate', label: 'Alternate · Kaleidoscope' },
-  { value: 'front', label: 'Front · Infinite corridor' },
-  { value: 'all', label: 'All · Blended' },
-];
-export const ROOM_SHAPE_OPTIONS: { value: RoomShape; label: string }[] = [
-  { value: 'cube', label: 'Cube' },
-  { value: 'octahedron', label: 'Octahedron' },
-  { value: 'dodecahedron', label: 'Dodecahedron' },
-];
 export type ConeSeamMode = 'mirror' | 'weld' | 'reapply';
 
 /**
@@ -168,16 +136,6 @@ export type ConeViewConfig = {
   latticeScale: number;
   /** Lattice only: wall thickness in field units. */
   latticeThickness: number;
-  /** Mirror Room only: polyhedron the camera sits in. */
-  roomShape: RoomShape;
-  /** Mirror Room only: reflections traced per pixel. */
-  roomBounces: number;
-  /** Mirror Room only: mirror strength; with All walls, the share each wall mirrors instead of showing the canvas. */
-  roomReflectivity: number;
-  /** Mirror Room only: which walls show the canvas. */
-  roomCanvasFaces: RoomCanvasFaces;
-  /** Sphere only: camera at the center or outside at Depth / 2. */
-  sphereView: SphereView;
   /** Terrain only: height of the brightest canvas color. */
   terrainHeight: number;
   /** Terrain only: camera height above the ground plane. */
@@ -232,11 +190,6 @@ export const DEFAULT_CONE_VIEW: ConeViewConfig = {
   latticeType: 'gyroid',
   latticeScale: getParameterDefault('cone.latticeScale'),
   latticeThickness: getParameterDefault('cone.latticeThickness'),
-  roomShape: 'cube',
-  roomBounces: getParameterDefault('cone.roomBounces'),
-  roomReflectivity: getParameterDefault('cone.roomReflectivity'),
-  roomCanvasFaces: 'alternate',
-  sphereView: 'inside',
   terrainHeight: getParameterDefault('cone.terrainHeight'),
   terrainAltitude: getParameterDefault('cone.terrainAltitude'),
   extrudeCells: getParameterDefault('cone.extrudeCells'),
@@ -288,11 +241,6 @@ export function normalizeConeViewConfig(value: unknown): ConeViewConfig {
     latticeType: normalizeOption(raw.latticeType, LATTICE_TYPES, DEFAULT_CONE_VIEW.latticeType),
     latticeScale: clampParameter(raw.latticeScale, DEFAULT_CONE_VIEW.latticeScale, getParameterLimit('cone.latticeScale')),
     latticeThickness: clampParameter(raw.latticeThickness, DEFAULT_CONE_VIEW.latticeThickness, getParameterLimit('cone.latticeThickness')),
-    roomShape: normalizeOption(raw.roomShape, ROOM_SHAPES, DEFAULT_CONE_VIEW.roomShape),
-    roomBounces: clampParameter(raw.roomBounces, DEFAULT_CONE_VIEW.roomBounces, getParameterLimit('cone.roomBounces')),
-    roomReflectivity: clampParameter(raw.roomReflectivity, DEFAULT_CONE_VIEW.roomReflectivity, getParameterLimit('cone.roomReflectivity')),
-    roomCanvasFaces: normalizeOption(raw.roomCanvasFaces, ROOM_CANVAS_FACES, DEFAULT_CONE_VIEW.roomCanvasFaces),
-    sphereView: normalizeOption(raw.sphereView, SPHERE_VIEWS, DEFAULT_CONE_VIEW.sphereView),
     terrainHeight: clampParameter(raw.terrainHeight, DEFAULT_CONE_VIEW.terrainHeight, getParameterLimit('cone.terrainHeight')),
     terrainAltitude: clampParameter(raw.terrainAltitude, DEFAULT_CONE_VIEW.terrainAltitude, getParameterLimit('cone.terrainAltitude')),
     extrudeCells: clampParameter(raw.extrudeCells, DEFAULT_CONE_VIEW.extrudeCells, getParameterLimit('cone.extrudeCells')),

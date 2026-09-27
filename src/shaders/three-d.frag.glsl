@@ -44,12 +44,6 @@ uniform int u_latticeType;
 uniform float u_latticeScale;
 uniform float u_latticeThickness;
 
-uniform int u_roomShape;
-uniform int u_roomBounces;
-uniform float u_roomReflectivity;
-
-uniform bool u_sphereInside;
-
 uniform float u_terrainHeight;
 uniform float u_terrainAltitude;
 
@@ -59,7 +53,6 @@ uniform float u_extrudeGap;
 
 uniform float u_ribbonHalfTwists;
 uniform float u_ribbonWidth;
-uniform int u_roomCanvasFaces;
 
 const float PI = 3.141592653589793;
 const float TAU = 6.283185307179586;
@@ -67,11 +60,9 @@ const float TAU = 6.283185307179586;
 const int SHAPE_CONE = 0;
 const int SHAPE_TORUS = 1;
 const int SHAPE_LATTICE = 2;
-const int SHAPE_MIRROR_ROOM = 3;
-const int SHAPE_SPHERE = 4;
-const int SHAPE_TERRAIN = 5;
-const int SHAPE_EXTRUSION = 6;
-const int SHAPE_RIBBON = 7;
+const int SHAPE_TERRAIN = 3;
+const int SHAPE_EXTRUSION = 4;
+const int SHAPE_RIBBON = 5;
 
 const int MAPPING_UV = 0;
 const int MAPPING_TRIPLANAR = 1;
@@ -423,172 +414,6 @@ ThreeDHit latticeHit(vec3 localRay) {
 }
 
 // ---------------------------------------------------------------------------
-// Mirror Room: the camera sits inside a convex polyhedron whose faces lie at
-// distance 1 from the center. Each wall shows the canvas and mirrors the rest
-// of the room by Reflectivity. The room turns about the vertical axis by the
-// travel in whole turns.
-
-int roomFaceCount() {
-  if (u_roomShape == 1) return 8;
-  if (u_roomShape == 2) return 12;
-  return 6;
-}
-
-vec3 roomFaceNormal(int index) {
-  float i = float(index);
-  float firstSign = mod(i, 2.0) < 0.5 ? 1.0 : -1.0;
-  float secondSign = mod(floor(i / 2.0), 2.0) < 0.5 ? 1.0 : -1.0;
-  if (u_roomShape == 1) {
-    float thirdSign = floor(i / 4.0) < 0.5 ? 1.0 : -1.0;
-    return normalize(vec3(firstSign, secondSign, thirdSign));
-  }
-  if (u_roomShape == 2) {
-    float golden = 1.618033988749895;
-    float group = floor(i / 4.0);
-    if (group < 0.5) return normalize(vec3(0.0, firstSign, secondSign * golden));
-    if (group < 1.5) return normalize(vec3(firstSign, secondSign * golden, 0.0));
-    return normalize(vec3(secondSign * golden, 0.0, firstSign));
-  }
-  float axis = floor(i / 2.0);
-  if (axis < 0.5) return vec3(firstSign, 0.0, 0.0);
-  if (axis < 1.5) return vec3(0.0, firstSign, 0.0);
-  return vec3(0.0, 0.0, firstSign);
-}
-
-// Which walls show the canvas when the others are perfect mirrors:
-// 1 = alternate faces, 2 = the faces ahead of the unrotated camera.
-bool roomFaceShowsCanvas(int index, vec3 roomNormal) {
-  if (u_roomCanvasFaces == 1) return mod(float(index), 2.0) < 0.5;
-  return roomNormal.z < -0.5;
-}
-
-vec2 roomFaceUv(vec3 position, vec3 normal) {
-  vec3 reference = abs(normal.y) < 0.9 ? vec3(0.0, 1.0, 0.0) : vec3(1.0, 0.0, 0.0);
-  vec3 tangent = normalize(cross(reference, normal));
-  vec3 bitangent = cross(normal, tangent);
-  return vec2(dot(position, tangent), dot(position, bitangent)) * 0.5 + 0.5;
-}
-
-vec3 roomRotate(vec3 value, float angle) {
-  float c = cos(angle);
-  float s = sin(angle);
-  return vec3(value.x * c + value.z * s, value.y, -value.x * s + value.z * c);
-}
-
-vec4 threeDSurfaceColor(ThreeDHit hit);
-
-vec4 mirrorRoomColor(vec3 localRay, out float firstDistance) {
-  vec3 forward = vec3(0.0, 0.0, -1.0);
-  vec3 up = vec3(0.0, 1.0, 0.0);
-  threeDSetCameraBasis(forward, up);
-  float angle = -u_threeDTravel * TAU;
-  vec3 rayDirection = roomRotate(threeDWorldDirection(localRay, forward, up), angle);
-  vec3 right = normalize(cross(forward, up));
-  vec2 offset = threeDRollMatrix() * u_cameraOffset * 0.6;
-  vec3 rayOrigin = roomRotate(right * offset.x + up * offset.y, angle);
-  g_cameraRight = roomRotate(g_cameraRight, angle);
-  g_cameraUp = roomRotate(g_cameraUp, angle);
-  g_cameraForward = roomRotate(g_cameraForward, angle);
-  int faceCount = roomFaceCount();
-  float reflectivity = clamp(u_roomReflectivity, 0.0, 0.95);
-  vec3 color = vec3(0.0);
-  float weight = 1.0;
-  float travelled = 0.0;
-  firstDistance = 0.0;
-  for (int bounce = 0; bounce < 12; bounce++) {
-    if (bounce >= u_roomBounces) break;
-    float nearest = 1000000.0;
-    vec3 faceNormal = vec3(0.0, 0.0, 1.0);
-    int faceIndex = 0;
-    for (int face = 0; face < 12; face++) {
-      if (face >= faceCount) break;
-      vec3 normal = roomFaceNormal(face);
-      float facing = dot(normal, rayDirection);
-      if (facing <= 0.00001) continue;
-      float distance = (1.0 - dot(normal, rayOrigin)) / facing;
-      if (distance > 0.0 && distance < nearest) {
-        nearest = distance;
-        faceNormal = normal;
-        faceIndex = face;
-      }
-    }
-    vec3 position = rayOrigin + rayDirection * nearest;
-    travelled += nearest;
-    if (bounce == 0) firstDistance = nearest;
-    ThreeDHit hit = threeDMiss();
-    hit.hit = true;
-    hit.position = position;
-    hit.normal = faceNormal;
-    hit.uv = roomFaceUv(position, faceNormal);
-    hit.hasUv = true;
-    hit.distance = travelled;
-    hit.rayDirection = rayDirection;
-    hit.mapScale = 0.5;
-    // The last traced wall shows its canvas so the frame never goes black.
-    bool last = bounce + 1 >= u_roomBounces;
-    if (u_roomCanvasFaces == 0) {
-      // All walls: each shows the canvas and mirrors the rest by Reflectivity.
-      vec4 surface = threeDSurfaceColor(hit);
-      float shown = last ? 1.0 : 1.0 - reflectivity;
-      color += weight * shown * surface.rgb;
-      weight *= reflectivity;
-    } else if (last || roomFaceShowsCanvas(faceIndex, faceNormal)) {
-      // Canvas walls end the path, so the reflections stay crisp.
-      color += weight * threeDSurfaceColor(hit).rgb;
-      break;
-    } else {
-      // Mirror walls lose a little light per bounce, which reads as depth.
-      weight *= mix(0.55, 1.0, reflectivity);
-    }
-    rayOrigin = position - faceNormal * 0.0005;
-    rayDirection = reflect(rayDirection, faceNormal);
-  }
-  return vec4(color, 1.0);
-}
-
-// ---------------------------------------------------------------------------
-// Sphere: a unit sphere seen from its center (Inside, a 360 degree room for
-// dome and VR output) or from Distance outside (a planet). The canvas wraps
-// in longitude and latitude; Flow turns the longitude by whole tiles.
-
-ThreeDHit sphereHit(vec3 localRay) {
-  ThreeDHit result = threeDMiss();
-  vec3 forward = vec3(0.0, 0.0, -1.0);
-  vec3 up = vec3(0.0, 1.0, 0.0);
-  threeDSetCameraBasis(forward, up);
-  vec3 rayDirection = threeDWorldDirection(localRay, forward, up);
-  vec3 right = normalize(cross(forward, up));
-  vec2 offset = threeDRollMatrix() * u_cameraOffset;
-  vec3 rayOrigin;
-  if (u_sphereInside) {
-    rayOrigin = (right * offset.x + up * offset.y) * 0.6;
-  } else {
-    float cameraDistance = max(u_threeDDistance, 1.2);
-    rayOrigin = vec3(0.0, 0.0, cameraDistance) + (right * offset.x + up * offset.y) * cameraDistance * 0.4;
-  }
-  float b = dot(rayOrigin, rayDirection);
-  float c = dot(rayOrigin, rayOrigin) - 1.0;
-  float discriminant = b * b - c;
-  result.rayDirection = rayDirection;
-  if (discriminant < 0.0) return result;
-  float root = sqrt(discriminant);
-  float distance = u_sphereInside ? -b + root : -b - root;
-  if (distance <= 0.0) return result;
-  vec3 position = rayOrigin + rayDirection * distance;
-  result.hit = true;
-  result.position = position;
-  result.normal = u_sphereInside ? -position : position;
-  result.uv = vec2(
-    atan(position.x, -position.z) / TAU + 0.5,
-    asin(clamp(position.y, -1.0, 1.0)) / PI + 0.5
-  );
-  result.hasUv = true;
-  result.distance = distance;
-  result.mapScale = 0.5;
-  return result;
-}
-
-// ---------------------------------------------------------------------------
 // Terrain: the canvas luminance lifts a heightfield that repeats every tile
 // (4 / Texture Repeat world units). The camera glides forward at Altitude and
 // Flow advances it by whole tiles, so integer Flow Cycles loop seamlessly.
@@ -770,6 +595,15 @@ ThreeDHit extrusionHit(vec3 localRay) {
 }
 
 // ---------------------------------------------------------------------------
+// Rotation about the vertical axis, used to turn whole scenes.
+
+vec3 rotateAboutY(vec3 value, float angle) {
+  float c = cos(angle);
+  float s = sin(angle);
+  return vec3(value.x * c + value.z * s, value.y, -value.x * s + value.z * c);
+}
+
+// ---------------------------------------------------------------------------
 // Ribbon: a flat band swept around a unit circle in the XZ plane. Its cross
 // section turns by Half Twists / 2 turns per revolution, so an odd count
 // makes a Mobius band; the rectangle's symmetry keeps the surface continuous
@@ -801,11 +635,11 @@ ThreeDHit ribbonHit(vec3 localRay) {
   float angle = -u_threeDTravel * TAU;
   vec3 right = normalize(cross(forward, up));
   vec2 offset = threeDRollMatrix() * u_cameraOffset * cameraDistance * 0.3;
-  vec3 rayDirection = roomRotate(threeDWorldDirection(localRay, forward, up), angle);
-  vec3 rayOrigin = roomRotate(cameraPosition + right * offset.x + cross(right, forward) * offset.y, angle);
-  g_cameraRight = roomRotate(g_cameraRight, angle);
-  g_cameraUp = roomRotate(g_cameraUp, angle);
-  g_cameraForward = roomRotate(g_cameraForward, angle);
+  vec3 rayDirection = rotateAboutY(threeDWorldDirection(localRay, forward, up), angle);
+  vec3 rayOrigin = rotateAboutY(cameraPosition + right * offset.x + cross(right, forward) * offset.y, angle);
+  g_cameraRight = rotateAboutY(g_cameraRight, angle);
+  g_cameraUp = rotateAboutY(g_cameraUp, angle);
+  g_cameraForward = rotateAboutY(g_cameraForward, angle);
   result.rayDirection = rayDirection;
   float distance = 0.0;
   bool hit = false;
@@ -909,21 +743,11 @@ void main() {
     return;
   }
 
-  if (u_threeDShape == SHAPE_MIRROR_ROOM) {
-    float firstDistance;
-    vec4 roomColor = mirrorRoomColor(localRay, firstDistance);
-    gl_FragColor = threeDApplyFog(roomColor, firstDistance, 0.5);
-    return;
-  }
-
   ThreeDHit hit;
   float fogScale = 0.25;
   if (u_threeDShape == SHAPE_LATTICE) {
     hit = latticeHit(localRay);
     fogScale = 1.0 / max(u_latticeScale, 0.1);
-  } else if (u_threeDShape == SHAPE_SPHERE) {
-    hit = sphereHit(localRay);
-    fogScale = 0.5;
   } else if (u_threeDShape == SHAPE_TERRAIN) {
     hit = terrainHit(localRay);
     fogScale = 0.15;

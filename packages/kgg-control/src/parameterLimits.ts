@@ -162,8 +162,6 @@ export const PARAMETER_LIMITS = {
   'cone.shade': { min: 0, max: 1, step: 0.01, defaultValue: 0 },
   'cone.latticeScale': { min: 0.5, max: 8, step: 0.05, defaultValue: 2 },
   'cone.latticeThickness': { min: 0.02, max: 0.9, step: 0.01, defaultValue: 0.25 },
-  'cone.roomBounces': { min: 1, max: 12, step: 1, defaultValue: 6, integer: true },
-  'cone.roomReflectivity': { min: 0, max: 0.95, step: 0.01, defaultValue: 0.65 },
   'cone.terrainHeight': { min: 0, max: 2, step: 0.01, defaultValue: 0.6 },
   'cone.terrainAltitude': { min: 0.1, max: 3, step: 0.01, defaultValue: 1 },
   'cone.extrudeCells': { min: 4, max: 128, step: 1, defaultValue: 32, integer: true },
