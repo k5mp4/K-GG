@@ -3,6 +3,7 @@
 | AC | 検証方法 | テスト・確認場所 | 結果 |
 | --- | --- | --- | --- |
 | Effect StackでDatamoshをON/OFFでき、PostprocessのEdit Layerで設定できる | manual（headless Chromium、UI操作） | Effect Stack → Datamosh、Postprocess → Edit Layer → Datamosh | pass |
+| Animation Flowで前段アニメーションの動きに沿って履歴が引き伸ばされる | manual（headless Chromium + SwiftShader、Slit ON・再生中） | Slit + Datamosh（既定値） | pass（Slitの動きに沿った不定形の引きずりを確認。SwiftShaderではNoiseのshaderが準備中のままでNoiseでは未確認） |
 | 履歴を使った崩れ表現が出る | manual（headless Chromium + SwiftShader、アニメーション再生中の画面取得） | Noise + Datamosh（既定値、Block Variance 0.5、Luma Stretch 0.8、Saturation Stretch 0.5） | pass（大きさの異なるブロック、色ごとに長さの違う筋状の引きずり、破損を確認） |
 | 設定の正規化と旧Video Motionの移行 | unit | `src/types/datamosh.test.ts` | pass |
 | DatamoshがEffect Stackレイヤーとしてtexture経路で描画され、旧`videoMotion`が同じ位置へ写像される | unit | `src/lib/effectPipeline.test.ts` | pass |

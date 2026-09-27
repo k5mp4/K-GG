@@ -3,6 +3,9 @@ precision highp float;
 // Stage input (Main Stack output) and the previous Datamosh output.
 uniform sampler2D u_currentTex;
 uniform sampler2D u_historyTex;
+// The layer input of the previous logical frame (Animation Flow source).
+uniform sampler2D u_previousInputTex;
+uniform bool u_previousInputValid;
 // RGBA8 Video Motion field: RG = direction, B = magnitude, A = frame change.
 uniform sampler2D u_motionField;
 uniform sampler2D u_gradientRamp;
@@ -11,7 +14,7 @@ uniform float u_time;
 // Advances once per logical frame; drives the per-block corruption rolls.
 uniform float u_frameSeed;
 uniform bool u_historyPrimed;
-// 0: procedural, 1: video
+// 0: procedural, 1: video, 2: animation (optical flow of the layer input)
 uniform int u_motionSource;
 // 0: mix, 1: lighten, 2: difference, 3: rampLock
 uniform int u_mixMode;
@@ -19,6 +22,7 @@ uniform float u_strength;
 uniform float u_refresh;
 uniform float u_feedback;
 uniform float u_blockSize;
+uniform float u_blockLock;
 uniform float u_blockVariance;
 uniform float u_lumaStretch;
 uniform float u_saturationStretch;

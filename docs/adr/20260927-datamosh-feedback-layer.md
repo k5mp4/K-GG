@@ -27,7 +27,7 @@ supersedes: []
 1. DatamoshはEffect Stackの通常レイヤー（`EffectStackKind`の`datamosh`）とし、drag、randomize、solo、選択、永続化、render planの対象にする。有効状態と順序は`effectPipeline.effectStack`、設定は`datamosh`へ保存する。旧`videoMotion`レイヤーは正規化時に同じ位置の`datamosh`レイヤーへ写像する。
 2. 履歴はDatamosh専用のping-pong target 2枚で持ち、片方を前フレーム（読み取り）、もう片方を今フレームの出力（書き込み）とする。レイヤーの出力は書き込み側textureをそのまま後段の入力にし、コピーしない。
 3. 履歴は論理フレームが変わったときだけ進める。フレームキーはtimeline正規化時刻、shader時刻、video source時は動画field更新回数から作る。同じキーの再描画は同じ履歴から再評価する（冪等）。解像度、render session、motion source、動画のreset versionが変わったら履歴を初期化し、初回は現在フレームを出力する（I-frame）。
-4. motion fieldは`vec2 datamoshMotionField(vec2 uv)`を返す独立したGLSL chunkとし、プロシージャル（curl noise）と動画motion fieldを同じ契約で差し替える。
+4. motion fieldは`vec2 datamoshMotionField(vec2 uv, vec2 window)`を返す独立したGLSL chunkとし、レイヤー入力のoptical flow（Animation Flow）、プロシージャル（curl noise）、動画motion fieldを同じ契約で差し替える。Animation Flowのため、レイヤー入力も履歴と同じ添字のping-pong target 2枚へ保持し、前フレームの入力と比較する。
 5. タイル描画ではDatamoshレイヤーを適用しない。
 
 ## 理由
@@ -57,7 +57,7 @@ supersedes: []
 
 - ランダム化・ソロ・並べ替えで入力が変わると、履歴は新しい入力へ徐々に置き換わるまで前の見た目を引きずる。
 - MCPの`EffectKind`は`videoMotion`の代わりに`datamosh`を受け付ける。外部scenarioの`videoMotion`指定は無効になる。
-- 履歴用のフルサイズtargetが2枚増える（Datamosh有効時のみ確保）。
+- 履歴用のフルサイズtargetが2枚、Animation Flow時は入力保持用にさらに2枚増える（Datamosh有効時のみ確保）。Animation Flowはブロック・隣接・画素の3か所でそれぞれ54回のtexture参照を行う。
 
 ## 再検討条件
 

@@ -117,7 +117,7 @@ Datamoshは主スタックの通常レイヤーで、配置された位置の前
 
 ### DATAMOSH-002 motion field and partitions
 
-motion sourceは`Procedural`（既定）と`Video Motion`を持つ。`Procedural`はfbmの流れ関数のcurlと低周波のdriftから成る時間変化する2chベクトル場で、`Motion Scale`で空間スケール、`Motion Speed`で時間変化速度を変える。motion vectorはマクロブロック中心で評価し、ブロック内の全画素が同じvectorを共有する。基準の大きさは`Block Size`（1〜128px、1で量子化なし）で、`Block Variance`（0〜1）の確率で隣接ブロックを2倍へ結合、またはx／y／両方向へ最大2段分割し、不規則な大きさ・縦横比のパーティションにする。パーティション配置は6論理フレームごとに変わる。`Neighbor Mix`は隣接ブロックのvectorを混ぜる量で、`Strength`は1フレーム当たりの履歴のずらし量を決める。
+motion sourceは`Animation Flow`（既定）、`Procedural`、`Video Motion`を持つ。`Animation Flow`はDatamoshレイヤーの入力（前段のNoise、Slitなどのアニメーション結果）の前フレームと現在フレームの輝度からLucas–Kanade法で動きを推定し、アニメーションが動いた向きへ履歴を引き伸ばす。推定は3×3の標本点と正則化項で行い、平坦な領域や変化のない入力では動きを0とし、1フレームの推定量はフレームの5%以下に制限する。入力が静止している間は動かない。`Procedural`はfbmの流れ関数のcurlと低周波のdriftから成る時間変化する2chベクトル場で、`Motion Scale`で空間スケール、`Motion Speed`で時間変化速度を変える。motion vectorはマクロブロック中心でブロック範囲を窓として評価し、ブロック内の全画素が同じvectorを共有する。`Block Lock`（0〜1、既定0.6）はブロックのvectorと画素ごと（6px窓）のvectorの混合量で、1ではブロック単位、下げるほど画素がアニメーションの流れに沿って個別に引き伸ばされる。基準の大きさは`Block Size`（1〜128px、1で量子化なし）で、`Block Variance`（0〜1）の確率で隣接ブロックを2倍へ結合、またはx／y／両方向へ最大2段分割し、不規則な大きさ・縦横比のパーティションにする。パーティション配置は6論理フレームごとに変わる。`Neighbor Mix`は隣接ブロックのvectorを混ぜる量で、`Strength`は1フレーム当たりの履歴のずらし量を決める。
 
 ### DATAMOSH-003 history feedback, stretch, and refresh
 
@@ -129,7 +129,7 @@ Datamoshは前フレームの自身の出力を履歴として保持し、各画
 
 ### DATAMOSH-005 history lifecycle and compatibility
 
-履歴は論理フレーム（timeline正規化時刻、shader時刻、video source時は動画fieldの更新回数）が変わったときだけ進む。同じ論理フレームの再描画は同じ履歴から再評価し、停止中のパラメータ編集で崩れを進めない。解像度変更、render session変更、motion source変更、動画reset時は履歴を初期化し、初回フレームは現在フレームをそのまま出力する。旧Presetの`videoMotion`レイヤーは同じ位置・有効状態の`datamosh`レイヤーへ、選択中の`videoMotion`は`datamosh`へ写像する。`datamosh`設定を持たない旧Presetの`videoMotion`設定は、`Video Motion` source、`Ramp Lock`、Block Size 1、Block Variance 0、Luma／Saturation Stretch 0、Refresh 0、破損なしのDatamosh設定へ移行する。スタックにレイヤーがない旧Presetで`videoMotion.enabled`が有効な場合はDatamoshレイヤーを有効にする。保存時は`datamosh`だけを書き、`videoMotion`設定は書かない。
+履歴は論理フレーム（timeline正規化時刻、shader時刻、video source時は動画fieldの更新回数）が変わったときだけ進む。同じ論理フレームの再描画は同じ履歴から再評価し、停止中のパラメータ編集で崩れを進めない。解像度変更、render session変更、motion source変更、動画reset時は履歴を初期化し、初回フレームは現在フレームをそのまま出力する。旧Presetの`videoMotion`レイヤーは同じ位置・有効状態の`datamosh`レイヤーへ、選択中の`videoMotion`は`datamosh`へ写像する。`datamosh`設定を持たない旧Presetの`videoMotion`設定は、`Video Motion` source、`Ramp Lock`、Block Size 1、Block Lock 1、Block Variance 0、Luma／Saturation Stretch 0、Refresh 0、破損なしのDatamosh設定へ移行する。スタックにレイヤーがない旧Presetで`videoMotion.enabled`が有効な場合はDatamoshレイヤーを有効にする。保存時は`datamosh`だけを書き、`videoMotion`設定は書かない。
 
 ### EFFECT-004 DiffuseとImage Gradient Source
 

@@ -56,6 +56,8 @@ function makeContext() {
     flowGradient: makeFlowResources(),
     datamoshHistoryTextures: [{} as WebGLTexture, {} as WebGLTexture],
     datamoshHistoryFbos: [{} as WebGLFramebuffer, {} as WebGLFramebuffer],
+    datamoshInputTextures: [{} as WebGLTexture, {} as WebGLTexture],
+    datamoshInputFbos: [{} as WebGLFramebuffer, {} as WebGLFramebuffer],
     disposed: false,
   } as unknown as WebGLContext;
   return { context, gl, geometryBuffer, transitionGeometryBuffer };

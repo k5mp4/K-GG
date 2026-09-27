@@ -31,6 +31,8 @@ storeの`videoMotion` sliceを`datamosh`へ置き換え、`setVideoMotion`を`se
 - `advanceDatamoshHistory`: フレームキーが変わったときだけ読み取り／書き込みを入れ替える。Freeze中はprimed済みなら入れ替えない。
 - V2: Main Stackループ内の`datamosh`レイヤーの位置で実行。Legacy V1: `datamosh.enabled`のとき、Flowの後、Seamless／Particlesの前で実行し、後段がなければ既定framebufferへblitする。
 - 不規則パーティション: 基準グリッドのブロックを`Block Variance × 0.35`の確率で2倍へ結合し、それ以外は`Block Variance`の確率でx／y／両方向へ最大2段分割する。配置は6論理フレームごとに変わる。
+- Animation Flow: `datamoshInputTextures`（2枚）へ、描画のたびにレイヤー入力を履歴の書き込み側と同じ添字でblitする。shaderは読み取り側の前フレーム入力と現在の入力の輝度から、3×3標本・Tikhonov正則化のLucas–Kanadeでflowを求める。入力textureのframebufferが特定できない場合は、その添字を無効として動きを0にする。
+- Block Lock: 1未満なら画素位置で6px窓のmotionも評価し、ブロックのmotionと混ぜる。
 - 輝度・彩度stretch: 未移動の履歴画素の輝度・彩度から0〜4倍の倍率を求め、motionのずらし量に掛ける。
 - Shaderは`uniforms.glsl`、`motion-field.glsl`（`datamoshMotionField`契約）、`main.glsl`の3 chunkを連結する。procedural motionは解析的勾配つきvalue noiseの3 octave fbmでcurlを求め、finite differenceを使わない。
 

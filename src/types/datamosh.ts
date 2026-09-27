@@ -1,14 +1,15 @@
 /**
  * Datamosh Effect Stack layer: GPU feedback that re-uses the previous output
- * as a motion-compensated "P-frame" reference. The motion field comes from a
- * procedural GLSL vector field or from the decoded Video Motion source.
+ * as a motion-compensated "P-frame" reference. The motion field is estimated
+ * from the animated layer input (optical flow), generated procedurally, or
+ * taken from the decoded Video Motion source.
  */
-export type DatamoshMotionSource = 'procedural' | 'video';
+export type DatamoshMotionSource = 'animation' | 'procedural' | 'video';
 
 /** How the motion-compensated history is combined with the current frame. */
 export type DatamoshMixMode = 'mix' | 'lighten' | 'difference' | 'rampLock';
 
-export const DATAMOSH_MOTION_SOURCES = ['procedural', 'video'] as const satisfies readonly DatamoshMotionSource[];
+export const DATAMOSH_MOTION_SOURCES = ['animation', 'procedural', 'video'] as const satisfies readonly DatamoshMotionSource[];
 export const DATAMOSH_MIX_MODES = ['mix', 'lighten', 'difference', 'rampLock'] as const satisfies readonly DatamoshMixMode[];
 
 export type DatamoshConfig = {
@@ -23,6 +24,8 @@ export type DatamoshConfig = {
   feedback: number;
   /** Macroblock edge length in output pixels. 1 disables quantization. */
   blockSize: number;
+  /** 1 = every pixel follows its macroblock vector, 0 = per-pixel motion only. */
+  blockLock: number;
   /** Probability that a macroblock is merged or split into irregular partitions. */
   blockVariance: number;
   /** How much brighter history pixels lengthen (negative: shorten) the drag. */
@@ -56,6 +59,7 @@ export const DATAMOSH_RANGES: Record<DatamoshNumericKey, DatamoshRange> = {
   refresh: { min: 0, max: 1, step: 0.01 },
   feedback: { min: 0, max: 0.995, step: 0.005 },
   blockSize: { min: 1, max: 128, step: 1 },
+  blockLock: { min: 0, max: 1, step: 0.01 },
   blockVariance: { min: 0, max: 1, step: 0.01 },
   lumaStretch: { min: -2, max: 2, step: 0.01 },
   saturationStretch: { min: -2, max: 2, step: 0.01 },
@@ -71,12 +75,13 @@ export const DATAMOSH_RANGES: Record<DatamoshNumericKey, DatamoshRange> = {
 
 export const DATAMOSH_DEFAULTS: DatamoshConfig = {
   enabled: false,
-  motionSource: 'procedural',
+  motionSource: 'animation',
   mixMode: 'mix',
   strength: 0.6,
   refresh: 0.04,
   feedback: 0.94,
   blockSize: 16,
+  blockLock: 0.6,
   blockVariance: 0.5,
   lumaStretch: 0.8,
   saturationStretch: 0.5,
@@ -112,6 +117,7 @@ export function normalizeDatamoshConfig(value: unknown): DatamoshConfig {
     refresh: bounded(raw.refresh, 'refresh'),
     feedback: bounded(raw.feedback, 'feedback'),
     blockSize: Math.round(bounded(raw.blockSize, 'blockSize')),
+    blockLock: bounded(raw.blockLock, 'blockLock'),
     blockVariance: bounded(raw.blockVariance, 'blockVariance'),
     lumaStretch: bounded(raw.lumaStretch, 'lumaStretch'),
     saturationStretch: bounded(raw.saturationStretch, 'saturationStretch'),
@@ -157,6 +163,7 @@ export function datamoshFromLegacyVideoMotion(value: unknown, enabled: boolean):
     refresh: 0,
     feedback: historyWeight,
     blockSize: 1,
+    blockLock: 1,
     blockVariance: 0,
     lumaStretch: 0,
     saturationStretch: 0,

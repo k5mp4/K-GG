@@ -8,7 +8,7 @@ Datamoshは主スタックの通常レイヤーで、配置位置の前段textur
 
 ### DATAMOSH-002 motion field and partitions
 
-motion sourceは`Procedural`（curl noise + drift）と`Video Motion`。motion vectorはマクロブロック中心で評価して共有する。Block Varianceで結合・x／y分割した不規則パーティションにする。Neighbor Mix、Strength、Motion Scale、Motion Speedを持つ。
+motion sourceは`Animation Flow`（既定、レイヤー入力の前後フレームからLucas–Kanadeで推定）、`Procedural`（curl noise + drift）、`Video Motion`。motion vectorはマクロブロック中心で評価して共有し、Block Lockで画素ごとのvectorと混ぜる。Block Varianceで結合・x／y分割した不規則パーティションにする。Neighbor Mix、Strength、Motion Scale、Motion Speedを持つ。
 
 ### DATAMOSH-003 history feedback, stretch, and refresh
 

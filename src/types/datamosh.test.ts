@@ -22,7 +22,7 @@ describe('datamosh config', () => {
     });
 
     expect(value.enabled).toBe(true);
-    expect(value.motionSource).toBe('procedural');
+    expect(value.motionSource).toBe('animation');
     expect(value.mixMode).toBe('mix');
     expect(value.strength).toBe(2);
     expect(value.feedback).toBe(0.995);
@@ -64,6 +64,7 @@ describe('legacy Video Motion migration', () => {
       refresh: 0,
       feedback: 0.82,
       blockSize: 1,
+      blockLock: 1,
       blockVariance: 0,
       lumaStretch: 0,
       saturationStretch: 0,
@@ -103,7 +104,8 @@ describe('legacy Video Motion migration', () => {
     expect(resolvePersistedDatamosh({
       datamosh: { enabled: true, blockSize: 32 },
       videoMotion: legacyVideoMotion,
-    })).toMatchObject({ enabled: true, blockSize: 32, motionSource: 'procedural' });
+    })).toMatchObject({ enabled: true, blockSize: 32, motionSource: 'animation' });
+    expect(normalizeDatamoshConfig({ motionSource: 'procedural' }).motionSource).toBe('procedural');
     expect(resolvePersistedDatamosh({})).toEqual(DATAMOSH_DEFAULTS);
   });
 });

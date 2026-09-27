@@ -97,13 +97,20 @@ void main() {
   vec2 blockId = floor(uv * blockCount);
   vec2 blockCenter = (blockId + 0.5) / blockCount;
 
-  vec2 motion = datamoshMotionField(blockCenter);
+  vec2 blockWindow = 1.0 / blockCount;
+  vec2 motion = datamoshMotionField(blockCenter, blockWindow);
   vec2 neighborStep = step(0.5, dmHash22(blockId + vec2(41.0, 7.0))) * 2.0 - 1.0;
   vec2 neighborOffset = dmHash12(blockId + vec2(9.1, 3.7)) < 0.5
     ? vec2(neighborStep.x, 0.0)
     : vec2(0.0, neighborStep.y);
-  vec2 neighborMotion = datamoshMotionField((blockId + neighborOffset + 0.5) / blockCount);
+  vec2 neighborMotion = datamoshMotionField((blockId + neighborOffset + 0.5) / blockCount, blockWindow);
   motion = mix(motion, neighborMotion, u_neighborMix);
+  // Block Lock below 1 lets pixels follow their own motion, so the drag
+  // traces the animation instead of translating whole blocks.
+  if (u_blockLock < 0.999) {
+    vec2 pixelMotion = datamoshMotionField(uv, 6.0 / u_resolution);
+    motion = mix(pixelMotion, motion, u_blockLock);
+  }
 
   vec2 jitterRoll = dmHash22(blockId + vec2(seed * 0.917, 17.0)) - 0.5;
   vec2 referenceShift = jitterRoll * u_jitter / blockCount;

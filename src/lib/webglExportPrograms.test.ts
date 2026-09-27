@@ -135,10 +135,11 @@ describe('export WebGL program plan', () => {
     const source = getProgramSource('datamosh');
 
     expect(source.fragment.indexOf('precision highp float;')).toBe(0);
-    expect(source.fragment).toContain('vec2 datamoshMotionField(vec2 uv)');
+    expect(source.fragment).toContain('vec2 datamoshMotionField(vec2 uv, vec2 window)');
+    expect(source.fragment).toContain('u_previousInputTex');
     expect(source.fragment).toContain('u_historyTex');
     expect(source.fragment).toContain('floor(uv * blockCount)');
-    expect(source.fragment.indexOf('datamoshMotionField(vec2 uv)')).toBeLessThan(source.fragment.indexOf('void main()'));
+    expect(source.fragment.indexOf('datamoshMotionField(vec2 uv, vec2 window)')).toBeLessThan(source.fragment.indexOf('void main()'));
   });
 
   it('exposes the standalone Seamless shader uniforms', () => {

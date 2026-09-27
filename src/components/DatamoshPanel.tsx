@@ -255,12 +255,17 @@ export function DatamoshPanel() {
           value={datamosh.motionSource}
           localizeOptions={false}
           options={[
+            { value: 'animation', label: 'Animation Flow' },
             { value: 'procedural', label: 'Procedural (Curl Noise)' },
             { value: 'video', label: 'Video Motion' },
           ]}
           onChange={(value) => setDatamosh({ motionSource: value as DatamoshMotionSource })}
         />
-        {datamosh.motionSource === 'procedural' ? (
+        {datamosh.motionSource === 'animation' ? (
+          <p className="text-[9px] leading-relaxed text-tab-inactive" data-datamosh-animation-source>
+            {t('effect.datamoshAnimationHint')}
+          </p>
+        ) : datamosh.motionSource === 'procedural' ? (
           <>
             {field('Motion Scale', 'motionScale')}
             {field('Motion Speed', 'motionSpeed')}
@@ -321,6 +326,7 @@ export function DatamoshPanel() {
           </div>
         )}
         {field('Block Size', 'blockSize', value => `${Math.round(value)}px`)}
+        {field('Block Lock', 'blockLock', percent)}
         {field('Block Variance', 'blockVariance', percent)}
       </Section>
 
