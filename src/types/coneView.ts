@@ -1,6 +1,13 @@
 import { clampParameter, getParameterDefault, getParameterLimit } from '../lib/parameterLimits';
 
 export type ConeMappingMode = 'flow' | 'projection';
+/** Geometry of the 3D layer. The layer kind and preset key stay `cone` for compatibility. */
+export type ConeShape = 'cone' | 'torus';
+export const CONE_SHAPES = ['cone', 'torus'] as const satisfies readonly ConeShape[];
+export const CONE_SHAPE_INDEX = {
+  cone: 0,
+  torus: 1,
+} as const satisfies Record<ConeShape, number>;
 export type ConeSeamMode = 'mirror' | 'weld' | 'reapply';
 
 export const CONE_SEAM_MODES = ['mirror', 'weld', 'reapply'] as const satisfies readonly ConeSeamMode[];
@@ -18,6 +25,7 @@ export const CONE_SEAM_MODE_OPTIONS: { value: ConeSeamMode; label: string }[] = 
 export const DEFAULT_CONE_SEAM_MODE: ConeSeamMode = 'mirror';
 
 export type ConeViewConfig = {
+  shape: ConeShape;
   depth: number;
   rotation: number;
   textureRepeat: number;
@@ -27,6 +35,10 @@ export type ConeViewConfig = {
   seamBlend: number;
   seamMode: ConeSeamMode;
   mappingMode: ConeMappingMode;
+  /** Torus only: tube radius divided by ring radius. Larger values bend the tunnel more tightly. */
+  torusBend: number;
+  /** Torus only: texture tiles around the ring. Integer values keep the ring seamless. */
+  torusRingRepeat: number;
 };
 
 /** Normalized apex movement limit; ±2 reaches 50% of the canvas outside its edge. */
@@ -39,6 +51,7 @@ export const CONE_SEAM_BLEND_MIN = 0;
 export const CONE_SEAM_BLEND_MAX = getParameterLimit('cone.seamBlend').max;
 
 export const DEFAULT_CONE_VIEW: ConeViewConfig = {
+  shape: 'cone',
   depth: getParameterDefault('cone.depth'),
   rotation: getParameterDefault('cone.rotation'),
   textureRepeat: getParameterDefault('cone.textureRepeat'),
@@ -48,6 +61,8 @@ export const DEFAULT_CONE_VIEW: ConeViewConfig = {
   seamBlend: getParameterDefault('cone.seamBlend'),
   seamMode: DEFAULT_CONE_SEAM_MODE,
   mappingMode: 'flow',
+  torusBend: getParameterDefault('cone.torusBend'),
+  torusRingRepeat: getParameterDefault('cone.torusRingRepeat'),
 };
 
 function normalizeSeamMode(value: unknown): ConeSeamMode {
@@ -60,6 +75,7 @@ export function normalizeConeViewConfig(value: unknown): ConeViewConfig {
   if (typeof value !== 'object' || value === null) return { ...DEFAULT_CONE_VIEW };
   const raw = value as Partial<ConeViewConfig>;
   return {
+    shape: raw.shape === 'torus' ? 'torus' : DEFAULT_CONE_VIEW.shape,
     depth: clampParameter(raw.depth, DEFAULT_CONE_VIEW.depth, getParameterLimit('cone.depth')),
     rotation: clampParameter(raw.rotation, DEFAULT_CONE_VIEW.rotation, getParameterLimit('cone.rotation')),
     textureRepeat: clampParameter(raw.textureRepeat, DEFAULT_CONE_VIEW.textureRepeat, getParameterLimit('cone.textureRepeat')),
@@ -69,5 +85,7 @@ export function normalizeConeViewConfig(value: unknown): ConeViewConfig {
     seamBlend: clampParameter(raw.seamBlend, DEFAULT_CONE_VIEW.seamBlend, getParameterLimit('cone.seamBlend')),
     seamMode: normalizeSeamMode(raw.seamMode),
     mappingMode: raw.mappingMode === 'projection' ? 'projection' : DEFAULT_CONE_VIEW.mappingMode,
+    torusBend: clampParameter(raw.torusBend, DEFAULT_CONE_VIEW.torusBend, getParameterLimit('cone.torusBend')),
+    torusRingRepeat: clampParameter(raw.torusRingRepeat, DEFAULT_CONE_VIEW.torusRingRepeat, getParameterLimit('cone.torusRingRepeat')),
   };
 }

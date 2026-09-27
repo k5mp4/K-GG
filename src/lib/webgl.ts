@@ -86,7 +86,10 @@ import {
   CONE_CAMERA_FOV,
   getConeApertureRadius,
   getConeApexOffset,
+  getConeRollRadians,
+  getConeShapeIndex,
   getConeTextureTransform,
+  getTorusMajorRadius,
 } from './coneView';
 
 export type { TileRenderOptions } from '../types/rendering';
@@ -2481,6 +2484,10 @@ function drawPostprocessPass(
       gl.uniform2f(ctx.postprocessUniforms.u_coneTextureOffset, textureTransform.offsetU, textureTransform.offsetV);
       gl.uniform1f(ctx.postprocessUniforms.u_coneSeamBlend, textureTransform.seamBlend);
       setUniform1i(gl, ctx.postprocessUniforms.u_coneSeamMode, CONE_SEAM_MODE_INDEX[textureTransform.seamMode]);
+      setUniform1i(gl, ctx.postprocessUniforms.u_coneShape, getConeShapeIndex(normalizedConeView));
+      gl.uniform1f(ctx.postprocessUniforms.u_coneRoll, getConeRollRadians(normalizedConeView));
+      gl.uniform1f(ctx.postprocessUniforms.u_torusMajorRadius, getTorusMajorRadius(normalizedConeView));
+      gl.uniform1f(ctx.postprocessUniforms.u_torusRingRepeat, normalizedConeView.torusRingRepeat);
     }
   setUniform1i(gl, ctx.postprocessUniforms.u_noiseEnabled, noiseDistortion.enabled ? 1 : 0);
   setUniform1i(gl, ctx.postprocessUniforms.u_noiseType, NOISE_TYPE_MAP[noiseDistortion.type]);

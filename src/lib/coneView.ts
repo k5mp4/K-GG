@@ -1,6 +1,7 @@
 import {
   CONE_APEX_LIMIT,
   CONE_SEAM_MODE_INDEX,
+  CONE_SHAPE_INDEX,
   type ConeViewConfig,
   type ConeSeamMode,
 } from '../types/coneView';
@@ -90,13 +91,29 @@ export function getConeTextureTransform(
   const rotationTurns = config.rotation / 360;
   return {
     repeatU: config.textureRepeat,
-    offsetU: rotationTurns - Math.floor(rotationTurns),
+    // Torus uses Rotation as a camera roll (see getConeRollRadians) so the
+    // tunnel's bend direction can be chosen; the texture itself stays put.
+    offsetU: config.shape === 'torus' ? 0 : rotationTurns - Math.floor(rotationTurns),
     // Direct Projection keeps the processed 2D frame fixed on the cone.
     // Flow mode is the only mode that advances the texture from apex to opening.
     offsetV: config.mappingMode === 'projection' ? 0 : time * config.flowCycles,
     seamBlend: config.seamBlend,
     seamMode: config.seamMode,
   };
+}
+
+export function getConeShapeIndex(config: ConeViewConfig): number {
+  return CONE_SHAPE_INDEX[config.shape];
+}
+
+/** Camera roll for the torus tunnel. The cone applies Rotation to the texture instead. */
+export function getConeRollRadians(config: ConeViewConfig): number {
+  return config.shape === 'torus' ? (config.rotation * Math.PI) / 180 : 0;
+}
+
+/** Ring radius of the torus when its tube radius is 1. */
+export function getTorusMajorRadius(config: ConeViewConfig): number {
+  return 1 / Math.max(0.01, Math.min(0.95, safeFinite(config.torusBend, 0.3)));
 }
 
 export function getConeSeamModeIndex(mode: ConeSeamMode): number {

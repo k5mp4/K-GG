@@ -7,8 +7,11 @@ import {
   getConeApertureRadius,
   getConeApexCanvasPoint,
   getConeApexOffset,
+  getConeRollRadians,
   getConeSeamModeIndex,
+  getConeShapeIndex,
   getConeTextureTransform,
+  getTorusMajorRadius,
 } from './coneView';
 
 describe('cone view geometry', () => {
@@ -94,5 +97,35 @@ describe('cone texture flow', () => {
     expect(start.seamMode).toBe(seamMode);
     expect(end.seamMode).toBe(seamMode);
     expect(end.offsetV - start.offsetV).toBe(4);
+  });
+});
+
+describe('torus tunnel', () => {
+  const torus = { ...DEFAULT_CONE_VIEW, shape: 'torus' as const };
+
+  it('selects the torus shader branch and keeps the cone as the default branch', () => {
+    expect(getConeShapeIndex(DEFAULT_CONE_VIEW)).toBe(0);
+    expect(getConeShapeIndex(torus)).toBe(1);
+  });
+
+  it('uses Rotation as a camera roll instead of a texture offset', () => {
+    const rotated = { ...torus, rotation: 90 };
+    expect(getConeRollRadians(rotated)).toBeCloseTo(Math.PI / 2, 10);
+    expect(getConeTextureTransform(rotated, 0).offsetU).toBe(0);
+    expect(getConeRollRadians({ ...DEFAULT_CONE_VIEW, rotation: 90 })).toBe(0);
+    expect(getConeTextureTransform({ ...DEFAULT_CONE_VIEW, rotation: 90 }, 0).offsetU).toBeCloseTo(0.25, 10);
+  });
+
+  it('derives the ring radius from Bend with a unit tube radius', () => {
+    expect(getTorusMajorRadius({ ...torus, torusBend: 0.25 })).toBeCloseTo(4, 10);
+    expect(getTorusMajorRadius({ ...torus, torusBend: Number.NaN })).toBeCloseTo(1 / 0.3, 10);
+    expect(getTorusMajorRadius({ ...torus, torusBend: 5 })).toBeGreaterThan(1);
+  });
+
+  it('advances whole ring tiles over one loop so integer Flow Cycles loop seamlessly', () => {
+    const flowing = { ...torus, flowCycles: 3 };
+    expect(getConeTextureTransform(flowing, 0).offsetV).toBe(0);
+    expect(getConeTextureTransform(flowing, 1).offsetV).toBe(3);
+    expect(getConeTextureTransform({ ...flowing, mappingMode: 'projection' }, 0.5).offsetV).toBe(0);
   });
 });

@@ -1,7 +1,7 @@
 import { useLanguage } from '../i18n/LanguageProvider';
 import { useGradientStore } from '../store/gradientStore';
 import { applicationCommands } from '../application/commands';
-import { CONE_SEAM_MODE_OPTIONS, DEFAULT_CONE_VIEW, type ConeSeamMode } from '../types/coneView';
+import { CONE_SEAM_MODE_OPTIONS, DEFAULT_CONE_VIEW, type ConeSeamMode, type ConeShape } from '../types/coneView';
 import { CustomSelect } from './CustomSelect';
 import { SliderField } from './SliderField';
 
@@ -9,22 +9,34 @@ export function ConeViewPanel() {
   const { t } = useLanguage();
   const { coneView } = useGradientStore();
   const { setConeView } = applicationCommands;
+  const isTorus = coneView.shape === 'torus';
 
   return (
     <div className="space-y-3 text-[11px]" data-cone-view-panel>
       <div className="border border-cyan-200/25 bg-cyan-300/[0.04] p-3">
         <div className="flex items-center justify-between gap-3">
           <span className="font-display text-[10px] font-semibold uppercase tracking-[0.16em] text-cyan-100">
-            {t('cone.surface')}
+            {t(isTorus ? 'cone.torusSurface' : 'cone.surface')}
           </span>
           <span className="border border-cyan-200/25 bg-k-bg/45 px-2 py-1 font-display text-[8px] font-bold uppercase tracking-[0.13em] text-cyan-100/75">
             {t('cone.unlit')}
           </span>
         </div>
-        <p className="mt-2 text-[10px] leading-relaxed text-cream/65">{t('cone.description')}</p>
+        <p className="mt-2 text-[10px] leading-relaxed text-cream/65">{t(isTorus ? 'cone.torusDescription' : 'cone.description')}</p>
       </div>
 
       <div className="space-y-3 border border-cream/25 bg-k-surface/35 p-3">
+        <CustomSelect
+          label="Shape"
+          value={coneView.shape}
+          localizeLabel={false}
+          localizeOptions={false}
+          options={[
+            { value: 'cone', label: 'Cone' },
+            { value: 'torus', label: 'Torus · Tunnel' },
+          ]}
+          onChange={(shape) => setConeView({ shape: shape as ConeShape })}
+        />
         <CustomSelect
           label="Mapping"
           value={coneView.mappingMode}
@@ -35,12 +47,29 @@ export function ConeViewPanel() {
           ]}
           onChange={(mappingMode) => setConeView({ mappingMode: mappingMode as 'flow' | 'projection' })}
         />
-        <SliderField
-          label="Depth"
-          value={coneView.depth}
-          limitKey="cone.depth"
-          onChange={(depth) => setConeView({ depth })}
-        />
+        {isTorus ? (
+          <>
+            <SliderField
+              label="Bend"
+              value={coneView.torusBend}
+              limitKey="cone.torusBend"
+              onChange={(torusBend) => setConeView({ torusBend })}
+            />
+            <SliderField
+              label="Ring Repeat"
+              value={coneView.torusRingRepeat}
+              limitKey="cone.torusRingRepeat"
+              onChange={(torusRingRepeat) => setConeView({ torusRingRepeat })}
+            />
+          </>
+        ) : (
+          <SliderField
+            label="Depth"
+            value={coneView.depth}
+            limitKey="cone.depth"
+            onChange={(depth) => setConeView({ depth })}
+          />
+        )}
         <SliderField
           label="Rotation"
           value={coneView.rotation}
@@ -48,6 +77,7 @@ export function ConeViewPanel() {
           format={(value) => `${Math.round(value)}°`}
           onChange={(rotation) => setConeView({ rotation })}
         />
+        {!isTorus && (
         <div className="flex items-center justify-between gap-3 border border-cyan-200/20 bg-cyan-300/[0.04] px-2.5 py-2">
           <div className="min-w-0">
             <span className="block font-display text-[9px] font-semibold uppercase tracking-[0.12em] text-cyan-100">{t('cone.apexPosition')}</span>
@@ -61,6 +91,7 @@ export function ConeViewPanel() {
             {t('cone.resetPosition')}
           </button>
         </div>
+        )}
         <SliderField
           label="Texture Repeat"
           value={coneView.textureRepeat}
@@ -96,6 +127,7 @@ export function ConeViewPanel() {
           ? 'Direct Projection keeps the processed 2D frame fixed on the cone and does not advance Flow Cycles.'
           : t('cone.flowHint')}
       </p>
+      {isTorus && <p className="px-1 text-[9px] leading-relaxed text-cream/55">{t('cone.torusHint')}</p>}
       <p className="px-1 text-[9px] leading-relaxed text-cream/55">{t('cone.seamHint')}</p>
     </div>
   );

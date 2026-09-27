@@ -142,4 +142,8 @@ uniform float u_coneTextureRepeat;
 uniform vec2 u_coneTextureOffset;
 uniform float u_coneSeamBlend;
 uniform int u_coneSeamMode;
+uniform int u_coneShape;
+uniform float u_coneRoll;
+uniform float u_torusMajorRadius;
+uniform float u_torusRingRepeat;
 const float PI = 3.141592653589793;

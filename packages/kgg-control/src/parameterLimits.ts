@@ -158,6 +158,8 @@ export const PARAMETER_LIMITS = {
   'cone.apexX': { min: -2, max: 2, step: 0.01, defaultValue: 0 },
   'cone.apexY': { min: -2, max: 2, step: 0.01, defaultValue: 0 },
   'cone.seamBlend': { min: 0, max: 0.5, step: 0.01, defaultValue: 0.25 },
+  'cone.torusBend': { min: 0.05, max: 0.9, step: 0.01, defaultValue: 0.3 },
+  'cone.torusRingRepeat': { min: 1, max: 64, step: 1, defaultValue: 12, integer: true },
 
   'seamless.blendWidth': { min: 0.02, max: 0.5, step: 0.01, defaultValue: 0.25 },
 

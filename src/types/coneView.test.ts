@@ -34,7 +34,10 @@ describe('cone view configuration', () => {
       apexX: 99,
       apexY: -99,
       seamBlend: 2,
+      torusBend: 5,
+      torusRingRepeat: 7.4,
     })).toEqual({
+      shape: 'cone',
       depth: 30,
       rotation: -180,
       textureRepeat: 4,
@@ -44,7 +47,18 @@ describe('cone view configuration', () => {
       seamBlend: 0.5,
       seamMode: 'mirror',
       mappingMode: 'flow',
+      torusBend: 0.9,
+      torusRingRepeat: 7,
     });
+  });
+
+  it('keeps presets without a shape on the cone and normalizes the torus shape', () => {
+    expect(DEFAULT_CONE_VIEW.shape).toBe('cone');
+    expect(normalizeConeViewConfig({ depth: 8 }).shape).toBe('cone');
+    expect(normalizeConeViewConfig({ shape: 'torus' }).shape).toBe('torus');
+    expect(normalizeConeViewConfig({ shape: 'sphere' }).shape).toBe('cone');
+    expect(normalizeConeViewConfig({ torusBend: 0 }).torusBend).toBe(0.05);
+    expect(normalizeConeViewConfig({ torusRingRepeat: 0 }).torusRingRepeat).toBe(1);
   });
 
   it('normalizes all seam modes and falls back for legacy values', () => {

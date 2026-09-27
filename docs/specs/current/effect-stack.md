@@ -262,6 +262,8 @@ Coneは通常の`EffectStackKind`であり、順序・有効状態は`effectPipe
 
 K-GG control APIのEffectState一覧はConeを返し、enable／reorder／resetとscenario commandで同じレイヤー状態を操作できます。
 
+UI上の表示名は`3D`です。レイヤー種別`cone`、Presetキー`coneView`、パラメータキー`cone.*`は互換性のため変更しません。`coneView.shape`は`cone`（既定）と`torus`を持ち、値がない旧Presetや未知の値は`cone`として扱います。`torus`では、チューブ半径1、リング半径`1 / torusBend`のトーラスの中心線上にカメラを固定し、リング接線方向からチューブ壁に視線が半径の半分以上離れる最遠の中心線点へ向けてカメラを曲がりの内側へ向けます。画素レイはチューブ内部から壁までの距離でsphere tracingし、交点のチューブ周方向角をU、リング周方向角を`torusRingRepeat`倍したタイル座標をVとします。前方がVの正方向で、FlowではConeと同じ`offsetV = normalizedTime * flowCycles`を加えるため、正のFlow Cyclesは模様がカメラへ向かって流れ、リングが回転してトンネルを進む見た目になります。`torusRingRepeat`と`flowCycles`が整数なのでリングの継ぎ目とループ境界は連続します。Rotationは`torus`ではtexture offsetではなくカメラのロールとして曲がる方向を変えます。Texture Repeat、Seam Mode、Seam Blend、Flow／Direct Projectionは共通で、Depth、Apexは`torus`では使わずApexハンドルも表示しません。探索が上限ステップで収束しない視線は最後の到達点をヒットとして扱い、穴を描きません。
+
 ## 他領域との関係
 
 - Gradient SystemはEffect Stackの入力画像・色場と、Image Gradient Sourceの保護条件を定義します。
