@@ -142,6 +142,38 @@ function ShapeControls({ coneView, setConeView }: { coneView: ConeViewConfig; se
       </>
     );
   }
+  if (coneView.shape === 'torus') {
+    return (
+      <>
+        <SliderField
+          label="Bend"
+          value={coneView.torusBend}
+          limitKey="cone.torusBend"
+          onChange={(torusBend) => setConeView({ torusBend })}
+        />
+        <SliderField
+          label="Ring Repeat"
+          value={coneView.ringRepeat}
+          limitKey="cone.ringRepeat"
+          onChange={(ringRepeat) => setConeView({ ringRepeat })}
+        />
+        <SliderField
+          label="Twist"
+          value={coneView.torusTwist}
+          limitKey="cone.torusTwist"
+          format={(value) => value.toFixed(2)}
+          onChange={(torusTwist) => setConeView({ torusTwist })}
+        />
+        <SliderField
+          label="Spin"
+          value={coneView.spin}
+          limitKey="cone.spin"
+          format={(value) => `${Math.round(value)}`}
+          onChange={(spin) => setConeView({ spin })}
+        />
+      </>
+    );
+  }
   if (coneView.shape === 'extrusion') {
     return (
       <>
