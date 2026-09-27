@@ -39,7 +39,7 @@ describe('cone view configuration', () => {
     })).toEqual({
       shape: 'cone',
       depth: 30,
-      rotation: -180,
+      rotation: 81,
       textureRepeat: 4,
       flowCycles: 30,
       apexX: CONE_APEX_LIMIT,
@@ -49,6 +49,10 @@ describe('cone view configuration', () => {
       mappingMode: 'flow',
       torusBend: 0.9,
       torusRingRepeat: 7,
+      torusCameraX: 0,
+      torusCameraY: 0,
+      torusCameraYaw: 0,
+      torusCameraPitch: 0,
     });
   });
 
@@ -59,6 +63,18 @@ describe('cone view configuration', () => {
     expect(normalizeConeViewConfig({ shape: 'sphere' }).shape).toBe('cone');
     expect(normalizeConeViewConfig({ torusBend: 0 }).torusBend).toBe(0.05);
     expect(normalizeConeViewConfig({ torusRingRepeat: 0 }).torusRingRepeat).toBe(1);
+  });
+
+  it('wraps rotation-like angles and clamps the torus camera offset', () => {
+    expect(normalizeConeViewConfig({ rotation: -90 }).rotation).toBe(270);
+    expect(normalizeConeViewConfig({ torusCameraYaw: 390, torusCameraPitch: -30 })).toMatchObject({
+      torusCameraYaw: 30,
+      torusCameraPitch: 330,
+    });
+    expect(normalizeConeViewConfig({ torusCameraX: 2, torusCameraY: -2 })).toMatchObject({
+      torusCameraX: 0.8,
+      torusCameraY: -0.8,
+    });
   });
 
   it('normalizes all seam modes and falls back for legacy values', () => {

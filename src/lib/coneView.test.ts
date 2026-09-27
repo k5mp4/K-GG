@@ -11,7 +11,9 @@ import {
   getConeSeamModeIndex,
   getConeShapeIndex,
   getConeTextureTransform,
+  getTorusCamera,
   getTorusMajorRadius,
+  TORUS_CAMERA_MAX_OFFSET,
 } from './coneView';
 
 describe('cone view geometry', () => {
@@ -120,6 +122,18 @@ describe('torus tunnel', () => {
     expect(getTorusMajorRadius({ ...torus, torusBend: 0.25 })).toBeCloseTo(4, 10);
     expect(getTorusMajorRadius({ ...torus, torusBend: Number.NaN })).toBeCloseTo(1 / 0.3, 10);
     expect(getTorusMajorRadius({ ...torus, torusBend: 5 })).toBeGreaterThan(1);
+  });
+
+  it('converts the camera look angles and keeps the offset inside the tube', () => {
+    const camera = getTorusCamera({ ...torus, torusCameraYaw: 90, torusCameraPitch: 180, torusCameraX: 0.3, torusCameraY: -0.4 });
+    expect(camera.yawRadians).toBeCloseTo(Math.PI / 2, 10);
+    expect(camera.pitchRadians).toBeCloseTo(Math.PI, 10);
+    expect(camera.offsetX).toBeCloseTo(0.3, 10);
+    expect(camera.offsetY).toBeCloseTo(-0.4, 10);
+
+    const corner = getTorusCamera({ ...torus, torusCameraX: 0.8, torusCameraY: 0.8 });
+    expect(Math.hypot(corner.offsetX, corner.offsetY)).toBeCloseTo(TORUS_CAMERA_MAX_OFFSET, 10);
+    expect(corner.offsetX).toBeCloseTo(corner.offsetY, 10);
   });
 
   it('advances whole ring tiles over one loop so integer Flow Cycles loop seamlessly', () => {

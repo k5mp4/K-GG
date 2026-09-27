@@ -116,6 +116,33 @@ export function getTorusMajorRadius(config: ConeViewConfig): number {
   return 1 / Math.max(0.01, Math.min(0.95, safeFinite(config.torusBend, 0.3)));
 }
 
+export type TorusCamera = {
+  /** Offset inside the tube cross-section in camera-right/up tube radii, before roll. */
+  offsetX: number;
+  offsetY: number;
+  yawRadians: number;
+  pitchRadians: number;
+};
+
+/** Keeps the camera clear of the tube wall (radius 1) regardless of direction. */
+export const TORUS_CAMERA_MAX_OFFSET = 0.8;
+
+export function getTorusCamera(config: ConeViewConfig): TorusCamera {
+  let offsetX = safeFinite(config.torusCameraX, 0);
+  let offsetY = safeFinite(config.torusCameraY, 0);
+  const length = Math.hypot(offsetX, offsetY);
+  if (length > TORUS_CAMERA_MAX_OFFSET) {
+    offsetX *= TORUS_CAMERA_MAX_OFFSET / length;
+    offsetY *= TORUS_CAMERA_MAX_OFFSET / length;
+  }
+  return {
+    offsetX,
+    offsetY,
+    yawRadians: (safeFinite(config.torusCameraYaw, 0) * Math.PI) / 180,
+    pitchRadians: (safeFinite(config.torusCameraPitch, 0) * Math.PI) / 180,
+  };
+}
+
 export function getConeSeamModeIndex(mode: ConeSeamMode): number {
   return CONE_SEAM_MODE_INDEX[mode];
 }

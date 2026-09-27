@@ -39,6 +39,12 @@ export type ConeViewConfig = {
   torusBend: number;
   /** Torus only: texture tiles around the ring. Integer values keep the ring seamless. */
   torusRingRepeat: number;
+  /** Torus only: camera offset inside the tube cross-section, in tube radii (screen right/up). */
+  torusCameraX: number;
+  torusCameraY: number;
+  /** Torus only: look-direction adjustment in degrees, relative to the automatic aim into the bend. */
+  torusCameraYaw: number;
+  torusCameraPitch: number;
 };
 
 /** Normalized apex movement limit; ±2 reaches 50% of the canvas outside its edge. */
@@ -63,6 +69,10 @@ export const DEFAULT_CONE_VIEW: ConeViewConfig = {
   mappingMode: 'flow',
   torusBend: getParameterDefault('cone.torusBend'),
   torusRingRepeat: getParameterDefault('cone.torusRingRepeat'),
+  torusCameraX: getParameterDefault('cone.torusCameraX'),
+  torusCameraY: getParameterDefault('cone.torusCameraY'),
+  torusCameraYaw: getParameterDefault('cone.torusCameraYaw'),
+  torusCameraPitch: getParameterDefault('cone.torusCameraPitch'),
 };
 
 function normalizeSeamMode(value: unknown): ConeSeamMode {
@@ -87,5 +97,9 @@ export function normalizeConeViewConfig(value: unknown): ConeViewConfig {
     mappingMode: raw.mappingMode === 'projection' ? 'projection' : DEFAULT_CONE_VIEW.mappingMode,
     torusBend: clampParameter(raw.torusBend, DEFAULT_CONE_VIEW.torusBend, getParameterLimit('cone.torusBend')),
     torusRingRepeat: clampParameter(raw.torusRingRepeat, DEFAULT_CONE_VIEW.torusRingRepeat, getParameterLimit('cone.torusRingRepeat')),
+    torusCameraX: clampParameter(raw.torusCameraX, DEFAULT_CONE_VIEW.torusCameraX, getParameterLimit('cone.torusCameraX')),
+    torusCameraY: clampParameter(raw.torusCameraY, DEFAULT_CONE_VIEW.torusCameraY, getParameterLimit('cone.torusCameraY')),
+    torusCameraYaw: clampParameter(raw.torusCameraYaw, DEFAULT_CONE_VIEW.torusCameraYaw, getParameterLimit('cone.torusCameraYaw')),
+    torusCameraPitch: clampParameter(raw.torusCameraPitch, DEFAULT_CONE_VIEW.torusCameraPitch, getParameterLimit('cone.torusCameraPitch')),
   };
 }

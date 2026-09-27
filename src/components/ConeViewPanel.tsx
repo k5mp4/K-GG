@@ -71,12 +71,45 @@ export function ConeViewPanel() {
           />
         )}
         <SliderField
-          label="Rotation"
+          label={isTorus ? 'Camera Roll' : 'Rotation'}
           value={coneView.rotation}
           limitKey="cone.rotation"
+          control="angle"
           format={(value) => `${Math.round(value)}°`}
           onChange={(rotation) => setConeView({ rotation })}
         />
+        {isTorus && (
+          <>
+            <SliderField
+              label="Camera Yaw"
+              value={coneView.torusCameraYaw}
+              limitKey="cone.torusCameraYaw"
+              control="angle"
+              format={(value) => `${Math.round(value)}°`}
+              onChange={(torusCameraYaw) => setConeView({ torusCameraYaw })}
+            />
+            <SliderField
+              label="Camera Pitch"
+              value={coneView.torusCameraPitch}
+              limitKey="cone.torusCameraPitch"
+              control="angle"
+              format={(value) => `${Math.round(value)}°`}
+              onChange={(torusCameraPitch) => setConeView({ torusCameraPitch })}
+            />
+            <SliderField
+              label="Camera X"
+              value={coneView.torusCameraX}
+              limitKey="cone.torusCameraX"
+              onChange={(torusCameraX) => setConeView({ torusCameraX })}
+            />
+            <SliderField
+              label="Camera Y"
+              value={coneView.torusCameraY}
+              limitKey="cone.torusCameraY"
+              onChange={(torusCameraY) => setConeView({ torusCameraY })}
+            />
+          </>
+        )}
         {!isTorus && (
         <div className="flex items-center justify-between gap-3 border border-cyan-200/20 bg-cyan-300/[0.04] px-2.5 py-2">
           <div className="min-w-0">

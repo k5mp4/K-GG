@@ -152,27 +152,47 @@ vec2 torusMappedUv(vec2 globalUv, out bool hitTorus) {
   float aspect = u_fullResolution.x / max(u_fullResolution.y, 1.0);
   vec2 ndc = globalUv * 2.0 - 1.0;
   vec2 screenRay = vec2(ndc.x * aspect, ndc.y) * u_coneTangentHalfFov;
+  // Camera orientation: user pitch and yaw in the camera frame, then roll
+  // around the forward axis, then the automatic aim into the bend. Applying
+  // the user look first keeps yaw horizontal and pitch vertical on screen
+  // whatever the roll is.
+  vec3 cameraRay = vec3(screenRay, -1.0);
+  float pitchCos = cos(u_torusCameraPitch);
+  float pitchSin = sin(u_torusCameraPitch);
+  cameraRay = vec3(
+    cameraRay.x,
+    cameraRay.y * pitchCos - cameraRay.z * pitchSin,
+    cameraRay.y * pitchSin + cameraRay.z * pitchCos
+  );
+  float lookCos = cos(u_torusCameraYaw);
+  float lookSin = sin(u_torusCameraYaw);
+  cameraRay = vec3(
+    cameraRay.x * lookCos + cameraRay.z * lookSin,
+    cameraRay.y,
+    -cameraRay.x * lookSin + cameraRay.z * lookCos
+  );
   float rollCos = cos(u_coneRoll);
   float rollSin = sin(u_coneRoll);
-  screenRay = vec2(
-    screenRay.x * rollCos - screenRay.y * rollSin,
-    screenRay.x * rollSin + screenRay.y * rollCos
-  );
+  mat2 roll = mat2(rollCos, rollSin, -rollSin, rollCos);
+  cameraRay.xy = roll * cameraRay.xy;
   float majorRadius = max(u_torusMajorRadius, 1.05);
   float yaw = acos(clamp(1.0 - 0.5 / majorRadius, -1.0, 1.0));
   float yawCos = cos(yaw);
   float yawSin = sin(yaw);
   vec3 rayDirection = normalize(vec3(
-    screenRay.x * yawCos - yawSin,
-    screenRay.y,
-    -screenRay.x * yawSin - yawCos
+    cameraRay.x * yawCos + cameraRay.z * yawSin,
+    cameraRay.y,
+    -cameraRay.x * yawSin + cameraRay.z * yawCos
   ));
+  // The camera moves inside the tube cross-section at its ring position, so
+  // the offset follows the roll but not the look direction.
+  vec3 rayOrigin = vec3(roll * u_torusCameraOffset, 0.0);
   // Sphere tracing from inside the tube: the interior distance is the exact
   // distance to the wall, so each step stays inside and converges on the hit.
   float distance = 0.0;
   float wallDistance = 1.0;
   for (int i = 0; i < 96; i++) {
-    wallDistance = torusInteriorDistance(rayDirection * distance, majorRadius);
+    wallDistance = torusInteriorDistance(rayOrigin + rayDirection * distance, majorRadius);
     if (wallDistance < 0.0005 * (1.0 + distance)) break;
     distance += wallDistance;
   }
@@ -180,7 +200,7 @@ vec2 torusMappedUv(vec2 globalUv, out bool hitTorus) {
   // rays near the vanishing point may run out of steps; their last point is
   // already close to the wall, so keep it instead of drawing a hole.
   hitTorus = true;
-  vec3 q = rayDirection * distance + vec3(majorRadius, 0.0, 0.0);
+  vec3 q = rayOrigin + rayDirection * distance + vec3(majorRadius, 0.0, 0.0);
   // The forward (-Z) direction is the positive ring angle.
   float ringAngle = atan(-q.z, q.x);
   float tubeAngle = atan(q.y, length(q.xz) - majorRadius);

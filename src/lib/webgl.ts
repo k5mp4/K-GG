@@ -89,6 +89,7 @@ import {
   getConeRollRadians,
   getConeShapeIndex,
   getConeTextureTransform,
+  getTorusCamera,
   getTorusMajorRadius,
 } from './coneView';
 
@@ -2488,6 +2489,10 @@ function drawPostprocessPass(
       gl.uniform1f(ctx.postprocessUniforms.u_coneRoll, getConeRollRadians(normalizedConeView));
       gl.uniform1f(ctx.postprocessUniforms.u_torusMajorRadius, getTorusMajorRadius(normalizedConeView));
       gl.uniform1f(ctx.postprocessUniforms.u_torusRingRepeat, normalizedConeView.torusRingRepeat);
+      const torusCamera = getTorusCamera(normalizedConeView);
+      gl.uniform2f(ctx.postprocessUniforms.u_torusCameraOffset, torusCamera.offsetX, torusCamera.offsetY);
+      gl.uniform1f(ctx.postprocessUniforms.u_torusCameraYaw, torusCamera.yawRadians);
+      gl.uniform1f(ctx.postprocessUniforms.u_torusCameraPitch, torusCamera.pitchRadians);
     }
   setUniform1i(gl, ctx.postprocessUniforms.u_noiseEnabled, noiseDistortion.enabled ? 1 : 0);
   setUniform1i(gl, ctx.postprocessUniforms.u_noiseType, NOISE_TYPE_MAP[noiseDistortion.type]);
