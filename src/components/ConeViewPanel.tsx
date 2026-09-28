@@ -108,19 +108,6 @@ function ShapeControls({ coneView, setConeView }: { coneView: ConeViewConfig; se
           limitKey="cone.ringRepeat"
           onChange={(ringRepeat) => setConeView({ ringRepeat })}
         />
-        <SliderField
-          label="Spin"
-          value={coneView.spin}
-          limitKey="cone.spin"
-          format={(value) => `${Math.round(value)}`}
-          onChange={(spin) => setConeView({ spin })}
-        />
-        <SliderField
-          label="Distance"
-          value={coneView.depth}
-          limitKey="cone.depth"
-          onChange={(depth) => setConeView({ depth })}
-        />
       </>
     );
   }
