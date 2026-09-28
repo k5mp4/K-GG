@@ -306,6 +306,15 @@ vec2 coneMappedUv(vec2 globalUv, out bool hitCone) {
 }
 
 // ---------------------------------------------------------------------------
+// Rotation about the vertical axis, used to carry the Torus camera around its ring.
+
+vec3 rotateAboutY(vec3 value, float angle) {
+  float c = cos(angle);
+  float s = sin(angle);
+  return vec3(value.x * c + value.z * s, value.y, -value.x * s + value.z * c);
+}
+
+// ---------------------------------------------------------------------------
 // Torus tunnel: the camera sits on the ring's center line inside a tube of
 // radius 1 and looks along the ring tangent. The ring lies in the XZ plane
 // with its center at (-R, 0, 0), so the tube bends toward -X. The camera aims
@@ -314,6 +323,7 @@ vec2 coneMappedUv(vec2 globalUv, out bool hitCone) {
 // sagitta R * (1 - cos(aim)) = 0.5. Looking backward, the tunnel behind bends
 // the same way, so the aim flips; looking sideways needs none. Scaling by
 // cos(yaw) keeps the far end in view while the yaw turns a full circle.
+// Flow carries the camera forward along the ring, one lap per Flow Cycle.
 
 float torusInteriorDistance(vec3 p, float majorRadius) {
   vec3 q = p + vec3(majorRadius, 0.0, 0.0);
@@ -344,14 +354,22 @@ ThreeDHit torusHit(vec3 localRay) {
   // A ray that starts inside the closed tube always meets the wall. Grazing
   // rays near the vanishing point may run out of steps; their last point is
   // already close to the wall, so keep it instead of drawing a hole.
-  vec3 position = rayOrigin + rayDirection * distance;
-  vec3 q = position + vec3(majorRadius, 0.0, 0.0);
+  // The tube is symmetric about the ring axis, so the march runs with the
+  // camera at ring angle 0 and the hit is then turned to the camera's actual
+  // ring angle. Rotating by a positive angle moves toward -Z, i.e. forward.
+  float cameraRingAngle = u_threeDTravel * TAU;
+  vec3 q = rotateAboutY(rayOrigin + rayDirection * distance + vec3(majorRadius, 0.0, 0.0), cameraRingAngle);
+  vec3 position = q - vec3(majorRadius, 0.0, 0.0);
+  rayDirection = rotateAboutY(rayDirection, cameraRingAngle);
+  g_cameraRight = rotateAboutY(g_cameraRight, cameraRingAngle);
+  g_cameraUp = rotateAboutY(g_cameraUp, cameraRingAngle);
+  g_cameraForward = rotateAboutY(g_cameraForward, cameraRingAngle);
   vec2 ringPoint = normalize(q.xz) * majorRadius;
   // The forward (-Z) direction is the positive ring angle.
   float ringTurns = atan(-q.z, q.x) / TAU;
   float tubeAngle = atan(q.y, length(q.xz) - majorRadius);
-  // Twist turns the texture around the tube along the ring. Combined with the
-  // Flow offset on v, the pattern spirals toward the camera like a vortex.
+  // Twist turns the texture around the tube along the ring. As the camera
+  // travels, the pattern spirals toward it like a vortex.
   result.hit = true;
   result.position = position;
   result.normal = normalize(vec3(ringPoint.x, 0.0, ringPoint.y) - q);
@@ -610,20 +628,12 @@ ThreeDHit extrusionHit(vec3 localRay) {
 }
 
 // ---------------------------------------------------------------------------
-// Rotation about the vertical axis, used to turn whole scenes.
-
-vec3 rotateAboutY(vec3 value, float angle) {
-  float c = cos(angle);
-  float s = sin(angle);
-  return vec3(value.x * c + value.z * s, value.y, -value.x * s + value.z * c);
-}
-
-// ---------------------------------------------------------------------------
 // Ribbon: a flat band swept around a unit circle in the XZ plane. Its cross
 // section turns by Half Twists / 2 turns per revolution, so an odd count
 // makes a Mobius band; the rectangle's symmetry keeps the surface continuous
 // where the ring angle wraps. The texture runs along the band in Ring Repeat
-// tiles and slides with Flow; Spin turns the whole band per loop.
+// tiles. The camera rides just above the band, following its twist, and Flow
+// carries it along the band.
 
 float ribbonDistance(vec3 position, out vec2 bandUv) {
   float ringAngle = atan(position.z, position.x);
@@ -641,33 +651,38 @@ float ribbonDistance(vec3 position, out vec2 bandUv) {
 
 ThreeDHit ribbonHit(vec3 localRay) {
   ThreeDHit result = threeDMiss();
-  float elevation = 0.45;
-  float cameraDistance = max(u_threeDDistance * 0.8, 1.6);
-  vec3 cameraPosition = vec3(0.0, sin(elevation), cos(elevation)) * cameraDistance;
-  vec3 forward = normalize(-cameraPosition);
-  vec3 up = vec3(0.0, 1.0, 0.0);
-  threeDSetCameraBasis(forward, up);
-  float angle = -u_threeDTravel * TAU;
-  vec3 right = normalize(cross(forward, up));
-  vec2 offset = threeDRollMatrix() * u_cameraOffset * cameraDistance * 0.3;
-  vec3 rayDirection = rotateAboutY(threeDWorldDirection(localRay, forward, up), angle);
-  vec3 rayOrigin = rotateAboutY(cameraPosition + right * offset.x + cross(right, forward) * offset.y, angle);
-  g_cameraRight = rotateAboutY(g_cameraRight, angle);
-  g_cameraUp = rotateAboutY(g_cameraUp, angle);
-  g_cameraForward = rotateAboutY(g_cameraForward, angle);
-  rayOrigin += g_cameraForward * u_cameraDolly * cameraDistance * 0.5;
+  float halfWidth = max(u_ribbonWidth, 0.01);
+  // One Flow Cycle is one closed ride: a Mobius band brings the camera back
+  // to the same side only after two laps. Dolly steps along the band.
+  float laps = mod(u_ribbonHalfTwists, 2.0) > 0.5 ? 2.0 : 1.0;
+  float ringAngle = (u_threeDTravel * laps + u_cameraDolly * 0.08) * TAU;
+  // The band frame at the camera, matching the section rotation in
+  // ribbonDistance: `across` spans the width, `bandNormal` faces off the band.
+  vec3 radial = vec3(cos(ringAngle), 0.0, sin(ringAngle));
+  vec3 tangent = vec3(-sin(ringAngle), 0.0, cos(ringAngle));
+  float twist = u_ribbonHalfTwists * 0.5 * ringAngle;
+  vec3 across = cos(twist) * radial + sin(twist) * vec3(0.0, 1.0, 0.0);
+  vec3 bandNormal = -sin(twist) * radial + cos(twist) * vec3(0.0, 1.0, 0.0);
+  // Aim slightly into the ring's bend so the band ahead stays in view.
+  float aim = 0.3;
+  vec3 forward = normalize(tangent * cos(aim) - radial * sin(aim));
+  threeDSetCameraBasis(forward, bandNormal);
+  vec3 rayDirection = threeDWorldDirection(localRay, forward, bandNormal);
+  // Camera X moves across the width, Camera Y changes the ride height.
+  vec2 offset = threeDRollMatrix() * u_cameraOffset;
+  vec3 rayOrigin = radial + across * offset.x * halfWidth + bandNormal * (0.15 + 0.35 * offset.y);
   result.rayDirection = rayDirection;
   float distance = 0.0;
   bool hit = false;
   vec2 bandUv = vec2(0.0);
-  for (int i = 0; i < 180; i++) {
+  for (int i = 0; i < 220; i++) {
     float surfaceDistance = ribbonDistance(rayOrigin + rayDirection * distance, bandUv);
-    if (surfaceDistance < 0.0004) {
+    if (surfaceDistance < 0.0004 * (1.0 + distance)) {
       hit = true;
       break;
     }
     distance += surfaceDistance;
-    if (distance > cameraDistance + 3.0) break;
+    if (distance > 8.0) break;
   }
   if (!hit) return result;
   vec3 position = rayOrigin + rayDirection * distance;
