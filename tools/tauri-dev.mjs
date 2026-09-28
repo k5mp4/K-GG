@@ -1,5 +1,6 @@
 import { spawn, spawnSync } from 'node:child_process';
 import { existsSync } from 'node:fs';
+import { createRequire } from 'node:module';
 import { resolve } from 'node:path';
 import { createKggViteEnvironment } from './dev-local-env.mjs';
 
@@ -14,7 +15,9 @@ if (!existsSync(figmaConnectorBundle)) {
   }
 }
 
-const tauriCli = resolve('node_modules/@tauri-apps/cli/tauri.js');
+// Resolve through Node's lookup instead of ./node_modules: a git worktree
+// under .claude/worktrees has no install of its own and uses the parent's.
+const tauriCli = createRequire(import.meta.url).resolve('@tauri-apps/cli/tauri.js');
 const tauri = spawn(process.execPath, [tauriCli, 'dev', ...process.argv.slice(2)], {
   stdio: 'inherit',
   env: createKggViteEnvironment(),
