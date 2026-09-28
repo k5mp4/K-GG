@@ -77,6 +77,28 @@ describe('cone view configuration', () => {
       extrudeGap: 0.15,
       ribbonHalfTwists: 1,
       ribbonWidth: 0.25,
+      ringsPattern: 'corridor',
+      ringsMapping: 'wrap',
+      ringsPerTile: 8,
+      ringsSpacing: 1,
+      ringsThickness: 0.12,
+      ringsDepth: 0.06,
+      ringsTwist: 0,
+      ringsPulse: 0,
+      ringsBeats: 4,
+      ringsAmount: 0.5,
+      fieldGeometry: 'mix',
+      fieldRender: 'solid',
+      fieldLoopCells: 16,
+      fieldDensity: 0.3,
+      fieldSize: 0.75,
+      fieldClearance: 1.5,
+      fieldSpread: 5,
+      fieldArms: 0,
+      fieldTwist: 1,
+      fieldArmWidth: 0.35,
+      fieldWire: 0.03,
+      fieldVariation: 1,
     });
   });
 
@@ -142,6 +164,78 @@ describe('cone view configuration', () => {
       ribbonHalfTwists: 3,
       ribbonWidth: 0.6,
     });
+  });
+
+  it('normalizes the square ring settings', () => {
+    expect(normalizeConeViewConfig({
+      shape: 'rings',
+      ringsPattern: 'tumble',
+      ringsMapping: 'picture',
+      ringsPerTile: 6.6,
+      ringsSpacing: 99,
+      ringsThickness: 0,
+      ringsDepth: 5,
+      ringsTwist: -90,
+      ringsPulse: 2,
+      ringsBeats: 3.4,
+      ringsAmount: -1,
+    })).toMatchObject({
+      shape: 'rings',
+      ringsPattern: 'tumble',
+      ringsMapping: 'picture',
+      ringsPerTile: 7,
+      ringsSpacing: 4,
+      ringsThickness: 0.02,
+      ringsDepth: 1,
+      ringsTwist: -45,
+      ringsPulse: 1,
+      ringsBeats: 3,
+      ringsAmount: 0,
+    });
+    expect(normalizeConeViewConfig({ ringsPattern: 'spiral', ringsMapping: 'cube' })).toMatchObject({
+      ringsPattern: 'corridor',
+      ringsMapping: 'wrap',
+    });
+  });
+
+  it('normalizes the geometry field settings', () => {
+    expect(normalizeConeViewConfig({
+      shape: 'field',
+      fieldGeometry: 'prism',
+      fieldRender: 'wire',
+      fieldLoopCells: 99.4,
+      fieldDensity: 0,
+      fieldSize: 3,
+      fieldClearance: 0,
+      fieldSpread: 40,
+      fieldWire: 1,
+      fieldVariation: -2,
+    })).toMatchObject({
+      shape: 'field',
+      fieldGeometry: 'prism',
+      fieldRender: 'wire',
+      fieldLoopCells: 64,
+      fieldDensity: 0.05,
+      fieldSize: 1,
+      fieldClearance: 1,
+      fieldSpread: 12,
+      fieldWire: 0.12,
+      fieldVariation: 0,
+    });
+    expect(normalizeConeViewConfig({ fieldGeometry: 'teapot', fieldRender: 'points' })).toMatchObject({
+      fieldGeometry: 'mix',
+      fieldRender: 'solid',
+    });
+    expect(normalizeConeViewConfig({ fieldGeometry: 'model' }).fieldGeometry).toBe('model');
+  });
+
+  it('rounds the spiral arms and twist to whole numbers', () => {
+    expect(normalizeConeViewConfig({ fieldArms: 2.6, fieldTwist: -2.4, fieldArmWidth: 3 })).toMatchObject({
+      fieldArms: 3,
+      fieldTwist: -2,
+      fieldArmWidth: 1,
+    });
+    expect(normalizeConeViewConfig({ fieldArms: 20, fieldTwist: 20 })).toMatchObject({ fieldArms: 8, fieldTwist: 8 });
   });
 
   it('clamps the camera lens settings', () => {

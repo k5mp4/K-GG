@@ -18,6 +18,7 @@ import { useLanguage } from '../i18n/LanguageProvider';
 import { WebGLPerformancePanel } from './WebGLPerformancePanel';
 import type { KggControlProjectAdapter, KggControlUiAdapter } from '../lib/kggControlRuntime';
 import type { LatestState } from '../types/latestState';
+import { FIELD_MODEL_CHANGED_EVENT } from '../lib/fieldModelRuntime';
 
 
 type Props = {
@@ -100,7 +101,12 @@ export function GradientCanvas({ width = 800, height = 800, animLoopRef, seekVer
       });
     };
     window.addEventListener('kgg:video-motion-frame', handleVideoMotionFrame);
-    return () => window.removeEventListener('kgg:video-motion-frame', handleVideoMotionFrame);
+    // A newly loaded Geometry Field model redraws the current frame the same way.
+    window.addEventListener(FIELD_MODEL_CHANGED_EVENT, handleVideoMotionFrame);
+    return () => {
+      window.removeEventListener('kgg:video-motion-frame', handleVideoMotionFrame);
+      window.removeEventListener(FIELD_MODEL_CHANGED_EVENT, handleVideoMotionFrame);
+    };
   }, [animLoopRef, latestRef, webglRef]);
 
   useEffect(() => () => {

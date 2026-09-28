@@ -1,5 +1,6 @@
-import type { ReactNode } from 'react';
+import { useRef, useState, useSyncExternalStore, type ChangeEvent, type ReactNode } from 'react';
 import { useLanguage } from '../i18n/LanguageProvider';
+import { getFieldModel, setFieldModel, subscribeFieldModel } from '../lib/fieldModelRuntime';
 import type { MessageKey } from '../i18n/messages';
 import { useGradientStore } from '../store/gradientStore';
 import { applicationCommands } from '../application/commands';
@@ -10,14 +11,22 @@ import {
   CONE_SEAM_MODE_OPTIONS,
   CONE_SHAPE_OPTIONS,
   DEFAULT_CONE_VIEW,
+  FIELD_GEOMETRY_OPTIONS,
+  FIELD_RENDER_OPTIONS,
   LATTICE_TYPE_OPTIONS,
+  RINGS_MAPPING_OPTIONS,
+  RINGS_PATTERN_OPTIONS,
   THREE_D_PROJECTION_OPTIONS,
   THREE_D_SURFACE_MAPPING_OPTIONS,
   type CameraWigglePreset,
   type ConeSeamMode,
   type ConeShape,
   type ConeViewConfig,
+  type FieldGeometry,
+  type FieldRender,
   type LatticeType,
+  type RingsMapping,
+  type RingsPattern,
   type ThreeDProjection,
   type ThreeDSurfaceMapping,
 } from '../types/coneView';
@@ -38,6 +47,14 @@ const SHAPE_TEXT: Record<ConeShape, { title: MessageKey; description: MessageKey
   terrain: { title: 'cone.terrainSurface', description: 'cone.terrainDescription', hint: 'cone.terrainHint' },
   extrusion: { title: 'cone.extrusionSurface', description: 'cone.extrusionDescription', hint: 'cone.extrusionHint' },
   ribbon: { title: 'cone.ribbonSurface', description: 'cone.ribbonDescription', hint: 'cone.ribbonHint' },
+  rings: { title: 'cone.ringsSurface', description: 'cone.ringsDescription', hint: 'cone.ringsHint' },
+  field: { title: 'cone.fieldSurface', description: 'cone.fieldDescription', hint: 'cone.fieldHint' },
+};
+
+/** Serpent bends its path and Tumble scatters its frames with the same amount. */
+const RINGS_AMOUNT_LABEL: Partial<Record<RingsPattern, string>> = {
+  serpent: 'Curve',
+  tumble: 'Scatter',
 };
 
 function toCameraPositionInput(x: number, y: number): [number, number] {
@@ -58,6 +75,68 @@ function Section({ title, children }: { title: string; children: ReactNode }) {
 }
 
 type SetConeView = (value: Partial<ConeViewConfig>) => void;
+
+/** Loads a .glb as the Geometry Field model; the model stays runtime-only. */
+function FieldModelLoader({ setConeView }: { setConeView: SetConeView }) {
+  const { t } = useLanguage();
+  const model = useSyncExternalStore(subscribeFieldModel, getFieldModel, getFieldModel);
+  const inputRef = useRef<HTMLInputElement>(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  async function handleChange(event: ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0];
+    event.currentTarget.value = '';
+    if (!file) return;
+    setError(null);
+    setLoading(true);
+    try {
+      // The glTF loader is only fetched when a model is actually loaded.
+      const { loadFieldModelFile } = await import('../lib/loadFieldModel');
+      await loadFieldModelFile(file);
+      setConeView({ fieldGeometry: 'model' });
+    } catch (cause) {
+      console.error('Geometry Field model load failed:', cause);
+      setError(cause instanceof Error ? cause.message : String(cause));
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  return (
+    <div className="space-y-1.5 border border-cream/20 bg-k-bg/30 px-2.5 py-2" data-field-model-loader>
+      <div className="flex items-center justify-between gap-2">
+        <span className="font-display text-[9px] font-semibold uppercase tracking-[0.12em] text-cream/70">Model</span>
+        <div className="flex items-center gap-2">
+          {model && (
+            <button
+              type="button"
+              onClick={() => setFieldModel(null)}
+              className="px-2 py-0.5 text-[10px] text-red-400 transition-colors hover:text-red-300 bg-red-900/30 hover:bg-red-900/50"
+            >
+              {t('cone.fieldModelClear')}
+            </button>
+          )}
+          <button
+            type="button"
+            onClick={() => inputRef.current?.click()}
+            disabled={loading}
+            className="px-2 py-0.5 text-[10px] text-cream transition-all hover:text-k-text bg-cream/10 hover:bg-cream/20 disabled:opacity-50"
+          >
+            {loading ? t('cone.fieldModelLoading') : t('cone.fieldModelLoad')}
+          </button>
+          <input ref={inputRef} type="file" accept=".glb,model/gltf-binary" onChange={handleChange} className="hidden" />
+        </div>
+      </div>
+      <p className="truncate text-[9px] leading-relaxed text-cream/55">
+        {model
+          ? t('cone.fieldModelStatus', { name: model.name, count: model.triangleCount.toLocaleString() })
+          : t('cone.fieldModelEmpty')}
+      </p>
+      {error && <p className="text-[9px] leading-relaxed text-red-300">{t('cone.fieldModelFailed', { reason: error })}</p>}
+    </div>
+  );
+}
 
 function ShapeControls({ coneView, setConeView }: { coneView: ConeViewConfig; setConeView: SetConeView }) {
   if (coneView.shape === 'lattice') {
@@ -107,6 +186,195 @@ function ShapeControls({ coneView, setConeView }: { coneView: ConeViewConfig; se
           value={coneView.ringRepeat}
           limitKey="cone.ringRepeat"
           onChange={(ringRepeat) => setConeView({ ringRepeat })}
+        />
+      </>
+    );
+  }
+  if (coneView.shape === 'rings') {
+    const amountLabel = RINGS_AMOUNT_LABEL[coneView.ringsPattern];
+    return (
+      <>
+        <CustomSelect
+          label="Pattern"
+          value={coneView.ringsPattern}
+          localizeLabel={false}
+          localizeOptions={false}
+          options={[...RINGS_PATTERN_OPTIONS]}
+          onChange={(ringsPattern) => setConeView({ ringsPattern: ringsPattern as RingsPattern })}
+        />
+        {amountLabel && (
+          <SliderField
+            label={amountLabel}
+            value={coneView.ringsAmount}
+            limitKey="cone.ringsAmount"
+            format={(value) => `${Math.round(value * 100)}%`}
+            onChange={(ringsAmount) => setConeView({ ringsAmount })}
+          />
+        )}
+        <CustomSelect
+          label="Ring Mapping"
+          value={coneView.ringsMapping}
+          localizeLabel={false}
+          localizeOptions={false}
+          options={[...RINGS_MAPPING_OPTIONS]}
+          onChange={(ringsMapping) => setConeView({ ringsMapping: ringsMapping as RingsMapping })}
+        />
+        <SliderField
+          label="Rings per Tile"
+          value={coneView.ringsPerTile}
+          limitKey="cone.ringsPerTile"
+          format={(value) => `${Math.round(value)}`}
+          onChange={(ringsPerTile) => setConeView({ ringsPerTile })}
+        />
+        <SliderField
+          label="Spacing"
+          value={coneView.ringsSpacing}
+          limitKey="cone.ringsSpacing"
+          onChange={(ringsSpacing) => setConeView({ ringsSpacing })}
+        />
+        <SliderField
+          label="Thickness"
+          value={coneView.ringsThickness}
+          limitKey="cone.ringsThickness"
+          format={(value) => `${Math.round(value * 100)}%`}
+          onChange={(ringsThickness) => setConeView({ ringsThickness })}
+        />
+        <SliderField
+          label="Frame Depth"
+          value={coneView.ringsDepth}
+          limitKey="cone.ringsDepth"
+          onChange={(ringsDepth) => setConeView({ ringsDepth })}
+        />
+        <SliderField
+          label="Twist"
+          value={coneView.ringsTwist}
+          limitKey="cone.ringsTwist"
+          format={(value) => `${value > 0 ? '+' : ''}${value.toFixed(1)}°`}
+          onChange={(ringsTwist) => setConeView({ ringsTwist })}
+        />
+        <SliderField
+          label="Spin"
+          value={coneView.spin}
+          limitKey="cone.spin"
+          format={(value) => `${Math.round(value)}`}
+          onChange={(spin) => setConeView({ spin })}
+        />
+        <SliderField
+          label="Pulse"
+          value={coneView.ringsPulse}
+          limitKey="cone.ringsPulse"
+          format={(value) => `${Math.round(value * 100)}%`}
+          onChange={(ringsPulse) => setConeView({ ringsPulse })}
+        />
+        <SliderField
+          label="Beats"
+          value={coneView.ringsBeats}
+          limitKey="cone.ringsBeats"
+          disabled={coneView.ringsPulse === 0}
+          format={(value) => `${Math.round(value)}`}
+          onChange={(ringsBeats) => setConeView({ ringsBeats })}
+        />
+      </>
+    );
+  }
+  if (coneView.shape === 'field') {
+    const percent = (value: number) => `${Math.round(value * 100)}%`;
+    return (
+      <>
+        <CustomSelect
+          label="Geometry"
+          value={coneView.fieldGeometry}
+          localizeLabel={false}
+          localizeOptions={false}
+          options={[...FIELD_GEOMETRY_OPTIONS]}
+          onChange={(fieldGeometry) => setConeView({ fieldGeometry: fieldGeometry as FieldGeometry })}
+        />
+        <FieldModelLoader setConeView={setConeView} />
+        <CustomSelect
+          label="Render"
+          value={coneView.fieldRender}
+          localizeLabel={false}
+          localizeOptions={false}
+          options={[...FIELD_RENDER_OPTIONS]}
+          onChange={(fieldRender) => setConeView({ fieldRender: fieldRender as FieldRender })}
+        />
+        <SliderField
+          label="Wire Width"
+          value={coneView.fieldWire}
+          limitKey="cone.fieldWire"
+          disabled={coneView.fieldRender === 'solid'}
+          format={(value) => value.toFixed(3)}
+          onChange={(fieldWire) => setConeView({ fieldWire })}
+        />
+        <SliderField
+          label="Loop Length"
+          value={coneView.fieldLoopCells}
+          limitKey="cone.fieldLoopCells"
+          format={(value) => `${Math.round(value)}`}
+          onChange={(fieldLoopCells) => setConeView({ fieldLoopCells })}
+        />
+        <SliderField
+          label="Density"
+          value={coneView.fieldDensity}
+          limitKey="cone.fieldDensity"
+          format={percent}
+          onChange={(fieldDensity) => setConeView({ fieldDensity })}
+        />
+        <SliderField
+          label="Size"
+          value={coneView.fieldSize}
+          limitKey="cone.fieldSize"
+          format={percent}
+          onChange={(fieldSize) => setConeView({ fieldSize })}
+        />
+        <SliderField
+          label="Clearance"
+          value={coneView.fieldClearance}
+          limitKey="cone.fieldClearance"
+          onChange={(fieldClearance) => setConeView({ fieldClearance })}
+        />
+        <SliderField
+          label="Spread"
+          value={coneView.fieldSpread}
+          limitKey="cone.fieldSpread"
+          onChange={(fieldSpread) => setConeView({ fieldSpread })}
+        />
+        <SliderField
+          label="Arms"
+          value={coneView.fieldArms}
+          limitKey="cone.fieldArms"
+          format={(value) => (Math.round(value) === 0 ? 'Off' : `${Math.round(value)}`)}
+          onChange={(fieldArms) => setConeView({ fieldArms })}
+        />
+        <SliderField
+          label="Twist"
+          value={coneView.fieldTwist}
+          limitKey="cone.fieldTwist"
+          disabled={coneView.fieldArms === 0}
+          format={(value) => `${Math.round(value)}`}
+          onChange={(fieldTwist) => setConeView({ fieldTwist })}
+        />
+        <SliderField
+          label="Arm Width"
+          value={coneView.fieldArmWidth}
+          limitKey="cone.fieldArmWidth"
+          disabled={coneView.fieldArms === 0}
+          format={percent}
+          onChange={(fieldArmWidth) => setConeView({ fieldArmWidth })}
+        />
+        <SliderField
+          label="Spin"
+          value={coneView.spin}
+          limitKey="cone.spin"
+          format={(value) => `${Math.round(value)}`}
+          onChange={(spin) => setConeView({ spin })}
+        />
+        <SliderField
+          label="Variation"
+          value={coneView.fieldVariation}
+          limitKey="cone.fieldVariation"
+          format={percent}
+          onChange={(fieldVariation) => setConeView({ fieldVariation })}
         />
       </>
     );

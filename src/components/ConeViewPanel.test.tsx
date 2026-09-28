@@ -43,6 +43,30 @@ describe('ConeViewPanel shape controls', () => {
     expect(hasLabel(markup, 'Camera Roll')).toBe(true);
   });
 
+  it('shows the Square Rings controls with the pattern amount only where it applies', () => {
+    const markup = renderShape('rings');
+    for (const label of ['Pattern', 'Ring Mapping', 'Rings per Tile', 'Spacing', 'Thickness', 'Frame Depth', 'Twist', 'Spin', 'Pulse', 'Beats']) {
+      expect(hasLabel(markup, label), label).toBe(true);
+    }
+    // The default Corridor has no Curve or Scatter.
+    expect(hasLabel(markup, 'Curve')).toBe(false);
+    expect(hasLabel(markup, 'Scatter')).toBe(false);
+    expect(hasLabel(markup, 'Depth')).toBe(false);
+    expect(hasLabel(markup, 'Camera Roll')).toBe(true);
+  });
+
+  it('shows the Geometry Field controls', () => {
+    const markup = renderShape('field');
+    for (const label of ['Geometry', 'Render', 'Wire Width', 'Loop Length', 'Density', 'Size', 'Clearance', 'Spread', 'Arms', 'Twist', 'Arm Width', 'Spin', 'Variation']) {
+      expect(hasLabel(markup, label), label).toBe(true);
+    }
+    // The GLB loader is offered with a .glb file input.
+    expect(markup).toContain('data-field-model-loader');
+    expect(markup).toContain('accept=".glb,model/gltf-binary"');
+    expect(hasLabel(markup, 'Depth')).toBe(false);
+    expect(hasLabel(markup, 'Camera Roll')).toBe(true);
+  });
+
   it('keeps Depth and Rotation for the Cone', () => {
     const markup = renderShape('cone');
     expect(hasLabel(markup, 'Depth')).toBe(true);

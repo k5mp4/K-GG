@@ -238,10 +238,27 @@ function createSpecializedPostprocessSource(
   );
 }
 
+// The 3D program is compiled as GLSL ES 3.00 so the Geometry Field can read
+// its model atlas with explicit LOD inside the ray-march loop: implicit
+// derivatives there make ANGLE slow down every shape in the program. The
+// shader keeps its ES 1.00 spelling through these aliases.
+const THREE_D_VERTEX_SOURCE = `#version 300 es
+in vec2 a_position;
+void main() {
+  gl_Position = vec4(a_position, 0.0, 1.0);
+}`;
+
+const THREE_D_FRAGMENT_PRELUDE = `#version 300 es
+precision highp float;
+out vec4 kggThreeDColor;
+#define gl_FragColor kggThreeDColor
+#define texture2D texture
+`;
+
 // The 3D layer's seam modes share the Gradient Reapply implementation with
 // the CPU reference in coneSeam.ts; splice it into the dedicated program.
 function createThreeDSource(): string {
-  return threeDGLSL.replace('// KGG_CONE_GRADIENT_REAPPLY_SHADER', CONE_GRADIENT_REAPPLY_SHADER);
+  return THREE_D_FRAGMENT_PRELUDE + threeDGLSL.replace('// KGG_CONE_GRADIENT_REAPPLY_SHADER', CONE_GRADIENT_REAPPLY_SHADER);
 }
 
 function createStackCoreSource(): string {
@@ -332,7 +349,7 @@ export function getProgramSource(key: LazyProgramKey): ProgramSource {
   if (key === 'flowTrail') return { vertex: vertexGLSL, fragment: flowTrailFragmentGLSL };
   if (key === 'flowComposite') return { vertex: vertexGLSL, fragment: flowGradientFragmentGLSL };
   if (key === 'datamosh') return { vertex: vertexGLSL, fragment: datamoshGLSL };
-  if (key === 'threeD') return { vertex: vertexGLSL, fragment: createThreeDSource() };
+  if (key === 'threeD') return { vertex: THREE_D_VERTEX_SOURCE, fragment: createThreeDSource() };
   return { vertex: particlesVertexGLSL, fragment: particlesFragmentGLSL };
 }
 

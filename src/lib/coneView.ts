@@ -3,6 +3,10 @@ import {
   CONE_SEAM_MODE_INDEX,
   CONE_SHAPE_INDEX,
   LATTICE_TYPES,
+  FIELD_GEOMETRIES,
+  FIELD_RENDERS,
+  RINGS_MAPPINGS,
+  RINGS_PATTERNS,
   THREE_D_PROJECTIONS,
   THREE_D_SURFACE_MAPPING_INDEX,
   type ConeViewConfig,
@@ -346,6 +350,38 @@ export type ThreeDRenderParams = {
     halfTwists: number;
     width: number;
   };
+  rings: {
+    pattern: number;
+    mapping: number;
+    perTile: number;
+    spacing: number;
+    thickness: number;
+    depth: number;
+    twistRadians: number;
+    /** Roll of every frame from Spin, in [0, 2π). */
+    spinRadians: number;
+    pulse: number;
+    /** Size wave phase from Beats, in [0, 1) turns. */
+    pulsePhase: number;
+    amount: number;
+  };
+  field: {
+    geometry: number;
+    render: number;
+    loopCells: number;
+    density: number;
+    size: number;
+    clearance: number;
+    spread: number;
+    arms: number;
+    /** Arm turn per cell along the path, in radians; whole turns per Loop Length. */
+    twistPerCell: number;
+    armWidth: number;
+    wire: number;
+    /** Turn of an object spinning once per loop per Spin, in [0, 2π). */
+    spinRadians: number;
+    variation: number;
+  };
 };
 
 /**
@@ -353,7 +389,35 @@ export type ThreeDRenderParams = {
  * texture. Their loop-normalized travel is the Flow offset, and the texture
  * offset stays at zero except for the Torus Spin around the tube.
  */
-const GEOMETRY_MOTION_SHAPES: ReadonlySet<ConeViewConfig['shape']> = new Set(['torus', 'lattice', 'terrain', 'extrusion', 'ribbon']);
+const GEOMETRY_MOTION_SHAPES: ReadonlySet<ConeViewConfig['shape']> = new Set(['torus', 'lattice', 'terrain', 'extrusion', 'ribbon', 'rings', 'field']);
+
+/** Frames of one Square Rings texture tile; the camera passes this many per Flow Cycle. */
+export function getRingsPerTile(config: ConeViewConfig): number {
+  return Math.max(1, Math.round(safeFinite(config.ringsPerTile, 8)));
+}
+
+/** Cells after which the Geometry Field repeats; the camera passes this many per Flow Cycle. */
+export function getFieldLoopCells(config: ConeViewConfig): number {
+  return Math.max(1, Math.round(safeFinite(config.fieldLoopCells, 16)));
+}
+
+/** Fraction in [0, 1) of `count` whole cycles at a loop-normalized time. */
+function wholeCyclePhase(count: number, normalizedTime: number): number {
+  const cycles = Math.round(safeFinite(count, 0)) * Math.max(0, Math.min(1, safeFinite(normalizedTime, 0)));
+  return cycles - Math.floor(cycles);
+}
+
+/**
+ * Loop-periodic motion of the Square Rings. Spin rolls every frame by whole
+ * turns per loop and Beats moves the size wave by whole periods per loop, so
+ * both return to their start values at the loop boundary.
+ */
+export function getRingsMotion(config: ConeViewConfig, normalizedTime: number): { spinRadians: number; pulsePhase: number } {
+  return {
+    spinRadians: wholeCyclePhase(config.spin, normalizedTime) * 2 * Math.PI,
+    pulsePhase: wholeCyclePhase(config.ringsBeats, normalizedTime),
+  };
+}
 
 export function getThreeDRenderParams(
   config: ConeViewConfig,
@@ -365,6 +429,8 @@ export function getThreeDRenderParams(
   const apexOffset = getConeApexOffset(CONE_CAMERA_DISTANCE, config.depth, safeAspect, config.apexX, config.apexY);
   const camera = getThreeDCamera(config, normalizedTime);
   const geometryMotion = GEOMETRY_MOTION_SHAPES.has(config.shape);
+  const ringsPerTile = getRingsPerTile(config);
+  const ringsMotion = getRingsMotion(config, normalizedTime);
   return {
     shape: getConeShapeIndex(config),
     surfaceMapping: THREE_D_SURFACE_MAPPING_INDEX[config.surfaceMapping] ?? 0,
@@ -375,7 +441,11 @@ export function getThreeDRenderParams(
     distance: config.depth * 0.5,
     fog: clamp(safeFinite(config.fog, 0), 0, 1),
     shade: clamp(safeFinite(config.shade, 0), 0, 1),
-    travel: geometryMotion ? transform.offsetV : 0,
+    // The Square Rings travel in frames, one tile of frames per Flow Cycle,
+    // and the Geometry Field in cells, one repeat of its layout per cycle.
+    travel: geometryMotion
+      ? transform.offsetV * (config.shape === 'rings' ? ringsPerTile : config.shape === 'field' ? getFieldLoopCells(config) : 1)
+      : 0,
     // The Cone keeps its fixed 60 degree camera; other shapes use the FOV.
     tangentHalfFov: Math.tan((config.shape === 'cone' ? CONE_CAMERA_FOV : camera.fovDegrees) * Math.PI / 360),
     textureRepeat: transform.repeatU,
@@ -417,6 +487,34 @@ export function getThreeDRenderParams(
     ribbon: {
       halfTwists: Math.round(config.ribbonHalfTwists),
       width: config.ribbonWidth,
+    },
+    rings: {
+      pattern: Math.max(0, RINGS_PATTERNS.indexOf(config.ringsPattern)),
+      mapping: Math.max(0, RINGS_MAPPINGS.indexOf(config.ringsMapping)),
+      perTile: ringsPerTile,
+      spacing: config.ringsSpacing,
+      thickness: config.ringsThickness,
+      depth: config.ringsDepth,
+      twistRadians: safeFinite(config.ringsTwist, 0) * Math.PI / 180,
+      spinRadians: ringsMotion.spinRadians,
+      pulse: clamp(safeFinite(config.ringsPulse, 0), 0, 1),
+      pulsePhase: ringsMotion.pulsePhase,
+      amount: clamp(safeFinite(config.ringsAmount, 0), 0, 1),
+    },
+    field: {
+      geometry: Math.max(0, FIELD_GEOMETRIES.indexOf(config.fieldGeometry)),
+      render: Math.max(0, FIELD_RENDERS.indexOf(config.fieldRender)),
+      loopCells: getFieldLoopCells(config),
+      density: config.fieldDensity,
+      size: config.fieldSize,
+      clearance: config.fieldClearance,
+      spread: config.fieldSpread,
+      arms: Math.max(0, Math.round(safeFinite(config.fieldArms, 0))),
+      twistPerCell: Math.round(safeFinite(config.fieldTwist, 0)) * 2 * Math.PI / getFieldLoopCells(config),
+      armWidth: clamp(safeFinite(config.fieldArmWidth, 0.35), 0, 1),
+      wire: config.fieldWire,
+      spinRadians: wholeCyclePhase(config.spin, normalizedTime) * 2 * Math.PI,
+      variation: config.fieldVariation,
     },
   };
 }
