@@ -71,6 +71,20 @@
   uniform float u_phasorKernelDensity;
   uniform int u_phasorDirectionMode;
 
+  // Chladni: Pattern A-D modes are chosen on the CPU (src/lib/chladniNoise.ts)
+  uniform int u_chladniPatternCount;   // 2-4
+  uniform vec4 u_chladniModesAB;       // (mA, nA, mB, nB)
+  uniform vec4 u_chladniModesCD;       // (mC, nC, mD, nD)
+  uniform float u_chladniLineWidth;
+  uniform float u_chladniSharpness;
+  uniform float u_chladniWarpStrength;
+  uniform float u_chladniRotation;     // radians
+  uniform int u_chladniMode;           // 0=Warp, 1=Gradient Map
+  uniform int u_chladniMapProfile;     // 0=Signed, 1=Folded (|F|)
+  uniform float u_chladniMapAngle;     // radians
+  uniform float u_chladniModeMix;      // -1..1: F = b(n,x)b(m,y) - mix*b(m,x)b(n,y)
+  uniform float u_chladniEdgePhase;    // 0=free edge (cos) .. PI/2=fixed edge (sin)
+
   const float KG_TAU = 6.28318530718;
 
   vec2 noiseAnimDir() {
@@ -1066,6 +1080,125 @@
     return vec2(cos(angle), sin(angle)) * field;
   }
 
+  // Square-plate Chladni field
+  //   F = b(n,x)b(m,y) - s*b(m,x)b(n,y),  b(k,t) = cos(k*PI*t - phi)
+  // s = Mode Mix (1 = classic difference), phi = Edge (0 = free-edge cosine,
+  // PI/2 = fixed-edge sine). F = 0 is the nodal line pattern. Seed/Complexity
+  // choose the key patterns A-D on the CPU; this function only reads the two
+  // patterns that bracket the current loop position, whatever the Pattern
+  // Count is.
+  const int CHLADNI_NOISE_TYPE = 12;
+  const float CHLADNI_PI = 3.14159265359;
+  const float CHLADNI_GRADIENT_EPSILON = 0.5;
+  const float CHLADNI_DISTANCE_EPSILON = 0.0001;
+  const float CHLADNI_MAP_GAIN = 2.0;
+
+  float chladniFinite(float value, float fallback) {
+    return value == value && abs(value) < 1000000.0 ? value : fallback;
+  }
+
+  vec2 chladniMode(int index) {
+    if (index == 1) return u_chladniModesAB.zw;
+    if (index == 2) return u_chladniModesCD.xy;
+    if (index == 3) return u_chladniModesCD.zw;
+    return u_chladniModesAB.xy;
+  }
+
+  // Returns (F, dF/dx, dF/dy) with the analytic gradient.
+  highp vec3 chladniField(highp vec2 x, vec2 mode, float modeMix, float edgePhase) {
+    highp float m = mode.x * CHLADNI_PI;
+    highp float n = mode.y * CHLADNI_PI;
+    highp float cnx = cos(n * x.x - edgePhase);
+    highp float snx = sin(n * x.x - edgePhase);
+    highp float cmy = cos(m * x.y - edgePhase);
+    highp float smy = sin(m * x.y - edgePhase);
+    highp float cmx = cos(m * x.x - edgePhase);
+    highp float smx = sin(m * x.x - edgePhase);
+    highp float cny = cos(n * x.y - edgePhase);
+    highp float sny = sin(n * x.y - edgePhase);
+    return vec3(
+      cnx * cmy - modeMix * cmx * cny,
+      -n * snx * cmy + modeMix * m * smx * cny,
+      -m * cnx * smy + modeMix * n * cmx * sny
+    );
+  }
+
+  // (current pattern, next pattern, eased weight) within one Loop Period.
+  // The raised-cosine weight has zero time derivative at every key pattern,
+  // and the last pattern morphs back into Pattern A, so the field closes on
+  // itself without the global loop cross-fade.
+  vec3 chladniMorphState(float evolution) {
+    int count = u_chladniPatternCount;
+    if (count < 2) count = 2;
+    if (count > 4) count = 4;
+    highp float period = max(chladniFinite(u_noiseLoopPeriod, 1.0), 0.0001);
+    highp float position = fract(chladniFinite(evolution, 0.0) / period) * float(count);
+    float current = min(floor(position), float(count - 1));
+    float t = clamp(position - current, 0.0, 1.0);
+    float next = current + 1.0 >= float(count) ? 0.0 : current + 1.0;
+    return vec3(current, next, 0.5 - 0.5 * cos(CHLADNI_PI * t));
+  }
+
+  // The signed fields of the two key patterns are interpolated (not the
+  // rendered images), so the nodal lines themselves bend into the next shape.
+  // Warp mode moves UV along the normalized field gradient: a band peaked on
+  // the nodal lines plus a soft signed term that pinches toward them. Map
+  // mode pushes UV along Map Direction by the field height instead. The
+  // evaluation space is centered and aspect-corrected so the plate stays
+  // square.
+  vec2 chladniDistortion(vec2 uv, float scale, float evolution) {
+    float warpStrength = clamp(chladniFinite(u_chladniWarpStrength, 0.3), 0.0, 1.0);
+    if (warpStrength <= 0.0) return vec2(0.0);
+    highp float aspect = u_resolution.x / max(u_resolution.y, 1.0);
+    highp vec2 p = (uv - vec2(0.5)) * vec2(aspect, 1.0);
+    highp float rotation = chladniFinite(u_chladniRotation, 0.0);
+    highp float c = cos(rotation);
+    highp float s = sin(rotation);
+    highp mat2 rotationMatrix = mat2(c, s, -s, c);
+    highp float safeScale = clamp(abs(chladniFinite(scale, 1.0)), 0.01, 10.0);
+    highp vec2 x = rotationMatrix * p * safeScale + vec2(0.5);
+
+    vec3 morph = chladniMorphState(evolution);
+    vec2 modeA = chladniMode(int(morph.x));
+    vec2 modeB = chladniMode(int(morph.y));
+    float modeMix = clamp(chladniFinite(u_chladniModeMix, 1.0), -1.0, 1.0);
+    float edgePhase = clamp(chladniFinite(u_chladniEdgePhase, 0.0), 0.0, CHLADNI_PI * 0.5);
+    highp vec3 field = mix(
+      chladniField(x, modeA, modeMix, edgePhase),
+      chladniField(x, modeB, modeMix, edgePhase),
+      morph.z
+    );
+
+    if (u_chladniMode == 1) {
+      // Gradient Map: push UV along one direction by the field height, so a
+      // gradient running that way is re-mapped onto the plate's relief.
+      float height = u_chladniMapProfile == 1
+        ? clamp(abs(field.x) - 1.0, -1.0, 1.0)
+        : clamp(field.x * 0.5, -1.0, 1.0);
+      float mapAngle = chladniFinite(u_chladniMapAngle, 1.57079632679);
+      return vec2(cos(mapAngle), sin(mapAngle)) * height * warpStrength * CHLADNI_MAP_GAIN;
+    }
+
+    highp float wavenumber = mix(length(modeA), length(modeB), morph.z);
+
+    // First-order distance to the nodal line, relative to the line spacing,
+    // so Line Width keeps its look across Scale and Complexity.
+    highp float gradientLength = length(field.yz);
+    highp float lineDistance = abs(field.x) / max(gradientLength, CHLADNI_DISTANCE_EPSILON) * wavenumber;
+    float lineWidth = clamp(chladniFinite(u_chladniLineWidth, 0.1), 0.005, 1.0);
+    float sharpness = clamp(chladniFinite(u_chladniSharpness, 2.0), 0.25, 8.0);
+    float lineInfluence = pow(1.0 - smoothstep(0.0, lineWidth, lineDistance), sharpness);
+
+    // transpose(rotation) * gradient: back into screen orientation. The soft
+    // normalization fades to zero at critical points instead of dividing by 0.
+    highp vec2 screenGradient = field.yz * rotationMatrix;
+    highp vec2 direction = screenGradient
+      / sqrt(dot(screenGradient, screenGradient) + CHLADNI_GRADIENT_EPSILON * CHLADNI_GRADIENT_EPSILON);
+    float signedField = clamp(field.x * 0.5, -1.0, 1.0);
+    highp vec2 offset = direction * (lineInfluence * 0.75 + signedField * 0.25) * warpStrength;
+    return vec2(offset.x / aspect, offset.y);
+  }
+
   // A divergence-free 2D vector field from the perpendicular of an analytic
   // scalar-field gradient. This replaces the four finite-difference fBM calls
   // used by Legacy Curl with one derivative simplex evaluation per octave.
@@ -1144,6 +1277,9 @@
     } else if (noiseType == PERLIN_NOISE_TYPE) {
       // Perlin samples XY + time-Z itself with its own reduced drift.
       return perlinDistortion(uv, scale, evolution, octaves);
+    } else if (noiseType == CHLADNI_NOISE_TYPE) {
+      // Chladni is a gradient vector field that loops on its own; no drift.
+      return chladniDistortion(uv, scale, evolution);
     } else if (noiseType == PHASOR_NOISE_TYPE) {
       // Phasor is already a phase-gradient vector field; do not duplicate its
       // scalar line signal into X/Y like the legacy scalar noise types.
@@ -1199,6 +1335,8 @@
     if (noiseType == PHASOR_NOISE_TYPE && u_noiseLoopMode == 1) return current;
     // Perlin 4D loops exactly on its own; a cross-fade would only blur it.
     if (noiseType == PERLIN_NOISE_TYPE && u_perlinDimension == 1) return current;
+    // Chladni morphs back into Pattern A once per Loop Period by itself.
+    if (noiseType == CHLADNI_NOISE_TYPE) return current;
     float wrapPeriod = noiseType == CAUSTICS_NOISE_TYPE
       ? u_noiseLoopPeriod * clamp(causticsFinite(u_noiseSpeed, 0.5), 0.0, 4.0)
       : u_noiseLoopPeriod;

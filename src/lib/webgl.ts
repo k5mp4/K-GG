@@ -47,6 +47,7 @@ import { getSceneRenderPlan, getSceneRenderPlanInput, getRequiredSceneProgramKey
 import { buildDiffuseBezierLut, normalizeDiffuseBezier } from './diffuseCurve';
 import { buildMeshGradientField, MESH_FIELD_SIZE, MESH_FIELD_SUBDIVISIONS } from './meshGradientField';
 import { noiseAngleDegreesForShader, noiseAngleRadiansForShader } from './noiseAngle';
+import { getChladniUniformValues } from './chladniNoise';
 import { clampParameter, getParameterLimit } from './parameterLimits';
 import { getAnimationDirectionVector } from './animationDirection';
 import { getSlitAnimationPhase } from './slitAnimation';
@@ -649,6 +650,18 @@ export async function initWebGL(canvas: HTMLCanvasElement): Promise<WebGLContext
     u_phasorTangentMix: gl.getUniformLocation(program, 'u_phasorTangentMix'),
     u_phasorKernelDensity: gl.getUniformLocation(program, 'u_phasorKernelDensity'),
     u_phasorDirectionMode: gl.getUniformLocation(program, 'u_phasorDirectionMode'),
+    u_chladniPatternCount: gl.getUniformLocation(program, 'u_chladniPatternCount'),
+    u_chladniModesAB: gl.getUniformLocation(program, 'u_chladniModesAB'),
+    u_chladniModesCD: gl.getUniformLocation(program, 'u_chladniModesCD'),
+    u_chladniLineWidth: gl.getUniformLocation(program, 'u_chladniLineWidth'),
+    u_chladniSharpness: gl.getUniformLocation(program, 'u_chladniSharpness'),
+    u_chladniWarpStrength: gl.getUniformLocation(program, 'u_chladniWarpStrength'),
+    u_chladniRotation: gl.getUniformLocation(program, 'u_chladniRotation'),
+    u_chladniMode: gl.getUniformLocation(program, 'u_chladniMode'),
+    u_chladniMapProfile: gl.getUniformLocation(program, 'u_chladniMapProfile'),
+    u_chladniMapAngle: gl.getUniformLocation(program, 'u_chladniMapAngle'),
+    u_chladniModeMix: gl.getUniformLocation(program, 'u_chladniModeMix'),
+    u_chladniEdgePhase: gl.getUniformLocation(program, 'u_chladniEdgePhase'),
     u_time: gl.getUniformLocation(program, 'u_time'),
     u_noiseLoopPeriod: gl.getUniformLocation(program, 'u_noiseLoopPeriod'),
     u_animDir: gl.getUniformLocation(program, 'u_animDir'),
@@ -1879,7 +1892,7 @@ export function hexToRgb(hex: string): [number, number, number] {
   return [r, g, b];
 }
 
-export const NOISE_TYPE_MAP = { simplex: 0, fbm: 1, voronoi: 2, curl: 3, domain_warp_anim: 4, seamless: 5, ridged_fbm: 6, ae_fractal: 7, fast_curl: 8, caustics: 9, phasor: 10, perlin: 11 } as const;
+export const NOISE_TYPE_MAP = { simplex: 0, fbm: 1, voronoi: 2, curl: 3, domain_warp_anim: 4, seamless: 5, ridged_fbm: 6, ae_fractal: 7, fast_curl: 8, caustics: 9, phasor: 10, perlin: 11, chladni: 12 } as const;
 export const GRADIENT_TYPE_MAP = { linear: 0, radial: 1, fourcolor: 2, diamond: 3, angle: 4, bezier: 5, mesh: 6 } as const;
 const DIFFUSE_MODE_MAP = { block: 0, smooth: 1, dither: 2, halftone: 3, ascii: 4, legacy: 5 } as const;
 const PARTICLE_EMITTER_TYPE_MAP = { field: 0, line: 1, burst: 2, point: 3 } as const;
@@ -1893,6 +1906,27 @@ const ASCII_ATLAS_HEIGHT = ASCII_ATLAS_MAX_ROWS * ASCII_GLYPH_HEIGHT;
 function finiteClamp(value: number | undefined, fallback: number, min: number, max: number): number {
   if (typeof value !== 'number' || !Number.isFinite(value)) return fallback;
   return Math.min(max, Math.max(min, value));
+}
+
+/** Uploads the same Chladni uniforms to the Legacy generator and the V2 Noise programs. */
+function applyChladniUniforms(
+  gl: WebGL2RenderingContext,
+  uniforms: Record<string, WebGLUniformLocation | null>,
+  noiseDistortion: NoiseDistortionConfig,
+): void {
+  const chladni = getChladniUniformValues(noiseDistortion);
+  setUniform1i(gl, uniforms.u_chladniPatternCount, chladni.patternCount);
+  gl.uniform4f(uniforms.u_chladniModesAB, ...chladni.modesAB);
+  gl.uniform4f(uniforms.u_chladniModesCD, ...chladni.modesCD);
+  gl.uniform1f(uniforms.u_chladniLineWidth, chladni.lineWidth);
+  gl.uniform1f(uniforms.u_chladniSharpness, chladni.sharpness);
+  gl.uniform1f(uniforms.u_chladniWarpStrength, chladni.warpStrength);
+  gl.uniform1f(uniforms.u_chladniRotation, chladni.rotation);
+  setUniform1i(gl, uniforms.u_chladniMode, chladni.mode);
+  setUniform1i(gl, uniforms.u_chladniMapProfile, chladni.mapProfile);
+  gl.uniform1f(uniforms.u_chladniMapAngle, chladni.mapAngle);
+  gl.uniform1f(uniforms.u_chladniModeMix, chladni.modeMix);
+  gl.uniform1f(uniforms.u_chladniEdgePhase, chladni.edgePhase);
 }
 
 export function applyMeshGradientUniforms(
@@ -2535,6 +2569,7 @@ function drawPostprocessPass(
   gl.uniform1f(ctx.postprocessUniforms.u_phasorTangentMix, finiteClamp(noiseDistortion.phasorTangentMix, 0.65, 0, 1));
   gl.uniform1f(ctx.postprocessUniforms.u_phasorKernelDensity, finiteClamp(noiseDistortion.phasorKernelDensity, 1.0, 0.25, 2));
   setUniform1i(gl, ctx.postprocessUniforms.u_phasorDirectionMode, phasorDirectionMode[noiseDistortion.phasorDirectionMode] ?? 0);
+  applyChladniUniforms(gl, ctx.postprocessUniforms, noiseDistortion);
   setUniform1i(gl, ctx.postprocessUniforms.u_curlSteps, noiseDistortion.curlSteps);
   gl.uniform1f(ctx.postprocessUniforms.u_curlSpeed, noiseDistortion.curlSpeed ?? 1);
   gl.uniform1f(ctx.postprocessUniforms.u_curlEps, noiseDistortion.curlEps ?? 0.01);
@@ -3795,6 +3830,7 @@ export function render(
   gl.uniform1f(uniforms.u_phasorTangentMix, finiteClamp(noiseDistortion.phasorTangentMix, 0.65, 0, 1));
   gl.uniform1f(uniforms.u_phasorKernelDensity, finiteClamp(noiseDistortion.phasorKernelDensity, 1.0, 0.25, 2));
   setUniform1i(gl, uniforms.u_phasorDirectionMode, phasorDirectionMode[noiseDistortion.phasorDirectionMode] ?? 0);
+  applyChladniUniforms(gl, uniforms, noiseDistortion);
   gl.uniform1f(uniforms.u_time, time);
   gl.uniform1f(uniforms.u_noiseLoopPeriod, Math.max(Math.abs(noiseLoopPeriod), 0.0001));
   const [animDirX, animDirY] = getAnimationDirectionVector(animDirection);

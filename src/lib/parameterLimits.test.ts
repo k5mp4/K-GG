@@ -53,4 +53,24 @@ describe('central parameter limits', () => {
     expect(normalizeTrackValue('noiseDistortion.phasorSharpness', 99)).toBe(10);
     expect(normalizeTrackValue('noiseDistortion.phasorKernelDensity', 0)).toBe(0.25);
   });
+
+  it('clamps Chladni controls, rounds integer controls, and wraps its rotation', () => {
+    expect(clampParameter(1, 3, getParameterLimit('noise.chladniPatternCount'))).toBe(2);
+    expect(clampParameter(9, 3, getParameterLimit('noise.chladniPatternCount'))).toBe(4);
+    expect(clampParameter(2.6, 3, getParameterLimit('noise.chladniPatternCount'))).toBe(3);
+    expect(clampParameter(0, 4, getParameterLimit('noise.chladniComplexity'))).toBe(1);
+    expect(clampParameter(5.4, 4, getParameterLimit('noise.chladniComplexity'))).toBe(5);
+    expect(clampParameter(0, 0.1, getParameterLimit('noise.chladniLineWidth'))).toBe(0.01);
+    expect(clampParameter(99, 2, getParameterLimit('noise.chladniSharpness'))).toBe(8);
+    expect(clampParameter(-1, 0.3, getParameterLimit('noise.chladniWarpStrength'))).toBe(0);
+    expect(clampParameter(-30, 0, getParameterLimit('noise.chladniRotation'))).toBe(330);
+    expect(normalizeTrackValue('noiseDistortion.chladniPatternCount', 7)).toBe(4);
+    expect(normalizeTrackValue('noiseDistortion.chladniLineWidth', 3)).toBe(1);
+    expect(normalizeTrackValue('noiseDistortion.chladniWarpStrength', 2)).toBe(1);
+    expect(normalizeTrackValue('noiseDistortion.chladniRotation', 370)).toBe(10);
+    expect(normalizeTrackValue('noiseDistortion.chladniModeMix', -2)).toBe(-1);
+    expect(normalizeTrackValue('noiseDistortion.chladniEdge', 2)).toBe(1);
+    expect(normalizeTrackValue('noiseDistortion.chladniDetune', -1)).toBe(0);
+    expect(normalizeTrackValue('noiseDistortion.chladniMapAngle', -90)).toBe(270);
+  });
 });

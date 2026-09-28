@@ -62,6 +62,7 @@ const ANALYTIC_NOISE_TYPES = new Set<NoiseDistortionConfig['type']>([
   'caustics',
   'phasor',
   'perlin',
+  'chladni',
 ]);
 const ANALYTIC_DIFFUSE_MODES = new Set<DiffuseMode>(['block', 'smooth']);
 
