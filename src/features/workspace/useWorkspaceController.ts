@@ -37,7 +37,7 @@ export const CANVAS_SIZE_PRESETS = [
 ] as const;
 
 type StoreSnapshot = ReturnType<typeof useGradientStore.getState>;
-type AppStoreState = Pick<StoreSnapshot, 'diffuse' | 'noiseDistortion' | 'slitScan' | 'normalMap' | 'effectPipeline' | 'seamless' | 'postprocess' | 'videoMotion'>;
+type AppStoreState = Pick<StoreSnapshot, 'diffuse' | 'noiseDistortion' | 'slitScan' | 'normalMap' | 'effectPipeline' | 'seamless' | 'postprocess'>;
 
 const TAB_ENABLED_MAP: Partial<Record<LeftTab, (state: AppStoreState) => boolean>> = {
   diffuse: state => state.diffuse.enabled,
@@ -55,7 +55,7 @@ const EFFECT_STACK_TAB_MAP: Partial<Record<EffectStackKind, LeftTab>> = {
   noise: 'noise',
   slit: 'slit',
   stretch: 'postprocess',
-  videoMotion: 'postprocess',
+  datamosh: 'postprocess',
   cone: 'postprocess',
 };
 
@@ -102,7 +102,6 @@ export function useWorkspaceController({ translate }: WorkspaceControllerOptions
     diffuse: state.diffuse,
     normalMap: state.normalMap,
     seamless: state.seamless,
-    videoMotion: state.videoMotion,
   })));
   const updater = useAppUpdater();
   const {

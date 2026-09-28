@@ -5,7 +5,7 @@ import { normalizeClothGradientConfig } from '../types/clothGradient';
 import { normalizeConeViewConfig } from '../types/coneView';
 import { normalizeSeamlessConfig } from '../types/seamless';
 import { normalizeFlowGradientConfig } from '../types/flowGradient';
-import { normalizeVideoMotionConfig } from '../types/videoMotion';
+import { resolvePersistedDatamosh } from '../types/datamosh';
 import { normalizeImageGradientConfig } from '../types/imageGradient';
 import { stripSlitPhaseMotionFields } from '../types/distortion';
 import { resolveDiffuseBezier } from '../lib/diffuseCurve';
@@ -347,7 +347,8 @@ export function PresetPanel({ canvasW, canvasH, setCanvasW, setCanvasH, aspectRa
     applicationCommands.setConeView(normalizeConeViewConfig(s.coneView));
     applicationCommands.setSeamless(normalizeSeamlessConfig(s.seamless));
     applicationCommands.setFlowGradient(normalizeFlowGradientConfig(s.flowGradient));
-    applicationCommands.setVideoMotion(normalizeVideoMotionConfig(s.videoMotion));
+    // Presets saved before Datamosh migrate their Effect Stack Video Motion here.
+    applicationCommands.setDatamosh(resolvePersistedDatamosh(s));
     // effectPipeline を持たない旧プリセット/内蔵プリセットは Legacy v1 に
     // ならないよう、既定の V2 パイプラインへ昇格する。V2 でなければ
     // SANDBOX Cloth は描画パイプラインへ一切統合されないため。
@@ -373,10 +374,10 @@ export function PresetPanel({ canvasW, canvasH, setCanvasW, setCanvasH, aspectRa
   async function handleSave() {
     const trimmed = name.trim();
     if (!trimmed) return;
-    const { gradient, noiseDistortion, diffuse, imageGradient, slitScan, stretch, animation, normalMap, clothGradient, coneView, seamless, flowGradient, videoMotion, manualDistort, postprocess, effectPipeline, keyframeTracks } = store;
+    const { gradient, noiseDistortion, diffuse, imageGradient, slitScan, stretch, animation, normalMap, clothGradient, coneView, seamless, flowGradient, datamosh, manualDistort, postprocess, effectPipeline, keyframeTracks } = store;
     const state = createPresetSaveState({
       gradient, noiseDistortion, diffuse, imageGradient, slitScan, stretch,
-      animation, normalMap, clothGradient, coneView, seamless, flowGradient, videoMotion,
+      animation, normalMap, clothGradient, coneView, seamless, flowGradient, datamosh,
       manualDistort, postprocess, effectPipeline,
       keyframeTracks,
     }, loadUserColorPalettes(), { width: canvasW, height: canvasH });

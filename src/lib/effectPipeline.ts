@@ -23,7 +23,7 @@ export const EFFECT_STACK_KINDS = [
   'glass',
   'glassTile',
   'diffuse',
-  'videoMotion',
+  'datamosh',
   'cone',
 ] as const satisfies readonly EffectStackKind[];
 
@@ -36,7 +36,7 @@ export const POSTPROCESS_EFFECT_STACK_KINDS = [
   'voronoi',
   'glass',
   'glassTile',
-  'videoMotion',
+  'datamosh',
   'cone',
 ] as const satisfies readonly EffectStackKind[];
 
@@ -110,7 +110,8 @@ export function normalizeEffectStack(stack: unknown): EffectStackLayer[] {
   for (const rawLayer of stack) {
     if (typeof rawLayer !== 'object' || rawLayer === null) continue;
     const rawKind = (rawLayer as { kind?: unknown }).kind;
-    const kind = rawKind === 'glassV2' ? 'glass' : rawKind;
+    // Removed Video Motion layers continue as Datamosh at the same position.
+    const kind = rawKind === 'glassV2' ? 'glass' : rawKind === 'videoMotion' ? 'datamosh' : rawKind;
     if (!isEffectStackKind(kind)) continue;
     const enabled = Boolean((rawLayer as { enabled?: unknown }).enabled);
     const existing = normalized.find(layer => layer.kind === kind);
@@ -157,6 +158,8 @@ export function normalizeEffectPipelineConfig(value: unknown): EffectPipelineCon
   const rawSelectedKind = (value as { selectedKind?: unknown }).selectedKind;
   const selectedKind: EffectStackKind = rawSelectedKind === 'glassV2'
     ? 'glass'
+    : rawSelectedKind === 'videoMotion'
+      ? 'datamosh'
     : isEffectStackKind(rawSelectedKind)
       ? rawSelectedKind
       : 'diffuse';
@@ -445,7 +448,7 @@ export type V2RenderPlan = {
     prism: boolean;
     prismComposite: boolean;
     particles: boolean;
-    videoMotion: boolean;
+    datamosh: boolean;
     threeD: boolean;
   };
 };
@@ -713,7 +716,7 @@ export function getV2RenderPlan(
       prism: prismRequested,
       prismComposite: prismRequested,
       particles: particlesRequested,
-      videoMotion: enabledLayers.some(layer => layer.kind === 'videoMotion'),
+      datamosh: enabledLayers.some(layer => layer.kind === 'datamosh'),
       threeD: enabledLayers.some(layer => layer.kind === 'cone'),
     },
   };

@@ -66,10 +66,11 @@ Web 版は `index.html` で Google Fonts から Noto Sans JP、Open Sans を読�
 - GlassTileはGlassとは別のエフェクトで、KG_Glassのタイル表面モデルを使います。Pattern、タイルサイズ、表面形状、屈折・分散、粗さ、Mix、Edge Mode、Seedを調整できます。
 - 行のグリップをドラッグすると、行が目的位置へ収束してから描画順序が確定します。各行のスイッチでレイヤーをON/OFFできます。
 - 手描きの`Distort`はPostprocessの`Edit Layer`から編集します。旧Presetの`manualDistort`は読み込み時にPostprocessへ移行されます。
-- Postprocessの全体ON／OFFは、Effect Stack内のStretch／Distort／Mirror／Kaleidoscope／Voronoi／Glass／GlassTile／Video Motion／Coneの有効状態を反映します。各レイヤーの個別ON／OFFはEffect Stackで操作し、Postprocessプロパティでは選択レイヤーの詳細を編集します。
+- Postprocessの全体ON／OFFは、Effect Stack内のStretch／Distort／Mirror／Kaleidoscope／Voronoi／Glass／GlassTile／Datamosh／Coneの有効状態を反映します。
+- DatamoshはEffect Stackのレイヤーで、前フレームの出力を不規則なブロックに分けたモーション場（前段のNoiseなどのアニメーションから推定したAnimation Flow、Curl Noise、または読み込んだ動画のVideo Motion）に沿ってずらして再利用します。Block Lockを下げると、ブロック単位ではなく画素ごとにアニメーションの流れへ沿って引き伸ばします。Luma／Saturation Stretchで明るい・鮮やかな画素ほど長く引き伸ばし、Refreshを下げるほど履歴が残ります。設定はPostprocessのEdit Layerで`Datamosh`を選んで編集します。履歴はアニメーションのフレームごとに進むため、タイムラインを再生して確認します。各レイヤーの個別ON／OFFはEffect Stackで操作し、Postprocessプロパティでは選択レイヤーの詳細を編集します。
 - Effect Stackヘッダーのシャッフル操作で主スタックの順序をランダム化できます。現在の見た目から新しい順序へ滑らかに遷移します。行またはオンオフToggleをAltクリックすると、そのレイヤーだけを有効にするソロ操作になり、ソロ化で一時的に非表示になったレイヤーは黄色の`STAY`で示されます。同じ対象をもう一度Altクリックすると元の有効状態へ戻ります。
 - Effect Stackは別ウィンドウへ切り離せます。別ウィンドウを閉じるとインライン表示へ戻ります。
-- 固定段は `Surface → Main Stack → Prism → Particles` です。ConeはMain Stack内の通常レイヤーとして前段textureを投影し、出力を後続レイヤーへ渡します。Normal、Prism、Particlesはトップバーの`SANDBOX`から編集し、DiffuseはMain Stack内の位置で一度だけ適用されます。
+- 固定段は `Surface → Main Stack → Prism → Particles` です。ConeとDatamoshはMain Stack内の通常レイヤーとして前段textureを処理し、出力を後続レイヤーへ渡します。Normal、Prism、Particlesはトップバーの`SANDBOX`から編集し、DiffuseはMain Stack内の位置で一度だけ適用されます。
 - 画面やGPU描画が壊れた場合は、トップバーの設定モーダル（Hover / Click only）にある `Refresh app` でアプリを再読み込みできます。未保存の編集状態は破棄されます。
 
 
@@ -81,6 +82,7 @@ Web 版は `index.html` で Google Fonts から Noto Sans JP、Open Sans を読�
 ### SANDBOX
 - トップバーは `Diffuse → Noise → Slit → Postprocess → SANDBOX → Export → Preset` の順で、Stretchは独立項目およびPostprocessのプロパティモジュールに表示しません。PostprocessではEdit Layerを選択し、その詳細プロパティを操作できます。SANDBOXの文字色はPostprocessと同じです。
 - グラデーションの主スタックとは別に、Cloth、Normal、Prism、Particles、Flow Gradient、Seamlessの6モジュールを一つのパネルから編集できます。ConeはSANDBOXに含めず、Effect Stackの通常レイヤーとして扱います。
+
 - `Normal` はグラデーションの輝度勾配から法線マップを生成します。`Strength`、`Blur`、`Angle`、`Bevel Size`で表面の凹凸を調整します。
 - `Prism` は主スタック後段の光線・グロー、`Particles` は最終オーバーレイのパーティクルを調整します。
 - `Edit Layer`の選択要素から各モジュールを一つずつ表示して編集します。選択を変更しても描画順は変わりません。

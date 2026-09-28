@@ -26,7 +26,7 @@ test('every WebGL program compiles and links in a real WebGL2 context', async ({
         'generator', 'blur', 'normalMap', 'stretch', 'stackCore', 'noiseStack',
         'noiseDiffuseStack', 'glass', 'glassV2', 'glassTile', 'prism', 'postprocess',
         'prismComposite', 'particles', 'seamless', 'flowSplat', 'flowTrail',
-        'flowComposite', 'videoMotion', 'threeD',
+        'flowComposite', 'datamosh', 'threeD',
       ].map(key => [key, getProgramSource(key)] as [string, { vertex: string; fragment: string }]),
     ];
 

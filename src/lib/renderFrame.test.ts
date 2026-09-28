@@ -78,7 +78,7 @@ describe('renderFrame compatibility adapter', () => {
       request.flowNormalizedTime,
       request.flowLoopEnabled,
       request.flowSessionId,
-      request.videoMotion,
+      request.datamosh,
       request.coneView,
     );
   });

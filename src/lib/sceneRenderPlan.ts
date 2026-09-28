@@ -31,7 +31,7 @@ export type SceneRenderPlanState = Pick<LatestState,
   | 'flowGradient'
   | 'sourceImageCanvas'
   | 'imageGradientSource'
-  | 'videoMotion'
+  | 'datamosh'
 >;
 
 /**
@@ -100,7 +100,7 @@ export function getRequiredSceneProgramKeys(state: LatestState): LazyProgramKey[
     add('prism', plan.programs.prism);
     add('prismComposite', plan.programs.prismComposite);
     add('particles', plan.programs.particles);
-    add('videoMotion', plan.programs.videoMotion);
+    add('datamosh', plan.programs.datamosh);
     add('threeD', plan.programs.threeD);
   } else {
     const layers = getActivePostprocessStackLayers(state.postprocess).filter(layer => (
@@ -126,7 +126,7 @@ export function getRequiredSceneProgramKeys(state: LatestState): LazyProgramKey[
   add('flowTrail', flowGradientEnabled);
   add('flowComposite', flowGradientEnabled);
   if (state.effectPipeline.version !== 'stack-v2') {
-    add('videoMotion', state.videoMotion?.enabled === true);
+    add('datamosh', state.datamosh?.enabled === true);
   }
 
   return required;

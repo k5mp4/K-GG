@@ -1,4 +1,3 @@
-import type { VideoMotionConfig } from '../types/videoMotion';
 
 export const VIDEO_MOTION_FIELD_WIDTH = 64;
 export const VIDEO_MOTION_FIELD_HEIGHT = 36;
@@ -9,6 +8,12 @@ export type VideoMotionField = {
   width: number;
   height: number;
   hasFrame: boolean;
+};
+
+/** Estimation controls shared by the preview and export field updates. */
+export type VideoMotionFieldOptions = {
+  fieldSmoothing: number;
+  motionDamping: number;
 };
 
 export type VideoMotionFieldStats = {
@@ -142,7 +147,7 @@ export function estimateVideoMotionField(
   field: VideoMotionField,
   current: Float32Array,
   previous: Float32Array,
-  config: Pick<VideoMotionConfig, 'fieldSmoothing' | 'motionDamping'>,
+  config: VideoMotionFieldOptions,
 ): void {
   const smoothing = Math.min(0.95, Math.max(0, config.fieldSmoothing));
   const damping = Math.min(0.95, Math.max(0, config.motionDamping));
@@ -293,7 +298,7 @@ export function drawVideoMotionFieldPreview(canvas: HTMLCanvasElement, source: V
 export function updateVideoMotionField(
   source: VideoMotionSource,
   video: HTMLVideoElement,
-  config: Pick<VideoMotionConfig, 'fieldSmoothing' | 'motionDamping'>,
+  config: VideoMotionFieldOptions,
 ): boolean {
   if (!video.videoWidth || !video.videoHeight || video.readyState < HTMLMediaElement.HAVE_CURRENT_DATA) return false;
   if (source.lastVideoTime === video.currentTime && source.field.hasFrame) return false;

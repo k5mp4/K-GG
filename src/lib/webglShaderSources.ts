@@ -24,7 +24,9 @@ import flowSplatVertexGLSL from '../shaders/flow-splat.vert.glsl?raw';
 import flowSplatFragmentGLSL from '../shaders/flow-splat.frag.glsl?raw';
 import flowTrailFragmentGLSL from '../shaders/flow-trail.frag.glsl?raw';
 import flowGradientFragmentGLSL from '../shaders/flow-gradient.frag.glsl?raw';
-import videoMotionGLSL from '../shaders/video-motion.frag.glsl?raw';
+import datamoshUniformsGLSL from '../shaders/datamosh/uniforms.glsl?raw';
+import datamoshMotionFieldGLSL from '../shaders/datamosh/motion-field.glsl?raw';
+import datamoshMainGLSL from '../shaders/datamosh/main.glsl?raw';
 import threeDGLSL from '../shaders/three-d.frag.glsl?raw';
 import { CONE_GRADIENT_REAPPLY_SHADER } from './coneSeam';
 
@@ -39,6 +41,14 @@ const postprocessGLSL = [
   postprocessGlassTileGLSL,
   postprocessMainGLSL,
 ].join('');
+
+// The motion field is a separate chunk so another source (codec vectors,
+// optical flow) can replace it without touching the feedback composite.
+const datamoshGLSL = [
+  datamoshUniformsGLSL,
+  datamoshMotionFieldGLSL,
+  datamoshMainGLSL,
+].join('\n');
 
 export type LazyProgramKey =
   | 'generator'
@@ -59,7 +69,7 @@ export type LazyProgramKey =
   | 'flowSplat'
   | 'flowTrail'
   | 'flowComposite'
-  | 'videoMotion'
+  | 'datamosh'
   | 'threeD';
 
 export type ProgramSource = {
@@ -173,7 +183,7 @@ export const SHADER_VERSION = (
   + flowSplatFragmentGLSL.length * 61
   + flowTrailFragmentGLSL.length * 59
   + flowGradientFragmentGLSL.length * 53
-  + videoMotionGLSL.length * 47
+  + datamoshGLSL.length * 47
   + threeDGLSL.length * 43
 ) | 0;
 
@@ -321,7 +331,7 @@ export function getProgramSource(key: LazyProgramKey): ProgramSource {
   if (key === 'flowSplat') return { vertex: flowSplatVertexGLSL, fragment: flowSplatFragmentGLSL };
   if (key === 'flowTrail') return { vertex: vertexGLSL, fragment: flowTrailFragmentGLSL };
   if (key === 'flowComposite') return { vertex: vertexGLSL, fragment: flowGradientFragmentGLSL };
-  if (key === 'videoMotion') return { vertex: vertexGLSL, fragment: videoMotionGLSL };
+  if (key === 'datamosh') return { vertex: vertexGLSL, fragment: datamoshGLSL };
   if (key === 'threeD') return { vertex: vertexGLSL, fragment: createThreeDSource() };
   return { vertex: particlesVertexGLSL, fragment: particlesFragmentGLSL };
 }

@@ -31,7 +31,7 @@ const LABELS: Record<EffectStackKind, string> = {
   voronoi: 'Voronoi',
   glass: 'Glass',
   glassTile: 'GlassTile',
-  videoMotion: 'Video Motion',
+  datamosh: 'Datamosh',
   cone: '3D',
 };
 

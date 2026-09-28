@@ -3,6 +3,7 @@ import type { LatestState } from '../types/latestState';
 import { createDefaultEffectPipeline, updateEffectStackLayer } from './effectPipeline';
 import { getRequiredExportProgramKeys } from './webgl';
 import { getProgramSource } from './webglShaderSources';
+import { DATAMOSH_DEFAULTS } from '../types/datamosh';
 
 function stateWithGlass(enabled: boolean): LatestState {
   const pipeline = createDefaultEffectPipeline();
@@ -121,15 +122,24 @@ describe('export WebGL program plan', () => {
     expect(getRequiredExportProgramKeys(state)).toEqual(['stackCore', 'flowSplat', 'flowTrail', 'flowComposite']);
   });
 
-  it('requests Video Motion from the enabled Effect Stack layer', () => {
+  it('requests the Datamosh program from the enabled Effect Stack layer', () => {
     const state = stateWithGlass(false);
-    state.effectPipeline.effectStack = [
-      ...state.effectPipeline.effectStack,
-      { kind: 'videoMotion', enabled: true },
-    ];
-    state.videoMotion = { ...(state.videoMotion ?? {}), enabled: false } as LatestState['videoMotion'];
+    state.effectPipeline.effectStack = updateEffectStackLayer(state.effectPipeline.effectStack, 'datamosh', { enabled: true });
+    // The V2 layer is the source of truth, not the mirrored config flag.
+    state.datamosh = { ...DATAMOSH_DEFAULTS, enabled: false };
 
-    expect(getRequiredExportProgramKeys(state)).toEqual(['stackCore', 'videoMotion']);
+    expect(getRequiredExportProgramKeys(state)).toEqual(['stackCore', 'datamosh']);
+  });
+
+  it('assembles the Datamosh program from uniforms, motion field, and composite chunks', () => {
+    const source = getProgramSource('datamosh');
+
+    expect(source.fragment.indexOf('precision highp float;')).toBe(0);
+    expect(source.fragment).toContain('vec2 datamoshMotionField(vec2 uv, vec2 window)');
+    expect(source.fragment).toContain('u_previousInputTex');
+    expect(source.fragment).toContain('u_historyTex');
+    expect(source.fragment).toContain('floor(uv * blockCount)');
+    expect(source.fragment.indexOf('datamoshMotionField(vec2 uv, vec2 window)')).toBeLessThan(source.fragment.indexOf('void main()'));
   });
 
   it('exposes the standalone Seamless shader uniforms', () => {

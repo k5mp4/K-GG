@@ -6,6 +6,7 @@ import {
   renderTiledToCanvas2D,
 } from './tileRender';
 import { useGradientStore } from '../store/gradientStore';
+import { getDatamoshVideoFieldOptions, isDatamoshVideoSourceActive } from '../types/datamosh';
 import type { AnimationEasing } from '../types/animation';
 import type { VideoExportFrameRenderer } from '../adapters/types';
 import {
@@ -16,7 +17,6 @@ import {
   beginVideoMotionExport,
   prepareVideoMotionExportFrame,
 } from './videoMotionRuntime';
-import { isEffectStackLayerEnabled } from './effectPipeline';
 
 export type ExportFrameResult = {
   blob: Blob;
@@ -112,15 +112,11 @@ export async function renderAndCaptureExportFrame(
   const normalizedTime = calcExportNormalizedTime(frameIndex, totalFrames);
   const renderTime = calcExportRenderTime(normalizedTime, speed, duration, easing);
   const state = useGradientStore.getState();
-  const videoMotion = state.videoMotion;
-  const videoMotionEnabled = state.effectPipeline.version === 'stack-v2'
-    ? isEffectStackLayerEnabled(state.effectPipeline, 'videoMotion')
-    : videoMotion?.enabled === true;
-  if (videoMotionEnabled) {
+  if (isDatamoshVideoSourceActive(state.datamosh)) {
     await prepareVideoMotionExportFrame(
       normalizedTime,
       duration,
-      videoMotion,
+      getDatamoshVideoFieldOptions(state.datamosh),
       signal,
     );
   }

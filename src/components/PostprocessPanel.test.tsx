@@ -24,45 +24,40 @@ function renderPostprocessPanelWithLayerSelected(kind: 'cone' | 'stretch') {
   }
 }
 
-describe('PostprocessPanel Video Motion integration', () => {
+describe('PostprocessPanel layer surface', () => {
   beforeEach(() => {
     useGradientStore.setState(useGradientStore.getInitialState(), true);
   });
 
-  it('keeps Video Motion mounted in the Postprocess property surface', () => {
+  it('keeps the Datamosh layer mounted in the Postprocess property surface', () => {
     const current = useGradientStore.getState().effectPipeline;
     useGradientStore.setState({
       effectPipeline: {
         ...current,
-        selectedKind: 'videoMotion',
-        effectStack: updateEffectStackLayer(current.effectStack, 'videoMotion', { enabled: true }),
+        selectedKind: 'datamosh',
+        effectStack: updateEffectStackLayer(current.effectStack, 'datamosh', { enabled: true }),
       },
     });
-
     const markup = renderToStaticMarkup(
       <LanguageProvider>
         <PostprocessPanel />
       </LanguageProvider>,
     );
 
-    expect(markup).toContain('data-video-motion-panel');
-    expect(markup).toContain('Choose Video');
-    expect(markup).toContain('Motion Feedback');
-    expect(markup).not.toContain('Motion Warp');
-    expect(markup).not.toContain('Motion Datamosh');
+    expect(markup).toContain('data-datamosh-panel');
+    expect(markup).toContain('Luma Stretch');
+    expect(markup).toContain('Block Variance');
 
     useGradientStore.setState({
-      effectPipeline: {
-        ...useGradientStore.getState().effectPipeline,
-        selectedKind: 'glass',
-      },
+      effectPipeline: { ...useGradientStore.getState().effectPipeline, selectedKind: 'glass' },
     });
     const otherLayerMarkup = renderToStaticMarkup(
       <LanguageProvider>
         <PostprocessPanel />
       </LanguageProvider>,
     );
-    expect(otherLayerMarkup).toContain('data-video-motion-panel');
+    // Hidden but mounted so a loaded video survives layer switches.
+    expect(otherLayerMarkup).toContain('data-datamosh-panel');
   });
 
   it('keeps the existing Cone controls available in the Postprocess property surface', () => {
@@ -86,7 +81,10 @@ describe('PostprocessPanel Video Motion integration', () => {
     // Stretch is a Postprocess layer: the Effect Stack owns its ON/OFF, so the
     // module shows the Postprocess master switch and no per-layer switch.
     expect(markup).toContain('data-postprocess-master-toggle');
-    expect(markup.match(/role="switch"/g) ?? []).toHaveLength(2); // master + Glow
+    // The hidden Datamosh panel's option switches are not layer switches.
+    const switches = (markup.match(/<button[^>]*role="switch"[^>]*>/g) ?? [])
+      .filter(tag => !/aria-label="(Freeze|Color Drift)"/.test(tag));
+    expect(switches).toHaveLength(2); // master + Glow
   });
 
   it('exposes Glass IOR and refinable Chromatic Steps in Optics', () => {

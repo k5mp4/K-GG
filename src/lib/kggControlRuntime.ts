@@ -253,7 +253,7 @@ function serializeStore(state: StoreState): SerializableStore {
     clothGradient: state.clothGradient,
     coneView: state.coneView,
     seamless: state.seamless,
-    videoMotion: state.videoMotion,
+    datamosh: state.datamosh,
     manualDistort: state.manualDistort,
     postprocess: state.postprocess,
     effectPipeline: state.effectPipeline,

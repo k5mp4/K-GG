@@ -1,8 +1,8 @@
-import type { VideoMotionConfig } from '../types/videoMotion';
 import {
   createVideoMotionSource,
   resetVideoMotionSource,
   updateVideoMotionField,
+  type VideoMotionFieldOptions,
   type VideoMotionSource,
 } from './videoMotionSource';
 
@@ -74,7 +74,7 @@ function resetForTimelineJump(): void {
 function requestPreviewSeek(
   video: HTMLVideoElement,
   targetTime: number,
-  config: Pick<VideoMotionConfig, 'fieldSmoothing' | 'motionDamping'>,
+  config: VideoMotionFieldOptions,
 ): void {
   if (video.seeking) return;
   resetForTimelineJump();
@@ -106,7 +106,7 @@ export type VideoMotionTimelineSync = {
 export function syncVideoMotionToTimeline(
   normalizedTime: number,
   timelineDuration: number,
-  config: Pick<VideoMotionConfig, 'fieldSmoothing' | 'motionDamping'>,
+  config: VideoMotionFieldOptions,
   options: { timelinePlaying?: boolean; timelineControlled?: boolean } = {},
 ): VideoMotionTimelineSync {
   const video = runtime.video;
@@ -205,7 +205,7 @@ function waitForSeek(video: HTMLVideoElement, targetTime: number, signal?: Abort
 export async function prepareVideoMotionExportFrame(
   normalizedTime: number,
   _timelineDuration: number,
-  config: Pick<VideoMotionConfig, 'fieldSmoothing' | 'motionDamping'>,
+  config: VideoMotionFieldOptions,
   signal?: AbortSignal,
 ): Promise<boolean> {
   const video = runtime.video;
