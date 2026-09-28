@@ -57,9 +57,12 @@ describe('ConeViewPanel shape controls', () => {
 
   it('shows the Geometry Field controls', () => {
     const markup = renderShape('field');
-    for (const label of ['Geometry', 'Render', 'Wire Width', 'Loop Length', 'Density', 'Size', 'Clearance', 'Spread', 'Spin', 'Variation']) {
+    for (const label of ['Geometry', 'Render', 'Wire Width', 'Loop Length', 'Density', 'Size', 'Clearance', 'Spread', 'Arms', 'Twist', 'Arm Width', 'Spin', 'Variation']) {
       expect(hasLabel(markup, label), label).toBe(true);
     }
+    // The GLB loader is offered with a .glb file input.
+    expect(markup).toContain('data-field-model-loader');
+    expect(markup).toContain('accept=".glb,model/gltf-binary"');
     expect(hasLabel(markup, 'Depth')).toBe(false);
     expect(hasLabel(markup, 'Camera Roll')).toBe(true);
   });

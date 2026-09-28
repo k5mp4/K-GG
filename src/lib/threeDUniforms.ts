@@ -1,6 +1,45 @@
 import type { ThreeDRenderParams } from './coneView';
+import type { FieldModel } from './fieldModelRuntime';
 
 type UniformLocations = Record<string, WebGLUniformLocation | null>;
+
+/** Texture unit of the Geometry Field model atlas; no other pass uses it. */
+export const FIELD_MODEL_TEXTURE_UNIT = 13;
+
+/**
+ * Binds the Geometry Field model atlas and sets its uniforms. The atlas is
+ * uploaded only when the model's version differs from the one this context
+ * last uploaded; returns the version now held by the texture.
+ */
+export function bindFieldModelTexture(
+  gl: WebGL2RenderingContext,
+  uniforms: UniformLocations,
+  texture: WebGLTexture,
+  model: FieldModel | null,
+  uploadedVersion: number,
+): number {
+  gl.activeTexture(gl.TEXTURE0 + FIELD_MODEL_TEXTURE_UNIT);
+  gl.bindTexture(gl.TEXTURE_2D, texture);
+  let version = uploadedVersion;
+  if (model && model.version !== uploadedVersion) {
+    gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, false);
+    // Half floats keep the distances near the surface precise and filter
+    // linearly in core WebGL2.
+    gl.texImage2D(
+      gl.TEXTURE_2D, 0, gl.RG16F,
+      model.resolution * model.tilesX, model.resolution * model.tilesY, 0,
+      gl.RG, gl.FLOAT, model.data,
+    );
+    version = model.version;
+  }
+  const sampler = uniforms.u_fieldModelTex;
+  if (sampler) gl.uniform1i(sampler, FIELD_MODEL_TEXTURE_UNIT);
+  const ready = uniforms.u_fieldModelReady;
+  if (ready) gl.uniform1f(ready, model ? 1 : 0);
+  const grid = uniforms.u_fieldModelGrid;
+  if (grid) gl.uniform3f(grid, model?.resolution ?? 1, model?.tilesX ?? 1, model?.tilesY ?? 1);
+  return version;
+}
 
 /**
  * Uploads every uniform of the dedicated 3D program. Kept separate from the
@@ -78,6 +117,9 @@ export function uploadThreeDUniforms(
   float('u_fieldSize', params.field.size);
   float('u_fieldClearance', params.field.clearance);
   float('u_fieldSpread', params.field.spread);
+  float('u_fieldArms', params.field.arms);
+  float('u_fieldTwist', params.field.twistPerCell);
+  float('u_fieldArmWidth', params.field.armWidth);
   float('u_fieldWire', params.field.wire);
   float('u_fieldSpin', params.field.spinRadians);
   float('u_fieldVariation', params.field.variation);

@@ -373,6 +373,10 @@ export type ThreeDRenderParams = {
     size: number;
     clearance: number;
     spread: number;
+    arms: number;
+    /** Arm turn per cell along the path, in radians; whole turns per Loop Length. */
+    twistPerCell: number;
+    armWidth: number;
     wire: number;
     /** Turn of an object spinning once per loop per Spin, in [0, 2π). */
     spinRadians: number;
@@ -508,6 +512,9 @@ export function getThreeDRenderParams(
       size: config.fieldSize,
       clearance: config.fieldClearance,
       spread: config.fieldSpread,
+      arms: Math.max(0, Math.round(safeFinite(config.fieldArms, 0))),
+      twistPerCell: Math.round(safeFinite(config.fieldTwist, 0)) * 2 * Math.PI / getFieldLoopCells(config),
+      armWidth: clamp(safeFinite(config.fieldArmWidth, 0.35), 0, 1),
       wire: config.fieldWire,
       spinRadians: wholeCyclePhase(config.spin, normalizedTime) * 2 * Math.PI,
       variation: config.fieldVariation,

@@ -94,6 +94,9 @@ describe('cone view configuration', () => {
       fieldSize: 0.75,
       fieldClearance: 1.5,
       fieldSpread: 5,
+      fieldArms: 0,
+      fieldTwist: 1,
+      fieldArmWidth: 0.35,
       fieldWire: 0.03,
       fieldVariation: 1,
     });
@@ -223,6 +226,16 @@ describe('cone view configuration', () => {
       fieldGeometry: 'mix',
       fieldRender: 'solid',
     });
+    expect(normalizeConeViewConfig({ fieldGeometry: 'model' }).fieldGeometry).toBe('model');
+  });
+
+  it('rounds the spiral arms and twist to whole numbers', () => {
+    expect(normalizeConeViewConfig({ fieldArms: 2.6, fieldTwist: -2.4, fieldArmWidth: 3 })).toMatchObject({
+      fieldArms: 3,
+      fieldTwist: -2,
+      fieldArmWidth: 1,
+    });
+    expect(normalizeConeViewConfig({ fieldArms: 20, fieldTwist: 20 })).toMatchObject({ fieldArms: 8, fieldTwist: 8 });
   });
 
   it('clamps the camera lens settings', () => {

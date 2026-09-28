@@ -1,5 +1,8 @@
 precision highp float;
 
+// Compiled as GLSL ES 3.00 behind aliases for texture2D and gl_FragColor
+// (see createThreeDSource), so explicit-LOD textureLod is available.
+
 // Dedicated program for the orderable 3D layer (layer kind `cone`). It maps
 // the preceding stack texture onto a camera-rendered surface. Every shape
 // returns a hit position, normal, and optional surface UV; the shared mapping,
@@ -77,6 +80,14 @@ uniform float u_fieldDensity;
 uniform float u_fieldSize;
 uniform float u_fieldClearance;
 uniform float u_fieldSpread;
+uniform float u_fieldArms;
+uniform float u_fieldTwist;
+uniform float u_fieldArmWidth;
+// Loaded .glb model: slice atlas of distance grids (see src/lib/meshSdf.ts).
+uniform sampler2D u_fieldModelTex;
+uniform float u_fieldModelReady;
+// Voxels per axis, then atlas tiles in x and y.
+uniform vec3 u_fieldModelGrid;
 uniform float u_fieldWire;
 uniform float u_fieldSpin;
 uniform float u_fieldVariation;
@@ -972,6 +983,9 @@ const int FIELD_SPHERE = 0;
 const int FIELD_CUBE = 1;
 const int FIELD_PRISM = 2;
 const int FIELD_OCTAHEDRON = 3;
+const int FIELD_MODEL = 5;
+// Half size of the model grid around the unit sphere (MESH_SDF_EXTENT).
+const float FIELD_MODEL_EXTENT = 1.05;
 const int FIELD_RENDER_WIRE = 1;
 const int FIELD_RENDER_MIXED = 2;
 const float FIELD_VIEW_CELLS = 26.0;
@@ -1019,6 +1033,25 @@ float fieldSpread() {
   return max(u_fieldSpread, u_fieldClearance + 1.0);
 }
 
+// Shape, render mode, spin, and texture offset of an object from its cell
+// key; the layouts set its presence, center, and radius.
+void fieldDecorate(inout FieldObject object, vec3 key) {
+  vec3 pick = fieldHash(key);
+  vec3 place = fieldHash(key + 19.1);
+  vec3 turn = fieldHash(key + 47.3);
+  vec3 extra = fieldHash(key + 113.7);
+  // Mix includes the model once one is loaded; without one it is a sphere.
+  float kinds = u_fieldModelReady > 0.5 ? 6.0 : 5.0;
+  object.type = u_fieldGeometry == 0 ? int(min(floor(pick.y * kinds), kinds - 1.0)) : u_fieldGeometry - 1;
+  if (object.type == FIELD_MODEL && u_fieldModelReady < 0.5) object.type = FIELD_SPHERE;
+  object.wire = u_fieldRender == FIELD_RENDER_WIRE || (u_fieldRender == FIELD_RENDER_MIXED && pick.z < 0.5);
+  vec3 axis = normalize(turn * 2.0 - 1.0 + vec3(0.0, 0.001, 0.0));
+  // Once or twice per Spin, either way round: whole turns per loop.
+  float rate = (place.y < 0.5 ? -1.0 : 1.0) * (place.z < 0.5 ? 1.0 : 2.0);
+  object.rotation = axisAngleMatrix(axis, extra.z * TAU + rate * u_fieldSpin);
+  object.uvOffset = extra.xy * clamp(u_fieldVariation, 0.0, 1.0);
+}
+
 // `cell` holds the grid indices in x and y and the slice in z; `base` is the
 // cell center after the slice shift.
 FieldObject fieldObjectAt(vec3 cell, vec3 base) {
@@ -1026,21 +1059,64 @@ FieldObject fieldObjectAt(vec3 cell, vec3 base) {
   vec3 key = vec3(cell.xy, mod(cell.z, fieldPeriod())) + 0.37;
   vec3 pick = fieldHash(key);
   vec3 place = fieldHash(key + 19.1);
-  vec3 turn = fieldHash(key + 47.3);
-  vec3 extra = fieldHash(key + 113.7);
   float axisDistance = length(base.xy);
   object.present = axisDistance >= u_fieldClearance && axisDistance <= fieldSpread() && pick.x < u_fieldDensity;
-  object.type = u_fieldGeometry == 0 ? int(min(floor(pick.y * 5.0), 4.0)) : u_fieldGeometry - 1;
-  object.wire = u_fieldRender == FIELD_RENDER_WIRE || (u_fieldRender == FIELD_RENDER_MIXED && pick.z < 0.5);
   object.radius = 0.5 * clamp(u_fieldSize, 0.05, 1.0) * (0.55 + 0.45 * place.x);
   // Each axis moves at most as far as keeps the bounding sphere in the cell.
   object.center = base + (fieldHash(key + 83.9) * 2.0 - 1.0) * (0.5 - object.radius);
-  vec3 axis = normalize(turn * 2.0 - 1.0 + vec3(0.0, 0.001, 0.0));
-  // Once or twice per Spin, either way round: whole turns per loop.
-  float rate = (place.y < 0.5 ? -1.0 : 1.0) * (place.z < 0.5 ? 1.0 : 2.0);
-  object.rotation = axisAngleMatrix(axis, extra.z * TAU + rate * u_fieldSpin);
-  object.uvOffset = extra.xy * clamp(u_fieldVariation, 0.0, 1.0);
+  fieldDecorate(object, key);
   return object;
+}
+
+// Spiral layout: each slice is split into Arms angular sectors, turned by
+// Twist per slice, and unit-wide rings from Clearance outward. `cell` holds
+// the arm, ring, and slice. The object sits on its arm's center line, spread
+// across the sector by Arm Width, and its bounding sphere stays inside the
+// sector, ring, and slice.
+FieldObject fieldSpiralObjectAt(vec3 cell) {
+  FieldObject object;
+  vec3 key = vec3(cell.xy, mod(cell.z, fieldPeriod())) + 211.37;
+  vec3 pick = fieldHash(key);
+  vec3 place = fieldHash(key + 19.1);
+  vec3 jitter = fieldHash(key + 83.9);
+  float arms = max(floor(u_fieldArms + 0.5), 1.0);
+  float innerRadius = u_fieldClearance + cell.y;
+  object.present = cell.y >= 0.0 && innerRadius < fieldSpread() && pick.x < u_fieldDensity;
+  // Half the chord of the sector at its inner edge bounds the size.
+  float room = arms >= 2.0 ? min(0.5, innerRadius * sin(PI / arms)) : 0.5;
+  object.radius = room * clamp(u_fieldSize, 0.05, 1.0) * (0.55 + 0.45 * place.x);
+  float centerRadius = innerRadius + 0.5 + (jitter.x * 2.0 - 1.0) * (0.5 - object.radius);
+  // The angle from the arm keeps the sphere clear of the sector planes.
+  float angleRoom = arms >= 2.0 ? max(PI / arms - asin(min(object.radius / centerRadius, 1.0)), 0.0) : PI;
+  float angle = u_fieldTwist * cell.z + cell.x * TAU / arms
+    + (jitter.y * 2.0 - 1.0) * angleRoom * clamp(u_fieldArmWidth, 0.0, 1.0);
+  object.center = vec3(centerRadius * cos(angle), centerRadius * sin(angle),
+    cell.z + (jitter.z * 2.0 - 1.0) * (0.5 - object.radius));
+  fieldDecorate(object, key);
+  return object;
+}
+
+// Nearest positive distance along a ray (in xy) to the cylinder of `radius`
+// around the z axis, or a large value.
+float fieldCylinderExit(vec2 origin, vec2 direction, float radius) {
+  float a = dot(direction, direction);
+  if (a < 1.0e-8 || radius <= 0.0) return 1.0e9;
+  float b = dot(origin, direction);
+  float discriminant = b * b - a * (dot(origin, origin) - radius * radius);
+  if (discriminant < 0.0) return 1.0e9;
+  float root = sqrt(discriminant);
+  float near = (-b - root) / a;
+  float far = (-b + root) / a;
+  return near > 1.0e-5 ? near : far > 1.0e-5 ? far : 1.0e9;
+}
+
+// Distance along a ray (in xy) to the plane through the z axis at `angle`.
+float fieldAxialPlaneExit(vec2 origin, vec2 direction, float angle) {
+  vec2 normal = vec2(-sin(angle), cos(angle));
+  float approach = dot(direction, normal);
+  if (abs(approach) < 1.0e-8) return 1.0e9;
+  float t = -dot(origin, normal) / approach;
+  return t > 1.0e-5 ? t : 1.0e9;
 }
 
 float fieldSegment(vec3 p, vec3 a, vec3 b) {
@@ -1049,9 +1125,37 @@ float fieldSegment(vec3 p, vec3 a, vec3 b) {
   return length(pa - ba * clamp(dot(pa, ba) / dot(ba, ba), 0.0, 1.0));
 }
 
+// Surface (x) and edge (y) distances of the loaded model at an object-space
+// point: bilinear within the two nearest slices of the atlas, then linear
+// between them. The model lies inside the unit sphere, so the distance to it
+// is also a lower bound and takes over outside the sphere without a lookup.
+vec2 fieldModelDistances(vec3 p) {
+  float sphereBound = length(p) - 1.0;
+  if (sphereBound > 0.1) return vec2(sphereBound);
+  float n = u_fieldModelGrid.x;
+  vec2 atlasSize = n * u_fieldModelGrid.yz;
+  vec3 g = clamp((p + FIELD_MODEL_EXTENT) / (2.0 * FIELD_MODEL_EXTENT) * n - 0.5, 0.0, n - 1.0);
+  float z0 = floor(g.z);
+  float z1 = min(z0 + 1.0, n - 1.0);
+  // Offset the division by half a slice: 7.0 / 7.0 may round below 1.0.
+  float row0 = floor((z0 + 0.5) / u_fieldModelGrid.y);
+  float row1 = floor((z1 + 0.5) / u_fieldModelGrid.y);
+  vec2 tile0 = vec2(z0 - row0 * u_fieldModelGrid.y, row0) * n;
+  vec2 tile1 = vec2(z1 - row1 * u_fieldModelGrid.y, row1) * n;
+  // Explicit LOD: this runs inside the march loop (see createThreeDSource).
+  vec2 grid = mix(
+    textureLod(u_fieldModelTex, (tile0 + g.xy + 0.5) / atlasSize, 0.0).rg,
+    textureLod(u_fieldModelTex, (tile1 + g.xy + 0.5) / atlasSize, 0.0).rg,
+    g.z - z0
+  );
+  return max(grid, vec2(sphereBound));
+}
+
 // Solid primitives in object space, each inside the unit sphere.
 float fieldSolidDistance(int type, vec3 p) {
   if (type == FIELD_SPHERE) return length(p) - 1.0;
+  // Interpolated grid distances can slightly overshoot, so step 90%.
+  if (type == FIELD_MODEL) return fieldModelDistances(p).x * 0.9;
   if (type == FIELD_CUBE) {
     vec3 q = abs(p) - vec3(FIELD_CUBE_HALF - 0.05);
     return length(max(q, 0.0)) + min(max(q.x, max(q.y, q.z)), 0.0) - 0.05;
@@ -1072,7 +1176,11 @@ float fieldSolidDistance(int type, vec3 p) {
 // angle snapping reduce each edge set to the few edges nearest the point.
 float fieldWireDistance(int type, vec3 p, float width) {
   float edge;
-  if (type == FIELD_SPHERE) {
+  if (type == FIELD_MODEL) {
+    // Lines thinner than a voxel break up between grid samples.
+    float voxel = 2.0 * FIELD_MODEL_EXTENT / max(u_fieldModelGrid.x, 1.0);
+    return (fieldModelDistances(p).y - max(width, 0.8 * voxel)) * 0.9;
+  } else if (type == FIELD_SPHERE) {
     // Four great circles through the poles and parallels at 0 and ±45°.
     float angleStep = PI / 4.0;
     float meridian = floor(atan(p.z, p.x) / angleStep + 0.5) * angleStep;
@@ -1159,6 +1267,9 @@ ThreeDHit fieldHit(vec3 localRay) {
   vec3 inverse = 1.0 / safeDirection;
   vec3 exitSide = 0.5 * sign(safeDirection);
   float spread = fieldSpread();
+  bool spiral = u_fieldArms > 0.5;
+  float arms = max(floor(u_fieldArms + 0.5), 1.0);
+  float armAngle = TAU / arms;
   vec3 cell = vec3(1.0e6);
   vec3 base = vec3(0.0);
   FieldObject object;
@@ -1171,16 +1282,36 @@ ThreeDHit fieldHit(vec3 localRay) {
     // A ray outside the swarm that moves away from the axis meets nothing more.
     if (length(position.xy) > spread + 1.0 && dot(position.xy, rayDirection.xy) > 0.0) break;
     float slice = floor(position.z + 0.5);
-    vec2 shift = fieldSliceShift(slice);
-    vec3 current = vec3(floor(position.xy - shift + 0.5), slice);
-    if (any(notEqual(current, cell))) {
-      cell = current;
-      base = vec3(cell.xy + shift, slice);
-      object = fieldObjectAt(cell, base);
-    }
     // Never step past the cell's far side: the next cell may hold an object.
-    vec3 planes = (base + exitSide - position) * inverse;
-    float advance = min(min(planes.x, planes.y), planes.z) + 0.001;
+    float advance = (slice + exitSide.z - position.z) * inverse.z;
+    if (spiral) {
+      float ring = floor(length(position.xy) - u_fieldClearance);
+      float armStart = u_fieldTwist * slice;
+      float arm = floor((atan(position.y, position.x) - armStart) / armAngle + 0.5);
+      vec3 current = vec3(mod(arm, arms), ring, slice);
+      if (any(notEqual(current, cell))) {
+        cell = current;
+        object = fieldSpiralObjectAt(cell);
+      }
+      float innerRadius = u_fieldClearance + ring;
+      advance = min(advance, fieldCylinderExit(position.xy, rayDirection.xy, innerRadius));
+      advance = min(advance, fieldCylinderExit(position.xy, rayDirection.xy, innerRadius + 1.0));
+      if (arms >= 2.0) {
+        advance = min(advance, fieldAxialPlaneExit(position.xy, rayDirection.xy, armStart + (arm - 0.5) * armAngle));
+        advance = min(advance, fieldAxialPlaneExit(position.xy, rayDirection.xy, armStart + (arm + 0.5) * armAngle));
+      }
+    } else {
+      vec2 shift = fieldSliceShift(slice);
+      vec3 current = vec3(floor(position.xy - shift + 0.5), slice);
+      if (any(notEqual(current, cell))) {
+        cell = current;
+        base = vec3(cell.xy + shift, slice);
+        object = fieldObjectAt(cell, base);
+      }
+      vec2 planes = (base.xy + exitSide.xy - position.xy) * inverse.xy;
+      advance = min(advance, min(planes.x, planes.y));
+    }
+    advance += 0.001;
     if (object.present) {
       width = max(u_fieldWire, 0.75 * pixelAngle * distance / object.radius);
       float surface = fieldObjectDistance(object, position, width);
@@ -1196,6 +1327,11 @@ ThreeDHit fieldHit(vec3 localRay) {
   if (!hit) return result;
   vec3 position = rayOrigin + rayDirection * distance;
   float epsilon = 0.0003 + 0.3 * pixelAngle * distance;
+  // Grid-sampled models need half a voxel, or the normal follows the
+  // interpolation cells and the 8-bit steps instead of the surface.
+  if (object.type == FIELD_MODEL) {
+    epsilon = max(epsilon, FIELD_MODEL_EXTENT / max(u_fieldModelGrid.x, 1.0) * object.radius);
+  }
   vec2 k = vec2(1.0, -1.0);
   vec3 normal = normalize(
     k.xyy * fieldObjectDistance(object, position + k.xyy * epsilon, width)
@@ -1218,6 +1354,17 @@ ThreeDHit fieldHit(vec3 localRay) {
     vec3 faceNormal = normalize(normal * object.rotation);
     vec3 tangentU = normalize(cross(abs(faceNormal.y) < 0.99 ? vec3(0.0, 1.0, 0.0) : vec3(1.0, 0.0, 0.0), faceNormal));
     uv = vec2(dot(local, tangentU), dot(local, cross(faceNormal, tangentU))) * 0.5 + 0.5;
+  } else if (object.type == FIELD_MODEL) {
+    // Arbitrary models blend three object-space projections by the normal,
+    // so the canvas follows the object without seams from a single axis.
+    vec3 weights = pow(abs(normalize(normal * object.rotation)), vec3(4.0));
+    weights /= max(weights.x + weights.y + weights.z, 0.0001);
+    float repeat = max(u_coneTextureRepeat, 1.0);
+    result.hasColor = true;
+    result.color = threeDSampleUnwrapped((local.zy * 0.5 + 0.5) * repeat + object.uvOffset) * weights.x
+      + threeDSampleUnwrapped((local.xz * 0.5 + 0.5) * repeat + object.uvOffset) * weights.y
+      + threeDSampleUnwrapped((local.xy * 0.5 + 0.5) * repeat + object.uvOffset) * weights.z;
+    uv = local.xy * 0.5 + 0.5;
   } else {
     uv = vec2(atan(local.z, local.x) / TAU + 0.5, atan(local.y, length(local.xz) - FIELD_TORUS_RING) / TAU + 0.5);
   }

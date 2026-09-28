@@ -1,5 +1,6 @@
-import type { ReactNode } from 'react';
+import { useRef, useState, useSyncExternalStore, type ChangeEvent, type ReactNode } from 'react';
 import { useLanguage } from '../i18n/LanguageProvider';
+import { getFieldModel, setFieldModel, subscribeFieldModel } from '../lib/fieldModelRuntime';
 import type { MessageKey } from '../i18n/messages';
 import { useGradientStore } from '../store/gradientStore';
 import { applicationCommands } from '../application/commands';
@@ -74,6 +75,68 @@ function Section({ title, children }: { title: string; children: ReactNode }) {
 }
 
 type SetConeView = (value: Partial<ConeViewConfig>) => void;
+
+/** Loads a .glb as the Geometry Field model; the model stays runtime-only. */
+function FieldModelLoader({ setConeView }: { setConeView: SetConeView }) {
+  const { t } = useLanguage();
+  const model = useSyncExternalStore(subscribeFieldModel, getFieldModel, getFieldModel);
+  const inputRef = useRef<HTMLInputElement>(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  async function handleChange(event: ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0];
+    event.currentTarget.value = '';
+    if (!file) return;
+    setError(null);
+    setLoading(true);
+    try {
+      // The glTF loader is only fetched when a model is actually loaded.
+      const { loadFieldModelFile } = await import('../lib/loadFieldModel');
+      await loadFieldModelFile(file);
+      setConeView({ fieldGeometry: 'model' });
+    } catch (cause) {
+      console.error('Geometry Field model load failed:', cause);
+      setError(cause instanceof Error ? cause.message : String(cause));
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  return (
+    <div className="space-y-1.5 border border-cream/20 bg-k-bg/30 px-2.5 py-2" data-field-model-loader>
+      <div className="flex items-center justify-between gap-2">
+        <span className="font-display text-[9px] font-semibold uppercase tracking-[0.12em] text-cream/70">Model</span>
+        <div className="flex items-center gap-2">
+          {model && (
+            <button
+              type="button"
+              onClick={() => setFieldModel(null)}
+              className="px-2 py-0.5 text-[10px] text-red-400 transition-colors hover:text-red-300 bg-red-900/30 hover:bg-red-900/50"
+            >
+              {t('cone.fieldModelClear')}
+            </button>
+          )}
+          <button
+            type="button"
+            onClick={() => inputRef.current?.click()}
+            disabled={loading}
+            className="px-2 py-0.5 text-[10px] text-cream transition-all hover:text-k-text bg-cream/10 hover:bg-cream/20 disabled:opacity-50"
+          >
+            {loading ? t('cone.fieldModelLoading') : t('cone.fieldModelLoad')}
+          </button>
+          <input ref={inputRef} type="file" accept=".glb,model/gltf-binary" onChange={handleChange} className="hidden" />
+        </div>
+      </div>
+      <p className="truncate text-[9px] leading-relaxed text-cream/55">
+        {model
+          ? t('cone.fieldModelStatus', { name: model.name, count: model.triangleCount.toLocaleString() })
+          : t('cone.fieldModelEmpty')}
+      </p>
+      {error && <p className="text-[9px] leading-relaxed text-red-300">{t('cone.fieldModelFailed', { reason: error })}</p>}
+    </div>
+  );
+}
 
 function ShapeControls({ coneView, setConeView }: { coneView: ConeViewConfig; setConeView: SetConeView }) {
   if (coneView.shape === 'lattice') {
@@ -239,6 +302,7 @@ function ShapeControls({ coneView, setConeView }: { coneView: ConeViewConfig; se
           options={[...FIELD_GEOMETRY_OPTIONS]}
           onChange={(fieldGeometry) => setConeView({ fieldGeometry: fieldGeometry as FieldGeometry })}
         />
+        <FieldModelLoader setConeView={setConeView} />
         <CustomSelect
           label="Render"
           value={coneView.fieldRender}
@@ -287,6 +351,29 @@ function ShapeControls({ coneView, setConeView }: { coneView: ConeViewConfig; se
           value={coneView.fieldSpread}
           limitKey="cone.fieldSpread"
           onChange={(fieldSpread) => setConeView({ fieldSpread })}
+        />
+        <SliderField
+          label="Arms"
+          value={coneView.fieldArms}
+          limitKey="cone.fieldArms"
+          format={(value) => (Math.round(value) === 0 ? 'Off' : `${Math.round(value)}`)}
+          onChange={(fieldArms) => setConeView({ fieldArms })}
+        />
+        <SliderField
+          label="Twist"
+          value={coneView.fieldTwist}
+          limitKey="cone.fieldTwist"
+          disabled={coneView.fieldArms === 0}
+          format={(value) => `${Math.round(value)}`}
+          onChange={(fieldTwist) => setConeView({ fieldTwist })}
+        />
+        <SliderField
+          label="Arm Width"
+          value={coneView.fieldArmWidth}
+          limitKey="cone.fieldArmWidth"
+          disabled={coneView.fieldArms === 0}
+          format={percent}
+          onChange={(fieldArmWidth) => setConeView({ fieldArmWidth })}
         />
         <SliderField
           label="Spin"

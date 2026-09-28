@@ -242,7 +242,17 @@ describe('3D render parameters', () => {
       variation: 1,
     });
     expect(params.field.spinRadians).toBeCloseTo(1.5 * Math.PI, 10);
+    expect(params.field.arms).toBe(0);
     expect(getThreeDRenderParams(field, 1, 1).field.spinRadians).toBeCloseTo(getThreeDRenderParams(field, 0, 1).field.spinRadians, 10);
+  });
+
+  it('turns the spiral arms by whole turns per Loop Length', () => {
+    const spiral = { ...DEFAULT_CONE_VIEW, shape: 'field' as const, fieldArms: 3, fieldTwist: 2, fieldLoopCells: 8, fieldArmWidth: 0.2 };
+    const params = getThreeDRenderParams(spiral, 0, 1);
+    expect(params.field.arms).toBe(3);
+    expect(params.field.armWidth).toBe(0.2);
+    // Over one Loop Length the arms turn exactly Twist whole turns.
+    expect(params.field.twistPerCell * 8).toBeCloseTo(2 * 2 * Math.PI, 10);
   });
 
   it('maps the lattice type to its shader index', () => {

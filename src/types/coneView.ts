@@ -25,9 +25,13 @@ export const CONE_SHAPE_OPTIONS: { value: ConeShape; label: string }[] = [
   { value: 'field', label: 'Geometry Field · Scattered flythrough' },
 ];
 
-/** Primitives of the Geometry Field; `mix` picks one at random per object. */
-export type FieldGeometry = 'mix' | 'sphere' | 'cube' | 'prism' | 'octahedron' | 'torus';
-export const FIELD_GEOMETRIES = ['mix', 'sphere', 'cube', 'prism', 'octahedron', 'torus'] as const satisfies readonly FieldGeometry[];
+/**
+ * Primitives of the Geometry Field; `mix` picks one at random per object and
+ * includes the loaded model. `model` uses the loaded .glb and draws spheres
+ * until one is loaded, since presets do not store the file.
+ */
+export type FieldGeometry = 'mix' | 'sphere' | 'cube' | 'prism' | 'octahedron' | 'torus' | 'model';
+export const FIELD_GEOMETRIES = ['mix', 'sphere', 'cube', 'prism', 'octahedron', 'torus', 'model'] as const satisfies readonly FieldGeometry[];
 export const FIELD_GEOMETRY_OPTIONS: { value: FieldGeometry; label: string }[] = [
   { value: 'mix', label: 'Mix · All shapes' },
   { value: 'sphere', label: 'Sphere' },
@@ -35,6 +39,7 @@ export const FIELD_GEOMETRY_OPTIONS: { value: FieldGeometry; label: string }[] =
   { value: 'prism', label: 'Triangular Prism' },
   { value: 'octahedron', label: 'Octahedron' },
   { value: 'torus', label: 'Torus' },
+  { value: 'model', label: 'Model · Loaded GLB' },
 ];
 
 /** Geometry Field surfaces: filled, edges only, or a random choice per object. */
@@ -246,6 +251,12 @@ export type ConeViewConfig = {
   fieldClearance: number;
   /** Geometry Field only: outer radius in cells of the swarm; at least Clearance + 1. */
   fieldSpread: number;
+  /** Geometry Field only: spiral arms holding the objects; 0 scatters them evenly. */
+  fieldArms: number;
+  /** Geometry Field only: whole turns of the arms around the path per Loop Length. */
+  fieldTwist: number;
+  /** Geometry Field only: share of the angle between arms that an arm covers. */
+  fieldArmWidth: number;
   /** Geometry Field only: wire thickness relative to the object radius. */
   fieldWire: number;
   /** Geometry Field only: how far each object's texture is shifted from the others. */
@@ -319,6 +330,9 @@ export const DEFAULT_CONE_VIEW: ConeViewConfig = {
   fieldSize: getParameterDefault('cone.fieldSize'),
   fieldClearance: getParameterDefault('cone.fieldClearance'),
   fieldSpread: getParameterDefault('cone.fieldSpread'),
+  fieldArms: getParameterDefault('cone.fieldArms'),
+  fieldTwist: getParameterDefault('cone.fieldTwist'),
+  fieldArmWidth: getParameterDefault('cone.fieldArmWidth'),
   fieldWire: getParameterDefault('cone.fieldWire'),
   fieldVariation: getParameterDefault('cone.fieldVariation'),
 };
@@ -394,6 +408,9 @@ export function normalizeConeViewConfig(value: unknown): ConeViewConfig {
     fieldSize: clampParameter(raw.fieldSize, DEFAULT_CONE_VIEW.fieldSize, getParameterLimit('cone.fieldSize')),
     fieldClearance: clampParameter(raw.fieldClearance, DEFAULT_CONE_VIEW.fieldClearance, getParameterLimit('cone.fieldClearance')),
     fieldSpread: clampParameter(raw.fieldSpread, DEFAULT_CONE_VIEW.fieldSpread, getParameterLimit('cone.fieldSpread')),
+    fieldArms: clampParameter(raw.fieldArms, DEFAULT_CONE_VIEW.fieldArms, getParameterLimit('cone.fieldArms')),
+    fieldTwist: clampParameter(raw.fieldTwist, DEFAULT_CONE_VIEW.fieldTwist, getParameterLimit('cone.fieldTwist')),
+    fieldArmWidth: clampParameter(raw.fieldArmWidth, DEFAULT_CONE_VIEW.fieldArmWidth, getParameterLimit('cone.fieldArmWidth')),
     fieldWire: clampParameter(raw.fieldWire, DEFAULT_CONE_VIEW.fieldWire, getParameterLimit('cone.fieldWire')),
     fieldVariation: clampParameter(raw.fieldVariation, DEFAULT_CONE_VIEW.fieldVariation, getParameterLimit('cone.fieldVariation')),
   };
