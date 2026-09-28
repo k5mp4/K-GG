@@ -2,8 +2,8 @@ import { clampParameter, getParameterDefault, getParameterLimit } from '../lib/p
 
 export type ConeMappingMode = 'flow' | 'projection';
 /** Geometry of the 3D layer. The layer kind and preset key stay `cone` for compatibility. */
-export type ConeShape = 'cone' | 'torus' | 'lattice' | 'terrain' | 'extrusion' | 'ribbon';
-export const CONE_SHAPES = ['cone', 'torus', 'lattice', 'terrain', 'extrusion', 'ribbon'] as const satisfies readonly ConeShape[];
+export type ConeShape = 'cone' | 'torus' | 'lattice' | 'terrain' | 'extrusion' | 'ribbon' | 'rings';
+export const CONE_SHAPES = ['cone', 'torus', 'lattice', 'terrain', 'extrusion', 'ribbon', 'rings'] as const satisfies readonly ConeShape[];
 export const CONE_SHAPE_INDEX = {
   cone: 0,
   torus: 1,
@@ -11,6 +11,7 @@ export const CONE_SHAPE_INDEX = {
   terrain: 3,
   extrusion: 4,
   ribbon: 5,
+  rings: 6,
 } as const satisfies Record<ConeShape, number>;
 export const CONE_SHAPE_OPTIONS: { value: ConeShape; label: string }[] = [
   { value: 'cone', label: 'Cone' },
@@ -19,6 +20,32 @@ export const CONE_SHAPE_OPTIONS: { value: ConeShape; label: string }[] = [
   { value: 'terrain', label: 'Terrain · Heightfield flyover' },
   { value: 'extrusion', label: 'Extrusion · Pixel city' },
   { value: 'ribbon', label: 'Ribbon · Twisted band' },
+  { value: 'rings', label: 'Square Rings · Frame tunnel' },
+];
+
+/**
+ * Layouts of the Square Rings shape. `corridor` lines the frames up straight,
+ * `serpent` threads them on a winding path, and `tumble` scatters and turns
+ * them until they line up in front of the camera.
+ */
+export type RingsPattern = 'corridor' | 'serpent' | 'tumble';
+export const RINGS_PATTERNS = ['corridor', 'serpent', 'tumble'] as const satisfies readonly RingsPattern[];
+export const RINGS_PATTERN_OPTIONS: { value: RingsPattern; label: string }[] = [
+  { value: 'corridor', label: 'Corridor · Straight' },
+  { value: 'serpent', label: 'Serpent · Winding path' },
+  { value: 'tumble', label: 'Tumble · Assemble' },
+];
+
+/**
+ * How Surface UV lays the canvas on each frame. `wrap` runs U around the
+ * frame and spreads V over the frames of one tile; `picture` shows the whole
+ * canvas on every frame, cut out by the hole.
+ */
+export type RingsMapping = 'wrap' | 'picture';
+export const RINGS_MAPPINGS = ['wrap', 'picture'] as const satisfies readonly RingsMapping[];
+export const RINGS_MAPPING_OPTIONS: { value: RingsMapping; label: string }[] = [
+  { value: 'wrap', label: 'Wrap · Around the frames' },
+  { value: 'picture', label: 'Picture · Canvas per frame' },
 ];
 
 /**
@@ -162,6 +189,26 @@ export type ConeViewConfig = {
   ribbonHalfTwists: number;
   /** Ribbon only: half width of the band relative to the unit ring radius. */
   ribbonWidth: number;
+  /** Square Rings only: frame layout. */
+  ringsPattern: RingsPattern;
+  /** Square Rings only: canvas layout on the frames under Surface UV. */
+  ringsMapping: RingsMapping;
+  /** Square Rings only: frames per texture tile; each Flow Cycle passes this many frames. */
+  ringsPerTile: number;
+  /** Square Rings only: distance between frames, in frame half sizes. */
+  ringsSpacing: number;
+  /** Square Rings only: bar width as a share of the frame half size. */
+  ringsThickness: number;
+  /** Square Rings only: frame depth along the travel direction. */
+  ringsDepth: number;
+  /** Square Rings only: degrees each frame turns relative to the one before. */
+  ringsTwist: number;
+  /** Square Rings only: size wave along the frames; 1 swings the size by ±50%. */
+  ringsPulse: number;
+  /** Square Rings only: whole size waves passing each frame per loop. */
+  ringsBeats: number;
+  /** Square Rings only: Serpent path curvature or Tumble scatter strength. */
+  ringsAmount: number;
 };
 
 /** Normalized apex movement limit; ±2 reaches 50% of the canvas outside its edge. */
@@ -214,6 +261,16 @@ export const DEFAULT_CONE_VIEW: ConeViewConfig = {
   extrudeGap: getParameterDefault('cone.extrudeGap'),
   ribbonHalfTwists: getParameterDefault('cone.ribbonHalfTwists'),
   ribbonWidth: getParameterDefault('cone.ribbonWidth'),
+  ringsPattern: 'corridor',
+  ringsMapping: 'wrap',
+  ringsPerTile: getParameterDefault('cone.ringsPerTile'),
+  ringsSpacing: getParameterDefault('cone.ringsSpacing'),
+  ringsThickness: getParameterDefault('cone.ringsThickness'),
+  ringsDepth: getParameterDefault('cone.ringsDepth'),
+  ringsTwist: getParameterDefault('cone.ringsTwist'),
+  ringsPulse: getParameterDefault('cone.ringsPulse'),
+  ringsBeats: getParameterDefault('cone.ringsBeats'),
+  ringsAmount: getParameterDefault('cone.ringsAmount'),
 };
 
 function normalizeOption<T extends string>(value: unknown, options: readonly T[], fallback: T): T {
@@ -270,5 +327,15 @@ export function normalizeConeViewConfig(value: unknown): ConeViewConfig {
     extrudeGap: clampParameter(raw.extrudeGap, DEFAULT_CONE_VIEW.extrudeGap, getParameterLimit('cone.extrudeGap')),
     ribbonHalfTwists: clampParameter(raw.ribbonHalfTwists, DEFAULT_CONE_VIEW.ribbonHalfTwists, getParameterLimit('cone.ribbonHalfTwists')),
     ribbonWidth: clampParameter(raw.ribbonWidth, DEFAULT_CONE_VIEW.ribbonWidth, getParameterLimit('cone.ribbonWidth')),
+    ringsPattern: normalizeOption(raw.ringsPattern, RINGS_PATTERNS, DEFAULT_CONE_VIEW.ringsPattern),
+    ringsMapping: normalizeOption(raw.ringsMapping, RINGS_MAPPINGS, DEFAULT_CONE_VIEW.ringsMapping),
+    ringsPerTile: clampParameter(raw.ringsPerTile, DEFAULT_CONE_VIEW.ringsPerTile, getParameterLimit('cone.ringsPerTile')),
+    ringsSpacing: clampParameter(raw.ringsSpacing, DEFAULT_CONE_VIEW.ringsSpacing, getParameterLimit('cone.ringsSpacing')),
+    ringsThickness: clampParameter(raw.ringsThickness, DEFAULT_CONE_VIEW.ringsThickness, getParameterLimit('cone.ringsThickness')),
+    ringsDepth: clampParameter(raw.ringsDepth, DEFAULT_CONE_VIEW.ringsDepth, getParameterLimit('cone.ringsDepth')),
+    ringsTwist: clampParameter(raw.ringsTwist, DEFAULT_CONE_VIEW.ringsTwist, getParameterLimit('cone.ringsTwist')),
+    ringsPulse: clampParameter(raw.ringsPulse, DEFAULT_CONE_VIEW.ringsPulse, getParameterLimit('cone.ringsPulse')),
+    ringsBeats: clampParameter(raw.ringsBeats, DEFAULT_CONE_VIEW.ringsBeats, getParameterLimit('cone.ringsBeats')),
+    ringsAmount: clampParameter(raw.ringsAmount, DEFAULT_CONE_VIEW.ringsAmount, getParameterLimit('cone.ringsAmount')),
   };
 }

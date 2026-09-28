@@ -77,6 +77,16 @@ describe('cone view configuration', () => {
       extrudeGap: 0.15,
       ribbonHalfTwists: 1,
       ribbonWidth: 0.25,
+      ringsPattern: 'corridor',
+      ringsMapping: 'wrap',
+      ringsPerTile: 8,
+      ringsSpacing: 1,
+      ringsThickness: 0.12,
+      ringsDepth: 0.06,
+      ringsTwist: 0,
+      ringsPulse: 0,
+      ringsBeats: 4,
+      ringsAmount: 0.5,
     });
   });
 
@@ -141,6 +151,38 @@ describe('cone view configuration', () => {
       shape: 'ribbon',
       ribbonHalfTwists: 3,
       ribbonWidth: 0.6,
+    });
+  });
+
+  it('normalizes the square ring settings', () => {
+    expect(normalizeConeViewConfig({
+      shape: 'rings',
+      ringsPattern: 'tumble',
+      ringsMapping: 'picture',
+      ringsPerTile: 6.6,
+      ringsSpacing: 99,
+      ringsThickness: 0,
+      ringsDepth: 5,
+      ringsTwist: -90,
+      ringsPulse: 2,
+      ringsBeats: 3.4,
+      ringsAmount: -1,
+    })).toMatchObject({
+      shape: 'rings',
+      ringsPattern: 'tumble',
+      ringsMapping: 'picture',
+      ringsPerTile: 7,
+      ringsSpacing: 4,
+      ringsThickness: 0.02,
+      ringsDepth: 1,
+      ringsTwist: -45,
+      ringsPulse: 1,
+      ringsBeats: 3,
+      ringsAmount: 0,
+    });
+    expect(normalizeConeViewConfig({ ringsPattern: 'spiral', ringsMapping: 'cube' })).toMatchObject({
+      ringsPattern: 'corridor',
+      ringsMapping: 'wrap',
     });
   });
 

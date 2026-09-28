@@ -60,4 +60,15 @@ export function uploadThreeDUniforms(
   float('u_extrudeGap', params.extrusion.gap);
   float('u_ribbonHalfTwists', params.ribbon.halfTwists);
   float('u_ribbonWidth', params.ribbon.width);
+  int('u_ringsPattern', params.rings.pattern);
+  int('u_ringsMapping', params.rings.mapping);
+  float('u_ringsPerTile', params.rings.perTile);
+  float('u_ringsSpacing', params.rings.spacing);
+  float('u_ringsThickness', params.rings.thickness);
+  float('u_ringsDepth', params.rings.depth);
+  float('u_ringsTwist', params.rings.twistRadians);
+  float('u_ringsSpin', params.rings.spinRadians);
+  float('u_ringsPulse', params.rings.pulse);
+  float('u_ringsPulsePhase', params.rings.pulsePhase);
+  float('u_ringsAmount', params.rings.amount);
 }

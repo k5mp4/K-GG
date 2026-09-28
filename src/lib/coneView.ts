@@ -3,6 +3,8 @@ import {
   CONE_SEAM_MODE_INDEX,
   CONE_SHAPE_INDEX,
   LATTICE_TYPES,
+  RINGS_MAPPINGS,
+  RINGS_PATTERNS,
   THREE_D_PROJECTIONS,
   THREE_D_SURFACE_MAPPING_INDEX,
   type ConeViewConfig,
@@ -346,6 +348,21 @@ export type ThreeDRenderParams = {
     halfTwists: number;
     width: number;
   };
+  rings: {
+    pattern: number;
+    mapping: number;
+    perTile: number;
+    spacing: number;
+    thickness: number;
+    depth: number;
+    twistRadians: number;
+    /** Roll of every frame from Spin, in [0, 2π). */
+    spinRadians: number;
+    pulse: number;
+    /** Size wave phase from Beats, in [0, 1) turns. */
+    pulsePhase: number;
+    amount: number;
+  };
 };
 
 /**
@@ -353,7 +370,27 @@ export type ThreeDRenderParams = {
  * texture. Their loop-normalized travel is the Flow offset, and the texture
  * offset stays at zero.
  */
-const GEOMETRY_MOTION_SHAPES: ReadonlySet<ConeViewConfig['shape']> = new Set(['lattice', 'terrain', 'extrusion']);
+const GEOMETRY_MOTION_SHAPES: ReadonlySet<ConeViewConfig['shape']> = new Set(['lattice', 'terrain', 'extrusion', 'rings']);
+
+/** Frames of one Square Rings texture tile; the camera passes this many per Flow Cycle. */
+export function getRingsPerTile(config: ConeViewConfig): number {
+  return Math.max(1, Math.round(safeFinite(config.ringsPerTile, 8)));
+}
+
+/**
+ * Loop-periodic motion of the Square Rings. Spin rolls every frame by whole
+ * turns per loop and Beats moves the size wave by whole periods per loop, so
+ * both return to their start values at the loop boundary.
+ */
+export function getRingsMotion(config: ConeViewConfig, normalizedTime: number): { spinRadians: number; pulsePhase: number } {
+  const time = Math.max(0, Math.min(1, safeFinite(normalizedTime, 0)));
+  const spinTurns = Math.round(safeFinite(config.spin, 0)) * time;
+  const beats = Math.round(safeFinite(config.ringsBeats, 0)) * time;
+  return {
+    spinRadians: (spinTurns - Math.floor(spinTurns)) * 2 * Math.PI,
+    pulsePhase: beats - Math.floor(beats),
+  };
+}
 
 export function getThreeDRenderParams(
   config: ConeViewConfig,
@@ -365,6 +402,8 @@ export function getThreeDRenderParams(
   const apexOffset = getConeApexOffset(CONE_CAMERA_DISTANCE, config.depth, safeAspect, config.apexX, config.apexY);
   const camera = getThreeDCamera(config, normalizedTime);
   const geometryMotion = GEOMETRY_MOTION_SHAPES.has(config.shape);
+  const ringsPerTile = getRingsPerTile(config);
+  const ringsMotion = getRingsMotion(config, normalizedTime);
   return {
     shape: getConeShapeIndex(config),
     surfaceMapping: THREE_D_SURFACE_MAPPING_INDEX[config.surfaceMapping] ?? 0,
@@ -376,8 +415,9 @@ export function getThreeDRenderParams(
     fog: clamp(safeFinite(config.fog, 0), 0, 1),
     shade: clamp(safeFinite(config.shade, 0), 0, 1),
     // The ribbon slides its texture with Flow and turns the band by Spin.
+    // The Square Rings travel in frames, one tile of frames per Flow Cycle.
     travel: geometryMotion
-      ? transform.offsetV
+      ? transform.offsetV * (config.shape === 'rings' ? ringsPerTile : 1)
       : config.shape === 'ribbon'
         ? Math.round(config.spin) * Math.max(0, Math.min(1, safeFinite(normalizedTime, 0)))
         : 0,
@@ -422,6 +462,19 @@ export function getThreeDRenderParams(
     ribbon: {
       halfTwists: Math.round(config.ribbonHalfTwists),
       width: config.ribbonWidth,
+    },
+    rings: {
+      pattern: Math.max(0, RINGS_PATTERNS.indexOf(config.ringsPattern)),
+      mapping: Math.max(0, RINGS_MAPPINGS.indexOf(config.ringsMapping)),
+      perTile: ringsPerTile,
+      spacing: config.ringsSpacing,
+      thickness: config.ringsThickness,
+      depth: config.ringsDepth,
+      twistRadians: safeFinite(config.ringsTwist, 0) * Math.PI / 180,
+      spinRadians: ringsMotion.spinRadians,
+      pulse: clamp(safeFinite(config.ringsPulse, 0), 0, 1),
+      pulsePhase: ringsMotion.pulsePhase,
+      amount: clamp(safeFinite(config.ringsAmount, 0), 0, 1),
     },
   };
 }

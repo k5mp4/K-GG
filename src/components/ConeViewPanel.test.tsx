@@ -43,6 +43,18 @@ describe('ConeViewPanel shape controls', () => {
     expect(hasLabel(markup, 'Camera Roll')).toBe(true);
   });
 
+  it('shows the Square Rings controls with the pattern amount only where it applies', () => {
+    const markup = renderShape('rings');
+    for (const label of ['Pattern', 'Ring Mapping', 'Rings per Tile', 'Spacing', 'Thickness', 'Frame Depth', 'Twist', 'Spin', 'Pulse', 'Beats']) {
+      expect(hasLabel(markup, label), label).toBe(true);
+    }
+    // The default Corridor has no Curve or Scatter.
+    expect(hasLabel(markup, 'Curve')).toBe(false);
+    expect(hasLabel(markup, 'Scatter')).toBe(false);
+    expect(hasLabel(markup, 'Depth')).toBe(false);
+    expect(hasLabel(markup, 'Camera Roll')).toBe(true);
+  });
+
   it('keeps Depth and Rotation for the Cone', () => {
     const markup = renderShape('cone');
     expect(hasLabel(markup, 'Depth')).toBe(true);

@@ -58,6 +58,18 @@ uniform float u_extrudeGap;
 uniform float u_ribbonHalfTwists;
 uniform float u_ribbonWidth;
 
+uniform int u_ringsPattern;
+uniform int u_ringsMapping;
+uniform float u_ringsPerTile;
+uniform float u_ringsSpacing;
+uniform float u_ringsThickness;
+uniform float u_ringsDepth;
+uniform float u_ringsTwist;
+uniform float u_ringsSpin;
+uniform float u_ringsPulse;
+uniform float u_ringsPulsePhase;
+uniform float u_ringsAmount;
+
 const float PI = 3.141592653589793;
 const float TAU = 6.283185307179586;
 
@@ -67,6 +79,7 @@ const int SHAPE_LATTICE = 2;
 const int SHAPE_TERRAIN = 3;
 const int SHAPE_EXTRUSION = 4;
 const int SHAPE_RIBBON = 5;
+const int SHAPE_RINGS = 6;
 
 const int MAPPING_UV = 0;
 const int MAPPING_TRIPLANAR = 1;
@@ -223,6 +236,8 @@ struct ThreeDHit {
   vec3 rayDirection;
   // Triplanar texture tiles per world unit.
   float mapScale;
+  // Brightness left after the shape's own fade-out at its drawing limit.
+  float fade;
 };
 
 ThreeDHit threeDMiss() {
@@ -238,6 +253,7 @@ ThreeDHit threeDMiss() {
   result.distance = 0.0;
   result.rayDirection = vec3(0.0, 0.0, -1.0);
   result.mapScale = 1.0;
+  result.fade = 1.0;
   return result;
 }
 
@@ -690,6 +706,246 @@ ThreeDHit ribbonHit(vec3 localRay) {
 }
 
 // ---------------------------------------------------------------------------
+// Square Rings: square frames (outer half size 1, bar width Thickness, depth
+// Depth, all times the frame's pulse scale) placed one Spacing apart along a
+// path. Frame k sits at path position k and the camera at path position
+// travel, which Flow advances by Rings per Tile frames per Flow Cycle. Every
+// per-frame variation depends on k - travel, on k modulo Rings per Tile, or on
+// whole turns per loop, so integer Flow Cycles show the same view at both ends
+// of the loop. Frames are intersected analytically; the loop keeps the
+// nearest hit among RINGS_COUNT frames around the camera.
+
+const int RINGS_PATTERN_SERPENT = 1;
+const int RINGS_PATTERN_TUMBLE = 2;
+const int RINGS_MAPPING_PICTURE = 1;
+const int RINGS_BEHIND = 12;
+const int RINGS_COUNT = 64;
+
+float ringsPeriod() {
+  return max(floor(u_ringsPerTile + 0.5), 1.0);
+}
+
+// Center line of the frames. The Serpent swings x once and y twice per tile,
+// so the path repeats every tile. Its amplitude keeps the curvature below 0.4
+// and the slope below 0.8 whatever the tile length.
+vec3 ringsPath(float w) {
+  float spacing = max(u_ringsSpacing, 0.05);
+  vec3 center = vec3(0.0, 0.0, -w * spacing);
+  if (u_ringsPattern != RINGS_PATTERN_SERPENT) return center;
+  float tileRadius = ringsPeriod() * spacing / TAU;
+  float amplitude = clamp(u_ringsAmount, 0.0, 1.0) * tileRadius * min(0.4 * tileRadius, 0.8);
+  // fract keeps the phase exact after whole tiles, so the loop ends match.
+  float phase = TAU * fract(w / ringsPeriod());
+  center.x = amplitude * sin(phase);
+  center.y = 0.25 * amplitude * cos(2.0 * phase);
+  return center;
+}
+
+vec3 ringsHash(float n) {
+  vec3 p = fract(vec3(n + 0.37) * vec3(0.1031, 0.1030, 0.0973));
+  p += dot(p, p.yzx + 33.33);
+  return fract((p.xxy + p.yzz) * p.zyx);
+}
+
+vec3 rotateAboutAxis(vec3 value, vec3 axis, float angle) {
+  float c = cos(angle);
+  float s = sin(angle);
+  return value * c + cross(axis, value) * s + axis * dot(axis, value) * (1.0 - c);
+}
+
+struct RingsFrame {
+  vec3 center;
+  // Local x and y span the square; local z runs along the path.
+  vec3 axisX;
+  vec3 axisY;
+  vec3 axisZ;
+  float scale;
+};
+
+RingsFrame ringsFrameAt(float k) {
+  RingsFrame frame;
+  float period = ringsPeriod();
+  float relative = k - u_threeDTravel;
+  frame.center = ringsPath(k);
+  vec3 forward = vec3(0.0, 0.0, -1.0);
+  if (u_ringsPattern == RINGS_PATTERN_SERPENT) {
+    forward = normalize(ringsPath(k + 0.05) - ringsPath(k - 0.05));
+  }
+  vec3 axisX = normalize(cross(forward, vec3(0.0, 1.0, 0.0)));
+  vec3 axisY = cross(axisX, forward);
+  vec3 axisZ = forward;
+  if (u_ringsPattern == RINGS_PATTERN_TUMBLE) {
+    // Frames near the camera line up so it flies through their holes; farther
+    // frames drift aside and turn about a per-slot random axis.
+    float scatter = clamp(u_ringsAmount, 0.0, 1.0) * smoothstep(1.5, 7.5, abs(relative));
+    float slot = mod(k, period);
+    vec3 random = ringsHash(slot);
+    vec3 axis = normalize(ringsHash(slot + 17.0) * 2.0 - 1.0 + vec3(0.0, 0.0, 0.001));
+    float angle = scatter * PI * (0.6 + 0.4 * random.z);
+    frame.center.xy += (random.xy * 2.0 - 1.0) * 2.5 * scatter;
+    axisX = rotateAboutAxis(axisX, axis, angle);
+    axisY = rotateAboutAxis(axisY, axis, angle);
+    axisZ = rotateAboutAxis(axisZ, axis, angle);
+  }
+  // Twist turns each frame relative to the camera, so the spiral turns as the
+  // camera flies through it; Spin rolls every frame by whole turns per loop.
+  float roll = relative * u_ringsTwist + u_ringsSpin;
+  float c = cos(roll);
+  float s = sin(roll);
+  frame.axisX = c * axisX + s * axisY;
+  frame.axisY = -s * axisX + c * axisY;
+  frame.axisZ = axisZ;
+  frame.scale = 1.0 + 0.5 * clamp(u_ringsPulse, 0.0, 1.0) * sin(TAU * (k / period - u_ringsPulsePhase));
+  return frame;
+}
+
+// Ray against one frame in its local space: the box |x|, |y| <= 1,
+// |z| <= halfDepth minus the hole |x|, |y| < inner running through it.
+// Returns the hit distance, or -1, and the local normal of the face hit.
+float ringsFrameIntersect(vec3 origin, vec3 direction, float inner, float halfDepth, out vec3 normal) {
+  normal = vec3(0.0, 0.0, 1.0);
+  vec3 safeDirection = direction + vec3(
+    abs(direction.x) < 0.000001 ? 0.000001 : 0.0,
+    abs(direction.y) < 0.000001 ? 0.000001 : 0.0,
+    abs(direction.z) < 0.000001 ? 0.000001 : 0.0
+  );
+  vec3 inverse = 1.0 / safeDirection;
+  vec3 stepSign = sign(safeDirection);
+  vec3 boxNear = (vec3(-1.0, -1.0, -halfDepth) - origin) * inverse;
+  vec3 boxFar = (vec3(1.0, 1.0, halfDepth) - origin) * inverse;
+  vec3 entry = min(boxNear, boxFar);
+  vec3 exit = max(boxNear, boxFar);
+  float enter = max(max(entry.x, entry.y), entry.z);
+  float leave = min(min(exit.x, exit.y), exit.z);
+  if (leave < max(enter, 0.0)) return -1.0;
+  vec2 holeNear = (vec2(-inner) - origin.xy) * inverse.xy;
+  vec2 holeFar = (vec2(inner) - origin.xy) * inverse.xy;
+  vec2 holeEntry = min(holeNear, holeFar);
+  vec2 holeExit = max(holeNear, holeFar);
+  float holeEnter = max(holeEntry.x, holeEntry.y);
+  float holeLeave = min(holeExit.x, holeExit.y);
+  bool crossesHole = holeLeave > holeEnter;
+  if (enter > 0.0 && (!crossesHole || enter < holeEnter || enter > holeLeave)) {
+    // Entering through the front, back, or outer face.
+    normal = entry.x >= entry.y && entry.x >= entry.z
+      ? vec3(-stepSign.x, 0.0, 0.0)
+      : entry.y >= entry.z
+        ? vec3(0.0, -stepSign.y, 0.0)
+        : vec3(0.0, 0.0, -stepSign.z);
+    return enter;
+  }
+  // Inside the hole where the ray reaches the frame: it meets the inner wall
+  // where it leaves the hole, unless it leaves the frame first.
+  if (crossesHole && holeLeave > max(enter, 0.0) && holeLeave < leave) {
+    normal = holeExit.x <= holeExit.y ? vec3(-stepSign.x, 0.0, 0.0) : vec3(0.0, -stepSign.y, 0.0);
+    return holeLeave;
+  }
+  return -1.0;
+}
+
+// Position around a square outline in [0, 1), clockwise from the top-left
+// corner with a quarter per side.
+float ringsPerimeter(vec2 p) {
+  vec2 q = p / max(max(abs(p.x), abs(p.y)), 0.000001);
+  if (q.y >= abs(q.x)) return 0.125 * (q.x + 1.0);
+  if (q.x >= abs(q.y)) return 0.25 + 0.125 * (1.0 - q.y);
+  if (-q.y >= abs(q.x)) return 0.5 + 0.125 * (1.0 - q.x);
+  return 0.75 + 0.125 * (q.y + 1.0);
+}
+
+ThreeDHit ringsHit(vec3 localRay) {
+  ThreeDHit result = threeDMiss();
+  float period = ringsPeriod();
+  float spacing = max(u_ringsSpacing, 0.05);
+  float pulse = clamp(u_ringsPulse, 0.0, 1.0);
+  float inner = clamp(1.0 - u_ringsThickness, 0.05, 0.98);
+  float halfDepth = clamp(0.5 * u_ringsDepth, 0.002, 0.45 * spacing);
+  float travel = u_threeDTravel;
+  vec3 cameraPosition = ringsPath(travel);
+  vec3 forward = vec3(0.0, 0.0, -1.0);
+  vec3 up = vec3(0.0, 1.0, 0.0);
+  if (u_ringsPattern == RINGS_PATTERN_SERPENT) {
+    // Aim one frame ahead and bank into the curve like a coaster.
+    forward = normalize(ringsPath(travel + 1.0) - cameraPosition);
+    vec3 pathRight = normalize(cross(forward, up));
+    vec3 behind = ringsPath(travel - 0.25);
+    vec3 ahead = ringsPath(travel + 0.25);
+    vec3 velocity = ahead - behind;
+    float curvature = 4.0 * dot(ahead - 2.0 * cameraPosition + behind, pathRight) / max(dot(velocity, velocity), 0.000001);
+    float bank = clamp(curvature * 1.5, -0.6, 0.6);
+    up = normalize(cos(bank) * cross(pathRight, forward) + sin(bank) * pathRight);
+  }
+  threeDSetCameraBasis(forward, up);
+  vec3 rayDirection = threeDWorldDirection(localRay, forward, up);
+  vec3 right = normalize(cross(forward, up));
+  vec3 cameraUp = cross(right, forward);
+  // The offset stays inside the smallest hole of the pulse.
+  vec2 offset = threeDRollMatrix() * u_cameraOffset * inner * (1.0 - 0.5 * pulse);
+  vec3 rayOrigin = cameraPosition + right * offset.x + cameraUp * offset.y
+    + g_cameraForward * u_cameraDolly * spacing;
+  result.rayDirection = rayDirection;
+
+  float first = floor(travel) - float(RINGS_BEHIND);
+  float best = 1.0e9;
+  float bestK = 0.0;
+  vec3 bestNormal = vec3(0.0, 0.0, 1.0);
+  vec2 bestLocal = vec2(0.0);
+  // A sphere around the path point that holds the frame at any pulse, turn,
+  // and Tumble drift, so frames can be culled before they are built.
+  bool tumble = u_ringsPattern == RINGS_PATTERN_TUMBLE;
+  float boundRadius = (1.0 + 0.5 * pulse) * sqrt(2.0 + halfDepth * halfDepth)
+    + (tumble ? 2.5 * clamp(u_ringsAmount, 0.0, 1.0) * 1.4143 : 0.0);
+  // Straight layouts line the frames up along -z, so a forward ray that has
+  // hit a frame cannot hit a closer one further along.
+  bool ordered = u_ringsPattern != RINGS_PATTERN_SERPENT && rayDirection.z < -0.0001;
+  for (int i = 0; i < RINGS_COUNT; i++) {
+    float k = first + float(i);
+    vec3 toPath = rayOrigin - ringsPath(k);
+    if (ordered && (toPath.z - boundRadius) / -rayDirection.z > best) break;
+    float b = dot(toPath, rayDirection);
+    float discriminant = b * b - dot(toPath, toPath) + boundRadius * boundRadius;
+    if (discriminant < 0.0) continue;
+    float root = sqrt(discriminant);
+    if (-b + root < 0.0 || -b - root > best) continue;
+    RingsFrame frame = ringsFrameAt(k);
+    vec3 toFrame = rayOrigin - frame.center;
+    vec3 localOrigin = vec3(dot(toFrame, frame.axisX), dot(toFrame, frame.axisY), dot(toFrame, frame.axisZ)) / frame.scale;
+    vec3 localDirection = vec3(dot(rayDirection, frame.axisX), dot(rayDirection, frame.axisY), dot(rayDirection, frame.axisZ)) / frame.scale;
+    vec3 localNormal;
+    float distance = ringsFrameIntersect(localOrigin, localDirection, inner, halfDepth, localNormal);
+    if (distance > 0.0 && distance < best) {
+      best = distance;
+      bestK = k;
+      bestNormal = localNormal.x * frame.axisX + localNormal.y * frame.axisY + localNormal.z * frame.axisZ;
+      bestLocal = (localOrigin + localDirection * distance).xy;
+    }
+  }
+  if (best > 1.0e8) return result;
+  result.hit = true;
+  result.position = rayOrigin + rayDirection * best;
+  result.normal = normalize(bestNormal);
+  result.distance = best;
+  float repeat = max(u_coneTextureRepeat, 1.0);
+  if (u_ringsMapping == RINGS_MAPPING_PICTURE) {
+    result.uv = (bestLocal * 0.5 + 0.5) * repeat;
+  } else {
+    // U runs around the frame and V across the bar, continuing into the next
+    // frame, so one tile of frames shows the canvas once along the path.
+    float across = clamp((max(abs(bestLocal.x), abs(bestLocal.y)) - inner) / max(1.0 - inner, 0.0001), 0.0, 1.0);
+    result.uv = vec2(ringsPerimeter(bestLocal) * repeat, (bestK + across) / period);
+  }
+  result.hasUv = true;
+  result.uvTiled = true;
+  result.mapScale = 0.5;
+  // Frames fade out before they leave the drawn range, so none pops in or out.
+  float relative = bestK - travel;
+  float ahead = float(RINGS_COUNT - RINGS_BEHIND);
+  result.fade = (1.0 - smoothstep(ahead - 14.0, ahead - 2.0, relative))
+    * (1.0 - smoothstep(float(RINGS_BEHIND) - 5.0, float(RINGS_BEHIND) - 1.0, -relative));
+  return result;
+}
+
+// ---------------------------------------------------------------------------
 // Mapping, shading, and fog.
 
 vec4 threeDTriplanarSample(vec3 position, vec3 normal, float mapScale) {
@@ -773,6 +1029,9 @@ void main() {
   } else if (u_threeDShape == SHAPE_RIBBON) {
     hit = ribbonHit(localRay);
     fogScale = 0.3;
+  } else if (u_threeDShape == SHAPE_RINGS) {
+    hit = ringsHit(localRay);
+    fogScale = 0.25 / max(u_ringsSpacing, 0.05);
   } else {
     hit = torusHit(localRay);
   }
@@ -781,5 +1040,6 @@ void main() {
     return;
   }
   vec4 color = threeDSurfaceColor(hit);
+  color.rgb *= hit.fade;
   gl_FragColor = threeDApplyFog(color, hit.distance, fogScale);
 }

@@ -167,6 +167,49 @@ describe('3D render parameters', () => {
     expect(getThreeDRenderParams(ribbon, 1, 1).travel).toBe(3);
   });
 
+  it('flies through one tile of square rings per Flow Cycle', () => {
+    const rings = { ...DEFAULT_CONE_VIEW, shape: 'rings' as const, flowCycles: 2, ringsPerTile: 6 };
+    const quarter = getThreeDRenderParams(rings, 0.25, 1);
+    expect(quarter.shape).toBe(6);
+    expect(quarter.travel).toBeCloseTo(3, 10);
+    expect(quarter.textureOffset).toEqual([0, 0]);
+    expect(getThreeDRenderParams(rings, 1, 1).travel).toBe(12);
+    expect(getThreeDRenderParams({ ...rings, mappingMode: 'projection' }, 0.5, 1).travel).toBe(0);
+  });
+
+  it('passes the square ring settings and loops their Spin and Beats', () => {
+    const rings = {
+      ...DEFAULT_CONE_VIEW,
+      shape: 'rings' as const,
+      ringsPattern: 'serpent' as const,
+      ringsMapping: 'picture' as const,
+      ringsTwist: 90,
+      spin: 2,
+      ringsBeats: 3,
+      ringsPulse: 0.4,
+      ringsAmount: 0.7,
+    };
+    const params = getThreeDRenderParams(rings, 0.25, 1);
+    expect(params.rings).toMatchObject({
+      pattern: 1,
+      mapping: 1,
+      perTile: 8,
+      spacing: 1,
+      thickness: 0.12,
+      depth: 0.06,
+      pulse: 0.4,
+      amount: 0.7,
+    });
+    expect(params.rings.twistRadians).toBeCloseTo(Math.PI / 2, 10);
+    expect(params.rings.spinRadians).toBeCloseTo(Math.PI, 10);
+    expect(params.rings.pulsePhase).toBeCloseTo(0.75, 10);
+    const start = getThreeDRenderParams(rings, 0, 1).rings;
+    const end = getThreeDRenderParams(rings, 1, 1).rings;
+    expect(end.spinRadians).toBeCloseTo(start.spinRadians, 10);
+    expect(end.pulsePhase).toBeCloseTo(start.pulsePhase, 10);
+    expect(getThreeDRenderParams({ ...rings, ringsPattern: 'tumble' }, 0, 1).rings.pattern).toBe(2);
+  });
+
   it('maps the lattice type to its shader index', () => {
     expect(getThreeDRenderParams({ ...DEFAULT_CONE_VIEW, latticeType: 'schwarzP' }, 0, 1).lattice.type).toBe(1);
   });

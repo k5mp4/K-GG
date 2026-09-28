@@ -11,6 +11,8 @@ import {
   CONE_SHAPE_OPTIONS,
   DEFAULT_CONE_VIEW,
   LATTICE_TYPE_OPTIONS,
+  RINGS_MAPPING_OPTIONS,
+  RINGS_PATTERN_OPTIONS,
   THREE_D_PROJECTION_OPTIONS,
   THREE_D_SURFACE_MAPPING_OPTIONS,
   type CameraWigglePreset,
@@ -18,6 +20,8 @@ import {
   type ConeShape,
   type ConeViewConfig,
   type LatticeType,
+  type RingsMapping,
+  type RingsPattern,
   type ThreeDProjection,
   type ThreeDSurfaceMapping,
 } from '../types/coneView';
@@ -38,6 +42,13 @@ const SHAPE_TEXT: Record<ConeShape, { title: MessageKey; description: MessageKey
   terrain: { title: 'cone.terrainSurface', description: 'cone.terrainDescription', hint: 'cone.terrainHint' },
   extrusion: { title: 'cone.extrusionSurface', description: 'cone.extrusionDescription', hint: 'cone.extrusionHint' },
   ribbon: { title: 'cone.ribbonSurface', description: 'cone.ribbonDescription', hint: 'cone.ribbonHint' },
+  rings: { title: 'cone.ringsSurface', description: 'cone.ringsDescription', hint: 'cone.ringsHint' },
+};
+
+/** Serpent bends its path and Tumble scatters its frames with the same amount. */
+const RINGS_AMOUNT_LABEL: Partial<Record<RingsPattern, string>> = {
+  serpent: 'Curve',
+  tumble: 'Scatter',
 };
 
 function toCameraPositionInput(x: number, y: number): [number, number] {
@@ -120,6 +131,93 @@ function ShapeControls({ coneView, setConeView }: { coneView: ConeViewConfig; se
           value={coneView.depth}
           limitKey="cone.depth"
           onChange={(depth) => setConeView({ depth })}
+        />
+      </>
+    );
+  }
+  if (coneView.shape === 'rings') {
+    const amountLabel = RINGS_AMOUNT_LABEL[coneView.ringsPattern];
+    return (
+      <>
+        <CustomSelect
+          label="Pattern"
+          value={coneView.ringsPattern}
+          localizeLabel={false}
+          localizeOptions={false}
+          options={[...RINGS_PATTERN_OPTIONS]}
+          onChange={(ringsPattern) => setConeView({ ringsPattern: ringsPattern as RingsPattern })}
+        />
+        {amountLabel && (
+          <SliderField
+            label={amountLabel}
+            value={coneView.ringsAmount}
+            limitKey="cone.ringsAmount"
+            format={(value) => `${Math.round(value * 100)}%`}
+            onChange={(ringsAmount) => setConeView({ ringsAmount })}
+          />
+        )}
+        <CustomSelect
+          label="Ring Mapping"
+          value={coneView.ringsMapping}
+          localizeLabel={false}
+          localizeOptions={false}
+          options={[...RINGS_MAPPING_OPTIONS]}
+          onChange={(ringsMapping) => setConeView({ ringsMapping: ringsMapping as RingsMapping })}
+        />
+        <SliderField
+          label="Rings per Tile"
+          value={coneView.ringsPerTile}
+          limitKey="cone.ringsPerTile"
+          format={(value) => `${Math.round(value)}`}
+          onChange={(ringsPerTile) => setConeView({ ringsPerTile })}
+        />
+        <SliderField
+          label="Spacing"
+          value={coneView.ringsSpacing}
+          limitKey="cone.ringsSpacing"
+          onChange={(ringsSpacing) => setConeView({ ringsSpacing })}
+        />
+        <SliderField
+          label="Thickness"
+          value={coneView.ringsThickness}
+          limitKey="cone.ringsThickness"
+          format={(value) => `${Math.round(value * 100)}%`}
+          onChange={(ringsThickness) => setConeView({ ringsThickness })}
+        />
+        <SliderField
+          label="Frame Depth"
+          value={coneView.ringsDepth}
+          limitKey="cone.ringsDepth"
+          onChange={(ringsDepth) => setConeView({ ringsDepth })}
+        />
+        <SliderField
+          label="Twist"
+          value={coneView.ringsTwist}
+          limitKey="cone.ringsTwist"
+          format={(value) => `${value > 0 ? '+' : ''}${value.toFixed(1)}°`}
+          onChange={(ringsTwist) => setConeView({ ringsTwist })}
+        />
+        <SliderField
+          label="Spin"
+          value={coneView.spin}
+          limitKey="cone.spin"
+          format={(value) => `${Math.round(value)}`}
+          onChange={(spin) => setConeView({ spin })}
+        />
+        <SliderField
+          label="Pulse"
+          value={coneView.ringsPulse}
+          limitKey="cone.ringsPulse"
+          format={(value) => `${Math.round(value * 100)}%`}
+          onChange={(ringsPulse) => setConeView({ ringsPulse })}
+        />
+        <SliderField
+          label="Beats"
+          value={coneView.ringsBeats}
+          limitKey="cone.ringsBeats"
+          disabled={coneView.ringsPulse === 0}
+          format={(value) => `${Math.round(value)}`}
+          onChange={(ringsBeats) => setConeView({ ringsBeats })}
         />
       </>
     );
