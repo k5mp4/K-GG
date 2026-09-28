@@ -2,8 +2,8 @@ import { clampParameter, getParameterDefault, getParameterLimit } from '../lib/p
 
 export type ConeMappingMode = 'flow' | 'projection';
 /** Geometry of the 3D layer. The layer kind and preset key stay `cone` for compatibility. */
-export type ConeShape = 'cone' | 'torus' | 'lattice' | 'terrain' | 'extrusion' | 'ribbon' | 'rings';
-export const CONE_SHAPES = ['cone', 'torus', 'lattice', 'terrain', 'extrusion', 'ribbon', 'rings'] as const satisfies readonly ConeShape[];
+export type ConeShape = 'cone' | 'torus' | 'lattice' | 'terrain' | 'extrusion' | 'ribbon' | 'rings' | 'field';
+export const CONE_SHAPES = ['cone', 'torus', 'lattice', 'terrain', 'extrusion', 'ribbon', 'rings', 'field'] as const satisfies readonly ConeShape[];
 export const CONE_SHAPE_INDEX = {
   cone: 0,
   torus: 1,
@@ -12,6 +12,7 @@ export const CONE_SHAPE_INDEX = {
   extrusion: 4,
   ribbon: 5,
   rings: 6,
+  field: 7,
 } as const satisfies Record<ConeShape, number>;
 export const CONE_SHAPE_OPTIONS: { value: ConeShape; label: string }[] = [
   { value: 'cone', label: 'Cone' },
@@ -21,6 +22,28 @@ export const CONE_SHAPE_OPTIONS: { value: ConeShape; label: string }[] = [
   { value: 'extrusion', label: 'Extrusion · Pixel city' },
   { value: 'ribbon', label: 'Ribbon · Twisted band' },
   { value: 'rings', label: 'Square Rings · Frame tunnel' },
+  { value: 'field', label: 'Geometry Field · Scattered flythrough' },
+];
+
+/** Primitives of the Geometry Field; `mix` picks one at random per object. */
+export type FieldGeometry = 'mix' | 'sphere' | 'cube' | 'prism' | 'octahedron' | 'torus';
+export const FIELD_GEOMETRIES = ['mix', 'sphere', 'cube', 'prism', 'octahedron', 'torus'] as const satisfies readonly FieldGeometry[];
+export const FIELD_GEOMETRY_OPTIONS: { value: FieldGeometry; label: string }[] = [
+  { value: 'mix', label: 'Mix · All shapes' },
+  { value: 'sphere', label: 'Sphere' },
+  { value: 'cube', label: 'Cube' },
+  { value: 'prism', label: 'Triangular Prism' },
+  { value: 'octahedron', label: 'Octahedron' },
+  { value: 'torus', label: 'Torus' },
+];
+
+/** Geometry Field surfaces: filled, edges only, or a random choice per object. */
+export type FieldRender = 'solid' | 'wire' | 'mixed';
+export const FIELD_RENDERS = ['solid', 'wire', 'mixed'] as const satisfies readonly FieldRender[];
+export const FIELD_RENDER_OPTIONS: { value: FieldRender; label: string }[] = [
+  { value: 'solid', label: 'Solid' },
+  { value: 'wire', label: 'Wireframe' },
+  { value: 'mixed', label: 'Mixed · Per object' },
 ];
 
 /**
@@ -209,6 +232,24 @@ export type ConeViewConfig = {
   ringsBeats: number;
   /** Square Rings only: Serpent path curvature or Tumble scatter strength. */
   ringsAmount: number;
+  /** Geometry Field only: primitive of every object, or a random mix. */
+  fieldGeometry: FieldGeometry;
+  /** Geometry Field only: solid, wireframe, or a random choice per object. */
+  fieldRender: FieldRender;
+  /** Geometry Field only: cells after which the layout repeats; each Flow Cycle passes this many. */
+  fieldLoopCells: number;
+  /** Geometry Field only: share of cells holding an object. */
+  fieldDensity: number;
+  /** Geometry Field only: largest object size as a share of its cell. */
+  fieldSize: number;
+  /** Geometry Field only: radius in cells around the camera path kept free of objects. */
+  fieldClearance: number;
+  /** Geometry Field only: outer radius in cells of the swarm; at least Clearance + 1. */
+  fieldSpread: number;
+  /** Geometry Field only: wire thickness relative to the object radius. */
+  fieldWire: number;
+  /** Geometry Field only: how far each object's texture is shifted from the others. */
+  fieldVariation: number;
 };
 
 /** Normalized apex movement limit; ±2 reaches 50% of the canvas outside its edge. */
@@ -271,6 +312,15 @@ export const DEFAULT_CONE_VIEW: ConeViewConfig = {
   ringsPulse: getParameterDefault('cone.ringsPulse'),
   ringsBeats: getParameterDefault('cone.ringsBeats'),
   ringsAmount: getParameterDefault('cone.ringsAmount'),
+  fieldGeometry: 'mix',
+  fieldRender: 'solid',
+  fieldLoopCells: getParameterDefault('cone.fieldLoopCells'),
+  fieldDensity: getParameterDefault('cone.fieldDensity'),
+  fieldSize: getParameterDefault('cone.fieldSize'),
+  fieldClearance: getParameterDefault('cone.fieldClearance'),
+  fieldSpread: getParameterDefault('cone.fieldSpread'),
+  fieldWire: getParameterDefault('cone.fieldWire'),
+  fieldVariation: getParameterDefault('cone.fieldVariation'),
 };
 
 function normalizeOption<T extends string>(value: unknown, options: readonly T[], fallback: T): T {
@@ -337,5 +387,14 @@ export function normalizeConeViewConfig(value: unknown): ConeViewConfig {
     ringsPulse: clampParameter(raw.ringsPulse, DEFAULT_CONE_VIEW.ringsPulse, getParameterLimit('cone.ringsPulse')),
     ringsBeats: clampParameter(raw.ringsBeats, DEFAULT_CONE_VIEW.ringsBeats, getParameterLimit('cone.ringsBeats')),
     ringsAmount: clampParameter(raw.ringsAmount, DEFAULT_CONE_VIEW.ringsAmount, getParameterLimit('cone.ringsAmount')),
+    fieldGeometry: normalizeOption(raw.fieldGeometry, FIELD_GEOMETRIES, DEFAULT_CONE_VIEW.fieldGeometry),
+    fieldRender: normalizeOption(raw.fieldRender, FIELD_RENDERS, DEFAULT_CONE_VIEW.fieldRender),
+    fieldLoopCells: clampParameter(raw.fieldLoopCells, DEFAULT_CONE_VIEW.fieldLoopCells, getParameterLimit('cone.fieldLoopCells')),
+    fieldDensity: clampParameter(raw.fieldDensity, DEFAULT_CONE_VIEW.fieldDensity, getParameterLimit('cone.fieldDensity')),
+    fieldSize: clampParameter(raw.fieldSize, DEFAULT_CONE_VIEW.fieldSize, getParameterLimit('cone.fieldSize')),
+    fieldClearance: clampParameter(raw.fieldClearance, DEFAULT_CONE_VIEW.fieldClearance, getParameterLimit('cone.fieldClearance')),
+    fieldSpread: clampParameter(raw.fieldSpread, DEFAULT_CONE_VIEW.fieldSpread, getParameterLimit('cone.fieldSpread')),
+    fieldWire: clampParameter(raw.fieldWire, DEFAULT_CONE_VIEW.fieldWire, getParameterLimit('cone.fieldWire')),
+    fieldVariation: clampParameter(raw.fieldVariation, DEFAULT_CONE_VIEW.fieldVariation, getParameterLimit('cone.fieldVariation')),
   };
 }

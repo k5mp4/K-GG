@@ -70,6 +70,17 @@ uniform float u_ringsPulse;
 uniform float u_ringsPulsePhase;
 uniform float u_ringsAmount;
 
+uniform int u_fieldGeometry;
+uniform int u_fieldRender;
+uniform float u_fieldLoopCells;
+uniform float u_fieldDensity;
+uniform float u_fieldSize;
+uniform float u_fieldClearance;
+uniform float u_fieldSpread;
+uniform float u_fieldWire;
+uniform float u_fieldSpin;
+uniform float u_fieldVariation;
+
 const float PI = 3.141592653589793;
 const float TAU = 6.283185307179586;
 
@@ -80,6 +91,7 @@ const int SHAPE_TERRAIN = 3;
 const int SHAPE_EXTRUSION = 4;
 const int SHAPE_RIBBON = 5;
 const int SHAPE_RINGS = 6;
+const int SHAPE_FIELD = 7;
 
 const int MAPPING_UV = 0;
 const int MAPPING_TRIPLANAR = 1;
@@ -946,6 +958,279 @@ ThreeDHit ringsHit(vec3 localRay) {
 }
 
 // ---------------------------------------------------------------------------
+// Geometry Field: space is split into unit slices along z, and each slice
+// into unit cells whose grid is shifted by a per-slice random offset so the
+// objects do not line up into lanes. A cell may hold one primitive whose
+// bounding sphere stays inside the cell, so the march only looks at the cell
+// it is in and never steps past the cell's far side. Objects fill the ring
+// between Clearance and Spread around the z axis, along which the camera
+// travels toward -z. The layout hashes the slice modulo Loop Length and the
+// camera moves Loop Length cells per Flow Cycle; objects spin by whole turns
+// per loop, so integer Flow Cycles loop seamlessly.
+
+const int FIELD_SPHERE = 0;
+const int FIELD_CUBE = 1;
+const int FIELD_PRISM = 2;
+const int FIELD_OCTAHEDRON = 3;
+const int FIELD_RENDER_WIRE = 1;
+const int FIELD_RENDER_MIXED = 2;
+const float FIELD_VIEW_CELLS = 26.0;
+const float FIELD_CUBE_HALF = 0.57;
+const float FIELD_TORUS_RING = 0.7;
+const float FIELD_TORUS_TUBE = 0.28;
+
+vec3 fieldHash(vec3 p) {
+  vec3 q = fract(p * vec3(0.1031, 0.1030, 0.0973));
+  q += dot(q, q.yxz + 33.33);
+  return fract((q.xxy + q.yxx) * q.zyx);
+}
+
+mat3 axisAngleMatrix(vec3 axis, float angle) {
+  float c = cos(angle);
+  float s = sin(angle);
+  float t = 1.0 - c;
+  return mat3(
+    t * axis.x * axis.x + c, t * axis.x * axis.y + s * axis.z, t * axis.x * axis.z - s * axis.y,
+    t * axis.x * axis.y - s * axis.z, t * axis.y * axis.y + c, t * axis.y * axis.z + s * axis.x,
+    t * axis.x * axis.z + s * axis.y, t * axis.y * axis.z - s * axis.x, t * axis.z * axis.z + c
+  );
+}
+
+struct FieldObject {
+  bool present;
+  int type;
+  bool wire;
+  vec3 center;
+  mat3 rotation;
+  float radius;
+  vec2 uvOffset;
+};
+
+float fieldPeriod() {
+  return max(floor(u_fieldLoopCells + 0.5), 1.0);
+}
+
+// Grid offset of one z slice, repeating every Loop Length slices.
+vec2 fieldSliceShift(float slice) {
+  return fieldHash(vec3(mod(slice, fieldPeriod()) + 0.37, 5.1, 9.7)).xy;
+}
+
+float fieldSpread() {
+  return max(u_fieldSpread, u_fieldClearance + 1.0);
+}
+
+// `cell` holds the grid indices in x and y and the slice in z; `base` is the
+// cell center after the slice shift.
+FieldObject fieldObjectAt(vec3 cell, vec3 base) {
+  FieldObject object;
+  vec3 key = vec3(cell.xy, mod(cell.z, fieldPeriod())) + 0.37;
+  vec3 pick = fieldHash(key);
+  vec3 place = fieldHash(key + 19.1);
+  vec3 turn = fieldHash(key + 47.3);
+  vec3 extra = fieldHash(key + 113.7);
+  float axisDistance = length(base.xy);
+  object.present = axisDistance >= u_fieldClearance && axisDistance <= fieldSpread() && pick.x < u_fieldDensity;
+  object.type = u_fieldGeometry == 0 ? int(min(floor(pick.y * 5.0), 4.0)) : u_fieldGeometry - 1;
+  object.wire = u_fieldRender == FIELD_RENDER_WIRE || (u_fieldRender == FIELD_RENDER_MIXED && pick.z < 0.5);
+  object.radius = 0.5 * clamp(u_fieldSize, 0.05, 1.0) * (0.55 + 0.45 * place.x);
+  // Each axis moves at most as far as keeps the bounding sphere in the cell.
+  object.center = base + (fieldHash(key + 83.9) * 2.0 - 1.0) * (0.5 - object.radius);
+  vec3 axis = normalize(turn * 2.0 - 1.0 + vec3(0.0, 0.001, 0.0));
+  // Once or twice per Spin, either way round: whole turns per loop.
+  float rate = (place.y < 0.5 ? -1.0 : 1.0) * (place.z < 0.5 ? 1.0 : 2.0);
+  object.rotation = axisAngleMatrix(axis, extra.z * TAU + rate * u_fieldSpin);
+  object.uvOffset = extra.xy * clamp(u_fieldVariation, 0.0, 1.0);
+  return object;
+}
+
+float fieldSegment(vec3 p, vec3 a, vec3 b) {
+  vec3 pa = p - a;
+  vec3 ba = b - a;
+  return length(pa - ba * clamp(dot(pa, ba) / dot(ba, ba), 0.0, 1.0));
+}
+
+// Solid primitives in object space, each inside the unit sphere.
+float fieldSolidDistance(int type, vec3 p) {
+  if (type == FIELD_SPHERE) return length(p) - 1.0;
+  if (type == FIELD_CUBE) {
+    vec3 q = abs(p) - vec3(FIELD_CUBE_HALF - 0.05);
+    return length(max(q, 0.0)) + min(max(q.x, max(q.y, q.z)), 0.0) - 0.05;
+  }
+  if (type == FIELD_PRISM) {
+    // Triangle with inradius 0.375 (apex at y = 0.75), 1.2 long along z.
+    vec3 q = abs(p);
+    return max(q.z - 0.6, max(q.x * 0.866025 + p.y * 0.5, -p.y) - 0.375);
+  }
+  if (type == FIELD_OCTAHEDRON) {
+    vec3 q = abs(p);
+    return (q.x + q.y + q.z - 1.0) * 0.57735027;
+  }
+  return length(vec2(length(p.xz) - FIELD_TORUS_RING, p.y) ) - FIELD_TORUS_TUBE;
+}
+
+// Edges of the same primitives as tubes of radius `width`. Mirror folds and
+// angle snapping reduce each edge set to the few edges nearest the point.
+float fieldWireDistance(int type, vec3 p, float width) {
+  float edge;
+  if (type == FIELD_SPHERE) {
+    // Four great circles through the poles and parallels at 0 and ±45°.
+    float angleStep = PI / 4.0;
+    float meridian = floor(atan(p.z, p.x) / angleStep + 0.5) * angleStep;
+    vec3 normal = vec3(-sin(meridian), 0.0, cos(meridian));
+    float h = dot(p, normal);
+    float meridianEdge = length(vec2(h, length(p - h * normal) - 1.0));
+    float latitude = asin(clamp(p.y / max(length(p), 0.0001), -1.0, 1.0));
+    float parallel = clamp(floor(latitude / angleStep + 0.5), -1.0, 1.0) * angleStep;
+    float parallelEdge = length(vec2(length(p.xz) - cos(parallel), p.y - sin(parallel)));
+    edge = min(meridianEdge, parallelEdge);
+  } else if (type == FIELD_CUBE) {
+    vec3 q = abs(p);
+    vec3 corner = vec3(FIELD_CUBE_HALF);
+    edge = min(
+      fieldSegment(q, vec3(0.0, corner.yz), corner),
+      min(fieldSegment(q, vec3(corner.x, 0.0, corner.z), corner), fieldSegment(q, vec3(corner.xy, 0.0), corner))
+    );
+  } else if (type == FIELD_PRISM) {
+    vec3 q = vec3(abs(p.x), p.y, abs(p.z));
+    vec3 apex = vec3(0.0, 0.75, 0.6);
+    vec3 base = vec3(0.649519, -0.375, 0.6);
+    edge = min(
+      min(fieldSegment(q, apex, base), fieldSegment(q, vec3(0.0, -0.375, 0.6), base)),
+      min(fieldSegment(q, vec3(apex.xy, 0.0), apex), fieldSegment(q, vec3(base.xy, 0.0), base))
+    );
+  } else if (type == FIELD_OCTAHEDRON) {
+    vec3 q = abs(p);
+    edge = min(
+      fieldSegment(q, vec3(1.0, 0.0, 0.0), vec3(0.0, 1.0, 0.0)),
+      min(fieldSegment(q, vec3(0.0, 1.0, 0.0), vec3(0.0, 0.0, 1.0)), fieldSegment(q, vec3(0.0, 0.0, 1.0), vec3(1.0, 0.0, 0.0)))
+    );
+  } else {
+    // Twelve tube circles around the ring and four circles along it.
+    float ringStep = TAU / 12.0;
+    float ringAngle = floor(atan(p.z, p.x) / ringStep + 0.5) * ringStep;
+    vec3 radial = vec3(cos(ringAngle), 0.0, sin(ringAngle));
+    vec3 tangent = vec3(-radial.z, 0.0, radial.x);
+    vec3 q = p - radial * FIELD_TORUS_RING;
+    float h = dot(q, tangent);
+    float meridianEdge = length(vec2(h, length(q - h * tangent) - FIELD_TORUS_TUBE));
+    float tubeStep = TAU / 4.0;
+    float tubeAngle = floor(atan(p.y, length(p.xz) - FIELD_TORUS_RING) / tubeStep + 0.5) * tubeStep;
+    float parallelEdge = length(vec2(
+      length(p.xz) - (FIELD_TORUS_RING + FIELD_TORUS_TUBE * cos(tubeAngle)),
+      p.y - FIELD_TORUS_TUBE * sin(tubeAngle)
+    ));
+    edge = min(meridianEdge, parallelEdge);
+  }
+  return edge - width;
+}
+
+float fieldObjectDistance(FieldObject object, vec3 position, float width) {
+  // Row-vector product: the inverse rotation into object space.
+  vec3 local = (position - object.center) * object.rotation / object.radius;
+  float surface = object.wire ? fieldWireDistance(object.type, local, width) : fieldSolidDistance(object.type, local);
+  return surface * object.radius;
+}
+
+ThreeDHit fieldHit(vec3 localRay) {
+  ThreeDHit result = threeDMiss();
+  vec3 forward = vec3(0.0, 0.0, -1.0);
+  vec3 up = vec3(0.0, 1.0, 0.0);
+  threeDSetCameraBasis(forward, up);
+  vec3 rayDirection = threeDWorldDirection(localRay, forward, up);
+  // Kept cells lie at least Clearance - sqrt(0.5) from the axis, so the
+  // camera offset stays inside that. Dolly moves along the path, not the look.
+  vec2 offset = threeDRollMatrix() * u_cameraOffset * max(u_fieldClearance - 0.7072, 0.0);
+  // The layout repeats every Loop Length cells, so wrapping the travel keeps
+  // coordinates small and makes both loop ends compute the same view exactly.
+  vec3 rayOrigin = vec3(offset, -mod(u_threeDTravel, fieldPeriod()) - u_cameraDolly);
+  result.rayDirection = rayDirection;
+  // Angle of one pixel, used to keep distant wires at least a pixel wide.
+  float pixelAngle = u_threeDProjection == 0
+    ? 2.0 * u_coneTangentHalfFov / max(u_fullResolution.y, 1.0)
+    : u_threeDProjection == 1
+      ? 2.0 * u_fisheyeHalfAngle / max(min(u_fullResolution.x, u_fullResolution.y), 1.0)
+      : PI / max(u_fullResolution.y, 1.0);
+
+  vec3 safeDirection = rayDirection + vec3(
+    abs(rayDirection.x) < 0.000001 ? 0.000001 : 0.0,
+    abs(rayDirection.y) < 0.000001 ? 0.000001 : 0.0,
+    abs(rayDirection.z) < 0.000001 ? 0.000001 : 0.0
+  );
+  vec3 inverse = 1.0 / safeDirection;
+  vec3 exitSide = 0.5 * sign(safeDirection);
+  float spread = fieldSpread();
+  vec3 cell = vec3(1.0e6);
+  vec3 base = vec3(0.0);
+  FieldObject object;
+  object.present = false;
+  float distance = 0.0;
+  float width = u_fieldWire;
+  bool hit = false;
+  for (int i = 0; i < 192; i++) {
+    vec3 position = rayOrigin + rayDirection * distance;
+    // A ray outside the swarm that moves away from the axis meets nothing more.
+    if (length(position.xy) > spread + 1.0 && dot(position.xy, rayDirection.xy) > 0.0) break;
+    float slice = floor(position.z + 0.5);
+    vec2 shift = fieldSliceShift(slice);
+    vec3 current = vec3(floor(position.xy - shift + 0.5), slice);
+    if (any(notEqual(current, cell))) {
+      cell = current;
+      base = vec3(cell.xy + shift, slice);
+      object = fieldObjectAt(cell, base);
+    }
+    // Never step past the cell's far side: the next cell may hold an object.
+    vec3 planes = (base + exitSide - position) * inverse;
+    float advance = min(min(planes.x, planes.y), planes.z) + 0.001;
+    if (object.present) {
+      width = max(u_fieldWire, 0.75 * pixelAngle * distance / object.radius);
+      float surface = fieldObjectDistance(object, position, width);
+      if (surface < 0.0004 * (1.0 + distance)) {
+        hit = true;
+        break;
+      }
+      advance = min(surface, advance);
+    }
+    distance += advance;
+    if (distance > FIELD_VIEW_CELLS) break;
+  }
+  if (!hit) return result;
+  vec3 position = rayOrigin + rayDirection * distance;
+  float epsilon = 0.0003 + 0.3 * pixelAngle * distance;
+  vec2 k = vec2(1.0, -1.0);
+  vec3 normal = normalize(
+    k.xyy * fieldObjectDistance(object, position + k.xyy * epsilon, width)
+    + k.yyx * fieldObjectDistance(object, position + k.yyx * epsilon, width)
+    + k.yxy * fieldObjectDistance(object, position + k.yxy * epsilon, width)
+    + k.xxx * fieldObjectDistance(object, position + k.xxx * epsilon, width)
+  );
+  result.hit = true;
+  result.position = position;
+  result.normal = normal;
+  result.distance = distance;
+  // Surface UV in object space, so the canvas turns with each object and
+  // Variation shifts every object to a different part of the canvas.
+  vec3 local = (position - object.center) * object.rotation / object.radius;
+  vec2 uv;
+  if (object.type == FIELD_SPHERE) {
+    uv = vec2(atan(local.z, local.x) / TAU + 0.5, acos(clamp(-local.y / max(length(local), 0.0001), -1.0, 1.0)) / PI);
+  } else if (object.type == FIELD_CUBE || object.type == FIELD_PRISM || object.type == FIELD_OCTAHEDRON) {
+    // Planar mapping on each flat face, from a basis built on its normal.
+    vec3 faceNormal = normalize(normal * object.rotation);
+    vec3 tangentU = normalize(cross(abs(faceNormal.y) < 0.99 ? vec3(0.0, 1.0, 0.0) : vec3(1.0, 0.0, 0.0), faceNormal));
+    uv = vec2(dot(local, tangentU), dot(local, cross(faceNormal, tangentU))) * 0.5 + 0.5;
+  } else {
+    uv = vec2(atan(local.z, local.x) / TAU + 0.5, atan(local.y, length(local.xz) - FIELD_TORUS_RING) / TAU + 0.5);
+  }
+  result.uv = uv * max(u_coneTextureRepeat, 1.0) + object.uvOffset;
+  result.hasUv = true;
+  result.uvTiled = true;
+  result.mapScale = 1.0;
+  // Objects fade out before the view limit, so none pops in.
+  result.fade = 1.0 - smoothstep(FIELD_VIEW_CELLS - 12.0, FIELD_VIEW_CELLS, distance);
+  return result;
+}
+
+// ---------------------------------------------------------------------------
 // Mapping, shading, and fog.
 
 vec4 threeDTriplanarSample(vec3 position, vec3 normal, float mapScale) {
@@ -1032,6 +1317,9 @@ void main() {
   } else if (u_threeDShape == SHAPE_RINGS) {
     hit = ringsHit(localRay);
     fogScale = 0.25 / max(u_ringsSpacing, 0.05);
+  } else if (u_threeDShape == SHAPE_FIELD) {
+    hit = fieldHit(localRay);
+    fogScale = 0.12;
   } else {
     hit = torusHit(localRay);
   }

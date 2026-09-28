@@ -10,6 +10,8 @@ import {
   CONE_SEAM_MODE_OPTIONS,
   CONE_SHAPE_OPTIONS,
   DEFAULT_CONE_VIEW,
+  FIELD_GEOMETRY_OPTIONS,
+  FIELD_RENDER_OPTIONS,
   LATTICE_TYPE_OPTIONS,
   RINGS_MAPPING_OPTIONS,
   RINGS_PATTERN_OPTIONS,
@@ -19,6 +21,8 @@ import {
   type ConeSeamMode,
   type ConeShape,
   type ConeViewConfig,
+  type FieldGeometry,
+  type FieldRender,
   type LatticeType,
   type RingsMapping,
   type RingsPattern,
@@ -43,6 +47,7 @@ const SHAPE_TEXT: Record<ConeShape, { title: MessageKey; description: MessageKey
   extrusion: { title: 'cone.extrusionSurface', description: 'cone.extrusionDescription', hint: 'cone.extrusionHint' },
   ribbon: { title: 'cone.ribbonSurface', description: 'cone.ribbonDescription', hint: 'cone.ribbonHint' },
   rings: { title: 'cone.ringsSurface', description: 'cone.ringsDescription', hint: 'cone.ringsHint' },
+  field: { title: 'cone.fieldSurface', description: 'cone.fieldDescription', hint: 'cone.fieldHint' },
 };
 
 /** Serpent bends its path and Tumble scatters its frames with the same amount. */
@@ -218,6 +223,84 @@ function ShapeControls({ coneView, setConeView }: { coneView: ConeViewConfig; se
           disabled={coneView.ringsPulse === 0}
           format={(value) => `${Math.round(value)}`}
           onChange={(ringsBeats) => setConeView({ ringsBeats })}
+        />
+      </>
+    );
+  }
+  if (coneView.shape === 'field') {
+    const percent = (value: number) => `${Math.round(value * 100)}%`;
+    return (
+      <>
+        <CustomSelect
+          label="Geometry"
+          value={coneView.fieldGeometry}
+          localizeLabel={false}
+          localizeOptions={false}
+          options={[...FIELD_GEOMETRY_OPTIONS]}
+          onChange={(fieldGeometry) => setConeView({ fieldGeometry: fieldGeometry as FieldGeometry })}
+        />
+        <CustomSelect
+          label="Render"
+          value={coneView.fieldRender}
+          localizeLabel={false}
+          localizeOptions={false}
+          options={[...FIELD_RENDER_OPTIONS]}
+          onChange={(fieldRender) => setConeView({ fieldRender: fieldRender as FieldRender })}
+        />
+        <SliderField
+          label="Wire Width"
+          value={coneView.fieldWire}
+          limitKey="cone.fieldWire"
+          disabled={coneView.fieldRender === 'solid'}
+          format={(value) => value.toFixed(3)}
+          onChange={(fieldWire) => setConeView({ fieldWire })}
+        />
+        <SliderField
+          label="Loop Length"
+          value={coneView.fieldLoopCells}
+          limitKey="cone.fieldLoopCells"
+          format={(value) => `${Math.round(value)}`}
+          onChange={(fieldLoopCells) => setConeView({ fieldLoopCells })}
+        />
+        <SliderField
+          label="Density"
+          value={coneView.fieldDensity}
+          limitKey="cone.fieldDensity"
+          format={percent}
+          onChange={(fieldDensity) => setConeView({ fieldDensity })}
+        />
+        <SliderField
+          label="Size"
+          value={coneView.fieldSize}
+          limitKey="cone.fieldSize"
+          format={percent}
+          onChange={(fieldSize) => setConeView({ fieldSize })}
+        />
+        <SliderField
+          label="Clearance"
+          value={coneView.fieldClearance}
+          limitKey="cone.fieldClearance"
+          onChange={(fieldClearance) => setConeView({ fieldClearance })}
+        />
+        <SliderField
+          label="Spread"
+          value={coneView.fieldSpread}
+          limitKey="cone.fieldSpread"
+          onChange={(fieldSpread) => setConeView({ fieldSpread })}
+        />
+        <SliderField
+          label="Spin"
+          value={coneView.spin}
+          limitKey="cone.spin"
+          format={(value) => `${Math.round(value)}`}
+          onChange={(spin) => setConeView({ spin })}
+        />
+        <SliderField
+          label="Variation"
+          value={coneView.fieldVariation}
+          limitKey="cone.fieldVariation"
+          format={percent}
+          onChange={(fieldVariation) => setConeView({ fieldVariation })}
         />
       </>
     );

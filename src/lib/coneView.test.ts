@@ -210,6 +210,41 @@ describe('3D render parameters', () => {
     expect(getThreeDRenderParams({ ...rings, ringsPattern: 'tumble' }, 0, 1).rings.pattern).toBe(2);
   });
 
+  it('flies through one repeat of the geometry field per Flow Cycle', () => {
+    const field = { ...DEFAULT_CONE_VIEW, shape: 'field' as const, flowCycles: 3, fieldLoopCells: 10 };
+    const middle = getThreeDRenderParams(field, 0.5, 1);
+    expect(middle.shape).toBe(7);
+    expect(middle.travel).toBeCloseTo(15, 10);
+    expect(middle.textureOffset).toEqual([0, 0]);
+    expect(getThreeDRenderParams(field, 1, 1).travel).toBe(30);
+  });
+
+  it('passes the geometry field settings and loops its Spin', () => {
+    const field = {
+      ...DEFAULT_CONE_VIEW,
+      shape: 'field' as const,
+      fieldGeometry: 'octahedron' as const,
+      fieldRender: 'mixed' as const,
+      fieldDensity: 0.6,
+      fieldSpread: 8,
+      spin: 3,
+    };
+    const params = getThreeDRenderParams(field, 0.25, 1);
+    expect(params.field).toMatchObject({
+      geometry: 4,
+      render: 2,
+      loopCells: 16,
+      density: 0.6,
+      size: 0.75,
+      clearance: 1.5,
+      spread: 8,
+      wire: 0.03,
+      variation: 1,
+    });
+    expect(params.field.spinRadians).toBeCloseTo(1.5 * Math.PI, 10);
+    expect(getThreeDRenderParams(field, 1, 1).field.spinRadians).toBeCloseTo(getThreeDRenderParams(field, 0, 1).field.spinRadians, 10);
+  });
+
   it('maps the lattice type to its shader index', () => {
     expect(getThreeDRenderParams({ ...DEFAULT_CONE_VIEW, latticeType: 'schwarzP' }, 0, 1).lattice.type).toBe(1);
   });

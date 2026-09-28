@@ -87,6 +87,15 @@ describe('cone view configuration', () => {
       ringsPulse: 0,
       ringsBeats: 4,
       ringsAmount: 0.5,
+      fieldGeometry: 'mix',
+      fieldRender: 'solid',
+      fieldLoopCells: 16,
+      fieldDensity: 0.3,
+      fieldSize: 0.75,
+      fieldClearance: 1.5,
+      fieldSpread: 5,
+      fieldWire: 0.03,
+      fieldVariation: 1,
     });
   });
 
@@ -183,6 +192,36 @@ describe('cone view configuration', () => {
     expect(normalizeConeViewConfig({ ringsPattern: 'spiral', ringsMapping: 'cube' })).toMatchObject({
       ringsPattern: 'corridor',
       ringsMapping: 'wrap',
+    });
+  });
+
+  it('normalizes the geometry field settings', () => {
+    expect(normalizeConeViewConfig({
+      shape: 'field',
+      fieldGeometry: 'prism',
+      fieldRender: 'wire',
+      fieldLoopCells: 99.4,
+      fieldDensity: 0,
+      fieldSize: 3,
+      fieldClearance: 0,
+      fieldSpread: 40,
+      fieldWire: 1,
+      fieldVariation: -2,
+    })).toMatchObject({
+      shape: 'field',
+      fieldGeometry: 'prism',
+      fieldRender: 'wire',
+      fieldLoopCells: 64,
+      fieldDensity: 0.05,
+      fieldSize: 1,
+      fieldClearance: 1,
+      fieldSpread: 12,
+      fieldWire: 0.12,
+      fieldVariation: 0,
+    });
+    expect(normalizeConeViewConfig({ fieldGeometry: 'teapot', fieldRender: 'points' })).toMatchObject({
+      fieldGeometry: 'mix',
+      fieldRender: 'solid',
     });
   });
 

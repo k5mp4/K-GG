@@ -71,4 +71,14 @@ export function uploadThreeDUniforms(
   float('u_ringsPulse', params.rings.pulse);
   float('u_ringsPulsePhase', params.rings.pulsePhase);
   float('u_ringsAmount', params.rings.amount);
+  int('u_fieldGeometry', params.field.geometry);
+  int('u_fieldRender', params.field.render);
+  float('u_fieldLoopCells', params.field.loopCells);
+  float('u_fieldDensity', params.field.density);
+  float('u_fieldSize', params.field.size);
+  float('u_fieldClearance', params.field.clearance);
+  float('u_fieldSpread', params.field.spread);
+  float('u_fieldWire', params.field.wire);
+  float('u_fieldSpin', params.field.spinRadians);
+  float('u_fieldVariation', params.field.variation);
 }
