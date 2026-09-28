@@ -1,6 +1,7 @@
 import { spawn } from 'node:child_process';
 import { createConnection } from 'node:net';
-import { resolve } from 'node:path';
+import { createRequire } from 'node:module';
+import { dirname, resolve } from 'node:path';
 
 const HOST = '127.0.0.1';
 const PORT = 5173;
@@ -43,7 +44,9 @@ async function main() {
     return;
   }
 
-  const viteEntry = resolve('node_modules/vite/bin/vite.js');
+  // Resolve through Node's lookup instead of ./node_modules: a git worktree
+  // under .claude/worktrees has no install of its own and uses the parent's.
+  const viteEntry = resolve(dirname(createRequire(import.meta.url).resolve('vite/package.json')), 'bin/vite.js');
   const vite = spawn(process.execPath, [viteEntry, '--host', HOST, '--port', String(PORT), '--strictPort'], {
     stdio: 'inherit',
   });

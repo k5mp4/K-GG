@@ -127,7 +127,7 @@ describe('3D render parameters', () => {
     expect(torus.camera.rollRadians).toBeCloseTo(Math.PI / 2, 10);
   });
 
-  it.each(['lattice', 'terrain', 'extrusion'] as const)('moves the %s geometry with Flow instead of the texture', (shape) => {
+  it.each(['lattice', 'terrain', 'extrusion', 'ribbon'] as const)('moves the %s geometry with Flow instead of the texture', (shape) => {
     const config = { ...DEFAULT_CONE_VIEW, shape, flowCycles: 3 };
     const middle = getThreeDRenderParams(config, 0.5, 1);
     expect(middle.travel).toBeCloseTo(1.5, 10);
@@ -157,14 +157,19 @@ describe('3D render parameters', () => {
     expect(params.extrusion).toEqual({ cells: 48, height: 1.5, gap: 0.3 });
   });
 
-  it('slides the ribbon texture with Flow and turns the band by whole Spin turns', () => {
-    const ribbon = { ...DEFAULT_CONE_VIEW, shape: 'ribbon' as const, flowCycles: 2, spin: 3, ribbonHalfTwists: 5 };
-    const quarter = getThreeDRenderParams(ribbon, 0.25, 1);
-    expect(quarter.shape).toBe(5);
-    expect(quarter.textureOffset).toEqual([0.5, 0]);
-    expect(quarter.travel).toBeCloseTo(0.75, 10);
-    expect(quarter.ribbon).toEqual({ halfTwists: 5, width: 0.25 });
-    expect(getThreeDRenderParams(ribbon, 1, 1).travel).toBe(3);
+  it('rides the torus camera around the ring with Flow while Spin turns the texture', () => {
+    const torus = { ...DEFAULT_CONE_VIEW, shape: 'torus' as const, flowCycles: 2, spin: 1 };
+    const quarter = getThreeDRenderParams(torus, 0.25, 1);
+    expect(quarter.travel).toBeCloseTo(0.5, 10);
+    expect(quarter.textureOffset).toEqual([0.25, 0]);
+    expect(getThreeDRenderParams(torus, 1, 1).travel).toBe(2);
+    expect(getThreeDRenderParams({ ...torus, mappingMode: 'projection' }, 0.5, 1).travel).toBe(0);
+  });
+
+  it('passes the ribbon band settings through', () => {
+    const ribbon = getThreeDRenderParams({ ...DEFAULT_CONE_VIEW, shape: 'ribbon', ribbonHalfTwists: 5 }, 0, 1);
+    expect(ribbon.shape).toBe(5);
+    expect(ribbon.ribbon).toEqual({ halfTwists: 5, width: 0.25 });
   });
 
   it('flies through one tile of square rings per Flow Cycle', () => {

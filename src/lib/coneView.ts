@@ -387,9 +387,9 @@ export type ThreeDRenderParams = {
 /**
  * Shapes whose Flow moves the geometry or camera instead of sliding the
  * texture. Their loop-normalized travel is the Flow offset, and the texture
- * offset stays at zero.
+ * offset stays at zero except for the Torus Spin around the tube.
  */
-const GEOMETRY_MOTION_SHAPES: ReadonlySet<ConeViewConfig['shape']> = new Set(['lattice', 'terrain', 'extrusion', 'rings', 'field']);
+const GEOMETRY_MOTION_SHAPES: ReadonlySet<ConeViewConfig['shape']> = new Set(['torus', 'lattice', 'terrain', 'extrusion', 'ribbon', 'rings', 'field']);
 
 /** Frames of one Square Rings texture tile; the camera passes this many per Flow Cycle. */
 export function getRingsPerTile(config: ConeViewConfig): number {
@@ -441,22 +441,19 @@ export function getThreeDRenderParams(
     distance: config.depth * 0.5,
     fog: clamp(safeFinite(config.fog, 0), 0, 1),
     shade: clamp(safeFinite(config.shade, 0), 0, 1),
-    // The ribbon slides its texture with Flow and turns the band by Spin.
     // The Square Rings travel in frames, one tile of frames per Flow Cycle,
     // and the Geometry Field in cells, one repeat of its layout per cycle.
     travel: geometryMotion
       ? transform.offsetV * (config.shape === 'rings' ? ringsPerTile : config.shape === 'field' ? getFieldLoopCells(config) : 1)
-      : config.shape === 'ribbon'
-        ? Math.round(config.spin) * Math.max(0, Math.min(1, safeFinite(normalizedTime, 0)))
-        : 0,
+      : 0,
     // The Cone keeps its fixed 60 degree camera; other shapes use the FOV.
     tangentHalfFov: Math.tan((config.shape === 'cone' ? CONE_CAMERA_FOV : camera.fovDegrees) * Math.PI / 360),
     textureRepeat: transform.repeatU,
-    // The ribbon's Flow slides along the band, so the offset moves along u.
-    textureOffset: geometryMotion
-      ? [0, 0]
-      : config.shape === 'ribbon'
-        ? [transform.offsetV, 0]
+    // The Torus camera rides the ring while Spin still turns its texture.
+    textureOffset: config.shape === 'torus'
+      ? [transform.offsetU, 0]
+      : geometryMotion
+        ? [0, 0]
         : [transform.offsetU, transform.offsetV],
     seamBlend: transform.seamBlend,
     seamMode: CONE_SEAM_MODE_INDEX[transform.seamMode],
