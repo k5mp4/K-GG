@@ -22,6 +22,14 @@ export default defineConfig({
   define: {
     __APP_VERSION__: JSON.stringify(appVersion),
   },
+  server: {
+    watch: {
+      // Cargo writes and locks build-script executables under src-tauri/target
+      // while `tauri dev` compiles; watching them crashes Vite with EBUSY on
+      // Windows. The frontend imports nothing from src-tauri.
+      ignored: ['**/src-tauri/**'],
+    },
+  },
   optimizeDeps: {
     // Tweeq is a checked-in file dependency symlinked into node_modules.
     // Include it explicitly so CI pre-bundles its large generated ESM entry
