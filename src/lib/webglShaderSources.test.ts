@@ -40,6 +40,7 @@ describe('webglShaderSources compile boundaries', () => {
     expect(core).toContain('#define KGG_LIGHTWEIGHT');
     expect(core).toContain('#define KGG_STACK_CORE_NO_NOISE');
     expect(core).not.toContain('vec2 noiseDisplaceRaw(');
+    expect(core).not.toContain('vec2 chladniDistortion(');
     expect(general).not.toContain('#define KGG_GLASS_ONLY');
   });
 
@@ -55,9 +56,16 @@ describe('webglShaderSources compile boundaries', () => {
         'float glassDomainWarpScalar(',
         'causticsDistortion(',
         'phasorDistortion(',
+        'chladniDistortion(',
+        'u_chladni',
       ]) {
         expect(specialized, `${key} should not compile ${excluded}`).not.toContain(excluded);
       }
+    }
+    for (const key of ['glassTile', 'prism'] as const) {
+      const source = getProgramSource(key).fragment;
+      expect(source, `${key} should not compile Chladni`).not.toContain('chladniDistortion(');
+      expect(source, `${key} should not declare Chladni uniforms`).not.toContain('u_chladni');
     }
     expect(getProgramSource('glassV2').fragment.length)
       .toBeLessThan(getProgramSource('postprocess').fragment.length);
@@ -78,12 +86,33 @@ describe('TypeScript and GLSL integer contracts', () => {
   });
 
   it('matches the Noise type constants declared in GLSL', () => {
-    expect(NOISE_TYPE_MAP).toMatchObject({ simplex: 0, fast_curl: 8, caustics: 9, phasor: 10, perlin: 11 });
-    for (const key of ['generator', 'noiseStack'] as const) {
+    // Existing values are persisted in rendered output contracts; new types
+    // are appended and never renumber the older ones.
+    expect(NOISE_TYPE_MAP).toEqual({
+      simplex: 0,
+      fbm: 1,
+      voronoi: 2,
+      curl: 3,
+      domain_warp_anim: 4,
+      seamless: 5,
+      ridged_fbm: 6,
+      ae_fractal: 7,
+      fast_curl: 8,
+      caustics: 9,
+      phasor: 10,
+      perlin: 11,
+      chladni: 12,
+    });
+    for (const key of ['generator', 'noiseStack', 'noiseDiffuseStack', 'postprocess'] as const) {
       const source = getProgramSource(key).fragment;
       expect(source).toContain(`const int CAUSTICS_NOISE_TYPE = ${NOISE_TYPE_MAP.caustics};`);
       expect(source).toContain(`const int PHASOR_NOISE_TYPE = ${NOISE_TYPE_MAP.phasor};`);
       expect(source).toContain(`const int PERLIN_NOISE_TYPE = ${NOISE_TYPE_MAP.perlin};`);
+      expect(source).toContain(`const int CHLADNI_NOISE_TYPE = ${NOISE_TYPE_MAP.chladni};`);
     }
+  });
+
+  it('keeps the bootstrap program free of the Chladni implementation', () => {
+    expect(getInitialProgramSource().fragment).not.toContain('vec2 chladniDistortion(');
   });
 });

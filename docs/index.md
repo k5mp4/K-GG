@@ -123,7 +123,7 @@ Linear/Radial/4-color/Diamond/Angle/Bezier/Mesh Gradationのグラデーショ�
 ## Noise (ノイズ歪み)
 - 各種ノイズを用いて、グラデーションを複雑に歪ませます
 - `Type`
-  - Simplex/Perlin/Voronoi/Aura Ridges/Phasor Lines/Fractal Drift/Curl/Fast Curl/Domain Warp/Seamless/Causticsを選択できます。
+  - Simplex/Perlin/Voronoi/Aura Ridges/Phasor Lines/Chladni/Fractal Drift/Curl/Fast Curl/Domain Warp/Seamless/Causticsを選択できます。
 - `Seed`
   - 各ノイズタイプではseed値を変更可能です。
 - `Caustics`
@@ -132,6 +132,8 @@ Linear/Radial/4-color/Diamond/Angle/Bezier/Mesh Gradationのグラデーショ�
   - 3D Perlinノイズ（画面XY＋時間Z）から、暗い領域を柔らかく光る筋が横切るテクスチャ（AEフラクタルノイズの「にじみ」風）を作り、Direction方向へグラデーションを歪ませます。アニメーションでは形がその場で有機的に変化します。Roughnessで細部、Sharpnessで筋の細さ、Layer Mixで淡い副次的な筋の量を調整できます。Dimensionを`4D (Loop)`にすると、時間を4次元目の円周上で進めるため、ループ期間ごとに継ぎ目なく元の形へ戻ります。Loop Wobbleを上げると、ループの軌道がうねり、場所ごとにタイミングのずれた有機的な動きになります。
 - `Phasor Lines`
   - 3×3近傍の決定論的な局所波を複素Phasorとして合成し、連続した線状構造と位相勾配からUVを歪ませます。Direction Mode（Directional/Radial/Swirl）、Frequency、Direction Spread、Sharpness、Warp Strength、Tangent Mix、Bandwidth、Kernel Densityで調整できます。
+- `Chladni`
+  - 振動する正方形プレートにできるクラドニ図形の節線に沿ってグラデーションを歪ませます。Seedごとに異なる2〜4個の図形（Pattern Count）を、ループ期間ごとに A → B → … → A と節線そのものを変形させながら巡り、継ぎ目なく元へ戻ります。Complexityで図形の細かさ、Line Widthで節線まわりの影響範囲、Sharpnessで減衰の鋭さ、Warp Strengthで歪みの強さ、Rotationで図形の向きを調整できます。
 
 ::: tip
 Diceボタンを押すことでランダムなノイズを生成することができます。

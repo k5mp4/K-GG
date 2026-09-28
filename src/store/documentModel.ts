@@ -66,6 +66,7 @@ export const NOISE_TYPE_PRESETS: Record<NoiseDistortionConfig['type'], Partial<N
   caustics: { amount: 0.45, scale: 2.4, octaves: 4, speed: 0.5, noiseLoopMode: 'seamless', noiseLoopBlend: 0.75, causticsDepth: 0.65, causticsRefraction: 1.0, causticsSharpness: 2.5, causticsComplexity: 4, causticsWaveSpread: 0.75, causticsBoundaryWidth: 0.75 },
   phasor: { amount: 0.24, scale: 2.8, octaves: 3, speed: 0.5, noiseLoopMode: 'seamless', noiseLoopBlend: 0.75, phasorFrequency: 5.0, phasorBandwidth: 0.8, phasorDirection: 28, phasorDirectionSpread: 0.35, phasorSharpness: 3.0, phasorWarpStrength: 0.18, phasorTangentMix: 0.65, phasorKernelDensity: 1.0, phasorDirectionMode: 'directional' },
   perlin: { amount: 0.3, scale: 1.2, octaves: 2, perlinRoughness: getParameterDefault('noise.perlinRoughness'), perlinSharpness: getParameterDefault('noise.perlinSharpness'), perlinLayerMix: getParameterDefault('noise.perlinLayerMix'), perlinAngle: getParameterDefault('noise.perlinAngle'), perlinDimension: getEnumParameterDefault('noise.perlinDimension'), perlinLoopWobble: getParameterDefault('noise.perlinLoopWobble') },
+  chladni: { amount: 0.3, scale: 1.0, chladniPatternCount: getParameterDefault('noise.chladniPatternCount'), chladniComplexity: getParameterDefault('noise.chladniComplexity'), chladniLineWidth: getParameterDefault('noise.chladniLineWidth'), chladniSharpness: getParameterDefault('noise.chladniSharpness'), chladniWarpStrength: getParameterDefault('noise.chladniWarpStrength'), chladniRotation: getParameterDefault('noise.chladniRotation') },
 };
 
 const MANUAL_DISTORT_MAP_RESOLUTION = 64;
@@ -156,6 +157,12 @@ export const STORE_DEFAULTS = {
     phasorTangentMix: getParameterDefault('noise.phasorTangentMix'),
     phasorKernelDensity: getParameterDefault('noise.phasorKernelDensity'),
     phasorDirectionMode: 'directional' as const,
+    chladniPatternCount: getParameterDefault('noise.chladniPatternCount'),
+    chladniComplexity: getParameterDefault('noise.chladniComplexity'),
+    chladniLineWidth: getParameterDefault('noise.chladniLineWidth'),
+    chladniSharpness: getParameterDefault('noise.chladniSharpness'),
+    chladniWarpStrength: getParameterDefault('noise.chladniWarpStrength'),
+    chladniRotation: getParameterDefault('noise.chladniRotation'),
   },
   diffuse: {
     enabled: true,
@@ -454,6 +461,12 @@ const NOISE_PARAMETER_LIMIT_KEYS = {
   phasorWarpStrength: 'noise.phasorWarpStrength',
   phasorTangentMix: 'noise.phasorTangentMix',
   phasorKernelDensity: 'noise.phasorKernelDensity',
+  chladniPatternCount: 'noise.chladniPatternCount',
+  chladniComplexity: 'noise.chladniComplexity',
+  chladniLineWidth: 'noise.chladniLineWidth',
+  chladniSharpness: 'noise.chladniSharpness',
+  chladniWarpStrength: 'noise.chladniWarpStrength',
+  chladniRotation: 'noise.chladniRotation',
 } as const satisfies Partial<Record<keyof NoiseDistortionConfig, ParameterLimitKey>>;
 
 export function normalizeNoiseDistortionConfig(

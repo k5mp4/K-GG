@@ -47,7 +47,7 @@ const RAW_CONTROL_PARAMETER_DEFINITIONS: readonly ParameterDefinition[] = [
   numberParameter('gradient.rampRepeat', 'gradient', 'rampRepeat', 'Number of gradient ramp repetitions'),
 
   booleanParameter('noise.enabled', 'noiseDistortion', 'enabled', 'Enable the noise field'),
-  enumParameter('noise.type', 'noiseDistortion', 'type', ['simplex', 'fbm', 'voronoi', 'curl', 'fast_curl', 'domain_warp_anim', 'seamless', 'ridged_fbm', 'ae_fractal', 'caustics', 'phasor', 'perlin'], 'Noise algorithm'),
+  enumParameter('noise.type', 'noiseDistortion', 'type', ['simplex', 'fbm', 'voronoi', 'curl', 'fast_curl', 'domain_warp_anim', 'seamless', 'ridged_fbm', 'ae_fractal', 'caustics', 'phasor', 'perlin', 'chladni'], 'Noise algorithm'),
   numberParameter('noise.amount', 'noiseDistortion', 'amount', 'Noise displacement amount'),
   numberParameter('noise.scale', 'noiseDistortion', 'scale', 'Noise scale'),
   numberParameter('noise.octaves', 'noiseDistortion', 'octaves', 'Noise octave count'),
@@ -76,6 +76,12 @@ const RAW_CONTROL_PARAMETER_DEFINITIONS: readonly ParameterDefinition[] = [
   numberParameter('noise.perlinAngle', 'noiseDistortion', 'perlinAngle', 'Perlin displacement direction'),
   numberParameter('noise.perlinLoopWobble', 'noiseDistortion', 'perlinLoopWobble', 'Perlin 4D loop path wobble'),
   enumParameter('noise.perlinDimension', 'noiseDistortion', 'perlinDimension', getEnumParameterLimit('noise.perlinDimension').values, 'Perlin dimension (3D or 4D seamless loop)', { defaultValue: getEnumParameterDefault('noise.perlinDimension') }),
+  numberParameter('noise.chladniPatternCount', 'noiseDistortion', 'chladniPatternCount', 'Chladni patterns morphed per loop (2-4)'),
+  numberParameter('noise.chladniComplexity', 'noiseDistortion', 'chladniComplexity', 'Chladni plate mode complexity'),
+  numberParameter('noise.chladniLineWidth', 'noiseDistortion', 'chladniLineWidth', 'Chladni nodal line influence width'),
+  numberParameter('noise.chladniSharpness', 'noiseDistortion', 'chladniSharpness', 'Chladni nodal line falloff sharpness'),
+  numberParameter('noise.chladniWarpStrength', 'noiseDistortion', 'chladniWarpStrength', 'Chladni gradient warp strength'),
+  numberParameter('noise.chladniRotation', 'noiseDistortion', 'chladniRotation', 'Chladni pattern rotation'),
 
   booleanParameter('diffuse.enabled', 'diffuse', 'enabled', 'Enable diffuse/stipple rendering'),
   enumParameter('diffuse.mode', 'diffuse', 'mode', ['block', 'smooth', 'dither', 'halftone', 'ascii', 'legacy'], 'Diffuse rendering mode'),

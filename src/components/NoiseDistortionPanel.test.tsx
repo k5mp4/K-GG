@@ -17,6 +17,7 @@ const TYPE_ORDER = [
   'Voronoi',
   'Caustics',
   'Phasor Lines',
+  'Chladni',
 ] as const;
 
 describe('NoiseDistortionPanel', () => {
@@ -103,6 +104,34 @@ describe('NoiseDistortionPanel', () => {
         </LanguageProvider>,
       );
       expect(ridgedMarkup).not.toContain('>Roughness</label>');
+    } finally {
+      initialState.noiseDistortion = previousNoiseDistortion;
+    }
+  });
+
+  it('shows the Chladni controls only when Type is Chladni', () => {
+    const initialState = useGradientStore.getInitialState();
+    const previousNoiseDistortion = initialState.noiseDistortion;
+    const render = () => renderToStaticMarkup(
+      <LanguageProvider>
+        <NoiseDistortionPanel />
+      </LanguageProvider>,
+    );
+    try {
+      initialState.noiseDistortion = { ...previousNoiseDistortion, enabled: true, type: 'chladni' };
+      const chladniMarkup = render();
+      const position = (label: string) => chladniMarkup.indexOf(`>${label}</label>`);
+      for (const label of ['Pattern Count', 'Complexity', 'Line Width', 'Sharpness', 'Warp Strength', 'Rotation']) {
+        expect(position(label), label).toBeGreaterThanOrEqual(0);
+      }
+      expect(position('Seed')).toBeLessThan(position('Pattern Count'));
+      for (const count of [2, 3, 4]) expect(chladniMarkup).toContain(`>${count}</button>`);
+      expect(chladniMarkup).not.toContain('>Octaves</label>');
+
+      initialState.noiseDistortion = { ...previousNoiseDistortion, enabled: true, type: 'phasor' };
+      const phasorMarkup = render();
+      expect(phasorMarkup).not.toContain('>Pattern Count</label>');
+      expect(phasorMarkup).not.toContain('>Line Width</label>');
     } finally {
       initialState.noiseDistortion = previousNoiseDistortion;
     }

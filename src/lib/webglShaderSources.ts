@@ -128,7 +128,7 @@ uniform float u_aeContrast;
 uniform float u_aeBrightness;
 `;
 
-// Caustics and Phasor uniforms are intentionally absent here: specialized
+// Caustics, Phasor, and Chladni uniforms are intentionally absent here: specialized
 // Glass/Prism programs do not evaluate Noise. The full generator, general
 // postprocess, and V2 noiseStack receive them from noise.glsl exactly once.
 

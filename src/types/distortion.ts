@@ -5,7 +5,7 @@ export type VoronoiFeature = 'f1' | 'f2' | 'distance_to_edge';
 
 export type NoiseDistortionConfig = {
   enabled: boolean;
-  type: 'simplex' | 'fbm' | 'voronoi' | 'curl' | 'fast_curl' | 'domain_warp_anim' | 'seamless' | 'ridged_fbm' | 'ae_fractal' | 'caustics' | 'phasor' | 'perlin';
+  type: 'simplex' | 'fbm' | 'voronoi' | 'curl' | 'fast_curl' | 'domain_warp_anim' | 'seamless' | 'ridged_fbm' | 'ae_fractal' | 'caustics' | 'phasor' | 'perlin' | 'chladni';
   amount: number;
   scale: number;
   octaves: number;
@@ -73,6 +73,13 @@ export type NoiseDistortionConfig = {
   phasorTangentMix: number;      // 0.0–1.0: 法線から接線への混合
   phasorKernelDensity: number;   // 0.25–2.0: カーネルの重なり密度
   phasorDirectionMode: PhasorDirectionMode;
+  // Chladni Noise 専用パラメータ (Seed/Complexityから決まる2〜4個のPatternをLoop Periodで循環モーフィング)
+  chladniPatternCount: number;   // 2–4: 1ループで巡るPattern数
+  chladniComplexity: number;     // 1–8: 生成する (m, n) モードの上限（大→細かく複雑）
+  chladniLineWidth: number;      // 0.01–1.0: 節線周辺の影響範囲（節線間隔に対する比）
+  chladniSharpness: number;      // 0.5–8.0: 節線から離れたときの減衰の急峻さ
+  chladniWarpStrength: number;   // 0.0–1.0: Chladni勾配による内部変位場の強さ
+  chladniRotation: number;       // 0–360°: Pattern全体の回転
 };
 
 export type DiffuseDitherMode = 'pattern_dither';

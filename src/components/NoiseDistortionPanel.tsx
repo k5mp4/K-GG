@@ -36,6 +36,7 @@ const NOISE_TYPES = [
   { value: 'voronoi',          label: 'Voronoi' },
   { value: 'caustics',         label: 'Caustics' },
   { value: 'phasor',           label: 'Phasor Lines' },
+  { value: 'chladni',          label: 'Chladni' },
 ] as { value: string; label: string; hidden?: boolean }[];
 
 const AE_FRACTAL_TYPES = [
@@ -64,6 +65,8 @@ const PERLIN_DIMENSIONS = [
   { value: '4d', label: '4D (Loop)' },
 ];
 
+const CHLADNI_PATTERN_COUNTS = [2, 3, 4] as const;
+
 const PHASOR_DIRECTION_MODES = [
   { value: 'directional', label: 'Directional' },
   { value: 'radial', label: 'Radial' },
@@ -87,6 +90,7 @@ export function NoiseDistortionPanel() {
   const seed = noiseDistortion[seedField] ?? 0;
   const isCaustics = noiseDistortion.type === 'caustics';
   const isPhasor = noiseDistortion.type === 'phasor';
+  const isChladni = noiseDistortion.type === 'chladni';
   const hasOctaves = noiseDistortion.type === 'fbm' ||
                     isPerlin ||
                     noiseDistortion.type === 'ridged_fbm' ||
@@ -354,6 +358,66 @@ export function NoiseDistortionPanel() {
                 format={(v) => v.toFixed(2)}
                 trackId="noiseDistortion.phasorKernelDensity"
                 limitKey="noise.phasorKernelDensity"
+              />
+            </>
+          )}
+
+          {isChladni && (
+            <>
+              <div>
+                <label className="block text-xs mb-1 text-deep">Pattern Count</label>
+                <div className="flex gap-1">
+                  {CHLADNI_PATTERN_COUNTS.map((count) => (
+                    <button
+                      key={count}
+                      onClick={() => setNoiseDistortion({ chladniPatternCount: count })}
+                      className={`flex-1 text-xs py-1 rounded-none ${(noiseDistortion.chladniPatternCount ?? D.chladniPatternCount) === count ? 'bg-fire text-k-text' : 'bg-k-muted hover:bg-k-muted/70 text-k-text'}`}
+                    >
+                      {count}
+                    </button>
+                  ))}
+                </div>
+              </div>
+              <SliderField
+                label="Complexity"
+                value={noiseDistortion.chladniComplexity ?? D.chladniComplexity}
+                onChange={(v) => setNoiseDistortion({ chladniComplexity: v })}
+                format={(v) => `${Math.round(v)}`}
+                trackId="noiseDistortion.chladniComplexity"
+                limitKey="noise.chladniComplexity"
+              />
+              <SliderField
+                label="Line Width"
+                value={noiseDistortion.chladniLineWidth ?? D.chladniLineWidth}
+                onChange={(v) => setNoiseDistortion({ chladniLineWidth: v })}
+                format={(v) => v.toFixed(2)}
+                trackId="noiseDistortion.chladniLineWidth"
+                limitKey="noise.chladniLineWidth"
+              />
+              <SliderField
+                label="Sharpness"
+                value={noiseDistortion.chladniSharpness ?? D.chladniSharpness}
+                onChange={(v) => setNoiseDistortion({ chladniSharpness: v })}
+                format={(v) => v.toFixed(2)}
+                trackId="noiseDistortion.chladniSharpness"
+                limitKey="noise.chladniSharpness"
+              />
+              <SliderField
+                label="Warp Strength"
+                value={noiseDistortion.chladniWarpStrength ?? D.chladniWarpStrength}
+                onChange={(v) => setNoiseDistortion({ chladniWarpStrength: v })}
+                format={(v) => v.toFixed(2)}
+                trackId="noiseDistortion.chladniWarpStrength"
+                limitKey="noise.chladniWarpStrength"
+              />
+              <SliderField
+                label="Rotation"
+                value={noiseDistortion.chladniRotation ?? D.chladniRotation}
+                onChange={(v) => setNoiseDistortion({ chladniRotation: v })}
+                format={(v) => `${Math.round(v)}°`}
+                trackId="noiseDistortion.chladniRotation"
+                control="angle"
+                limitKey="noise.chladniRotation"
               />
             </>
           )}
