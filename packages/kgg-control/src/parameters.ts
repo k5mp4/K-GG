@@ -82,6 +82,12 @@ const RAW_CONTROL_PARAMETER_DEFINITIONS: readonly ParameterDefinition[] = [
   numberParameter('noise.chladniSharpness', 'noiseDistortion', 'chladniSharpness', 'Chladni nodal line falloff sharpness'),
   numberParameter('noise.chladniWarpStrength', 'noiseDistortion', 'chladniWarpStrength', 'Chladni gradient warp strength'),
   numberParameter('noise.chladniRotation', 'noiseDistortion', 'chladniRotation', 'Chladni pattern rotation'),
+  enumParameter('noise.chladniMode', 'noiseDistortion', 'chladniMode', getEnumParameterLimit('noise.chladniMode').values, 'Chladni mode (warp along nodal lines or gradient map by field height)', { defaultValue: getEnumParameterDefault('noise.chladniMode') }),
+  enumParameter('noise.chladniMapProfile', 'noiseDistortion', 'chladniMapProfile', getEnumParameterLimit('noise.chladniMapProfile').values, 'Chladni gradient map height profile', { defaultValue: getEnumParameterDefault('noise.chladniMapProfile') }),
+  numberParameter('noise.chladniMapAngle', 'noiseDistortion', 'chladniMapAngle', 'Chladni gradient map direction'),
+  numberParameter('noise.chladniModeMix', 'noiseDistortion', 'chladniModeMix', 'Chladni mode pair mix (1 difference, -1 sum)'),
+  numberParameter('noise.chladniEdge', 'noiseDistortion', 'chladniEdge', 'Chladni plate edge (0 free, 1 fixed)'),
+  numberParameter('noise.chladniDetune', 'noiseDistortion', 'chladniDetune', 'Chladni non-integer mode detune'),
 
   booleanParameter('diffuse.enabled', 'diffuse', 'enabled', 'Enable diffuse/stipple rendering'),
   enumParameter('diffuse.mode', 'diffuse', 'mode', ['block', 'smooth', 'dither', 'halftone', 'ascii', 'legacy'], 'Diffuse rendering mode'),

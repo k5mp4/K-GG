@@ -13,6 +13,12 @@ const CUSTOM_CHLADNI = {
   chladniSharpness: 3.5,
   chladniWarpStrength: 0.55,
   chladniRotation: 135,
+  chladniMode: 'map' as const,
+  chladniMapProfile: 'folded' as const,
+  chladniMapAngle: 45,
+  chladniModeMix: -0.4,
+  chladniEdge: 0.7,
+  chladniDetune: 0.25,
 };
 
 describe('Chladni Noise document lifecycle', () => {

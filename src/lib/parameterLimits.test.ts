@@ -68,5 +68,9 @@ describe('central parameter limits', () => {
     expect(normalizeTrackValue('noiseDistortion.chladniLineWidth', 3)).toBe(1);
     expect(normalizeTrackValue('noiseDistortion.chladniWarpStrength', 2)).toBe(1);
     expect(normalizeTrackValue('noiseDistortion.chladniRotation', 370)).toBe(10);
+    expect(normalizeTrackValue('noiseDistortion.chladniModeMix', -2)).toBe(-1);
+    expect(normalizeTrackValue('noiseDistortion.chladniEdge', 2)).toBe(1);
+    expect(normalizeTrackValue('noiseDistortion.chladniDetune', -1)).toBe(0);
+    expect(normalizeTrackValue('noiseDistortion.chladniMapAngle', -90)).toBe(270);
   });
 });

@@ -133,7 +133,9 @@ Linear/Radial/4-color/Diamond/Angle/Bezier/Mesh Gradationのグラデーショ�
 - `Phasor Lines`
   - 3×3近傍の決定論的な局所波を複素Phasorとして合成し、連続した線状構造と位相勾配からUVを歪ませます。Direction Mode（Directional/Radial/Swirl）、Frequency、Direction Spread、Sharpness、Warp Strength、Tangent Mix、Bandwidth、Kernel Densityで調整できます。
 - `Chladni`
-  - 振動する正方形プレートにできるクラドニ図形の節線に沿ってグラデーションを歪ませます。Seedごとに異なる2〜4個の図形（Pattern Count）を、ループ期間ごとに A → B → … → A と節線そのものを変形させながら巡り、継ぎ目なく元へ戻ります。Complexityで図形の細かさ、Line Widthで節線まわりの影響範囲、Sharpnessで減衰の鋭さ、Warp Strengthで歪みの強さ、Rotationで図形の向きを調整できます。
+  - 振動する正方形プレートにできるクラドニ図形でグラデーションを歪ませます。Seedごとに異なる2〜4個の図形（Pattern Count）を、ループ期間ごとに A → B → … → A と節線そのものを変形させながら巡り、継ぎ目なく元へ戻ります。
+  - Modeは`Warp (Nodal Lines)`（節線に沿って模様を刻む）と`Gradient Map`（図形の凹凸に応じてグラデーションをマッピングする）を切り替えられます。Gradient MapではMap Profile（Signed=±の凹凸 / Folded=節線を谷にする）とMap Directionを選べます。
+  - Complexityで図形の細かさ、Mode Mixで2つの振動モードの組み合わせ方、Edgeで板の端の条件（自由端〜固定端）、Detuneで図形の崩し具合、Rotationで向きを調整できます。Warp時はLine Width・Sharpness・Warp Strength、Gradient Map時はMap Strengthで効き方を調整します。
 
 ::: tip
 Diceボタンを押すことでランダムなノイズを生成することができます。

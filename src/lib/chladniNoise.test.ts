@@ -8,7 +8,7 @@ import {
   getChladniPatternModes,
   getChladniUniformValues,
   listChladniModeCandidates,
-  type ChladniMode,
+  type ChladniPlateMode,
   type ChladniReferenceInput,
 } from './chladniNoise';
 
@@ -32,14 +32,14 @@ function sampleGrid(size: number): Array<[number, number]> {
   return points;
 }
 
-const unordered = ([m, n]: ChladniMode) => `${Math.min(m, n)},${Math.max(m, n)}`;
+const unordered = ([m, n]: ChladniPlateMode) => `${Math.min(m, n)},${Math.max(m, n)}`;
 
 describe('Chladni pattern generation', () => {
-  it('never produces m == n and treats (m, n) / (n, m) as one candidate', () => {
+  it('never produces m == n or a zero mode and treats (m, n) / (n, m) as one candidate', () => {
     for (let complexity = 1; complexity <= 8; complexity++) {
       const candidates = listChladniModeCandidates(getChladniModeLimit(complexity));
       expect(candidates.length).toBeGreaterThanOrEqual(4);
-      expect(candidates.every(([m, n]) => m < n)).toBe(true);
+      expect(candidates.every(([m, n]) => m >= 1 && m < n)).toBe(true);
       expect(new Set(candidates.map(unordered)).size).toBe(candidates.length);
     }
   });
@@ -90,6 +90,37 @@ describe('Chladni pattern generation', () => {
     expect(totalWavenumber(4)).toBeLessThan(totalWavenumber(8));
   });
 
+  it('bends the same base patterns toward non-integer modes with Detune', () => {
+    for (const seed of [0, 8.8, 57]) {
+      const base = getChladniPatternModes(seed, 5);
+      const detuned = getChladniPatternModes(seed, 5, 1);
+      expect(detuned).toEqual(getChladniPatternModes(seed, 5, 1));
+      expect(detuned.flat().some(value => !Number.isInteger(value))).toBe(true);
+      detuned.forEach(([m, n], index) => {
+        expect(Math.abs(m - base[index][0])).toBeLessThanOrEqual(0.4);
+        expect(Math.abs(n - base[index][1])).toBeLessThanOrEqual(0.4);
+        expect(Math.abs(m - n)).toBeGreaterThanOrEqual(0.2 - 1e-9);
+      });
+    }
+  });
+
+  it('maps Mode, Map Profile, Map Direction, Mode Mix, and Edge to shader uniforms', () => {
+    const uniforms = getChladniUniformValues({
+      ...DEFAULTS,
+      chladniMode: 'map',
+      chladniMapProfile: 'folded',
+      chladniMapAngle: 180,
+      chladniModeMix: -3,
+      chladniEdge: 1,
+    });
+    expect(uniforms).toMatchObject({ mode: 1, mapProfile: 1, modeMix: -1 });
+    expect(uniforms.mapAngle).toBeCloseTo(Math.PI, 10);
+    expect(uniforms.edgePhase).toBeCloseTo(Math.PI / 2, 10);
+
+    const fallback = getChladniUniformValues({ ...DEFAULTS, chladniMode: 'bogus' as never, chladniMapProfile: 'bogus' as never });
+    expect(fallback).toMatchObject({ mode: 0, mapProfile: 0, modeMix: 1, edgePhase: 0 });
+  });
+
   it('clamps uniform values and mirrors the rotation for the shader', () => {
     const uniforms = getChladniUniformValues({
       ...DEFAULTS,
@@ -111,7 +142,7 @@ describe('Chladni pattern generation', () => {
 
 describe('Chladni field and loop', () => {
   it('matches the square-plate formula and its analytic gradient', () => {
-    const mode: ChladniMode = [2, 5];
+    const mode: ChladniPlateMode = [2, 5];
     const [x, y] = [0.31, 0.77];
     const f = (px: number, py: number) => evaluateChladniField(px, py, mode)[0];
     const [value, dx, dy] = evaluateChladniField(x, y, mode);
@@ -122,6 +153,25 @@ describe('Chladni field and loop', () => {
     const h = 1e-6;
     expect(dx).toBeCloseTo((f(x + h, y) - f(x - h, y)) / (2 * h), 5);
     expect(dy).toBeCloseTo((f(x, y + h) - f(x, y - h)) / (2 * h), 5);
+  });
+
+  it('keeps the analytic gradient exact for Mode Mix, Edge, and detuned modes', () => {
+    const mode: ChladniPlateMode = [2.3, 4.8];
+    for (const [modeMix, edgePhase] of [[-1, 0], [0, 0.4], [0.35, Math.PI / 2]]) {
+      const f = (px: number, py: number) => evaluateChladniField(px, py, mode, modeMix, edgePhase)[0];
+      const [, dx, dy] = evaluateChladniField(0.27, 0.64, mode, modeMix, edgePhase);
+      const h = 1e-6;
+      expect(dx).toBeCloseTo((f(0.27 + h, 0.64) - f(0.27 - h, 0.64)) / (2 * h), 5);
+      expect(dy).toBeCloseTo((f(0.27, 0.64 + h) - f(0.27, 0.64 - h)) / (2 * h), 5);
+    }
+  });
+
+  it('uses the sine basis for a fixed edge', () => {
+    const [value] = evaluateChladniField(0.21, 0.58, [3, 5], 1, Math.PI / 2);
+    expect(value).toBeCloseTo(
+      Math.sin(5 * Math.PI * 0.21) * Math.sin(3 * Math.PI * 0.58) - Math.sin(3 * Math.PI * 0.21) * Math.sin(5 * Math.PI * 0.58),
+      12,
+    );
   });
 
   it.each([2, 3, 4])('cycles through %i patterns and returns to Pattern A', (count) => {
@@ -145,6 +195,9 @@ describe('Chladni displacement reference', () => {
         {},
         { chladniComplexity: 8, chladniLineWidth: 0.01, chladniSharpness: 0.5, chladniWarpStrength: 1, scale: 5 },
         { chladniComplexity: 1, chladniLineWidth: 1, chladniSharpness: 8, chladniRotation: 270, scale: 0.01 },
+        { chladniModeMix: -1, chladniEdge: 1, chladniDetune: 1, chladniWarpStrength: 1 },
+        { chladniModeMix: 0, chladniEdge: 0.5, chladniDetune: 0.5 },
+        { chladniMode: 'map' as const, chladniMapProfile: 'folded' as const, chladniWarpStrength: 0.5, chladniEdge: 1 },
       ]) {
         const input = referenceInput({ noiseSeed: seed, chladniPatternCount: count, ...params });
         for (const time of [0, 0.37, 1.25, 2.5, 4.99, 123.4]) {
@@ -170,13 +223,40 @@ describe('Chladni displacement reference', () => {
     }
   });
 
-  it('is the identity when Warp Strength is 0', () => {
-    const input = referenceInput({ chladniWarpStrength: 0 });
+  it.each(['warp', 'map'] as const)('is the identity when Warp Strength is 0 in %s mode', (mode) => {
+    const input = referenceInput({ chladniWarpStrength: 0, chladniMode: mode });
     for (const uv of sampleGrid(5)) expect(evaluateChladniDisplacement(uv, 1.3, input)).toEqual([0, 0]);
   });
 
-  it.each([2, 3, 4])('matches at the start and end of the Loop Period with Pattern Count %i', (count) => {
-    const input = referenceInput({ noiseSeed: 7, chladniPatternCount: count });
+  it('pushes UV along Map Direction by the field height in Gradient Map mode', () => {
+    const vertical = referenceInput({ noiseSeed: 4, chladniMode: 'map', chladniMapAngle: 90 });
+    const horizontal = referenceInput({ noiseSeed: 4, chladniMode: 'map', chladniMapAngle: 0 });
+    let maxHeight = 0;
+    for (const uv of sampleGrid(9)) {
+      const [vx, vy] = evaluateChladniDisplacement(uv, 0.6, vertical);
+      const [hx, hy] = evaluateChladniDisplacement(uv, 0.6, horizontal);
+      expect(Math.abs(vx)).toBeLessThan(1e-12);
+      expect(Math.abs(hy)).toBeLessThan(1e-12);
+      expect(hx).toBeCloseTo(vy, 12);
+      // Signed height is |F|/2 ≤ 1, scaled by Map Strength × gain 2.
+      expect(Math.abs(vy)).toBeLessThanOrEqual(0.3 * 2 + 1e-12);
+      maxHeight = Math.max(maxHeight, Math.abs(vy));
+    }
+    expect(maxHeight).toBeGreaterThan(0.1);
+  });
+
+  it('maps nodal lines to the low end with the Folded profile', () => {
+    // uv (0.5, 0.5) is the plate center (0.5, 0.5), where the classic field
+    // with Mode Mix 1 cancels for every mode pair: F = 0 on a nodal line.
+    const input = referenceInput({ chladniMode: 'map', chladniMapProfile: 'folded', chladniMapAngle: 90 }, [1000, 1000]);
+    const [, dy] = evaluateChladniDisplacement([0.5, 0.5], 0, input);
+    expect(dy).toBeCloseTo(-1 * 0.3 * 2, 9);
+  });
+
+  it.each([
+    [2, 'warp'], [3, 'warp'], [4, 'warp'], [2, 'map'], [3, 'map'], [4, 'map'],
+  ] as const)('matches at the start and end of the Loop Period with Pattern Count %i (%s)', (count, mode) => {
+    const input = referenceInput({ noiseSeed: 7, chladniPatternCount: count, chladniMode: mode, chladniDetune: 0.6, chladniEdge: 0.3 });
     for (const uv of sampleGrid(9)) {
       const start = evaluateChladniDisplacement(uv, 0, input);
       const end = evaluateChladniDisplacement(uv, LOOP_PERIOD - 1e-7, input);
@@ -188,8 +268,8 @@ describe('Chladni displacement reference', () => {
     }
   });
 
-  it('has no velocity jump at the loop boundary or at key patterns', () => {
-    const input = referenceInput({ noiseSeed: 3, chladniPatternCount: 3 });
+  it.each(['warp', 'map'] as const)('has no velocity jump at the loop boundary or at key patterns (%s)', (mode) => {
+    const input = referenceInput({ noiseSeed: 3, chladniPatternCount: 3, chladniMode: mode });
     const h = 1e-4;
     for (const boundary of [0, LOOP_PERIOD / 3, (LOOP_PERIOD * 2) / 3, LOOP_PERIOD]) {
       for (const uv of sampleGrid(5)) {

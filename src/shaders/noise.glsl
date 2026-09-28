@@ -79,6 +79,11 @@
   uniform float u_chladniSharpness;
   uniform float u_chladniWarpStrength;
   uniform float u_chladniRotation;     // radians
+  uniform int u_chladniMode;           // 0=Warp, 1=Gradient Map
+  uniform int u_chladniMapProfile;     // 0=Signed, 1=Folded (|F|)
+  uniform float u_chladniMapAngle;     // radians
+  uniform float u_chladniModeMix;      // -1..1: F = b(n,x)b(m,y) - mix*b(m,x)b(n,y)
+  uniform float u_chladniEdgePhase;    // 0=free edge (cos) .. PI/2=fixed edge (sin)
 
   const float KG_TAU = 6.28318530718;
 
@@ -1075,14 +1080,18 @@
     return vec2(cos(angle), sin(angle)) * field;
   }
 
-  // Square-plate Chladni field F = cos(nπx)cos(mπy) - cos(mπx)cos(nπy).
-  // F = 0 is the nodal line pattern. Seed/Complexity choose the key
-  // patterns A-D on the CPU; this function only reads the two patterns that
-  // bracket the current loop position, whatever the Pattern Count is.
+  // Square-plate Chladni field
+  //   F = b(n,x)b(m,y) - s*b(m,x)b(n,y),  b(k,t) = cos(k*PI*t - phi)
+  // s = Mode Mix (1 = classic difference), phi = Edge (0 = free-edge cosine,
+  // PI/2 = fixed-edge sine). F = 0 is the nodal line pattern. Seed/Complexity
+  // choose the key patterns A-D on the CPU; this function only reads the two
+  // patterns that bracket the current loop position, whatever the Pattern
+  // Count is.
   const int CHLADNI_NOISE_TYPE = 12;
   const float CHLADNI_PI = 3.14159265359;
   const float CHLADNI_GRADIENT_EPSILON = 0.5;
   const float CHLADNI_DISTANCE_EPSILON = 0.0001;
+  const float CHLADNI_MAP_GAIN = 2.0;
 
   float chladniFinite(float value, float fallback) {
     return value == value && abs(value) < 1000000.0 ? value : fallback;
@@ -1096,21 +1105,21 @@
   }
 
   // Returns (F, dF/dx, dF/dy) with the analytic gradient.
-  highp vec3 chladniField(highp vec2 x, vec2 mode) {
+  highp vec3 chladniField(highp vec2 x, vec2 mode, float modeMix, float edgePhase) {
     highp float m = mode.x * CHLADNI_PI;
     highp float n = mode.y * CHLADNI_PI;
-    highp float cnx = cos(n * x.x);
-    highp float snx = sin(n * x.x);
-    highp float cmy = cos(m * x.y);
-    highp float smy = sin(m * x.y);
-    highp float cmx = cos(m * x.x);
-    highp float smx = sin(m * x.x);
-    highp float cny = cos(n * x.y);
-    highp float sny = sin(n * x.y);
+    highp float cnx = cos(n * x.x - edgePhase);
+    highp float snx = sin(n * x.x - edgePhase);
+    highp float cmy = cos(m * x.y - edgePhase);
+    highp float smy = sin(m * x.y - edgePhase);
+    highp float cmx = cos(m * x.x - edgePhase);
+    highp float smx = sin(m * x.x - edgePhase);
+    highp float cny = cos(n * x.y - edgePhase);
+    highp float sny = sin(n * x.y - edgePhase);
     return vec3(
-      cnx * cmy - cmx * cny,
-      -n * snx * cmy + m * smx * cny,
-      -m * cnx * smy + n * cmx * sny
+      cnx * cmy - modeMix * cmx * cny,
+      -n * snx * cmy + modeMix * m * smx * cny,
+      -m * cnx * smy + modeMix * n * cmx * sny
     );
   }
 
@@ -1132,9 +1141,11 @@
 
   // The signed fields of the two key patterns are interpolated (not the
   // rendered images), so the nodal lines themselves bend into the next shape.
-  // UV moves along the normalized field gradient: a band peaked on the nodal
-  // lines plus a soft signed term that pinches toward them. The evaluation
-  // space is centered and aspect-corrected so the plate stays square.
+  // Warp mode moves UV along the normalized field gradient: a band peaked on
+  // the nodal lines plus a soft signed term that pinches toward them. Map
+  // mode pushes UV along Map Direction by the field height instead. The
+  // evaluation space is centered and aspect-corrected so the plate stays
+  // square.
   vec2 chladniDistortion(vec2 uv, float scale, float evolution) {
     float warpStrength = clamp(chladniFinite(u_chladniWarpStrength, 0.3), 0.0, 1.0);
     if (warpStrength <= 0.0) return vec2(0.0);
@@ -1150,7 +1161,24 @@
     vec3 morph = chladniMorphState(evolution);
     vec2 modeA = chladniMode(int(morph.x));
     vec2 modeB = chladniMode(int(morph.y));
-    highp vec3 field = mix(chladniField(x, modeA), chladniField(x, modeB), morph.z);
+    float modeMix = clamp(chladniFinite(u_chladniModeMix, 1.0), -1.0, 1.0);
+    float edgePhase = clamp(chladniFinite(u_chladniEdgePhase, 0.0), 0.0, CHLADNI_PI * 0.5);
+    highp vec3 field = mix(
+      chladniField(x, modeA, modeMix, edgePhase),
+      chladniField(x, modeB, modeMix, edgePhase),
+      morph.z
+    );
+
+    if (u_chladniMode == 1) {
+      // Gradient Map: push UV along one direction by the field height, so a
+      // gradient running that way is re-mapped onto the plate's relief.
+      float height = u_chladniMapProfile == 1
+        ? clamp(abs(field.x) - 1.0, -1.0, 1.0)
+        : clamp(field.x * 0.5, -1.0, 1.0);
+      float mapAngle = chladniFinite(u_chladniMapAngle, 1.57079632679);
+      return vec2(cos(mapAngle), sin(mapAngle)) * height * warpStrength * CHLADNI_MAP_GAIN;
+    }
+
     highp float wavenumber = mix(length(modeA), length(modeB), morph.z);
 
     // First-order distance to the nodal line, relative to the line spacing,

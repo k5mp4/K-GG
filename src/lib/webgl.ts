@@ -657,6 +657,11 @@ export async function initWebGL(canvas: HTMLCanvasElement): Promise<WebGLContext
     u_chladniSharpness: gl.getUniformLocation(program, 'u_chladniSharpness'),
     u_chladniWarpStrength: gl.getUniformLocation(program, 'u_chladniWarpStrength'),
     u_chladniRotation: gl.getUniformLocation(program, 'u_chladniRotation'),
+    u_chladniMode: gl.getUniformLocation(program, 'u_chladniMode'),
+    u_chladniMapProfile: gl.getUniformLocation(program, 'u_chladniMapProfile'),
+    u_chladniMapAngle: gl.getUniformLocation(program, 'u_chladniMapAngle'),
+    u_chladniModeMix: gl.getUniformLocation(program, 'u_chladniModeMix'),
+    u_chladniEdgePhase: gl.getUniformLocation(program, 'u_chladniEdgePhase'),
     u_time: gl.getUniformLocation(program, 'u_time'),
     u_noiseLoopPeriod: gl.getUniformLocation(program, 'u_noiseLoopPeriod'),
     u_animDir: gl.getUniformLocation(program, 'u_animDir'),
@@ -1917,6 +1922,11 @@ function applyChladniUniforms(
   gl.uniform1f(uniforms.u_chladniSharpness, chladni.sharpness);
   gl.uniform1f(uniforms.u_chladniWarpStrength, chladni.warpStrength);
   gl.uniform1f(uniforms.u_chladniRotation, chladni.rotation);
+  setUniform1i(gl, uniforms.u_chladniMode, chladni.mode);
+  setUniform1i(gl, uniforms.u_chladniMapProfile, chladni.mapProfile);
+  gl.uniform1f(uniforms.u_chladniMapAngle, chladni.mapAngle);
+  gl.uniform1f(uniforms.u_chladniModeMix, chladni.modeMix);
+  gl.uniform1f(uniforms.u_chladniEdgePhase, chladni.edgePhase);
 }
 
 export function applyMeshGradientUniforms(

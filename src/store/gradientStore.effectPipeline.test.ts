@@ -378,7 +378,25 @@ describe('Gradient store Effect Pipeline V2 synchronization', () => {
       chladniSharpness: 2,
       chladniWarpStrength: 0.3,
       chladniRotation: 0,
+      chladniMode: 'warp',
+      chladniMapProfile: 'signed',
+      chladniMapAngle: 90,
+      chladniModeMix: 1,
+      chladniEdge: 0,
+      chladniDetune: 0,
     });
+
+    store.setNoiseDistortion({ chladniMode: 'map', chladniMapProfile: 'folded', chladniModeMix: -4, chladniEdge: 3, chladniDetune: -1, chladniMapAngle: -45 });
+    expect(useGradientStore.getState().noiseDistortion).toMatchObject({
+      chladniMode: 'map',
+      chladniMapProfile: 'folded',
+      chladniModeMix: -1,
+      chladniEdge: 1,
+      chladniDetune: 0,
+      chladniMapAngle: 315,
+    });
+    store.setNoiseDistortion({ chladniMode: 'bogus' as never, chladniMapProfile: 'bogus' as never });
+    expect(useGradientStore.getState().noiseDistortion).toMatchObject({ chladniMode: 'warp', chladniMapProfile: 'signed' });
 
     store.setNoiseDistortion({
       chladniPatternCount: 9,
@@ -429,6 +447,12 @@ describe('Gradient store Effect Pipeline V2 synchronization', () => {
       chladniSharpness: STORE_DEFAULTS.noiseDistortion.chladniSharpness,
       chladniWarpStrength: STORE_DEFAULTS.noiseDistortion.chladniWarpStrength,
       chladniRotation: STORE_DEFAULTS.noiseDistortion.chladniRotation,
+      chladniMode: 'warp',
+      chladniMapProfile: 'signed',
+      chladniMapAngle: STORE_DEFAULTS.noiseDistortion.chladniMapAngle,
+      chladniModeMix: STORE_DEFAULTS.noiseDistortion.chladniModeMix,
+      chladniEdge: STORE_DEFAULTS.noiseDistortion.chladniEdge,
+      chladniDetune: STORE_DEFAULTS.noiseDistortion.chladniDetune,
     });
   });
 

@@ -86,6 +86,10 @@ export const PARAMETER_LIMITS = {
   'noise.chladniSharpness': { min: 0.5, max: 8, step: 0.05, defaultValue: 2 },
   'noise.chladniWarpStrength': { min: 0, max: 1, step: 0.01, defaultValue: 0.3 },
   'noise.chladniRotation': { min: 0, max: 360, step: 1, defaultValue: 0, angleUnit: 'degrees', wrapAngle: true },
+  'noise.chladniMapAngle': { min: 0, max: 360, step: 1, defaultValue: 90, angleUnit: 'degrees', wrapAngle: true },
+  'noise.chladniModeMix': { min: -1, max: 1, step: 0.01, defaultValue: 1 },
+  'noise.chladniEdge': { min: 0, max: 1, step: 0.01, defaultValue: 0 },
+  'noise.chladniDetune': { min: 0, max: 1, step: 0.01, defaultValue: 0 },
 
   'diffuse.scatter': { min: 0, max: 300, step: 1, defaultValue: 70 },
   'diffuse.grain': { min: 0.01, max: 5, step: 0.01, defaultValue: 2 },
@@ -325,6 +329,14 @@ export const ENUM_PARAMETER_LIMITS = {
     values: ['3d', '4d'],
     defaultValue: '3d',
   },
+  'noise.chladniMode': {
+    values: ['warp', 'map'],
+    defaultValue: 'warp',
+  },
+  'noise.chladniMapProfile': {
+    values: ['signed', 'folded'],
+    defaultValue: 'signed',
+  },
   'postprocess.voronoiDistMetric': VORONOI_DISTANCE_METRIC_LIMIT,
   'postprocess.voronoiFeature': VORONOI_FEATURE_LIMIT,
   'postprocess.glassSurfaceType': {
@@ -437,6 +449,10 @@ const TRACK_LIMIT_KEYS: Record<string, ParameterLimitKey> = {
   'noiseDistortion.chladniSharpness': 'noise.chladniSharpness',
   'noiseDistortion.chladniWarpStrength': 'noise.chladniWarpStrength',
   'noiseDistortion.chladniRotation': 'noise.chladniRotation',
+  'noiseDistortion.chladniMapAngle': 'noise.chladniMapAngle',
+  'noiseDistortion.chladniModeMix': 'noise.chladniModeMix',
+  'noiseDistortion.chladniEdge': 'noise.chladniEdge',
+  'noiseDistortion.chladniDetune': 'noise.chladniDetune',
   'slitScan.angle': 'slit.angle',
   'slitScan.offsetAngle': 'slit.offsetAngle',
   'normalMap.angle': 'normalMap.angle',

@@ -7,7 +7,7 @@ import { Collapsible } from './Collapsible';
 import { Toggle } from './Toggle';
 import { CustomSelect } from './CustomSelect';
 import { Icon } from './Icon';
-import { InputShuffle, fromNumber } from 'tweeq';
+import { InputDrum, InputShuffle, fromNumber } from 'tweeq';
 import { useLanguage } from '../i18n/LanguageProvider';
 import { getNoiseSeedField } from '../lib/noiseSeed';
 import { VORONOI_FEATURES, VORONOI_METRICS } from '../lib/voronoi';
@@ -65,7 +65,18 @@ const PERLIN_DIMENSIONS = [
   { value: '4d', label: '4D (Loop)' },
 ];
 
-const CHLADNI_PATTERN_COUNTS = [2, 3, 4] as const;
+const CHLADNI_PATTERN_COUNTS = [2, 3, 4];
+const CHLADNI_PATTERN_COUNT_LABELS = CHLADNI_PATTERN_COUNTS.map(String);
+
+const CHLADNI_MODES = [
+  { value: 'warp', label: 'Warp (Nodal Lines)' },
+  { value: 'map', label: 'Gradient Map' },
+];
+
+const CHLADNI_MAP_PROFILES = [
+  { value: 'signed', label: 'Signed (±)' },
+  { value: 'folded', label: 'Folded (|F|)' },
+];
 
 const PHASOR_DIRECTION_MODES = [
   { value: 'directional', label: 'Directional' },
@@ -91,6 +102,7 @@ export function NoiseDistortionPanel() {
   const isCaustics = noiseDistortion.type === 'caustics';
   const isPhasor = noiseDistortion.type === 'phasor';
   const isChladni = noiseDistortion.type === 'chladni';
+  const isChladniMap = (noiseDistortion.chladniMode ?? D.chladniMode) === 'map';
   const hasOctaves = noiseDistortion.type === 'fbm' ||
                     isPerlin ||
                     noiseDistortion.type === 'ridged_fbm' ||
@@ -364,19 +376,22 @@ export function NoiseDistortionPanel() {
 
           {isChladni && (
             <>
+              <CustomSelect
+                label="Mode"
+                value={noiseDistortion.chladniMode ?? D.chladniMode}
+                options={CHLADNI_MODES}
+                onChange={(val) => setNoiseDistortion({ chladniMode: val as NoiseDistortionConfig['chladniMode'] })}
+              />
               <div>
                 <label className="block text-xs mb-1 text-deep">Pattern Count</label>
-                <div className="flex gap-1">
-                  {CHLADNI_PATTERN_COUNTS.map((count) => (
-                    <button
-                      key={count}
-                      onClick={() => setNoiseDistortion({ chladniPatternCount: count })}
-                      className={`flex-1 text-xs py-1 rounded-none ${(noiseDistortion.chladniPatternCount ?? D.chladniPatternCount) === count ? 'bg-fire text-k-text' : 'bg-k-muted hover:bg-k-muted/70 text-k-text'}`}
-                    >
-                      {count}
-                    </button>
-                  ))}
-                </div>
+                <InputDrum
+                  value={noiseDistortion.chladniPatternCount ?? D.chladniPatternCount}
+                  options={CHLADNI_PATTERN_COUNTS}
+                  labels={CHLADNI_PATTERN_COUNT_LABELS}
+                  onChange={(count) => count !== undefined && setNoiseDistortion({ chladniPatternCount: count })}
+                  aria-label="Chladni pattern count"
+                  className="w-full"
+                />
               </div>
               <SliderField
                 label="Complexity"
@@ -387,23 +402,69 @@ export function NoiseDistortionPanel() {
                 limitKey="noise.chladniComplexity"
               />
               <SliderField
-                label="Line Width"
-                value={noiseDistortion.chladniLineWidth ?? D.chladniLineWidth}
-                onChange={(v) => setNoiseDistortion({ chladniLineWidth: v })}
+                label="Mode Mix"
+                value={noiseDistortion.chladniModeMix ?? D.chladniModeMix}
+                onChange={(v) => setNoiseDistortion({ chladniModeMix: v })}
                 format={(v) => v.toFixed(2)}
-                trackId="noiseDistortion.chladniLineWidth"
-                limitKey="noise.chladniLineWidth"
+                trackId="noiseDistortion.chladniModeMix"
+                limitKey="noise.chladniModeMix"
               />
               <SliderField
-                label="Sharpness"
-                value={noiseDistortion.chladniSharpness ?? D.chladniSharpness}
-                onChange={(v) => setNoiseDistortion({ chladniSharpness: v })}
+                label="Edge"
+                value={noiseDistortion.chladniEdge ?? D.chladniEdge}
+                onChange={(v) => setNoiseDistortion({ chladniEdge: v })}
                 format={(v) => v.toFixed(2)}
-                trackId="noiseDistortion.chladniSharpness"
-                limitKey="noise.chladniSharpness"
+                trackId="noiseDistortion.chladniEdge"
+                limitKey="noise.chladniEdge"
               />
               <SliderField
-                label="Warp Strength"
+                label="Detune"
+                value={noiseDistortion.chladniDetune ?? D.chladniDetune}
+                onChange={(v) => setNoiseDistortion({ chladniDetune: v })}
+                format={(v) => v.toFixed(2)}
+                trackId="noiseDistortion.chladniDetune"
+                limitKey="noise.chladniDetune"
+              />
+              {isChladniMap ? (
+                <>
+                  <CustomSelect
+                    label="Map Profile"
+                    value={noiseDistortion.chladniMapProfile ?? D.chladniMapProfile}
+                    options={CHLADNI_MAP_PROFILES}
+                    onChange={(val) => setNoiseDistortion({ chladniMapProfile: val as NoiseDistortionConfig['chladniMapProfile'] })}
+                  />
+                  <SliderField
+                    label="Map Direction"
+                    value={noiseDistortion.chladniMapAngle ?? D.chladniMapAngle}
+                    onChange={(v) => setNoiseDistortion({ chladniMapAngle: v })}
+                    format={(v) => `${Math.round(v)}°`}
+                    trackId="noiseDistortion.chladniMapAngle"
+                    control="angle"
+                    limitKey="noise.chladniMapAngle"
+                  />
+                </>
+              ) : (
+                <>
+                  <SliderField
+                    label="Line Width"
+                    value={noiseDistortion.chladniLineWidth ?? D.chladniLineWidth}
+                    onChange={(v) => setNoiseDistortion({ chladniLineWidth: v })}
+                    format={(v) => v.toFixed(2)}
+                    trackId="noiseDistortion.chladniLineWidth"
+                    limitKey="noise.chladniLineWidth"
+                  />
+                  <SliderField
+                    label="Sharpness"
+                    value={noiseDistortion.chladniSharpness ?? D.chladniSharpness}
+                    onChange={(v) => setNoiseDistortion({ chladniSharpness: v })}
+                    format={(v) => v.toFixed(2)}
+                    trackId="noiseDistortion.chladniSharpness"
+                    limitKey="noise.chladniSharpness"
+                  />
+                </>
+              )}
+              <SliderField
+                label={isChladniMap ? 'Map Strength' : 'Warp Strength'}
                 value={noiseDistortion.chladniWarpStrength ?? D.chladniWarpStrength}
                 onChange={(v) => setNoiseDistortion({ chladniWarpStrength: v })}
                 format={(v) => v.toFixed(2)}

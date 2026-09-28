@@ -80,7 +80,16 @@ export type NoiseDistortionConfig = {
   chladniSharpness: number;      // 0.5–8.0: 節線から離れたときの減衰の急峻さ
   chladniWarpStrength: number;   // 0.0–1.0: Chladni勾配による内部変位場の強さ
   chladniRotation: number;       // 0–360°: Pattern全体の回転
+  chladniMode: ChladniMode;      // warp=節線に沿った勾配変位, map=field高さでグラデーションをマッピング
+  chladniMapProfile: ChladniMapProfile; // map時の高さ: signed=±の凹凸, folded=|F|（節線が谷）
+  chladniMapAngle: number;       // 0–360°: map時にUVを押し出す方向
+  chladniModeMix: number;        // -1.0–1.0: 2項の結合係数（1=差, -1=和, 0=単一定在波）
+  chladniEdge: number;           // 0.0–1.0: 板の端条件（0=自由端cos, 1=固定端sin）
+  chladniDetune: number;         // 0.0–1.0: Seed由来の非整数モードずれ
 };
+
+export type ChladniMode = 'warp' | 'map';
+export type ChladniMapProfile = 'signed' | 'folded';
 
 export type DiffuseDitherMode = 'pattern_dither';
 export type DiffuseMode = 'block' | 'smooth' | 'dither' | 'halftone' | 'ascii' | 'legacy';

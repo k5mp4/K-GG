@@ -1,23 +1,25 @@
 import type { NoiseDistortionConfig } from '../types/distortion';
 import { noiseAngleDegreesForShader } from './noiseAngle';
-import { clampParameter, getParameterDefault, getParameterLimit } from './parameterLimits';
+import { clampParameter, getParameterDefault, getParameterLimit, normalizeEnumParameter } from './parameterLimits';
 
 /**
  * Chladni Noise support shared by the renderer and tests.
  *
  * A square-plate Chladni field is
- *   F(x, y; m, n) = cos(nπx)·cos(mπy) − cos(mπx)·cos(nπy)
- * whose zero set (F = 0) is the nodal line pattern. The key patterns A–D are
- * chosen here on the CPU so the selection is deterministic, easy to
- * de-duplicate, and uploaded identically to the Legacy generator and the V2
- * Noise Stack. The GLSL implementation lives in `chladniDistortion()` in
- * src/shaders/noise.glsl; the reference evaluator below mirrors it for tests.
+ *   F(x, y; m, n) = b(n, x)·b(m, y) − s·b(m, x)·b(n, y),  b(k, t) = cos(kπt − φ)
+ * where s is Mode Mix (1 = the classic difference) and φ = Edge·π/2 turns the
+ * free-edge cosine basis into the fixed-edge sine basis. F = 0 is the nodal
+ * line pattern. The key patterns A–D are chosen here on the CPU so the
+ * selection is deterministic, easy to de-duplicate, and uploaded identically
+ * to the Legacy generator and the V2 Noise Stack. The GLSL implementation
+ * lives in `chladniDistortion()` in src/shaders/noise.glsl; the reference
+ * evaluator below mirrors it for tests.
  */
 
 export const CHLADNI_MAX_PATTERNS = 4;
 
 /** An ordered plate mode. (n, m) is the same nodal set as (m, n) with F negated. */
-export type ChladniMode = readonly [m: number, n: number];
+export type ChladniPlateMode = readonly [m: number, n: number];
 
 type ChladniConfig = Pick<
   NoiseDistortionConfig,
@@ -28,6 +30,12 @@ type ChladniConfig = Pick<
   | 'chladniSharpness'
   | 'chladniWarpStrength'
   | 'chladniRotation'
+  | 'chladniMode'
+  | 'chladniMapProfile'
+  | 'chladniMapAngle'
+  | 'chladniModeMix'
+  | 'chladniEdge'
+  | 'chladniDetune'
 >;
 
 export type ChladniUniformValues = {
@@ -41,23 +49,39 @@ export type ChladniUniformValues = {
   warpStrength: number;
   /** Radians, sign-mirrored like the other Noise angles at the upload boundary. */
   rotation: number;
+  /** 0 = Warp, 1 = Gradient Map */
+  mode: number;
+  /** 0 = Signed, 1 = Folded */
+  mapProfile: number;
+  /** Radians, the same convention as Perlin Direction. */
+  mapAngle: number;
+  modeMix: number;
+  /** Basis phase φ in radians: 0 = free edge (cos), π/2 = fixed edge (sin). */
+  edgePhase: number;
 };
 
-/** Highest mode index for a Complexity value. Complexity 1 → 3, 8 → 10. */
+type NumericChladniKey = Parameters<typeof getParameterLimit>[0];
+
+function clampChladni(value: number, key: NumericChladniKey): number {
+  return clampParameter(value, getParameterDefault(key), getParameterLimit(key));
+}
+
+/** Highest mode index for a Complexity value. Complexity 1 → 4, 8 → 11. */
 export function getChladniModeLimit(complexity: number): number {
-  return clampParameter(complexity, getParameterDefault('noise.chladniComplexity'), getParameterLimit('noise.chladniComplexity')) + 2;
+  return clampChladni(complexity, 'noise.chladniComplexity') + 3;
 }
 
 /**
- * Unordered mode pairs {m < n} in [0, limit] with m + n ≥ limit. Excluding
- * m == n removes the identically-zero field, and keeping only m < n treats
- * (m, n) / (n, m) as the same pattern. The m + n floor makes higher
- * Complexity select finer patterns; limit ≥ 3 always leaves at least four
- * distinct candidates, so Pattern A–D never repeat.
+ * Unordered mode pairs {1 ≤ m < n ≤ limit} with m + n ≥ limit. Excluding
+ * m == n removes the identically-zero classic field, and keeping only m < n
+ * treats (m, n) / (n, m) as the same pattern. Index 0 is left out because the
+ * fixed-edge (sine) basis makes every 0 mode vanish. The m + n floor makes
+ * higher Complexity select finer patterns; limit ≥ 4 always leaves at least
+ * four distinct candidates, so Pattern A–D never repeat.
  */
-export function listChladniModeCandidates(limit: number): ChladniMode[] {
-  const candidates: ChladniMode[] = [];
-  for (let m = 0; m <= limit; m++) {
+export function listChladniModeCandidates(limit: number): ChladniPlateMode[] {
+  const candidates: ChladniPlateMode[] = [];
+  for (let m = 1; m <= limit; m++) {
     for (let n = m + 1; n <= limit; n++) {
       if (m + n >= limit) candidates.push([m, n]);
     }
@@ -65,9 +89,9 @@ export function listChladniModeCandidates(limit: number): ChladniMode[] {
   return candidates;
 }
 
-function hashSeed(seed: number, limit: number): number {
+function hashSeed(seed: number, limit: number, stream: number): number {
   const seedKey = Number.isFinite(seed) ? Math.round(seed * 1000) : 0;
-  let hash = Math.imul(seedKey ^ 0x9e3779b9, 0x85ebca6b) ^ Math.imul(limit + 1, 0xc2b2ae35);
+  let hash = Math.imul(seedKey ^ 0x9e3779b9, 0x85ebca6b) ^ Math.imul(limit + 1, 0xc2b2ae35) ^ Math.imul(stream, 0x27d4eb2f);
   hash ^= hash >>> 16;
   hash = Math.imul(hash, 0x7feb352d);
   hash ^= hash >>> 15;
@@ -86,41 +110,54 @@ function createRandom(state: number): () => number {
   };
 }
 
+/** Largest per-index Detune offset. Keeps |m − n| ≥ 0.2 for distinct integers. */
+const CHLADNI_MAX_DETUNE = 0.4;
+
 /**
  * Pattern A–D for a Seed and Complexity. The list does not depend on Pattern
  * Count, so changing the count only adds or removes trailing patterns.
+ * Detune uses its own random stream, so it bends the same base patterns
+ * toward non-integer modes instead of choosing different ones.
  */
-export function getChladniPatternModes(seed: number, complexity: number): ChladniMode[] {
+export function getChladniPatternModes(seed: number, complexity: number, detune = 0): ChladniPlateMode[] {
   const limit = getChladniModeLimit(complexity);
   const candidates = listChladniModeCandidates(limit);
-  const random = createRandom(hashSeed(seed, limit));
+  const random = createRandom(hashSeed(seed, limit, 0));
   const picks = Math.min(CHLADNI_MAX_PATTERNS, candidates.length);
   for (let index = 0; index < picks; index++) {
     const swapIndex = index + Math.floor(random() * (candidates.length - index));
     [candidates[index], candidates[swapIndex]] = [candidates[swapIndex], candidates[index]];
   }
-  const modes: ChladniMode[] = [];
+  const detuneAmount = clampChladni(detune, 'noise.chladniDetune') * CHLADNI_MAX_DETUNE;
+  const detuneRandom = createRandom(hashSeed(seed, limit, 1));
+  const modes: ChladniPlateMode[] = [];
   for (let index = 0; index < CHLADNI_MAX_PATTERNS; index++) {
     const [m, n] = candidates[index % picks];
     // The orientation flips the sign of F, which changes the in-between
     // shapes of the signed-field morph without changing the key pattern.
-    modes.push(random() < 0.5 ? [m, n] : [n, m]);
+    const [first, second] = random() < 0.5 ? [m, n] : [n, m];
+    const firstOffset = (detuneRandom() * 2 - 1) * detuneAmount;
+    const secondOffset = (detuneRandom() * 2 - 1) * detuneAmount;
+    modes.push([first + firstOffset, second + secondOffset]);
   }
   return modes;
 }
 
 export function getChladniUniformValues(config: ChladniConfig): ChladniUniformValues {
-  const clampNoise = (value: number, key: Parameters<typeof getParameterLimit>[0]) =>
-    clampParameter(value, getParameterDefault(key), getParameterLimit(key));
-  const [a, b, c, d] = getChladniPatternModes(config.noiseSeed ?? 0, config.chladniComplexity);
+  const [a, b, c, d] = getChladniPatternModes(config.noiseSeed ?? 0, config.chladniComplexity, config.chladniDetune);
   return {
-    patternCount: clampNoise(config.chladniPatternCount, 'noise.chladniPatternCount'),
+    patternCount: clampChladni(config.chladniPatternCount, 'noise.chladniPatternCount'),
     modesAB: [a[0], a[1], b[0], b[1]],
     modesCD: [c[0], c[1], d[0], d[1]],
-    lineWidth: clampNoise(config.chladniLineWidth, 'noise.chladniLineWidth'),
-    sharpness: clampNoise(config.chladniSharpness, 'noise.chladniSharpness'),
-    warpStrength: clampNoise(config.chladniWarpStrength, 'noise.chladniWarpStrength'),
-    rotation: noiseAngleDegreesForShader(clampNoise(config.chladniRotation, 'noise.chladniRotation')),
+    lineWidth: clampChladni(config.chladniLineWidth, 'noise.chladniLineWidth'),
+    sharpness: clampChladni(config.chladniSharpness, 'noise.chladniSharpness'),
+    warpStrength: clampChladni(config.chladniWarpStrength, 'noise.chladniWarpStrength'),
+    rotation: noiseAngleDegreesForShader(clampChladni(config.chladniRotation, 'noise.chladniRotation')),
+    mode: normalizeEnumParameter('noise.chladniMode', config.chladniMode) === 'map' ? 1 : 0,
+    mapProfile: normalizeEnumParameter('noise.chladniMapProfile', config.chladniMapProfile) === 'folded' ? 1 : 0,
+    mapAngle: clampChladni(config.chladniMapAngle, 'noise.chladniMapAngle') * Math.PI / 180,
+    modeMix: clampChladni(config.chladniModeMix, 'noise.chladniModeMix'),
+    edgePhase: clampChladni(config.chladniEdge, 'noise.chladniEdge') * Math.PI / 2,
   };
 }
 
@@ -131,23 +168,30 @@ export function getChladniUniformValues(config: ChladniConfig): ChladniUniformVa
 
 const CHLADNI_GRADIENT_EPSILON = 0.5;
 const CHLADNI_DISTANCE_EPSILON = 0.0001;
+const CHLADNI_MAP_GAIN = 2.0;
 
 /** Returns [F, ∂F/∂x, ∂F/∂y] at plate coordinate (x, y). */
-export function evaluateChladniField(x: number, y: number, mode: ChladniMode): [number, number, number] {
+export function evaluateChladniField(
+  x: number,
+  y: number,
+  mode: ChladniPlateMode,
+  modeMix = 1,
+  edgePhase = 0,
+): [number, number, number] {
   const m = mode[0] * Math.PI;
   const n = mode[1] * Math.PI;
-  const cnx = Math.cos(n * x);
-  const snx = Math.sin(n * x);
-  const cmy = Math.cos(m * y);
-  const smy = Math.sin(m * y);
-  const cmx = Math.cos(m * x);
-  const smx = Math.sin(m * x);
-  const cny = Math.cos(n * y);
-  const sny = Math.sin(n * y);
+  const cnx = Math.cos(n * x - edgePhase);
+  const snx = Math.sin(n * x - edgePhase);
+  const cmy = Math.cos(m * y - edgePhase);
+  const smy = Math.sin(m * y - edgePhase);
+  const cmx = Math.cos(m * x - edgePhase);
+  const smx = Math.sin(m * x - edgePhase);
+  const cny = Math.cos(n * y - edgePhase);
+  const sny = Math.sin(n * y - edgePhase);
   return [
-    cnx * cmy - cmx * cny,
-    -n * snx * cmy + m * smx * cny,
-    -m * cnx * smy + n * cmx * sny,
+    cnx * cmy - modeMix * cmx * cny,
+    -n * snx * cmy + modeMix * m * smx * cny,
+    -m * cnx * smy + modeMix * n * cmx * sny,
   ];
 }
 
@@ -184,7 +228,7 @@ function smoothstep(edge0: number, edge1: number, value: number): number {
   return t * t * (3 - 2 * t);
 }
 
-function modeAt(uniforms: ChladniUniformValues, index: number): ChladniMode {
+function modeAt(uniforms: ChladniUniformValues, index: number): ChladniPlateMode {
   if (index === 1) return [uniforms.modesAB[2], uniforms.modesAB[3]];
   if (index === 2) return [uniforms.modesCD[0], uniforms.modesCD[1]];
   if (index === 3) return [uniforms.modesCD[2], uniforms.modesCD[3]];
@@ -213,12 +257,24 @@ export function evaluateChladniDisplacement(
   const morph = getChladniMorphState(evolution, input.loopPeriod, uniforms.patternCount);
   const modeA = modeAt(uniforms, morph.current);
   const modeB = modeAt(uniforms, morph.next);
-  const a = evaluateChladniField(x, y, modeA);
-  const b = evaluateChladniField(x, y, modeB);
+  const modeMix = Math.min(Math.max(uniforms.modeMix, -1), 1);
+  const edgePhase = Math.min(Math.max(uniforms.edgePhase, 0), Math.PI / 2);
+  const a = evaluateChladniField(x, y, modeA, modeMix, edgePhase);
+  const b = evaluateChladniField(x, y, modeB, modeMix, edgePhase);
   const mix = (from: number, to: number) => from + (to - from) * morph.weight;
   const field = [mix(a[0], b[0]), mix(a[1], b[1]), mix(a[2], b[2])];
-  const wavenumber = mix(Math.hypot(modeA[0], modeA[1]), Math.hypot(modeB[0], modeB[1]));
 
+  if (uniforms.mode === 1) {
+    // Gradient Map: push UV along one direction by the field height, so a
+    // gradient running that way is re-mapped onto the plate's relief.
+    const height = uniforms.mapProfile === 1
+      ? Math.min(Math.max(Math.abs(field[0]) - 1, -1), 1)
+      : Math.min(Math.max(field[0] * 0.5, -1), 1);
+    const strength = height * warpStrength * CHLADNI_MAP_GAIN;
+    return [Math.cos(uniforms.mapAngle) * strength, Math.sin(uniforms.mapAngle) * strength];
+  }
+
+  const wavenumber = mix(Math.hypot(modeA[0], modeA[1]), Math.hypot(modeB[0], modeB[1]));
   const gradientLength = Math.hypot(field[1], field[2]);
   const lineDistance = Math.abs(field[0]) / Math.max(gradientLength, CHLADNI_DISTANCE_EPSILON) * wavenumber;
   const lineWidth = Math.min(Math.max(uniforms.lineWidth, 0.005), 1);
