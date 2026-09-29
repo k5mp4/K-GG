@@ -5,12 +5,15 @@ import { renderSceneAtTime } from './renderSceneAtTime';
 import { normalizeImageGradientConfig } from '../types/imageGradient';
 import { normalizeMeshGradientConfig } from '../types/gradient';
 import type { LatestState } from '../types/latestState';
-import { disposeWebGL, initWebGL, type WebGLContext } from './webgl';
+import { disposeWebGL, initWebGL, settleLazyProgram, type WebGLContext } from './webgl';
+import { getRequiredSceneProgramKeys } from './sceneRenderPlan';
 import { resolveDiffuseBezier } from './diffuseCurve';
 import { normalizeSeamlessConfig } from '../types/seamless';
 import { normalizeTextureConfig } from '../types/texture';
 import { normalizeFlowGradientConfig } from '../types/flowGradient';
 import { normalizeConeViewConfig } from '../types/coneView';
+import { normalizeClothGradientConfig } from '../types/clothGradient';
+import { resolvePersistedDatamosh } from '../types/datamosh';
 
 export const PRESET_THUMBNAIL_WIDTH = 320;
 export const PRESET_THUMBNAIL_HEIGHT = 200;
@@ -75,7 +78,9 @@ export function createPresetThumbnailState(snapshot: StoreSnapshot): LatestState
     })(),
     stretch: { ...STORE_DEFAULTS.stretch, ...snapshot.stretch },
     normalMap: { ...STORE_DEFAULTS.normalMap, ...snapshot.normalMap },
+    clothGradient: normalizeClothGradientConfig(snapshot.clothGradient),
     coneView: normalizeConeViewConfig(snapshot.coneView),
+    datamosh: resolvePersistedDatamosh(snapshot),
     seamless: normalizeSeamlessConfig(snapshot.seamless),
     texture: normalizeTextureConfig(snapshot.texture),
     flowGradient: normalizeFlowGradientConfig(snapshot.flowGradient),
@@ -130,13 +135,60 @@ async function getRenderer(): Promise<{ canvas: HTMLCanvasElement; context: WebG
   return await rendererPromise;
 }
 
+let captureCount = 0;
+const PRESET_THUMBNAIL_PROGRAM_WAIT_MS = 10_000;
+
+/**
+ * Timeline positions rendered before the thumbnail frame (time 0) so feedback
+ * effects such as Datamosh reach a steady state. The frames approach 0 from the
+ * end of the loop, about one second at the preset's frame rate.
+ */
+export function getThumbnailWarmupTimes(state: Pick<LatestState, 'animation'>): number[] {
+  const fps = Number.isFinite(state.animation.fps) ? state.animation.fps : 24;
+  const duration = Number.isFinite(state.animation.duration) && state.animation.duration > 0 ? state.animation.duration : 1;
+  const loopFrames = Math.max(2, Math.round(fps * duration));
+  const warmupFrames = Math.min(loopFrames - 1, Math.round(fps));
+  return Array.from({ length: warmupFrames }, (_, index) => 1 - (warmupFrames - index) / loopFrames);
+}
+
 async function captureNow(snapshot: StoreSnapshot): Promise<string> {
   const { canvas, context } = await getRenderer();
   const state = createPresetThumbnailState(snapshot);
   canvas.width = PRESET_THUMBNAIL_WIDTH;
   canvas.height = PRESET_THUMBNAIL_HEIGHT;
-  renderSceneAtTime(context, state, 0, { renderSessionId: 'thumbnail' });
-  return canvas.toDataURL('image/png');
+  // A fresh context compiles most stack shaders lazily; rendering before they
+  // settle would silently drop those layers from the thumbnail. A failed
+  // compile still renders, without that layer, as the preview does. Compiles
+  // poll on animation frames, which stop while the window is hidden, so the
+  // wait is capped to keep preset saving from stalling.
+  const requiredPrograms = getRequiredSceneProgramKeys(state);
+  let timeoutId: ReturnType<typeof setTimeout> | undefined;
+  await Promise.race([
+    Promise.all(requiredPrograms.map(key => settleLazyProgram(context, key, 'demand'))),
+    new Promise<void>(resolve => { timeoutId = setTimeout(resolve, PRESET_THUMBNAIL_PROGRAM_WAIT_MS); }),
+  ]);
+  clearTimeout(timeoutId);
+  // A new session resets feedback history left by the previous capture.
+  captureCount += 1;
+  const options = { renderSessionId: `thumbnail-${captureCount}`, allowEffectStackTransition: false };
+  if (requiredPrograms.includes('datamosh')) {
+    for (const time of getThumbnailWarmupTimes(state)) renderSceneAtTime(context, state, time, options);
+  }
+  renderSceneAtTime(context, state, 0, options);
+  return encodePresetThumbnail(canvas);
+}
+
+const PRESET_THUMBNAIL_WEBP_QUALITY = 0.8;
+
+/**
+ * Lossy WebP shrinks smooth gradients by an order of magnitude, while PNG can
+ * still be smaller for dithered or noisy frames, so the smaller encoding wins.
+ * Browsers without a WebP encoder return PNG for the WebP request.
+ */
+export function encodePresetThumbnail(canvas: Pick<HTMLCanvasElement, 'toDataURL'>): string {
+  const png = canvas.toDataURL('image/png');
+  const webp = canvas.toDataURL('image/webp', PRESET_THUMBNAIL_WEBP_QUALITY);
+  return webp.startsWith('data:image/webp') && webp.length < png.length ? webp : png;
 }
 
 /**

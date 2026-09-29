@@ -31,6 +31,7 @@ import {
 } from './effectPipeline';
 import type { WebGLContext } from './webgl';
 import { renderBridge } from './renderBridge';
+import { expandPresetState, type StoreSnapshot } from './presetModel';
 import { getShaderErrors } from './shaderDiagnostics';
 import type { ColorStop, GradientConfig, MeshEdge, OpacityStop, Vec2Tuple } from '../types/gradient';
 import type { AnimationMode, InterpolationType, Keyframe } from '../types/keyframe';
@@ -924,7 +925,7 @@ export class KggControlRuntime {
       const preset = await this.project.getPreset(presetIdResult.value);
       if (!isRecord(preset) || !isRecord(preset.state)) return error('preset_not_found', `Preset not found: ${presetIdResult.value}`);
       this.applySnapshot({
-        store: preset.state,
+        store: expandPresetState(preset.state as StoreSnapshot),
         currentTime: 0,
         presetName: typeof preset.name === 'string' ? preset.name : useGradientStore.getState().presetName,
       });
