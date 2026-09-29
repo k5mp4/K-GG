@@ -115,6 +115,29 @@ describe('export WebGL program plan', () => {
     expect(getRequiredExportProgramKeys(state)).toEqual(['stackCore', 'noiseDiffuseStack', 'glassV2']);
   });
 
+  it('requests Stack Core and the Texture program from the enabled Texture layer', () => {
+    const state = stateWithGlass(false);
+    state.effectPipeline.effectStack = updateEffectStackLayer(state.effectPipeline.effectStack, 'texture', { enabled: true });
+
+    expect(getRequiredExportProgramKeys(state)).toEqual(['stackCore', 'texture']);
+  });
+
+  it('does not request the Texture program while the layer is off', () => {
+    const state = stateWithGlass(false);
+
+    expect(getRequiredExportProgramKeys(state)).not.toContain('texture');
+  });
+
+  it('exposes the Texture shader uniforms and keeps it tile-safe', () => {
+    const source = getProgramSource('texture');
+
+    expect(source.fragment.indexOf('precision highp float;')).toBe(0);
+    for (const name of ['u_sourceTex', 'u_textureImage', 'u_fullResolution', 'u_tileOffset', 'u_lightAngle', 'u_anisotropy', 'u_diffraction']) {
+      expect(source.fragment).toContain(name);
+    }
+    expect(source.fragment).toContain('gl_FragCoord.xy + u_tileOffset');
+  });
+
   it('requests all Flow Gradient passes when the fixed stage is enabled', () => {
     const state = stateWithGlass(false);
     state.effectPipeline.flowGradientEnabled = true;

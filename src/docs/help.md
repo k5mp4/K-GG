@@ -83,6 +83,7 @@ Web 版は `index.html` で Google Fonts から Noto Sans JP、Open Sans を読�
 - トップバーは `Diffuse → Noise → Slit → Postprocess → SANDBOX → Export → Preset` の順で、Stretchは独立項目およびPostprocessのプロパティモジュールに表示しません。PostprocessではEdit Layerを選択し、その詳細プロパティを操作できます。SANDBOXの文字色はPostprocessと同じです。
 - グラデーションの主スタックとは別に、Cloth、Normal、Prism、Particles、Flow Gradient、Seamlessの6モジュールを一つのパネルから編集できます。ConeはSANDBOXに含めず、Effect Stackの通常レイヤーとして扱います。
 
+- `Texture` はEffect Stackのレイヤーで、それより上のレイヤーの結果へ高さ場でライティングし、異方性反射の質感を重ねます。`Source`は手続き型（ヘアライン金属、旋盤仕上げ金属、CDの溝、紙）または読み込んだ画像の輝度で、画像は`Cover`／`Tile`で配置します。`Roughness`と`Anisotropy`でハイライトの広がりと伸びを、`Metallic`で色の付き方を、`Light Angle`・`Light Height`・`Light Sweep`（Animation 1ループでライトが回る回数）でライトを、`Diffraction`でCDの虹色を調整します。読み込んだ画像はPresetへ保存されず、未読込のときは選択中のプリセットで描画します。
 - `Normal` はグラデーションの輝度勾配から法線マップを生成します。`Strength`、`Blur`、`Angle`、`Bevel Size`で表面の凹凸を調整します。
 - `Prism` は主スタック後段の光線・グロー、`Particles` は最終オーバーレイのパーティクルを調整します。
 - `Edit Layer`の選択要素から各モジュールを一つずつ表示して編集します。選択を変更しても描画順は変わりません。

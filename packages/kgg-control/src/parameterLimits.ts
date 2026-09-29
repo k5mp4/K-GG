@@ -215,6 +215,22 @@ export const PARAMETER_LIMITS = {
 
   'seamless.blendWidth': { min: 0.02, max: 0.5, step: 0.01, defaultValue: 0.25 },
 
+  'texture.strength': { min: 0, max: 1, step: 0.01, defaultValue: 0.85 },
+  'texture.scale': { min: 0.25, max: 8, step: 0.05, defaultValue: 1 },
+  'texture.rotation': { min: 0, max: 360, step: 1, defaultValue: 0, angleUnit: 'degrees', wrapAngle: true },
+  'texture.bump': { min: -2, max: 2, step: 0.01, defaultValue: 0.6 },
+  'texture.centerX': { min: 0, max: 1, step: 0.01, defaultValue: 0.5 },
+  'texture.centerY': { min: 0, max: 1, step: 0.01, defaultValue: 0.5 },
+  'texture.roughness': { min: 0.05, max: 1, step: 0.01, defaultValue: 0.3 },
+  'texture.anisotropy': { min: 0, max: 1, step: 0.01, defaultValue: 0.75 },
+  'texture.metallic': { min: 0, max: 1, step: 0.01, defaultValue: 0.7 },
+  'texture.specular': { min: 0, max: 2, step: 0.01, defaultValue: 1 },
+  'texture.lightAngle': { min: 0, max: 360, step: 1, defaultValue: 40, angleUnit: 'degrees', wrapAngle: true },
+  'texture.lightHeight': { min: 0.15, max: 2, step: 0.01, defaultValue: 0.55 },
+  'texture.lightSweep': { min: -4, max: 4, step: 1, defaultValue: 0, integer: true },
+  'texture.diffraction': { min: 0, max: 1, step: 0.01, defaultValue: 0 },
+  'texture.diffractionSpread': { min: 0.25, max: 4, step: 0.05, defaultValue: 1 },
+
   'manualDistort.brushSize': { min: 8, max: 640, step: 1, defaultValue: 120, integer: true },
   'manualDistort.strength': { min: 0.05, max: 4, step: 0.01, defaultValue: 1 },
   'manualDistort.falloff': { min: 0.25, max: 5, step: 0.05, defaultValue: 1.8 },
@@ -336,6 +352,18 @@ export const ENUM_PARAMETER_LIMITS = {
   'noise.chladniMapProfile': {
     values: ['signed', 'folded'],
     defaultValue: 'signed',
+  },
+  'texture.source': {
+    values: ['procedural', 'image'],
+    defaultValue: 'procedural',
+  },
+  'texture.preset': {
+    values: ['brushedMetal', 'spunMetal', 'cdGroove', 'paper'],
+    defaultValue: 'brushedMetal',
+  },
+  'texture.imageFit': {
+    values: ['cover', 'tile'],
+    defaultValue: 'cover',
   },
   'postprocess.voronoiDistMetric': VORONOI_DISTANCE_METRIC_LIMIT,
   'postprocess.voronoiFeature': VORONOI_FEATURE_LIMIT,

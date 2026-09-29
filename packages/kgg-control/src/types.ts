@@ -34,7 +34,8 @@ export type EffectKind =
   | 'glassTile'
   | 'diffuse'
   | 'datamosh'
-  | 'cone';
+  | 'cone'
+  | 'texture';
 
 export type EffectState = {
   kind: EffectKind;

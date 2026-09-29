@@ -84,6 +84,7 @@ import { getFieldModel } from './fieldModelRuntime';
 import { VIDEO_MOTION_FIELD_HEIGHT, VIDEO_MOTION_FIELD_WIDTH } from './videoMotionSource';
 import { getThreeDRenderParams } from './coneView';
 import { bindFieldModelTexture, uploadThreeDUniforms } from './threeDUniforms';
+import { DEFAULT_TEXTURE, normalizeTextureConfig, resolveTextureLightAngle, type TextureConfig } from '../types/texture';
 
 export type { TileRenderOptions } from '../types/rendering';
 
@@ -290,6 +291,11 @@ export type WebGLContext = {
   datamoshUniforms: Record<string, WebGLUniformLocation | null>;
   threeDProgram: WebGLProgram | null;
   threeDUniforms: Record<string, WebGLUniformLocation | null>;
+  textureProgram: WebGLProgram | null;
+  textureUniforms: Record<string, WebGLUniformLocation | null>;
+  /** Height map of the SANDBOX Texture stage (unit 4 during its pass). */
+  textureImageTexture: WebGLTexture;
+  textureImageSource: HTMLCanvasElement | null;
   /** Geometry Field model atlas (unit 13) and the model version it holds, 0 when none. */
   fieldModelTexture: WebGLTexture;
   fieldModelVersion: number;
@@ -828,6 +834,14 @@ export async function initWebGL(canvas: HTMLCanvasElement): Promise<WebGLContext
   gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
   gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
   gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+  const textureImageTexture = createOwnedTexture();
+  gl.bindTexture(gl.TEXTURE_2D, textureImageTexture);
+  gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, 1, 1, 0, gl.RGBA, gl.UNSIGNED_BYTE, new Uint8Array([128, 128, 128, 255]));
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+  // The tile fit repeats the image, so the wrap mode must repeat too.
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.REPEAT);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.REPEAT);
   const fieldModelTexture = createOwnedTexture();
   gl.bindTexture(gl.TEXTURE_2D, fieldModelTexture);
   gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, 1, 1, 0, gl.RGBA, gl.UNSIGNED_BYTE, new Uint8Array([255, 255, 0, 255]));
@@ -865,7 +879,7 @@ export async function initWebGL(canvas: HTMLCanvasElement): Promise<WebGLContext
   ownedFlowGradient = flowGradient;
   const transitionTextureFrom = ownTexture(createTexture(gl));
   const transitionTextureTo = ownTexture(createTexture(gl));
-  const ctx: WebGLContext = { gl, performanceProfiler, gpuDiagnostics, renderOptimization, program, uniforms, geometryBuffer, transitionGeometryBuffer, generatorProgram: null, generatorUniforms: {}, gradientRampTexture, meshGradientTexture, meshGradientTextureSignature: '', diffuseCurveTexture, diffuseCurveSignature: '', diffuseAsciiTexture, diffuseAsciiSignature: '', diffuseAsciiCount: 1, diffuseAsciiRows: ASCII_ATLAS_MAX_ROWS, diffuseHistogramAt: 0, manualDistortTexture, manualDistortDisplacement: null, manualDistortSmoothMask: null, manualDistortMapResolution: 0, sourceImageTexture, sourceImageCanvas: null, imageGradientTexture, imageGradientSource: null, imageMaskTexture, imageMaskSource: null, normalMapProgram: null, normalMapUniforms: {}, datamoshProgram: null, datamoshUniforms: {}, threeDProgram: null, threeDUniforms: {}, fieldModelTexture, fieldModelVersion: 0, videoMotionFieldTexture, datamoshHistoryFbos: [datamoshHistoryFboA, datamoshHistoryFboB], datamoshHistoryTextures: [datamoshHistoryTextureA, datamoshHistoryTextureB], datamoshInputFbos: [datamoshInputFboA, datamoshInputFboB], datamoshInputTextures: [datamoshInputTextureA, datamoshInputTextureB], datamoshHistory: createDatamoshHistoryState(), gradFbo, gradTexture, blurProgram: null, blurUniforms: {}, stretchProgram: null, stretchUniforms: {}, seamlessProgram: null, seamlessUniforms: {}, postprocessProgram: null, postprocessUniforms: {}, stackCoreProgram: null, stackCoreUniforms: {}, noiseStackProgram: null, noiseStackUniforms: {}, noiseDiffuseStackProgram: null, noiseDiffuseStackUniforms: {}, glassProgram: null, glassUniforms: {}, glassFallbackActive: false, glassV2Program: null, glassV2Uniforms: {}, glassV2FallbackActive: false, glassTileProgram: null, glassTileUniforms: {}, glassTileFallbackActive: false, prismProgram: null, prismUniforms: {}, prismCompositeProgram: null, prismCompositeUniforms: {}, particleProgram: null, particleUniforms: {}, particleVao: null, particleQuadBuffer: null, particleInstanceBuffer: null, particleInstanceCount: 0, particleInstanceSeed: Number.NaN, flowGradient, normalFbo, normalTexture, hBlurFbo, hBlurTexture, postprocessFboA, postprocessTextureA, postprocessFboB, postprocessTextureB, prismScratchFbo, prismScratchTexture, prismBlurFbo, prismBlurTexture, prismGlowFbo, prismGlowTexture, shaderCompileExt, lazyProgramState: createLazyProgramState(), lazyProgramCompileQueue: createSerialAsyncQueue(), resourceLedger, hasPresentedFrame: false, disposed: false };
+  const ctx: WebGLContext = { gl, performanceProfiler, gpuDiagnostics, renderOptimization, program, uniforms, geometryBuffer, transitionGeometryBuffer, generatorProgram: null, generatorUniforms: {}, gradientRampTexture, meshGradientTexture, meshGradientTextureSignature: '', diffuseCurveTexture, diffuseCurveSignature: '', diffuseAsciiTexture, diffuseAsciiSignature: '', diffuseAsciiCount: 1, diffuseAsciiRows: ASCII_ATLAS_MAX_ROWS, diffuseHistogramAt: 0, manualDistortTexture, manualDistortDisplacement: null, manualDistortSmoothMask: null, manualDistortMapResolution: 0, sourceImageTexture, sourceImageCanvas: null, imageGradientTexture, imageGradientSource: null, imageMaskTexture, imageMaskSource: null, normalMapProgram: null, normalMapUniforms: {}, datamoshProgram: null, datamoshUniforms: {}, threeDProgram: null, threeDUniforms: {}, textureProgram: null, textureUniforms: {}, textureImageTexture, textureImageSource: null, fieldModelTexture, fieldModelVersion: 0, videoMotionFieldTexture, datamoshHistoryFbos: [datamoshHistoryFboA, datamoshHistoryFboB], datamoshHistoryTextures: [datamoshHistoryTextureA, datamoshHistoryTextureB], datamoshInputFbos: [datamoshInputFboA, datamoshInputFboB], datamoshInputTextures: [datamoshInputTextureA, datamoshInputTextureB], datamoshHistory: createDatamoshHistoryState(), gradFbo, gradTexture, blurProgram: null, blurUniforms: {}, stretchProgram: null, stretchUniforms: {}, seamlessProgram: null, seamlessUniforms: {}, postprocessProgram: null, postprocessUniforms: {}, stackCoreProgram: null, stackCoreUniforms: {}, noiseStackProgram: null, noiseStackUniforms: {}, noiseDiffuseStackProgram: null, noiseDiffuseStackUniforms: {}, glassProgram: null, glassUniforms: {}, glassFallbackActive: false, glassV2Program: null, glassV2Uniforms: {}, glassV2FallbackActive: false, glassTileProgram: null, glassTileUniforms: {}, glassTileFallbackActive: false, prismProgram: null, prismUniforms: {}, prismCompositeProgram: null, prismCompositeUniforms: {}, particleProgram: null, particleUniforms: {}, particleVao: null, particleQuadBuffer: null, particleInstanceBuffer: null, particleInstanceCount: 0, particleInstanceSeed: Number.NaN, flowGradient, normalFbo, normalTexture, hBlurFbo, hBlurTexture, postprocessFboA, postprocessTextureA, postprocessFboB, postprocessTextureB, prismScratchFbo, prismScratchTexture, prismBlurFbo, prismBlurTexture, prismGlowFbo, prismGlowTexture, shaderCompileExt, lazyProgramState: createLazyProgramState(), lazyProgramCompileQueue: createSerialAsyncQueue(), resourceLedger, hasPresentedFrame: false, disposed: false };
   initializedContext = ctx;
   effectStackTransitionResources.set(ctx, {
     program: transitionProgram,
@@ -935,6 +949,7 @@ export function disposeWebGL(ctx: WebGLContext): void {
     ctx.particleProgram,
     ctx.datamoshProgram,
     ctx.threeDProgram,
+    ctx.textureProgram,
   ];
   const uniquePrograms = new Set(programs.filter((program): program is WebGLProgram => Boolean(program)));
   for (const program of uniquePrograms) gl.deleteProgram(program);
@@ -948,6 +963,7 @@ export function disposeWebGL(ctx: WebGLContext): void {
     ctx.sourceImageTexture,
     ctx.imageGradientTexture,
     ctx.imageMaskTexture,
+    ctx.textureImageTexture,
     ctx.fieldModelTexture,
     ctx.videoMotionFieldTexture,
     ...ctx.datamoshHistoryTextures,
@@ -1127,6 +1143,7 @@ function createLazyProgramState(): Record<LazyProgramKey, LazyProgramState> {
     flowComposite: { promise: null, failed: false, timedOut: false, fallback: false },
     datamosh: { promise: null, failed: false, timedOut: false, fallback: false },
     threeD: { promise: null, failed: false, timedOut: false, fallback: false },
+    texture: { promise: null, failed: false, timedOut: false, fallback: false },
   };
 }
 
@@ -1300,6 +1317,17 @@ function getFlowCompositeUniforms(gl: WebGL2RenderingContext, program: WebGLProg
   };
 }
 
+const TEXTURE_UNIFORM_NAMES = [
+  'u_sourceTex', 'u_textureImage', 'u_resolution', 'u_fullResolution', 'u_tileOffset', 'u_imageSize',
+  'u_source', 'u_preset', 'u_imageFit', 'u_strength', 'u_scale', 'u_rotation', 'u_bump', 'u_center',
+  'u_roughness', 'u_anisotropy', 'u_metallic', 'u_specular', 'u_lightAngle', 'u_lightHeight',
+  'u_diffraction', 'u_diffractionSpread',
+] as const;
+
+function getTextureUniforms(gl: WebGL2RenderingContext, program: WebGLProgram): Record<string, WebGLUniformLocation | null> {
+  return Object.fromEntries(TEXTURE_UNIFORM_NAMES.map(name => [name, gl.getUniformLocation(program, name)]));
+}
+
 const DATAMOSH_UNIFORM_NAMES = [
   'u_currentTex', 'u_historyTex', 'u_motionField', 'u_gradientRamp', 'u_resolution', 'u_time',
   'u_frameSeed', 'u_historyPrimed', 'u_previousInputTex', 'u_previousInputValid', 'u_blockLock', 'u_motionSource', 'u_mixMode', 'u_strength', 'u_refresh',
@@ -1458,6 +1486,9 @@ function installLazyProgram(ctx: WebGLContext, key: LazyProgramKey, program: Web
   } else if (key === 'threeD') {
     ctx.threeDProgram = program;
     ctx.threeDUniforms = getPostprocessUniforms(gl, program);
+  } else if (key === 'texture') {
+    ctx.textureProgram = program;
+    ctx.textureUniforms = getTextureUniforms(gl, program);
   } else {
     const uniforms = getParticleUniforms(gl, program);
     ctx.particleProgram = program;
@@ -1552,6 +1583,7 @@ function lazyProgramReady(ctx: WebGLContext, key: LazyProgramKey): boolean {
     normalMap: [ctx.normalMapProgram, ctx.normalMapUniforms],
     datamosh: [ctx.datamoshProgram, ctx.datamoshUniforms],
     threeD: [ctx.threeDProgram, ctx.threeDUniforms],
+    texture: [ctx.textureProgram, ctx.textureUniforms],
     stretch: [ctx.stretchProgram, ctx.stretchUniforms],
     seamless: [ctx.seamlessProgram, ctx.seamlessUniforms],
     stackCore: [ctx.stackCoreProgram, ctx.stackCoreUniforms],
@@ -3049,6 +3081,79 @@ function renderSeamlessPass(
         : null;
 }
 
+const TEXTURE_SOURCE_MAP = { procedural: 0, image: 1 } as const;
+const TEXTURE_PRESET_MAP = { brushedMetal: 0, spunMetal: 1, cdGroove: 2, paper: 3 } as const;
+const TEXTURE_IMAGE_FIT_MAP = { cover: 0, tile: 1 } as const;
+
+/**
+ * SANDBOX Texture: lights the Main Stack result with a procedural or image
+ * height field. The pass is evaluated from global pixel coordinates, so it is
+ * valid for tiled export as well. An image source without a loaded image
+ * falls back to the selected procedural preset.
+ */
+function drawTexturePass(
+  ctx: WebGLContext,
+  sourceTexture: WebGLTexture,
+  config: TextureConfig,
+  imageSource: HTMLCanvasElement | null,
+  normalizedTime: number,
+  width: number,
+  height: number,
+  fullWidth: number,
+  fullHeight: number,
+  offsetX: number,
+  offsetY: number,
+  targetFramebuffer: WebGLFramebuffer | null,
+): boolean {
+  const { gl } = ctx;
+  if (!ctx.textureProgram) return false;
+  const uniforms = ctx.textureUniforms;
+  const useImage = config.source === 'image' && imageSource != null && imageSource.width > 0 && imageSource.height > 0;
+  const degrees = Math.PI / 180;
+
+  gl.useProgram(ctx.textureProgram);
+  gl.viewport(0, 0, width, height);
+  gl.disable(gl.BLEND);
+  gl.disable(gl.SCISSOR_TEST);
+  gl.colorMask(true, true, true, true);
+  gl.bindFramebuffer(gl.FRAMEBUFFER, targetFramebuffer);
+  gl.activeTexture(gl.TEXTURE3);
+  gl.bindTexture(gl.TEXTURE_2D, sourceTexture);
+  setUniform1i(gl, uniforms.u_sourceTex, 3);
+  gl.activeTexture(gl.TEXTURE4);
+  gl.bindTexture(gl.TEXTURE_2D, ctx.textureImageTexture);
+  if (useImage && ctx.textureImageSource !== imageSource) {
+    gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, false);
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, imageSource);
+    ctx.textureImageSource = imageSource;
+  } else if (!useImage) {
+    ctx.textureImageSource = null;
+  }
+  setUniform1i(gl, uniforms.u_textureImage, 4);
+  gl.uniform2f(uniforms.u_resolution, width, height);
+  gl.uniform2f(uniforms.u_fullResolution, fullWidth, fullHeight);
+  gl.uniform2f(uniforms.u_tileOffset, offsetX, offsetY);
+  gl.uniform2f(uniforms.u_imageSize, useImage ? imageSource.width : 1, useImage ? imageSource.height : 1);
+  setUniform1i(gl, uniforms.u_source, TEXTURE_SOURCE_MAP[useImage ? 'image' : 'procedural']);
+  setUniform1i(gl, uniforms.u_preset, TEXTURE_PRESET_MAP[config.preset]);
+  setUniform1i(gl, uniforms.u_imageFit, TEXTURE_IMAGE_FIT_MAP[config.imageFit]);
+  gl.uniform1f(uniforms.u_strength, config.strength);
+  gl.uniform1f(uniforms.u_scale, config.scale);
+  gl.uniform1f(uniforms.u_rotation, config.rotation * degrees);
+  gl.uniform1f(uniforms.u_bump, config.bump);
+  gl.uniform2f(uniforms.u_center, config.centerX, config.centerY);
+  gl.uniform1f(uniforms.u_roughness, config.roughness);
+  gl.uniform1f(uniforms.u_anisotropy, config.anisotropy);
+  gl.uniform1f(uniforms.u_metallic, config.metallic);
+  gl.uniform1f(uniforms.u_specular, config.specular);
+  gl.uniform1f(uniforms.u_lightAngle, resolveTextureLightAngle(config, normalizedTime) * degrees);
+  gl.uniform1f(uniforms.u_lightHeight, config.lightHeight);
+  gl.uniform1f(uniforms.u_diffraction, config.diffraction);
+  gl.uniform1f(uniforms.u_diffractionSpread, config.diffractionSpread);
+  drawArrays(ctx, 'Texture', gl.TRIANGLES, 0, 6);
+  return true;
+}
+
 function drawPostprocessStackOutput(
   ctx: WebGLContext,
   sourceTexture: WebGLTexture,
@@ -3604,8 +3709,12 @@ export function render(
   flowSessionId = 'preview',
   datamosh: DatamoshConfig = normalizeDatamoshConfig(undefined),
   coneView: ConeViewConfig = DEFAULT_CONE_VIEW,
+  texture: TextureConfig = DEFAULT_TEXTURE,
+  textureImageSource: HTMLCanvasElement | null = null,
+  textureNormalizedTime = 0,
 ): void {
   seamless = normalizeSeamlessConfig(seamless);
+  texture = normalizeTextureConfig(texture);
   coneView = normalizeConeViewConfig(coneView);
   if (ctx.disposed || ctx.gl.isContextLost()) return;
   const isV2Pipeline = effectPipeline?.version === 'stack-v2';
@@ -3697,6 +3806,10 @@ export function render(
   const tileOx = tile ? tile.offset[0] : 0;
   const tileOy = tile ? tile.offset[1] : 0;
   const seamlessRequested = seamless.enabled && !tile;
+  // Texture is an Effect Stack layer, so only V2 has it; its shader is tile-safe.
+  const textureRequested = isV2Pipeline && effectPipeline
+    ? isEffectStackLayerEnabled(effectPipeline, 'texture')
+    : false;
   const renderPlan = isV2Pipeline && effectPipeline
     ? getSceneRenderPlan(getSceneRenderPlanInput({
       gradient,
@@ -4014,11 +4127,13 @@ export function render(
       && diffuse.mode === 'legacy'
       && diffuseLayerEnabled;
     const protectedCone = imageGradientProtected && protectedLayerEnabled('cone');
+    // Lighting does not resample the image, so a protected Image Gradient keeps it.
+    const protectedTexture = imageGradientProtected && protectedLayerEnabled('texture');
     const consumedAnalyticLayers = new Set<string>(renderPlan.analyticPrefix.consumedLayers);
     const mainLayerEntries = renderPlan.enabledLayers
       .map((layer, index) => ({ layer, index }))
       .filter(({ layer }) => imageGradientProtected
-        ? (protectedStipple && layer.kind === 'diffuse') || (protectedCone && layer.kind === 'cone')
+        ? (protectedStipple && layer.kind === 'diffuse') || (protectedCone && layer.kind === 'cone') || (protectedTexture && layer.kind === 'texture')
         : !consumedAnalyticLayers.has(layer.kind));
     const normalRequested = renderPlan.normalRequested;
     const normalNeedsBlur = renderPlan.normalNeedsBlur;
@@ -4038,6 +4153,7 @@ export function render(
       && !renderPlan.particlesRequested
       && !seamlessRequested
       && !protectedCone
+      && !protectedTexture
       && !datamoshActive;
     const generatorReady = !analyticPrefixEnabled || requestLazyProgram(ctx, 'generator');
     if ((renderPlan.framebufferAllocationMode === 'direct' || protectedDirect) && !flowActive && !datamoshActive && generatorReady) {
@@ -4053,7 +4169,9 @@ export function render(
       return;
     }
 
-    const stackCoreRequested = (!imageGradientProtected || protectedStipple || protectedCone) && renderPlan.programs.stackCore;
+    // Texture ends in the shared final present, which is a Stack Core pass, even when
+    // a protected Image Gradient would otherwise skip the reorderable stack.
+    const stackCoreRequested = (!imageGradientProtected || protectedStipple || protectedCone || protectedTexture) && renderPlan.programs.stackCore;
     // V2's texture stack has its own specialized programs. It must not wait
     // for the Legacy generator unless the analytic prefix explicitly needs
     // the full Generator output.
@@ -4084,6 +4202,7 @@ export function render(
     );
     const stretchReady = imageGradientProtected || !renderPlan.programs.stretch || requestLazyProgram(ctx, 'stretch');
     const seamlessReady = !seamlessRequested || requestLazyProgram(ctx, 'seamless');
+    const textureReady = !textureRequested || requestLazyProgram(ctx, 'texture');
     const prismReady = !prismRequested || (
       requestLazyProgram(ctx, 'prism') &&
       requestLazyProgram(ctx, 'prismComposite') &&
@@ -4093,7 +4212,7 @@ export function render(
 
     // Lazy programs compile asynchronously. Keep a usable base frame until every
     // requested V2 stage is available instead of presenting a partial stack.
-    if (!generatorReady || !stackCoreReady || !noiseDiffuseCompositionReady || !normalReady || !stretchReady || !prismReady || !particlesReady || !seamlessReady || !flowProgramsReady || (datamoshRequested && !datamoshActive) || threeDPending) {
+    if (!generatorReady || !stackCoreReady || !noiseDiffuseCompositionReady || !normalReady || !stretchReady || !prismReady || !particlesReady || !seamlessReady || !textureReady || !flowProgramsReady || (datamoshRequested && !datamoshActive) || threeDPending) {
       // Cloth is a Base generator and does not depend on the stack programs:
       // present the cloth frame even while they compile.
       const clothReady = clothGradient?.enabled
@@ -4279,6 +4398,18 @@ export function render(
         if (!datamoshActive) continue;
         const moshedTexture = drawDatamoshPass(ctx, currentTexture, datamosh, datamoshFrame, vpW, vpH);
         if (moshedTexture) currentTexture = moshedTexture;
+        continue;
+      }
+      if (layer.kind === 'texture') {
+        // Texture lights whatever the previous layers produced at this position.
+        // It uses its own program; if that is unavailable the layer is skipped.
+        const target = choosePostprocessTarget(ctx, currentTexture);
+        if (drawTexturePass(
+          ctx, currentTexture, texture, textureImageSource, textureNormalizedTime,
+          vpW, vpH, width, height, tileOx, tileOy, target.fbo,
+        )) {
+          currentTexture = target.texture;
+        }
         continue;
       }
       if (layer.kind === 'cone') {

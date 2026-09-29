@@ -15,6 +15,7 @@ import { DEFAULT_DIFFUSE_ASCII_CHARSET, DEFAULT_DIFFUSE_BACKGROUND_COLOR, normal
 import { normalizeClothGradientConfig } from '../types/clothGradient';
 import { normalizeConeViewConfig } from '../types/coneView';
 import { normalizeSeamlessConfig } from '../types/seamless';
+import { normalizeTextureConfig } from '../types/texture';
 import { normalizeImageGradientConfig } from '../types/imageGradient';
 import { normalizePropertyTrack, type AnimationMode, type Keyframe } from '../types/keyframe';
 import { computeAutoHandles } from '../lib/autoBezier';
@@ -373,6 +374,16 @@ export function createDocumentActions(set: DocumentStoreSet, defaults: DocumentD
   setClothGradient: (v) => set((s) => ({ clothGradient: normalizeClothGradientConfig({ ...s.clothGradient, ...v }) })),
   setConeView: (v) => set((s) => ({ coneView: normalizeConeViewConfig({ ...s.coneView, ...v }) })),
   setSeamless: (v) => set((s) => ({ seamless: normalizeSeamlessConfig({ ...s.seamless, ...v }) })),
+  setTexture: (v) => set((s) => {
+    const texture = normalizeTextureConfig({ ...s.texture, ...v });
+    const effectPipeline = v.enabled !== undefined && s.effectPipeline.version === 'stack-v2'
+      ? {
+        ...s.effectPipeline,
+        effectStack: updateEffectStackLayer(s.effectPipeline.effectStack, 'texture', { enabled: v.enabled }),
+      }
+      : s.effectPipeline;
+    return { texture, effectPipeline };
+  }),
   setFlowGradient: (v) => set((s) => ({
     flowGradient: normalizeFlowGradientConfig({ ...s.flowGradient, ...v }),
   })),
@@ -464,6 +475,10 @@ export function createDocumentActions(set: DocumentStoreSet, defaults: DocumentD
         const kind = typeof layer === 'object' && layer !== null ? (layer as { kind?: unknown }).kind : undefined;
         return kind === 'datamosh' || kind === 'videoMotion';
       });
+    const rawHasTextureLayer = Array.isArray(rawEffectStack)
+      && rawEffectStack.some(layer => (
+        typeof layer === 'object' && layer !== null && (layer as { kind?: unknown }).kind === 'texture'
+      ));
     const effectPipeline = normalizeEffectPipelineConfig({
       ...s.effectPipeline,
       ...v,
@@ -474,6 +489,11 @@ export function createDocumentActions(set: DocumentStoreSet, defaults: DocumentD
     // enabled standalone config but no layer; keep that source enabled.
     if (!rawHasDatamoshLayer && s.datamosh.enabled) {
       effectPipeline.effectStack = updateEffectStackLayer(effectPipeline.effectStack, 'datamosh', { enabled: true });
+    }
+    // Documents saved while Texture was a SANDBOX stage carry an enabled
+    // config but no layer; keep that Texture enabled.
+    if (!rawHasTextureLayer && s.texture.enabled) {
+      effectPipeline.effectStack = updateEffectStackLayer(effectPipeline.effectStack, 'texture', { enabled: true });
     }
     const enabled = (kind: import('../types/distortion').EffectStackKind) => (
       effectPipeline.effectStack.some(layer => layer.kind === kind && layer.enabled)
@@ -490,6 +510,7 @@ export function createDocumentActions(set: DocumentStoreSet, defaults: DocumentD
       slitScan: { ...s.slitScan, enabled: enabled('slit') },
       stretch: { ...s.stretch, enabled: enabled('stretch') },
       datamosh: { ...s.datamosh, enabled: enabled('datamosh') },
+      texture: { ...s.texture, enabled: enabled('texture') },
       ...(postprocessEnabledSignatureChanged
         ? { postprocess: { ...s.postprocess, enabled: hasEnabledPostprocessEffectStack(effectPipeline) } }
         : {}),

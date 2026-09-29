@@ -34,7 +34,8 @@ describe('PostprocessStackPanel Cone layer', () => {
         <PostprocessStackPanel />
       </LanguageProvider>,
     );
-    expect(markup).not.toMatch(/>(Texture|Transform|Structure)</);
+    // Texture is now a layer row, so only the retired category names are checked.
+    expect(markup).not.toMatch(/>(Transform|Structure)</);
   });
 });
 

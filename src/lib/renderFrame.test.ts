@@ -41,6 +41,9 @@ describe('renderFrame compatibility adapter', () => {
       flowLoopEnabled: false,
       flowSessionId: 'test-session',
       coneView: { depth: 6, mappingMode: 'flow' },
+      texture: { enabled: true },
+      textureImageSource: { id: 'texture-image' },
+      textureNormalizedTime: 0.7,
     } as unknown as RenderFrameRequest;
 
     renderFrame({} as WebGLContext, request);
@@ -80,6 +83,9 @@ describe('renderFrame compatibility adapter', () => {
       request.flowSessionId,
       request.datamosh,
       request.coneView,
+      request.texture,
+      request.textureImageSource,
+      request.textureNormalizedTime,
     );
   });
 });
