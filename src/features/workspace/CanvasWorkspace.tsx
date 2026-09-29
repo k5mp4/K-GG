@@ -69,6 +69,7 @@ type CanvasWorkspaceOverlayProps = {
   overlayOpacity: number;
   slitSourceImageCanvas: HTMLCanvasElement | null;
   imageGradientSource: HTMLCanvasElement | null;
+  textureImageSource: HTMLCanvasElement | null;
 };
 
 type CanvasWorkspaceResourcesProps = {
@@ -150,6 +151,7 @@ export function CanvasWorkspace({
     overlayOpacity,
     slitSourceImageCanvas,
     imageGradientSource,
+    textureImageSource,
   } = overlays;
   const {
     animLoopRef,
@@ -312,6 +314,7 @@ export function CanvasWorkspace({
               imageGradientSource={imageGradientSource}
               imageMaskSource={overlayImageElement}
               imageMaskEnabled={overlayImageMode === 'mask'}
+              textureImageSource={textureImageSource}
               disableClothBase={renderViewMode === 'cloth'}
               controlUi={controlUi}
               controlProject={controlProject}

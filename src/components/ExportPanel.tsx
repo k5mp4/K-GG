@@ -50,6 +50,7 @@ import {
   LOSSY_IMAGE_QUALITY,
   REQUIRED_NATIVE_VIDEO_FORMATS,
   availableNativeVideoFormats,
+  gpuEncoderLabel,
   isNativeVideoFormat,
   nativeVideoFileName,
   nativeVideoFormatDefinition,
@@ -121,6 +122,7 @@ export function ExportPanel({
   const [exportStage, setExportStage] = useState<ExportStage>('preparing');
   const [mp4Quality, setMp4Quality] = useState<Mp4QualityPreset>('high');
   const [gifMaxFileMb, setGifMaxFileMb] = useState<number>(GIF_MAX_FILE_MB.default);
+  const [useGpuEncode, setUseGpuEncode] = useState(true);
   const [imageFormat, setImageFormat] = useState<ImageExportFormat>('png');
   const [videoFormat, setVideoFormat] = useState<VideoExportFormat>(
     () => nativeFfmpegSupported() ? 'mov' : FRAME_ZIP_FORMAT,
@@ -382,7 +384,11 @@ export function ExportPanel({
     : null;
   const lastVideoAeExt = lastVideoRef.current ? aeVideoExt(lastVideoRef.current.format) : null;
 
+  const gpuEncoderName = nativeVideoEncodeReady ? gpuEncoderLabel(ffmpegStatus?.gpuEncoder) : null;
+
   async function ensureNativeVideoEncodeReady(): Promise<boolean> {
+    // 起動時の自動検出で利用可能と分かっていれば再確認しない（Rust側が書き出し直前にも再検証する）。
+    if (nativeVideoEncodeReady) return true;
     const status = await onCheckFfmpeg(true);
     return status?.available === true;
   }
@@ -440,6 +446,7 @@ export function ExportPanel({
         easing: animation.easing,
         mp4Quality: definition.supportsQuality ? mp4Quality : undefined,
         gifMaxFileMb: format === 'gif' ? gifMaxFileMb : undefined,
+        useGpu: format === 'mp4' && useGpuEncode && gpuEncoderName !== null,
         signal: controller.signal,
         onProgress: reportProgress,
         onStage: reportStage,
@@ -743,6 +750,9 @@ export function ExportPanel({
                       ? `FFmpeg ready · ${ffmpegStatus.source === 'app-data-folder' ? 'K-GG folder' : 'System PATH'}`
                       : 'FFmpeg not found'}
                 </p>
+                {gpuEncoderName && (
+                  <p className="mt-1 text-[10px] text-emerald-300/80">GPU encoder · {gpuEncoderName}</p>
+                )}
                 {ffmpegStatus?.version && (
                   <p className="mt-1 truncate text-[10px] text-k-text/65" title={ffmpegStatus.version}>
                     {ffmpegStatus.version}
@@ -812,6 +822,18 @@ export function ExportPanel({
               localizeLabel={false}
               localizeOptions={false}
             />
+          )}
+
+          {selectedNativeVideoFormat?.value === 'mp4' && gpuEncoderName && (
+            <div>
+              <label className="flex items-center gap-2 cursor-pointer select-none">
+                <Toggle size="sm" checked={useGpuEncode} onChange={setUseGpuEncode} />
+                <span className="text-xs text-k-text/80">{t('export.gpuEncode')}</span>
+              </label>
+              <p className="mt-1 text-[10px] leading-relaxed text-tab-inactive">
+                {t('export.gpuEncodeDescription', { encoder: gpuEncoderName })}
+              </p>
+            </div>
           )}
 
           {selectedNativeVideoFormat?.value === 'gif' && (

@@ -140,7 +140,8 @@ vec2 stackNoiseUv(vec2 uv) {
     return applyFastCurlNoiseUV(uv, evolution);
   }
   if ((u_noiseType == CAUSTICS_NOISE_TYPE && u_noiseAmount == 0.0)
-    || (u_noiseType == PHASOR_NOISE_TYPE && (u_noiseAmount == 0.0 || u_phasorWarpStrength == 0.0))) {
+    || (u_noiseType == PHASOR_NOISE_TYPE && (u_noiseAmount == 0.0 || u_phasorWarpStrength == 0.0))
+    || (u_noiseType == CHLADNI_NOISE_TYPE && (u_noiseAmount == 0.0 || u_chladniWarpStrength == 0.0))) {
     return uv;
   }
   vec2 offset = noiseDisplace(uv, u_noiseScale, evolution, u_noiseType, u_noiseOctaves);

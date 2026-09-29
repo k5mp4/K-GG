@@ -28,6 +28,7 @@ import datamoshUniformsGLSL from '../shaders/datamosh/uniforms.glsl?raw';
 import datamoshMotionFieldGLSL from '../shaders/datamosh/motion-field.glsl?raw';
 import datamoshMainGLSL from '../shaders/datamosh/main.glsl?raw';
 import threeDGLSL from '../shaders/three-d.frag.glsl?raw';
+import textureGLSL from '../shaders/texture.frag.glsl?raw';
 import { CONE_GRADIENT_REAPPLY_SHADER } from './coneSeam';
 
 const postprocessGLSL = [
@@ -70,7 +71,8 @@ export type LazyProgramKey =
   | 'flowTrail'
   | 'flowComposite'
   | 'datamosh'
-  | 'threeD';
+  | 'threeD'
+  | 'texture';
 
 export type ProgramSource = {
   vertex: string;
@@ -128,7 +130,7 @@ uniform float u_aeContrast;
 uniform float u_aeBrightness;
 `;
 
-// Caustics and Phasor uniforms are intentionally absent here: specialized
+// Caustics, Phasor, and Chladni uniforms are intentionally absent here: specialized
 // Glass/Prism programs do not evaluate Noise. The full generator, general
 // postprocess, and V2 noiseStack receive them from noise.glsl exactly once.
 
@@ -185,6 +187,7 @@ export const SHADER_VERSION = (
   + flowGradientFragmentGLSL.length * 53
   + datamoshGLSL.length * 47
   + threeDGLSL.length * 43
+  + textureGLSL.length * 41
 ) | 0;
 
 // Keep these symbols in the dedicated Glass sources explicitly instead of
@@ -350,6 +353,7 @@ export function getProgramSource(key: LazyProgramKey): ProgramSource {
   if (key === 'flowComposite') return { vertex: vertexGLSL, fragment: flowGradientFragmentGLSL };
   if (key === 'datamosh') return { vertex: vertexGLSL, fragment: datamoshGLSL };
   if (key === 'threeD') return { vertex: THREE_D_VERTEX_SOURCE, fragment: createThreeDSource() };
+  if (key === 'texture') return { vertex: vertexGLSL, fragment: textureGLSL };
   return { vertex: particlesVertexGLSL, fragment: particlesFragmentGLSL };
 }
 

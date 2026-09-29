@@ -1,6 +1,7 @@
 import { DEFAULT_CLOTH_GRADIENT } from '../types/clothGradient';
 import { DEFAULT_CONE_VIEW } from '../types/coneView';
 import { DEFAULT_SEAMLESS } from '../types/seamless';
+import { DEFAULT_TEXTURE } from '../types/texture';
 import { DEFAULT_DIFFUSE_ASCII_CHARSET, DEFAULT_DIFFUSE_BACKGROUND_COLOR } from '../types/distortion';
 import type { DiffuseAdaptiveChannel, DiffuseApplyMode, DiffuseConfig, DiffuseHalftoneShape, ManualDistortConfig, NoiseDistortionConfig, PostprocessConfig } from '../types/distortion';
 import { IMAGE_GRADIENT_DEFAULTS } from '../types/imageGradient';
@@ -66,6 +67,7 @@ export const NOISE_TYPE_PRESETS: Record<NoiseDistortionConfig['type'], Partial<N
   caustics: { amount: 0.45, scale: 2.4, octaves: 4, speed: 0.5, noiseLoopMode: 'seamless', noiseLoopBlend: 0.75, causticsDepth: 0.65, causticsRefraction: 1.0, causticsSharpness: 2.5, causticsComplexity: 4, causticsWaveSpread: 0.75, causticsBoundaryWidth: 0.75 },
   phasor: { amount: 0.24, scale: 2.8, octaves: 3, speed: 0.5, noiseLoopMode: 'seamless', noiseLoopBlend: 0.75, phasorFrequency: 5.0, phasorBandwidth: 0.8, phasorDirection: 28, phasorDirectionSpread: 0.35, phasorSharpness: 3.0, phasorWarpStrength: 0.18, phasorTangentMix: 0.65, phasorKernelDensity: 1.0, phasorDirectionMode: 'directional' },
   perlin: { amount: 0.3, scale: 1.2, octaves: 2, perlinRoughness: getParameterDefault('noise.perlinRoughness'), perlinSharpness: getParameterDefault('noise.perlinSharpness'), perlinLayerMix: getParameterDefault('noise.perlinLayerMix'), perlinAngle: getParameterDefault('noise.perlinAngle'), perlinDimension: getEnumParameterDefault('noise.perlinDimension'), perlinLoopWobble: getParameterDefault('noise.perlinLoopWobble') },
+  chladni: { amount: 0.3, scale: 1.0, chladniPatternCount: getParameterDefault('noise.chladniPatternCount'), chladniComplexity: getParameterDefault('noise.chladniComplexity'), chladniLineWidth: getParameterDefault('noise.chladniLineWidth'), chladniSharpness: getParameterDefault('noise.chladniSharpness'), chladniWarpStrength: getParameterDefault('noise.chladniWarpStrength'), chladniRotation: getParameterDefault('noise.chladniRotation'), chladniMode: getEnumParameterDefault('noise.chladniMode'), chladniMapProfile: getEnumParameterDefault('noise.chladniMapProfile'), chladniMapAngle: getParameterDefault('noise.chladniMapAngle'), chladniModeMix: getParameterDefault('noise.chladniModeMix'), chladniEdge: getParameterDefault('noise.chladniEdge'), chladniDetune: getParameterDefault('noise.chladniDetune') },
 };
 
 const MANUAL_DISTORT_MAP_RESOLUTION = 64;
@@ -156,6 +158,18 @@ export const STORE_DEFAULTS = {
     phasorTangentMix: getParameterDefault('noise.phasorTangentMix'),
     phasorKernelDensity: getParameterDefault('noise.phasorKernelDensity'),
     phasorDirectionMode: 'directional' as const,
+    chladniPatternCount: getParameterDefault('noise.chladniPatternCount'),
+    chladniComplexity: getParameterDefault('noise.chladniComplexity'),
+    chladniLineWidth: getParameterDefault('noise.chladniLineWidth'),
+    chladniSharpness: getParameterDefault('noise.chladniSharpness'),
+    chladniWarpStrength: getParameterDefault('noise.chladniWarpStrength'),
+    chladniRotation: getParameterDefault('noise.chladniRotation'),
+    chladniMode: getEnumParameterDefault('noise.chladniMode'),
+    chladniMapProfile: getEnumParameterDefault('noise.chladniMapProfile'),
+    chladniMapAngle: getParameterDefault('noise.chladniMapAngle'),
+    chladniModeMix: getParameterDefault('noise.chladniModeMix'),
+    chladniEdge: getParameterDefault('noise.chladniEdge'),
+    chladniDetune: getParameterDefault('noise.chladniDetune'),
   },
   diffuse: {
     enabled: true,
@@ -250,6 +264,7 @@ export const STORE_DEFAULTS = {
   clothGradient: { ...DEFAULT_CLOTH_GRADIENT },
   coneView: { ...DEFAULT_CONE_VIEW },
   seamless: { ...DEFAULT_SEAMLESS },
+  texture: { ...DEFAULT_TEXTURE },
   flowGradient: { ...FLOW_GRADIENT_DEFAULTS },
   datamosh: { ...DATAMOSH_DEFAULTS },
   manualDistort: {
@@ -454,6 +469,16 @@ const NOISE_PARAMETER_LIMIT_KEYS = {
   phasorWarpStrength: 'noise.phasorWarpStrength',
   phasorTangentMix: 'noise.phasorTangentMix',
   phasorKernelDensity: 'noise.phasorKernelDensity',
+  chladniPatternCount: 'noise.chladniPatternCount',
+  chladniComplexity: 'noise.chladniComplexity',
+  chladniLineWidth: 'noise.chladniLineWidth',
+  chladniSharpness: 'noise.chladniSharpness',
+  chladniWarpStrength: 'noise.chladniWarpStrength',
+  chladniRotation: 'noise.chladniRotation',
+  chladniMapAngle: 'noise.chladniMapAngle',
+  chladniModeMix: 'noise.chladniModeMix',
+  chladniEdge: 'noise.chladniEdge',
+  chladniDetune: 'noise.chladniDetune',
 } as const satisfies Partial<Record<keyof NoiseDistortionConfig, ParameterLimitKey>>;
 
 export function normalizeNoiseDistortionConfig(
@@ -474,6 +499,8 @@ export function normalizeNoiseDistortionConfig(
   normalized.voronoiDistMetric = normalizeEnumParameter('noise.voronoiDistMetric', normalized.voronoiDistMetric);
   normalized.voronoiFeature = normalizeEnumParameter('noise.voronoiFeature', normalized.voronoiFeature);
   normalized.perlinDimension = normalizeEnumParameter('noise.perlinDimension', normalized.perlinDimension);
+  normalized.chladniMode = normalizeEnumParameter('noise.chladniMode', normalized.chladniMode);
+  normalized.chladniMapProfile = normalizeEnumParameter('noise.chladniMapProfile', normalized.chladniMapProfile);
   // Refraction is intentionally fixed at 1 for Caustics. Keep the field in
   // persisted data so older presets remain readable, but do not expose an
   // obsolete user-controlled degree of freedom.

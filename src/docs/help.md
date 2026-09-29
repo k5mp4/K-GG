@@ -83,6 +83,7 @@ Web 版は `index.html` で Google Fonts から Noto Sans JP、Open Sans を読�
 - トップバーは `Diffuse → Noise → Slit → Postprocess → SANDBOX → Export → Preset` の順で、Stretchは独立項目およびPostprocessのプロパティモジュールに表示しません。PostprocessではEdit Layerを選択し、その詳細プロパティを操作できます。SANDBOXの文字色はPostprocessと同じです。
 - グラデーションの主スタックとは別に、Cloth、Normal、Prism、Particles、Flow Gradient、Seamlessの6モジュールを一つのパネルから編集できます。ConeはSANDBOXに含めず、Effect Stackの通常レイヤーとして扱います。
 
+- `Texture` はEffect Stackのレイヤーで、それより上のレイヤーの結果へ高さ場でライティングし、異方性反射の質感を重ねます。`Source`は手続き型（ヘアライン金属、旋盤仕上げ金属、CDの溝、紙）または読み込んだ画像の輝度で、画像は`Cover`／`Tile`で配置します。`Roughness`と`Anisotropy`でハイライトの広がりと伸びを、`Metallic`で色の付き方を、`Light Angle`・`Light Height`・`Light Sweep`（Animation 1ループでライトが回る回数）でライトを、`Diffraction`でCDの虹色を調整します。読み込んだ画像はPresetへ保存されず、未読込のときは選択中のプリセットで描画します。
 - `Normal` はグラデーションの輝度勾配から法線マップを生成します。`Strength`、`Blur`、`Angle`、`Bevel Size`で表面の凹凸を調整します。
 - `Prism` は主スタック後段の光線・グロー、`Particles` は最終オーバーレイのパーティクルを調整します。
 - `Edit Layer`の選択要素から各モジュールを一つずつ表示して編集します。選択を変更しても描画順は変わりません。
@@ -109,6 +110,8 @@ Web 版は `index.html` で Google Fonts から Noto Sans JP、Open Sans を読�
 - **MOV**: Tauri デスクトップ版で、外部 FFmpeg を使って QuickTime Animation(qtrle) の MOV を生成します。
 - **MP4 (H.264)**: Tauri デスクトップ版で、外部 FFmpeg を使って標準的なYUV 4:2:0 / BT.709のMP4を生成します。High（CRF 18）、Balanced（CRF 22）、Small（CRF 27）を選択でき、Highが既定値です。
 - **ZIP PNG**: Web 版 / Tauri 版の両方で利用できる連番 PNG ZIP 書き出しです。FFmpeg は不要です。
+- MP4は、GPUエンコーダー（NVIDIA NVENC / Intel Quick Sync / AMD AMF / Apple VideoToolbox）が使えるFFmpegとGPUを検出した場合、既定でGPUで書き出します。ExportタブのGPUエンコードで切り替えられ、GPUが失敗した場合は自動でCPU（x264）へ切り替わります。画質はx264と多少異なる場合があります。
+- FFmpegはアプリ起動時に自動検出します。導入後にウィンドウへ戻ると再検出され、Exportタブの`Check`でも手動で再確認できます。
 - MOV / MP4書き出しには、K-GG専用FFmpegフォルダへ`ffmpeg.exe`を配置するか、`ffmpeg`コマンドをPATHから実行できる状態にする必要があります。
 - K-GG専用フォルダはExportタブの`Open K-GG FFmpeg folder`から開けます。専用フォルダが優先され、利用できない場合はPATH上のFFmpegを確認します。
 - 未導入の場合はExportタブの案内からgyan.devを開き、Windows x64用`release essentials` ZIPを取得して展開してください。K-GG自身はFFmpegをダウンロードしません。

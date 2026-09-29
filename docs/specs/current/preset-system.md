@@ -5,12 +5,12 @@ title: Preset System
 status: current
 owners: [maintainer]
 created: 2026-07-27
-updated: 2026-09-28
-requirement_ids: [PRESET-001, PRESET-002, PRESET-003, PRESET-004, PRESET-005, PRESET-006, PRESET-007, PRESET-008, PRESET-009, PRESET-011, PRESET-012, PRESET-013, PRESET-014, PRESET-016, PRESET-017, PRESET-018, PRESET-019]
-related_adrs: [ADR-0007, ADR-0008, ADR-20260927-datamosh-feedback-layer]
+updated: 2026-09-30
+requirement_ids: [PRESET-001, PRESET-002, PRESET-003, PRESET-004, PRESET-005, PRESET-006, PRESET-007, PRESET-008, PRESET-009, PRESET-011, PRESET-012, PRESET-013, PRESET-014, PRESET-016, PRESET-017, PRESET-018, PRESET-019, PRESET-020]
+related_adrs: [ADR-0007, ADR-0008, ADR-20260927-datamosh-feedback-layer, ADR-20260929-sandbox-texture-material-stage]
 related_changes: [CHANGE-001, CHANGE-012, CHANGE-013, CHANGE-018, CHANGE-024, CHANGE-025, CHANGE-026, CHANGE-027, CHANGE-030, CHANGE-031, CHANGE-032, CHANGE-034, CHANGE-037, CHANGE-039, CHANGE-046, CHANGE-048, CHANGE-051]
-related_code: [src/lib/presetModel.ts, src/lib/presetLibrary.ts, src/lib/presets.ts, src/lib/presetPreview.ts, src/lib/presetThumbnail.ts, src/lib/flowGradientRenderer.ts, src/types/flowGradient.ts, src/types/datamosh.ts, src/lib/effectPipeline.ts, src/lib/glass.ts, src/lib/postprocessStack.ts, src/store/gradientStore.ts, src/components/PresetPanel.tsx, src/components/FlowGradientPanel.tsx, src/components/DatamoshPanel.tsx, src/components/PresetPreview.tsx, src/components/ClothCanvas.tsx, src/types/coneView.ts, src/adapters/types.ts, src/adapters/browser/presetRepository.ts, src/adapters/tauri/presetRepository.ts, src/lib/kggControlRuntime.ts, src-tauri/src/lib.rs]
-related_tests: [src/lib/presetLibrary.test.ts, src/lib/presetModel.diffuse.test.ts, src/lib/presetModel.slit.test.ts, src/lib/presetModel.removedEffects.test.ts, src/lib/presetModel.compact.test.ts, src/lib/flowGradientPreset.test.ts, src/lib/presetPreview.test.ts, src/lib/presetThumbnail.test.ts, src/lib/presetThumbnail.lifecycle.test.ts, src/lib/glass.test.ts, src/lib/postprocessStack.test.ts, src/store/gradientStore.glass.test.ts, src/store/gradientStore.postprocessStack.test.ts, src/store/gradientStore.animation.test.ts, src/types/coneView.test.ts, src/lib/effectPipeline.test.ts]
+related_code: [src/lib/presetModel.ts, src/lib/presetLibrary.ts, src/lib/presets.ts, src/lib/presetPreview.ts, src/lib/presetThumbnail.ts, src/lib/flowGradientRenderer.ts, src/types/flowGradient.ts, src/types/datamosh.ts, src/lib/effectPipeline.ts, src/lib/glass.ts, src/lib/postprocessStack.ts, src/store/gradientStore.ts, src/components/PresetPanel.tsx, src/components/FlowGradientPanel.tsx, src/components/DatamoshPanel.tsx, src/components/PresetPreview.tsx, src/components/ClothCanvas.tsx, src/types/coneView.ts, src/adapters/types.ts, src/adapters/browser/presetRepository.ts, src/adapters/tauri/presetRepository.ts, src/lib/kggControlRuntime.ts, src-tauri/src/lib.rs, src/types/texture.ts]
+related_tests: [src/lib/presetLibrary.test.ts, src/lib/presetModel.diffuse.test.ts, src/lib/presetModel.slit.test.ts, src/lib/presetModel.removedEffects.test.ts, src/lib/presetModel.compact.test.ts, src/lib/flowGradientPreset.test.ts, src/lib/presetPreview.test.ts, src/lib/presetThumbnail.test.ts, src/lib/presetThumbnail.lifecycle.test.ts, src/lib/glass.test.ts, src/lib/postprocessStack.test.ts, src/store/gradientStore.glass.test.ts, src/store/gradientStore.postprocessStack.test.ts, src/store/gradientStore.animation.test.ts, src/types/coneView.test.ts, src/lib/effectPipeline.test.ts, src/lib/presetModel.texture.test.ts]
 ---
 
 # Preset System
@@ -25,7 +25,7 @@ Preset Systemは、Gradient、Effect Stack、アニメーションなどの編�
 
 Presetの `state` には、Gradient、Noise Distortion、Diffuse、Image Gradientの設定、Slit Scan、Stretch、Animation、Normal Map、手描きDistort、Postprocess、Effect Pipeline、キーフレームトラック、Gradientに適用中のユーザーカラーパレット、解像度などの編集状態を含められます。
 
-選択中のUI状態や互換用の任意フィールドが含まれることはありますが、Presetの読込時は描画に必要な状態を正規化してからストアへ適用します。手描きDistortはPostprocess設定を正規値とし、旧Presetの`manualDistort`だけに残る値は読込時にPostprocessへ移行します。新規保存ではPostprocessがある限り`manualDistort`を書き出さず（PRESET-019）、読込時は旧`manualDistort.enabled`をLegacy generatorの独立入力として有効化しません。Slitの新規Presetには`phaseAnimEnabled`と`phaseSpeed`を保存せず、旧Presetの同キーおよび`slitScan.slitPhase`のPhase Motionキーフレームは無視します。手動設定の静的な`slitPhase`は保存・復元します。削除済みのRadon、Iridescence、Matcapについて、旧Presetの`radon`・`iridescence`・`matcap`と`radon.*`・`iridescence.*`のキーフレームは読込時に無視し、再保存時に取り除きます。
+選択中のUI状態や互換用の任意フィールドが含まれることはありますが、Presetの読込時は描画に必要な状態を正規化してからストアへ適用します。手描きDistortはPostprocess設定を正規値とし、旧Presetの`manualDistort`だけに残る値は読込時にPostprocessへ移行します。新規保存ではPostprocessがある限り`manualDistort`を書き出さず（PRESET-020）、読込時は旧`manualDistort.enabled`をLegacy generatorの独立入力として有効化しません。Slitの新規Presetには`phaseAnimEnabled`と`phaseSpeed`を保存せず、旧Presetの同キーおよび`slitScan.slitPhase`のPhase Motionキーフレームは無視します。手動設定の静的な`slitPhase`は保存・復元します。削除済みのRadon、Iridescence、Matcapについて、旧Presetの`radon`・`iridescence`・`matcap`と`radon.*`・`iridescence.*`のキーフレームは読込時に無視し、再保存時に取り除きます。
 
 ### PRESET-002 保存しない外部入力
 
@@ -93,22 +93,11 @@ Presetは`effectPipeline.flowGradientEnabled`と`flowGradient`のFlow設定を�
 
 ### PRESET-017 SANDBOX設定の完全保存
 
-Preset保存時のスナップショットには、Cloth、Cone、Normal、Prism、Particles、Flow Gradient、Datamosh、Seamlessの永続化対象設定を含めます。Clothは`clothGradient`、Coneは`coneView`と`effectPipeline.effectStack`、Normal／Prism／Particlesは`normalMap`と`effectPipeline`、Flow Gradientは`flowGradient`と`effectPipeline.flowGradientEnabled`、Datamoshは`datamosh`と`effectPipeline.effectStack`、Seamlessは`seamless`として保存・復元します。旧Presetで欠落している任意設定は各normalizerの既定値へ補完します。Canvas／Clothの一時表示面、SANDBOXの選択中Edit Layer、GPU資源は保存しません。
+Preset保存時のスナップショットには、Cloth、Cone、Normal、Prism、Particles、Flow Gradient、Datamosh、Seamlessの永続化対象設定を含めます。Clothは`clothGradient`、Coneは`coneView`と`effectPipeline.effectStack`、Normal／Prism／Particlesは`normalMap`と`effectPipeline`、Flow Gradientは`flowGradient`と`effectPipeline.flowGradientEnabled`、Datamoshは`datamosh`と`effectPipeline.effectStack`、Seamlessは`seamless`として保存・復元します。Textureは`texture`と`effectPipeline.effectStack`として保存・復元します（PRESET-019）。旧Presetで欠落している任意設定は各normalizerの既定値へ補完します。Canvas／Clothの一時表示面、SANDBOXの選択中Edit Layer、GPU資源は保存しません。
 
 ### PRESET-018 Datamosh設定とVideo Motionの保存互換
 
 PresetはDatamoshレイヤーのmotion source、Mix Mode、各パラメータを`datamosh`として、有効状態と順序を`effectPipeline.effectStack`として保存・復元し、範囲外の値は各パラメータの範囲へ、未知のmotion source／Mix Modeは既定値へ正規化します。動画ファイル、Object URL、HTMLVideoElement、motion field、Datamoshの履歴textureは保存しません。Effect Stackの`videoMotion`レイヤーは同じ位置の`datamosh`レイヤーへ、`datamosh`を持たない旧Presetの`videoMotion`設定は`Video Motion` source・`Ramp Lock`のDatamosh設定へ、読み込み時に移行します（CURRENT-EFFECT-STACKのDATAMOSH-005）。保存時は`videoMotion`を書き出しません。どちらも持たない旧Presetは無効な既定値へ正規化し、動画未接続時も既存のGradient描画を継続します。
-
-### PRESET-019 保存データの最小化
-
-Presetの新規保存と書出し（単一JSON、フォルダ／ライブラリZIP）では、読込時に同じ状態へ再構成できるデータと、そのPresetが使わないライブラリデータを書き出しません。
-
-- `postprocess`がある場合の旧`manualDistort`。読込時は従来どおりPostprocessの手描きDistort設定から無効状態で補完します。`postprocess`を持たない旧Presetの`manualDistort`は残します。
-- `postprocess`と、残した`manualDistort`の`displacement`／`smoothMask`のうち全要素が0のもの。読込時は`mapResolution`から空のマップを作ります。描画済みのマップは保存します。
-- Gradientに適用されていないユーザーカラーパレット。パレットの適用はRampへstopsを複製する操作で参照を残さないため、stopsの位置と色がRampの`gradient.stops`と一致するもの（Mirror有効時は位置を1/2にして比較）だけを`colorPalettes`へ残し、一致するものがなければ`colorPalettes`自体を書き出しません。読込時は残ったパレットだけを利用者のパレット一覧へ追加します。Rampの色は`gradient.stops`に保存されるため、描画結果は変わりません。
-- `effectPipeline.version`が`stack-v2`のPresetにおける`postprocess.effectStack`と`postprocess.diffuse*`。Stack v2は順序を`effectPipeline.effectStack`、Post Diffuseを`diffuse`から取るため、これらはLegacy v1描画だけが読むフィールドです。Legacy v1のPresetでは保存します。
-
-保存済みライブラリ内の既存Presetは自動で書き換えず、書出し時に同じ省略を適用します。省略済みPresetは旧来の完全な形式と同じ描画状態で読み込め、正規化を経ずにストアへ適用するMCPの`apply_preset`は省略したフィールドを補完してから適用し、前の文書の値を残しません。無効な機能の設定値と既定値と同じ値は、再有効化時の復元と既定値変更時の外観維持のため省略しません。
 
 ## 他領域との関係
 
@@ -129,3 +118,18 @@ Legacy SPECは保存形式が変化した経緯を追うために残します。
 ## 未確認・今後の現行仕様化
 
 保存先の容量上限、ブラウザのlocalStorage quota超過時の利用者向け表示、異なるGPUで生成されたThumbnailの再現性は、現行仕様として数値保証していません。Presetの専用更新操作が必要になった場合は、ID・履歴・Thumbnail更新の意味を含む別変更として定義します。
+
+### PRESET-019 Texture設定の保存互換
+
+`texture`と、`effectPipeline.effectStack`内の`texture`レイヤー（有効状態と順序）はPresetの永続化対象です。SANDBOX時代の保存（レイヤーがなく`texture.enabled`だけが有効）は、読み込み時にレイヤーを有効にして引き継ぎます。保存時と読み込み時に`normalizeTextureConfig`で範囲と列挙を正規化し、旧Presetにない場合は無効の既定値を使います。Texture用に読み込んだ画像はPortableなPresetへ保存せず、読込後に画像がない場合は選択中の手続き型プリセットで描画します。Thumbnailも同じ規則で、画像を使いません。
+
+### PRESET-020 保存データの最小化
+
+Presetの新規保存と書出し（単一JSON、フォルダ／ライブラリZIP）では、読込時に同じ状態へ再構成できるデータと、そのPresetが使わないライブラリデータを書き出しません。
+
+- `postprocess`がある場合の旧`manualDistort`。読込時は従来どおりPostprocessの手描きDistort設定から無効状態で補完します。`postprocess`を持たない旧Presetの`manualDistort`は残します。
+- `postprocess`と、残した`manualDistort`の`displacement`／`smoothMask`のうち全要素が0のもの。読込時は`mapResolution`から空のマップを作ります。描画済みのマップは保存します。
+- Gradientに適用されていないユーザーカラーパレット。パレットの適用はRampへstopsを複製する操作で参照を残さないため、stopsの位置と色がRampの`gradient.stops`と一致するもの（Mirror有効時は位置を1/2にして比較）だけを`colorPalettes`へ残し、一致するものがなければ`colorPalettes`自体を書き出しません。読込時は残ったパレットだけを利用者のパレット一覧へ追加します。Rampの色は`gradient.stops`に保存されるため、描画結果は変わりません。
+- `effectPipeline.version`が`stack-v2`のPresetにおける`postprocess.effectStack`と`postprocess.diffuse*`。Stack v2は順序を`effectPipeline.effectStack`、Post Diffuseを`diffuse`から取るため、これらはLegacy v1描画だけが読むフィールドです。Legacy v1のPresetでは保存します。
+
+保存済みライブラリ内の既存Presetは自動で書き換えず、書出し時に同じ省略を適用します。省略済みPresetは旧来の完全な形式と同じ描画状態で読み込め、正規化を経ずにストアへ適用するMCPの`apply_preset`は省略したフィールドを補完してから適用し、前の文書の値を残しません。無効な機能の設定値と既定値と同じ値は、再有効化時の復元と既定値変更時の外観維持のため省略しません。

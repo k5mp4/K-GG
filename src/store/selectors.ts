@@ -35,6 +35,7 @@ export const selectDocumentState = (state: GradientStore): DocumentState => ({
   clothGradient: state.clothGradient,
   coneView: state.coneView,
   seamless: state.seamless,
+  texture: state.texture,
   flowGradient: state.flowGradient,
   datamosh: state.datamosh,
   manualDistort: state.manualDistort,

@@ -1,4 +1,4 @@
-import { useCallback, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   getNativeFfmpegStatus,
   nativeFfmpegSupported,
@@ -21,6 +21,7 @@ function statusAfterError(error: unknown, current: NativeFfmpegStatus | null): N
     ffprobePath: current?.ffprobePath ?? null,
     ffprobeVersion: current?.ffprobeVersion ?? null,
     videoFormats: current?.videoFormats,
+    gpuEncoder: current?.gpuEncoder ?? null,
   };
 }
 
@@ -58,6 +59,23 @@ export function useNativeFfmpeg(isExportTabActive: () => boolean) {
       if (requestId === ffmpegCheckRequestRef.current) setFfmpegChecking(false);
     }
   }, []);
+
+  // 起動時に一度だけ黙って検出し、書き出しタブを開く前にFFmpeg・GPUの状態を確定させる。
+  useEffect(() => {
+    void refreshFfmpegStatus(false);
+  }, [refreshFfmpegStatus]);
+
+  // 未検出のままFFmpegを導入して戻ってきた場合に備え、ウィンドウが前面に戻った時にも再検出する。
+  const availableRef = useRef(false);
+  availableRef.current = ffmpegStatus?.available === true;
+  useEffect(() => {
+    if (!nativeFfmpegSupported()) return undefined;
+    const handleFocus = () => {
+      if (!availableRef.current) void refreshFfmpegStatus(false);
+    };
+    window.addEventListener('focus', handleFocus);
+    return () => window.removeEventListener('focus', handleFocus);
+  }, [refreshFfmpegStatus]);
 
   const closeFfmpegDialog = useCallback(() => setFfmpegDialogOpen(false), []);
 

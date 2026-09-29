@@ -9,6 +9,7 @@ import { disposeWebGL, initWebGL, settleLazyProgram, type WebGLContext } from '.
 import { getRequiredSceneProgramKeys } from './sceneRenderPlan';
 import { resolveDiffuseBezier } from './diffuseCurve';
 import { normalizeSeamlessConfig } from '../types/seamless';
+import { normalizeTextureConfig } from '../types/texture';
 import { normalizeFlowGradientConfig } from '../types/flowGradient';
 import { normalizeConeViewConfig } from '../types/coneView';
 import { normalizeClothGradientConfig } from '../types/clothGradient';
@@ -81,6 +82,7 @@ export function createPresetThumbnailState(snapshot: StoreSnapshot): LatestState
     coneView: normalizeConeViewConfig(snapshot.coneView),
     datamosh: resolvePersistedDatamosh(snapshot),
     seamless: normalizeSeamlessConfig(snapshot.seamless),
+    texture: normalizeTextureConfig(snapshot.texture),
     flowGradient: normalizeFlowGradientConfig(snapshot.flowGradient),
     manualDistort,
     postprocess,
@@ -94,6 +96,8 @@ export function createPresetThumbnailState(snapshot: StoreSnapshot): LatestState
     imageGradientSource: null,
     imageMaskSource: null,
     imageMaskEnabled: false,
+    // The height map is a session-only external image and not part of a portable Preset.
+    textureImageSource: null,
   };
 }
 

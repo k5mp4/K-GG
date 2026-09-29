@@ -364,6 +364,98 @@ describe('Gradient store Effect Pipeline V2 synchronization', () => {
     expect(legacyFbm.perlinDimension).toBe('3d');
   });
 
+  it('adds Chladni with its defaults and clamps out-of-range/invalid values', () => {
+    const store = useGradientStore.getState();
+    store.setNoiseDistortion({ type: 'chladni' });
+
+    expect(useGradientStore.getState().noiseDistortion).toMatchObject({
+      type: 'chladni',
+      amount: 0.3,
+      scale: 1,
+      chladniPatternCount: 3,
+      chladniComplexity: 4,
+      chladniLineWidth: 0.1,
+      chladniSharpness: 2,
+      chladniWarpStrength: 0.3,
+      chladniRotation: 0,
+      chladniMode: 'warp',
+      chladniMapProfile: 'signed',
+      chladniMapAngle: 90,
+      chladniModeMix: 1,
+      chladniEdge: 0,
+      chladniDetune: 0,
+    });
+
+    store.setNoiseDistortion({ chladniMode: 'map', chladniMapProfile: 'folded', chladniModeMix: -4, chladniEdge: 3, chladniDetune: -1, chladniMapAngle: -45 });
+    expect(useGradientStore.getState().noiseDistortion).toMatchObject({
+      chladniMode: 'map',
+      chladniMapProfile: 'folded',
+      chladniModeMix: -1,
+      chladniEdge: 1,
+      chladniDetune: 0,
+      chladniMapAngle: 315,
+    });
+    store.setNoiseDistortion({ chladniMode: 'bogus' as never, chladniMapProfile: 'bogus' as never });
+    expect(useGradientStore.getState().noiseDistortion).toMatchObject({ chladniMode: 'warp', chladniMapProfile: 'signed' });
+
+    store.setNoiseDistortion({
+      chladniPatternCount: 9,
+      chladniComplexity: 99,
+      chladniLineWidth: 5,
+      chladniSharpness: 99,
+      chladniWarpStrength: 3,
+      chladniRotation: 400,
+    });
+    expect(useGradientStore.getState().noiseDistortion).toMatchObject({
+      chladniPatternCount: 4,
+      chladniComplexity: 8,
+      chladniLineWidth: 1,
+      chladniSharpness: 8,
+      chladniWarpStrength: 1,
+      chladniRotation: 40,
+    });
+
+    store.setNoiseDistortion({
+      chladniPatternCount: 1,
+      chladniComplexity: -3,
+      chladniLineWidth: 0,
+      chladniSharpness: 0,
+      chladniWarpStrength: -1,
+      chladniRotation: -90,
+    });
+    expect(useGradientStore.getState().noiseDistortion).toMatchObject({
+      chladniPatternCount: 2,
+      chladniComplexity: 1,
+      chladniLineWidth: 0.01,
+      chladniSharpness: 0.5,
+      chladniWarpStrength: 0,
+      chladniRotation: 270,
+    });
+
+    store.setNoiseDistortion({ chladniPatternCount: 2.6, chladniComplexity: Number.NaN });
+    expect(useGradientStore.getState().noiseDistortion.chladniPatternCount).toBe(3);
+    expect(useGradientStore.getState().noiseDistortion.chladniComplexity).toBe(STORE_DEFAULTS.noiseDistortion.chladniComplexity);
+  });
+
+  it('fills Chladni defaults into presets saved before Chladni existed', () => {
+    const legacy = normalizeNoiseDistortionConfig({ type: 'phasor', amount: 0.2 } as never);
+    expect(legacy.type).toBe('phasor');
+    expect(legacy).toMatchObject({
+      chladniPatternCount: STORE_DEFAULTS.noiseDistortion.chladniPatternCount,
+      chladniComplexity: STORE_DEFAULTS.noiseDistortion.chladniComplexity,
+      chladniLineWidth: STORE_DEFAULTS.noiseDistortion.chladniLineWidth,
+      chladniSharpness: STORE_DEFAULTS.noiseDistortion.chladniSharpness,
+      chladniWarpStrength: STORE_DEFAULTS.noiseDistortion.chladniWarpStrength,
+      chladniRotation: STORE_DEFAULTS.noiseDistortion.chladniRotation,
+      chladniMode: 'warp',
+      chladniMapProfile: 'signed',
+      chladniMapAngle: STORE_DEFAULTS.noiseDistortion.chladniMapAngle,
+      chladniModeMix: STORE_DEFAULTS.noiseDistortion.chladniModeMix,
+      chladniEdge: STORE_DEFAULTS.noiseDistortion.chladniEdge,
+      chladniDetune: STORE_DEFAULTS.noiseDistortion.chladniDetune,
+    });
+  });
+
   it('applies GPU-tier octave and step limits to Fast Curl', () => {
     const medium: RenderOptimization = {
       tier: 'medium', reasons: [], maxNoiseOctaves: 6, maxCurlSteps: 5,

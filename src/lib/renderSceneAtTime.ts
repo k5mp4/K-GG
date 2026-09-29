@@ -60,6 +60,9 @@ function renderSceneFrame(
     flowSessionId: options.renderSessionId ?? 'preview',
     datamosh: state.datamosh,
     coneView: state.coneView,
+    texture: state.texture,
+    textureImageSource: state.textureImageSource ?? null,
+    textureNormalizedTime: normalizedTime,
   });
 }
 

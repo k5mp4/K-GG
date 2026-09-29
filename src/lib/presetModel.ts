@@ -23,6 +23,8 @@ import type { ConeViewConfig } from '../types/coneView';
 import { normalizeConeViewConfig } from '../types/coneView';
 import type { SeamlessConfig } from '../types/seamless';
 import { normalizeSeamlessConfig } from '../types/seamless';
+import type { TextureConfig } from '../types/texture';
+import { normalizeTextureConfig } from '../types/texture';
 import type { FlowGradientConfig } from '../types/flowGradient';
 import { normalizeFlowGradientConfig } from '../types/flowGradient';
 import { isRemovedAnimationProperty } from './animationRegistry';
@@ -41,6 +43,7 @@ export type StoreSnapshot = {
   clothGradient?: ClothGradientConfig;
   coneView?: ConeViewConfig;
   seamless?: SeamlessConfig;
+  texture?: TextureConfig;
   flowGradient?: FlowGradientConfig;
   datamosh?: DatamoshConfig;
   /**
@@ -246,6 +249,7 @@ export function makePreset(
       clothGradient: normalizeClothGradientConfig(state.clothGradient),
       coneView: normalizeConeViewConfig(state.coneView),
       seamless: normalizeSeamlessConfig(state.seamless),
+      texture: normalizeTextureConfig(state.texture),
       flowGradient: normalizeFlowGradientConfig(state.flowGradient),
       datamosh: resolvePersistedDatamosh(sourceState),
       effectPipeline: state.effectPipeline

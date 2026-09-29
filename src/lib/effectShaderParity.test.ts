@@ -116,6 +116,24 @@ describe('V2 effect shader parity', () => {
       .toBe(canonicalNoise(extractFunction(normalizedGradientShader, 'applyNoiseUV')));
   });
 
+  it('renders Chladni with one implementation in the Legacy generator and the V2 Noise Stack', () => {
+    const generator = getProgramSource('generator').fragment.replace(/\r\n?/g, '\n');
+    const canonical = (source: string) => compact(source.replaceAll('u_fullResolution', 'u_resolution'));
+    for (const key of ['noiseStack', 'noiseDiffuseStack'] as const) {
+      const stack = getProgramSource(key).fragment.replace(/\r\n?/g, '\n');
+      for (const name of ['chladniField', 'chladniMorphState', 'chladniDistortion', 'noiseDisplace']) {
+        expect(canonical(extractFunction(stack, name)), `${key}: ${name}`)
+          .toBe(canonical(extractFunction(generator, name)));
+      }
+    }
+  });
+
+  it('evaluates at most two Chladni patterns per pixel', () => {
+    const distortion = extractFunction(getProgramSource('generator').fragment, 'chladniDistortion');
+    expect(distortion.match(/chladniField\(/g)).toHaveLength(2);
+    expect(distortion.match(/chladniMode\(/g)).toHaveLength(2);
+  });
+
   it('keeps the Fast Curl Legacy/V2 wrappers equivalent', () => {
     const legacy = extractFunction(normalizedGradientShader, 'applyFastCurlNoiseUV');
     const stack = extractFunction(postprocessShader, 'applyStackFastCurlNoiseUv');

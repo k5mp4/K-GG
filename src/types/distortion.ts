@@ -5,7 +5,7 @@ export type VoronoiFeature = 'f1' | 'f2' | 'distance_to_edge';
 
 export type NoiseDistortionConfig = {
   enabled: boolean;
-  type: 'simplex' | 'fbm' | 'voronoi' | 'curl' | 'fast_curl' | 'domain_warp_anim' | 'seamless' | 'ridged_fbm' | 'ae_fractal' | 'caustics' | 'phasor' | 'perlin';
+  type: 'simplex' | 'fbm' | 'voronoi' | 'curl' | 'fast_curl' | 'domain_warp_anim' | 'seamless' | 'ridged_fbm' | 'ae_fractal' | 'caustics' | 'phasor' | 'perlin' | 'chladni';
   amount: number;
   scale: number;
   octaves: number;
@@ -73,7 +73,23 @@ export type NoiseDistortionConfig = {
   phasorTangentMix: number;      // 0.0–1.0: 法線から接線への混合
   phasorKernelDensity: number;   // 0.25–2.0: カーネルの重なり密度
   phasorDirectionMode: PhasorDirectionMode;
+  // Chladni Noise 専用パラメータ (Seed/Complexityから決まる2〜4個のPatternをLoop Periodで循環モーフィング)
+  chladniPatternCount: number;   // 2–4: 1ループで巡るPattern数
+  chladniComplexity: number;     // 1–8: 生成する (m, n) モードの上限（大→細かく複雑）
+  chladniLineWidth: number;      // 0.01–1.0: 節線周辺の影響範囲（節線間隔に対する比）
+  chladniSharpness: number;      // 0.5–8.0: 節線から離れたときの減衰の急峻さ
+  chladniWarpStrength: number;   // 0.0–1.0: Chladni勾配による内部変位場の強さ
+  chladniRotation: number;       // 0–360°: Pattern全体の回転
+  chladniMode: ChladniMode;      // warp=節線に沿った勾配変位, map=field高さでグラデーションをマッピング
+  chladniMapProfile: ChladniMapProfile; // map時の高さ: signed=±の凹凸, folded=|F|（節線が谷）
+  chladniMapAngle: number;       // 0–360°: map時にUVを押し出す方向
+  chladniModeMix: number;        // -1.0–1.0: 2項の結合係数（1=差, -1=和, 0=単一定在波）
+  chladniEdge: number;           // 0.0–1.0: 板の端条件（0=自由端cos, 1=固定端sin）
+  chladniDetune: number;         // 0.0–1.0: Seed由来の非整数モードずれ
 };
+
+export type ChladniMode = 'warp' | 'map';
+export type ChladniMapProfile = 'signed' | 'folded';
 
 export type DiffuseDitherMode = 'pattern_dither';
 export type DiffuseMode = 'block' | 'smooth' | 'dither' | 'halftone' | 'ascii' | 'legacy';
@@ -231,7 +247,8 @@ export type EffectStackKind =
   | 'glass'
   | 'glassTile'
   | 'datamosh'
-  | 'cone';
+  | 'cone'
+  | 'texture';
 
 export type EffectStackLayer = {
   kind: EffectStackKind;

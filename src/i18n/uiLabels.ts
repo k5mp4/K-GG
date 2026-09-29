@@ -48,6 +48,10 @@ const uiTerms = [
   ['Counter-Clockwise', '反時計回り'], ['Point', '点'], ['Line', '線'], ['Circle', '円'],
   ['Surface Type', '表面の種類'], ['Organic', '有機的'], ['Ripple', '波紋'], ['Faceted', '多面カット'],
   ['Facet Density', '面の密度'], ['Facet Depth', '面の高低差'],
+  ['Anisotropy', '異方性'], ['Diffraction', '回折'], ['Fit', 'フィット'], ['Grain Angle', '目の向き'],
+  ['Light', 'ライト'], ['Light Angle', 'ライト角度'], ['Light Height', 'ライトの高さ'], ['Light Sweep', 'ライトスイープ'],
+  ['Material', 'マテリアル'], ['Metallic', '金属感'], ['Preset', 'プリセット'], ['Reflection', '反射'],
+  ['Relief', '凹凸'], ['Repeat', '反復回数'], ['Source', 'ソース'], ['Specular', 'スペキュラ'], ['Surface', '表面'],
 ] as const;
 
 const aliases = new Map<string, { en: string; ja: string }>();

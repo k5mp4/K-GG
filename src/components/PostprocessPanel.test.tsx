@@ -5,7 +5,7 @@ import { updateEffectStackLayer } from '../lib/effectPipeline';
 import { useGradientStore } from '../store/gradientStore';
 import { PostprocessPanel } from './PostprocessPanel';
 
-function renderPostprocessPanelWithLayerSelected(kind: 'cone' | 'stretch') {
+function renderPostprocessPanelWithLayerSelected(kind: 'cone' | 'stretch' | 'texture') {
   const initialState = useGradientStore.getInitialState();
   const previousEffectPipeline = initialState.effectPipeline;
   initialState.effectPipeline = {
@@ -27,6 +27,14 @@ function renderPostprocessPanelWithLayerSelected(kind: 'cone' | 'stretch') {
 describe('PostprocessPanel layer surface', () => {
   beforeEach(() => {
     useGradientStore.setState(useGradientStore.getInitialState(), true);
+  });
+
+  it('shows the Texture settings when the Texture layer is selected', () => {
+    const markup = renderPostprocessPanelWithLayerSelected('texture');
+
+    expect(markup).toContain('data-texture-panel');
+    expect(markup).toContain('Anisotropy');
+    expect(markup).not.toContain('data-stretch-settings');
   });
 
   it('keeps the Datamosh layer mounted in the Postprocess property surface', () => {
