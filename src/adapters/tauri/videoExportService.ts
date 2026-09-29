@@ -106,14 +106,16 @@ export const tauriVideoExportService: VideoExportService = {
       await writePngSequenceToTempDir(config, exportTemp, totalFrames);
       config.onProgress?.(0.7);
       config.onStage?.('encoding');
-      await invoke('encode_native_video', {
+      const encoder = await invoke<string | undefined>('encode_native_video', {
         format,
         inputPattern: await join(exportTemp, 'frame_%04d.png'),
         outputPath,
         fps: config.fps,
         quality: config.mp4Quality ?? 'high',
         gifMaxFileMb: format === 'gif' ? config.gifMaxFileMb ?? GIF_MAX_FILE_MB.default : null,
+        useGpu: format === 'mp4' && config.useGpu === true,
       });
+      if (encoder) console.info(`[Export] Encoded ${format} with ${encoder}`);
       config.onProgress?.(0.95);
       config.onStage?.('saving');
       const artifact = nativeVideoArtifact(outputPath, exportTemp, format);

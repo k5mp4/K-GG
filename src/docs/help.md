@@ -109,6 +109,8 @@ Web 版は `index.html` で Google Fonts から Noto Sans JP、Open Sans を読�
 - **MOV**: Tauri デスクトップ版で、外部 FFmpeg を使って QuickTime Animation(qtrle) の MOV を生成します。
 - **MP4 (H.264)**: Tauri デスクトップ版で、外部 FFmpeg を使って標準的なYUV 4:2:0 / BT.709のMP4を生成します。High（CRF 18）、Balanced（CRF 22）、Small（CRF 27）を選択でき、Highが既定値です。
 - **ZIP PNG**: Web 版 / Tauri 版の両方で利用できる連番 PNG ZIP 書き出しです。FFmpeg は不要です。
+- MP4は、GPUエンコーダー（NVIDIA NVENC / Intel Quick Sync / AMD AMF / Apple VideoToolbox）が使えるFFmpegとGPUを検出した場合、既定でGPUで書き出します。ExportタブのGPUエンコードで切り替えられ、GPUが失敗した場合は自動でCPU（x264）へ切り替わります。画質はx264と多少異なる場合があります。
+- FFmpegはアプリ起動時に自動検出します。導入後にウィンドウへ戻ると再検出され、Exportタブの`Check`でも手動で再確認できます。
 - MOV / MP4書き出しには、K-GG専用FFmpegフォルダへ`ffmpeg.exe`を配置するか、`ffmpeg`コマンドをPATHから実行できる状態にする必要があります。
 - K-GG専用フォルダはExportタブの`Open K-GG FFmpeg folder`から開けます。専用フォルダが優先され、利用できない場合はPATH上のFFmpegを確認します。
 - 未導入の場合はExportタブの案内からgyan.devを開き、Windows x64用`release essentials` ZIPを取得して展開してください。K-GG自身はFFmpegをダウンロードしません。

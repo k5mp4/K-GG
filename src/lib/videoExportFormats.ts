@@ -89,6 +89,19 @@ export function availableNativeVideoFormats(status: NativeFfmpegStatus | null): 
     .filter(format => reported.includes(format));
 }
 
+const GPU_ENCODER_LABELS: Record<string, string> = {
+  h264_nvenc: 'NVIDIA NVENC',
+  h264_qsv: 'Intel Quick Sync',
+  h264_amf: 'AMD AMF',
+  h264_videotoolbox: 'Apple VideoToolbox',
+};
+
+/** 検出したGPUエンコーダーの表示名。GPUエンコードできない場合はnull。 */
+export function gpuEncoderLabel(encoder: string | null | undefined): string | null {
+  if (!encoder) return null;
+  return GPU_ENCODER_LABELS[encoder] ?? encoder;
+}
+
 export function nativeVideoFileName(stem: string, format: NativeVideoFormat): string {
   const { fileSuffix, extension } = nativeVideoFormatDefinition(format);
   return `${stem}${fileSuffix}.${extension}`;

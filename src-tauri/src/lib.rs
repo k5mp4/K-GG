@@ -1,8 +1,10 @@
 use serde::Serialize;
+use std::collections::HashMap;
 use std::ffi::OsStr;
 use std::io::{Read, Seek, SeekFrom, Write};
 use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
+use std::sync::{Mutex, OnceLock};
 use std::thread;
 use std::time::{Duration, Instant};
 use tauri::Manager;
@@ -98,6 +100,8 @@ struct NativeFfmpegStatus {
     ffprobe_version: Option<String>,
     /// 検出したFFmpegで書き出せる動画形式ID（`NativeVideoFormat::id`）。
     video_formats: Vec<&'static str>,
+    /// MP4（H.264）の書き出しに使えるGPUエンコーダー。テストエンコードに成功したものだけを返す。
+    gpu_encoder: Option<&'static str>,
 }
 
 #[derive(Debug)]
@@ -112,6 +116,8 @@ struct ValidatedFfmpeg {
     path: PathBuf,
     version: String,
     video_formats: Vec<&'static str>,
+    /// FFmpegのビルドに含まれるH.264 GPUエンコーダー（優先順）。実際に動作するかは未確認。
+    hardware_h264_encoders: Vec<&'static str>,
 }
 
 struct CandidateSelection<T> {
@@ -468,7 +474,77 @@ fn validate_ffmpeg(path: &Path) -> Result<ValidatedFfmpeg, String> {
         path: path.to_path_buf(),
         version,
         video_formats: available_video_formats(&encoders),
+        hardware_h264_encoders: hardware_h264_encoders(&encoders),
     })
+}
+
+/// H.264のGPUエンコーダー（優先順）。NVIDIA→Intel→AMD→Apple。
+const HARDWARE_H264_ENCODERS: [&str; 4] =
+    ["h264_nvenc", "h264_qsv", "h264_amf", "h264_videotoolbox"];
+
+fn hardware_h264_encoders(encoders: &str) -> Vec<&'static str> {
+    HARDWARE_H264_ENCODERS
+        .into_iter()
+        .filter(|encoder| encoder_list_has(encoders, encoder))
+        .collect()
+}
+
+/// GPUエンコーダーへ渡すピクセル形式。Intel QSVはNV12を要求する。
+fn hardware_pixel_format(encoder: &str) -> &'static str {
+    if encoder == "h264_qsv" {
+        "nv12"
+    } else {
+        "yuv420p"
+    }
+}
+
+/// FFmpegに含まれていても、GPU・ドライバーがなければ初期化に失敗する。
+/// 数フレームのテストエンコードが成功したエンコーダーだけを使用可能とみなす。
+fn probe_hardware_h264_encoder(ffmpeg: &Path, encoder: &str) -> bool {
+    let pixel_format = hardware_pixel_format(encoder);
+    let args = [
+        "-hide_banner",
+        "-loglevel",
+        "error",
+        "-f",
+        "lavfi",
+        "-i",
+        "color=c=black:s=320x240:r=30:d=0.2",
+        "-frames:v",
+        "3",
+        "-pix_fmt",
+        pixel_format,
+        "-c:v",
+        encoder,
+        "-f",
+        "null",
+        "-",
+    ];
+    run_command_with_timeout(ffmpeg, &args, FFMPEG_CHECK_TIMEOUT)
+        .map(|result| result.success)
+        .unwrap_or(false)
+}
+
+/// 同じFFmpegでの再テストを避けるため、実行ファイルとバージョンごとに結果を保持する。
+fn detect_gpu_encoder(validated: &ValidatedFfmpeg) -> Option<&'static str> {
+    static CACHE: OnceLock<Mutex<HashMap<String, Option<&'static str>>>> = OnceLock::new();
+    if validated.hardware_h264_encoders.is_empty() {
+        return None;
+    }
+    let key = format!("{}|{}", validated.path.display(), validated.version);
+    let cache = CACHE.get_or_init(|| Mutex::new(HashMap::new()));
+    if let Some(cached) = cache.lock().ok().and_then(|map| map.get(&key).copied()) {
+        return cached;
+    }
+    let detected = validated
+        .hardware_h264_encoders
+        .iter()
+        .copied()
+        .find(|encoder| probe_hardware_h264_encoder(&validated.path, encoder));
+    if let Ok(mut map) = cache.lock() {
+        map.insert(key, detected);
+    }
+    detected
 }
 
 fn push_unique_candidate(candidates: &mut Vec<PathBuf>, candidate: PathBuf) {
@@ -667,6 +743,7 @@ fn status_from_validated(
     warning: Option<String>,
     ffprobe: Option<(PathBuf, String)>,
 ) -> NativeFfmpegStatus {
+    let gpu_encoder = detect_gpu_encoder(&validated);
     NativeFfmpegStatus {
         platform: native_platform(),
         supported: true,
@@ -682,6 +759,7 @@ fn status_from_validated(
             .map(|(path, _)| path.to_string_lossy().into_owned()),
         ffprobe_version: ffprobe.map(|(_, version)| version),
         video_formats: validated.video_formats,
+        gpu_encoder,
     }
 }
 
@@ -702,6 +780,7 @@ fn native_ffmpeg_status(app: &tauri::AppHandle) -> NativeFfmpegStatus {
             ffprobe_path: None,
             ffprobe_version: None,
             video_formats: Vec::new(),
+            gpu_encoder: None,
         };
     }
 
@@ -782,10 +861,13 @@ fn native_ffmpeg_status(app: &tauri::AppHandle) -> NativeFfmpegStatus {
             .map(|(path, _)| path.to_string_lossy().into_owned()),
         ffprobe_version: ffprobe.map(|(_, version)| version),
         video_formats: Vec::new(),
+        gpu_encoder: None,
     }
 }
 
-#[tauri::command]
+// 起動時にも呼ばれ、FFmpegの起動とGPUのテストエンコードで時間がかかるため、
+// UIスレッドを止めないよう非同期スレッドで実行する。
+#[tauri::command(async)]
 fn get_native_ffmpeg_status(app: tauri::AppHandle) -> NativeFfmpegStatus {
     native_ffmpeg_status(&app)
 }
@@ -1258,6 +1340,65 @@ fn h264_rgb_ffmpeg_args(
     Ok(args)
 }
 
+/// GPUエンコーダーの品質指定。CPU版のCRFと同じ3段階を各エンコーダーの固定品質モードへ対応させる。
+fn hardware_h264_quality_args(encoder: &str, quality: &str) -> Result<Vec<String>, String> {
+    let level_value = mp4_crf_for_quality(quality)?.to_string();
+    let level = level_value.as_str();
+    let args: Vec<&str> = match encoder {
+        "h264_nvenc" => vec![
+            "-preset", "p5", "-rc", "vbr", "-cq", level, "-b:v", "0",
+        ],
+        "h264_qsv" => vec!["-preset", "slower", "-global_quality", level],
+        "h264_amf" => vec![
+            "-quality", "quality", "-rc", "cqp", "-qp_i", level, "-qp_p", level, "-qp_b",
+            level,
+        ],
+        // VideoToolboxは1〜100（大きいほど高品質）で指定する。
+        "h264_videotoolbox" => {
+            let vt_quality = match quality {
+                "high" => "80",
+                "balanced" => "65",
+                _ => "50",
+            };
+            return Ok(vec!["-q:v".to_string(), vt_quality.to_string()]);
+        }
+        _ => return Err(format!("未対応のGPUエンコーダーです: {encoder}")),
+    };
+    Ok(args.into_iter().map(str::to_string).collect())
+}
+
+/// MP4（H.264）をGPUでエンコードする引数。色メタデータ・寸法padding・faststartはCPU版と揃える。
+fn h264_hardware_ffmpeg_args(
+    input_pattern: &Path,
+    output_path: &Path,
+    fps: u32,
+    quality: &str,
+    encoder: &str,
+) -> Result<Vec<String>, String> {
+    let pixel_format = hardware_pixel_format(encoder);
+    let mut args = image_sequence_input_args(input_pattern, fps);
+    args.extend(["-c:v".to_string(), encoder.to_string()]);
+    args.extend(hardware_h264_quality_args(encoder, quality)?);
+    args.extend([
+        "-vf".to_string(),
+        format!("pad=ceil(iw/2)*2:ceil(ih/2)*2:0:0,format={pixel_format},setsar=1"),
+        "-pix_fmt".to_string(),
+        pixel_format.to_string(),
+        "-color_range".to_string(),
+        "tv".to_string(),
+        "-colorspace".to_string(),
+        "bt709".to_string(),
+        "-color_primaries".to_string(),
+        "bt709".to_string(),
+        "-color_trc".to_string(),
+        "bt709".to_string(),
+        "-movflags".to_string(),
+        "+faststart".to_string(),
+        output_path.to_string_lossy().into_owned(),
+    ]);
+    Ok(args)
+}
+
 fn image_sequence_input_args(input_pattern: &Path, fps: u32) -> Vec<String> {
     vec![
         "-y".to_string(),
@@ -1364,7 +1505,8 @@ fn encode_native_video_blocking(
     fps: u32,
     quality: String,
     gif_max_file_mb: Option<u32>,
-) -> Result<(), String> {
+    use_gpu: bool,
+) -> Result<String, String> {
     let format = NativeVideoFormat::parse(&format)?;
     let gif_limit_bytes = if format == NativeVideoFormat::Gif {
         gif_max_file_bytes(gif_max_file_mb)?
@@ -1386,18 +1528,37 @@ fn encode_native_video_blocking(
     let output_path =
         validate_video_export_path(&output_path, format.output_filename(), "出力ファイル")?;
 
+    // GPUエンコードはMP4（H.264）だけが対象。GPUで失敗した場合は出力を破棄してCPU（libx264）へ戻す。
+    if let (NativeVideoFormat::Mp4, true, Some(gpu_encoder)) = (format, use_gpu, status.gpu_encoder)
+    {
+        let args = h264_hardware_ffmpeg_args(
+            &input_pattern,
+            &output_path,
+            fps,
+            &quality,
+            gpu_encoder,
+        )?;
+        match run_ffmpeg(&ffmpeg_path, args, format) {
+            Ok(()) => return Ok(gpu_encoder.to_string()),
+            Err(err) => {
+                eprintln!("GPUエンコード({gpu_encoder})に失敗したためCPUで再試行します: {err}");
+                let _ = std::fs::remove_file(&output_path);
+            }
+        }
+    }
+
     let mut scale = 1.0;
     for attempt in 1..=GIF_SIZE_FIT_MAX_ATTEMPTS {
         let args = format.ffmpeg_args(&input_pattern, &output_path, fps, &quality, scale)?;
         run_ffmpeg(&ffmpeg_path, args, format)?;
         let Some(limit_bytes) = gif_limit_bytes else {
-            return Ok(());
+            return Ok(format.encoder().to_string());
         };
         let actual_bytes = std::fs::metadata(&output_path)
             .map_err(|err| format!("書き出したGIFのサイズを確認できません: {err}"))?
             .len();
         if actual_bytes < limit_bytes {
-            return Ok(());
+            return Ok(format.encoder().to_string());
         }
         match next_gif_scale(scale, actual_bytes, limit_bytes) {
             Some(next) if attempt < GIF_SIZE_FIT_MAX_ATTEMPTS => scale = next,
@@ -1450,8 +1611,10 @@ async fn encode_native_video(
     fps: u32,
     quality: Option<String>,
     gif_max_file_mb: Option<u32>,
-) -> Result<(), String> {
+    use_gpu: Option<bool>,
+) -> Result<String, String> {
     let quality = quality.unwrap_or_else(|| "high".to_string());
+    let use_gpu = use_gpu.unwrap_or(false);
     tauri::async_runtime::spawn_blocking(move || {
         encode_native_video_blocking(
             app,
@@ -1461,6 +1624,7 @@ async fn encode_native_video(
             fps,
             quality,
             gif_max_file_mb,
+            use_gpu,
         )
     })
     .await
@@ -1472,7 +1636,8 @@ mod tests {
     use super::{
         append_ffmpeg_candidates_from_path_value, available_video_formats, backup_path,
         choose_candidate, encoder_list_has, gif_ffmpeg_args, gif_max_file_bytes,
-        h264_rgb_ffmpeg_args, migrate_legacy_presets, mp4_crf_for_quality, next_gif_scale,
+        h264_hardware_ffmpeg_args, h264_rgb_ffmpeg_args, hardware_h264_encoders,
+        migrate_legacy_presets, mp4_crf_for_quality, next_gif_scale,
         qtrle_ffmpeg_args, recover_interrupted_write, replace_presets_file,
         validate_video_export_path, vp9_webm_ffmpeg_args, webm_crf_for_quality, NativeVideoFormat,
         GIF_MIN_SCALE, VIDEO_EXPORT_TEMP_DIR,
@@ -1519,6 +1684,41 @@ mod tests {
         assert!(encoder_list_has(output, "qtrle"));
         assert!(encoder_list_has(output, "libx264"));
         assert!(!encoder_list_has(output, "libx264rgb"));
+    }
+
+    #[test]
+    fn lists_hardware_h264_encoders_in_priority_order() {
+        let output = " V....D libx264   H.264\n V....D h264_amf   AMD\n V....D h264_nvenc   NVIDIA\n V....D hevc_nvenc   HEVC";
+        assert_eq!(hardware_h264_encoders(output), vec!["h264_nvenc", "h264_amf"]);
+        assert!(hardware_h264_encoders(" V....D libx264   H.264").is_empty());
+    }
+
+    #[test]
+    fn builds_hardware_h264_arguments_with_shared_color_metadata() {
+        let input = Path::new("C:\\kgg\\frame_%04d.png");
+        let output = Path::new("C:\\kgg\\output.mp4");
+
+        let nvenc = h264_hardware_ffmpeg_args(input, output, 30, "balanced", "h264_nvenc").unwrap();
+        assert!(has_pair(&nvenc, "-c:v", "h264_nvenc"));
+        assert!(has_pair(&nvenc, "-cq", "22"));
+        assert!(has_pair(&nvenc, "-pix_fmt", "yuv420p"));
+        assert!(has_pair(&nvenc, "-colorspace", "bt709"));
+        assert!(has_pair(&nvenc, "-movflags", "+faststart"));
+        assert_eq!(nvenc.last().map(String::as_str), Some("C:\\kgg\\output.mp4"));
+
+        let qsv = h264_hardware_ffmpeg_args(input, output, 30, "high", "h264_qsv").unwrap();
+        assert!(has_pair(&qsv, "-global_quality", "18"));
+        assert!(has_pair(&qsv, "-pix_fmt", "nv12"));
+
+        let amf = h264_hardware_ffmpeg_args(input, output, 30, "small", "h264_amf").unwrap();
+        assert!(has_pair(&amf, "-rc", "cqp"));
+        assert!(has_pair(&amf, "-qp_i", "27"));
+
+        let vt = h264_hardware_ffmpeg_args(input, output, 30, "high", "h264_videotoolbox").unwrap();
+        assert!(has_pair(&vt, "-q:v", "80"));
+
+        assert!(h264_hardware_ffmpeg_args(input, output, 30, "high", "libx264").is_err());
+        assert!(h264_hardware_ffmpeg_args(input, output, 30, "unknown", "h264_nvenc").is_err());
     }
 
     #[test]
