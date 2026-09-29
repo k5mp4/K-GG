@@ -87,6 +87,8 @@ Each property can be Static, Auto, or Keys. Switching from Auto to Keys records 
 - **MP4 (H.264)** uses external FFmpeg with standard YUV 4:2:0 / BT.709 output and offers High (CRF 18), Balanced (CRF 22), and Small (CRF 27). High is the default.
 - **ZIP PNG** exports a numbered PNG sequence in both web and Tauri builds without FFmpeg.
 
+K-GG detects FFmpeg automatically at startup and again when the window regains focus while FFmpeg is missing. MP4 is encoded on the GPU by default when FFmpeg provides a working GPU encoder (NVIDIA NVENC, Intel Quick Sync, AMD AMF, or Apple VideoToolbox); toggle it with **GPU encoding** in Export. If the GPU fails, K-GG falls back to the CPU (x264). Quality can differ slightly from x264.
+
 For MOV or MP4, place `ffmpeg.exe` in the K-GG FFmpeg folder or make the `ffmpeg` command available on PATH. Open the preferred folder with **Open K-GG FFmpeg folder** in Export. K-GG does not download FFmpeg.
 
 ### Preset

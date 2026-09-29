@@ -4,6 +4,7 @@ import {
   FRAME_ZIP_FORMAT,
   NATIVE_VIDEO_FORMATS,
   availableNativeVideoFormats,
+  gpuEncoderLabel,
   isNativeVideoFormat,
   nativeVideoFileName,
   nativeVideoFormatDefinition,
@@ -67,5 +68,15 @@ describe('video export format registry', () => {
   it('distinguishes the PNG ZIP sequence from native formats', () => {
     expect(isNativeVideoFormat(FRAME_ZIP_FORMAT)).toBe(false);
     expect(isNativeVideoFormat('gif')).toBe(true);
+  });
+});
+
+describe('gpuEncoderLabel', () => {
+  it('names known GPU encoders and hides the option when none was detected', () => {
+    expect(gpuEncoderLabel('h264_nvenc')).toBe('NVIDIA NVENC');
+    expect(gpuEncoderLabel('h264_videotoolbox')).toBe('Apple VideoToolbox');
+    expect(gpuEncoderLabel('h264_unknown')).toBe('h264_unknown');
+    expect(gpuEncoderLabel(null)).toBeNull();
+    expect(gpuEncoderLabel(undefined)).toBeNull();
   });
 });

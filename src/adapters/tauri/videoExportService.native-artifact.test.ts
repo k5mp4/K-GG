@@ -65,7 +65,13 @@ function exportConfig() {
   };
 }
 
-type EncodeRequest = { format: string; outputPath: string; quality: string; gifMaxFileMb: number | null };
+type EncodeRequest = {
+  format: string;
+  outputPath: string;
+  quality: string;
+  gifMaxFileMb: number | null;
+  useGpu: boolean;
+};
 
 function encodedRequest(): EncodeRequest {
   const call = mocks.invoke.mock.calls.find(([name]) => name === 'encode_native_video');
@@ -93,6 +99,19 @@ describe('tauriVideoExportService native video artifact contract', () => {
     mocks.invoke.mockClear();
     await tauriVideoExportService.exportNativeVideo('mp4', { ...exportConfig(), gifMaxFileMb: 8 });
     expect(encodedRequest().gifMaxFileMb).toBeNull();
+  });
+
+  it('requests GPU encoding only for MP4 and only when enabled', async () => {
+    await tauriVideoExportService.exportNativeVideo('mp4', { ...exportConfig(), useGpu: true });
+    expect(encodedRequest().useGpu).toBe(true);
+
+    mocks.invoke.mockClear();
+    await tauriVideoExportService.exportNativeVideo('mp4', exportConfig());
+    expect(encodedRequest().useGpu).toBe(false);
+
+    mocks.invoke.mockClear();
+    await tauriVideoExportService.exportNativeVideo('webm', { ...exportConfig(), useGpu: true });
+    expect(encodedRequest().useGpu).toBe(false);
   });
 
   it.each(nativeExportCases)(

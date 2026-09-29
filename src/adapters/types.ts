@@ -147,6 +147,8 @@ export type VideoExportConfig = {
   speed: number;
   easing?: AnimationEasing;
   mp4Quality?: Mp4QualityPreset;
+  /** MP4をGPUエンコーダー（NVENC/QSV/AMF/VideoToolbox）で書き出す。利用不可・失敗時はCPUへ戻る。 */
+  useGpu?: boolean;
   /** GIFをこのサイズ未満に収める。超えた場合は解像度を下げて再エンコードする。 */
   gifMaxFileMb?: number;
   signal?: AbortSignal;
@@ -168,6 +170,8 @@ export type NativeFfmpegStatus = {
   ffprobeVersion: string | null;
   /** 検出したFFmpegで書き出せる形式。未報告の場合はMOV・MP4のみとみなす。 */
   videoFormats?: NativeVideoFormat[];
+  /** MP4書き出しに使えるGPUエンコーダー名（テストエンコード成功時のみ）。未検出・未報告はnull。 */
+  gpuEncoder?: string | null;
 };
 
 export interface VideoExportService {

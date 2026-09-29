@@ -5,8 +5,8 @@ title: 動画・連番フレーム出力
 status: current
 owners: [maintainer]
 created: 2026-07-31
-updated: 2026-09-25
-requirement_ids: [EXPORT-001, EXPORT-002, EXPORT-003, EXPORT-004, EXPORT-005, EXPORT-006, EXPORT-007, EXPORT-008, EXPORT-009, EXPORT-010, EXPORT-011, EXPORT-012, EXPORT-013, EXPORT-021]
+updated: 2026-09-29
+requirement_ids: [EXPORT-001, EXPORT-002, EXPORT-003, EXPORT-004, EXPORT-005, EXPORT-006, EXPORT-007, EXPORT-008, EXPORT-009, EXPORT-010, EXPORT-011, EXPORT-012, EXPORT-013, EXPORT-021, EXPORT-022]
 related_adrs: [ADR-0004, ADR-0005, ADR-0018, ADR-0021]
 related_changes: [CHANGE-011, CHANGE-024, CHANGE-025, CHANGE-027, CHANGE-030, CHANGE-031, CHANGE-032, CHANGE-037, CHANGE-038, CHANGE-048, CHANGE-051, CHANGE-052, CHANGE-054]
 related_code: [src/adapters/browser/videoExportService.ts, src/adapters/tauri/videoExportService.ts, src/adapters/browser/exportService.ts, src/adapters/tauri/exportService.ts, src/adapters/tauri/afterEffectsService.ts, src/adapters/types.ts, src/lib/export.ts, src/lib/exportSlits.ts, src/lib/exportVideo.ts, src/lib/videoExportFormats.ts, src/lib/aftereffectsExport.ts, src/lib/aeStatusController.ts, src/lib/videoExportLifecycle.ts, src/lib/renderBridge.ts, src/lib/renderSceneAtTime.ts, src/lib/flowGradientRenderer.ts, src/lib/flowSimulation.ts, src/lib/videoExportFrames.ts, src/lib/tileRender.ts, src/lib/webgl.ts, src/lib/clothGradientRenderer.ts, src/lib/coneSeam.ts, src/components/GradientCanvas.tsx, src/components/ClothCanvas.tsx, src/components/ConeApexEditor.tsx, src/components/ExportPanel.tsx, src-tauri/src/lib.rs, tools/ffmpeg-native-smoke.mjs, tools/verify-macos-signing.sh, tools/tauri-build-macos-verified.sh]
@@ -73,7 +73,7 @@ Tauriデスクトップ版の動画出力はWindows x64とmacOS arm64/Intelで�
 
 ### EXPORT-011 外部FFmpegの検出
 
-Windows x64はアプリローカルデータの`ffmpeg/ffmpeg.exe`を優先し、利用できない場合はPATHとWindows環境変数Pathを探索する。macOSはPATH上の`ffmpeg`と`ffprobe`を探索する。どちらもRust側でFFmpegの起動、バージョン、`qtrle`、`libx264`を検証し、K-GGはFFmpegを同梱・ダウンロード・PATH変更しない。macOSの`ffprobe`はアプリの検出警告とCI/Release Gateの生成物検証に使用する。
+Windows x64はアプリローカルデータの`ffmpeg/ffmpeg.exe`を優先し、利用できない場合はPATHとWindows環境変数Pathを探索する。macOSはPATH上の`ffmpeg`と`ffprobe`を探索する。どちらもRust側でFFmpegの起動、バージョン、`qtrle`、`libx264`を検証し、K-GGはFFmpegを同梱・ダウンロード・PATH変更しない。検出はアプリ起動時に利用者操作なしで一度実行し、未検出のままウィンドウが前面へ戻った場合にも再実行する。書き出しタブの`Check`は手動再確認として残し、起動時の自動検出でFFmpegが利用可能と分かっていれば書き出し開始時に再確認を要求しない（Rustが書き出し直前に再検証する）。macOSの`ffprobe`はアプリの検出警告とCI/Release Gateの生成物検証に使用する。
 
 ### EXPORT-012 書き出し形式の選択
 
@@ -99,6 +99,12 @@ GIFは最大ファイルサイズ（MB、1MB = 1,000,000 bytes、既定15MB、1�
 ### EXPORT-021 Flow Gradientの論理フレーム
 
 Flow Gradientを有効にした出力は、Seed、正規化時刻、設定、Render Session、固定3D投影を共通入力として評価します。Export開始時はFlowの履歴をリセットし、必要な事前評価を行ってから対象フレームを描画します。同じ論理フレームを複数タイルで描画してもTrailをタイル数だけ進めず、Preview、Thumbnail、静止画、連番、動画で同じフレーム規則を使用します。Loop有効時は終端フレームを重複せず位相0へ戻り、Flow無効時の既存出力経路は変えません。
+
+### EXPORT-022 GPUによるMP4エンコード
+
+FFmpegのビルドに`h264_nvenc`／`h264_qsv`／`h264_amf`／`h264_videotoolbox`が含まれる場合、Rustはこの優先順で数フレームのテストエンコードを行い、初めて成功したエンコーダーを`gpuEncoder`としてFFmpeg状態に含める。GPU・ドライバーがなくテストに失敗したエンコーダーは使用しない。結果はFFmpegの実行ファイルとバージョンごとに保持する。
+
+`gpuEncoder`がある場合、書き出しタブのMP4に`GPU encoding`トグルを既定ONで表示する。ONのMP4は選択したGPUエンコーダーで、EXPORT-009と同じYUV 4:2:0、BT.709色メタデータ、video range、正方画素、奇数寸法padding、`faststart`を保ち、品質プリセット（High／Balanced／Small）を各エンコーダーの固定品質指定へ対応させる。GPUエンコードに失敗した場合は出力を破棄し、同じ入力から`libx264`で再エンコードする。GPUエンコードの対象はMP4だけで、MOV／WebM／GIFは従来どおりCPUで生成する。GPUエンコーダーはx264と同一のビット列・画質を保証しない。
 
 ## 他領域との関係
 
