@@ -110,6 +110,106 @@ function withoutRemovedStateKeys(state: StoreSnapshot): StoreSnapshot {
   ) as StoreSnapshot;
 }
 
+type DistortMapFields = { displacement?: number[]; smoothMask?: number[] };
+
+const isZeroMap = (value: unknown): boolean => (
+  Array.isArray(value) && value.every(item => item === 0)
+);
+
+/** Empty maps are rebuilt from `mapResolution` on load, so they need not be stored. */
+function withoutEmptyDistortMaps<T extends DistortMapFields>(config: T): T {
+  const next = { ...config };
+  if (isZeroMap(next.displacement)) delete next.displacement;
+  if (isZeroMap(next.smoothMask)) delete next.smoothMask;
+  return next;
+}
+
+/**
+ * Postprocess fields that only the Legacy v1 pipeline reads. Stack v2 takes
+ * layer order from `effectPipeline` and Post Diffuse from `state.diffuse`, so
+ * persisting these for a v2 preset only duplicates those groups with stale values.
+ */
+const isLegacyV1OnlyPostprocessKey = (key: string): boolean => (
+  key === 'effectStack' || key.startsWith('diffuse')
+);
+
+const colorStopsKey = (stops: readonly { position: number; color: string }[], positionScale = 1): string => (
+  stops.map(stop => `${stop.position * positionScale}:${String(stop.color).toLowerCase()}`).join('|')
+);
+
+/**
+ * Applying a palette copies its stops into the ramp (halving positions in
+ * Mirror mode) instead of linking to it, so a palette is in use exactly when
+ * its stops still equal the ramp stops.
+ */
+function getAppliedColorPalettes(state: StoreSnapshot): UserColorPalette[] {
+  const stops = state.gradient?.stops;
+  if (!Array.isArray(stops) || !Array.isArray(state.colorPalettes)) return [];
+  const rampKey = colorStopsKey(stops);
+  const positionScale = state.gradient.rampMirror ? 0.5 : 1;
+  return state.colorPalettes.filter(palette => (
+    Array.isArray(palette?.stops) && colorStopsKey(palette.stops, positionScale) === rampKey
+  ));
+}
+
+/**
+ * Drops persisted data that loading reconstructs identically, plus library
+ * data the preset does not use: the legacy `manualDistort` fallback when
+ * Postprocess exists, all-zero distort maps, Legacy v1-only Postprocess fields
+ * of a Stack v2 preset, and user color palettes not applied to the ramp.
+ */
+export function compactPresetState(state: StoreSnapshot): StoreSnapshot {
+  const { manualDistort, colorPalettes: _colorPalettes, ...rest }: StoreSnapshot = state;
+  const appliedPalettes = getAppliedColorPalettes(state);
+  const compacted: StoreSnapshot = appliedPalettes.length > 0 ? { ...rest, colorPalettes: appliedPalettes } : rest;
+  if (typeof state.postprocess !== 'object' || state.postprocess === null) {
+    return manualDistort ? { ...compacted, manualDistort: withoutEmptyDistortMaps(manualDistort) } : compacted;
+  }
+  const postprocess: Partial<PostprocessConfig> = withoutEmptyDistortMaps(state.postprocess);
+  if (state.effectPipeline?.version === 'stack-v2') {
+    for (const key of Object.keys(postprocess)) {
+      if (isLegacyV1OnlyPostprocessKey(key)) delete postprocess[key as keyof PostprocessConfig];
+    }
+  }
+  return { ...compacted, postprocess };
+}
+
+export function compactPreset(preset: Preset): Preset {
+  return { ...preset, state: compactPresetState(preset.state) };
+}
+
+const MANUAL_DISTORT_KEYS = [
+  'mode', 'brushSize', 'strength', 'falloff', 'showOverlay', 'mapResolution',
+  'displacement', 'smoothMask', 'smoothStrength', 'smoothRadius', 'maxDisplacement',
+] as const satisfies readonly (keyof ManualDistortConfig)[];
+
+/**
+ * Restores the fields `compactPresetState` omitted for consumers that merge a
+ * preset into the store without normalizing it, so values from the previously
+ * open document cannot leak through the missing keys.
+ */
+export function expandPresetState(state: StoreSnapshot): StoreSnapshot {
+  const postprocess = state.postprocess;
+  if (typeof postprocess !== 'object' || postprocess === null) return state;
+  const rawResolution = postprocess.mapResolution;
+  const resolution = typeof rawResolution === 'number' && Number.isFinite(rawResolution)
+    ? Math.max(1, Math.min(512, Math.round(rawResolution)))
+    : 64;
+  const expandedPostprocess = {
+    ...postprocess,
+    mapResolution: resolution,
+    displacement: postprocess.displacement ?? Array<number>(resolution * resolution * 2).fill(0),
+    smoothMask: postprocess.smoothMask ?? Array<number>(resolution * resolution).fill(0),
+  };
+  const manualDistort = state.manualDistort ?? {
+    ...Object.fromEntries(MANUAL_DISTORT_KEYS
+      .filter(key => expandedPostprocess[key] !== undefined)
+      .map(key => [key, expandedPostprocess[key]])),
+    enabled: false,
+  } as ManualDistortConfig;
+  return { ...state, postprocess: expandedPostprocess, manualDistort };
+}
+
 export function makePreset(
   name: string,
   sourceState: StoreSnapshot,
@@ -137,7 +237,7 @@ export function makePreset(
     folderId: metadata.folderId ?? null,
     order: metadata.order ?? 0,
     ...(metadata.thumbnail ? { thumbnail: metadata.thumbnail } : {}),
-    state: {
+    state: compactPresetState({
       ...state,
       gradient,
       diffuse,
@@ -151,7 +251,7 @@ export function makePreset(
       effectPipeline: state.effectPipeline
         ? normalizeEffectPipelineConfig(state.effectPipeline)
         : createDefaultEffectPipeline(),
-    },
+    }),
   };
 }
 

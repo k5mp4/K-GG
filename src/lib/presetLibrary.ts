@@ -1,7 +1,7 @@
 import { readPresetArchive, MAX_PRESET_PACKAGE_BYTES, MAX_PRESET_MANIFEST_BYTES } from './presetArchive';
 import { strFromU8, strToU8, zipSync } from 'fflate';
 import type { Preset, StoreSnapshot } from './presetModel';
-import { isPreset, makePreset } from './presetModel';
+import { compactPreset, isPreset, makePreset } from './presetModel';
 
 export const PRESET_LIBRARY_FORMAT = 'kgg-preset-library';
 export const PRESET_LIBRARY_VERSION = 2 as const;
@@ -269,12 +269,14 @@ export function encodePresetExport(library: PresetLibrary, scope: PresetExportSc
   if (scope.kind === 'preset') {
     if (!('name' in selected)) throw new Error('Preset not found');
     return {
-      bytes: strToU8(JSON.stringify([selected], null, 2)),
+      bytes: strToU8(JSON.stringify([compactPreset(selected)], null, 2)),
       filename: `gradPreset_${safeFilename(selected.name)}.json`,
       mimeType: 'application/json',
     };
   }
-  const manifest = JSON.stringify(selected, null, 2);
+  if ('name' in selected) throw new Error('Preset library not found');
+  // Presets saved before compaction still carry reconstructible data; drop it on export too.
+  const manifest = JSON.stringify({ ...selected, presets: selected.presets.map(compactPreset) }, null, 2);
   return {
     bytes: zipSync({ [MANIFEST_NAME]: strToU8(manifest) }),
     filename: scope.kind === 'folder' ? 'gradPreset_folder.kggpresets.zip' : 'gradPreset_library.kggpresets.zip',
