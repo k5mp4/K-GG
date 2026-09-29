@@ -280,6 +280,9 @@ export function DatamoshPanel() {
             {field('Length', 'pixelStretchLength', value => `${Math.round(value)}px`)}
             {field('Threshold', 'pixelStretchThreshold', percent)}
             {field('Length Variance', 'pixelStretchVariance', percent)}
+            {field('Curl', 'pixelStretchCurl', percent)}
+            {datamosh.pixelStretchCurl > 0 ? field('Curl Scale', 'pixelStretchCurlScale', value => value.toFixed(2)) : null}
+            {datamosh.pixelStretchCurl > 0 ? field('Curl Loops', 'pixelStretchCurlLoops', value => `${Math.round(value)}`) : null}
           </div>
         ) : (
           <div className="space-y-2.5" data-datamosh-video-source>

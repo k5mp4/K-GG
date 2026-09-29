@@ -39,3 +39,8 @@ uniform vec2 u_pixelStretchDirection;
 uniform float u_pixelStretchLength;
 uniform float u_pixelStretchThreshold;
 uniform float u_pixelStretchVariance;
+// Curl amount (0 = one fixed direction) and spatial scale of the curl field.
+uniform float u_pixelStretchCurl;
+uniform float u_pixelStretchCurlScale;
+// (cos, sin) of the curl field's loop phase.
+uniform vec2 u_pixelStretchCurlPhase;

@@ -133,14 +133,14 @@ Datamoshは前フレームの自身の出力を履歴として保持し、各画
 
 ### DATAMOSH-006 Pixel Stretch motion source
 
-motion sourceの`Pixel Stretch`は、全画素で`Angle`（0〜360°、既定0°。0°は右、90°は上、反時計回り）の一定方向のmotion vectorを使い、大きさは`Procedural`と同じ基準（Strength 1で1フレーム当たりフレーム高さの1.2%）とする。輝度（Rec.709係数）が`Threshold`（0〜1、既定0.6）以上の画素を起点とし、各画素の出力を次の順で決める。
+motion sourceの`Pixel Stretch`は、`Angle`（0〜360°、既定0°。0°は右、90°は上、反時計回り）の向きを基準にしたmotion vector（`Curl`が0の既定では全画素で一定方向、`Curl`を上げると場所ごとに向きが変わる）を使い、大きさは`Procedural`と同じ基準（Strength 1で1フレーム当たりフレーム高さの1.2%）とする。輝度（Rec.709係数）が`Threshold`（0〜1、既定0.6）以上の画素を起点とし、各画素の出力を次の順で決める。
 
 1. 現在フレームの入力が起点なら入力をそのまま出す。伸びた画素は明るい入力の背後を通る。
 2. motion vector 1ステップ後ろの履歴（予測画像）がThreshold以上で、かつ後方`Length`（1〜2048px、既定240px）以内に現在入力の起点があれば、その予測画像を出す。これにより明るい画素は論理フレームごとに1ステップずつ伸びる。
 3. 自身の履歴がThreshold以上なら履歴をそのまま出す。伸びた画素はFeedbackで薄れず、そのまま描画に残る。
 4. それ以外は現在入力と自身の履歴を`Feedback`と`Mix Mode`で合成する。
 
-起点は`Length / 64`px（最小1px）間隔で探し、キャンバス外は起点にならない。`Length Variance`（0〜1、既定0.5）は伸びる向きを横切る`Block Size`幅の帯ごとにLengthを乱数で短くし、この乱数は論理フレームで変わらない。`Luma Stretch`／`Saturation Stretch`は引き込む側（1ステップ後ろ）の色に掛かり、伸びる速さを変える。`Refresh`で選ばれたブロックは現在フレームで作り直されるため残った伸びも消え、Refresh 0では消えない。`Freeze`中は伸びが止まる。破損とJitterは他のsourceと同じく予測画像の参照位置へ作用する。motion sourceを切り替えると履歴を初期化する（DATAMOSH-005）。
+`Curl`（0〜1、既定0）と`Curl Scale`（0.25〜8、既定1.5）は方向を場所ごとに変える。静的な2オクターブvalue noiseの流れ関数のcurl（発散なし）を単位方向へ正規化し、`Angle`方向との単位ベクトル補間`normalize(mix(Angle方向, curl方向, Curl))`を各位置の伸びる向きとする（打ち消し合って長さ0、またはcurlが0なら`Angle`方向）。Curl 0は全画素で`Angle`の一定方向（従来の描画のまま）、1は`Angle`を使わずcurlのみで、伸びる向きが渦を巻く。起点探索は伸びる向きの場に沿って後方へ辿るため、曲がった筋も起点までつながる。`Curl Scale`は場の空間周波数で、大きいほど渦が細かい。`Curl Loops`（0〜8の整数、既定1）はタイムライン1ループの間に力場が展開して元へ戻る回数で、流れ関数を独立な2つのnoise場A、Bの`cos(φ)A + sin(φ)B`（φ = 2π × Loops × 正規化時間）とするため、強さを保ったまま滑らかに変化し、正規化時間1で開始時と一致して書き出しループが閉じる。0は場が固定される。起点は`Length / 64`px（最小1px）間隔で探し、キャンバス外は起点にならない。`Length Variance`（0〜1、既定0.5）は伸びる向きを横切る`Block Size`幅の帯ごとにLengthを乱数で短くし、この乱数は論理フレームで変わらない。`Luma Stretch`／`Saturation Stretch`は引き込む側（1ステップ後ろ）の色に掛かり、伸びる速さを変える。`Refresh`で選ばれたブロックは現在フレームで作り直されるため残った伸びも消え、Refresh 0では消えない。`Freeze`中は伸びが止まる。破損とJitterは他のsourceと同じく予測画像の参照位置へ作用する。motion sourceを切り替えると履歴を初期化する（DATAMOSH-005）。
 
 ### EFFECT-004 DiffuseとImage Gradient Source
 

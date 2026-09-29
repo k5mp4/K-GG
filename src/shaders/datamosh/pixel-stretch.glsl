@@ -9,22 +9,25 @@ float dmStretchLuma(vec3 color) {
 }
 
 // True when a live anchor of the layer input lies within the streak reach
-// behind this pixel. Bands across the direction are Block Size wide and each
-// has its own reach, so streaks end raggedly instead of on one straight line.
+// behind this pixel. The search walks back along the direction field, so
+// curled streaks are found along their bend. Bands across the local direction
+// are Block Size wide and each has its own reach, so streaks end raggedly
+// instead of on one straight line.
 bool dmPixelStretchReachable(vec2 fragCoord) {
-  vec2 direction = u_pixelStretchDirection;
+  vec2 direction = dmPixelStretchDirectionAt(fragCoord / u_resolution);
   float band = floor(dot(fragCoord, vec2(-direction.y, direction.x)) / max(u_blockSize, 1.0));
   float reach = u_pixelStretchLength * (1.0 - u_pixelStretchVariance * dmHash12(vec2(band, 83.0)));
   float stepLength = max(reach / float(PIXEL_STRETCH_STEPS), 1.0);
+  vec2 position = fragCoord;
   for (int i = 1; i <= PIXEL_STRETCH_STEPS; i++) {
-    float distance = float(i) * stepLength;
-    if (distance > reach) break;
-    vec2 samplePosition = fragCoord - direction * distance;
+    if (float(i) * stepLength > reach) break;
+    position -= direction * stepLength;
     // Nothing beyond the frame edge can anchor a streak.
-    if (any(lessThan(samplePosition, vec2(0.0))) || any(greaterThanEqual(samplePosition, u_resolution))) break;
-    if (dmStretchLuma(texture2D(u_currentTex, samplePosition / u_resolution).rgb) >= u_pixelStretchThreshold) {
+    if (any(lessThan(position, vec2(0.0))) || any(greaterThanEqual(position, u_resolution))) break;
+    if (dmStretchLuma(texture2D(u_currentTex, position / u_resolution).rgb) >= u_pixelStretchThreshold) {
       return true;
     }
+    direction = dmPixelStretchDirectionAt(position / u_resolution);
   }
   return false;
 }

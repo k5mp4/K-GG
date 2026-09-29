@@ -55,6 +55,12 @@ export type DatamoshConfig = {
   pixelStretchThreshold: number;
   /** Random per-band shortening of the streak length (bands are Block Size wide). */
   pixelStretchVariance: number;
+  /** Pixel Stretch source only: how far the direction follows a curl-noise field instead of Angle (0 = one fixed direction). */
+  pixelStretchCurl: number;
+  /** Pixel Stretch source only: spatial frequency of the curl field (higher = tighter swirls). */
+  pixelStretchCurlScale: number;
+  /** Pixel Stretch source only: whole cycles the curl field evolves per timeline loop, so exports close seamlessly (0 = static). */
+  pixelStretchCurlLoops: number;
 };
 
 type DatamoshNumericKey = {
@@ -84,6 +90,9 @@ export const DATAMOSH_RANGES: Record<DatamoshNumericKey, DatamoshRange> = {
   pixelStretchLength: { min: 1, max: 2048, step: 1 },
   pixelStretchThreshold: { min: 0, max: 1, step: 0.01 },
   pixelStretchVariance: { min: 0, max: 1, step: 0.01 },
+  pixelStretchCurl: { min: 0, max: 1, step: 0.01 },
+  pixelStretchCurlScale: { min: 0.25, max: 8, step: 0.05 },
+  pixelStretchCurlLoops: { min: 0, max: 8, step: 1 },
 };
 
 export const DATAMOSH_DEFAULTS: DatamoshConfig = {
@@ -112,6 +121,9 @@ export const DATAMOSH_DEFAULTS: DatamoshConfig = {
   pixelStretchLength: 240,
   pixelStretchThreshold: 0.6,
   pixelStretchVariance: 0.5,
+  pixelStretchCurl: 0,
+  pixelStretchCurlScale: 1.5,
+  pixelStretchCurlLoops: 1,
 };
 
 function bounded(value: unknown, key: DatamoshNumericKey): number {
@@ -152,6 +164,9 @@ export function normalizeDatamoshConfig(value: unknown): DatamoshConfig {
     pixelStretchLength: bounded(raw.pixelStretchLength, 'pixelStretchLength'),
     pixelStretchThreshold: bounded(raw.pixelStretchThreshold, 'pixelStretchThreshold'),
     pixelStretchVariance: bounded(raw.pixelStretchVariance, 'pixelStretchVariance'),
+    pixelStretchCurl: bounded(raw.pixelStretchCurl, 'pixelStretchCurl'),
+    pixelStretchCurlScale: bounded(raw.pixelStretchCurlScale, 'pixelStretchCurlScale'),
+    pixelStretchCurlLoops: Math.round(bounded(raw.pixelStretchCurlLoops, 'pixelStretchCurlLoops')),
   };
 }
 

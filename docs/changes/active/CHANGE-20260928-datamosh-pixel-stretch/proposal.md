@@ -31,11 +31,12 @@ Datamoshは前フレームの履歴をmotion fieldに沿ってずらすことで
 - Datamoshの`Motion Field` Sourceに`Pixel Stretch`が表示され、選択時にAngle、Length、Threshold、Length Varianceを編集できる。
 - 輝度がThreshold以上の画素が、論理フレームごとにStrength分ずつAngleの方向へ伸びる（現在入力の明るい画素からLengthまで）。
 - 伸びた画素は入力が変わってもそのまま描画に残り、Refreshで選ばれたブロックだけが作り直される。
+- `Curl`を上げると、伸びる向きがcurl noiseの力場に沿って場所ごとに変わり、曲がった筋が起点までつながって渦を巻くように伸びる。`Curl` 0では従来の一定方向の描画から変わらない。
 - 他のmotion sourceの描画と、Pixel Stretch設定を持たない既存Presetの見た目は変わらない。
 
 ## 対象
 
-- `DatamoshMotionSource`へ`pixelStretch`を追加し、`pixelStretchAngle`、`pixelStretchLength`、`pixelStretchThreshold`、`pixelStretchVariance`の正規化・既定値を定義する。
+- `DatamoshMotionSource`へ`pixelStretch`を追加し、`pixelStretchAngle`、`pixelStretchLength`、`pixelStretchThreshold`、`pixelStretchVariance`、`pixelStretchCurl`、`pixelStretchCurlScale`、`pixelStretchCurlLoops`の正規化・既定値を定義する。
 - motion field chunkへ一定方向のfieldを、Pixel Stretch chunkへ伸び・保持の合成を追加する。
 - Datamoshパネル（UI-026）のSource選択肢と設定表示、説明文（日英）を追加する。
 - Current Spec（CURRENT-EFFECT-STACK、CURRENT-UI-CONTROLS）とアプリ内ヘルプを同期する。
@@ -61,6 +62,7 @@ Datamoshは前フレームの履歴をmotion fieldに沿ってずらすことで
 
 - 性能: Pixel Stretch source選択時、1ステップ後ろの履歴が明るい非起点画素ごとに最大64回のtexture参照を行う。それ以外の画素と他のsourceでは追加の探索をしない。
 - 画面の焼き付き: Refresh 0ではThreshold以上の画素が消えないため、明るい入力がアニメーションすると軌跡が蓄積し続ける（要求どおりの挙動）。消したい場合はRefreshを上げるか、sourceを切り替えて履歴を初期化する。
+- 性能: `Curl`が0より大きいと、起点探索が1ステップごとに2オクターブのnoise勾配を評価する（最大64回、Curl Loopsが0でなければ勾配は4評価）。`Curl` 0では評価しない。
 - 単位: LengthはBlock Sizeと同じく出力pxのため、Previewと書き出しで解像度が異なると相対的な長さが変わる。伸びる速さはフレーム高さ基準で解像度に比例する。
 
 ## 未決定事項

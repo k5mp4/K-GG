@@ -33,6 +33,18 @@ describe('datamosh config', () => {
     expect(value.freeze).toBe(false);
   });
 
+  it('clamps the Pixel Stretch curl settings and keeps curl off by default', () => {
+    const value = normalizeDatamoshConfig({ pixelStretchCurl: 3, pixelStretchCurlScale: 0 });
+
+    expect(value.pixelStretchCurl).toBe(1);
+    expect(value.pixelStretchCurlScale).toBe(0.25);
+    expect(normalizeDatamoshConfig({ pixelStretchCurl: 'much' }).pixelStretchCurl).toBe(0);
+    expect(DATAMOSH_DEFAULTS.pixelStretchCurl).toBe(0);
+    expect(normalizeDatamoshConfig({ pixelStretchCurlLoops: 2.6 }).pixelStretchCurlLoops).toBe(3);
+    expect(normalizeDatamoshConfig({ pixelStretchCurlLoops: 99 }).pixelStretchCurlLoops).toBe(8);
+    expect(normalizeDatamoshConfig({}).pixelStretchCurlLoops).toBe(1);
+  });
+
   it('falls back to defaults for malformed input', () => {
     expect(normalizeDatamoshConfig(null)).toEqual(DATAMOSH_DEFAULTS);
     expect(normalizeDatamoshConfig('datamosh')).toEqual(DATAMOSH_DEFAULTS);
