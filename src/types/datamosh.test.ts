@@ -37,6 +37,28 @@ describe('datamosh config', () => {
     expect(normalizeDatamoshConfig(null)).toEqual(DATAMOSH_DEFAULTS);
     expect(normalizeDatamoshConfig('datamosh')).toEqual(DATAMOSH_DEFAULTS);
   });
+
+  it('accepts the Pixel Stretch source and clamps its values', () => {
+    const value = normalizeDatamoshConfig({
+      motionSource: 'pixelStretch',
+      pixelStretchAngle: 400,
+      pixelStretchLength: 0,
+      pixelStretchThreshold: -1,
+      pixelStretchVariance: 'wide',
+    });
+
+    expect(value.motionSource).toBe('pixelStretch');
+    expect(value.pixelStretchAngle).toBe(360);
+    expect(value.pixelStretchLength).toBe(1);
+    expect(value.pixelStretchThreshold).toBe(0);
+    expect(value.pixelStretchVariance).toBe(DATAMOSH_DEFAULTS.pixelStretchVariance);
+    // Presets saved before Pixel Stretch keep their source and get default streak settings.
+    expect(normalizeDatamoshConfig({ motionSource: 'procedural' })).toMatchObject({
+      motionSource: 'procedural',
+      pixelStretchAngle: DATAMOSH_DEFAULTS.pixelStretchAngle,
+      pixelStretchLength: DATAMOSH_DEFAULTS.pixelStretchLength,
+    });
+  });
 });
 
 describe('legacy Video Motion migration', () => {

@@ -26,6 +26,7 @@ import flowTrailFragmentGLSL from '../shaders/flow-trail.frag.glsl?raw';
 import flowGradientFragmentGLSL from '../shaders/flow-gradient.frag.glsl?raw';
 import datamoshUniformsGLSL from '../shaders/datamosh/uniforms.glsl?raw';
 import datamoshMotionFieldGLSL from '../shaders/datamosh/motion-field.glsl?raw';
+import datamoshPixelStretchGLSL from '../shaders/datamosh/pixel-stretch.glsl?raw';
 import datamoshMainGLSL from '../shaders/datamosh/main.glsl?raw';
 import threeDGLSL from '../shaders/three-d.frag.glsl?raw';
 import textureGLSL from '../shaders/texture.frag.glsl?raw';
@@ -48,6 +49,7 @@ const postprocessGLSL = [
 const datamoshGLSL = [
   datamoshUniformsGLSL,
   datamoshMotionFieldGLSL,
+  datamoshPixelStretchGLSL,
   datamoshMainGLSL,
 ].join('\n');
 

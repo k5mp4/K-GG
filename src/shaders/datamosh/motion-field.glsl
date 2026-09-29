@@ -130,7 +130,14 @@ vec2 dmAnimationMotion(vec2 uv, vec2 window) {
   return flow;
 }
 
+// Pixel Stretch: one fixed direction everywhere, at the procedural source's
+// scale (1.2% of the frame height per frame at strength 1), isotropic in pixels.
+vec2 dmPixelStretchMotion() {
+  return u_pixelStretchDirection * 0.012 * vec2(u_resolution.y / max(u_resolution.x, 1.0), 1.0);
+}
+
 vec2 datamoshMotionField(vec2 uv, vec2 window) {
+  if (u_motionSource == 3) return dmPixelStretchMotion();
   if (u_motionSource == 2) return dmAnimationMotion(uv, window);
   if (u_motionSource == 1) return dmVideoMotion(uv);
   return dmProceduralMotion(uv);
