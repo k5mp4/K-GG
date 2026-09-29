@@ -1,6 +1,7 @@
 import { DEFAULT_CLOTH_GRADIENT } from '../types/clothGradient';
 import { DEFAULT_CONE_VIEW } from '../types/coneView';
 import { DEFAULT_SEAMLESS } from '../types/seamless';
+import { DEFAULT_TEXTURE } from '../types/texture';
 import { DEFAULT_DIFFUSE_ASCII_CHARSET, DEFAULT_DIFFUSE_BACKGROUND_COLOR } from '../types/distortion';
 import type { DiffuseAdaptiveChannel, DiffuseApplyMode, DiffuseConfig, DiffuseHalftoneShape, ManualDistortConfig, NoiseDistortionConfig, PostprocessConfig } from '../types/distortion';
 import { IMAGE_GRADIENT_DEFAULTS } from '../types/imageGradient';
@@ -263,6 +264,7 @@ export const STORE_DEFAULTS = {
   clothGradient: { ...DEFAULT_CLOTH_GRADIENT },
   coneView: { ...DEFAULT_CONE_VIEW },
   seamless: { ...DEFAULT_SEAMLESS },
+  texture: { ...DEFAULT_TEXTURE },
   flowGradient: { ...FLOW_GRADIENT_DEFAULTS },
   datamosh: { ...DATAMOSH_DEFAULTS },
   manualDistort: {

@@ -5,12 +5,12 @@ title: Effect Stack
 status: current
 owners: [maintainer]
 created: 2026-07-27
-updated: 2026-09-27
-requirement_ids: [EFFECT-001, EFFECT-002, EFFECT-003, EFFECT-004, EFFECT-005, EFFECT-006, EFFECT-007, EFFECT-008, EFFECT-009, EFFECT-010, EFFECT-011, EFFECT-012, EFFECT-013, EFFECT-014, EFFECT-015, EFFECT-016, EFFECT-017, EFFECT-018, EFFECT-019, EFFECT-020, EFFECT-021, EFFECT-022, EFFECT-023, EFFECT-025, EFFECT-026, EFFECT-027, EFFECT-028, EFFECT-029, EFFECT-030, EFFECT-031, DISTORT-001, DISTORT-002, CLOTH-001, CLOTH-002, CLOTH-003, SANDBOX-001, FLOW-001, FLOW-002, FLOW-003, FLOW-004, FLOW-005, FLOW-006, FLOW-007, FLOW-008, FLOW-009, FLOW-010, FLOW-011, FLOW-012, VIDEO-MOTION-001, VIDEO-MOTION-002, VIDEO-MOTION-003, VIDEO-MOTION-004, DATAMOSH-001, DATAMOSH-002, DATAMOSH-003, DATAMOSH-004, DATAMOSH-005]
-related_adrs: [ADR-0004, ADR-0005, ADR-0009, ADR-0010, ADR-0017, ADR-20260927-datamosh-feedback-layer]
+updated: 2026-09-29
+requirement_ids: [EFFECT-001, EFFECT-002, EFFECT-003, EFFECT-004, EFFECT-005, EFFECT-006, EFFECT-007, EFFECT-008, EFFECT-009, EFFECT-010, EFFECT-011, EFFECT-012, EFFECT-013, EFFECT-014, EFFECT-015, EFFECT-016, EFFECT-017, EFFECT-018, EFFECT-019, EFFECT-020, EFFECT-021, EFFECT-022, EFFECT-023, EFFECT-025, EFFECT-026, EFFECT-027, EFFECT-028, EFFECT-029, EFFECT-030, EFFECT-031, DISTORT-001, DISTORT-002, CLOTH-001, CLOTH-002, CLOTH-003, SANDBOX-001, FLOW-001, FLOW-002, FLOW-003, FLOW-004, FLOW-005, FLOW-006, FLOW-007, FLOW-008, FLOW-009, FLOW-010, FLOW-011, FLOW-012, VIDEO-MOTION-001, VIDEO-MOTION-002, VIDEO-MOTION-003, VIDEO-MOTION-004, DATAMOSH-001, DATAMOSH-002, DATAMOSH-003, DATAMOSH-004, DATAMOSH-005, TEXTURE-001, TEXTURE-002, TEXTURE-003]
+related_adrs: [ADR-0004, ADR-0005, ADR-0009, ADR-0010, ADR-0017, ADR-20260927-datamosh-feedback-layer, ADR-20260929-sandbox-texture-material-stage]
 related_changes: [CHANGE-001, CHANGE-011, CHANGE-012, CHANGE-013, CHANGE-014, CHANGE-015, CHANGE-018, CHANGE-019, CHANGE-020, CHANGE-021, CHANGE-022, CHANGE-023, CHANGE-024, CHANGE-025, CHANGE-026, CHANGE-027, CHANGE-030, CHANGE-031, CHANGE-032, CHANGE-033, CHANGE-034, CHANGE-035, CHANGE-036, CHANGE-037, CHANGE-044, CHANGE-046, CHANGE-047, CHANGE-048, CHANGE-053]
-related_code: [src/types/distortion.ts, src/types/coneView.ts, src/lib/effectPipeline.ts, src/lib/normalMap.ts, src/lib/effectStackTransition.ts, src/lib/postprocessStack.ts, src/lib/postprocessAnimation.ts, src/lib/sceneEvaluation.ts, src/lib/animationRegistry.ts, src/lib/glass.ts, src/lib/glassTile.ts, src/lib/webgl.ts, src/lib/voronoi.ts, src/shaders/postprocess/stack.glsl, src/shaders/postprocess/uniforms.glsl, src/store/documentModel.ts, packages/kgg-control/src/parameterLimits.ts, packages/kgg-control/src/types.ts, packages/kgg-control/src/scenarios.ts, src/lib/slitAnimation.ts, src/lib/webglShaderSources.ts, src/lib/flowGradientRenderer.ts, src/lib/flowSimulation.ts, src/lib/presetModel.ts, src/lib/presetThumbnail.ts, src/lib/coneView.ts, src/lib/coneSeam.ts, src/store/gradientStore.ts, src/lib/kggControlRuntime.ts, src/components/PostprocessStackPanel.tsx, src/components/EffectStackWorkspace.tsx, src/components/PostprocessPanel.tsx, src/components/PostprocessOverlay.tsx, src/components/DistortOverlay.tsx, src/components/SandboxPanel.tsx, src/components/FlowGradientPanel.tsx, src/components/BlockNoisePanel.tsx, src/components/DiffuseCurveEditor.tsx, src/components/SlitScanPanel.tsx, src/components/StretchPanel.tsx, src/components/PresetPanel.tsx, src/components/ClothGradientPanel.tsx, src/components/ClothCanvas.tsx, src/components/ConeApexEditor.tsx, src/components/ConeViewPanel.tsx, src/lib/clothGradientRenderer.ts, src/types/clothGradient.ts, src/types/flowGradient.ts, src/shaders/normalmap.frag.glsl, src/shaders/postprocess/glass-optics.glsl, src/shaders/postprocess/glass-field.glsl, src/shaders/postprocess/glass-compact.glsl, src/shaders/postprocess/uniforms.glsl, src/shaders/postprocess/glass-tile.glsl, src/shaders/postprocess/diffuse.glsl, src/shaders/postprocess/noise-diffuse-main.glsl, src/shaders/flow-splat.vert.glsl, src/shaders/flow-splat.frag.glsl, src/shaders/flow-trail.frag.glsl, src/components/DatamoshPanel.tsx, src/types/datamosh.ts, src/lib/videoMotionSource.ts, src/lib/videoMotionRuntime.ts, src/shaders/datamosh/uniforms.glsl, src/shaders/datamosh/motion-field.glsl, src/shaders/datamosh/main.glsl]
-related_tests: [tests/e2e/shaders.spec.ts, src/lib/effectPipeline.test.ts, src/lib/webglNormalMapParity.test.ts, src/lib/effectStackTransition.test.ts, src/lib/postprocessStack.test.ts, src/lib/postprocessAnimation.test.ts, src/lib/effectStackDrag.test.ts, src/lib/effectShaderParity.test.ts, src/lib/webglExportPrograms.test.ts, src/lib/webglShaderSources.test.ts, src/lib/glassTile.test.ts, src/lib/glassTileShader.test.ts, src/lib/flowSimulation.test.ts, src/lib/flowGradientPreset.test.ts, src/lib/glass.test.ts, src/store/gradientStore.effectPipeline.test.ts, src/store/gradientStore.postprocessStack.test.ts, src/store/gradientStore.glass.test.ts, src/store/gradientStore.animation.test.ts, src/lib/sceneEvaluation.glass.test.ts, src/lib/slitAnimation.test.ts, src/lib/presetModel.slit.test.ts, src/lib/presetThumbnail.test.ts, src/lib/coneView.test.ts, src/lib/coneSeam.test.ts, src/lib/presetModel.diffuse.test.ts, src/lib/processedCanvasClock.test.ts, src/types/coneView.test.ts, tests/clothGradient.test.ts, src/types/datamosh.test.ts, src/lib/videoMotionSource.test.ts, src/lib/videoMotionRuntime.test.ts, src/lib/kggControlRuntime.test.ts, packages/kgg-control/src/scenarios.test.ts, src/components/PostprocessPanel.test.tsx, src/components/PostprocessStackPanel.test.tsx, src/components/SandboxPanel.test.tsx]
+related_code: [src/types/distortion.ts, src/types/coneView.ts, src/lib/effectPipeline.ts, src/lib/normalMap.ts, src/lib/effectStackTransition.ts, src/lib/postprocessStack.ts, src/lib/postprocessAnimation.ts, src/lib/sceneEvaluation.ts, src/lib/animationRegistry.ts, src/lib/glass.ts, src/lib/glassTile.ts, src/lib/webgl.ts, src/lib/voronoi.ts, src/shaders/postprocess/stack.glsl, src/shaders/postprocess/uniforms.glsl, src/store/documentModel.ts, packages/kgg-control/src/parameterLimits.ts, packages/kgg-control/src/types.ts, packages/kgg-control/src/scenarios.ts, src/lib/slitAnimation.ts, src/lib/webglShaderSources.ts, src/lib/flowGradientRenderer.ts, src/lib/flowSimulation.ts, src/lib/presetModel.ts, src/lib/presetThumbnail.ts, src/lib/coneView.ts, src/lib/coneSeam.ts, src/store/gradientStore.ts, src/lib/kggControlRuntime.ts, src/components/PostprocessStackPanel.tsx, src/components/EffectStackWorkspace.tsx, src/components/PostprocessPanel.tsx, src/components/PostprocessOverlay.tsx, src/components/DistortOverlay.tsx, src/components/SandboxPanel.tsx, src/components/FlowGradientPanel.tsx, src/components/BlockNoisePanel.tsx, src/components/DiffuseCurveEditor.tsx, src/components/SlitScanPanel.tsx, src/components/StretchPanel.tsx, src/components/PresetPanel.tsx, src/components/ClothGradientPanel.tsx, src/components/ClothCanvas.tsx, src/components/ConeApexEditor.tsx, src/components/ConeViewPanel.tsx, src/lib/clothGradientRenderer.ts, src/types/clothGradient.ts, src/types/flowGradient.ts, src/shaders/normalmap.frag.glsl, src/shaders/postprocess/glass-optics.glsl, src/shaders/postprocess/glass-field.glsl, src/shaders/postprocess/glass-compact.glsl, src/shaders/postprocess/uniforms.glsl, src/shaders/postprocess/glass-tile.glsl, src/shaders/postprocess/diffuse.glsl, src/shaders/postprocess/noise-diffuse-main.glsl, src/shaders/flow-splat.vert.glsl, src/shaders/flow-splat.frag.glsl, src/shaders/flow-trail.frag.glsl, src/components/DatamoshPanel.tsx, src/types/datamosh.ts, src/lib/videoMotionSource.ts, src/lib/videoMotionRuntime.ts, src/shaders/datamosh/uniforms.glsl, src/shaders/datamosh/motion-field.glsl, src/shaders/datamosh/main.glsl, src/types/texture.ts, src/shaders/texture.frag.glsl, src/components/TexturePanel.tsx]
+related_tests: [tests/e2e/shaders.spec.ts, src/lib/effectPipeline.test.ts, src/lib/webglNormalMapParity.test.ts, src/lib/effectStackTransition.test.ts, src/lib/postprocessStack.test.ts, src/lib/postprocessAnimation.test.ts, src/lib/effectStackDrag.test.ts, src/lib/effectShaderParity.test.ts, src/lib/webglExportPrograms.test.ts, src/lib/webglShaderSources.test.ts, src/lib/glassTile.test.ts, src/lib/glassTileShader.test.ts, src/lib/flowSimulation.test.ts, src/lib/flowGradientPreset.test.ts, src/lib/glass.test.ts, src/store/gradientStore.effectPipeline.test.ts, src/store/gradientStore.postprocessStack.test.ts, src/store/gradientStore.glass.test.ts, src/store/gradientStore.animation.test.ts, src/lib/sceneEvaluation.glass.test.ts, src/lib/slitAnimation.test.ts, src/lib/presetModel.slit.test.ts, src/lib/presetThumbnail.test.ts, src/lib/coneView.test.ts, src/lib/coneSeam.test.ts, src/lib/presetModel.diffuse.test.ts, src/lib/processedCanvasClock.test.ts, src/types/coneView.test.ts, tests/clothGradient.test.ts, src/types/datamosh.test.ts, src/lib/videoMotionSource.test.ts, src/lib/videoMotionRuntime.test.ts, src/lib/kggControlRuntime.test.ts, packages/kgg-control/src/scenarios.test.ts, src/components/PostprocessPanel.test.tsx, src/components/PostprocessStackPanel.test.tsx, src/components/SandboxPanel.test.tsx, src/types/texture.test.ts, src/store/gradientStore.texture.test.ts]
 ---
 
 # Effect Stack
@@ -23,19 +23,19 @@ Effect Stackは、Gradientから得た画像・色場へ複数の効果を適用
 
 ### EFFECT-001 主スタックの効果
 
-Unified Effect Stack V2の主スタックは、`Noise`、`Slit`、`Stretch`、`Distort`、`Mirror`、`Kaleidoscope`、`Voronoi`、`Glass`、`GlassTile`、`Diffuse`、`Datamosh`、`Cone`の12種類です。`Datamosh`は前フレームの履歴を使う時間フィードバック経路、`Glass`はGLASS V2、`GlassTile`はKG_Glassのタイル表面モデルを移植した専用描画経路、`Cone`は前段textureを円錐面へ投影する専用描画経路を使用します。各種類はスタック内に一度だけ存在し、同じ種類の複数インスタンスは現在サポートしません。
+Unified Effect Stack V2の主スタックは、`Noise`、`Slit`、`Stretch`、`Distort`、`Mirror`、`Kaleidoscope`、`Voronoi`、`Glass`、`GlassTile`、`Diffuse`、`Datamosh`、`Cone`、`Texture`の13種類です。`Datamosh`は前フレームの履歴を使う時間フィードバック経路、`Glass`はGLASS V2、`GlassTile`はKG_Glassのタイル表面モデルを移植した専用描画経路、`Cone`は前段textureを円錐面へ投影する専用描画経路、`Texture`は前段の結果へ高さ場でライティングする専用描画経路（TEXTURE-001）を使用します。各種類はスタック内に一度だけ存在し、同じ種類の複数インスタンスは現在サポートしません。
 
 主スタックは既知の種類を正規化して保持します。未知の種類や重複は保存・読込時に除外され、欠落した既知の種類は無効状態で補完されます。旧Presetの`videoMotion`レイヤーはDATAMOSH-005に従って同じ位置の`datamosh`レイヤーへ写像されます。旧Presetの`glassV2`は`glass`へ写像され、旧`glass`と同時に存在する場合も一つへ統合されます。
 
 ### EFFECT-002 有効化と順序
 
-利用者は主スタックの各効果を有効/無効に切り替え、順序を手動またはランダムに並べ替え、選択中の効果を変更できます。現在の実装は任意の新しい種類を追加・削除するモデルではなく、既知の12種類を無効化することで「使わない」状態を表現します。
+利用者は主スタックの各効果を有効/無効に切り替え、順序を手動またはランダムに並べ替え、選択中の効果を変更できます。現在の実装は任意の新しい種類を追加・削除するモデルではなく、既知の13種類を無効化することで「使わない」状態を表現します。
 
-新規V2状態の既定順は `Noise → Slit → Stretch → Distort → Mirror → Kaleidoscope → Voronoi → Glass → GlassTile → Diffuse → Datamosh → Cone` で、Diffuseが既定で有効です。ユーザーが保存した順序と有効状態はPresetへ保存されます。ランダム化操作では12種類を一度ずつ含む順列を作り、有効状態・選択状態・固定段を維持します。現在の描画結果から目標順序の結果へ400msの`easeInOut`表示ブレンドを行い、完了後に目標順序を確定します。
+新規V2状態の既定順は `Noise → Slit → Stretch → Distort → Mirror → Kaleidoscope → Voronoi → Glass → GlassTile → Diffuse → Datamosh → Cone → Texture` で、Diffuseが既定で有効です。ユーザーが保存した順序と有効状態はPresetへ保存されます。ランダム化操作では13種類を一度ずつ含む順列を作り、有効状態・選択状態・固定段を維持します。現在の描画結果から目標順序の結果へ400msの`easeInOut`表示ブレンドを行い、完了後に目標順序を確定します。
 
 ### EFFECT-014 Postprocessの全体有効状態
 
-`Stretch`、`Distort`、`Mirror`、`Kaleidoscope`、`Voronoi`、`Glass`、`GlassTile`、`Datamosh`、`Cone`のいずれか一つ以上が有効な場合、Postprocess全体を有効状態として表示します。Postprocessのプロパティモジュールには各レイヤーの個別ON／OFFを表示せず、レイヤーの有効状態はEffect Stackで管理します。プロパティモジュールではPostprocess全体のON／OFFと、選択レイヤーの詳細プロパティを表示します。Postprocessの全レイヤーが無効な場合は全体も無効状態になります。
+`Stretch`、`Distort`、`Mirror`、`Kaleidoscope`、`Voronoi`、`Glass`、`GlassTile`、`Datamosh`、`Cone`、`Texture`のいずれか一つ以上が有効な場合、Postprocess全体を有効状態として表示します。Postprocessのプロパティモジュールには各レイヤーの個別ON／OFFを表示せず、レイヤーの有効状態はEffect Stackで管理します。プロパティモジュールではPostprocess全体のON／OFFと、選択レイヤーの詳細プロパティを表示します。Postprocessの全レイヤーが無効な場合は全体も無効状態になります。
 
 ### EFFECT-029 Mirror／Kaleidoscopeのガイド表示
 
@@ -43,7 +43,7 @@ Effect Stack V2で`Mirror`または`Kaleidoscope`を選択し、そのレイヤ�
 
 ### EFFECT-003 固定段と描画順
 
-V2の全体順序は `Base → Surface → Main Stack → Prism → Flow Gradient → Particles` です。NormalはSurface、PrismはGlowを含む専用段、Flow GradientはGPU密度・Temporal TrailをGradient Rampへ合成する固定段、Particlesは最終2Dオーバーレイとして扱い、これらを主スタックの並べ替え対象には含めません。ConeはMain Stack内の通常レイヤーであり、配置された位置で前段textureを円錐面へ投影し、その描画結果を後段へ出力します。DatamoshとConeはdrag、randomize、solo、選択、永続化、render planの対象です。Coneを含む通常レイヤーはSANDBOXの固定段ではありません。Flow Gradientを無効にした場合は、Flow Gradientを除いたParticlesまでの経路を使用します。
+V2の全体順序は `Base → Surface → Main Stack → Prism → Flow Gradient → Particles` です。NormalはSurface、PrismはGlowを含む専用段、Flow GradientはGPU密度・Temporal TrailをGradient Rampへ合成する固定段、Particlesは最終2Dオーバーレイとして扱い、これらを主スタックの並べ替え対象には含めません。ConeはMain Stack内の通常レイヤーであり、配置された位置で前段textureを円錐面へ投影し、その描画結果を後段へ出力します。Datamosh、Cone、Textureはdrag、randomize、solo、選択、永続化、render planの対象です。Coneを含む通常レイヤーはSANDBOXの固定段ではありません。Flow Gradientを無効にした場合は、Flow Gradientを除いたParticlesまでの経路を使用します。
 
 有効な主スタックレイヤーは前段の結果を次段の入力として処理します。レイヤーが0件の場合の直接描画、軽量な主スタック、追加の中間バッファが必要な構成は描画計画として一貫して決定されます。
 
@@ -269,6 +269,24 @@ Cloth の全パラメータ (Surface Wave, Organic Motion, Lighting, Specular, F
 ### SANDBOX-001 SANDBOX パネルモジュールの拡張
 
 SANDBOXのEdit Layerには`Cloth`、`Normal`、`Prism`、`Particles`、`Flow Gradient`、`Seamless`の6モジュールを表示し、アクティブカウントを`/6`で示します。ConeはSANDBOXから除外し、EFFECT-021のMain StackレイヤーとしてEffect Stackで管理します。モジュールのON/OFF状態およびプログラム状態をUI上に可視化します。
+
+### TEXTURE-001 Texture Effect Stackレイヤー
+
+Textureは主スタックの通常レイヤー（`EffectStackKind`の`texture`）で、配置された位置の前段textureへ高さ場でライティングし、その結果を後段へ出力します。drag、randomize、solo、選択、永続化、render planの対象で、有効状態と順序は`effectPipeline.effectStack`、設定は`texture`へ保存します。既定順では最後（`Cone`の後）に置き、既定は無効です。設定はPostprocessの`Edit Layer`で編集します。
+
+専用program（`texture`）はTextureレイヤーが有効な場合だけ遅延コンパイルし、programが準備できるまでは通常のBase描画を維持し、失敗した場合はレイヤーを描画せず残りのstackを継続します。ON時は直接描画を使わずtexture pathを使います。Effect Stack V2だけで動作し、Legacy V1では適用しません。Image Gradient Sourceの保護中も、画像を再サンプルしないためTextureレイヤーは適用します。画素の座標はグローバル座標から求めるため、タイル書き出しでもフル描画と同じ結果になります。
+
+### TEXTURE-002 高さ場・異方性反射・回折
+
+Textureは高さ場から法線を求め、点光源の下でWard異方性反射を計算します。高さ場は`source`で選びます。`procedural`は`brushedMetal`（グレインに沿った細い傷）、`spunMetal`（中心を基準にした同心の旋盤目）、`cdGroove`（1本のらせん溝）、`paper`（繊維と低周波のむら）で、`image`は読み込んだ画像の輝度です。画像は`cover`（Canvasへ中央基準で合わせる）または`tile`（`scale`回反復）で配置し、画像が未読込のときは選択中の手続き型プリセットで描画します。
+
+反射は`roughness`、`anisotropy`（グレインに沿う方向を滑らか、直交方向を粗くする）、`metallic`（ハイライトを元の色で着色する割合）、`specular`で決まります。グレインの向きは`rotation`で指定し、`spunMetal`と`cdGroove`は中心（`centerX`／`centerY`）まわりの接線方向です。`diffraction`は溝直交方向のライト成分から虹色を求めて加算し、`diffractionSpread`が色相の変化幅です。`strength`は結果と元画像の混合率で、`bump`が負の値は高さを反転します。
+
+ライトは`lightAngle`（キャンバス中心まわりの角度）と`lightHeight`で決まります。`lightSweep`は整数の回転数で、Animationの1ループでライトがキャンバス中心を回る回数です。時刻はscene evaluationの正規化時刻を使うため、整数値ではループ境界が一致します。プリセットを選ぶと`TEXTURE_PRESET_LOOKS`の見た目値を`enabled`／`source`／`imageFit`／グレイン配置を保ったまま適用します。
+
+### TEXTURE-003 Texture設定の保存と外部画像
+
+Textureの設定は`texture`としてPreset、履歴（undo／redo）、storeへ保存し、旧Presetで欠落している場合は無効の既定値へ補完します。すべての数値と列挙は正規化時に範囲へ収め、未知の列挙値は既定値へ戻します。読み込んだ画像は外部入力としてセッション内だけで保持し、Preset、Thumbnail、書き出し用の設定JSONへ含めません。Thumbnailは画像を使わず選択中の手続き型プリセットで描画します。
 
 ### EFFECT-020 Cloth表示アダプター
 

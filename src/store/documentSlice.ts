@@ -15,6 +15,7 @@ import type {
   StretchConfig,
 } from '../types/distortion';
 import type { SeamlessConfig } from '../types/seamless';
+import type { TextureConfig } from '../types/texture';
 import type { DatamoshConfig } from '../types/datamosh';
 import type { WorkspaceSlice } from './workspaceSlice';
 
@@ -35,6 +36,7 @@ export type DocumentState = {
   clothGradient: ClothGradientConfig;
   coneView: ConeViewConfig;
   seamless: SeamlessConfig;
+  texture: TextureConfig;
   flowGradient: FlowGradientConfig;
   datamosh: DatamoshConfig;
   manualDistort: ManualDistortConfig;
@@ -71,6 +73,7 @@ export type DocumentActions = {
   setClothGradient: (value: Partial<ClothGradientConfig>) => void;
   setConeView: (value: Partial<ConeViewConfig>) => void;
   setSeamless: (value: Partial<SeamlessConfig>) => void;
+  setTexture: (value: Partial<TextureConfig>) => void;
   setFlowGradient: (value: Partial<FlowGradientConfig>) => void;
   setDatamosh: (value: Partial<DatamoshConfig>) => void;
   setManualDistort: (value: Partial<ManualDistortConfig>) => void;
@@ -107,6 +110,7 @@ export function createDocumentState(defaults: DocumentDefaults): DocumentState {
     clothGradient: { ...defaults.clothGradient },
     coneView: { ...defaults.coneView },
     seamless: { ...defaults.seamless },
+    texture: { ...defaults.texture },
     flowGradient: { ...defaults.flowGradient },
     datamosh: { ...defaults.datamosh },
     manualDistort: {

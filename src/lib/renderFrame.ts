@@ -42,5 +42,8 @@ export function renderFrame(ctx: WebGLContext, request: RenderFrameRequest): voi
     request.flowSessionId ?? 'preview',
     request.datamosh,
     request.coneView,
+    request.texture,
+    request.textureImageSource,
+    request.textureNormalizedTime ?? 0,
   );
 }

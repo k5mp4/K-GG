@@ -106,6 +106,8 @@ export default function App() {
     slitSourceImageName,
     imageGradientSource,
     imageGradientSourceName,
+    textureImageSource,
+    textureImageSourceName,
     ffmpegStatus,
     ffmpegChecking,
     ffmpegDialogOpen,
@@ -134,6 +136,8 @@ export default function App() {
     handleSlitSourceImageClear,
     handleImageGradientSourceLoad,
     handleImageGradientSourceClear,
+    handleTextureImageLoad,
+    handleTextureImageClear,
     handleSeek,
     handleTimelineToggle,
     handleTimeRemapToggle,
@@ -206,7 +210,14 @@ export default function App() {
                         onRenderViewModeChange={handleRenderViewModeChange}
                       />
                     )}
-                    {value === 'postprocess' && <PostprocessPanel />}
+                    {value === 'postprocess' && (
+                      <PostprocessPanel
+                        textureImageSource={textureImageSource}
+                        textureImageName={textureImageSourceName}
+                        onTextureImageLoad={handleTextureImageLoad}
+                        onTextureImageClear={handleTextureImageClear}
+                      />
+                    )}
                     {value === 'export' && (
                       <ExportPanel
                         onExportProgress={setExportProgress}

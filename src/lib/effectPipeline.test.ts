@@ -65,6 +65,46 @@ describe('effectPipeline', () => {
       expect(plan.framebufferAllocationMode).toBe('core');
       expect(plan.programs.stackCore).toBe(true);
     });
+
+    it('treats an enabled Texture layer as a texture-path layer and requests only its own program', () => {
+      const pipeline = createDefaultEffectPipeline();
+      const withTexture = {
+        ...pipeline,
+        effectStack: updateEffectStackLayer(pipeline.effectStack, 'texture', { enabled: true }),
+      };
+      const plan = getV2RenderPlan(withTexture, {
+        normalMapEnabled: false,
+        normalMapBlur: 0,
+        prismGlowRadius: 0,
+      });
+
+      expect(canRenderV2Direct(withTexture, false)).toBe(false);
+      expect(plan.enabledLayers.map(layer => layer.kind)).toEqual(['diffuse', 'texture']);
+      expect(plan.framebufferAllocationMode).toBe('core');
+      expect(plan.programs.stackCore).toBe(true);
+      expect(plan.programs.texture).toBe(true);
+      expect(plan.programs.prism).toBe(false);
+    });
+
+    it('does not request the Texture program or a texture path when the layer is off', () => {
+      const plan = getV2RenderPlan(createDefaultEffectPipeline(), {
+        normalMapEnabled: false,
+        normalMapBlur: 0,
+        prismGlowRadius: 0,
+      });
+
+      expect(plan.programs.texture).toBe(false);
+      expect(plan.framebufferAllocationMode).toBe('direct');
+    });
+
+    it('places Texture last by default and lets it move like any other layer', () => {
+      const stack = createDefaultEffectStack();
+
+      expect(stack.map(layer => layer.kind).at(-1)).toBe('texture');
+      expect(stack.find(layer => layer.kind === 'texture')?.enabled).toBe(false);
+      expect(normalizeEffectStack([{ kind: 'texture', enabled: true }, { kind: 'noise', enabled: true }])
+        .map(layer => layer.kind).slice(0, 2)).toEqual(['texture', 'noise']);
+    });
   });
 
   describe('getV2FramebufferAllocationMode', () => {
@@ -561,6 +601,7 @@ describe('effectPipeline', () => {
         particles: true,
         datamosh: false,
         threeD: false,
+        texture: false,
       });
       expect(plan.capabilities).toEqual({
         required: ['webgl2', 'rgba8-framebuffer'],
@@ -591,6 +632,7 @@ describe('effectPipeline', () => {
         { kind: 'diffuse', enabled: true },
         { kind: 'datamosh', enabled: false },
         { kind: 'cone', enabled: false },
+        { kind: 'texture', enabled: false },
       ],
       selectedKind: 'diffuse',
       prismEnabled: false,
@@ -618,6 +660,7 @@ describe('effectPipeline', () => {
       { kind: 'diffuse', enabled: false },
       { kind: 'datamosh', enabled: false },
       { kind: 'cone', enabled: false },
+      { kind: 'texture', enabled: false },
     ]);
   });
 
@@ -674,6 +717,7 @@ describe('effectPipeline', () => {
       'glassTile',
       'datamosh',
       'cone',
+      'texture',
     ]);
     expect(Object.fromEntries(normalized.map(layer => [layer.kind, layer.enabled]))).toEqual({
       diffuse: false,
@@ -688,6 +732,7 @@ describe('effectPipeline', () => {
       glassTile: false,
       datamosh: false,
       cone: false,
+      texture: false,
     });
   });
 
@@ -719,6 +764,7 @@ describe('effectPipeline', () => {
       'diffuse',
       'datamosh',
       'cone',
+      'texture',
     ]);
 
     expect(moveEffectStackLayer(toggled, 'diffuse', 0).at(0)).toEqual({ kind: 'diffuse', enabled: true });
@@ -756,11 +802,13 @@ describe('effectPipeline', () => {
       'diffuse',
       'datamosh',
       'cone',
+      'texture',
       'noise',
     ]);
-    expect(movedPastDiffuse.at(-4)).toEqual({ kind: 'diffuse', enabled: true });
-    expect(movedPastDiffuse.at(-3)).toEqual({ kind: 'datamosh', enabled: false });
-    expect(movedPastDiffuse.at(-2)).toEqual({ kind: 'cone', enabled: false });
+    expect(movedPastDiffuse.at(-5)).toEqual({ kind: 'diffuse', enabled: true });
+    expect(movedPastDiffuse.at(-4)).toEqual({ kind: 'datamosh', enabled: false });
+    expect(movedPastDiffuse.at(-3)).toEqual({ kind: 'cone', enabled: false });
+    expect(movedPastDiffuse.at(-2)).toEqual({ kind: 'texture', enabled: false });
     expect(movedPastDiffuse.at(-1)).toEqual({ kind: 'noise', enabled: true });
   });
 
@@ -774,7 +822,7 @@ describe('effectPipeline', () => {
     let seed = 0;
     const randomized = randomizeEffectStackOrder(stack, () => (seed += 0.17) % 1);
 
-    expect(randomized).toHaveLength(12);
+    expect(randomized).toHaveLength(13);
     expect(new Set(randomized.map(layer => layer.kind))).toEqual(new Set(stack.map(layer => layer.kind)));
     expect(Object.fromEntries(randomized.map(layer => [layer.kind, layer.enabled]))).toEqual(enabledByKind);
     expect(randomized).not.toBe(stack);

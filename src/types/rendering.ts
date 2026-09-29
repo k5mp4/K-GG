@@ -42,6 +42,9 @@ export type RenderFrameRequest = {
   clothTime?: number;
   clothLoopPeriod?: number;
   seamless?: LatestState['seamless'];
+  texture?: LatestState['texture'];
+  textureImageSource?: LatestState['textureImageSource'];
+  textureNormalizedTime?: number;
   flowGradient?: LatestState['flowGradient'];
   flowNormalizedTime?: number;
   flowLoopEnabled?: boolean;

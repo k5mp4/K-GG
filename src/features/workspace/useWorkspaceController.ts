@@ -57,6 +57,7 @@ const EFFECT_STACK_TAB_MAP: Partial<Record<EffectStackKind, LeftTab>> = {
   stretch: 'postprocess',
   datamosh: 'postprocess',
   cone: 'postprocess',
+  texture: 'postprocess',
 };
 
 function formatGpuBytes(bytes: number | null | undefined): string | null {
@@ -135,6 +136,8 @@ export function useWorkspaceController({ translate }: WorkspaceControllerOptions
   const [slitSourceImageName, setSlitSourceImageName] = useState('');
   const [imageGradientSource, setImageGradientSource] = useState<HTMLCanvasElement | null>(null);
   const [imageGradientSourceName, setImageGradientSourceName] = useState('');
+  const [textureImageSource, setTextureImageSource] = useState<HTMLCanvasElement | null>(null);
+  const [textureImageSourceName, setTextureImageSourceName] = useState('');
 
   const {
     canvasW, setCanvasW,
@@ -591,6 +594,7 @@ export function useWorkspaceController({ translate }: WorkspaceControllerOptions
       overlayOpacity,
       slitSourceImageCanvas,
       imageGradientSource,
+      textureImageSource,
     },
     resources: {
       animLoopRef,
@@ -699,6 +703,8 @@ export function useWorkspaceController({ translate }: WorkspaceControllerOptions
     slitSourceImageName,
     imageGradientSource,
     imageGradientSourceName,
+    textureImageSource,
+    textureImageSourceName,
     ffmpegStatus,
     ffmpegChecking,
     ffmpegDialogOpen,
@@ -746,6 +752,14 @@ export function useWorkspaceController({ translate }: WorkspaceControllerOptions
       setImageGradientSource(null);
       setImageGradientSourceName('');
       applicationCommands.setImageGradient({ enabled: false });
+    },
+    handleTextureImageLoad: (canvas: HTMLCanvasElement, name: string) => {
+      setTextureImageSource(canvas);
+      setTextureImageSourceName(name);
+    },
+    handleTextureImageClear: () => {
+      setTextureImageSource(null);
+      setTextureImageSourceName('');
     },
     handleSeek: () => setSeekVersion(value => value + 1),
     handleTimelineToggle: () => setShowTimeline(value => !value),

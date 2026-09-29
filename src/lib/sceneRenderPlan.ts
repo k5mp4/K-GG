@@ -89,7 +89,7 @@ export function getRequiredSceneProgramKeys(state: LatestState): LazyProgramKey[
       && state.diffuse.mode === 'legacy'
       && plan.diffuseEnabled;
     add('generator', plan.programs.generator);
-    add('stackCore', (!imageGradientProtected || protectedStipple) && plan.programs.stackCore);
+    add('stackCore', (!imageGradientProtected || protectedStipple || plan.programs.texture) && plan.programs.stackCore);
     add('noiseStack', !imageGradientProtected && plan.programs.noiseStack);
     add('noiseDiffuseStack', !imageGradientProtected && plan.programs.noiseDiffuseStack);
     add('glassV2', !imageGradientProtected && plan.programs.glassV2 && !isGlassOpticallyIdentity(state.postprocess));
@@ -102,6 +102,7 @@ export function getRequiredSceneProgramKeys(state: LatestState): LazyProgramKey[
     add('particles', plan.programs.particles);
     add('datamosh', plan.programs.datamosh);
     add('threeD', plan.programs.threeD);
+    add('texture', plan.programs.texture);
   } else {
     const layers = getActivePostprocessStackLayers(state.postprocess).filter(layer => (
       (layer.kind !== 'glass' && layer.kind !== 'glassV2' && layer.kind !== 'glassTile')

@@ -25,6 +25,7 @@ export const EFFECT_STACK_KINDS = [
   'diffuse',
   'datamosh',
   'cone',
+  'texture',
 ] as const satisfies readonly EffectStackKind[];
 
 /** Postprocessの全体ON/OFFへ反映する、主スタック内のレイヤー。 */
@@ -38,6 +39,7 @@ export const POSTPROCESS_EFFECT_STACK_KINDS = [
   'glassTile',
   'datamosh',
   'cone',
+  'texture',
 ] as const satisfies readonly EffectStackKind[];
 
 const EFFECT_STACK_KIND_SET = new Set<string>(EFFECT_STACK_KINDS);
@@ -451,6 +453,7 @@ export type V2RenderPlan = {
     particles: boolean;
     datamosh: boolean;
     threeD: boolean;
+    texture: boolean;
   };
 };
 
@@ -719,6 +722,7 @@ export function getV2RenderPlan(
       particles: particlesRequested,
       datamosh: enabledLayers.some(layer => layer.kind === 'datamosh'),
       threeD: enabledLayers.some(layer => layer.kind === 'cone'),
+      texture: enabledLayers.some(layer => layer.kind === 'texture'),
     },
   };
 }

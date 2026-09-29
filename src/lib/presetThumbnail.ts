@@ -8,6 +8,7 @@ import type { LatestState } from '../types/latestState';
 import { disposeWebGL, initWebGL, type WebGLContext } from './webgl';
 import { resolveDiffuseBezier } from './diffuseCurve';
 import { normalizeSeamlessConfig } from '../types/seamless';
+import { normalizeTextureConfig } from '../types/texture';
 import { normalizeFlowGradientConfig } from '../types/flowGradient';
 import { normalizeConeViewConfig } from '../types/coneView';
 
@@ -76,6 +77,7 @@ export function createPresetThumbnailState(snapshot: StoreSnapshot): LatestState
     normalMap: { ...STORE_DEFAULTS.normalMap, ...snapshot.normalMap },
     coneView: normalizeConeViewConfig(snapshot.coneView),
     seamless: normalizeSeamlessConfig(snapshot.seamless),
+    texture: normalizeTextureConfig(snapshot.texture),
     flowGradient: normalizeFlowGradientConfig(snapshot.flowGradient),
     manualDistort,
     postprocess,
@@ -89,6 +91,8 @@ export function createPresetThumbnailState(snapshot: StoreSnapshot): LatestState
     imageGradientSource: null,
     imageMaskSource: null,
     imageMaskEnabled: false,
+    // The height map is a session-only external image and not part of a portable Preset.
+    textureImageSource: null,
   };
 }
 

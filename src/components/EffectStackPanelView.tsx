@@ -33,6 +33,7 @@ const LABELS: Record<EffectStackKind, string> = {
   glassTile: 'GlassTile',
   datamosh: 'Datamosh',
   cone: '3D',
+  texture: 'Texture',
 };
 
 type DragState = Omit<EffectStackDragState, 'kind' | 'phase'> & {
