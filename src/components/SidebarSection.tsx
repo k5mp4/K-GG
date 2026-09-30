@@ -29,7 +29,6 @@ export function SidebarSection({
         onClick={onToggle}
         aria-expanded={open}
         aria-controls={contentId}
-        title={description}
         className={`group flex w-full items-center gap-3 bg-transparent px-0 py-3 text-left transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-fire ${
           nested ? 'hover:text-cream' : 'hover:text-cream'
         }`}
@@ -55,7 +54,7 @@ export function SidebarSection({
           </svg>
         </span>
         <span className="min-w-0 flex-1">
-          <span className={`block font-display text-[11px] font-semibold uppercase tracking-[0.14em] ${open ? 'text-k-text' : 'text-tab-inactive group-hover:text-k-text'}`}>
+          <span className={`block w-fit font-display text-[11px] font-semibold uppercase tracking-[0.14em] ${open ? 'text-k-text' : 'text-tab-inactive group-hover:text-k-text'} ${description ? 'hint-label' : ''}`} title={description}>
             {title}
           </span>
         </span>

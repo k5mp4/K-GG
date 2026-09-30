@@ -83,9 +83,8 @@ function PostprocessControlGroup({ title, hint, defaultOpen = true, children }: 
         onClick={() => setIsOpen((value) => !value)}
         className="flex w-full items-center justify-between px-3 py-2 text-left text-xs font-display uppercase tracking-wider text-deep hover:bg-k-muted/40"
         aria-expanded={isOpen}
-        title={hint}
       >
-        <span>{title}</span>
+        <span className={hint ? 'hint-label' : undefined} title={hint}>{title}</span>
         <Icon
           name="chevronDown"
           className={`text-[16px] transition-transform ${isOpen ? 'rotate-180' : ''}`}
@@ -705,6 +704,7 @@ export function PostprocessPanel({
                     <div className="space-y-4" title={t('postprocess.glassTile.facetedHelp')}>
                       <SliderField
                         label="Facet Density"
+                        labelClassName="hint-label text-xs text-deep"
                         value={postprocess.glassTileFacetDensity}
                         onChange={(v) => setPostprocess({ glassTileFacetDensity: v })}
                         format={(v) => v.toFixed(1)}
@@ -712,6 +712,7 @@ export function PostprocessPanel({
                       />
                       <SliderField
                         label="Facet Depth"
+                        labelClassName="hint-label text-xs text-deep"
                         value={postprocess.glassTileFacetDepth}
                         onChange={(v) => setPostprocess({ glassTileFacetDepth: v })}
                         format={(v) => `${Math.round(v * 100)}%`}
@@ -719,6 +720,7 @@ export function PostprocessPanel({
                       />
                       <SliderField
                         label="Rotation"
+                        labelClassName="hint-label text-xs text-deep"
                         value={postprocess.glassTileRotation}
                         onChange={(v) => setPostprocess({ glassTileRotation: v })}
                         format={(v) => `${Math.round(v)}°`}
@@ -837,6 +839,7 @@ export function PostprocessPanel({
                     <div className="space-y-4" title={t('postprocess.glass.rippleHelp')}>
                       <SliderField
                         label="Frequency"
+                        labelClassName="hint-label text-xs text-deep"
                         value={postprocess.glassRippleFrequency}
                         onChange={(v) => setPostprocess({ glassRippleFrequency: v })}
                         format={(v) => v.toFixed(1)}
@@ -844,6 +847,7 @@ export function PostprocessPanel({
                       />
                       <SliderField
                         label="Depth"
+                        labelClassName="hint-label text-xs text-deep"
                         value={postprocess.glassRippleDepth}
                         onChange={(v) => setPostprocess({ glassRippleDepth: v })}
                         format={(v) => `${Math.round(v * 100)}%`}
@@ -851,6 +855,7 @@ export function PostprocessPanel({
                       />
                       <SliderField
                         label="Animation Speed"
+                        labelClassName="hint-label text-xs text-deep"
                         value={postprocess.glassRippleSpeed}
                         onChange={(v) => setPostprocess({ glassRippleSpeed: Math.round(v) })}
                         format={(v) => `${Math.round(v)}×`}
@@ -911,6 +916,7 @@ export function PostprocessPanel({
                 <div title="Noise Distortion パネルの模様とパラメータをガラス表面へブレンドします。">
                   <SliderField
                     label="Noise Distortion"
+                    labelClassName="hint-label text-xs text-deep"
                     value={postprocess.glassNoiseInfluence}
                     onChange={(v) => setPostprocess({ glassNoiseInfluence: v })}
                     format={(v) => `${Math.round(v * 100)}%`}
@@ -932,6 +938,7 @@ export function PostprocessPanel({
                 <div className="space-y-4" title={t('postprocess.glass.iorHelp')}>
                   <SliderField
                     label="IOR"
+                    labelClassName="hint-label text-xs text-deep"
                     value={postprocess.glassIor}
                     onChange={(v) => setPostprocess({ glassIor: v })}
                     format={(v) => v.toFixed(2)}
@@ -949,6 +956,7 @@ export function PostprocessPanel({
                 <div className="space-y-4" title={t('postprocess.glass.chromaticStepsHelp')}>
                   <SliderField
                     label="Chromatic Steps"
+                    labelClassName="hint-label text-xs text-deep"
                     value={postprocess.glassChromaticSteps}
                     onChange={(v) => setPostprocess({ glassChromaticSteps: Math.round(v) })}
                     format={(v) => `${Math.round(v)}`}

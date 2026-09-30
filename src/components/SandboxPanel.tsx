@@ -48,8 +48,8 @@ function SandboxModule({
           <span className="flex h-7 w-7 shrink-0 items-center justify-center border border-cyan-200/45 bg-cyan-300/10 text-cyan-100" aria-hidden="true">
             <Icon name="grid" className="text-[13px]" />
           </span>
-          <span className="min-w-0" title={description}>
-            <span className="flex items-center gap-2 font-display text-[11px] font-semibold uppercase tracking-[0.15em] text-k-text">
+          <span className="min-w-0">
+            <span className="hint-label flex w-fit items-center gap-2 font-display text-[11px] font-semibold uppercase tracking-[0.15em] text-k-text" title={description}>
               {label}
               {badge}
             </span>
@@ -140,8 +140,8 @@ export function SandboxPanel({ onRenderViewModeChange }: SandboxPanelProps) {
   return (
     <div className="space-y-4" data-sandbox-panel>
       <div className="flex items-center justify-between gap-3">
-        <h2 className="font-display text-sm font-bold uppercase tracking-[0.2em] text-k-text" title={t('sandbox.description')}>{t('effect.sandbox')}</h2>
-        <span className="font-display text-[10px] font-bold text-cyan-100" title={t('sandbox.active')}>{activeCount}<span className="text-cyan-100/40">/6</span></span>
+        <h2 className="font-display text-sm font-bold uppercase tracking-[0.2em] text-k-text hint-label" title={t('sandbox.description')}>{t('effect.sandbox')}</h2>
+        <span className="font-display text-[10px] font-bold text-cyan-100 hint-label" title={t('sandbox.active')}>{activeCount}<span className="text-cyan-100/40">/6</span></span>
       </div>
 
       <div className="space-y-3">

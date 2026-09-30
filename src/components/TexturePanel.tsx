@@ -26,7 +26,7 @@ function Section({ title, hint, children }: { title: string; hint?: string; chil
   const { language } = useLanguage();
   return (
     <div className="space-y-3 border border-cream/25 bg-k-surface/35 p-3">
-      <span className="block font-display text-[10px] font-semibold uppercase tracking-[0.16em] text-cyan-100" title={hint}>{localizeUiLabel(title, language)}</span>
+      <span className={`block w-fit font-display text-[10px] font-semibold uppercase tracking-[0.16em] text-cyan-100${hint ? ' hint-label' : ''}`} title={hint}>{localizeUiLabel(title, language)}</span>
       {children}
     </div>
   );

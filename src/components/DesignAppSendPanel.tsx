@@ -138,7 +138,7 @@ export function DesignAppSendPanel({ canvas, imageName }: Props) {
   return (
     <section className="space-y-3 border-t border-panel-border border-t-panel pt-4" aria-labelledby="design-app-send-title">
       <div className="flex items-center justify-between gap-3">
-        <h3 id="design-app-send-title" className="font-display text-xs font-semibold uppercase tracking-wider text-k-text" title="受信アプリから接続をリクエストし、ここで許可するとPNGを直接送れます。">デザインアプリへ送信</h3>
+        <h3 id="design-app-send-title" className="font-display text-xs font-semibold uppercase tracking-wider text-k-text hint-label" title="受信アプリから接続をリクエストし、ここで許可するとPNGを直接送れます。">デザインアプリへ送信</h3>
         <span className={`h-2 w-2 shrink-0 rounded-full ${bridge.available ? 'bg-emerald-400' : 'bg-k-muted'}`} aria-label={bridge.available ? 'ローカル接続を利用できます' : 'ローカル接続を準備中'} />
       </div>
 
@@ -150,8 +150,8 @@ export function DesignAppSendPanel({ canvas, imageName }: Props) {
 
       {isTauriRuntime() && (
         <div className="flex items-center gap-2 border border-panel-border bg-k-surface px-2.5 py-2">
-          <div className="min-w-0 flex-1" title="FigmaのDevelopment Plugin登録で、同梱のmanifest.jsonを選びます。">
-            <p className="text-[10px] font-semibold text-k-text">Figma Pluginの初回登録</p>
+          <div className="min-w-0 flex-1">
+            <p className="hint-label text-[10px] font-semibold text-k-text" title="FigmaのDevelopment Plugin登録で、同梱のmanifest.jsonを選びます。">Figma Pluginの初回登録</p>
           </div>
           <button
             type="button"

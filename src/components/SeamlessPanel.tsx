@@ -16,6 +16,7 @@ export function SeamlessPanel() {
       >
         <SliderField
           label="Blend Width"
+          labelClassName="hint-label text-xs text-deep"
           value={seamless.blendWidth}
           limitKey="seamless.blendWidth"
           format={(value) => `${Math.round(value * 100)}%`}

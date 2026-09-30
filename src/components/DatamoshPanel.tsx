@@ -34,7 +34,7 @@ function emitVideoMotionFrame(): void {
 function Section({ title, hint, children }: { title: string; hint?: string; children: ReactNode }) {
   return (
     <div className="space-y-2.5 border border-cream/15 bg-black/10 p-3">
-      <span className="block text-[10px] font-display uppercase tracking-wider text-cyan-100" title={hint}>{title}</span>
+      <span className={`block w-fit text-[10px] font-display uppercase tracking-wider text-cyan-100${hint ? ' hint-label' : ''}`} title={hint}>{title}</span>
       {children}
     </div>
   );

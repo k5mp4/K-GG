@@ -68,7 +68,7 @@ function formatDegrees(value: number): string {
 function Section({ title, hint, children }: { title: string; hint?: string; children: ReactNode }) {
   return (
     <div className="space-y-3 border border-cream/25 bg-k-surface/35 p-3">
-      <span className="block font-display text-[9px] font-semibold uppercase tracking-[0.14em] text-cream/60" title={hint}>{title}</span>
+      <span className={`block w-fit font-display text-[9px] font-semibold uppercase tracking-[0.14em] text-cream/60${hint ? ' hint-label' : ''}`} title={hint}>{title}</span>
       {children}
     </div>
   );
@@ -661,7 +661,7 @@ export function ConeViewPanel() {
         {isCone && (
           <div className="flex items-center justify-between gap-3 border border-cyan-200/20 bg-cyan-300/[0.04] px-2.5 py-2">
             <div className="min-w-0">
-              <span className="block font-display text-[9px] font-semibold uppercase tracking-[0.12em] text-cyan-100" title={t('cone.apexHint')}>{t('cone.apexPosition')}</span>
+              <span className="block font-display text-[9px] font-semibold uppercase tracking-[0.12em] text-cyan-100 hint-label" title={t('cone.apexHint')}>{t('cone.apexPosition')}</span>
             </div>
             <button
               type="button"

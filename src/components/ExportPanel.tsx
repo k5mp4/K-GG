@@ -687,7 +687,7 @@ export function ExportPanel({
       {slitScan.enabled && (
         <div className="border-t border-panel-border border-t-panel pt-4 space-y-2">
           <p
-            className="text-xs text-deep"
+            className="hint-label text-xs text-deep"
             title={`${slitScan.mode === 'circular' ? '同心円' : slitScan.mode === 'polygon' ? `正${slitScan.polygonSides ?? 6}角形` : '直線'}スリットごとに個別 PNG を書き出します`}
           >
             スリット書き出し
@@ -793,12 +793,15 @@ export function ExportPanel({
 
         {/* オフライン書き出し */}
         <div className="space-y-1.5">
-          <div
-            title={selectedNativeVideoFormat
-              ? selectedNativeVideoFormat.description
-              : t('export.imageSequenceDescription')}
-          >
-            <p className="text-xs mb-1 text-deep font-display uppercase tracking-wider">{t('export.format')}</p>
+          <div>
+            <p
+              className="hint-label w-fit text-xs mb-1 text-deep font-display uppercase tracking-wider"
+              title={selectedNativeVideoFormat
+                ? selectedNativeVideoFormat.description
+                : t('export.imageSequenceDescription')}
+            >
+              {t('export.format')}
+            </p>
             <InputDrum
               value={selectedVideoFormat}
               options={videoFormatOptions}
@@ -826,15 +829,15 @@ export function ExportPanel({
           )}
 
           {selectedNativeVideoFormat?.value === 'mp4' && gpuEncoderName && (
-            <label className="flex items-center gap-2 cursor-pointer select-none" title={t('export.gpuEncodeDescription', { encoder: gpuEncoderName })}>
+            <label className="flex items-center gap-2 cursor-pointer select-none">
               <Toggle size="sm" checked={useGpuEncode} onChange={setUseGpuEncode} />
-              <span className="text-xs text-k-text/80">{t('export.gpuEncode')}</span>
+              <span className="hint-label text-xs text-k-text/80" title={t('export.gpuEncodeDescription', { encoder: gpuEncoderName })}>{t('export.gpuEncode')}</span>
             </label>
           )}
 
           {selectedNativeVideoFormat?.value === 'gif' && (
-            <div title={t('export.gifMaxFileSizeDescription')}>
-              <p className="text-xs mb-1 text-deep font-display uppercase tracking-wider">{t('export.gifMaxFileSize')}</p>
+            <div>
+              <p className="hint-label w-fit text-xs mb-1 text-deep font-display uppercase tracking-wider" title={t('export.gifMaxFileSizeDescription')}>{t('export.gifMaxFileSize')}</p>
               <div className="tq-input-number-shell w-full">
                 <InputNumber
                   className="tq-input-number w-full"
@@ -950,7 +953,7 @@ export function ExportPanel({
                   onChange={() => setAeVideoSendMode('export')}
                   className="mt-0.5 accent-fire"
                 />
-                <span className="text-xs text-k-text/80" title={t('export.aeVideoDestinationExportDescription')}>
+                <span className="hint-label text-xs text-k-text/80" title={t('export.aeVideoDestinationExportDescription')}>
                   {t('export.aeVideoDestinationExport')}
                 </span>
               </label>
@@ -969,7 +972,7 @@ export function ExportPanel({
 
             <div className="space-y-1.5">
               <p
-                className="text-xs text-tab-inactive"
+                className="hint-label w-fit text-xs text-tab-inactive"
                 title={t(
                   aeVideoSendMode === 'export'
                     ? 'export.aeSaveDirectoryExportDescription'

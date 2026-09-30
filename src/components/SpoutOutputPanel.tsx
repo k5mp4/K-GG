@@ -50,9 +50,9 @@ export function SpoutOutputPanel({ canvasRef }: Props) {
         </p>
       ) : (
         <>
-          <label className="flex items-center gap-2 cursor-pointer select-none" title={t('spout.description')}>
+          <label className="flex items-center gap-2 cursor-pointer select-none">
             <Toggle variant="switch" size="xs" checked={state.enabled} onChange={(enabled) => void setEnabled(enabled)} ariaLabel={t('spout.enable')} />
-            <span className="text-xs text-k-text/80">{t('spout.enable')}</span>
+            <span className="hint-label text-xs text-k-text/80" title={t('spout.description')}>{t('spout.enable')}</span>
           </label>
 
           <div className="space-y-1">
