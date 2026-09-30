@@ -2,7 +2,7 @@ import type { EffectPipelineConfig } from '../types/distortion';
 import { isGlassOpticallyIdentity } from './glass';
 import { isGlassTileOpticallyIdentity } from './glassTile';
 import { getActivePostprocessStackLayers } from './postprocessStack';
-import type { LazyProgramKey } from './webglShaderSources';
+import { getThreeDProgramKey, type LazyProgramKey } from './webglShaderSources';
 import type { LatestState } from '../types/latestState';
 import { getV2RenderPlan, type V2RenderPlan, type V2RenderPlanOptions } from './effectPipeline';
 
@@ -101,7 +101,7 @@ export function getRequiredSceneProgramKeys(state: LatestState): LazyProgramKey[
     add('prismComposite', plan.programs.prismComposite);
     add('particles', plan.programs.particles);
     add('datamosh', plan.programs.datamosh);
-    add('threeD', plan.programs.threeD);
+    if (plan.programs.threeD) add(getThreeDProgramKey(state.coneView.shape), true);
     add('texture', plan.programs.texture);
   } else {
     const layers = getActivePostprocessStackLayers(state.postprocess).filter(layer => (
