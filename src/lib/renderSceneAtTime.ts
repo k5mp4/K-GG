@@ -55,14 +55,17 @@ function renderSceneFrame(
     clothLoopPeriod: scene.noiseLoopPeriod,
     seamless: state.seamless,
     flowGradient: state.flowGradient,
-    flowNormalizedTime: normalizedTime,
+    // Flow, Datamosh, 3D, and Texture are driven by loop phase rather than
+    // seconds. Feed them the Loop Timing-remapped phase so they follow the
+    // same progress curve as the auto tracks (0 and 1 stay fixed points).
+    flowNormalizedTime: scene.autoTime,
     flowLoopEnabled: state.animation.previewLoop ?? true,
     flowSessionId: options.renderSessionId ?? 'preview',
     datamosh: state.datamosh,
     coneView: state.coneView,
     texture: state.texture,
     textureImageSource: state.textureImageSource ?? null,
-    textureNormalizedTime: normalizedTime,
+    textureNormalizedTime: scene.autoTime,
   });
 }
 

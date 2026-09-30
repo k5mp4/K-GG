@@ -95,6 +95,10 @@ Preview、Thumbnail、静止画、連番、動画、Transition、Tile Renderは�
 
 Animationの既存`previewLoop`、`duration`、`fps`、normalized timeをFlowが共有します。Loop有効時は位相0へ戻る際に決定的なreset/prewarmを行い、終端フレームを重複せず再生を継続します。Loop無効時は既存の非ループ挙動に従います。
 
+### LOOP-TIMING-001 位相駆動レイヤーへのLoop Timing適用
+
+Loop Timing（`animation.easing`のBezierとBeat Sync）は自動トラックの時刻変換で、Flow Gradient、Datamosh、3D（Cone）、Textureなど正規化時刻（ループ位相）で動くレイヤーにも同じ変換後の位相を渡します。0と1は固定点で、整数回のループ計算はLoop Timingの有無にかかわらずループ境界で閉じます。Loop Timing無効時は従来と同じ位相です。キーフレーム（Keys）トラックは利用者が置いた時刻どおりに評価し、Loop Timingでは変換しません。PreviewとExportは同じ`renderSceneAtTime`経路でこの位相を使います。
+
 ### VIDEO-MOTION-001 Datamosh video motion source
 
 Video Motionは独立したレイヤーではなく、Datamoshレイヤーの`Motion Field`で`Video Motion`を選んだときのmotion sourceとして提供する。動画ファイルはブラウザの`HTMLVideoElement`へ接続し、Datamoshパネルから選択、再生／停止、Field Smoothing、Motion Damping、`Motion Debug`を操作できる。動画を選択するとDatamoshを有効化し、motion sourceを`video`へ切り替える。動画ファイル自体はPresetへ保存しない。別のEffect Stackレイヤーを選択しても、Datamoshパネルと動画source/runtimeは破棄しない。
