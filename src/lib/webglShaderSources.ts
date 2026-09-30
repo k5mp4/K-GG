@@ -31,6 +31,7 @@ import datamoshMainGLSL from '../shaders/datamosh/main.glsl?raw';
 import threeDGLSL from '../shaders/three-d.frag.glsl?raw';
 import textureGLSL from '../shaders/texture.frag.glsl?raw';
 import { CONE_GRADIENT_REAPPLY_SHADER } from './coneSeam';
+import { CONE_SHAPE_INDEX, type ConeShape } from '../types/coneView';
 
 const postprocessGLSL = [
   postprocessUniformsGLSL,
@@ -73,8 +74,27 @@ export type LazyProgramKey =
   | 'flowTrail'
   | 'flowComposite'
   | 'datamosh'
-  | 'threeD'
+  | ThreeDProgramKey
   | 'texture';
+
+const THREE_D_SHAPES = ['cone', 'torus', 'lattice', 'terrain', 'extrusion', 'ribbon', 'rings', 'field'] as const satisfies readonly ConeShape[];
+
+/**
+ * The 3D layer compiles one program per shape (`KGG_THREE_D_SHAPE`). A single
+ * program holding every ray-marched shape takes far longer to compile on
+ * ANGLE/Direct3D than the one shape a scene actually draws.
+ */
+export type ThreeDProgramKey = `threeD${Capitalize<typeof THREE_D_SHAPES[number]>}`;
+
+export const THREE_D_PROGRAM_KEYS: readonly ThreeDProgramKey[] = THREE_D_SHAPES.map(getThreeDProgramKey);
+
+export function getThreeDProgramKey(shape: ConeShape): ThreeDProgramKey {
+  return `threeD${shape.charAt(0).toUpperCase()}${shape.slice(1)}` as ThreeDProgramKey;
+}
+
+export function isThreeDProgramKey(key: LazyProgramKey): key is ThreeDProgramKey {
+  return (THREE_D_PROGRAM_KEYS as readonly LazyProgramKey[]).includes(key);
+}
 
 export type ProgramSource = {
   vertex: string;
@@ -262,8 +282,15 @@ out vec4 kggThreeDColor;
 
 // The 3D layer's seam modes share the Gradient Reapply implementation with
 // the CPU reference in coneSeam.ts; splice it into the dedicated program.
-function createThreeDSource(): string {
-  return THREE_D_FRAGMENT_PRELUDE + threeDGLSL.replace('// KGG_CONE_GRADIENT_REAPPLY_SHADER', CONE_GRADIENT_REAPPLY_SHADER);
+function createThreeDSource(shape: ConeShape): string {
+  return THREE_D_FRAGMENT_PRELUDE
+    + `#define KGG_THREE_D_SHAPE ${CONE_SHAPE_INDEX[shape]}
+`
+    + threeDGLSL.replace('// KGG_CONE_GRADIENT_REAPPLY_SHADER', CONE_GRADIENT_REAPPLY_SHADER);
+}
+
+function getThreeDShape(key: ThreeDProgramKey): ConeShape {
+  return THREE_D_SHAPES.find(shape => getThreeDProgramKey(shape) === key) ?? 'cone';
 }
 
 function createStackCoreSource(): string {
@@ -392,7 +419,7 @@ function getBaseProgramSource(key: LazyProgramKey): ProgramSource {
   if (key === 'flowTrail') return { vertex: vertexGLSL, fragment: flowTrailFragmentGLSL };
   if (key === 'flowComposite') return { vertex: vertexGLSL, fragment: flowGradientFragmentGLSL };
   if (key === 'datamosh') return { vertex: vertexGLSL, fragment: datamoshGLSL };
-  if (key === 'threeD') return { vertex: THREE_D_VERTEX_SOURCE, fragment: createThreeDSource() };
+  if (isThreeDProgramKey(key)) return { vertex: THREE_D_VERTEX_SOURCE, fragment: createThreeDSource(getThreeDShape(key)) };
   if (key === 'texture') return { vertex: vertexGLSL, fragment: textureGLSL };
   return { vertex: particlesVertexGLSL, fragment: particlesFragmentGLSL };
 }

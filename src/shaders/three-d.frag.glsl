@@ -3,6 +3,13 @@ precision highp float;
 // Compiled as GLSL ES 3.00 behind aliases for texture2D and gl_FragColor
 // (see createThreeDSource), so explicit-LOD textureLod is available.
 
+// Which shape this program renders. A negative value compiles every shape and
+// selects one at runtime by u_threeDShape; a shape index compiles only that
+// shape (see getProgramSource), so a heavy shape never delays a light one.
+#ifndef KGG_THREE_D_SHAPE
+#define KGG_THREE_D_SHAPE -1
+#endif
+
 // Dedicated program for the orderable 3D layer (layer kind `cone`). It maps
 // the preceding stack texture onto a camera-rendered surface. Every shape
 // returns a hit position, normal, and optional surface UV; the shared mapping,
@@ -296,6 +303,7 @@ void threeDSetCameraBasis(vec3 forward, vec3 up) {
   g_cameraRight = normalize(right * localRight.x + cameraUp * localRight.y - forward * localRight.z);
 }
 
+#if KGG_THREE_D_SHAPE < 0 || KGG_THREE_D_SHAPE == 0
 // ---------------------------------------------------------------------------
 // Cone: the ray/cone intersection of the original Cone layer.
 
@@ -343,7 +351,9 @@ vec2 coneMappedUv(vec2 globalUv, out bool hitCone) {
   hitCone = true;
   return vec2(u, v);
 }
+#endif
 
+#if KGG_THREE_D_SHAPE < 0 || KGG_THREE_D_SHAPE == 1
 // ---------------------------------------------------------------------------
 // Rotation about the vertical axis, used to carry the Torus camera around its ring.
 
@@ -422,7 +432,9 @@ ThreeDHit torusHit(vec3 localRay) {
   result.mapScale = 1.0 / TAU;
   return result;
 }
+#endif
 
+#if KGG_THREE_D_SHAPE < 0 || KGG_THREE_D_SHAPE == 2
 // ---------------------------------------------------------------------------
 // Lattice: a triply periodic minimal surface thickened into walls. Straight
 // channels run along x: the gyroid field is exactly 1 on (x, P/4, 0) and the
@@ -482,7 +494,9 @@ ThreeDHit latticeHit(vec3 localRay) {
   result.mapScale = 1.0 / period;
   return result;
 }
+#endif
 
+#if KGG_THREE_D_SHAPE < 0 || KGG_THREE_D_SHAPE == 3 || KGG_THREE_D_SHAPE == 4
 // ---------------------------------------------------------------------------
 // Terrain: the canvas luminance lifts a heightfield that repeats every tile
 // (4 / Texture Repeat world units). The camera glides forward at Altitude and
@@ -560,7 +574,9 @@ ThreeDHit terrainHit(vec3 localRay) {
   result.mapScale = 0.25;
   return result;
 }
+#endif
 
+#if KGG_THREE_D_SHAPE < 0 || KGG_THREE_D_SHAPE == 4
 // ---------------------------------------------------------------------------
 // Extrusion: the canvas is split into Cells x Cells columns over [-1, 1]^2,
 // each raised by its cell color's luminance. A 2D DDA walks the cells along
@@ -665,7 +681,9 @@ ThreeDHit extrusionHit(vec3 localRay) {
   result.mapScale = 0.5;
   return result;
 }
+#endif
 
+#if KGG_THREE_D_SHAPE < 0 || KGG_THREE_D_SHAPE == 5
 // ---------------------------------------------------------------------------
 // Ribbon: a flat band swept around a unit circle in the XZ plane. Its cross
 // section turns by Half Twists / 2 turns per revolution, so an odd count
@@ -742,7 +760,9 @@ ThreeDHit ribbonHit(vec3 localRay) {
   result.mapScale = 0.5;
   return result;
 }
+#endif
 
+#if KGG_THREE_D_SHAPE < 0 || KGG_THREE_D_SHAPE == 6
 // ---------------------------------------------------------------------------
 // Square Rings: square frames (outer half size 1, bar width Thickness, depth
 // Depth, all times the frame's pulse scale) placed one Spacing apart along a
@@ -982,7 +1002,9 @@ ThreeDHit ringsHit(vec3 localRay) {
     * (1.0 - smoothstep(float(RINGS_BEHIND) - 5.0, float(RINGS_BEHIND) - 1.0, -relative));
   return result;
 }
+#endif
 
+#if KGG_THREE_D_SHAPE < 0 || KGG_THREE_D_SHAPE == 7
 // ---------------------------------------------------------------------------
 // Geometry Field: space is split into unit slices along z, and each slice
 // into unit cells whose grid is shifted by a per-slice random offset so the
@@ -1391,6 +1413,7 @@ ThreeDHit fieldHit(vec3 localRay) {
   result.fade = 1.0 - smoothstep(FIELD_VIEW_CELLS - 12.0, FIELD_VIEW_CELLS, distance);
   return result;
 }
+#endif
 
 // ---------------------------------------------------------------------------
 // Mapping, shading, and fog.
@@ -1444,7 +1467,8 @@ void main() {
   vec2 globalUv = (gl_FragCoord.xy + u_tileOffset) / max(u_fullResolution, vec2(1.0));
   vec4 background = vec4(0.0, 0.0, 0.0, 1.0);
 
-  if (u_threeDShape == SHAPE_CONE) {
+#if KGG_THREE_D_SHAPE < 0 || KGG_THREE_D_SHAPE == 0
+  if (KGG_THREE_D_SHAPE == 0 || u_threeDShape == SHAPE_CONE) {
     bool hitCone;
     vec2 mappedUv = coneMappedUv(globalUv, hitCone);
     if (!hitCone) {
@@ -1454,7 +1478,11 @@ void main() {
     gl_FragColor = threeDSampleUnwrapped(mappedUv * vec2(u_coneTextureRepeat, 1.0) + u_coneTextureOffset);
     return;
   }
+#endif
 
+#if KGG_THREE_D_SHAPE == 0
+  gl_FragColor = background;
+#else
   bool validRay;
   vec3 localRay = threeDLookRay(threeDProjectedRay(globalUv, validRay));
   if (!validRay) {
@@ -1464,6 +1492,7 @@ void main() {
 
   ThreeDHit hit;
   float fogScale = 0.25;
+#if KGG_THREE_D_SHAPE < 0
   if (u_threeDShape == SHAPE_LATTICE) {
     hit = latticeHit(localRay);
     fogScale = 1.0 / max(u_latticeScale, 0.1);
@@ -1485,6 +1514,27 @@ void main() {
   } else {
     hit = torusHit(localRay);
   }
+#elif KGG_THREE_D_SHAPE == 1
+  hit = torusHit(localRay);
+#elif KGG_THREE_D_SHAPE == 2
+  hit = latticeHit(localRay);
+  fogScale = 1.0 / max(u_latticeScale, 0.1);
+#elif KGG_THREE_D_SHAPE == 3
+  hit = terrainHit(localRay);
+  fogScale = 0.15;
+#elif KGG_THREE_D_SHAPE == 4
+  hit = extrusionHit(localRay);
+  fogScale = 0.3;
+#elif KGG_THREE_D_SHAPE == 5
+  hit = ribbonHit(localRay);
+  fogScale = 0.3;
+#elif KGG_THREE_D_SHAPE == 6
+  hit = ringsHit(localRay);
+  fogScale = 0.25 / max(u_ringsSpacing, 0.05);
+#elif KGG_THREE_D_SHAPE == 7
+  hit = fieldHit(localRay);
+  fogScale = 0.12;
+#endif
   if (!hit.hit) {
     gl_FragColor = background;
     return;
@@ -1492,4 +1542,5 @@ void main() {
   vec4 color = threeDSurfaceColor(hit);
   color.rgb *= hit.fade;
   gl_FragColor = threeDApplyFog(color, hit.distance, fogScale);
+#endif
 }

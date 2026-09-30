@@ -32,7 +32,10 @@ test('every WebGL program compiles and links in a real WebGL2 context', async ({
         'generator', 'blur', 'normalMap', 'stretch', 'stackCore', 'noiseStack',
         'noiseDiffuseStack', 'glass', 'glassV2', 'glassTile', 'prism', 'postprocess',
         'prismComposite', 'particles', 'seamless', 'flowSplat', 'flowTrail',
-        'flowComposite', 'datamosh', 'threeD', 'texture',
+        'flowComposite', 'datamosh', 'texture',
+        // One program per 3D shape.
+        'threeDCone', 'threeDTorus', 'threeDLattice', 'threeDTerrain',
+        'threeDExtrusion', 'threeDRibbon', 'threeDRings', 'threeDField',
       ].map(key => [key, getProgramSource(key)] as [string, Source]),
       // The renderer compiles Noise-dependent programs once per Noise type.
       ...(NOISE_VARIANT_PROGRAM_KEYS as readonly string[]).flatMap(key => (
@@ -78,6 +81,6 @@ test('every WebGL program compiles and links in a real WebGL2 context', async ({
   for (const result of results) console.log(`[shader] ${result.program}: ${result.ok ? 'ok' : 'FAILED'} (${result.ms}ms)`);
   const failures = results.filter(result => !result.ok);
   expect(failures, JSON.stringify(failures, null, 2)).toEqual([]);
-  // 22 base programs plus 13 Noise types for each of the 3 Noise-dependent programs.
-  expect(results).toHaveLength(22 + 13 * 3);
+  // 29 base programs (3D has one per shape) plus 13 Noise types for each of the 3 Noise-dependent programs.
+  expect(results).toHaveLength(29 + 13 * 3);
 });

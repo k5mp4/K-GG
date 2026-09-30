@@ -25,12 +25,15 @@ import {
   GENERATOR_WITHOUT_NOISE_VARIANT,
   getInitialProgramSource,
   getProgramSource,
+  getThreeDProgramKey,
   isNoiseVariantProgramKey,
+  isThreeDProgramKey,
   NOISE_TYPE_MAP,
   NOISE_VARIANT_PROGRAM_KEYS,
   SHADER_VERSION,
   type LazyProgramKey,
   type NoiseVariantProgramKey,
+  type ThreeDProgramKey,
 } from './webglShaderSources';
 import {
   collectGpuDiagnostics,
@@ -311,8 +314,8 @@ export type WebGLContext = {
   particleInstanceSeed: number;
   datamoshProgram: WebGLProgram | null;
   datamoshUniforms: Record<string, WebGLUniformLocation | null>;
-  threeDProgram: WebGLProgram | null;
-  threeDUniforms: Record<string, WebGLUniformLocation | null>;
+  /** One program per 3D shape, compiled on demand (see ThreeDProgramKey). */
+  threeDPrograms: Partial<Record<ThreeDProgramKey, { program: WebGLProgram; uniforms: Record<string, WebGLUniformLocation | null> }>>;
   textureProgram: WebGLProgram | null;
   textureUniforms: Record<string, WebGLUniformLocation | null>;
   /** Height map of the SANDBOX Texture stage (unit 4 during its pass). */
@@ -734,7 +737,7 @@ export async function initWebGL(canvas: HTMLCanvasElement): Promise<WebGLContext
   ownedFlowGradient = flowGradient;
   const transitionTextureFrom = ownTexture(createTexture(gl));
   const transitionTextureTo = ownTexture(createTexture(gl));
-  const ctx: WebGLContext = { gl, performanceProfiler, gpuDiagnostics, renderOptimization, program, uniforms, geometryBuffer, transitionGeometryBuffer, generatorProgram: program, generatorUniforms: uniforms, bootstrapProgram: program, bootstrapUniforms: uniforms, activeNoiseVariants: createInitialNoiseVariants(), noiseVariantPrograms: new Map([[noiseVariantId('generator', GENERATOR_WITHOUT_NOISE_VARIANT), { program, uniforms }]]), noiseVariantStates: new Map(), gradientRampTexture, meshGradientTexture, meshGradientTextureSignature: '', diffuseCurveTexture, diffuseCurveSignature: '', diffuseAsciiTexture, diffuseAsciiSignature: '', diffuseAsciiCount: 1, diffuseAsciiRows: ASCII_ATLAS_MAX_ROWS, diffuseHistogramAt: 0, manualDistortTexture, manualDistortDisplacement: null, manualDistortSmoothMask: null, manualDistortMapResolution: 0, sourceImageTexture, sourceImageCanvas: null, imageGradientTexture, imageGradientSource: null, imageMaskTexture, imageMaskSource: null, normalMapProgram: null, normalMapUniforms: {}, datamoshProgram: null, datamoshUniforms: {}, threeDProgram: null, threeDUniforms: {}, textureProgram: null, textureUniforms: {}, textureImageTexture, textureImageSource: null, fieldModelTexture, fieldModelVersion: 0, videoMotionFieldTexture, datamoshHistoryFbos: [datamoshHistoryFboA, datamoshHistoryFboB], datamoshHistoryTextures: [datamoshHistoryTextureA, datamoshHistoryTextureB], datamoshInputFbos: [datamoshInputFboA, datamoshInputFboB], datamoshInputTextures: [datamoshInputTextureA, datamoshInputTextureB], datamoshHistory: createDatamoshHistoryState(), gradFbo, gradTexture, blurProgram: null, blurUniforms: {}, stretchProgram: null, stretchUniforms: {}, seamlessProgram: null, seamlessUniforms: {}, postprocessProgram: null, postprocessUniforms: {}, stackCoreProgram: null, stackCoreUniforms: {}, noiseStackProgram: null, noiseStackUniforms: {}, noiseDiffuseStackProgram: null, noiseDiffuseStackUniforms: {}, glassProgram: null, glassUniforms: {}, glassFallbackActive: false, glassV2Program: null, glassV2Uniforms: {}, glassV2FallbackActive: false, glassTileProgram: null, glassTileUniforms: {}, glassTileFallbackActive: false, prismProgram: null, prismUniforms: {}, prismCompositeProgram: null, prismCompositeUniforms: {}, particleProgram: null, particleUniforms: {}, particleVao: null, particleQuadBuffer: null, particleInstanceBuffer: null, particleInstanceCount: 0, particleInstanceSeed: Number.NaN, flowGradient, normalFbo, normalTexture, hBlurFbo, hBlurTexture, postprocessFboA, postprocessTextureA, postprocessFboB, postprocessTextureB, prismScratchFbo, prismScratchTexture, prismBlurFbo, prismBlurTexture, prismGlowFbo, prismGlowTexture, shaderCompileExt, lazyProgramState: createLazyProgramState(), lazyProgramCompileQueue: createSerialAsyncQueue(), resourceLedger, hasPresentedFrame: false, disposed: false };
+  const ctx: WebGLContext = { gl, performanceProfiler, gpuDiagnostics, renderOptimization, program, uniforms, geometryBuffer, transitionGeometryBuffer, generatorProgram: program, generatorUniforms: uniforms, bootstrapProgram: program, bootstrapUniforms: uniforms, activeNoiseVariants: createInitialNoiseVariants(), noiseVariantPrograms: new Map([[noiseVariantId('generator', GENERATOR_WITHOUT_NOISE_VARIANT), { program, uniforms }]]), noiseVariantStates: new Map(), gradientRampTexture, meshGradientTexture, meshGradientTextureSignature: '', diffuseCurveTexture, diffuseCurveSignature: '', diffuseAsciiTexture, diffuseAsciiSignature: '', diffuseAsciiCount: 1, diffuseAsciiRows: ASCII_ATLAS_MAX_ROWS, diffuseHistogramAt: 0, manualDistortTexture, manualDistortDisplacement: null, manualDistortSmoothMask: null, manualDistortMapResolution: 0, sourceImageTexture, sourceImageCanvas: null, imageGradientTexture, imageGradientSource: null, imageMaskTexture, imageMaskSource: null, normalMapProgram: null, normalMapUniforms: {}, datamoshProgram: null, datamoshUniforms: {}, threeDPrograms: {}, textureProgram: null, textureUniforms: {}, textureImageTexture, textureImageSource: null, fieldModelTexture, fieldModelVersion: 0, videoMotionFieldTexture, datamoshHistoryFbos: [datamoshHistoryFboA, datamoshHistoryFboB], datamoshHistoryTextures: [datamoshHistoryTextureA, datamoshHistoryTextureB], datamoshInputFbos: [datamoshInputFboA, datamoshInputFboB], datamoshInputTextures: [datamoshInputTextureA, datamoshInputTextureB], datamoshHistory: createDatamoshHistoryState(), gradFbo, gradTexture, blurProgram: null, blurUniforms: {}, stretchProgram: null, stretchUniforms: {}, seamlessProgram: null, seamlessUniforms: {}, postprocessProgram: null, postprocessUniforms: {}, stackCoreProgram: null, stackCoreUniforms: {}, noiseStackProgram: null, noiseStackUniforms: {}, noiseDiffuseStackProgram: null, noiseDiffuseStackUniforms: {}, glassProgram: null, glassUniforms: {}, glassFallbackActive: false, glassV2Program: null, glassV2Uniforms: {}, glassV2FallbackActive: false, glassTileProgram: null, glassTileUniforms: {}, glassTileFallbackActive: false, prismProgram: null, prismUniforms: {}, prismCompositeProgram: null, prismCompositeUniforms: {}, particleProgram: null, particleUniforms: {}, particleVao: null, particleQuadBuffer: null, particleInstanceBuffer: null, particleInstanceCount: 0, particleInstanceSeed: Number.NaN, flowGradient, normalFbo, normalTexture, hBlurFbo, hBlurTexture, postprocessFboA, postprocessTextureA, postprocessFboB, postprocessTextureB, prismScratchFbo, prismScratchTexture, prismBlurFbo, prismBlurTexture, prismGlowFbo, prismGlowTexture, shaderCompileExt, lazyProgramState: createLazyProgramState(), lazyProgramCompileQueue: createSerialAsyncQueue(), resourceLedger, hasPresentedFrame: false, disposed: false };
   initializedContext = ctx;
   for (const key of NOISE_VARIANT_PROGRAM_KEYS) {
     ctx.lazyProgramState[key] = getNoiseVariantState(ctx, key, ctx.activeNoiseVariants[key]);
@@ -808,7 +811,7 @@ export function disposeWebGL(ctx: WebGLContext): void {
     ctx.prismCompositeProgram,
     ctx.particleProgram,
     ctx.datamoshProgram,
-    ctx.threeDProgram,
+    ...Object.values(ctx.threeDPrograms).map(entry => entry.program),
     ctx.textureProgram,
   ];
   const uniquePrograms = new Set(programs.filter((program): program is WebGLProgram => Boolean(program)));
@@ -1002,7 +1005,14 @@ function createLazyProgramState(): Record<LazyProgramKey, LazyProgramState> {
     flowTrail: { promise: null, failed: false, timedOut: false, fallback: false },
     flowComposite: { promise: null, failed: false, timedOut: false, fallback: false },
     datamosh: { promise: null, failed: false, timedOut: false, fallback: false },
-    threeD: { promise: null, failed: false, timedOut: false, fallback: false },
+    threeDCone: { promise: null, failed: false, timedOut: false, fallback: false },
+    threeDTorus: { promise: null, failed: false, timedOut: false, fallback: false },
+    threeDLattice: { promise: null, failed: false, timedOut: false, fallback: false },
+    threeDTerrain: { promise: null, failed: false, timedOut: false, fallback: false },
+    threeDExtrusion: { promise: null, failed: false, timedOut: false, fallback: false },
+    threeDRibbon: { promise: null, failed: false, timedOut: false, fallback: false },
+    threeDRings: { promise: null, failed: false, timedOut: false, fallback: false },
+    threeDField: { promise: null, failed: false, timedOut: false, fallback: false },
     texture: { promise: null, failed: false, timedOut: false, fallback: false },
   };
 }
@@ -1347,9 +1357,8 @@ function installLazyProgram(
   } else if (key === 'datamosh') {
     ctx.datamoshProgram = program;
     ctx.datamoshUniforms = getDatamoshUniforms(gl, program);
-  } else if (key === 'threeD') {
-    ctx.threeDProgram = program;
-    ctx.threeDUniforms = getPostprocessUniforms(gl, program);
+  } else if (isThreeDProgramKey(key)) {
+    ctx.threeDPrograms[key] = { program, uniforms: getPostprocessUniforms(gl, program) };
   } else if (key === 'texture') {
     ctx.textureProgram = program;
     ctx.textureUniforms = getTextureUniforms(gl, program);
@@ -1559,6 +1568,7 @@ function markNoiseDiffuseStackFallback(ctx: WebGLContext): void {
 }
 
 function lazyProgramReady(ctx: WebGLContext, key: LazyProgramKey, noiseVariant?: number): boolean {
+  if (isThreeDProgramKey(key)) return Boolean(ctx.threeDPrograms[key]);
   if (noiseVariant !== undefined && isNoiseVariantProgramKey(key)) {
     return ctx.noiseVariantPrograms.has(noiseVariantId(key, noiseVariant));
   }
@@ -1567,7 +1577,6 @@ function lazyProgramReady(ctx: WebGLContext, key: LazyProgramKey, noiseVariant?:
     blur: [ctx.blurProgram, ctx.blurUniforms],
     normalMap: [ctx.normalMapProgram, ctx.normalMapUniforms],
     datamosh: [ctx.datamoshProgram, ctx.datamoshUniforms],
-    threeD: [ctx.threeDProgram, ctx.threeDUniforms],
     texture: [ctx.textureProgram, ctx.textureUniforms],
     stretch: [ctx.stretchProgram, ctx.stretchUniforms],
     seamless: [ctx.seamlessProgram, ctx.seamlessUniforms],
@@ -3539,15 +3548,17 @@ function drawThreeDPass(
   offsetY: number,
   targetFramebuffer: WebGLFramebuffer | null,
 ): boolean {
-  if (!ctx.threeDProgram) return false;
+  const config = normalizeConeViewConfig(coneView);
+  const threeD = ctx.threeDPrograms[getThreeDProgramKey(config.shape)];
+  if (!threeD) return false;
   const { gl } = ctx;
-  const uniforms = ctx.threeDUniforms;
+  const uniforms = threeD.uniforms;
   const params = getThreeDRenderParams(
-    normalizeConeViewConfig(coneView),
+    config,
     normalizedTime,
     fullWidth / Math.max(fullHeight, 1),
   );
-  gl.useProgram(ctx.threeDProgram);
+  gl.useProgram(threeD.program);
   gl.viewport(0, 0, width, height);
   gl.disable(gl.BLEND);
   gl.bindFramebuffer(gl.FRAMEBUFFER, targetFramebuffer);
@@ -3743,8 +3754,11 @@ export function render(
   const threeDRequested = isV2Pipeline && effectPipeline
     ? isEffectStackLayerEnabled(effectPipeline, 'cone')
     : false;
-  const threeDActive = threeDRequested && requestLazyProgram(ctx, 'threeD');
-  const threeDPending = threeDRequested && !threeDActive && !ctx.lazyProgramState.threeD.failed;
+  // Only the shape being drawn is compiled; switching shapes compiles that
+  // shape's program the first time and reuses it afterwards.
+  const threeDProgramKey = getThreeDProgramKey(coneView.shape);
+  const threeDActive = threeDRequested && requestLazyProgram(ctx, threeDProgramKey);
+  const threeDPending = threeDRequested && !threeDActive && !ctx.lazyProgramState[threeDProgramKey].failed;
   const { gl, gradientRampTexture, meshGradientTexture, sourceImageTexture, imageGradientTexture, imageMaskTexture } = ctx;
   gradient = { ...gradient, angle: clampParameter(gradient.angle, 0, getParameterLimit('gradient.angle')) };
   noiseDistortion = {

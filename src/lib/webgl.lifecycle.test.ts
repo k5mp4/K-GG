@@ -61,6 +61,7 @@ function makeContext() {
     geometryBuffer,
     transitionGeometryBuffer,
     flowGradient: makeFlowResources(),
+    threeDPrograms: {},
     datamoshHistoryTextures: [{} as WebGLTexture, {} as WebGLTexture],
     datamoshHistoryFbos: [{} as WebGLFramebuffer, {} as WebGLFramebuffer],
     datamoshInputTextures: [{} as WebGLTexture, {} as WebGLTexture],

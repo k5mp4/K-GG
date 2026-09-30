@@ -4,6 +4,7 @@ import { isGlassTileOpticallyIdentity } from './glassTile';
 import { getActivePostprocessStackLayers } from './postprocessStack';
 import {
   GENERATOR_WITHOUT_NOISE_VARIANT,
+  getThreeDProgramKey,
   NOISE_TYPE_MAP,
   type LazyProgramKey,
   type NoiseVariantProgramKey,
@@ -111,7 +112,7 @@ export function getRequiredSceneProgramKeys(
     add('prismComposite', plan.programs.prismComposite);
     add('particles', plan.programs.particles);
     add('datamosh', plan.programs.datamosh);
-    add('threeD', plan.programs.threeD);
+    if (plan.programs.threeD) add(getThreeDProgramKey(state.coneView.shape), true);
     add('texture', plan.programs.texture);
   } else {
     const layers = getActivePostprocessStackLayers(state.postprocess).filter(layer => (
