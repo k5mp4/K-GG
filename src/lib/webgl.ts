@@ -380,6 +380,7 @@ type GradientRampCache = {
   rampColorMode: GradientConfig['rampColorMode'];
   rampVariable: number;
   rampRepeat: number;
+  rampOffset: number;
 };
 const gradientRampCache = new WeakMap<WebGLContext, GradientRampCache>();
 const registeredWebGLContexts = new WeakMap<HTMLCanvasElement, WebGL2RenderingContext>();
@@ -1989,6 +1990,10 @@ export function applyMeshGradientUniforms(
   gl.uniform4f(uniforms.u_meshColorPositions, 0, 1 / 3, 2 / 3, 1);
 }
 
+function gradientRampOffset(gradient: GradientConfig): number {
+  return Number.isFinite(gradient.rampOffset) ? gradient.rampOffset ?? 0 : 0;
+}
+
 function buildGradientRampData(gradient: GradientConfig): Uint8Array {
   return buildRampTextureData(
     gradient.stops,
@@ -1998,6 +2003,7 @@ function buildGradientRampData(gradient: GradientConfig): Uint8Array {
     gradient.rampColorMode,
     gradient.rampVariable ?? 0,
     gradient.rampRepeat ?? 1,
+    gradientRampOffset(gradient),
   );
 }
 
@@ -2008,6 +2014,7 @@ function gradientRampCacheMatches(cache: GradientRampCache, gradient: GradientCo
     || cache.rampColorMode !== gradient.rampColorMode
     || cache.rampVariable !== (gradient.rampVariable ?? 0)
     || cache.rampRepeat !== (gradient.rampRepeat ?? 1)
+    || cache.rampOffset !== gradientRampOffset(gradient)
     || cache.stops.length !== gradient.stops.length
     || cache.opacityStops.length !== (gradient.opacityStops?.length ?? 0)
   ) return false;
@@ -2035,6 +2042,7 @@ function createGradientRampCache(gradient: GradientConfig, data: Uint8Array): Gr
     rampColorMode: gradient.rampColorMode,
     rampVariable: gradient.rampVariable ?? 0,
     rampRepeat: gradient.rampRepeat ?? 1,
+    rampOffset: gradientRampOffset(gradient),
   };
 }
 
@@ -2201,6 +2209,7 @@ function publishDiffuseInputHistogram(ctx: WebGLContext, gradient: GradientConfi
         gradient.rampColorMode,
         gradient.rampVariable ?? 0,
         gradient.rampRepeat ?? 1,
+        gradientRampOffset(gradient),
       );
       for (let index = 0; index < ramp.length; index += 4) {
         const luminance = Math.max(0, Math.min(255, Math.round(

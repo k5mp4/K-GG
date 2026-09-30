@@ -244,6 +244,7 @@ export function renderFallbackPreview(canvas: HTMLCanvasElement, gradient: Gradi
     gradient.rampColorMode,
     gradient.rampVariable ?? 0,
     gradient.rampRepeat ?? 1,
+    gradient.rampOffset ?? 0,
   );
   const image = context.createImageData(previewWidth, previewHeight);
   const mesh = gradient.gradientType === 'mesh' ? normalizeMeshGradientConfig(gradient.mesh) : null;

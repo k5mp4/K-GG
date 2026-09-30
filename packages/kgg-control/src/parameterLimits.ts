@@ -20,6 +20,7 @@ export const PARAMETER_LIMITS = {
   'gradient.angle': { min: 0, max: 360, step: 1, defaultValue: 180, angleUnit: 'degrees', wrapAngle: true },
   'gradient.rampRepeat': { min: 1, max: 20, step: 1, defaultValue: 1, integer: true },
   'gradient.rampVariable': { min: -1, max: 1, step: 0.001, defaultValue: 0 },
+  'gradient.rampOffset': { min: -1, max: 1, step: 0.001, defaultValue: 0 },
   'imageGradient.anchorInfluence': { min: 0, max: 1, step: 0.01, defaultValue: 0.5 },
   'paletteGenerator.colorIntensity': { min: 0, max: 1, step: 0.01, defaultValue: 0.62 },
   'paletteGenerator.brightness': { min: 0, max: 1, step: 0.01, defaultValue: 0.55 },
@@ -323,6 +324,7 @@ export const PARAMETER_LIMITS = {
 
   'animation.direction': { min: 0, max: 360, step: 1, defaultValue: 0, angleUnit: 'degrees', wrapAngle: true },
   'animation.speed': { min: 0.01, max: 8, step: 0.01, defaultValue: 1 },
+  'animation.rampOffsetSpeed': { min: -8, max: 8, step: 1, defaultValue: 0, integer: true },
   'animation.intensity': { min: 0, max: 1, step: 0.01, defaultValue: 0.5 },
   'animation.duration': { min: 1, max: 10, step: 0.1, defaultValue: 5 },
 } as const satisfies Record<string, ParameterLimit>;

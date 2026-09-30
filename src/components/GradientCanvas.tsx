@@ -148,7 +148,7 @@ export function GradientCanvas({ width = 800, height = 800, animLoopRef, seekVer
         publishProcessedCanvasFrame(normalizedTime);
       });
     });
-  }, [gradient, noiseDistortion, diffuse, imageGradient, slitScan, stretch, normalMap, manualDistort, postprocess, effectPipeline, clothGradient, coneView, seamless, texture, flowGradient, datamosh, disableClothBase, width, height, animation.enabled, animation.speed, animation.direction, animation.easing, animation.affectNoise, animation.affectSlit, animation.affectRamp, animation.affectStretch, keyframeTracks, currentTime, lazyProgramReadyCount, seekVersion, isWebGLReady, sourceImageCanvas, imageGradientSource, imageMaskSource, imageMaskEnabled, textureImageSource]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [gradient, noiseDistortion, diffuse, imageGradient, slitScan, stretch, normalMap, manualDistort, postprocess, effectPipeline, clothGradient, coneView, seamless, texture, flowGradient, datamosh, disableClothBase, width, height, animation.enabled, animation.speed, animation.rampOffsetSpeed, animation.direction, animation.easing, animation.affectNoise, animation.affectSlit, animation.affectRamp, animation.affectStretch, keyframeTracks, currentTime, lazyProgramReadyCount, seekVersion, isWebGLReady, sourceImageCanvas, imageGradientSource, imageMaskSource, imageMaskEnabled, textureImageSource]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // アニメーションループの管理
   useEffect(() => {
@@ -226,7 +226,7 @@ export function GradientCanvas({ width = 800, height = 800, animLoopRef, seekVer
         loop.stop();
       }
     };
-  }, [animation.enabled, animation.duration, animation.previewLoop, animation.speed, animation.fps, keyframeTracks, noiseDistortion.enabled, slitScan.enabled, stretch.enabled, diffuse.enabled, diffuse.seedAnimEnabled, postprocess.enabled, postprocess.effectMode, postprocess.effectStack, postprocess.glassMotion, effectPipeline, clothGradient, coneView, seamless, texture, flowGradient, disableClothBase, isWebGLReady]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [animation.enabled, animation.duration, animation.previewLoop, animation.speed, animation.rampOffsetSpeed, animation.fps, keyframeTracks, noiseDistortion.enabled, slitScan.enabled, stretch.enabled, diffuse.enabled, diffuse.seedAnimEnabled, postprocess.enabled, postprocess.effectMode, postprocess.effectStack, postprocess.glassMotion, effectPipeline, clothGradient, coneView, seamless, texture, flowGradient, disableClothBase, isWebGLReady]); // eslint-disable-line react-hooks/exhaustive-deps
 
   return (
     <div style={{ position: 'relative', width: '100%', height: '100%', isolation: 'isolate' }}>
