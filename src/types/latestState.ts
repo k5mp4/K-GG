@@ -18,6 +18,8 @@ import type { SeamlessConfig } from './seamless';
 import type { TextureConfig } from './texture';
 import type { FlowGradientConfig } from './flowGradient';
 import type { DatamoshConfig } from './datamosh';
+import type { ShapesConfig } from './shapes';
+import type { ShapesMask } from '../lib/shapesLibrary';
 
 export type LatestState = {
   gradient: GradientConfig;
@@ -33,6 +35,7 @@ export type LatestState = {
   texture?: TextureConfig;
   flowGradient?: FlowGradientConfig;
   datamosh?: DatamoshConfig;
+  shapes?: ShapesConfig;
   manualDistort: ManualDistortConfig;
   postprocess: PostprocessConfig;
   effectPipeline: EffectPipelineConfig;
@@ -47,4 +50,6 @@ export type LatestState = {
   imageMaskEnabled?: boolean;
   /** Session-only height map for the SANDBOX Texture stage; never saved in a Preset. */
   textureImageSource?: HTMLCanvasElement | null;
+  /** Session-only rasterized custom SVG for SANDBOX Shapes; never saved in a Preset. */
+  shapesCustomMask?: ShapesMask | null;
 };

@@ -81,7 +81,8 @@ Web 版は `index.html` で Google Fonts から Noto Sans JP、Open Sans を読�
 
 ### SANDBOX
 - トップバーは `Diffuse → Noise → Slit → Postprocess → SANDBOX → Export → Preset` の順で、Stretchは独立項目およびPostprocessのプロパティモジュールに表示しません。PostprocessではEdit Layerを選択し、その詳細プロパティを操作できます。SANDBOXの文字色はPostprocessと同じです。
-- グラデーションの主スタックとは別に、Cloth、Normal、Prism、Particles、Flow Gradient、Seamlessの6モジュールを一つのパネルから編集できます。ConeはSANDBOXに含めず、Effect Stackの通常レイヤーとして扱います。
+- グラデーションの主スタックとは別に、Cloth、Normal、Prism、Particles、Flow Gradient、Seamless、Shapesの7モジュールを一つのパネルから編集できます。ConeはSANDBOXに含めず、Effect Stackの通常レイヤーとして扱います。
+- `Shapes` はSVGの形状を連続した輝度の場に変え、右サイドバーのGradient Rampで着色する最終段です（サーモグラフィやdepthパスのような見た目）。`Source`で円・星・文字のアウトラインか、`SVGを読み込む`で読み込んだSVGを選びます。SVGは形状（アルファ）だけを使い、色やスタイルは無視します。`Edge`のSoftnessで輪郭をなめらかにし、Inner Shadowで縁へ向かって暗くなる奥行きを作ります。`Fill`でフロー（流体のようなノイズ）、リップル（奥行きに沿って進む帯）、ストライプ、K-GGの描画の輝度のいずれかを内部で動かし（Fill CyclesはAnimation 1ループの周期数）、`Gradient`でオーラ・Contrast・Grainを調整します。`Show / Hide Loop`の`Mode`（フェード＋発光、ワイプ、ネオン点滅、常に表示）で、Animationの各ループ内に表示・非表示を`Cycles`回繰り返します。読み込んだSVGはPresetへ保存されず、未読込のときは星で描画します。
 
 - `Texture` はEffect Stackのレイヤーで、それより上のレイヤーの結果へ高さ場でライティングし、異方性反射の質感を重ねます。`Source`は手続き型（ヘアライン金属、旋盤仕上げ金属、CDの溝、紙）または読み込んだ画像の輝度で、画像は`Cover`／`Tile`で配置します。`Roughness`と`Anisotropy`でハイライトの広がりと伸びを、`Metallic`で色の付き方を、`Light Angle`・`Light Height`・`Light Sweep`（Animation 1ループでライトが回る回数）でライトを、`Diffraction`でCDの虹色を調整します。読み込んだ画像はPresetへ保存されず、未読込のときは選択中のプリセットで描画します。
 - `Normal` はグラデーションの輝度勾配から法線マップを生成します。`Strength`、`Blur`、`Angle`、`Bevel Size`で表面の凹凸を調整します。

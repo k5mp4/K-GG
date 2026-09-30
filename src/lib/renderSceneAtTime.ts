@@ -11,6 +11,7 @@ import {
   getEffectStackTransition,
 } from './effectStackTransition';
 import { renderFrame } from './renderFrame';
+import { resolveShapesMask } from './shapesLibrary';
 
 type RenderSceneOptions = {
   tile?: TileRenderOptions;
@@ -66,6 +67,10 @@ function renderSceneFrame(
     texture: state.texture,
     textureImageSource: state.textureImageSource ?? null,
     textureNormalizedTime: scene.autoTime,
+    shapes: state.shapes,
+    shapesMask: state.shapes?.enabled ? resolveShapesMask(state.shapes.source, state.shapesCustomMask) : null,
+    shapesNormalizedTime: scene.autoTime,
+    shapesAnimated: state.animation.enabled,
   });
 }
 

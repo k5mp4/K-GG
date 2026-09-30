@@ -5,6 +5,7 @@ import { normalizeClothGradientConfig } from '../types/clothGradient';
 import { normalizeConeViewConfig } from '../types/coneView';
 import { normalizeSeamlessConfig } from '../types/seamless';
 import { normalizeTextureConfig } from '../types/texture';
+import { normalizeShapesConfig } from '../types/shapes';
 import { normalizeFlowGradientConfig } from '../types/flowGradient';
 import { resolvePersistedDatamosh } from '../types/datamosh';
 import { normalizeImageGradientConfig } from '../types/imageGradient';
@@ -349,6 +350,7 @@ export function PresetPanel({ canvasW, canvasH, setCanvasW, setCanvasH, aspectRa
     applicationCommands.setConeView(normalizeConeViewConfig(s.coneView));
     applicationCommands.setSeamless(normalizeSeamlessConfig(s.seamless));
     applicationCommands.setTexture(normalizeTextureConfig(s.texture));
+    applicationCommands.setShapes(normalizeShapesConfig(s.shapes));
     applicationCommands.setFlowGradient(normalizeFlowGradientConfig(s.flowGradient));
     // Presets saved before Datamosh migrate their Effect Stack Video Motion here.
     applicationCommands.setDatamosh(resolvePersistedDatamosh(s));
@@ -380,10 +382,10 @@ export function PresetPanel({ canvasW, canvasH, setCanvasW, setCanvasH, aspectRa
   async function handleSave() {
     const trimmed = name.trim();
     if (!trimmed) return;
-    const { gradient, noiseDistortion, diffuse, imageGradient, slitScan, stretch, animation, normalMap, clothGradient, coneView, seamless, texture, flowGradient, datamosh, manualDistort, postprocess, effectPipeline, keyframeTracks } = store;
+    const { gradient, noiseDistortion, diffuse, imageGradient, slitScan, stretch, animation, normalMap, clothGradient, coneView, seamless, texture, shapes, flowGradient, datamosh, manualDistort, postprocess, effectPipeline, keyframeTracks } = store;
     const state = createPresetSaveState({
       gradient, noiseDistortion, diffuse, imageGradient, slitScan, stretch,
-      animation, normalMap, clothGradient, coneView, seamless, texture, flowGradient, datamosh,
+      animation, normalMap, clothGradient, coneView, seamless, texture, shapes, flowGradient, datamosh,
       manualDistort, postprocess, effectPipeline,
       keyframeTracks,
     }, loadUserColorPalettes(), { width: canvasW, height: canvasH });

@@ -102,6 +102,14 @@ import { VIDEO_MOTION_FIELD_HEIGHT, VIDEO_MOTION_FIELD_WIDTH } from './videoMoti
 import { getThreeDRenderParams } from './coneView';
 import { bindFieldModelTexture, uploadThreeDUniforms } from './threeDUniforms';
 import { DEFAULT_TEXTURE, normalizeTextureConfig, resolveTextureLightAngle, type TextureConfig } from '../types/texture';
+import {
+  evaluateShapesReveal,
+  normalizeShapesConfig,
+  resolveShapesFillPhase,
+  SHAPES_WIPE_SOFTNESS,
+  type ShapesConfig,
+} from '../types/shapes';
+import type { ShapesMask } from './shapesLibrary';
 
 export type { TileRenderOptions } from '../types/rendering';
 
@@ -321,6 +329,13 @@ export type WebGLContext = {
   /** Height map of the SANDBOX Texture stage (unit 4 during its pass). */
   textureImageTexture: WebGLTexture;
   textureImageSource: HTMLCanvasElement | null;
+  /** SANDBOX Shapes: final-stage program, mipmapped alpha mask, and captured frame. */
+  shapesProgram: WebGLProgram | null;
+  shapesUniforms: Record<string, WebGLUniformLocation | null>;
+  shapesMaskTexture: WebGLTexture;
+  shapesMaskKey: string | null;
+  shapesFrameTexture: WebGLTexture;
+  shapesFrameSize: [number, number];
   /** Geometry Field model atlas (unit 13) and the model version it holds, 0 when none. */
   fieldModelTexture: WebGLTexture;
   fieldModelVersion: number;
@@ -701,6 +716,20 @@ export async function initWebGL(canvas: HTMLCanvasElement): Promise<WebGLContext
   // The tile fit repeats the image, so the wrap mode must repeat too.
   gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.REPEAT);
   gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.REPEAT);
+  const shapesMaskTexture = createOwnedTexture();
+  gl.bindTexture(gl.TEXTURE_2D, shapesMaskTexture);
+  gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, 1, 1, 0, gl.RGBA, gl.UNSIGNED_BYTE, new Uint8Array([0, 0, 0, 0]));
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+  const shapesFrameTexture = createOwnedTexture();
+  gl.bindTexture(gl.TEXTURE_2D, shapesFrameTexture);
+  gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, 1, 1, 0, gl.RGBA, gl.UNSIGNED_BYTE, new Uint8Array([0, 0, 0, 0]));
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
   const fieldModelTexture = createOwnedTexture();
   gl.bindTexture(gl.TEXTURE_2D, fieldModelTexture);
   gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, 1, 1, 0, gl.RGBA, gl.UNSIGNED_BYTE, new Uint8Array([255, 255, 0, 255]));
@@ -738,7 +767,7 @@ export async function initWebGL(canvas: HTMLCanvasElement): Promise<WebGLContext
   ownedFlowGradient = flowGradient;
   const transitionTextureFrom = ownTexture(createTexture(gl));
   const transitionTextureTo = ownTexture(createTexture(gl));
-  const ctx: WebGLContext = { gl, performanceProfiler, gpuDiagnostics, renderOptimization, program, uniforms, geometryBuffer, transitionGeometryBuffer, generatorProgram: program, generatorUniforms: uniforms, bootstrapProgram: program, bootstrapUniforms: uniforms, activeNoiseVariants: createInitialNoiseVariants(), noiseVariantPrograms: new Map([[noiseVariantId('generator', GENERATOR_WITHOUT_NOISE_VARIANT), { program, uniforms }]]), noiseVariantStates: new Map(), gradientRampTexture, meshGradientTexture, meshGradientTextureSignature: '', diffuseCurveTexture, diffuseCurveSignature: '', diffuseAsciiTexture, diffuseAsciiSignature: '', diffuseAsciiCount: 1, diffuseAsciiRows: ASCII_ATLAS_MAX_ROWS, diffuseHistogramAt: 0, manualDistortTexture, manualDistortDisplacement: null, manualDistortSmoothMask: null, manualDistortMapResolution: 0, sourceImageTexture, sourceImageCanvas: null, imageGradientTexture, imageGradientSource: null, imageMaskTexture, imageMaskSource: null, normalMapProgram: null, normalMapUniforms: {}, datamoshProgram: null, datamoshUniforms: {}, threeDPrograms: {}, textureProgram: null, textureUniforms: {}, textureImageTexture, textureImageSource: null, fieldModelTexture, fieldModelVersion: 0, videoMotionFieldTexture, datamoshHistoryFbos: [datamoshHistoryFboA, datamoshHistoryFboB], datamoshHistoryTextures: [datamoshHistoryTextureA, datamoshHistoryTextureB], datamoshInputFbos: [datamoshInputFboA, datamoshInputFboB], datamoshInputTextures: [datamoshInputTextureA, datamoshInputTextureB], datamoshHistory: createDatamoshHistoryState(), gradFbo, gradTexture, blurProgram: null, blurUniforms: {}, stretchProgram: null, stretchUniforms: {}, seamlessProgram: null, seamlessUniforms: {}, postprocessProgram: null, postprocessUniforms: {}, stackCoreProgram: null, stackCoreUniforms: {}, noiseStackProgram: null, noiseStackUniforms: {}, noiseDiffuseStackProgram: null, noiseDiffuseStackUniforms: {}, glassProgram: null, glassUniforms: {}, glassFallbackActive: false, glassV2Program: null, glassV2Uniforms: {}, glassV2FallbackActive: false, glassTileProgram: null, glassTileUniforms: {}, glassTileFallbackActive: false, prismProgram: null, prismUniforms: {}, prismCompositeProgram: null, prismCompositeUniforms: {}, particleProgram: null, particleUniforms: {}, particleVao: null, particleQuadBuffer: null, particleInstanceBuffer: null, particleInstanceCount: 0, particleInstanceSeed: Number.NaN, flowGradient, normalFbo, normalTexture, hBlurFbo, hBlurTexture, postprocessFboA, postprocessTextureA, postprocessFboB, postprocessTextureB, prismScratchFbo, prismScratchTexture, prismBlurFbo, prismBlurTexture, prismGlowFbo, prismGlowTexture, shaderCompileExt, lazyProgramState: createLazyProgramState(), lazyProgramCompileQueue: createSerialAsyncQueue(), resourceLedger, hasPresentedFrame: false, disposed: false };
+  const ctx: WebGLContext = { gl, performanceProfiler, gpuDiagnostics, renderOptimization, program, uniforms, geometryBuffer, transitionGeometryBuffer, generatorProgram: program, generatorUniforms: uniforms, bootstrapProgram: program, bootstrapUniforms: uniforms, activeNoiseVariants: createInitialNoiseVariants(), noiseVariantPrograms: new Map([[noiseVariantId('generator', GENERATOR_WITHOUT_NOISE_VARIANT), { program, uniforms }]]), noiseVariantStates: new Map(), gradientRampTexture, meshGradientTexture, meshGradientTextureSignature: '', diffuseCurveTexture, diffuseCurveSignature: '', diffuseAsciiTexture, diffuseAsciiSignature: '', diffuseAsciiCount: 1, diffuseAsciiRows: ASCII_ATLAS_MAX_ROWS, diffuseHistogramAt: 0, manualDistortTexture, manualDistortDisplacement: null, manualDistortSmoothMask: null, manualDistortMapResolution: 0, sourceImageTexture, sourceImageCanvas: null, imageGradientTexture, imageGradientSource: null, imageMaskTexture, imageMaskSource: null, normalMapProgram: null, normalMapUniforms: {}, datamoshProgram: null, datamoshUniforms: {}, threeDPrograms: {}, textureProgram: null, textureUniforms: {}, textureImageTexture, textureImageSource: null, shapesProgram: null, shapesUniforms: {}, shapesMaskTexture, shapesMaskKey: null, shapesFrameTexture, shapesFrameSize: [1, 1], fieldModelTexture, fieldModelVersion: 0, videoMotionFieldTexture, datamoshHistoryFbos: [datamoshHistoryFboA, datamoshHistoryFboB], datamoshHistoryTextures: [datamoshHistoryTextureA, datamoshHistoryTextureB], datamoshInputFbos: [datamoshInputFboA, datamoshInputFboB], datamoshInputTextures: [datamoshInputTextureA, datamoshInputTextureB], datamoshHistory: createDatamoshHistoryState(), gradFbo, gradTexture, blurProgram: null, blurUniforms: {}, stretchProgram: null, stretchUniforms: {}, seamlessProgram: null, seamlessUniforms: {}, postprocessProgram: null, postprocessUniforms: {}, stackCoreProgram: null, stackCoreUniforms: {}, noiseStackProgram: null, noiseStackUniforms: {}, noiseDiffuseStackProgram: null, noiseDiffuseStackUniforms: {}, glassProgram: null, glassUniforms: {}, glassFallbackActive: false, glassV2Program: null, glassV2Uniforms: {}, glassV2FallbackActive: false, glassTileProgram: null, glassTileUniforms: {}, glassTileFallbackActive: false, prismProgram: null, prismUniforms: {}, prismCompositeProgram: null, prismCompositeUniforms: {}, particleProgram: null, particleUniforms: {}, particleVao: null, particleQuadBuffer: null, particleInstanceBuffer: null, particleInstanceCount: 0, particleInstanceSeed: Number.NaN, flowGradient, normalFbo, normalTexture, hBlurFbo, hBlurTexture, postprocessFboA, postprocessTextureA, postprocessFboB, postprocessTextureB, prismScratchFbo, prismScratchTexture, prismBlurFbo, prismBlurTexture, prismGlowFbo, prismGlowTexture, shaderCompileExt, lazyProgramState: createLazyProgramState(), lazyProgramCompileQueue: createSerialAsyncQueue(), resourceLedger, hasPresentedFrame: false, disposed: false };
   initializedContext = ctx;
   for (const key of NOISE_VARIANT_PROGRAM_KEYS) {
     ctx.lazyProgramState[key] = getNoiseVariantState(ctx, key, ctx.activeNoiseVariants[key]);
@@ -814,6 +843,7 @@ export function disposeWebGL(ctx: WebGLContext): void {
     ctx.datamoshProgram,
     ...Object.values(ctx.threeDPrograms).map(entry => entry.program),
     ctx.textureProgram,
+    ctx.shapesProgram,
   ];
   const uniquePrograms = new Set(programs.filter((program): program is WebGLProgram => Boolean(program)));
   for (const program of uniquePrograms) gl.deleteProgram(program);
@@ -828,6 +858,8 @@ export function disposeWebGL(ctx: WebGLContext): void {
     ctx.imageGradientTexture,
     ctx.imageMaskTexture,
     ctx.textureImageTexture,
+    ctx.shapesMaskTexture,
+    ctx.shapesFrameTexture,
     ctx.fieldModelTexture,
     ctx.videoMotionFieldTexture,
     ...ctx.datamoshHistoryTextures,
@@ -1015,6 +1047,7 @@ function createLazyProgramState(): Record<LazyProgramKey, LazyProgramState> {
     threeDRings: { promise: null, failed: false, timedOut: false, fallback: false },
     threeDField: { promise: null, failed: false, timedOut: false, fallback: false },
     texture: { promise: null, failed: false, timedOut: false, fallback: false },
+    shapes: { promise: null, failed: false, timedOut: false, fallback: false },
   };
 }
 
@@ -1199,6 +1232,21 @@ function getTextureUniforms(gl: WebGL2RenderingContext, program: WebGLProgram): 
   return Object.fromEntries(TEXTURE_UNIFORM_NAMES.map(name => [name, gl.getUniformLocation(program, name)]));
 }
 
+const SHAPES_UNIFORM_NAMES = [
+  'u_frameTex', 'u_maskTex', 'u_rampTex', 'u_resolution', 'u_tileOffset', 'u_maskSize',
+  'u_shapeCenter', 'u_shapeExtent', 'u_contentHalf', 'u_shapeUnit', 'u_rotation',
+  'u_softness', 'u_innerShadow', 'u_innerShadowSize', 'u_shadowOffset', 'u_lightAngle',
+  'u_fillSource', 'u_fillAmount', 'u_fillScale', 'u_fillWarp', 'u_fillAngle', 'u_fillPhase',
+  'u_glowRadius', 'u_glowIntensity', 'u_contrast', 'u_grain', 'u_transparentBackground',
+  'u_revealOpacity', 'u_revealGlowScale', 'u_wipeAngle', 'u_wipeRange', 'u_wipeSoftness',
+] as const;
+
+const SHAPES_FILL_SOURCE_INDEX = { flow: 0, ripple: 1, stripes: 2, render: 3 } as const;
+
+function getShapesUniforms(gl: WebGL2RenderingContext, program: WebGLProgram): Record<string, WebGLUniformLocation | null> {
+  return Object.fromEntries(SHAPES_UNIFORM_NAMES.map(name => [name, gl.getUniformLocation(program, name)]));
+}
+
 const DATAMOSH_UNIFORM_NAMES = [
   'u_currentTex', 'u_historyTex', 'u_motionField', 'u_gradientRamp', 'u_resolution', 'u_time',
   'u_frameSeed', 'u_historyPrimed', 'u_previousInputTex', 'u_previousInputValid', 'u_blockLock', 'u_motionSource', 'u_mixMode', 'u_strength', 'u_refresh',
@@ -1363,6 +1411,9 @@ function installLazyProgram(
   } else if (key === 'texture') {
     ctx.textureProgram = program;
     ctx.textureUniforms = getTextureUniforms(gl, program);
+  } else if (key === 'shapes') {
+    ctx.shapesProgram = program;
+    ctx.shapesUniforms = getShapesUniforms(gl, program);
   } else {
     const uniforms = getParticleUniforms(gl, program);
     ctx.particleProgram = program;
@@ -1579,6 +1630,7 @@ function lazyProgramReady(ctx: WebGLContext, key: LazyProgramKey, noiseVariant?:
     normalMap: [ctx.normalMapProgram, ctx.normalMapUniforms],
     datamosh: [ctx.datamoshProgram, ctx.datamoshUniforms],
     texture: [ctx.textureProgram, ctx.textureUniforms],
+    shapes: [ctx.shapesProgram, ctx.shapesUniforms],
     stretch: [ctx.stretchProgram, ctx.stretchUniforms],
     seamless: [ctx.seamlessProgram, ctx.seamlessUniforms],
     stackCore: [ctx.stackCoreProgram, ctx.stackCoreUniforms],
@@ -4800,4 +4852,126 @@ export function render(
   } else if (particleActive) {
     drawParticleOverlay(ctx, particleSourceTexture ?? ctx.gradTexture, gradient, postprocess, vpW, vpH, width, height, tileOx, tileOy, time);
   }
+}
+
+export type ShapesPassInput = {
+  config: ShapesConfig;
+  /** Resolved mask (built-in or custom). Without one the pass is skipped. */
+  mask: ShapesMask | null;
+  /** Loop phase (Loop Timing applied), shared with the other loop-driven stages. */
+  normalizedTime: number;
+  /** False when Animation is off: the shape stays fully visible and the stripes stand still. */
+  animated: boolean;
+  /** Full output size; tiles place the shape in this space. */
+  width: number;
+  height: number;
+  tile?: TileRenderOptions;
+};
+
+/** Content box, padded mask extent, and centre of the shape in global bottom-up pixels. */
+export function getShapesPlacement(config: ShapesConfig, mask: Pick<ShapesMask, 'aspect' | 'contentScale'>, width: number, height: number) {
+  const availableWidth = Math.max(width * config.scale, 1);
+  const availableHeight = Math.max(height * config.scale, 1);
+  const aspect = mask.aspect > 0 && Number.isFinite(mask.aspect) ? mask.aspect : 1;
+  const contentWidth = aspect >= availableWidth / availableHeight ? availableWidth : availableHeight * aspect;
+  const contentHeight = aspect >= availableWidth / availableHeight ? availableWidth / aspect : availableHeight;
+  // Lengths are relative to the shorter side, so thin shapes such as text
+  // strokes get the same inner depth as compact ones.
+  const unit = Math.min(contentWidth, contentHeight);
+  const shortSide = Math.min(width, height);
+  return {
+    center: [width / 2 + (config.offsetX * shortSide) / 2, height / 2 - (config.offsetY * shortSide) / 2] as [number, number],
+    extent: [contentWidth / mask.contentScale[0], contentHeight / mask.contentScale[1]] as [number, number],
+    contentHalf: [contentWidth / 2 / unit, contentHeight / 2 / unit] as [number, number],
+    unit,
+  };
+}
+
+/**
+ * SANDBOX Shapes: the final stage. It runs after the whole frame (including
+ * Particles and Seamless) has been drawn to the canvas, captures that frame
+ * (the Render fill reads its luminance), and redraws the canvas as the
+ * shape's luminance field mapped through the Gradient Ramp. Returns false when the
+ * stage is off, its program is still compiling, or there is no mask.
+ */
+export function renderShapesPass(ctx: WebGLContext, input: ShapesPassInput): boolean {
+  const config = normalizeShapesConfig(input.config);
+  const { mask } = input;
+  if (!config.enabled || !mask || ctx.disposed || ctx.gl.isContextLost()) return false;
+  if (!requestLazyProgram(ctx, 'shapes') || !ctx.shapesProgram) return false;
+  const { gl } = ctx;
+  const vpW = Math.min(input.tile ? input.tile.viewport[0] : input.width, gl.drawingBufferWidth);
+  const vpH = Math.min(input.tile ? input.tile.viewport[1] : input.height, gl.drawingBufferHeight);
+  if (vpW <= 0 || vpH <= 0) return false;
+  const uniforms = ctx.shapesUniforms;
+
+  // Capture the finished frame; the pass then overwrites the canvas.
+  gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+  gl.activeTexture(gl.TEXTURE3);
+  gl.bindTexture(gl.TEXTURE_2D, ctx.shapesFrameTexture);
+  if (ctx.shapesFrameSize[0] !== vpW || ctx.shapesFrameSize[1] !== vpH) {
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, vpW, vpH, 0, gl.RGBA, gl.UNSIGNED_BYTE, null);
+    ctx.shapesFrameSize = [vpW, vpH];
+  }
+  gl.copyTexSubImage2D(gl.TEXTURE_2D, 0, 0, 0, 0, 0, vpW, vpH);
+
+  gl.activeTexture(gl.TEXTURE4);
+  gl.bindTexture(gl.TEXTURE_2D, ctx.shapesMaskTexture);
+  if (ctx.shapesMaskKey !== mask.key) {
+    gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, false);
+    gl.pixelStorei(gl.UNPACK_PREMULTIPLY_ALPHA_WEBGL, false);
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, mask.canvas);
+    // Mip levels are the pre-filtered alpha the blur kernel samples.
+    gl.generateMipmap(gl.TEXTURE_2D);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR_MIPMAP_LINEAR);
+    ctx.shapesMaskKey = mask.key;
+  }
+
+  gl.activeTexture(gl.TEXTURE5);
+  gl.bindTexture(gl.TEXTURE_2D, ctx.gradientRampTexture);
+
+  const placement = getShapesPlacement(config, mask, input.width, input.height);
+  const reveal = evaluateShapesReveal(config, input.normalizedTime, input.animated);
+  const degrees = Math.PI / 180;
+
+  gl.useProgram(ctx.shapesProgram);
+  gl.viewport(0, 0, vpW, vpH);
+  gl.disable(gl.BLEND);
+  gl.disable(gl.SCISSOR_TEST);
+  gl.colorMask(true, true, true, true);
+  setUniform1i(gl, uniforms.u_frameTex, 3);
+  setUniform1i(gl, uniforms.u_maskTex, 4);
+  setUniform1i(gl, uniforms.u_rampTex, 5);
+  gl.uniform2f(uniforms.u_resolution, vpW, vpH);
+  gl.uniform2f(uniforms.u_tileOffset, input.tile ? input.tile.offset[0] : 0, input.tile ? input.tile.offset[1] : 0);
+  gl.uniform2f(uniforms.u_maskSize, mask.canvas.width, mask.canvas.height);
+  gl.uniform2f(uniforms.u_shapeCenter, placement.center[0], placement.center[1]);
+  gl.uniform2f(uniforms.u_shapeExtent, placement.extent[0], placement.extent[1]);
+  gl.uniform2f(uniforms.u_contentHalf, placement.contentHalf[0], placement.contentHalf[1]);
+  gl.uniform1f(uniforms.u_shapeUnit, placement.unit);
+  gl.uniform1f(uniforms.u_rotation, config.rotation * degrees);
+  gl.uniform1f(uniforms.u_softness, config.softness);
+  gl.uniform1f(uniforms.u_innerShadow, config.innerShadow);
+  gl.uniform1f(uniforms.u_innerShadowSize, config.innerShadowSize);
+  gl.uniform1f(uniforms.u_shadowOffset, config.shadowOffset);
+  gl.uniform1f(uniforms.u_lightAngle, config.lightAngle * degrees);
+  setUniform1i(gl, uniforms.u_fillSource, SHAPES_FILL_SOURCE_INDEX[config.fillSource]);
+  gl.uniform1f(uniforms.u_fillAmount, config.fillAmount);
+  gl.uniform1f(uniforms.u_fillScale, config.fillScale);
+  gl.uniform1f(uniforms.u_fillWarp, config.fillWarp);
+  gl.uniform1f(uniforms.u_fillAngle, config.fillAngle * degrees);
+  gl.uniform1f(uniforms.u_fillPhase, resolveShapesFillPhase(config, input.normalizedTime, input.animated));
+  gl.uniform1f(uniforms.u_glowRadius, config.glowRadius);
+  gl.uniform1f(uniforms.u_glowIntensity, config.glowIntensity);
+  gl.uniform1f(uniforms.u_contrast, config.contrast);
+  gl.uniform1f(uniforms.u_grain, config.grain);
+  setUniform1i(gl, uniforms.u_transparentBackground, config.transparentBackground ? 1 : 0);
+  gl.uniform1f(uniforms.u_revealOpacity, reveal.opacity);
+  gl.uniform1f(uniforms.u_revealGlowScale, reveal.glowScale);
+  // The wipe travels in the fill direction.
+  gl.uniform1f(uniforms.u_wipeAngle, config.fillAngle * degrees);
+  gl.uniform2f(uniforms.u_wipeRange, reveal.wipeStart, reveal.wipeEnd);
+  gl.uniform1f(uniforms.u_wipeSoftness, SHAPES_WIPE_SOFTNESS);
+  drawArrays(ctx, 'Shapes', gl.TRIANGLES, 0, 6);
+  return true;
 }

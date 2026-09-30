@@ -133,6 +133,7 @@ export function getRequiredSceneProgramKeys(
   }
 
   add('seamless', state.seamless?.enabled ?? false);
+  add('shapes', state.shapes?.enabled ?? false);
   const flowGradientEnabled = state.effectPipeline.flowGradientEnabled === true;
   add('flowSplat', flowGradientEnabled);
   add('flowTrail', flowGradientEnabled);

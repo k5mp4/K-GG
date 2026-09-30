@@ -10,12 +10,13 @@ import { Icon } from './Icon';
 import { NormalMapPanel } from './NormalMapPanel';
 import { PostprocessPanel } from './PostprocessPanel';
 import { SeamlessPanel } from './SeamlessPanel';
+import { ShapesPanel } from './ShapesPanel';
 import { Toggle } from './Toggle';
 import type { RenderViewMode } from '../types/renderView';
 
-type SandboxProgramKey = 'normalMap' | 'prism' | 'particles' | 'flowGradient' | 'flowSplat' | 'flowTrail' | 'flowComposite' | 'cloth' | 'seamless';
+type SandboxProgramKey = 'normalMap' | 'prism' | 'particles' | 'flowGradient' | 'flowSplat' | 'flowTrail' | 'flowComposite' | 'cloth' | 'seamless' | 'shapes';
 type SandboxProgramStatus = 'loading' | 'ready' | 'failed' | 'fallback';
-type SandboxModuleKey = 'cloth' | 'normal' | 'prism' | 'particles' | 'flowGradient' | 'seamless';
+type SandboxModuleKey = 'cloth' | 'normal' | 'prism' | 'particles' | 'flowGradient' | 'seamless' | 'shapes';
 
 type SandboxModuleProps = {
   id: SandboxModuleKey;
@@ -101,8 +102,9 @@ export function SandboxPanel({ onRenderViewModeChange }: SandboxPanelProps) {
     clothGradient,
     effectPipeline,
     seamless,
+    shapes,
   } = useGradientStore();
-  const { setNormalMap, setClothGradient, setGradient, setEffectPipeline, setSeamless } = applicationCommands;
+  const { setNormalMap, setClothGradient, setGradient, setEffectPipeline, setSeamless, setShapes } = applicationCommands;
   const [selectedModule, setSelectedModule] = useState<SandboxModuleKey>('cloth');
   const [programStatus, setProgramStatus] = useState<Partial<Record<SandboxProgramKey, SandboxProgramStatus>>>({});
 
@@ -123,7 +125,8 @@ export function SandboxPanel({ onRenderViewModeChange }: SandboxPanelProps) {
   const particlesStatus = moduleStatus('particles', effectPipeline.particlesEnabled, programStatus, t);
   const flowStatus = moduleStatus('flowGradient', Boolean(effectPipeline.flowGradientEnabled), programStatus, t);
   const seamlessStatus = moduleStatus('seamless', seamless.enabled, programStatus, t);
-  const activeCount = [clothGradient.enabled, normalMap.enabled, effectPipeline.prismEnabled, effectPipeline.particlesEnabled, Boolean(effectPipeline.flowGradientEnabled), seamless.enabled]
+  const shapesStatus = moduleStatus('shapes', shapes.enabled, programStatus, t);
+  const activeCount = [clothGradient.enabled, normalMap.enabled, effectPipeline.prismEnabled, effectPipeline.particlesEnabled, Boolean(effectPipeline.flowGradientEnabled), seamless.enabled, shapes.enabled]
     .filter(Boolean).length;
 
   const setNormalEnabled = (enabled: boolean) => {
@@ -135,13 +138,13 @@ export function SandboxPanel({ onRenderViewModeChange }: SandboxPanelProps) {
     ? 'Cloth'
     : selectedModule === 'normal'
       ? t('effect.normal')
-    : selectedModule === 'prism' ? 'Prism' : selectedModule === 'particles' ? 'Particles' : selectedModule === 'flowGradient' ? 'Flow Gradient' : 'Seamless';
+    : selectedModule === 'prism' ? 'Prism' : selectedModule === 'particles' ? 'Particles' : selectedModule === 'flowGradient' ? 'Flow Gradient' : selectedModule === 'shapes' ? 'Shapes' : 'Seamless';
 
   return (
     <div className="space-y-4" data-sandbox-panel>
       <div className="flex items-center justify-between gap-3">
         <h2 className="font-display text-sm font-bold uppercase tracking-[0.2em] text-k-text hint-label" title={t('sandbox.description')}>{t('effect.sandbox')}</h2>
-        <span className="font-display text-[10px] font-bold text-cyan-100 hint-label" title={t('sandbox.active')}>{activeCount}<span className="text-cyan-100/40">/6</span></span>
+        <span className="font-display text-[10px] font-bold text-cyan-100 hint-label" title={t('sandbox.active')}>{activeCount}<span className="text-cyan-100/40">/7</span></span>
       </div>
 
       <div className="space-y-3">
@@ -156,6 +159,7 @@ export function SandboxPanel({ onRenderViewModeChange }: SandboxPanelProps) {
             { value: 'particles', label: 'Particles' },
             { value: 'flowGradient', label: 'Flow Gradient' },
             { value: 'seamless', label: 'Seamless' },
+            { value: 'shapes', label: 'Shapes' },
           ]}
           onChange={(value) => setSelectedModule(value as SandboxModuleKey)}
         />
@@ -240,6 +244,20 @@ export function SandboxPanel({ onRenderViewModeChange }: SandboxPanelProps) {
             onToggleEnabled={(enabled) => setSeamless({ enabled })}
           >
             <SeamlessPanel />
+          </SandboxModule>
+        )}
+
+        {selectedModule === 'shapes' && (
+          <SandboxModule
+            id="shapes"
+            label={selectedLabel}
+            description={t('sandbox.shapesDescription')}
+            enabled={shapes.enabled}
+            status={shapesStatus}
+            onToggleEnabled={(enabled) => setShapes({ enabled })}
+            badge={<span className="rounded bg-amber-500/20 px-1.5 py-0.5 text-[8px] font-medium tracking-normal text-amber-300" title={t('beta.experimental')}>🧪 Beta</span>}
+          >
+            <ShapesPanel />
           </SandboxModule>
         )}
 

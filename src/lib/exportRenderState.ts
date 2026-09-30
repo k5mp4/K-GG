@@ -11,6 +11,7 @@ export function createExportStateSnapshot(state: LatestState): LatestState {
     imageGradientSource,
     imageMaskSource,
     textureImageSource,
+    shapesCustomMask,
     ...serializableState
   } = state;
   return {
@@ -19,5 +20,6 @@ export function createExportStateSnapshot(state: LatestState): LatestState {
     imageGradientSource,
     imageMaskSource,
     textureImageSource,
+    shapesCustomMask,
   };
 }

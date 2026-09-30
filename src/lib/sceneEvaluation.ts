@@ -304,7 +304,8 @@ export function hasActiveAnimation(state: LatestState): boolean {
     state.animation.affectRamp ||
     Math.round(state.animation.rampOffsetSpeed ?? 0) !== 0 ||
     (state.diffuse.enabled && Boolean(state.diffuse.seedAnimEnabled)) ||
-    isPostprocessTimeAnimationActive(state.postprocess, state.effectPipeline)
+    isPostprocessTimeAnimationActive(state.postprocess, state.effectPipeline) ||
+    (state.shapes?.enabled === true && (state.shapes.reveal !== 'none' || state.shapes.fillCycles !== 0))
   );
 }
 

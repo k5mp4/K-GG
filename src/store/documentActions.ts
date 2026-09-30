@@ -16,6 +16,7 @@ import { normalizeClothGradientConfig } from '../types/clothGradient';
 import { normalizeConeViewConfig } from '../types/coneView';
 import { normalizeSeamlessConfig } from '../types/seamless';
 import { normalizeTextureConfig } from '../types/texture';
+import { normalizeShapesConfig } from '../types/shapes';
 import { normalizeImageGradientConfig } from '../types/imageGradient';
 import { normalizePropertyTrack, type AnimationMode, type Keyframe } from '../types/keyframe';
 import { computeAutoHandles } from '../lib/autoBezier';
@@ -375,6 +376,7 @@ export function createDocumentActions(set: DocumentStoreSet, defaults: DocumentD
   setClothGradient: (v) => set((s) => ({ clothGradient: normalizeClothGradientConfig({ ...s.clothGradient, ...v }) })),
   setConeView: (v) => set((s) => ({ coneView: normalizeConeViewConfig({ ...s.coneView, ...v }) })),
   setSeamless: (v) => set((s) => ({ seamless: normalizeSeamlessConfig({ ...s.seamless, ...v }) })),
+  setShapes: (v) => set((s) => ({ shapes: normalizeShapesConfig({ ...s.shapes, ...v }) })),
   setTexture: (v) => set((s) => {
     const texture = normalizeTextureConfig({ ...s.texture, ...v });
     const effectPipeline = v.enabled !== undefined && s.effectPipeline.version === 'stack-v2'

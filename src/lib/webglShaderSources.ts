@@ -30,6 +30,7 @@ import datamoshPixelStretchGLSL from '../shaders/datamosh/pixel-stretch.glsl?raw
 import datamoshMainGLSL from '../shaders/datamosh/main.glsl?raw';
 import threeDGLSL from '../shaders/three-d.frag.glsl?raw';
 import textureGLSL from '../shaders/texture.frag.glsl?raw';
+import shapesGLSL from '../shaders/shapes.frag.glsl?raw';
 import { CONE_GRADIENT_REAPPLY_SHADER } from './coneSeam';
 import { CONE_SHAPE_INDEX, type ConeShape } from '../types/coneView';
 
@@ -75,7 +76,8 @@ export type LazyProgramKey =
   | 'flowComposite'
   | 'datamosh'
   | ThreeDProgramKey
-  | 'texture';
+  | 'texture'
+  | 'shapes';
 
 const THREE_D_SHAPES = ['cone', 'torus', 'lattice', 'terrain', 'extrusion', 'ribbon', 'rings', 'field'] as const satisfies readonly ConeShape[];
 
@@ -210,6 +212,7 @@ export const SHADER_VERSION = (
   + datamoshGLSL.length * 47
   + threeDGLSL.length * 43
   + textureGLSL.length * 41
+  + shapesGLSL.length * 37
 ) | 0;
 
 // Keep these symbols in the dedicated Glass sources explicitly instead of
@@ -272,6 +275,8 @@ in vec2 a_position;
 void main() {
   gl_Position = vec4(a_position, 0.0, 1.0);
 }`;
+
+const SHAPES_VERTEX_SOURCE = THREE_D_VERTEX_SOURCE;
 
 const THREE_D_FRAGMENT_PRELUDE = `#version 300 es
 precision highp float;
@@ -421,6 +426,8 @@ function getBaseProgramSource(key: LazyProgramKey): ProgramSource {
   if (key === 'datamosh') return { vertex: vertexGLSL, fragment: datamoshGLSL };
   if (isThreeDProgramKey(key)) return { vertex: THREE_D_VERTEX_SOURCE, fragment: createThreeDSource(getThreeDShape(key)) };
   if (key === 'texture') return { vertex: vertexGLSL, fragment: textureGLSL };
+  // GLSL ES 3.00 for explicit-LOD sampling of the mask mipmaps.
+  if (key === 'shapes') return { vertex: SHAPES_VERTEX_SOURCE, fragment: shapesGLSL };
   return { vertex: particlesVertexGLSL, fragment: particlesFragmentGLSL };
 }
 

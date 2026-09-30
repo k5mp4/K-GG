@@ -1,10 +1,10 @@
 import { describe, expect, it, vi } from 'vitest';
 import type { WebGLContext } from './webgl';
-import { render } from './webgl';
+import { render, renderShapesPass } from './webgl';
 import type { RenderFrameRequest } from '../types/rendering';
 import { renderFrame } from './renderFrame';
 
-vi.mock('./webgl', () => ({ render: vi.fn() }));
+vi.mock('./webgl', () => ({ render: vi.fn(), renderShapesPass: vi.fn() }));
 
 describe('renderFrame compatibility adapter', () => {
   it('preserves the legacy renderer argument order and optional defaults', () => {
@@ -87,5 +87,35 @@ describe('renderFrame compatibility adapter', () => {
       request.textureImageSource,
       request.textureNormalizedTime,
     );
+    expect(vi.mocked(renderShapesPass)).not.toHaveBeenCalled();
+  });
+
+  it('runs the Shapes pass after the frame with the same size, tile, and loop phase', () => {
+    const callOrder: string[] = [];
+    vi.mocked(render).mockImplementationOnce(() => { callOrder.push('render'); });
+    vi.mocked(renderShapesPass).mockImplementationOnce(() => { callOrder.push('shapes'); return true; });
+    const mask = { key: 'builtin:star' };
+    const request = {
+      width: 640,
+      height: 360,
+      tile: { viewport: [64, 36], offset: [8, 16] },
+      shapes: { enabled: true, source: 'star' },
+      shapesMask: mask,
+      shapesNormalizedTime: 0.25,
+      shapesAnimated: true,
+    } as unknown as RenderFrameRequest;
+
+    renderFrame({} as WebGLContext, request);
+
+    expect(callOrder).toEqual(['render', 'shapes']);
+    expect(vi.mocked(renderShapesPass)).toHaveBeenCalledWith({}, {
+      config: request.shapes,
+      mask,
+      normalizedTime: 0.25,
+      animated: true,
+      width: 640,
+      height: 360,
+      tile: request.tile,
+    });
   });
 });
