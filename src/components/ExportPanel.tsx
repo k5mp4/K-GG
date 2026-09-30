@@ -686,9 +686,11 @@ export function ExportPanel({
       {/* スリット書き出し */}
       {slitScan.enabled && (
         <div className="border-t border-panel-border border-t-panel pt-4 space-y-2">
-          <p className="text-xs text-deep">スリット書き出し</p>
-          <p className="text-xs text-tab-inactive">
-            {slitScan.mode === 'circular' ? '同心円' : slitScan.mode === 'polygon' ? `正${slitScan.polygonSides ?? 6}角形` : '直線'}スリットごとに個別 PNG を書き出します
+          <p
+            className="hint-label text-xs text-deep"
+            title={`${slitScan.mode === 'circular' ? '同心円' : slitScan.mode === 'polygon' ? `正${slitScan.polygonSides ?? 6}角形` : '直線'}スリットごとに個別 PNG を書き出します`}
+          >
+            スリット書き出し
           </p>
           {slitScan.mode === 'circular' && onResizeCanvas && (
             <button
@@ -792,7 +794,14 @@ export function ExportPanel({
         {/* オフライン書き出し */}
         <div className="space-y-1.5">
           <div>
-            <p className="text-xs mb-1 text-deep font-display uppercase tracking-wider">{t('export.format')}</p>
+            <p
+              className="hint-label w-fit text-xs mb-1 text-deep font-display uppercase tracking-wider"
+              title={selectedNativeVideoFormat
+                ? selectedNativeVideoFormat.description
+                : t('export.imageSequenceDescription')}
+            >
+              {t('export.format')}
+            </p>
             <InputDrum
               value={selectedVideoFormat}
               options={videoFormatOptions}
@@ -802,11 +811,6 @@ export function ExportPanel({
               className="w-full"
             />
           </div>
-          <p className="text-[10px] leading-relaxed text-tab-inactive">
-            {selectedNativeVideoFormat
-              ? selectedNativeVideoFormat.description
-              : t('export.imageSequenceDescription')}
-          </p>
 
           {selectedNativeVideoFormat?.supportsQuality && (
             <CustomSelect
@@ -825,20 +829,15 @@ export function ExportPanel({
           )}
 
           {selectedNativeVideoFormat?.value === 'mp4' && gpuEncoderName && (
-            <div>
-              <label className="flex items-center gap-2 cursor-pointer select-none">
-                <Toggle size="sm" checked={useGpuEncode} onChange={setUseGpuEncode} />
-                <span className="text-xs text-k-text/80">{t('export.gpuEncode')}</span>
-              </label>
-              <p className="mt-1 text-[10px] leading-relaxed text-tab-inactive">
-                {t('export.gpuEncodeDescription', { encoder: gpuEncoderName })}
-              </p>
-            </div>
+            <label className="flex items-center gap-2 cursor-pointer select-none">
+              <Toggle size="sm" checked={useGpuEncode} onChange={setUseGpuEncode} />
+              <span className="hint-label text-xs text-k-text/80" title={t('export.gpuEncodeDescription', { encoder: gpuEncoderName })}>{t('export.gpuEncode')}</span>
+            </label>
           )}
 
           {selectedNativeVideoFormat?.value === 'gif' && (
             <div>
-              <p className="text-xs mb-1 text-deep font-display uppercase tracking-wider">{t('export.gifMaxFileSize')}</p>
+              <p className="hint-label w-fit text-xs mb-1 text-deep font-display uppercase tracking-wider" title={t('export.gifMaxFileSizeDescription')}>{t('export.gifMaxFileSize')}</p>
               <div className="tq-input-number-shell w-full">
                 <InputNumber
                   className="tq-input-number w-full"
@@ -860,7 +859,6 @@ export function ExportPanel({
                   }}
                 />
               </div>
-              <p className="mt-1 text-[10px] leading-relaxed text-tab-inactive">{t('export.gifMaxFileSizeDescription')}</p>
             </div>
           )}
 
@@ -955,13 +953,8 @@ export function ExportPanel({
                   onChange={() => setAeVideoSendMode('export')}
                   className="mt-0.5 accent-fire"
                 />
-                <span className="text-xs text-k-text/80">
+                <span className="hint-label text-xs text-k-text/80" title={t('export.aeVideoDestinationExportDescription')}>
                   {t('export.aeVideoDestinationExport')}
-                  {aeVideoSendMode === 'export' && (
-                    <span className="block text-[10px] text-tab-inactive">
-                      {t('export.aeVideoDestinationExportDescription')}
-                    </span>
-                  )}
                 </span>
               </label>
               <label className="flex items-start gap-2 cursor-pointer select-none">
@@ -978,7 +971,16 @@ export function ExportPanel({
             </div>
 
             <div className="space-y-1.5">
-              <p className="text-xs text-tab-inactive">{t('export.aeSaveDirectory')}</p>
+              <p
+                className="hint-label w-fit text-xs text-tab-inactive"
+                title={t(
+                  aeVideoSendMode === 'export'
+                    ? 'export.aeSaveDirectoryExportDescription'
+                    : 'export.aeSaveDirectoryDescription',
+                )}
+              >
+                {t('export.aeSaveDirectory')}
+              </p>
               {aeSaveDirStatus.mode === 'custom' ? (
                 <div className="flex items-center gap-2">
                   <span className="flex-1 px-2 py-1.5 bg-k-surface border border-panel-border border-panel rounded-none text-xs text-k-text truncate">
@@ -1002,13 +1004,6 @@ export function ExportPanel({
                   {t('export.aeChooseDirectory')}
                 </button>
               )}
-              <p className="text-xs text-tab-inactive">
-                {t(
-                  aeVideoSendMode === 'export'
-                    ? 'export.aeSaveDirectoryExportDescription'
-                    : 'export.aeSaveDirectoryDescription',
-                )}
-              </p>
             </div>
 
             {/* 接続テスト */}

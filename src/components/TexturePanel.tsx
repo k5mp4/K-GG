@@ -22,11 +22,11 @@ const TEXTURE_IMAGE_MAX_DIMENSION = 4096;
 const percent = (value: number) => `${Math.round(value * 100)}%`;
 const twoDecimals = (value: number) => value.toFixed(2);
 
-function Section({ title, children }: { title: string; children: ReactNode }) {
+function Section({ title, hint, children }: { title: string; hint?: string; children: ReactNode }) {
   const { language } = useLanguage();
   return (
     <div className="space-y-3 border border-cream/25 bg-k-surface/35 p-3">
-      <span className="block font-display text-[10px] font-semibold uppercase tracking-[0.16em] text-cyan-100">{localizeUiLabel(title, language)}</span>
+      <span className={`block w-fit font-display text-[10px] font-semibold uppercase tracking-[0.16em] text-cyan-100${hint ? ' hint-label' : ''}`} title={hint}>{localizeUiLabel(title, language)}</span>
       {children}
     </div>
   );
@@ -74,16 +74,7 @@ export function TexturePanel({ imageSource, imageName, onImageLoad, onImageClear
 
   return (
     <div className="space-y-3 text-[11px]" data-texture-panel>
-      <div className="border border-cyan-200/25 bg-cyan-300/[0.04] p-3">
-        <span className="block font-display text-[10px] font-semibold uppercase tracking-[0.16em] text-cyan-100">
-          {t('texture.title')}
-        </span>
-        <p className="mt-2 text-[10px] leading-relaxed text-cream/65">
-          {t('texture.description')}
-        </p>
-      </div>
-
-      <Section title="Material">
+      <Section title="Material" hint={[t('texture.description'), t('texture.hint')].join('\n')}>
         <CustomSelect
           label="Source"
           value={texture.source}
@@ -306,10 +297,6 @@ export function TexturePanel({ imageSource, imageName, onImageLoad, onImageClear
           {t('common.reset')}
         </button>
       </div>
-
-      <p className="px-1 text-[9px] leading-relaxed text-cream/55">
-        {t('texture.hint')}
-      </p>
     </div>
   );
 }

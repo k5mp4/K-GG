@@ -54,14 +54,9 @@ export function SidebarSection({
           </svg>
         </span>
         <span className="min-w-0 flex-1">
-          <span className={`block font-display text-[11px] font-semibold uppercase tracking-[0.14em] ${open ? 'text-k-text' : 'text-tab-inactive group-hover:text-k-text'}`}>
+          <span className={`block w-fit font-display text-[11px] font-semibold uppercase tracking-[0.14em] ${open ? 'text-k-text' : 'text-tab-inactive group-hover:text-k-text'} ${description ? 'hint-label' : ''}`} title={description}>
             {title}
           </span>
-          {description && (
-            <span className="mt-0.5 block truncate text-[9px] font-body tracking-wide text-tab-inactive">
-              {description}
-            </span>
-          )}
         </span>
       </button>
       <Collapsible isOpen={open}>

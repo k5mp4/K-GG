@@ -122,3 +122,13 @@ h1 {
     outline: 4px auto -webkit-focus-ring-color;
   }
 }
+
+/* title属性のツールチップを持つ文字ラベルの目印（点線の下線 + ヘルプカーソル） */
+@utility hint-label {
+  cursor: help !important;
+  text-decoration-line: underline;
+  text-decoration-style: dotted;
+  text-decoration-color: color-mix(in srgb, currentColor 40%, transparent);
+  text-decoration-thickness: 1px;
+  text-underline-offset: 3px;
+}

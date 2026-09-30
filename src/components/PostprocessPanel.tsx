@@ -68,11 +68,12 @@ const PARTICLE_EMITTER_TYPE_OPTIONS = [
 
 type PostprocessControlGroupProps = {
   title: string;
+  hint?: string;
   defaultOpen?: boolean;
   children: ReactNode;
 };
 
-function PostprocessControlGroup({ title, defaultOpen = true, children }: PostprocessControlGroupProps) {
+function PostprocessControlGroup({ title, hint, defaultOpen = true, children }: PostprocessControlGroupProps) {
   const [isOpen, setIsOpen] = useState(defaultOpen);
 
   return (
@@ -83,7 +84,7 @@ function PostprocessControlGroup({ title, defaultOpen = true, children }: Postpr
         className="flex w-full items-center justify-between px-3 py-2 text-left text-xs font-display uppercase tracking-wider text-deep hover:bg-k-muted/40"
         aria-expanded={isOpen}
       >
-        <span>{title}</span>
+        <span className={hint ? 'hint-label' : undefined} title={hint}>{title}</span>
         <Icon
           name="chevronDown"
           className={`text-[16px] transition-transform ${isOpen ? 'rotate-180' : ''}`}
@@ -691,10 +692,7 @@ export function PostprocessPanel({
             </div>
           ) : activeEffectMode === 'glassTile' ? (
             <div className="space-y-4">
-              <p className="text-[10px] leading-relaxed text-tab-inactive">
-                KG_Glassのタイル表面モデルを、Effect Stack用の独立したGlassTileとして適用します。タイル輸出でも模様の位相を維持します。
-              </p>
-              <PostprocessControlGroup title="Pattern">
+              <PostprocessControlGroup title="Pattern" hint="KG_Glassのタイル表面モデルを、Effect Stack用の独立したGlassTileとして適用します。タイル輸出でも模様の位相を維持します。">
                 <CustomSelect
                   label="Pattern"
                   value={postprocess.glassTilePattern}
@@ -703,30 +701,32 @@ export function PostprocessPanel({
                 />
                 {postprocess.glassTilePattern === 'faceted' ? (
                   <>
-                    <SliderField
-                      label="Facet Density"
-                      value={postprocess.glassTileFacetDensity}
-                      onChange={(v) => setPostprocess({ glassTileFacetDensity: v })}
-                      format={(v) => v.toFixed(1)}
-                      limitKey="postprocess.glassTileFacetDensity"
-                    />
-                    <SliderField
-                      label="Facet Depth"
-                      value={postprocess.glassTileFacetDepth}
-                      onChange={(v) => setPostprocess({ glassTileFacetDepth: v })}
-                      format={(v) => `${Math.round(v * 100)}%`}
-                      limitKey="postprocess.glassTileFacetDepth"
-                    />
-                    <SliderField
-                      label="Rotation"
-                      value={postprocess.glassTileRotation}
-                      onChange={(v) => setPostprocess({ glassTileRotation: v })}
-                      format={(v) => `${Math.round(v)}°`}
-                      limitKey="postprocess.glassTileRotation"
-                    />
-                    <p className="text-[10px] leading-relaxed text-tab-inactive">
-                      {t('postprocess.glassTile.facetedHelp')}
-                    </p>
+                    <div className="space-y-4" title={t('postprocess.glassTile.facetedHelp')}>
+                      <SliderField
+                        label="Facet Density"
+                        labelClassName="hint-label text-xs text-deep"
+                        value={postprocess.glassTileFacetDensity}
+                        onChange={(v) => setPostprocess({ glassTileFacetDensity: v })}
+                        format={(v) => v.toFixed(1)}
+                        limitKey="postprocess.glassTileFacetDensity"
+                      />
+                      <SliderField
+                        label="Facet Depth"
+                        labelClassName="hint-label text-xs text-deep"
+                        value={postprocess.glassTileFacetDepth}
+                        onChange={(v) => setPostprocess({ glassTileFacetDepth: v })}
+                        format={(v) => `${Math.round(v * 100)}%`}
+                        limitKey="postprocess.glassTileFacetDepth"
+                      />
+                      <SliderField
+                        label="Rotation"
+                        labelClassName="hint-label text-xs text-deep"
+                        value={postprocess.glassTileRotation}
+                        onChange={(v) => setPostprocess({ glassTileRotation: v })}
+                        format={(v) => `${Math.round(v)}°`}
+                        limitKey="postprocess.glassTileRotation"
+                      />
+                    </div>
                   </>
                 ) : (
                   <>
@@ -824,10 +824,10 @@ export function PostprocessPanel({
             </div>
           ) : activeEffectMode === 'glassV2' ? (
             <div className="space-y-4">
-              <p className="text-[10px] leading-relaxed text-tab-inactive">
-                Organic noise or animated concentric Ripple ridges drive wavelength-dependent refraction, rough transmission, and Fresnel highlights in a single-layer screen-space approximation.
-              </p>
-              <PostprocessControlGroup title="Surface">
+              <PostprocessControlGroup
+                title="Surface"
+                hint="Organic noise or animated concentric Ripple ridges drive wavelength-dependent refraction, rough transmission, and Fresnel highlights in a single-layer screen-space approximation."
+              >
                 <CustomSelect
                   label="Surface Type"
                   value={postprocess.glassSurfaceType}
@@ -836,30 +836,32 @@ export function PostprocessPanel({
                 />
                 {postprocess.glassSurfaceType === 'ripple' ? (
                   <>
-                    <SliderField
-                      label="Frequency"
-                      value={postprocess.glassRippleFrequency}
-                      onChange={(v) => setPostprocess({ glassRippleFrequency: v })}
-                      format={(v) => v.toFixed(1)}
-                      limitKey="postprocess.glassRippleFrequency"
-                    />
-                    <SliderField
-                      label="Depth"
-                      value={postprocess.glassRippleDepth}
-                      onChange={(v) => setPostprocess({ glassRippleDepth: v })}
-                      format={(v) => `${Math.round(v * 100)}%`}
-                      limitKey="postprocess.glassRippleDepth"
-                    />
-                    <SliderField
-                      label="Animation Speed"
-                      value={postprocess.glassRippleSpeed}
-                      onChange={(v) => setPostprocess({ glassRippleSpeed: Math.round(v) })}
-                      format={(v) => `${Math.round(v)}×`}
-                      limitKey="postprocess.glassRippleSpeed"
-                    />
-                    <p className="text-[10px] leading-relaxed text-tab-inactive">
-                      {t('postprocess.glass.rippleHelp')}
-                    </p>
+                    <div className="space-y-4" title={t('postprocess.glass.rippleHelp')}>
+                      <SliderField
+                        label="Frequency"
+                        labelClassName="hint-label text-xs text-deep"
+                        value={postprocess.glassRippleFrequency}
+                        onChange={(v) => setPostprocess({ glassRippleFrequency: v })}
+                        format={(v) => v.toFixed(1)}
+                        limitKey="postprocess.glassRippleFrequency"
+                      />
+                      <SliderField
+                        label="Depth"
+                        labelClassName="hint-label text-xs text-deep"
+                        value={postprocess.glassRippleDepth}
+                        onChange={(v) => setPostprocess({ glassRippleDepth: v })}
+                        format={(v) => `${Math.round(v * 100)}%`}
+                        limitKey="postprocess.glassRippleDepth"
+                      />
+                      <SliderField
+                        label="Animation Speed"
+                        labelClassName="hint-label text-xs text-deep"
+                        value={postprocess.glassRippleSpeed}
+                        onChange={(v) => setPostprocess({ glassRippleSpeed: Math.round(v) })}
+                        format={(v) => `${Math.round(v)}×`}
+                        limitKey="postprocess.glassRippleSpeed"
+                      />
+                    </div>
                   </>
                 ) : (
                   <>
@@ -911,17 +913,17 @@ export function PostprocessPanel({
                     />
                   </>
                 )}
-                <SliderField
-                  label="Noise Distortion"
-                  value={postprocess.glassNoiseInfluence}
-                  onChange={(v) => setPostprocess({ glassNoiseInfluence: v })}
-                  format={(v) => `${Math.round(v * 100)}%`}
-                  trackId="postprocess.glassNoiseInfluence"
-                  limitKey="postprocess.glassNoiseInfluence"
-                />
-                <p className="text-[10px] leading-relaxed text-tab-inactive">
-                  Noise Distortion パネルの模様とパラメータをガラス表面へブレンドします。
-                </p>
+                <div title="Noise Distortion パネルの模様とパラメータをガラス表面へブレンドします。">
+                  <SliderField
+                    label="Noise Distortion"
+                    labelClassName="hint-label text-xs text-deep"
+                    value={postprocess.glassNoiseInfluence}
+                    onChange={(v) => setPostprocess({ glassNoiseInfluence: v })}
+                    format={(v) => `${Math.round(v * 100)}%`}
+                    trackId="postprocess.glassNoiseInfluence"
+                    limitKey="postprocess.glassNoiseInfluence"
+                  />
+                </div>
               </PostprocessControlGroup>
 
               <PostprocessControlGroup title="Optics">
@@ -933,16 +935,16 @@ export function PostprocessPanel({
                   trackId="postprocess.glassRefraction"
                   limitKey="postprocess.glassRefraction"
                 />
-                <SliderField
-                  label="IOR"
-                  value={postprocess.glassIor}
-                  onChange={(v) => setPostprocess({ glassIor: v })}
-                  format={(v) => v.toFixed(2)}
-                  limitKey="postprocess.glassIor"
-                />
-                <p className="text-[10px] leading-relaxed text-tab-inactive">
-                  {t('postprocess.glass.iorHelp')}
-                </p>
+                <div className="space-y-4" title={t('postprocess.glass.iorHelp')}>
+                  <SliderField
+                    label="IOR"
+                    labelClassName="hint-label text-xs text-deep"
+                    value={postprocess.glassIor}
+                    onChange={(v) => setPostprocess({ glassIor: v })}
+                    format={(v) => v.toFixed(2)}
+                    limitKey="postprocess.glassIor"
+                  />
+                </div>
                 <SliderField
                   label="Chromatic Aberration"
                   value={postprocess.glassChromaticAberration}
@@ -951,16 +953,16 @@ export function PostprocessPanel({
                   trackId="postprocess.glassChromaticAberration"
                   limitKey="postprocess.glassChromaticAberration"
                 />
-                <SliderField
-                  label="Chromatic Steps"
-                  value={postprocess.glassChromaticSteps}
-                  onChange={(v) => setPostprocess({ glassChromaticSteps: Math.round(v) })}
-                  format={(v) => `${Math.round(v)}`}
-                  limitKey="postprocess.glassChromaticSteps"
-                />
-                <p className="text-[10px] leading-relaxed text-tab-inactive">
-                  {t('postprocess.glass.chromaticStepsHelp')}
-                </p>
+                <div className="space-y-4" title={t('postprocess.glass.chromaticStepsHelp')}>
+                  <SliderField
+                    label="Chromatic Steps"
+                    labelClassName="hint-label text-xs text-deep"
+                    value={postprocess.glassChromaticSteps}
+                    onChange={(v) => setPostprocess({ glassChromaticSteps: Math.round(v) })}
+                    format={(v) => `${Math.round(v)}`}
+                    limitKey="postprocess.glassChromaticSteps"
+                  />
+                </div>
                 <SliderField
                   label="Roughness"
                   value={postprocess.glassRoughness}

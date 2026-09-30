@@ -283,10 +283,7 @@ export function DiffusePanel() {
                 </button>
 
                 <div className="flex items-center justify-between border-t border-k-muted/40 pt-3">
-                  <div>
-                    <p className="text-xs text-deep">Adaptive Grain</p>
-                    <p className="text-[10px] text-tab-inactive">Change cell size with the same source</p>
-                  </div>
+                  <p className="hint-label text-xs text-deep" title="Change cell size with the same source">Adaptive Grain</p>
                   <Toggle checked={diffuse.grainAdaptiveEnabled ?? false} onChange={(v) => setDiffuse({ grainAdaptiveEnabled: v })} />
                 </div>
                 <SliderField

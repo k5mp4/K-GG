@@ -65,10 +65,10 @@ function formatDegrees(value: number): string {
   return `${Math.round(value)}°`;
 }
 
-function Section({ title, children }: { title: string; children: ReactNode }) {
+function Section({ title, hint, children }: { title: string; hint?: string; children: ReactNode }) {
   return (
     <div className="space-y-3 border border-cream/25 bg-k-surface/35 p-3">
-      <span className="block font-display text-[9px] font-semibold uppercase tracking-[0.14em] text-cream/60">{title}</span>
+      <span className={`block w-fit font-display text-[9px] font-semibold uppercase tracking-[0.14em] text-cream/60${hint ? ' hint-label' : ''}`} title={hint}>{title}</span>
       {children}
     </div>
   );
@@ -648,21 +648,7 @@ export function ConeViewPanel() {
 
   return (
     <div className="space-y-3 text-[11px]" data-cone-view-panel>
-      <div className="border border-cyan-200/25 bg-cyan-300/[0.04] p-3">
-        <div className="flex items-center justify-between gap-3">
-          <span className="font-display text-[10px] font-semibold uppercase tracking-[0.16em] text-cyan-100">
-            {t(shapeText.title)}
-          </span>
-          {isCone && (
-            <span className="border border-cyan-200/25 bg-k-bg/45 px-2 py-1 font-display text-[8px] font-bold uppercase tracking-[0.13em] text-cyan-100/75">
-              {t('cone.unlit')}
-            </span>
-          )}
-        </div>
-        <p className="mt-2 text-[10px] leading-relaxed text-cream/65">{t(shapeText.description)}</p>
-      </div>
-
-      <Section title="Shape">
+      <Section title="Shape" hint={[t(shapeText.description), shapeText.hint && t(shapeText.hint), isCone && t('cone.unlit')].filter(Boolean).join('\n')}>
         <CustomSelect
           label="Shape"
           value={coneView.shape}
@@ -675,8 +661,7 @@ export function ConeViewPanel() {
         {isCone && (
           <div className="flex items-center justify-between gap-3 border border-cyan-200/20 bg-cyan-300/[0.04] px-2.5 py-2">
             <div className="min-w-0">
-              <span className="block font-display text-[9px] font-semibold uppercase tracking-[0.12em] text-cyan-100">{t('cone.apexPosition')}</span>
-              <span className="mt-1 block text-[9px] text-cream/55">{t('cone.apexHint')}</span>
+              <span className="block font-display text-[9px] font-semibold uppercase tracking-[0.12em] text-cyan-100 hint-label" title={t('cone.apexHint')}>{t('cone.apexPosition')}</span>
             </div>
             <button
               type="button"
@@ -701,7 +686,15 @@ export function ConeViewPanel() {
         </Section>
       )}
 
-      <Section title="Texture & Motion">
+      <Section
+        title="Texture & Motion"
+        hint={[
+          coneView.mappingMode === 'projection'
+            ? 'Direct Projection keeps the processed 2D frame fixed on the surface and does not advance Flow Cycles.'
+            : t('cone.flowHint'),
+          t('cone.seamHint'),
+        ].join('\n')}
+      >
         <CustomSelect
           label="Mapping"
           value={coneView.mappingMode}
@@ -742,13 +735,6 @@ export function ConeViewPanel() {
         />
       </Section>
 
-      <p className="px-1 text-[9px] leading-relaxed text-cream/55">
-        {coneView.mappingMode === 'projection'
-          ? 'Direct Projection keeps the processed 2D frame fixed on the surface and does not advance Flow Cycles.'
-          : t('cone.flowHint')}
-      </p>
-      {shapeText.hint && <p className="px-1 text-[9px] leading-relaxed text-cream/55">{t(shapeText.hint)}</p>}
-      <p className="px-1 text-[9px] leading-relaxed text-cream/55">{t('cone.seamHint')}</p>
     </div>
   );
 }

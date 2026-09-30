@@ -31,10 +31,10 @@ function emitVideoMotionFrame(): void {
   window.dispatchEvent(new CustomEvent('kgg:video-motion-frame'));
 }
 
-function Section({ title, children }: { title: string; children: ReactNode }) {
+function Section({ title, hint, children }: { title: string; hint?: string; children: ReactNode }) {
   return (
     <div className="space-y-2.5 border border-cream/15 bg-black/10 p-3">
-      <span className="block text-[10px] font-display uppercase tracking-wider text-cyan-100">{title}</span>
+      <span className={`block w-fit text-[10px] font-display uppercase tracking-wider text-cyan-100${hint ? ' hint-label' : ''}`} title={hint}>{title}</span>
       {children}
     </div>
   );
@@ -240,16 +240,15 @@ export function DatamoshPanel() {
 
   return (
     <div className="space-y-3 text-[11px]" data-datamosh-panel>
-      <div className="border border-cyan-200/25 bg-cyan-300/[0.04] p-3">
-        <span className="block font-display text-[10px] font-semibold uppercase tracking-[0.16em] text-cyan-100">
-          {t('sandbox.datamoshTitle')}
-        </span>
-        <p className="mt-2 text-[10px] leading-relaxed text-cream/65">
-          {t('sandbox.datamoshHint')}
-        </p>
-      </div>
-
-      <Section title="Motion Field">
+      <Section
+        title="Motion Field"
+        hint={[
+          t('sandbox.datamoshHint'),
+          datamosh.motionSource === 'animation' ? t('effect.datamoshAnimationHint') : null,
+          datamosh.motionSource === 'pixelStretch' ? t('effect.datamoshPixelStretchHint') : null,
+          t('sandbox.datamoshPlaybackHint'),
+        ].filter(Boolean).join('\n')}
+      >
         <CustomSelect
           label="Source"
           value={datamosh.motionSource}
@@ -262,20 +261,13 @@ export function DatamoshPanel() {
           ]}
           onChange={(value) => setDatamosh({ motionSource: value as DatamoshMotionSource })}
         />
-        {datamosh.motionSource === 'animation' ? (
-          <p className="text-[9px] leading-relaxed text-tab-inactive" data-datamosh-animation-source>
-            {t('effect.datamoshAnimationHint')}
-          </p>
-        ) : datamosh.motionSource === 'procedural' ? (
+        {datamosh.motionSource === 'animation' ? null : datamosh.motionSource === 'procedural' ? (
           <>
             {field('Motion Scale', 'motionScale')}
             {field('Motion Speed', 'motionSpeed')}
           </>
         ) : datamosh.motionSource === 'pixelStretch' ? (
           <div className="space-y-2.5" data-datamosh-pixel-stretch-source>
-            <p className="text-[9px] leading-relaxed text-tab-inactive">
-              {t('effect.datamoshPixelStretchHint')}
-            </p>
             {field('Angle', 'pixelStretchAngle', value => `${Math.round(value)}°`)}
             {field('Length', 'pixelStretchLength', value => `${Math.round(value)}px`)}
             {field('Threshold', 'pixelStretchThreshold', percent)}
@@ -376,9 +368,6 @@ export function DatamoshPanel() {
         <ToggleRow label="Color Drift" checked={datamosh.useColorDrift} onChange={(useColorDrift) => setDatamosh({ useColorDrift })} />
       </Section>
 
-      <p className="px-1 text-[9px] leading-relaxed text-cream/55">
-        {t('sandbox.datamoshPlaybackHint')}
-      </p>
       <video ref={videoRef} className="pointer-events-none absolute h-px w-px opacity-0" aria-hidden="true" tabIndex={-1} playsInline muted />
     </div>
   );
