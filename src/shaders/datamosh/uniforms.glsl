@@ -14,7 +14,8 @@ uniform float u_time;
 // Advances once per logical frame; drives the per-block corruption rolls.
 uniform float u_frameSeed;
 uniform bool u_historyPrimed;
-// 0: procedural, 1: video, 2: animation (optical flow of the layer input)
+// 0: procedural, 1: video, 2: animation (optical flow of the layer input),
+// 3: pixelStretch (fixed direction, streaks stay drawn)
 uniform int u_motionSource;
 // 0: mix, 1: lighten, 2: difference, 3: rampLock
 uniform int u_mixMode;
@@ -33,3 +34,13 @@ uniform float u_glitchThreshold;
 uniform float u_neighborMix;
 uniform float u_jitter;
 uniform bool u_colorDrift;
+// Pixel Stretch source: unit direction in pixels, reach in pixels.
+uniform vec2 u_pixelStretchDirection;
+uniform float u_pixelStretchLength;
+uniform float u_pixelStretchThreshold;
+uniform float u_pixelStretchVariance;
+// Curl amount (0 = one fixed direction) and spatial scale of the curl field.
+uniform float u_pixelStretchCurl;
+uniform float u_pixelStretchCurlScale;
+// (cos, sin) of the curl field's loop phase.
+uniform vec2 u_pixelStretchCurlPhase;

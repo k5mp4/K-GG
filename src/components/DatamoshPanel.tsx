@@ -258,6 +258,7 @@ export function DatamoshPanel() {
             { value: 'animation', label: 'Animation Flow' },
             { value: 'procedural', label: 'Procedural (Curl Noise)' },
             { value: 'video', label: 'Video Motion' },
+            { value: 'pixelStretch', label: 'Pixel Stretch' },
           ]}
           onChange={(value) => setDatamosh({ motionSource: value as DatamoshMotionSource })}
         />
@@ -270,6 +271,19 @@ export function DatamoshPanel() {
             {field('Motion Scale', 'motionScale')}
             {field('Motion Speed', 'motionSpeed')}
           </>
+        ) : datamosh.motionSource === 'pixelStretch' ? (
+          <div className="space-y-2.5" data-datamosh-pixel-stretch-source>
+            <p className="text-[9px] leading-relaxed text-tab-inactive">
+              {t('effect.datamoshPixelStretchHint')}
+            </p>
+            {field('Angle', 'pixelStretchAngle', value => `${Math.round(value)}°`)}
+            {field('Length', 'pixelStretchLength', value => `${Math.round(value)}px`)}
+            {field('Threshold', 'pixelStretchThreshold', percent)}
+            {field('Length Variance', 'pixelStretchVariance', percent)}
+            {field('Curl', 'pixelStretchCurl', percent)}
+            {datamosh.pixelStretchCurl > 0 ? field('Curl Scale', 'pixelStretchCurlScale', value => value.toFixed(2)) : null}
+            {datamosh.pixelStretchCurl > 0 ? field('Curl Loops', 'pixelStretchCurlLoops', value => `${Math.round(value)}`) : null}
+          </div>
         ) : (
           <div className="space-y-2.5" data-datamosh-video-source>
             <div className="flex items-center justify-between gap-2">

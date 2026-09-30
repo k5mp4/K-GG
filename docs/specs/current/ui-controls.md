@@ -110,7 +110,7 @@ SANDBOXのEdit Layerには`Flow Gradient`を表示し、固定段のON/OFFと設
 
 Effect Stackの`Datamosh`レイヤーを選択すると、Postprocessのプロパティモジュールに次のグループを表示します。ON／OFFはEffect Stackで操作し、独立した`Video Motion`レイヤーは表示しません。
 
-- `Motion Field`: Source（`Animation Flow`／`Procedural (Curl Noise)`／`Video Motion`）。Animation Flowでは推定方法の説明、ProceduralではMotion Scale、Motion Speed、Video MotionではChoose Video、Play／Pause、動画状態、Field Smoothing、Motion Damping、`Motion Debug`を表示します。続けてBlock Size、Block Lock、Block Varianceを表示します。
+- `Motion Field`: Source（`Animation Flow`／`Procedural (Curl Noise)`／`Video Motion`／`Pixel Stretch`）。Animation Flowでは推定方法の説明、ProceduralではMotion Scale、Motion Speed、Pixel Stretchでは説明とAngle（0〜360°）、Length（px）、Threshold、Length Variance、Curl、Curl Scale、Curl Loops（Curl 0より大きいときだけ表示。挙動はCURRENT-EFFECT-STACKのDATAMOSH-006）、Video MotionではChoose Video、Play／Pause、動画状態、Field Smoothing、Motion Damping、`Motion Debug`を表示します。続けてBlock Size、Block Lock、Block Varianceを表示します。
 - `History`: Strength、Luma Stretch、Saturation Stretch、Refresh、Feedback、Freeze。
 - `Corruption`: Glitch Amount、Glitch Threshold、Neighbor Mix、Jitter。
 - `Look`: Mix Mode（Mix／Lighten／Difference／Ramp Lock）、Color Drift。

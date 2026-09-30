@@ -130,7 +130,50 @@ vec2 dmAnimationMotion(vec2 uv, vec2 window) {
   return flow;
 }
 
+// Gradient of the Pixel Stretch stream function: 2 value-noise octaves. The
+// function is cos(phase) * A + sin(phase) * B for two independent noise fields,
+// so it stays equally strong while it evolves, and returns to A after one
+// full phase turn (a seamless loop). B is skipped while its weight is 0.
+vec2 dmPixelStretchStreamGradient(vec3 p) {
+  vec3 p2 = vec3(p.xy * 2.03 + vec2(17.1, 9.2), p.z * 1.31);
+  vec2 gradient = dmValueNoiseGrad(p).yz * u_pixelStretchCurlPhase.x;
+  // Second octave: half amplitude at 2.03x frequency scales its gradient by ~1.
+  gradient += dmValueNoiseGrad(p2).yz * u_pixelStretchCurlPhase.x;
+  if (abs(u_pixelStretchCurlPhase.y) > 1e-4) {
+    vec3 shift = vec3(41.3, 23.7, 11.1);
+    gradient += dmValueNoiseGrad(p + shift).yz * u_pixelStretchCurlPhase.y;
+    gradient += dmValueNoiseGrad(p2 + shift).yz * u_pixelStretchCurlPhase.y;
+  }
+  return gradient;
+}
+
+// Pixel Stretch stretch direction (unit, in pixels) at uv. The curl of a
+// value-noise stream function bends the fixed Angle direction: Curl 0 keeps
+// one direction everywhere, 1 follows the field alone. The field is
+// divergence-free, so streamlines swirl instead of converging, and it evolves
+// with a loop phase (Curl Loops).
+vec2 dmPixelStretchDirectionAt(vec2 uv) {
+  if (u_pixelStretchCurl <= 0.0) return u_pixelStretchDirection;
+  float aspect = u_resolution.x / max(u_resolution.y, 1.0);
+  vec3 p = vec3(uv * vec2(aspect, 1.0) * u_pixelStretchCurlScale, 3.7);
+  vec2 gradient = dmPixelStretchStreamGradient(p);
+  vec2 curl = vec2(gradient.y, -gradient.x);
+  float curlLength = length(curl);
+  if (curlLength < 1e-4) return u_pixelStretchDirection;
+  vec2 direction = mix(u_pixelStretchDirection, curl / curlLength, u_pixelStretchCurl);
+  float directionLength = length(direction);
+  // Opposing directions can cancel out; fall back to the Angle direction.
+  return directionLength < 1e-4 ? u_pixelStretchDirection : direction / directionLength;
+}
+
+// Pixel Stretch: the local stretch direction at the procedural source's scale
+// (1.2% of the frame height per frame at strength 1), isotropic in pixels.
+vec2 dmPixelStretchMotion(vec2 uv) {
+  return dmPixelStretchDirectionAt(uv) * 0.012 * vec2(u_resolution.y / max(u_resolution.x, 1.0), 1.0);
+}
+
 vec2 datamoshMotionField(vec2 uv, vec2 window) {
+  if (u_motionSource == 3) return dmPixelStretchMotion(uv);
   if (u_motionSource == 2) return dmAnimationMotion(uv, window);
   if (u_motionSource == 1) return dmVideoMotion(uv);
   return dmProceduralMotion(uv);

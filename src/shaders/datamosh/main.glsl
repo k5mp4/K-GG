@@ -132,11 +132,20 @@ void main() {
     }
   }
 
-  float stretch = dmStretchFactor(texture2D(u_historyTex, uv).rgb);
+  // Pixel Stretch grows into dark pixels, so the drag length follows the
+  // color being pulled in (one step behind) instead of the pixel it lands on.
+  vec2 stretchProbeUv = u_motionSource == 3 ? dmClampUv(uv - motion * u_strength) : uv;
+  float stretch = dmStretchFactor(texture2D(u_historyTex, stretchProbeUv).rgb);
   vec2 offset = motion * u_strength * stretch * (1.0 - stall);
   vec4 predicted = dmSampleHistory(uv - offset + referenceShift * (1.0 - stall), offset);
-  // A stalled block receives no residual: it holds the history as-is.
-  vec4 moshed = dmCombine(current, predicted, mix(u_feedback, 1.0, stall));
+  vec4 moshed;
+  if (u_motionSource == 3) {
+    vec4 held = texture2D(u_historyTex, uv);
+    moshed = dmPixelStretchCombine(gl_FragCoord.xy, current, predicted, held, dmCombine(current, held, u_feedback));
+  } else {
+    // A stalled block receives no residual: it holds the history as-is.
+    moshed = dmCombine(current, predicted, mix(u_feedback, 1.0, stall));
+  }
 
   // Intra refresh: a random subset of blocks is rebuilt from the current frame.
   float refreshRoll = dmHash12(blockId + vec2(seed * 7.13, 3.1));

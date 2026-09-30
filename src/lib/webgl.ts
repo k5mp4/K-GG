@@ -1332,7 +1332,9 @@ const DATAMOSH_UNIFORM_NAMES = [
   'u_currentTex', 'u_historyTex', 'u_motionField', 'u_gradientRamp', 'u_resolution', 'u_time',
   'u_frameSeed', 'u_historyPrimed', 'u_previousInputTex', 'u_previousInputValid', 'u_blockLock', 'u_motionSource', 'u_mixMode', 'u_strength', 'u_refresh',
   'u_feedback', 'u_blockSize', 'u_blockVariance', 'u_lumaStretch', 'u_saturationStretch', 'u_motionScale', 'u_motionSpeed', 'u_glitchAmount',
-  'u_glitchThreshold', 'u_neighborMix', 'u_jitter', 'u_colorDrift',
+  'u_glitchThreshold', 'u_neighborMix', 'u_jitter', 'u_colorDrift', 'u_pixelStretchDirection',
+  'u_pixelStretchLength', 'u_pixelStretchThreshold', 'u_pixelStretchVariance', 'u_pixelStretchCurl',
+  'u_pixelStretchCurlScale', 'u_pixelStretchCurlPhase',
 ] as const;
 
 function getDatamoshUniforms(gl: WebGL2RenderingContext, program: WebGLProgram): Record<string, WebGLUniformLocation | null> {
@@ -3379,7 +3381,7 @@ function resetDatamoshHistory(history: DatamoshHistoryState): void {
 }
 
 const DATAMOSH_MIX_MODE_MAP = { mix: 0, lighten: 1, difference: 2, rampLock: 3 } as const;
-const DATAMOSH_MOTION_SOURCE_MAP = { procedural: 0, video: 1, animation: 2 } as const;
+const DATAMOSH_MOTION_SOURCE_MAP = { procedural: 0, video: 1, animation: 2, pixelStretch: 3 } as const;
 
 type DatamoshFrame = {
   /** Shader time shared with Noise; drives the procedural motion field. */
@@ -3519,6 +3521,16 @@ function drawDatamoshPass(
   gl.uniform1f(uniforms.u_neighborMix, config.neighborMix);
   gl.uniform1f(uniforms.u_jitter, config.jitter);
   setUniform1i(gl, uniforms.u_colorDrift, config.useColorDrift ? 1 : 0);
+  const pixelStretchAngle = config.pixelStretchAngle * Math.PI / 180;
+  gl.uniform2f(uniforms.u_pixelStretchDirection, Math.cos(pixelStretchAngle), Math.sin(pixelStretchAngle));
+  gl.uniform1f(uniforms.u_pixelStretchLength, config.pixelStretchLength);
+  gl.uniform1f(uniforms.u_pixelStretchThreshold, config.pixelStretchThreshold);
+  gl.uniform1f(uniforms.u_pixelStretchVariance, config.pixelStretchVariance);
+  gl.uniform1f(uniforms.u_pixelStretchCurl, config.pixelStretchCurl);
+  gl.uniform1f(uniforms.u_pixelStretchCurlScale, config.pixelStretchCurlScale);
+  // Whole cycles per timeline loop: the curl field is back at its start at time 1.
+  const curlPhase = 2 * Math.PI * config.pixelStretchCurlLoops * (Number.isFinite(frame.normalizedTime) ? frame.normalizedTime : 0);
+  gl.uniform2f(uniforms.u_pixelStretchCurlPhase, Math.cos(curlPhase), Math.sin(curlPhase));
   drawArrays(ctx, 'Datamosh', gl.TRIANGLES, 0, 6);
   return ctx.datamoshHistoryTextures[writeIndex];
 }

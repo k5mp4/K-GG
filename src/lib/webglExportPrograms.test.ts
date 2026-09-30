@@ -154,7 +154,7 @@ describe('export WebGL program plan', () => {
     expect(getRequiredExportProgramKeys(state)).toEqual(['stackCore', 'datamosh']);
   });
 
-  it('assembles the Datamosh program from uniforms, motion field, and composite chunks', () => {
+  it('assembles the Datamosh program from uniforms, motion field, pixel stretch, and composite chunks', () => {
     const source = getProgramSource('datamosh');
 
     expect(source.fragment.indexOf('precision highp float;')).toBe(0);
@@ -163,6 +163,10 @@ describe('export WebGL program plan', () => {
     expect(source.fragment).toContain('u_historyTex');
     expect(source.fragment).toContain('floor(uv * blockCount)');
     expect(source.fragment.indexOf('datamoshMotionField(vec2 uv, vec2 window)')).toBeLessThan(source.fragment.indexOf('void main()'));
+    // The Pixel Stretch source uses the motion-field hash and replaces the combine.
+    expect(source.fragment).toContain('if (u_motionSource == 3) return dmPixelStretchMotion(uv);');
+    expect(source.fragment.indexOf('float dmHash12(vec2 p)')).toBeLessThan(source.fragment.indexOf('vec4 dmPixelStretchCombine('));
+    expect(source.fragment.indexOf('vec4 dmPixelStretchCombine(')).toBeLessThan(source.fragment.indexOf('void main()'));
   });
 
   it('exposes the standalone Seamless shader uniforms', () => {
