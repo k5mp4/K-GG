@@ -48,13 +48,10 @@ function SandboxModule({
           <span className="flex h-7 w-7 shrink-0 items-center justify-center border border-cyan-200/45 bg-cyan-300/10 text-cyan-100" aria-hidden="true">
             <Icon name="grid" className="text-[13px]" />
           </span>
-          <span className="min-w-0">
+          <span className="min-w-0" title={description}>
             <span className="flex items-center gap-2 font-display text-[11px] font-semibold uppercase tracking-[0.15em] text-k-text">
               {label}
               {badge}
-            </span>
-            <span className="mt-1 block truncate text-[9px] leading-relaxed tracking-wide text-tab-inactive">
-              {description}
             </span>
           </span>
         </div>
@@ -142,24 +139,9 @@ export function SandboxPanel({ onRenderViewModeChange }: SandboxPanelProps) {
 
   return (
     <div className="space-y-4" data-sandbox-panel>
-      <div className="relative overflow-hidden border border-cyan-300/30 bg-[linear-gradient(135deg,rgba(38,211,238,0.12),rgba(20,20,20,0.2)_48%,rgba(244,114,182,0.08))] p-4 shadow-[0_16px_36px_rgba(0,0,0,0.2)]">
-        <div className="pointer-events-none absolute -right-8 -top-10 h-28 w-28 rounded-full border border-cyan-200/20" aria-hidden="true" />
-        <div className="pointer-events-none absolute -bottom-16 right-10 h-32 w-32 rounded-full border border-fuchsia-300/10" aria-hidden="true" />
-        <div className="relative flex items-start justify-between gap-4">
-          <div className="min-w-0">
-            <div className="flex items-center gap-2">
-              <Icon name="grid" className="text-[17px] text-cyan-200" />
-              <h2 className="font-display text-lg font-bold uppercase tracking-[0.22em] text-k-text">{t('effect.sandbox')}</h2>
-            </div>
-            <p className="mt-2 max-w-[34rem] text-[10px] leading-relaxed tracking-wide text-cream/65">
-              {t('sandbox.description')}
-            </p>
-          </div>
-          <div className="shrink-0 border border-cyan-200/25 bg-k-bg/35 px-2 py-1 text-right">
-            <span className="block text-[8px] font-display uppercase tracking-[0.16em] text-cyan-100/60">{t('sandbox.active')}</span>
-            <span className="mt-0.5 block font-display text-sm font-bold text-cyan-100">{activeCount}<span className="text-cyan-100/40">/6</span></span>
-          </div>
-        </div>
+      <div className="flex items-center justify-between gap-3">
+        <h2 className="font-display text-sm font-bold uppercase tracking-[0.2em] text-k-text" title={t('sandbox.description')}>{t('effect.sandbox')}</h2>
+        <span className="font-display text-[10px] font-bold text-cyan-100" title={t('sandbox.active')}>{activeCount}<span className="text-cyan-100/40">/6</span></span>
       </div>
 
       <div className="space-y-3">

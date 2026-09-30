@@ -29,6 +29,7 @@ export function SidebarSection({
         onClick={onToggle}
         aria-expanded={open}
         aria-controls={contentId}
+        title={description}
         className={`group flex w-full items-center gap-3 bg-transparent px-0 py-3 text-left transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-fire ${
           nested ? 'hover:text-cream' : 'hover:text-cream'
         }`}
@@ -57,11 +58,6 @@ export function SidebarSection({
           <span className={`block font-display text-[11px] font-semibold uppercase tracking-[0.14em] ${open ? 'text-k-text' : 'text-tab-inactive group-hover:text-k-text'}`}>
             {title}
           </span>
-          {description && (
-            <span className="mt-0.5 block truncate text-[9px] font-body tracking-wide text-tab-inactive">
-              {description}
-            </span>
-          )}
         </span>
       </button>
       <Collapsible isOpen={open}>

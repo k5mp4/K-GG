@@ -195,6 +195,7 @@ export function ColorPaletteGenerator() {
           className="flex h-8 w-full overflow-hidden border border-panel-border bg-k-bg"
           role="group"
           aria-label={t('gradient.generatorStops')}
+          title={t('gradient.generatorEditStopHint')}
         >
           {editableGradientStops.map((stop, index) => {
             const stopLabel = t('gradient.generatorStop') + ' ' + (index + 1);
@@ -216,9 +217,6 @@ export function ColorPaletteGenerator() {
             );
           })}
         </div>
-        <p className="text-[9px] leading-relaxed text-k-muted">
-          {t('gradient.generatorEditStopHint')}
-        </p>
       </div>
 
       <CustomSelect
@@ -264,10 +262,6 @@ export function ColorPaletteGenerator() {
           </button>
         </div>
       )}
-
-      <p className="text-[9px] leading-relaxed text-cream/80">
-        {t('gradient.generatorDescription')}
-      </p>
 
       {generatorAlgorithm === 'perceptual' && (
         <CustomSelect

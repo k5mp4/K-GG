@@ -10,16 +10,10 @@ export function SeamlessPanel() {
 
   return (
     <div className="space-y-3 text-[11px]" data-seamless-panel>
-      <div className="border border-cyan-200/25 bg-cyan-300/[0.04] p-3">
-        <span className="block font-display text-[10px] font-semibold uppercase tracking-[0.16em] text-cyan-100">
-          {t('sandbox.seamlessTitle')}
-        </span>
-        <p className="mt-2 text-[10px] leading-relaxed text-cream/65">
-          {t('sandbox.seamlessDescription')}
-        </p>
-      </div>
-
-      <div className="space-y-3 border border-cream/25 bg-k-surface/35 p-3">
+      <div
+        className="space-y-3 border border-cream/25 bg-k-surface/35 p-3"
+        title={[t('sandbox.seamlessDescription'), t('sandbox.seamlessHint')].join('\n')}
+      >
         <SliderField
           label="Blend Width"
           value={seamless.blendWidth}
@@ -29,10 +23,6 @@ export function SeamlessPanel() {
           onChange={(blendWidth) => setSeamless({ blendWidth })}
         />
       </div>
-
-      <p className="px-1 text-[9px] leading-relaxed text-cream/55">
-        {t('sandbox.seamlessHint')}
-      </p>
     </div>
   );
 }

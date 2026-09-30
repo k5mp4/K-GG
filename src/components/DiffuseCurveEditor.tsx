@@ -17,9 +17,8 @@ export function DiffuseCurveEditor({ value, onChange, disabled = false, label, d
 
   return (
     <div className="flex min-h-9 items-center justify-between gap-3 rounded-[var(--tq-radius-pane)] border border-k-muted/60 bg-k-bg/70 px-2 py-1.5 text-k-text">
-      <div className="min-w-0">
+      <div className="min-w-0" title={description ?? t('diffuse.luminanceMapping')}>
         <p className="truncate text-[10px] font-semibold uppercase tracking-wider">{label ?? t('diffuse.luminanceCurve')}</p>
-        <p className="truncate text-[9px] text-tab-inactive">{description ?? t('diffuse.luminanceMapping')}</p>
       </div>
       <InputCubicBezier
         value={curve as CubicBezierValue}

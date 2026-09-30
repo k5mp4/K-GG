@@ -14,9 +14,6 @@ export function FlowGradientPanel() {
 
   return (
     <div className="space-y-4" data-flow-gradient-panel>
-      <div className="border border-cyan-200/20 bg-cyan-300/[0.04] px-3 py-2 text-[10px] leading-relaxed text-cream/70">
-        {t('sandbox.flowHint')}
-      </div>
       <div className="grid grid-cols-1 gap-2.5">
         <SliderField
           label="Seed"

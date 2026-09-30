@@ -312,9 +312,8 @@ export default function App() {
                     <path d="m4 6 4 4 4-4" />
                   </svg>
                 </div>
-                <p className="text-[9px] leading-relaxed text-tab-inactive">
+                <p className="text-[9px] leading-relaxed text-tab-inactive" title={t('canvas.customHint')}>
                   {activeCanvasPreset ? `${activeCanvasPreset.label} · ${activeCanvasPreset.width}×${activeCanvasPreset.height}` : `${t('common.custom')} · ${canvasW}×${canvasH}`}
-                  {' '}— {t('canvas.customHint')}
                 </p>
               </div>
 

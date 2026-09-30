@@ -59,7 +59,7 @@ PostprocessのプロパティモジュールにはGlassを一つだけ表示し�
 
 GlassのSurface groupにはSurface Typeを表示し、Organic／Rippleを選択できます。OrganicはScale、Stretch、Rotation、Complexity、Warp、Seedを表示します。RippleはFrequency（`0.5..18`、step`0.1`、既定値`6`）、Depth（`0..1`、step`0.01`、既定値`0.35`）、Animation Speed（Animationループ1周あたり`1..8`周期、step`1`、既定値`1`）を表示します。Glass Surfaceは有機的に変化する形状を対象とし、Noise Distortion Influenceは両Surfaceで共通です。
 
-Optics groupにはIORを`1.0..2.5`、step`0.01`、既定値`1.5`で表示します。説明文はIORが屈折、波長分散、Fresnel反射率へ作用する2Dスクリーン空間近似であることを伝えます。Chromatic StepsはChromatic Aberrationの近くに表示する`1..3`の整数スライダーで、既定値は1です。1は各shader経路の現行色分散サンプルを保ち、2..3はその経路の分散アンカー間を細分化します。新しいラベルと説明は英語／日本語に対応します。
+Optics groupにはIORを`1.0..2.5`、step`0.01`、既定値`1.5`で表示します。IORのツールチップ（画面上の説明文ではありません）は、IORが屈折、波長分散、Fresnel反射率へ作用する2Dスクリーン空間近似であることを伝えます。Chromatic StepsはChromatic Aberrationの近くに表示する`1..3`の整数スライダーで、既定値は1です。1は各shader経路の現行色分散サンプルを保ち、2..3はその経路の分散アンカー間を細分化します。新しいラベルと説明は英語／日本語に対応します。
 
 ### UI-008 Effect Stack探索操作
 
