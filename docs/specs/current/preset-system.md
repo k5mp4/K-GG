@@ -6,11 +6,11 @@ status: current
 owners: [maintainer]
 created: 2026-07-27
 updated: 2026-09-30
-requirement_ids: [PRESET-001, PRESET-002, PRESET-003, PRESET-004, PRESET-005, PRESET-006, PRESET-007, PRESET-008, PRESET-009, PRESET-011, PRESET-012, PRESET-013, PRESET-014, PRESET-016, PRESET-017, PRESET-018, PRESET-019, PRESET-020]
-related_adrs: [ADR-0007, ADR-0008, ADR-20260927-datamosh-feedback-layer, ADR-20260929-sandbox-texture-material-stage]
+requirement_ids: [PRESET-001, PRESET-002, PRESET-003, PRESET-004, PRESET-005, PRESET-006, PRESET-007, PRESET-008, PRESET-009, PRESET-011, PRESET-012, PRESET-013, PRESET-014, PRESET-016, PRESET-017, PRESET-018, PRESET-019, PRESET-020, PRESET-021]
+related_adrs: [ADR-0007, ADR-0008, ADR-20260927-datamosh-feedback-layer, ADR-20260929-sandbox-texture-material-stage, ADR-20260930-sandbox-shapes-final-stage]
 related_changes: [CHANGE-001, CHANGE-012, CHANGE-013, CHANGE-018, CHANGE-024, CHANGE-025, CHANGE-026, CHANGE-027, CHANGE-030, CHANGE-031, CHANGE-032, CHANGE-034, CHANGE-037, CHANGE-039, CHANGE-046, CHANGE-048, CHANGE-051]
-related_code: [src/lib/presetModel.ts, src/lib/presetLibrary.ts, src/lib/presets.ts, src/lib/presetPreview.ts, src/lib/presetThumbnail.ts, src/lib/flowGradientRenderer.ts, src/types/flowGradient.ts, src/types/datamosh.ts, src/lib/effectPipeline.ts, src/lib/glass.ts, src/lib/postprocessStack.ts, src/store/gradientStore.ts, src/components/PresetPanel.tsx, src/components/FlowGradientPanel.tsx, src/components/DatamoshPanel.tsx, src/components/PresetPreview.tsx, src/components/ClothCanvas.tsx, src/types/coneView.ts, src/adapters/types.ts, src/adapters/browser/presetRepository.ts, src/adapters/tauri/presetRepository.ts, src/lib/kggControlRuntime.ts, src-tauri/src/lib.rs, src/types/texture.ts]
-related_tests: [src/lib/presetLibrary.test.ts, src/lib/presetModel.diffuse.test.ts, src/lib/presetModel.slit.test.ts, src/lib/presetModel.removedEffects.test.ts, src/lib/presetModel.compact.test.ts, src/lib/flowGradientPreset.test.ts, src/lib/presetPreview.test.ts, src/lib/presetThumbnail.test.ts, src/lib/presetThumbnail.lifecycle.test.ts, src/lib/glass.test.ts, src/lib/postprocessStack.test.ts, src/store/gradientStore.glass.test.ts, src/store/gradientStore.postprocessStack.test.ts, src/store/gradientStore.animation.test.ts, src/types/coneView.test.ts, src/lib/effectPipeline.test.ts, src/lib/presetModel.texture.test.ts]
+related_code: [src/lib/presetModel.ts, src/lib/presetLibrary.ts, src/lib/presets.ts, src/lib/presetPreview.ts, src/lib/presetThumbnail.ts, src/lib/flowGradientRenderer.ts, src/types/flowGradient.ts, src/types/datamosh.ts, src/lib/effectPipeline.ts, src/lib/glass.ts, src/lib/postprocessStack.ts, src/store/gradientStore.ts, src/components/PresetPanel.tsx, src/components/FlowGradientPanel.tsx, src/components/DatamoshPanel.tsx, src/components/PresetPreview.tsx, src/components/ClothCanvas.tsx, src/types/coneView.ts, src/adapters/types.ts, src/adapters/browser/presetRepository.ts, src/adapters/tauri/presetRepository.ts, src/lib/kggControlRuntime.ts, src-tauri/src/lib.rs, src/types/texture.ts, src/types/shapes.ts]
+related_tests: [src/lib/presetLibrary.test.ts, src/lib/presetModel.diffuse.test.ts, src/lib/presetModel.slit.test.ts, src/lib/presetModel.removedEffects.test.ts, src/lib/presetModel.compact.test.ts, src/lib/flowGradientPreset.test.ts, src/lib/presetPreview.test.ts, src/lib/presetThumbnail.test.ts, src/lib/presetThumbnail.lifecycle.test.ts, src/lib/glass.test.ts, src/lib/postprocessStack.test.ts, src/store/gradientStore.glass.test.ts, src/store/gradientStore.postprocessStack.test.ts, src/store/gradientStore.animation.test.ts, src/types/coneView.test.ts, src/lib/effectPipeline.test.ts, src/lib/presetModel.texture.test.ts, src/lib/presetModel.shapes.test.ts]
 ---
 
 # Preset System
@@ -29,7 +29,7 @@ Presetの `state` には、Gradient、Noise Distortion、Diffuse、Image Gradien
 
 ### PRESET-002 保存しない外部入力
 
-Image Gradient Sourceの元画像、Image Overlay/Maskなどの外部画像オブジェクトやファイルパスはPortableなPresetへ保存しません。読込後に外部入力が存在しない場合は、該当設定を保ったまま安全なフォールバックを表示します。
+Image Gradient Sourceの元画像、Image Overlay/Mask、Texture画像、SANDBOX Shapesで読み込んだSVGなどの外部画像オブジェクトやファイルパスはPortableなPresetへ保存しません。読込後に外部入力が存在しない場合は、該当設定を保ったまま安全なフォールバックを表示します。
 
 ### PRESET-003 Preset文書と互換性
 
@@ -93,7 +93,7 @@ Presetは`effectPipeline.flowGradientEnabled`と`flowGradient`のFlow設定を�
 
 ### PRESET-017 SANDBOX設定の完全保存
 
-Preset保存時のスナップショットには、Cloth、Cone、Normal、Prism、Particles、Flow Gradient、Datamosh、Seamlessの永続化対象設定を含めます。Clothは`clothGradient`、Coneは`coneView`と`effectPipeline.effectStack`、Normal／Prism／Particlesは`normalMap`と`effectPipeline`、Flow Gradientは`flowGradient`と`effectPipeline.flowGradientEnabled`、Datamoshは`datamosh`と`effectPipeline.effectStack`、Seamlessは`seamless`として保存・復元します。Textureは`texture`と`effectPipeline.effectStack`として保存・復元します（PRESET-019）。旧Presetで欠落している任意設定は各normalizerの既定値へ補完します。Canvas／Clothの一時表示面、SANDBOXの選択中Edit Layer、GPU資源は保存しません。
+Preset保存時のスナップショットには、Cloth、Cone、Normal、Prism、Particles、Flow Gradient、Datamosh、Seamlessの永続化対象設定を含めます。Clothは`clothGradient`、Coneは`coneView`と`effectPipeline.effectStack`、Normal／Prism／Particlesは`normalMap`と`effectPipeline`、Flow Gradientは`flowGradient`と`effectPipeline.flowGradientEnabled`、Datamoshは`datamosh`と`effectPipeline.effectStack`、Seamlessは`seamless`として保存・復元します。Textureは`texture`と`effectPipeline.effectStack`として保存・復元します（PRESET-019）。Shapesは`shapes`として保存・復元します（PRESET-021）。旧Presetで欠落している任意設定は各normalizerの既定値へ補完します。Canvas／Clothの一時表示面、SANDBOXの選択中Edit Layer、GPU資源は保存しません。
 
 ### PRESET-018 Datamosh設定とVideo Motionの保存互換
 
@@ -123,6 +123,10 @@ Legacy SPECは保存形式が変化した経緯を追うために残します。
 ### PRESET-019 Texture設定の保存互換
 
 `texture`と、`effectPipeline.effectStack`内の`texture`レイヤー（有効状態と順序）はPresetの永続化対象です。SANDBOX時代の保存（レイヤーがなく`texture.enabled`だけが有効）は、読み込み時にレイヤーを有効にして引き継ぎます。保存時と読み込み時に`normalizeTextureConfig`で範囲と列挙を正規化し、旧Presetにない場合は無効の既定値を使います。Texture用に読み込んだ画像はPortableなPresetへ保存せず、読込後に画像がない場合は選択中の手続き型プリセットで描画します。Thumbnailも同じ規則で、画像を使いません。
+
+### PRESET-021 Shapes設定の保存互換
+
+`shapes`（有効状態、形状ソース、配置、輪郭と陰影、Fill、オーラと階調、背景、表示・非表示ループ）はPreset、履歴（undo／redo）、storeの永続化対象です。保存時と読み込み時に`normalizeShapesConfig`で範囲と列挙を正規化し、旧Presetにない場合は無効の既定値を使います。`source: custom`で読み込んだSVGは保存せず、読込後にSVGがない場合とThumbnailでは内蔵の`star`で描画します。
 
 ### PRESET-020 保存データの最小化
 

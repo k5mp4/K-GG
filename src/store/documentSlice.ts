@@ -16,6 +16,7 @@ import type {
 } from '../types/distortion';
 import type { SeamlessConfig } from '../types/seamless';
 import type { TextureConfig } from '../types/texture';
+import type { ShapesConfig } from '../types/shapes';
 import type { DatamoshConfig } from '../types/datamosh';
 import type { WorkspaceSlice } from './workspaceSlice';
 
@@ -37,6 +38,7 @@ export type DocumentState = {
   coneView: ConeViewConfig;
   seamless: SeamlessConfig;
   texture: TextureConfig;
+  shapes: ShapesConfig;
   flowGradient: FlowGradientConfig;
   datamosh: DatamoshConfig;
   manualDistort: ManualDistortConfig;
@@ -74,6 +76,7 @@ export type DocumentActions = {
   setConeView: (value: Partial<ConeViewConfig>) => void;
   setSeamless: (value: Partial<SeamlessConfig>) => void;
   setTexture: (value: Partial<TextureConfig>) => void;
+  setShapes: (value: Partial<ShapesConfig>) => void;
   setFlowGradient: (value: Partial<FlowGradientConfig>) => void;
   setDatamosh: (value: Partial<DatamoshConfig>) => void;
   setManualDistort: (value: Partial<ManualDistortConfig>) => void;
@@ -111,6 +114,7 @@ export function createDocumentState(defaults: DocumentDefaults): DocumentState {
     coneView: { ...defaults.coneView },
     seamless: { ...defaults.seamless },
     texture: { ...defaults.texture },
+    shapes: { ...defaults.shapes },
     flowGradient: { ...defaults.flowGradient },
     datamosh: { ...defaults.datamosh },
     manualDistort: {

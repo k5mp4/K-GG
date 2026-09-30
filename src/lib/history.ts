@@ -26,6 +26,7 @@ function extractSnapshot(s: StoreState): HistorySnapshot {
     normalMap: s.normalMap,
     seamless: s.seamless,
     texture: s.texture,
+    shapes: s.shapes,
     manualDistort: s.manualDistort,
     postprocess: s.postprocess,
     keyframeTracks: s.keyframeTracks,
@@ -65,6 +66,7 @@ class HistoryManager {
         state.normalMap !== prev.normalMap ||
         state.seamless !== prev.seamless ||
         state.texture !== prev.texture ||
+        state.shapes !== prev.shapes ||
         state.manualDistort !== prev.manualDistort ||
         state.postprocess !== prev.postprocess ||
         state.keyframeTracks !== prev.keyframeTracks ||
@@ -91,6 +93,7 @@ class HistoryManager {
       normalMap: snap.normalMap,
       seamless: snap.seamless ?? useGradientStore.getState().seamless,
       texture: snap.texture ?? useGradientStore.getState().texture,
+      shapes: snap.shapes ?? useGradientStore.getState().shapes,
       manualDistort: snap.manualDistort ?? useGradientStore.getState().manualDistort,
       postprocess: snap.postprocess ?? useGradientStore.getState().postprocess,
       keyframeTracks: snap.keyframeTracks ?? useGradientStore.getState().keyframeTracks,

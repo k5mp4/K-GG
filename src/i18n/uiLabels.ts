@@ -52,6 +52,12 @@ const uiTerms = [
   ['Light', 'ライト'], ['Light Angle', 'ライト角度'], ['Light Height', 'ライトの高さ'], ['Light Sweep', 'ライトスイープ'],
   ['Material', 'マテリアル'], ['Metallic', '金属感'], ['Preset', 'プリセット'], ['Reflection', '反射'],
   ['Relief', '凹凸'], ['Repeat', '反復回数'], ['Source', 'ソース'], ['Specular', 'スペキュラ'], ['Surface', '表面'],
+  ['Shape', '形状'], ['Offset X', 'オフセット X'], ['Offset Y', 'オフセット Y'],
+  ['Inner Shadow', 'インナーシャドウ'], ['Shadow Size', '影のサイズ'], ['Shadow Offset', '影のずれ'],
+  ['Softness', '輪郭のなめらかさ'], ['Fill', 'フィル'], ['Fill Source', 'フィルのソース'], ['Fill Amount', 'フィル量'],
+  ['Fill Scale', 'フィルのスケール'], ['Fill Cycles', 'フィル周期'], ['Gradient', 'グラデーション'],
+  ['Show / Hide Loop', '表示・非表示ループ'], ['Mode', 'モード'], ['Cycles', 'サイクル数'],
+  ['Transition', '切替時間'], ['Hidden', '非表示の長さ'], ['Phase', '位相'],
 ] as const;
 
 const aliases = new Map<string, { en: string; ja: string }>();

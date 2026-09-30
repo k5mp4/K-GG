@@ -1,10 +1,11 @@
 import { describe, expect, it } from 'vitest';
 import type { LatestState } from '../types/latestState';
 import { createDefaultEffectPipeline, updateEffectStackLayer } from './effectPipeline';
-import { getRequiredExportProgramKeys } from './webgl';
+import { getRequiredExportProgramKeys, getShapesPlacement } from './webgl';
 import { GENERATOR_WITHOUT_NOISE_VARIANT, getProgramSource, NOISE_TYPE_MAP } from './webglShaderSources';
 import { getSceneNoiseProgramVariants } from './sceneRenderPlan';
 import { DATAMOSH_DEFAULTS } from '../types/datamosh';
+import { DEFAULT_SHAPES } from '../types/shapes';
 
 function stateWithGlass(enabled: boolean): LatestState {
   const pipeline = createDefaultEffectPipeline();
@@ -121,6 +122,38 @@ describe('export WebGL program plan', () => {
     state.effectPipeline.effectStack = updateEffectStackLayer(state.effectPipeline.effectStack, 'texture', { enabled: true });
 
     expect(getRequiredExportProgramKeys(state)).toEqual(['stackCore', 'texture']);
+  });
+
+  it('requests the Shapes program only while SANDBOX Shapes is on', () => {
+    const state = stateWithGlass(false);
+    expect(getRequiredExportProgramKeys(state)).not.toContain('shapes');
+    state.shapes = { ...DEFAULT_SHAPES, enabled: true };
+    expect(getRequiredExportProgramKeys(state)).toContain('shapes');
+  });
+
+  it('measures Shapes lengths against the shorter content side and pads the mask extent', () => {
+    // A 3:1 text-like shape contained in 80% of a 1000×500 canvas.
+    const placement = getShapesPlacement(
+      { ...DEFAULT_SHAPES, scale: 0.8, offsetX: 0.5, offsetY: 0.5 },
+      { aspect: 3, contentScale: [0.5, 0.25] },
+      1000,
+      500,
+    );
+    expect(placement.unit).toBeCloseTo(800 / 3, 6);
+    expect(placement.extent[0]).toBeCloseTo(1600, 6);
+    expect(placement.extent[1]).toBeCloseTo((800 / 3) / 0.25, 6);
+    // +Y offset moves the shape down, i.e. to a lower bottom-up coordinate.
+    expect(placement.center).toEqual([500 + 125, 250 - 125]);
+    expect(placement.contentHalf[1]).toBeCloseTo(0.5, 6);
+  });
+
+  it('keeps the Shapes shader tile-safe and on GLSL ES 3.00 for explicit-LOD blur', () => {
+    const source = getProgramSource('shapes');
+
+    expect(source.vertex.startsWith('#version 300 es')).toBe(true);
+    expect(source.fragment.trimStart().startsWith('#version 300 es')).toBe(true);
+    expect(source.fragment).toContain('gl_FragCoord.xy + u_tileOffset');
+    expect(source.fragment).toContain('textureLod(u_maskTex');
   });
 
   it('does not request the Texture program while the layer is off', () => {

@@ -37,13 +37,13 @@ export const CANVAS_SIZE_PRESETS = [
 ] as const;
 
 type StoreSnapshot = ReturnType<typeof useGradientStore.getState>;
-type AppStoreState = Pick<StoreSnapshot, 'diffuse' | 'noiseDistortion' | 'slitScan' | 'normalMap' | 'effectPipeline' | 'seamless' | 'postprocess'>;
+type AppStoreState = Pick<StoreSnapshot, 'diffuse' | 'noiseDistortion' | 'slitScan' | 'normalMap' | 'effectPipeline' | 'seamless' | 'shapes' | 'postprocess'>;
 
 const TAB_ENABLED_MAP: Partial<Record<LeftTab, (state: AppStoreState) => boolean>> = {
   diffuse: state => state.diffuse.enabled,
   noise: state => state.noiseDistortion.enabled,
   slit: state => state.slitScan.enabled,
-  sandbox: state => state.normalMap.enabled || state.effectPipeline.prismEnabled || state.effectPipeline.particlesEnabled || state.seamless.enabled,
+  sandbox: state => state.normalMap.enabled || state.effectPipeline.prismEnabled || state.effectPipeline.particlesEnabled || state.seamless.enabled || state.shapes.enabled,
   postprocess: state => state.postprocess.enabled
     || hasEnabledPostprocessEffectStack(state.effectPipeline)
     || isEffectStackLayerEnabled(state.effectPipeline, 'cone')
@@ -103,6 +103,7 @@ export function useWorkspaceController({ translate }: WorkspaceControllerOptions
     diffuse: state.diffuse,
     normalMap: state.normalMap,
     seamless: state.seamless,
+    shapes: state.shapes,
   })));
   const updater = useAppUpdater();
   const {

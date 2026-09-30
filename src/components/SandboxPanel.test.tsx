@@ -56,7 +56,7 @@ describe('Texture layer panel', () => {
   it('keeps Texture out of the SANDBOX modules because it is an Effect Stack layer', () => {
     const markup = renderWithTexture({ enabled: true }, renderSandbox);
 
-    expect(markup).toContain('/6');
+    expect(markup).toContain('/7');
     expect(markup).not.toContain('data-sandbox-module="texture"');
     expect(markup).not.toContain('data-texture-panel');
   });
@@ -83,5 +83,24 @@ describe('Texture layer panel', () => {
     expect(markup).toContain('type="file"');
     expect(markup).toContain('No image loaded');
     expect(markup).toContain('Grain Angle');
+  });
+});
+
+describe('SANDBOX Shapes module', () => {
+  beforeEach(() => {
+    useGradientStore.setState(useGradientStore.getInitialState(), true);
+  });
+
+  it('lists Shapes in the Edit Layer selector and counts it as a module', () => {
+    const initialState = useGradientStore.getInitialState();
+    const previous = initialState.shapes;
+    initialState.shapes = { ...previous, enabled: true };
+    try {
+      const markup = renderSandbox();
+      expect(markup).toContain('Shapes');
+      expect(markup).toContain('1<span class="text-cyan-100/40">/7</span>');
+    } finally {
+      initialState.shapes = previous;
+    }
   });
 });

@@ -1,4 +1,5 @@
 import type { LatestState } from './latestState';
+import type { ShapesMask } from '../lib/shapesLibrary';
 
 /** Tile coordinates are expressed in final-output pixel space. */
 export type TileRenderOptions = {
@@ -51,4 +52,9 @@ export type RenderFrameRequest = {
   flowSessionId?: string;
   datamosh?: LatestState['datamosh'];
   coneView?: LatestState['coneView'];
+  /** SANDBOX Shapes, applied after the whole frame by renderShapesPass. */
+  shapes?: LatestState['shapes'];
+  shapesMask?: ShapesMask | null;
+  shapesNormalizedTime?: number;
+  shapesAnimated?: boolean;
 };

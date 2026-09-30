@@ -1,5 +1,5 @@
 import type { RenderFrameRequest } from '../types/rendering';
-import { render, type WebGLContext } from './webgl';
+import { render, renderShapesPass, type WebGLContext } from './webgl';
 
 /**
  * Adapter from the named frame contract to the legacy renderer entry point.
@@ -46,4 +46,16 @@ export function renderFrame(ctx: WebGLContext, request: RenderFrameRequest): voi
     request.textureImageSource,
     request.textureNormalizedTime ?? 0,
   );
+  // Shapes consumes the finished frame, so it runs after every other stage.
+  if (request.shapes?.enabled) {
+    renderShapesPass(ctx, {
+      config: request.shapes,
+      mask: request.shapesMask ?? null,
+      normalizedTime: request.shapesNormalizedTime ?? 0,
+      animated: request.shapesAnimated ?? false,
+      width: request.width,
+      height: request.height,
+      tile: request.tile,
+    });
+  }
 }
