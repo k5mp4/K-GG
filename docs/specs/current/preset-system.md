@@ -104,6 +104,7 @@ PresetはDatamoshレイヤーのmotion source、Mix Mode、各パラメータを
 - Gradient Systemは `state.gradient`、Image Gradient設定、Meshの正規化を定義します。
 - Effect Stackは `state.effectPipeline` を有効状態・順序の一次情報として使用します。
 - Animationは `state.animation` と `state.keyframeTracks` に保存され、Preset読込後も同じ時刻評価へ渡されます。
+- Preset読込は`animation.previewLoop`とLoop Timing（`animation.easing`、Beat Sync含む）を上書きせず、読込前の値を維持します。Duration、Speed、FPSなどそれ以外のAnimation設定はPresetの値を反映します。保存時は現在のLoop Timingを保存します。
 
 ## 変更履歴
 

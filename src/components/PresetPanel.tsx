@@ -11,6 +11,7 @@ import { normalizeImageGradientConfig } from '../types/imageGradient';
 import { stripSlitPhaseMotionFields } from '../types/distortion';
 import { resolveDiffuseBezier } from '../lib/diffuseCurve';
 import { createPresetSaveState } from '../lib/presetModel';
+import { keepLoopTimingOnPresetLoad } from '../lib/animationConfig';
 import {
   createFolder,
   deleteFolder,
@@ -358,7 +359,7 @@ export function PresetPanel({ canvasW, canvasH, setCanvasW, setCanvasH, aspectRa
       ? normalizeEffectPipelineConfig(s.effectPipeline)
       : createDefaultEffectPipeline());
     applicationCommands.setKeyframeTracks(s.keyframeTracks ?? {});
-    if (s.animation) applicationCommands.setAnimation({ ...s.animation, previewLoop: s.animation.previewLoop ?? true });
+    if (s.animation) applicationCommands.setAnimation(keepLoopTimingOnPresetLoad(s.animation, useGradientStore.getState().animation));
     if (s.colorPalettes) mergeUserColorPalettes(s.colorPalettes);
     if (s.resolution) {
       const normalizeResolution = (value: number) => Number.isFinite(value) ? Math.max(1, Math.min(4096, Math.round(value))) : 1024;
