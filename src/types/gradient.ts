@@ -494,6 +494,7 @@ export type GradientConfig = {
   rampInterpolation: RampInterpolation;
   rampVariable?: number; // -1.0..1.0, 0=Ease, +/-1=Constant寄り
   rampRepeat?: number; // 1–20, グラデーションランプの繰り返し回数
+  rampOffset?: number; // -1.0..1.0, ランプの色をずらす量（1=ランプ1周、周回する）。Mesh直接色モードには効かない
   gradientType: GradientType;
   /** グラデーションのアンカーポイント（UV空間: y=0が底辺）。常に4点保持し、fourcolor以外は0,1のみ使用 */
   anchors?: [[number,number],[number,number],[number,number],[number,number]];

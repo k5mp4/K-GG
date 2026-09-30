@@ -42,11 +42,11 @@ describe('context-owned gradient ramp uploads', () => {
     const ctx = context();
     let gradient = structuredClone(STORE_DEFAULTS.gradient);
     updateGradientRampTexture(ctx, gradient);
-    for (const change of [{ rampRepeat: 3 }, { rampMirror: true }, { rampVariable: 0.8 }]) {
+    for (const change of [{ rampRepeat: 3 }, { rampMirror: true }, { rampVariable: 0.8 }, { rampOffset: 0.25 }]) {
       gradient = { ...gradient, ...change };
       updateGradientRampTexture(ctx, gradient);
     }
-    expect(ctx.gl.texSubImage2D).toHaveBeenCalledTimes(4);
+    expect(ctx.gl.texSubImage2D).toHaveBeenCalledTimes(5);
     const restored = context();
     updateGradientRampTexture(restored, gradient);
     expect(restored.gl.texSubImage2D).toHaveBeenCalledTimes(1);

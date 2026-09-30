@@ -302,6 +302,7 @@ export function hasActiveAnimation(state: LatestState): boolean {
     (state.animation.affectSlit && state.slitScan.enabled) ||
     (state.animation.affectStretch && state.stretch.enabled) ||
     state.animation.affectRamp ||
+    Math.round(state.animation.rampOffsetSpeed ?? 0) !== 0 ||
     (state.diffuse.enabled && Boolean(state.diffuse.seedAnimEnabled)) ||
     isPostprocessTimeAnimationActive(state.postprocess, state.effectPipeline) ||
     (state.shapes?.enabled === true && (state.shapes.reveal !== 'none' || state.shapes.fillCycles !== 0))
@@ -410,8 +411,15 @@ export function evaluateSceneAtTime(state: LatestState, normalizedTime: number):
     ),
   );
 
+  let gradient = applyGradientTracks(state.gradient, tracks, time, animation.previewLoop ?? true);
+  const rampOffsetSpeed = Math.round(animation.rampOffsetSpeed ?? 0);
+  if (animation.enabled && rampOffsetSpeed !== 0) {
+    // Whole cycles per loop so the offset returns to its start exactly when the loop restarts (independent of Speed).
+    gradient = { ...gradient, rampOffset: (gradient.rampOffset ?? 0) + autoTime * rampOffsetSpeed };
+  }
+
   return {
-    gradient: applyGradientTracks(state.gradient, tracks, time, animation.previewLoop ?? true),
+    gradient,
     noiseDistortion,
     diffuse,
     slitScan,

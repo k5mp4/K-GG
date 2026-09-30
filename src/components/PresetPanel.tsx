@@ -361,7 +361,10 @@ export function PresetPanel({ canvasW, canvasH, setCanvasW, setCanvasH, aspectRa
       ? normalizeEffectPipelineConfig(s.effectPipeline)
       : createDefaultEffectPipeline());
     applicationCommands.setKeyframeTracks(s.keyframeTracks ?? {});
-    if (s.animation) applicationCommands.setAnimation(keepLoopTimingOnPresetLoad(s.animation, useGradientStore.getState().animation));
+    if (s.animation) applicationCommands.setAnimation({
+      ...keepLoopTimingOnPresetLoad(s.animation, useGradientStore.getState().animation),
+      rampOffsetSpeed: s.animation.rampOffsetSpeed ?? 0,
+    });
     if (s.colorPalettes) mergeUserColorPalettes(s.colorPalettes);
     if (s.resolution) {
       const normalizeResolution = (value: number) => Number.isFinite(value) ? Math.max(1, Math.min(4096, Math.round(value))) : 1024;
