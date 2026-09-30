@@ -83,8 +83,16 @@ export function GradientCanvas({ width = 800, height = 800, animLoopRef, seekVer
         setLazyProgramReadyCount(c => c + 1);
       }
     };
+    // A program that is not the active variant (for example the Generator's
+    // Noise variant while Noise is drawn by its stack pass) reports only this
+    // event, but the next frame can still use it.
+    const handleProgramReady = () => setLazyProgramReadyCount(c => c + 1);
     window.addEventListener('kgg:webgl-lazy-program-state', handleProgramState);
-    return () => window.removeEventListener('kgg:webgl-lazy-program-state', handleProgramState);
+    window.addEventListener('kgg:webgl-lazy-program-ready', handleProgramReady);
+    return () => {
+      window.removeEventListener('kgg:webgl-lazy-program-state', handleProgramState);
+      window.removeEventListener('kgg:webgl-lazy-program-ready', handleProgramReady);
+    };
   }, []);
 
   useEffect(() => {

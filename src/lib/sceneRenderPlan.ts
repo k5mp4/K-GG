@@ -2,7 +2,13 @@ import type { EffectPipelineConfig } from '../types/distortion';
 import { isGlassOpticallyIdentity } from './glass';
 import { isGlassTileOpticallyIdentity } from './glassTile';
 import { getActivePostprocessStackLayers } from './postprocessStack';
-import { getThreeDProgramKey, type LazyProgramKey } from './webglShaderSources';
+import {
+  GENERATOR_WITHOUT_NOISE_VARIANT,
+  getThreeDProgramKey,
+  NOISE_TYPE_MAP,
+  type LazyProgramKey,
+  type NoiseVariantProgramKey,
+} from './webglShaderSources';
 import type { LatestState } from '../types/latestState';
 import { getV2RenderPlan, type V2RenderPlan, type V2RenderPlanOptions } from './effectPipeline';
 
@@ -15,7 +21,7 @@ export type SceneRenderPlanInput = V2RenderPlanOptions & {
 };
 
 export type SceneRenderPlanOverrides = Partial<Pick<SceneRenderPlanInput,
-  'imageGradientEnabled' | 'forceTextureDiffusePass' | 'flowGradientEnabled'
+  'imageGradientEnabled' | 'forceTextureDiffusePass' | 'flowGradientEnabled' | 'analyticNoisePending'
 >>;
 
 export type SceneRenderPlanState = Pick<LatestState,
@@ -60,6 +66,7 @@ export function getSceneRenderPlanInput(
     noiseLoopMode: state.noiseDistortion?.noiseLoopMode,
     diffuseMode: state.diffuse?.mode,
     diffuseApplyMode: state.diffuse?.applyMode,
+    analyticNoisePending: overrides.analyticNoisePending,
   };
 }
 
@@ -73,7 +80,10 @@ export function getSceneRenderPlan(input: SceneRenderPlanInput): V2RenderPlan | 
 }
 
 /** Required program variants for preview readiness and every export adapter. */
-export function getRequiredSceneProgramKeys(state: LatestState): LazyProgramKey[] {
+export function getRequiredSceneProgramKeys(
+  state: LatestState,
+  options: Pick<SceneRenderPlanOverrides, 'analyticNoisePending'> = {},
+): LazyProgramKey[] {
   const required: LazyProgramKey[] = [];
   const add = (key: LazyProgramKey, needed: boolean) => {
     if (needed && !required.includes(key)) required.push(key);
@@ -83,6 +93,7 @@ export function getRequiredSceneProgramKeys(state: LatestState): LazyProgramKey[
   if (state.effectPipeline.version === 'stack-v2') {
     const plan = getSceneRenderPlan(getSceneRenderPlanInput(state, {
       imageGradientEnabled: imageGradientProtected,
+      analyticNoisePending: options.analyticNoisePending,
     }));
     if (!plan) return required;
     const protectedStipple = imageGradientProtected
@@ -131,4 +142,65 @@ export function getRequiredSceneProgramKeys(state: LatestState): LazyProgramKey[
   }
 
   return required;
+}
+
+/** The compiled variant each Noise-dependent program needs for one frame. */
+export type NoiseProgramVariants = Record<NoiseVariantProgramKey, number>;
+
+export type GeneratorVariantInput = {
+  isV2Pipeline: boolean;
+  imageGradientProtected: boolean;
+  renderPlan: V2RenderPlan | null;
+  noiseEnabled: boolean;
+  manualDistortEnabled: boolean;
+};
+
+/**
+ * Whether the Generator needs a full variant instead of the bootstrap
+ * program, which omits Noise and Manual Distort. V2 evaluates Noise in the
+ * Generator only when the analytic prefix consumes the Noise layer, and never
+ * runs Manual Distort there; Legacy and protected Image Gradient keep both.
+ */
+export function generatorNeedsNoiseVariant(input: GeneratorVariantInput): boolean {
+  if (input.isV2Pipeline && !input.imageGradientProtected) {
+    return input.renderPlan?.analyticPrefix.consumedLayers.includes('noise') === true;
+  }
+  if (input.noiseEnabled || input.manualDistortEnabled) return true;
+  return input.renderPlan?.normalizedStack.some(layer => layer.kind === 'noise' && layer.enabled) === true;
+}
+
+/**
+ * Selects the per-Noise-type program variants. A Generator that needs no
+ * full variant is the bootstrap program, which is ready as soon as WebGL initializes; the
+ * stack Noise passes always follow the current Noise type.
+ */
+export function getNoiseProgramVariants(
+  noiseType: keyof typeof NOISE_TYPE_MAP | undefined,
+  generatorNeedsVariant: boolean,
+): NoiseProgramVariants {
+  const noiseVariant = NOISE_TYPE_MAP[noiseType ?? 'simplex'] ?? NOISE_TYPE_MAP.simplex;
+  return {
+    generator: generatorNeedsVariant ? noiseVariant : GENERATOR_WITHOUT_NOISE_VARIANT,
+    noiseStack: noiseVariant,
+    noiseDiffuseStack: noiseVariant,
+  };
+}
+
+/** Program variants for a fully evaluated scene, shared by preview warmup and export. */
+export function getSceneNoiseProgramVariants(
+  state: LatestState,
+  options: Pick<SceneRenderPlanOverrides, 'analyticNoisePending'> = {},
+): NoiseProgramVariants {
+  const imageGradientProtected = state.imageGradient.enabled && Boolean(state.imageGradientSource);
+  const renderPlan = getSceneRenderPlan(getSceneRenderPlanInput(state, {
+    imageGradientEnabled: imageGradientProtected,
+    analyticNoisePending: options.analyticNoisePending,
+  }));
+  return getNoiseProgramVariants(state.noiseDistortion?.type, generatorNeedsNoiseVariant({
+    isV2Pipeline: state.effectPipeline.version === 'stack-v2',
+    imageGradientProtected,
+    renderPlan,
+    noiseEnabled: state.noiseDistortion?.enabled === true,
+    manualDistortEnabled: state.manualDistort?.enabled === true,
+  }));
 }

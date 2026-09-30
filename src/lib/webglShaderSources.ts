@@ -357,12 +357,50 @@ export function getPostprocessFragmentSource(): string {
   return postprocessGLSL;
 }
 
+/** Shader-side Noise type index (`u_noiseType`, `KGG_NOISE_VARIANT`). */
+export const NOISE_TYPE_MAP = { simplex: 0, fbm: 1, voronoi: 2, curl: 3, domain_warp_anim: 4, seamless: 5, ridged_fbm: 6, ae_fractal: 7, fast_curl: 8, caustics: 9, phasor: 10, perlin: 11, chladni: 12 } as const;
+
+/**
+ * Programs that evaluate the Noise dispatcher. They are compiled per Noise
+ * type (`KGG_NOISE_VARIANT`) because a program holding every algorithm takes
+ * tens of seconds to over a minute to compile on ANGLE/Direct3D.
+ */
+export const NOISE_VARIANT_PROGRAM_KEYS = ['generator', 'noiseStack', 'noiseDiffuseStack'] as const;
+export type NoiseVariantProgramKey = typeof NOISE_VARIANT_PROGRAM_KEYS[number];
+
+export function isNoiseVariantProgramKey(key: LazyProgramKey): key is NoiseVariantProgramKey {
+  return (NOISE_VARIANT_PROGRAM_KEYS as readonly LazyProgramKey[]).includes(key);
+}
+
+/**
+ * The Generator without Noise and Manual Distort. It is exactly the bootstrap
+ * program, which is compiled during initialization, so it never needs a lazy
+ * compile. V2 frames use it unless the analytic prefix consumes Noise.
+ */
+export const GENERATOR_WITHOUT_NOISE_VARIANT = -1;
+
+export type ProgramSourceOptions = {
+  /** NOISE_TYPE_MAP index for a program in NOISE_VARIANT_PROGRAM_KEYS. Omitted keeps every Noise type. */
+  noiseVariant?: number;
+};
+
+function withNoiseVariant(fragment: string, noiseVariant: number | undefined): string {
+  if (noiseVariant === undefined || noiseVariant < 0) return fragment;
+  return `#define KGG_NOISE_VARIANT ${Math.trunc(noiseVariant)}\n${fragment}`;
+}
+
 /**
  * Returns the exact source pair for one lazy program. Keeping this mapping
  * declarative makes the compile boundary reviewable and testable without a
  * WebGL context.
  */
-export function getProgramSource(key: LazyProgramKey): ProgramSource {
+export function getProgramSource(key: LazyProgramKey, options: ProgramSourceOptions = {}): ProgramSource {
+  const source = getBaseProgramSource(key);
+  if (!isNoiseVariantProgramKey(key)) return source;
+  return { vertex: source.vertex, fragment: withNoiseVariant(source.fragment, options.noiseVariant) };
+}
+
+function getBaseProgramSource(key: LazyProgramKey): ProgramSource {
   if (key === 'generator') return { vertex: vertexGLSL, fragment: `${noiseGLSL}\n${gradientGLSL}` };
   if (key === 'blur') return { vertex: vertexGLSL, fragment: blurGLSL };
   if (key === 'normalMap') return { vertex: vertexGLSL, fragment: normalMapGLSL };
@@ -388,8 +426,9 @@ export function getProgramSource(key: LazyProgramKey): ProgramSource {
 
 export function getInitialProgramSource(): ProgramSource {
   // The bootstrap program keeps the canvas out of the CPU-only fallback while
-  // the full generator remains lazy. Its noise transform is an
-  // identity, but base gradients, source images, Slit, and Diffuse stay live.
+  // the full generator remains lazy, and it is the V2 Generator whenever
+  // Noise is not folded into it. Noise and Manual Distort are omitted, but
+  // base gradients, source images, Slit, and Diffuse stay live.
   const begin = noiseGLSL.indexOf('// KGG_BOOTSTRAP_NOISE_BEGIN');
   const end = noiseGLSL.indexOf('// KGG_BOOTSTRAP_NOISE_END');
   const bootstrapNoise = begin >= 0 && end >= begin

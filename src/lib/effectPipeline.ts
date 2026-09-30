@@ -339,6 +339,11 @@ export type V2RenderPlanOptions = {
   diffuseMode?: DiffuseMode;
   /** Missing values mean `noiseLinked`, matching presets saved before the option existed. */
   diffuseApplyMode?: DiffuseApplyMode;
+  /**
+   * The Generator variant for the current Noise type is still compiling.
+   * Noise then runs as its stack pass, like a non-analytic Noise type.
+   */
+  analyticNoisePending?: boolean;
 };
 
 export type AnalyticPrefixReason =
@@ -356,6 +361,7 @@ export type AnalyticPrefixReason =
   | 'particles'
   | 'forced-texture-diffuse'
   | 'unsupported-noise'
+  | 'noise-program-pending'
   | 'unsupported-diffuse'
   | 'invalid-order'
   | 'diffuse-before-slit'
@@ -590,6 +596,9 @@ export function getAnalyticGradientPrefixPlan(
     )
   ) {
     return disabledAnalyticPrefix('unsupported-noise', firstTextureLayerIndex < 0 ? null : firstTextureLayerIndex);
+  }
+  if (noiseIndex >= 0 && options.analyticNoisePending) {
+    return disabledAnalyticPrefix('noise-program-pending', firstTextureLayerIndex < 0 ? null : firstTextureLayerIndex);
   }
   if (diffuseIndex >= 0 && (!ANALYTIC_DIFFUSE_MODES.has(options.diffuseMode) || options.forceTextureDiffusePass)) {
     return disabledAnalyticPrefix(

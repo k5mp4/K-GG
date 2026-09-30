@@ -296,22 +296,27 @@
 #else
     if (!u_noiseEnabled) return uv;
     float evo = u_noiseEvolution + u_time;
-    if (u_noiseType == 3) {
+#if KGG_NOISE_VARIANT < 0 || KGG_NOISE_VARIANT == 3
+    if (KGG_NOISE_TYPE == 3) {
       vec2 current = applyCurlNoiseUV(uv, evo, u_time * u_curlSpeed);
       float blend = loopBlendWeight();
       if (blend <= 0.0001) return current;
       vec2 wrapped = applyCurlNoiseUV(uv, evo - u_noiseLoopPeriod, (u_time - u_noiseLoopPeriod) * u_curlSpeed);
       return mix(current, wrapped, blend);
-    } else if (u_noiseType == 8) {
-      return applyFastCurlNoiseUV(uv, evo);
-    } else if ((u_noiseType == CAUSTICS_NOISE_TYPE && u_noiseAmount == 0.0)
-      || (u_noiseType == PHASOR_NOISE_TYPE && (u_noiseAmount == 0.0 || u_phasorWarpStrength == 0.0))
-      || (u_noiseType == CHLADNI_NOISE_TYPE && (u_noiseAmount == 0.0 || u_chladniWarpStrength == 0.0))) {
-      return uv;
-    } else {
-      vec2 offset = noiseDisplace(uv, u_noiseScale, evo, u_noiseType, u_noiseOctaves);
-      return uv + offset * u_noiseAmount;
     }
+#endif
+#if KGG_NOISE_VARIANT < 0 || KGG_NOISE_VARIANT == 8
+    if (KGG_NOISE_TYPE == 8) {
+      return applyFastCurlNoiseUV(uv, evo);
+    }
+#endif
+    if ((KGG_NOISE_TYPE == CAUSTICS_NOISE_TYPE && u_noiseAmount == 0.0)
+      || (KGG_NOISE_TYPE == PHASOR_NOISE_TYPE && (u_noiseAmount == 0.0 || u_phasorWarpStrength == 0.0))
+      || (KGG_NOISE_TYPE == CHLADNI_NOISE_TYPE && (u_noiseAmount == 0.0 || u_chladniWarpStrength == 0.0))) {
+      return uv;
+    }
+    vec2 offset = noiseDisplace(uv, u_noiseScale, evo, KGG_NOISE_TYPE, u_noiseOctaves);
+    return uv + offset * u_noiseAmount;
 #endif
   }
 
@@ -627,80 +632,38 @@
 
   // 複数スリットの幅オフセットを考慮したスリットインデックスを計算。
   // u_slitDelta** の各 vec4 は (.xy, .zw) の2エントリを保持。slitIdx=-1 は空エントリ。
-  // ループ変数での uniform 配列インデックスを避けた、静的展開版。
+  // uniform 配列ではなくローカル配列へ写してから引く。32エントリの静的展開は
+  // ANGLE/Direct3D での Generator コンパイル時間の大きな割合を占めていた。
   float computeSlitIdx(float warpedCoord, float sw) {
+    vec4 deltas[16];
+    deltas[0] = u_slitDelta01;
+    deltas[1] = u_slitDelta23;
+    deltas[2] = u_slitDelta45;
+    deltas[3] = u_slitDelta67;
+    deltas[4] = u_slitDelta89;
+    deltas[5] = u_slitDeltaAB;
+    deltas[6] = u_slitDeltaCD;
+    deltas[7] = u_slitDeltaEF;
+    deltas[8] = u_slitDeltaGH;
+    deltas[9] = u_slitDeltaIJ;
+    deltas[10] = u_slitDeltaKL;
+    deltas[11] = u_slitDeltaMN;
+    deltas[12] = u_slitDeltaOP;
+    deltas[13] = u_slitDeltaQR;
+    deltas[14] = u_slitDeltaST;
+    deltas[15] = u_slitDeltaUV;
     float cumDelta = 0.0;
-    float done = 0.0;   // 0.0=未確定, 1.0=確定済み
-    float result = 0.0;
-    float si = 0.0; float de = 0.0; float lb = 0.0; float rb = 0.0;
-
-    si = u_slitDelta01.x; de = u_slitDelta01.y;
-    if (done < 0.5 && si > -9000.0) { lb = si * sw + cumDelta; rb = lb + sw + de; if (warpedCoord < lb) { result = floor((warpedCoord - cumDelta) / sw); done = 1.0; } else if (warpedCoord < rb) { result = si; done = 1.0; } else { cumDelta += de; } }
-    si = u_slitDelta01.z; de = u_slitDelta01.w;
-    if (done < 0.5 && si > -9000.0) { lb = si * sw + cumDelta; rb = lb + sw + de; if (warpedCoord < lb) { result = floor((warpedCoord - cumDelta) / sw); done = 1.0; } else if (warpedCoord < rb) { result = si; done = 1.0; } else { cumDelta += de; } }
-    si = u_slitDelta23.x; de = u_slitDelta23.y;
-    if (done < 0.5 && si > -9000.0) { lb = si * sw + cumDelta; rb = lb + sw + de; if (warpedCoord < lb) { result = floor((warpedCoord - cumDelta) / sw); done = 1.0; } else if (warpedCoord < rb) { result = si; done = 1.0; } else { cumDelta += de; } }
-    si = u_slitDelta23.z; de = u_slitDelta23.w;
-    if (done < 0.5 && si > -9000.0) { lb = si * sw + cumDelta; rb = lb + sw + de; if (warpedCoord < lb) { result = floor((warpedCoord - cumDelta) / sw); done = 1.0; } else if (warpedCoord < rb) { result = si; done = 1.0; } else { cumDelta += de; } }
-    si = u_slitDelta45.x; de = u_slitDelta45.y;
-    if (done < 0.5 && si > -9000.0) { lb = si * sw + cumDelta; rb = lb + sw + de; if (warpedCoord < lb) { result = floor((warpedCoord - cumDelta) / sw); done = 1.0; } else if (warpedCoord < rb) { result = si; done = 1.0; } else { cumDelta += de; } }
-    si = u_slitDelta45.z; de = u_slitDelta45.w;
-    if (done < 0.5 && si > -9000.0) { lb = si * sw + cumDelta; rb = lb + sw + de; if (warpedCoord < lb) { result = floor((warpedCoord - cumDelta) / sw); done = 1.0; } else if (warpedCoord < rb) { result = si; done = 1.0; } else { cumDelta += de; } }
-    si = u_slitDelta67.x; de = u_slitDelta67.y;
-    if (done < 0.5 && si > -9000.0) { lb = si * sw + cumDelta; rb = lb + sw + de; if (warpedCoord < lb) { result = floor((warpedCoord - cumDelta) / sw); done = 1.0; } else if (warpedCoord < rb) { result = si; done = 1.0; } else { cumDelta += de; } }
-    si = u_slitDelta67.z; de = u_slitDelta67.w;
-    if (done < 0.5 && si > -9000.0) { lb = si * sw + cumDelta; rb = lb + sw + de; if (warpedCoord < lb) { result = floor((warpedCoord - cumDelta) / sw); done = 1.0; } else if (warpedCoord < rb) { result = si; done = 1.0; } else { cumDelta += de; } }
-    si = u_slitDelta89.x; de = u_slitDelta89.y;
-    if (done < 0.5 && si > -9000.0) { lb = si * sw + cumDelta; rb = lb + sw + de; if (warpedCoord < lb) { result = floor((warpedCoord - cumDelta) / sw); done = 1.0; } else if (warpedCoord < rb) { result = si; done = 1.0; } else { cumDelta += de; } }
-    si = u_slitDelta89.z; de = u_slitDelta89.w;
-    if (done < 0.5 && si > -9000.0) { lb = si * sw + cumDelta; rb = lb + sw + de; if (warpedCoord < lb) { result = floor((warpedCoord - cumDelta) / sw); done = 1.0; } else if (warpedCoord < rb) { result = si; done = 1.0; } else { cumDelta += de; } }
-    si = u_slitDeltaAB.x; de = u_slitDeltaAB.y;
-    if (done < 0.5 && si > -9000.0) { lb = si * sw + cumDelta; rb = lb + sw + de; if (warpedCoord < lb) { result = floor((warpedCoord - cumDelta) / sw); done = 1.0; } else if (warpedCoord < rb) { result = si; done = 1.0; } else { cumDelta += de; } }
-    si = u_slitDeltaAB.z; de = u_slitDeltaAB.w;
-    if (done < 0.5 && si > -9000.0) { lb = si * sw + cumDelta; rb = lb + sw + de; if (warpedCoord < lb) { result = floor((warpedCoord - cumDelta) / sw); done = 1.0; } else if (warpedCoord < rb) { result = si; done = 1.0; } else { cumDelta += de; } }
-    si = u_slitDeltaCD.x; de = u_slitDeltaCD.y;
-    if (done < 0.5 && si > -9000.0) { lb = si * sw + cumDelta; rb = lb + sw + de; if (warpedCoord < lb) { result = floor((warpedCoord - cumDelta) / sw); done = 1.0; } else if (warpedCoord < rb) { result = si; done = 1.0; } else { cumDelta += de; } }
-    si = u_slitDeltaCD.z; de = u_slitDeltaCD.w;
-    if (done < 0.5 && si > -9000.0) { lb = si * sw + cumDelta; rb = lb + sw + de; if (warpedCoord < lb) { result = floor((warpedCoord - cumDelta) / sw); done = 1.0; } else if (warpedCoord < rb) { result = si; done = 1.0; } else { cumDelta += de; } }
-    si = u_slitDeltaEF.x; de = u_slitDeltaEF.y;
-    if (done < 0.5 && si > -9000.0) { lb = si * sw + cumDelta; rb = lb + sw + de; if (warpedCoord < lb) { result = floor((warpedCoord - cumDelta) / sw); done = 1.0; } else if (warpedCoord < rb) { result = si; done = 1.0; } else { cumDelta += de; } }
-    si = u_slitDeltaEF.z; de = u_slitDeltaEF.w;
-    if (done < 0.5 && si > -9000.0) { lb = si * sw + cumDelta; rb = lb + sw + de; if (warpedCoord < lb) { result = floor((warpedCoord - cumDelta) / sw); done = 1.0; } else if (warpedCoord < rb) { result = si; done = 1.0; } else { cumDelta += de; } }
-    si = u_slitDeltaGH.x; de = u_slitDeltaGH.y;
-    if (done < 0.5 && si > -9000.0) { lb = si * sw + cumDelta; rb = lb + sw + de; if (warpedCoord < lb) { result = floor((warpedCoord - cumDelta) / sw); done = 1.0; } else if (warpedCoord < rb) { result = si; done = 1.0; } else { cumDelta += de; } }
-    si = u_slitDeltaGH.z; de = u_slitDeltaGH.w;
-    if (done < 0.5 && si > -9000.0) { lb = si * sw + cumDelta; rb = lb + sw + de; if (warpedCoord < lb) { result = floor((warpedCoord - cumDelta) / sw); done = 1.0; } else if (warpedCoord < rb) { result = si; done = 1.0; } else { cumDelta += de; } }
-    si = u_slitDeltaIJ.x; de = u_slitDeltaIJ.y;
-    if (done < 0.5 && si > -9000.0) { lb = si * sw + cumDelta; rb = lb + sw + de; if (warpedCoord < lb) { result = floor((warpedCoord - cumDelta) / sw); done = 1.0; } else if (warpedCoord < rb) { result = si; done = 1.0; } else { cumDelta += de; } }
-    si = u_slitDeltaIJ.z; de = u_slitDeltaIJ.w;
-    if (done < 0.5 && si > -9000.0) { lb = si * sw + cumDelta; rb = lb + sw + de; if (warpedCoord < lb) { result = floor((warpedCoord - cumDelta) / sw); done = 1.0; } else if (warpedCoord < rb) { result = si; done = 1.0; } else { cumDelta += de; } }
-    si = u_slitDeltaKL.x; de = u_slitDeltaKL.y;
-    if (done < 0.5 && si > -9000.0) { lb = si * sw + cumDelta; rb = lb + sw + de; if (warpedCoord < lb) { result = floor((warpedCoord - cumDelta) / sw); done = 1.0; } else if (warpedCoord < rb) { result = si; done = 1.0; } else { cumDelta += de; } }
-    si = u_slitDeltaKL.z; de = u_slitDeltaKL.w;
-    if (done < 0.5 && si > -9000.0) { lb = si * sw + cumDelta; rb = lb + sw + de; if (warpedCoord < lb) { result = floor((warpedCoord - cumDelta) / sw); done = 1.0; } else if (warpedCoord < rb) { result = si; done = 1.0; } else { cumDelta += de; } }
-    si = u_slitDeltaMN.x; de = u_slitDeltaMN.y;
-    if (done < 0.5 && si > -9000.0) { lb = si * sw + cumDelta; rb = lb + sw + de; if (warpedCoord < lb) { result = floor((warpedCoord - cumDelta) / sw); done = 1.0; } else if (warpedCoord < rb) { result = si; done = 1.0; } else { cumDelta += de; } }
-    si = u_slitDeltaMN.z; de = u_slitDeltaMN.w;
-    if (done < 0.5 && si > -9000.0) { lb = si * sw + cumDelta; rb = lb + sw + de; if (warpedCoord < lb) { result = floor((warpedCoord - cumDelta) / sw); done = 1.0; } else if (warpedCoord < rb) { result = si; done = 1.0; } else { cumDelta += de; } }
-    si = u_slitDeltaOP.x; de = u_slitDeltaOP.y;
-    if (done < 0.5 && si > -9000.0) { lb = si * sw + cumDelta; rb = lb + sw + de; if (warpedCoord < lb) { result = floor((warpedCoord - cumDelta) / sw); done = 1.0; } else if (warpedCoord < rb) { result = si; done = 1.0; } else { cumDelta += de; } }
-    si = u_slitDeltaOP.z; de = u_slitDeltaOP.w;
-    if (done < 0.5 && si > -9000.0) { lb = si * sw + cumDelta; rb = lb + sw + de; if (warpedCoord < lb) { result = floor((warpedCoord - cumDelta) / sw); done = 1.0; } else if (warpedCoord < rb) { result = si; done = 1.0; } else { cumDelta += de; } }
-    si = u_slitDeltaQR.x; de = u_slitDeltaQR.y;
-    if (done < 0.5 && si > -9000.0) { lb = si * sw + cumDelta; rb = lb + sw + de; if (warpedCoord < lb) { result = floor((warpedCoord - cumDelta) / sw); done = 1.0; } else if (warpedCoord < rb) { result = si; done = 1.0; } else { cumDelta += de; } }
-    si = u_slitDeltaQR.z; de = u_slitDeltaQR.w;
-    if (done < 0.5 && si > -9000.0) { lb = si * sw + cumDelta; rb = lb + sw + de; if (warpedCoord < lb) { result = floor((warpedCoord - cumDelta) / sw); done = 1.0; } else if (warpedCoord < rb) { result = si; done = 1.0; } else { cumDelta += de; } }
-    si = u_slitDeltaST.x; de = u_slitDeltaST.y;
-    if (done < 0.5 && si > -9000.0) { lb = si * sw + cumDelta; rb = lb + sw + de; if (warpedCoord < lb) { result = floor((warpedCoord - cumDelta) / sw); done = 1.0; } else if (warpedCoord < rb) { result = si; done = 1.0; } else { cumDelta += de; } }
-    si = u_slitDeltaST.z; de = u_slitDeltaST.w;
-    if (done < 0.5 && si > -9000.0) { lb = si * sw + cumDelta; rb = lb + sw + de; if (warpedCoord < lb) { result = floor((warpedCoord - cumDelta) / sw); done = 1.0; } else if (warpedCoord < rb) { result = si; done = 1.0; } else { cumDelta += de; } }
-    si = u_slitDeltaUV.x; de = u_slitDeltaUV.y;
-    if (done < 0.5 && si > -9000.0) { lb = si * sw + cumDelta; rb = lb + sw + de; if (warpedCoord < lb) { result = floor((warpedCoord - cumDelta) / sw); done = 1.0; } else if (warpedCoord < rb) { result = si; done = 1.0; } else { cumDelta += de; } }
-    si = u_slitDeltaUV.z; de = u_slitDeltaUV.w;
-    if (done < 0.5 && si > -9000.0) { lb = si * sw + cumDelta; rb = lb + sw + de; if (warpedCoord < lb) { result = floor((warpedCoord - cumDelta) / sw); done = 1.0; } else if (warpedCoord < rb) { result = si; done = 1.0; } else { cumDelta += de; } }
-
-    if (done < 0.5) { result = floor((warpedCoord - cumDelta) / sw); }
-    return result;
+    for (int index = 0; index < 32; index++) {
+      vec4 pair = deltas[index / 2];
+      vec2 entry = index - (index / 2) * 2 == 0 ? pair.xy : pair.zw;
+      if (entry.x <= -9000.0) continue;
+      float lb = entry.x * sw + cumDelta;
+      float rb = lb + sw + entry.y;
+      if (warpedCoord < lb) return floor((warpedCoord - cumDelta) / sw);
+      if (warpedCoord < rb) return entry.x;
+      cumDelta += entry.y;
+    }
+    return floor((warpedCoord - cumDelta) / sw);
   }
 
   void main() {
@@ -722,12 +685,17 @@
     float sourceStretchAmount = 0.0;
     bool rawSourceActive = u_sourceImageEnabled && !u_imageGradientEnabled;
 
+    // The bootstrap program doubles as the Noise-free V2 Generator, where
+    // Manual Distort never runs. Its nine-tap smoothing is a large share of
+    // the driver compile, so frames that need it use a full Generator variant.
+#if !defined(KGG_BOOTSTRAP)
     if (u_manualDistortEnabled && !rawSourceActive) {
       manualDistortSample = texture2D(u_manualDistortMap, vec2(manualDistortUV.x, 1.0 - manualDistortUV.y));
       manualSmoothMask = manualDistortSample.b;
       vec2 distortOffset = (manualDistortSample.rg * 2.0 - 1.0) * u_manualDistortMaxDisplacement;
       uv += distortOffset;
     }
+#endif
 
     // ── Slit scan (新動作: Noise 前) ──────────────────────────────────────────
     // u_slitNoiseAfter=false のとき: スリット UV シフトを先に行い、
@@ -855,6 +823,7 @@
     float t = u_imageGradientEnabled
       ? mix(imageGradientT(imageUV), computeGradientT(uv), u_imageGradientAnchorInfluence)
       : computeGradientT(uv);
+#if !defined(KGG_BOOTSTRAP)
     if (u_manualDistortEnabled && !u_imageGradientEnabled && !meshGradient) {
       float smoothPasses = manualSmoothMask * 8.0;
       if (smoothPasses > 0.001) {
@@ -874,10 +843,12 @@
         t = mix(t, avgT, mixAmt);
       }
     }
+#endif
     float rampT = applyRampRepeatT(t);
     vec4 rampColor;
     if (meshGradient) {
       vec4 meshColor = sampleMeshGradient(uv);
+#if !defined(KGG_BOOTSTRAP)
       if (u_manualDistortEnabled && !u_imageGradientEnabled) {
         float smoothPasses = manualSmoothMask * 8.0;
         if (smoothPasses > 0.001) {
@@ -897,6 +868,7 @@
           meshColor = mix(meshColor, averageColor, mixAmount);
         }
       }
+#endif
       if (u_imageGradientEnabled) {
         vec4 imageGradientColor = texture2D(u_gradientRamp, vec2(applyRampRepeatT(imageGradientT(imageUV)), 0.5));
         rampColor = mix(imageGradientColor, meshColor, clamp(u_imageGradientAnchorInfluence, 0.0, 1.0));

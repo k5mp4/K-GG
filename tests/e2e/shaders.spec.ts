@@ -19,8 +19,14 @@ test('every WebGL program compiles and links in a real WebGL2 context', async ({
 
   const results = await page.evaluate(async (): Promise<CompileResult[]> => {
     const sourcesPath = '/src/lib/webglShaderSources.ts';
-    const { getProgramSource, getInitialProgramSource } = await import(sourcesPath);
-    const programs: Array<[string, { vertex: string; fragment: string }]> = [
+    const {
+      getProgramSource,
+      getInitialProgramSource,
+      NOISE_TYPE_MAP,
+      NOISE_VARIANT_PROGRAM_KEYS,
+    } = await import(sourcesPath);
+    type Source = { vertex: string; fragment: string };
+    const programs: Array<[string, Source]> = [
       ['initial', getInitialProgramSource()],
       ...[
         'generator', 'blur', 'normalMap', 'stretch', 'stackCore', 'noiseStack',
@@ -30,7 +36,13 @@ test('every WebGL program compiles and links in a real WebGL2 context', async ({
         // One program per 3D shape.
         'threeDCone', 'threeDTorus', 'threeDLattice', 'threeDTerrain',
         'threeDExtrusion', 'threeDRibbon', 'threeDRings', 'threeDField',
-      ].map(key => [key, getProgramSource(key)] as [string, { vertex: string; fragment: string }]),
+      ].map(key => [key, getProgramSource(key)] as [string, Source]),
+      // The renderer compiles Noise-dependent programs once per Noise type.
+      ...(NOISE_VARIANT_PROGRAM_KEYS as readonly string[]).flatMap(key => (
+        (Object.values(NOISE_TYPE_MAP) as number[]).map(noiseVariant => (
+          [`${key}:${noiseVariant}`, getProgramSource(key, { noiseVariant })] as [string, Source]
+        ))
+      )),
     ];
 
     const gl = document.createElement('canvas').getContext('webgl2');
@@ -69,5 +81,6 @@ test('every WebGL program compiles and links in a real WebGL2 context', async ({
   for (const result of results) console.log(`[shader] ${result.program}: ${result.ok ? 'ok' : 'FAILED'} (${result.ms}ms)`);
   const failures = results.filter(result => !result.ok);
   expect(failures, JSON.stringify(failures, null, 2)).toEqual([]);
-  expect(results).toHaveLength(29);
+  // 29 base programs (3D has one per shape) plus 13 Noise types for each of the 3 Noise-dependent programs.
+  expect(results).toHaveLength(29 + 13 * 3);
 });

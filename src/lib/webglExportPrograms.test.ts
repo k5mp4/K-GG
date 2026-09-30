@@ -2,7 +2,8 @@ import { describe, expect, it } from 'vitest';
 import type { LatestState } from '../types/latestState';
 import { createDefaultEffectPipeline, updateEffectStackLayer } from './effectPipeline';
 import { getRequiredExportProgramKeys } from './webgl';
-import { getProgramSource } from './webglShaderSources';
+import { GENERATOR_WITHOUT_NOISE_VARIANT, getProgramSource, NOISE_TYPE_MAP } from './webglShaderSources';
+import { getSceneNoiseProgramVariants } from './sceneRenderPlan';
 import { DATAMOSH_DEFAULTS } from '../types/datamosh';
 
 function stateWithGlass(enabled: boolean): LatestState {
@@ -244,5 +245,67 @@ describe('export WebGL program plan', () => {
     expect(composite.fragment).toContain('flowColor.a * densityMask');
     expect(composite.fragment).not.toContain('source.a * densityMask');
     expect(composite.fragment).not.toContain('source.rgb +');
+  });
+});
+
+function stateWithAnalyticNoise(noiseType: LatestState['noiseDistortion']['type']): LatestState {
+  const state = stateWithGlass(false);
+  state.effectPipeline.effectStack = [
+    { kind: 'noise', enabled: true },
+    { kind: 'diffuse', enabled: true },
+    ...state.effectPipeline.effectStack.filter(layer => !['noise', 'diffuse'].includes(layer.kind)),
+  ];
+  state.gradient = { gradientType: 'linear' } as LatestState['gradient'];
+  state.noiseDistortion = { type: noiseType, noiseLoopMode: 'legacy', enabled: true } as LatestState['noiseDistortion'];
+  state.diffuse = { enabled: true, mode: 'block' } as LatestState['diffuse'];
+  state.manualDistort = { enabled: false } as LatestState['manualDistort'];
+  return state;
+}
+
+describe('Noise program variants', () => {
+  it('compiles the Generator for the Noise type only when the analytic prefix folds Noise into it', () => {
+    expect(getSceneNoiseProgramVariants(stateWithAnalyticNoise('fbm'))).toEqual({
+      generator: NOISE_TYPE_MAP.fbm,
+      noiseStack: NOISE_TYPE_MAP.fbm,
+      noiseDiffuseStack: NOISE_TYPE_MAP.fbm,
+    });
+
+    const textureNoise = stateWithAnalyticNoise('fbm');
+    textureNoise.effectPipeline.effectStack = [
+      { kind: 'glass', enabled: true },
+      ...textureNoise.effectPipeline.effectStack.filter(layer => layer.kind !== 'glass'),
+    ];
+    expect(getSceneNoiseProgramVariants(textureNoise).generator).toBe(GENERATOR_WITHOUT_NOISE_VARIANT);
+  });
+
+  it('keeps the Noise-free bootstrap Generator while the analytic Noise variant is pending', () => {
+    const state = stateWithAnalyticNoise('simplex');
+
+    expect(getSceneNoiseProgramVariants(state, { analyticNoisePending: true }).generator)
+      .toBe(GENERATOR_WITHOUT_NOISE_VARIANT);
+    // The fallback presents Noise through its stack pass, so startup and
+    // prefetch wait for those programs instead of the Generator variant.
+    expect(getRequiredExportProgramKeys(state)).toEqual(['generator']);
+    expect(getRequiredExportProgramKeys(state, { analyticNoisePending: true })).not.toContain('generator');
+  });
+
+  it('uses a full Generator variant for Legacy Noise and Manual Distort', () => {
+    const legacy = stateWithAnalyticNoise('perlin');
+    legacy.effectPipeline = { ...legacy.effectPipeline, version: 'legacy-v1' };
+    expect(getSceneNoiseProgramVariants(legacy).generator).toBe(NOISE_TYPE_MAP.perlin);
+
+    legacy.noiseDistortion = { ...legacy.noiseDistortion, enabled: false };
+    expect(getSceneNoiseProgramVariants(legacy).generator).toBe(GENERATOR_WITHOUT_NOISE_VARIANT);
+
+    legacy.manualDistort = { enabled: true } as LatestState['manualDistort'];
+    expect(getSceneNoiseProgramVariants(legacy).generator).toBe(NOISE_TYPE_MAP.perlin);
+  });
+
+  it('defines the variant only for Noise-dependent programs', () => {
+    expect(getProgramSource('noiseStack', { noiseVariant: NOISE_TYPE_MAP.caustics }).fragment)
+      .toMatch(/^#define KGG_NOISE_VARIANT 9\n/);
+    expect(getProgramSource('generator', { noiseVariant: GENERATOR_WITHOUT_NOISE_VARIANT }).fragment)
+      .toBe(getProgramSource('generator').fragment);
+    expect(getProgramSource('glassV2', { noiseVariant: 3 }).fragment).toBe(getProgramSource('glassV2').fragment);
   });
 });
