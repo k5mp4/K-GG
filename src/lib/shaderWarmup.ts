@@ -4,13 +4,14 @@ import type { LazyProgramKey } from './webglShaderSources';
 
 /**
  * Idle warmup order after the current scene is ready. Cheap, commonly used
- * Effect Stack programs come first; the Glass family has the longest driver
- * compile and goes last so it never delays the cheaper rows. Programs that
- * need an external input (Video Motion, Flow) or belong to other panels are
- * compiled on demand or by hover prefetch instead.
+ * Effect Stack programs come first. The Glass family and the Generator's
+ * analytic Noise variant have the longest driver compiles and go last, so a
+ * running compile (which cannot be interrupted) rarely delays a user toggle.
+ * Noise-dependent programs are warmed only for the current Noise type.
+ * Programs that need an external input (Video Motion, Flow) or belong to
+ * other panels are compiled on demand or by hover prefetch instead.
  */
 export const SHADER_WARMUP_PLAN: readonly LazyProgramKey[] = [
-  'generator',
   'stackCore',
   'noiseStack',
   'stretch',
@@ -19,6 +20,7 @@ export const SHADER_WARMUP_PLAN: readonly LazyProgramKey[] = [
   'normalMap',
   'glassTile',
   'glassV2',
+  'generator',
 ];
 
 /** How many idle attempts to wait for the first scene snapshot before giving up on critical keys. */

@@ -47,10 +47,17 @@ function makeContext() {
     deleteTexture: vi.fn(),
     deleteVertexArray: vi.fn(),
   } as unknown as WebGL2RenderingContext;
+  const bootstrapProgram = {} as WebGLProgram;
+  const noiseVariantProgram = {} as WebGLProgram;
   const context = {
     gl,
     performanceProfiler: null,
-    program: {} as WebGLProgram,
+    program: bootstrapProgram,
+    bootstrapProgram,
+    noiseVariantPrograms: new Map([
+      ['generator:-1', { program: bootstrapProgram, uniforms: {} }],
+      ['noiseStack:11', { program: noiseVariantProgram, uniforms: {} }],
+    ]),
     geometryBuffer,
     transitionGeometryBuffer,
     flowGradient: makeFlowResources(),
@@ -60,7 +67,7 @@ function makeContext() {
     datamoshInputFbos: [{} as WebGLFramebuffer, {} as WebGLFramebuffer],
     disposed: false,
   } as unknown as WebGLContext;
-  return { context, gl, geometryBuffer, transitionGeometryBuffer };
+  return { context, gl, geometryBuffer, transitionGeometryBuffer, bootstrapProgram, noiseVariantProgram };
 }
 
 describe('WebGL context resource lifecycle', () => {
@@ -77,5 +84,15 @@ describe('WebGL context resource lifecycle', () => {
 
     expect(vi.mocked(gl.deleteBuffer).mock.calls.length).toBe(deleteBufferCount);
     expect(context.disposed).toBe(true);
+  });
+
+  it('deletes every compiled Noise variant once, including inactive ones', () => {
+    const { context, gl, bootstrapProgram, noiseVariantProgram } = makeContext();
+
+    disposeWebGL(context);
+
+    const deleted = vi.mocked(gl.deleteProgram).mock.calls.map(([program]) => program);
+    expect(deleted.filter(program => program === bootstrapProgram)).toHaveLength(1);
+    expect(deleted.filter(program => program === noiseVariantProgram)).toHaveLength(1);
   });
 });

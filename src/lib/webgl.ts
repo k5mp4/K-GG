@@ -22,10 +22,15 @@ import { GRADIENT_ANCHOR_DEFAULTS, defaultBezierControlsForAnchors } from '../st
 import { normalizeMeshGradientConfig, type MeshGradientConfig } from '../types/gradient';
 import { buildRampTextureData, RAMP_TEX_WIDTH } from './gradientRampUtils';
 import {
+  GENERATOR_WITHOUT_NOISE_VARIANT,
   getInitialProgramSource,
   getProgramSource,
+  isNoiseVariantProgramKey,
+  NOISE_TYPE_MAP,
+  NOISE_VARIANT_PROGRAM_KEYS,
   SHADER_VERSION,
   type LazyProgramKey,
+  type NoiseVariantProgramKey,
 } from './webglShaderSources';
 import {
   collectGpuDiagnostics,
@@ -43,7 +48,15 @@ import {
 } from './glass';
 import { isGlassTileOpticallyIdentity, normalizeGlassTileRenderParameters } from './glassTile';
 import { getActivePostprocessStackLayers } from './postprocessStack';
-import { getSceneRenderPlan, getSceneRenderPlanInput, getRequiredSceneProgramKeys } from './sceneRenderPlan';
+import {
+  generatorNeedsNoiseVariant,
+  getNoiseProgramVariants,
+  getRequiredSceneProgramKeys,
+  getSceneNoiseProgramVariants,
+  getSceneRenderPlan,
+  getSceneRenderPlanInput,
+  type NoiseProgramVariants,
+} from './sceneRenderPlan';
 import { buildDiffuseBezierLut, normalizeDiffuseBezier } from './diffuseCurve';
 import { buildMeshGradientField, MESH_FIELD_SIZE, MESH_FIELD_SUBDIVISIONS } from './meshGradientField';
 import { noiseAngleDegreesForShader, noiseAngleRadiansForShader } from './noiseAngle';
@@ -76,6 +89,7 @@ import {
   isEffectStackLayerEnabled,
   type RenderPlanFallbackProgram,
   type RenderTargetKey,
+  type V2RenderPlan,
 } from './effectPipeline';
 import { installWebGLResourceLedger, type WebGLResourceLedger } from './webglResourceLedger';
 import { normalizeDatamoshConfig, type DatamoshConfig } from '../types/datamosh';
@@ -227,6 +241,14 @@ export type WebGLContext = {
   transitionGeometryBuffer: WebGLBuffer;
   generatorProgram: WebGLProgram | null;
   generatorUniforms: Record<string, WebGLUniformLocation | null>;
+  /** The Noise-free Generator compiled during init; also the Base frame while a Noise variant compiles. */
+  bootstrapProgram: WebGLProgram;
+  bootstrapUniforms: Record<string, WebGLUniformLocation | null>;
+  /** Variant (NOISE_TYPE_MAP index) each Noise-dependent program field currently exposes. */
+  activeNoiseVariants: Record<NoiseVariantProgramKey, number>;
+  /** Compiled Noise variants by `noiseVariantId`, including inactive ones. */
+  noiseVariantPrograms: Map<string, { program: WebGLProgram; uniforms: Record<string, WebGLUniformLocation | null> }>;
+  noiseVariantStates: Map<string, LazyProgramState>;
   gradientRampTexture: WebGLTexture; // TEXTURE1: グラデーションランプ
   meshGradientTexture: WebGLTexture; // TEXTURE2: 前方向テッセレーション済みMeshフィールド
   meshGradientTextureSignature: string;
@@ -599,176 +621,9 @@ export async function initWebGL(canvas: HTMLCanvasElement): Promise<WebGLContext
     'effect-stack-transition',
   ));
   const transitionGeometryBuffer = ownBuffer(setupGeometry(gl, transitionProgram));
-  const uniforms: Record<string, WebGLUniformLocation | null> = {
-    u_gradientType: gl.getUniformLocation(program, 'u_gradientType'),
-    u_resolution: gl.getUniformLocation(program, 'u_resolution'),
-    u_noiseEnabled: gl.getUniformLocation(program, 'u_noiseEnabled'),
-    u_noiseType: gl.getUniformLocation(program, 'u_noiseType'),
-    u_noiseAmount: gl.getUniformLocation(program, 'u_noiseAmount'),
-    u_noiseScale: gl.getUniformLocation(program, 'u_noiseScale'),
-    u_noiseOctaves: gl.getUniformLocation(program, 'u_noiseOctaves'),
-    u_noiseEvolution: gl.getUniformLocation(program, 'u_noiseEvolution'),
-    u_noiseSpeed: gl.getUniformLocation(program, 'u_noiseSpeed'),
-    u_noiseSeamlessType: gl.getUniformLocation(program, 'u_noiseSeamlessType'),
-    u_seamlessAnimation: gl.getUniformLocation(program, 'u_seamlessAnimation'),
-    u_seamlessTwist: gl.getUniformLocation(program, 'u_seamlessTwist'),
-    u_noiseLoopMode: gl.getUniformLocation(program, 'u_noiseLoopMode'),
-    u_noiseLoopBlend: gl.getUniformLocation(program, 'u_noiseLoopBlend'),
-    u_curlSteps: gl.getUniformLocation(program, 'u_curlSteps'),
-    u_curlSpeed: gl.getUniformLocation(program, 'u_curlSpeed'),
-    u_curlEps: gl.getUniformLocation(program, 'u_curlEps'),
-    u_curlSeed: gl.getUniformLocation(program, 'u_curlSeed'),
-    u_noiseSeed: gl.getUniformLocation(program, 'u_noiseSeed'),
-    u_voronoiDistMetric: gl.getUniformLocation(program, 'u_voronoiDistMetric'),
-    u_voronoiRandomness: gl.getUniformLocation(program, 'u_voronoiRandomness'),
-    u_voronoiFeature: gl.getUniformLocation(program, 'u_voronoiFeature'),
-    u_voronoiMinkowskiExp: gl.getUniformLocation(program, 'u_voronoiMinkowskiExp'),
-    u_ridgeSharpness: gl.getUniformLocation(program, 'u_ridgeSharpness'),
-    u_ridgeGain: gl.getUniformLocation(program, 'u_ridgeGain'),
-    u_ridgeLacunarity: gl.getUniformLocation(program, 'u_ridgeLacunarity'),
-    u_ridgePersistence: gl.getUniformLocation(program, 'u_ridgePersistence'),
-    u_ridgeOffset: gl.getUniformLocation(program, 'u_ridgeOffset'),
-    u_ridgeWarp: gl.getUniformLocation(program, 'u_ridgeWarp'),
-    u_perlinRoughness: gl.getUniformLocation(program, 'u_perlinRoughness'),
-    u_perlinSharpness: gl.getUniformLocation(program, 'u_perlinSharpness'),
-    u_perlinLayerMix: gl.getUniformLocation(program, 'u_perlinLayerMix'),
-    u_perlinAngle: gl.getUniformLocation(program, 'u_perlinAngle'),
-    u_perlinDimension: gl.getUniformLocation(program, 'u_perlinDimension'),
-    u_perlinLoopWobble: gl.getUniformLocation(program, 'u_perlinLoopWobble'),
-    u_aeFractalType: gl.getUniformLocation(program, 'u_aeFractalType'),
-    u_aeSubInfluence: gl.getUniformLocation(program, 'u_aeSubInfluence'),
-    u_aeSubScaling: gl.getUniformLocation(program, 'u_aeSubScaling'),
-    u_aeSubRotation: gl.getUniformLocation(program, 'u_aeSubRotation'),
-    u_aeContrast: gl.getUniformLocation(program, 'u_aeContrast'),
-    u_aeBrightness: gl.getUniformLocation(program, 'u_aeBrightness'),
-    u_causticsDepth: gl.getUniformLocation(program, 'u_causticsDepth'),
-    u_causticsRefraction: gl.getUniformLocation(program, 'u_causticsRefraction'),
-    u_causticsSharpness: gl.getUniformLocation(program, 'u_causticsSharpness'),
-    u_causticsComplexity: gl.getUniformLocation(program, 'u_causticsComplexity'),
-    u_causticsWaveSpread: gl.getUniformLocation(program, 'u_causticsWaveSpread'),
-    u_causticsBoundaryWidth: gl.getUniformLocation(program, 'u_causticsBoundaryWidth'),
-    u_phasorFrequency: gl.getUniformLocation(program, 'u_phasorFrequency'),
-    u_phasorBandwidth: gl.getUniformLocation(program, 'u_phasorBandwidth'),
-    u_phasorDirection: gl.getUniformLocation(program, 'u_phasorDirection'),
-    u_phasorDirectionSpread: gl.getUniformLocation(program, 'u_phasorDirectionSpread'),
-    u_phasorSharpness: gl.getUniformLocation(program, 'u_phasorSharpness'),
-    u_phasorWarpStrength: gl.getUniformLocation(program, 'u_phasorWarpStrength'),
-    u_phasorTangentMix: gl.getUniformLocation(program, 'u_phasorTangentMix'),
-    u_phasorKernelDensity: gl.getUniformLocation(program, 'u_phasorKernelDensity'),
-    u_phasorDirectionMode: gl.getUniformLocation(program, 'u_phasorDirectionMode'),
-    u_chladniPatternCount: gl.getUniformLocation(program, 'u_chladniPatternCount'),
-    u_chladniModesAB: gl.getUniformLocation(program, 'u_chladniModesAB'),
-    u_chladniModesCD: gl.getUniformLocation(program, 'u_chladniModesCD'),
-    u_chladniLineWidth: gl.getUniformLocation(program, 'u_chladniLineWidth'),
-    u_chladniSharpness: gl.getUniformLocation(program, 'u_chladniSharpness'),
-    u_chladniWarpStrength: gl.getUniformLocation(program, 'u_chladniWarpStrength'),
-    u_chladniRotation: gl.getUniformLocation(program, 'u_chladniRotation'),
-    u_chladniMode: gl.getUniformLocation(program, 'u_chladniMode'),
-    u_chladniMapProfile: gl.getUniformLocation(program, 'u_chladniMapProfile'),
-    u_chladniMapAngle: gl.getUniformLocation(program, 'u_chladniMapAngle'),
-    u_chladniModeMix: gl.getUniformLocation(program, 'u_chladniModeMix'),
-    u_chladniEdgePhase: gl.getUniformLocation(program, 'u_chladniEdgePhase'),
-    u_time: gl.getUniformLocation(program, 'u_time'),
-    u_noiseLoopPeriod: gl.getUniformLocation(program, 'u_noiseLoopPeriod'),
-    u_animDir: gl.getUniformLocation(program, 'u_animDir'),
-    u_diffuseEnabled: gl.getUniformLocation(program, 'u_diffuseEnabled'),
-    u_diffuseMode:    gl.getUniformLocation(program, 'u_diffuseMode'),
-    u_diffuseScatter: gl.getUniformLocation(program, 'u_diffuseScatter'),
-    u_diffuseGrain: gl.getUniformLocation(program, 'u_diffuseGrain'),
-    u_diffuseSeed: gl.getUniformLocation(program, 'u_diffuseSeed'),
-    u_diffuseDitherThreshold: gl.getUniformLocation(program, 'u_diffuseDitherThreshold'),
-    u_diffuseAdaptiveEnabled: gl.getUniformLocation(program, 'u_diffuseAdaptiveEnabled'),
-    u_diffuseAdaptiveChannel: gl.getUniformLocation(program, 'u_diffuseAdaptiveChannel'),
-    u_diffuseGrainAdaptiveEnabled: gl.getUniformLocation(program, 'u_diffuseGrainAdaptiveEnabled'),
-    u_diffuseGrainAdaptiveAmount: gl.getUniformLocation(program, 'u_diffuseGrainAdaptiveAmount'),
-    u_diffuseHalftoneShape: gl.getUniformLocation(program, 'u_diffuseHalftoneShape'),
-    u_diffuseHalftoneSize: gl.getUniformLocation(program, 'u_diffuseHalftoneSize'),
-    u_diffuseBackgroundColor: gl.getUniformLocation(program, 'u_diffuseBackgroundColor'),
-    u_diffuseAsciiAtlas: gl.getUniformLocation(program, 'u_diffuseAsciiAtlas'),
-    u_diffuseAsciiCount: gl.getUniformLocation(program, 'u_diffuseAsciiCount'),
-    u_diffuseAsciiColumns: gl.getUniformLocation(program, 'u_diffuseAsciiColumns'),
-    u_diffuseAsciiRows: gl.getUniformLocation(program, 'u_diffuseAsciiRows'),
-    u_diffuseAsciiRotation: gl.getUniformLocation(program, 'u_diffuseAsciiRotation'),
-    u_diffuseCurve: gl.getUniformLocation(program, 'u_diffuseCurve'),
-    u_gradientRamp: gl.getUniformLocation(program, 'u_gradientRamp'),
-    u_meshGradient: gl.getUniformLocation(program, 'u_meshGradient'),
-    u_rampRepeat: gl.getUniformLocation(program, 'u_rampRepeat'),
-    u_sourceImageEnabled: gl.getUniformLocation(program, 'u_sourceImageEnabled'),
-    u_sourceImage: gl.getUniformLocation(program, 'u_sourceImage'),
-    u_imageGradientEnabled: gl.getUniformLocation(program, 'u_imageGradientEnabled'),
-    u_imageGradient: gl.getUniformLocation(program, 'u_imageGradient'),
-    u_imageGradientSize: gl.getUniformLocation(program, 'u_imageGradientSize'),
-    u_imageGradientChannel: gl.getUniformLocation(program, 'u_imageGradientChannel'),
-    u_imageGradientAnchorInfluence: gl.getUniformLocation(program, 'u_imageGradientAnchorInfluence'),
-    u_imageMaskEnabled: gl.getUniformLocation(program, 'u_imageMaskEnabled'),
-    u_imageMask: gl.getUniformLocation(program, 'u_imageMask'),
-    u_slitEnabled: gl.getUniformLocation(program, 'u_slitEnabled'),
-    u_slitMode: gl.getUniformLocation(program, 'u_slitMode'),
-    u_slitAngle: gl.getUniformLocation(program, 'u_slitAngle'),
-    u_slitWaveType: gl.getUniformLocation(program, 'u_slitWaveType'),
-    u_slitWaveHeight: gl.getUniformLocation(program, 'u_slitWaveHeight'),
-    u_slitPolygonSides: gl.getUniformLocation(program, 'u_slitPolygonSides'),
-    u_slitOffsetAngle: gl.getUniformLocation(program, 'u_slitOffsetAngle'),
-    u_slitWidth: gl.getUniformLocation(program, 'u_slitWidth'),
-    u_slitOffset: gl.getUniformLocation(program, 'u_slitOffset'),
-    u_slitVariance: gl.getUniformLocation(program, 'u_slitVariance'),
-    u_slitParams: gl.getUniformLocation(program, 'u_slitParams'),
-    u_slitDelta01: gl.getUniformLocation(program, 'u_slitDelta01'),
-    u_slitDelta23: gl.getUniformLocation(program, 'u_slitDelta23'),
-    u_slitDelta45: gl.getUniformLocation(program, 'u_slitDelta45'),
-    u_slitDelta67: gl.getUniformLocation(program, 'u_slitDelta67'),
-    u_slitDelta89: gl.getUniformLocation(program, 'u_slitDelta89'),
-    u_slitDeltaAB: gl.getUniformLocation(program, 'u_slitDeltaAB'),
-    u_slitDeltaCD: gl.getUniformLocation(program, 'u_slitDeltaCD'),
-    u_slitDeltaEF: gl.getUniformLocation(program, 'u_slitDeltaEF'),
-    u_slitDeltaGH: gl.getUniformLocation(program, 'u_slitDeltaGH'),
-    u_slitDeltaIJ: gl.getUniformLocation(program, 'u_slitDeltaIJ'),
-    u_slitDeltaKL: gl.getUniformLocation(program, 'u_slitDeltaKL'),
-    u_slitDeltaMN: gl.getUniformLocation(program, 'u_slitDeltaMN'),
-    u_slitDeltaOP: gl.getUniformLocation(program, 'u_slitDeltaOP'),
-    u_slitDeltaQR: gl.getUniformLocation(program, 'u_slitDeltaQR'),
-    u_slitDeltaST: gl.getUniformLocation(program, 'u_slitDeltaST'),
-    u_slitDeltaUV: gl.getUniformLocation(program, 'u_slitDeltaUV'),
-    u_slitAnimEnabled: gl.getUniformLocation(program, 'u_slitAnimEnabled'),
-    u_slitAnimTime: gl.getUniformLocation(program, 'u_slitAnimTime'),
-    u_slitAnimMode: gl.getUniformLocation(program, 'u_slitAnimMode'),
-    u_slitNoiseAfter: gl.getUniformLocation(program, 'u_slitNoiseAfter'),
-    u_slitPixelPerfect: gl.getUniformLocation(program, 'u_slitPixelPerfect'),
-    u_dwInitVal: gl.getUniformLocation(program, 'u_dwInitVal'),
-    u_dwInitAmp: gl.getUniformLocation(program, 'u_dwInitAmp'),
-    u_dwRotAngle1: gl.getUniformLocation(program, 'u_dwRotAngle1'),
-    u_dwRotAngle2: gl.getUniformLocation(program, 'u_dwRotAngle2'),
-    u_dwDist1: gl.getUniformLocation(program, 'u_dwDist1'),
-    u_dwDist2: gl.getUniformLocation(program, 'u_dwDist2'),
-    u_dwDist3: gl.getUniformLocation(program, 'u_dwDist3'),
-    u_dwDriftAngle: gl.getUniformLocation(program, 'u_dwDriftAngle'),
-    u_manualDistortEnabled: gl.getUniformLocation(program, 'u_manualDistortEnabled'),
-    u_manualDistortMap: gl.getUniformLocation(program, 'u_manualDistortMap'),
-    u_manualDistortMaxDisplacement: gl.getUniformLocation(program, 'u_manualDistortMaxDisplacement'),
-    u_manualDistortSmoothStrength: gl.getUniformLocation(program, 'u_manualDistortSmoothStrength'),
-    u_manualDistortSmoothRadius: gl.getUniformLocation(program, 'u_manualDistortSmoothRadius'),
-    u_gradAnchor0: gl.getUniformLocation(program, 'u_gradAnchor0'),
-    u_gradAnchor1: gl.getUniformLocation(program, 'u_gradAnchor1'),
-    u_gradAnchor2: gl.getUniformLocation(program, 'u_gradAnchor2'),
-    u_gradAnchor3: gl.getUniformLocation(program, 'u_gradAnchor3'),
-    u_gradBezierCp0: gl.getUniformLocation(program, 'u_gradBezierCp0'),
-    u_gradBezierCp1: gl.getUniformLocation(program, 'u_gradBezierCp1'),
-    u_meshCorner0: gl.getUniformLocation(program, 'u_meshCorner0'),
-    u_meshCorner1: gl.getUniformLocation(program, 'u_meshCorner1'),
-    u_meshCorner2: gl.getUniformLocation(program, 'u_meshCorner2'),
-    u_meshCorner3: gl.getUniformLocation(program, 'u_meshCorner3'),
-    u_meshBottomCp0: gl.getUniformLocation(program, 'u_meshBottomCp0'),
-    u_meshBottomCp1: gl.getUniformLocation(program, 'u_meshBottomCp1'),
-    u_meshRightCp0: gl.getUniformLocation(program, 'u_meshRightCp0'),
-    u_meshRightCp1: gl.getUniformLocation(program, 'u_meshRightCp1'),
-    u_meshTopCp0: gl.getUniformLocation(program, 'u_meshTopCp0'),
-    u_meshTopCp1: gl.getUniformLocation(program, 'u_meshTopCp1'),
-    u_meshLeftCp0: gl.getUniformLocation(program, 'u_meshLeftCp0'),
-    u_meshLeftCp1: gl.getUniformLocation(program, 'u_meshLeftCp1'),
-    u_meshColorPositions: gl.getUniformLocation(program, 'u_meshColorPositions'),
-    u_tileOffset: gl.getUniformLocation(program, 'u_tileOffset'),
-    u_tileSize: gl.getUniformLocation(program, 'u_tileSize'),
-  };
+  // Reflect every active uniform: this program stays the Noise-free
+  // Generator, so a hand-written subset could silently drop an upload.
+  const uniforms = getGeneratorUniforms(gl, program);
   const imageMaskTexture = createOwnedTexture();
   gl.bindTexture(gl.TEXTURE_2D, imageMaskTexture);
   gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, 1, 1, 0, gl.RGBA, gl.UNSIGNED_BYTE, new Uint8Array([255, 255, 255, 255]));
@@ -879,8 +734,11 @@ export async function initWebGL(canvas: HTMLCanvasElement): Promise<WebGLContext
   ownedFlowGradient = flowGradient;
   const transitionTextureFrom = ownTexture(createTexture(gl));
   const transitionTextureTo = ownTexture(createTexture(gl));
-  const ctx: WebGLContext = { gl, performanceProfiler, gpuDiagnostics, renderOptimization, program, uniforms, geometryBuffer, transitionGeometryBuffer, generatorProgram: null, generatorUniforms: {}, gradientRampTexture, meshGradientTexture, meshGradientTextureSignature: '', diffuseCurveTexture, diffuseCurveSignature: '', diffuseAsciiTexture, diffuseAsciiSignature: '', diffuseAsciiCount: 1, diffuseAsciiRows: ASCII_ATLAS_MAX_ROWS, diffuseHistogramAt: 0, manualDistortTexture, manualDistortDisplacement: null, manualDistortSmoothMask: null, manualDistortMapResolution: 0, sourceImageTexture, sourceImageCanvas: null, imageGradientTexture, imageGradientSource: null, imageMaskTexture, imageMaskSource: null, normalMapProgram: null, normalMapUniforms: {}, datamoshProgram: null, datamoshUniforms: {}, threeDProgram: null, threeDUniforms: {}, textureProgram: null, textureUniforms: {}, textureImageTexture, textureImageSource: null, fieldModelTexture, fieldModelVersion: 0, videoMotionFieldTexture, datamoshHistoryFbos: [datamoshHistoryFboA, datamoshHistoryFboB], datamoshHistoryTextures: [datamoshHistoryTextureA, datamoshHistoryTextureB], datamoshInputFbos: [datamoshInputFboA, datamoshInputFboB], datamoshInputTextures: [datamoshInputTextureA, datamoshInputTextureB], datamoshHistory: createDatamoshHistoryState(), gradFbo, gradTexture, blurProgram: null, blurUniforms: {}, stretchProgram: null, stretchUniforms: {}, seamlessProgram: null, seamlessUniforms: {}, postprocessProgram: null, postprocessUniforms: {}, stackCoreProgram: null, stackCoreUniforms: {}, noiseStackProgram: null, noiseStackUniforms: {}, noiseDiffuseStackProgram: null, noiseDiffuseStackUniforms: {}, glassProgram: null, glassUniforms: {}, glassFallbackActive: false, glassV2Program: null, glassV2Uniforms: {}, glassV2FallbackActive: false, glassTileProgram: null, glassTileUniforms: {}, glassTileFallbackActive: false, prismProgram: null, prismUniforms: {}, prismCompositeProgram: null, prismCompositeUniforms: {}, particleProgram: null, particleUniforms: {}, particleVao: null, particleQuadBuffer: null, particleInstanceBuffer: null, particleInstanceCount: 0, particleInstanceSeed: Number.NaN, flowGradient, normalFbo, normalTexture, hBlurFbo, hBlurTexture, postprocessFboA, postprocessTextureA, postprocessFboB, postprocessTextureB, prismScratchFbo, prismScratchTexture, prismBlurFbo, prismBlurTexture, prismGlowFbo, prismGlowTexture, shaderCompileExt, lazyProgramState: createLazyProgramState(), lazyProgramCompileQueue: createSerialAsyncQueue(), resourceLedger, hasPresentedFrame: false, disposed: false };
+  const ctx: WebGLContext = { gl, performanceProfiler, gpuDiagnostics, renderOptimization, program, uniforms, geometryBuffer, transitionGeometryBuffer, generatorProgram: program, generatorUniforms: uniforms, bootstrapProgram: program, bootstrapUniforms: uniforms, activeNoiseVariants: createInitialNoiseVariants(), noiseVariantPrograms: new Map([[noiseVariantId('generator', GENERATOR_WITHOUT_NOISE_VARIANT), { program, uniforms }]]), noiseVariantStates: new Map(), gradientRampTexture, meshGradientTexture, meshGradientTextureSignature: '', diffuseCurveTexture, diffuseCurveSignature: '', diffuseAsciiTexture, diffuseAsciiSignature: '', diffuseAsciiCount: 1, diffuseAsciiRows: ASCII_ATLAS_MAX_ROWS, diffuseHistogramAt: 0, manualDistortTexture, manualDistortDisplacement: null, manualDistortSmoothMask: null, manualDistortMapResolution: 0, sourceImageTexture, sourceImageCanvas: null, imageGradientTexture, imageGradientSource: null, imageMaskTexture, imageMaskSource: null, normalMapProgram: null, normalMapUniforms: {}, datamoshProgram: null, datamoshUniforms: {}, threeDProgram: null, threeDUniforms: {}, textureProgram: null, textureUniforms: {}, textureImageTexture, textureImageSource: null, fieldModelTexture, fieldModelVersion: 0, videoMotionFieldTexture, datamoshHistoryFbos: [datamoshHistoryFboA, datamoshHistoryFboB], datamoshHistoryTextures: [datamoshHistoryTextureA, datamoshHistoryTextureB], datamoshInputFbos: [datamoshInputFboA, datamoshInputFboB], datamoshInputTextures: [datamoshInputTextureA, datamoshInputTextureB], datamoshHistory: createDatamoshHistoryState(), gradFbo, gradTexture, blurProgram: null, blurUniforms: {}, stretchProgram: null, stretchUniforms: {}, seamlessProgram: null, seamlessUniforms: {}, postprocessProgram: null, postprocessUniforms: {}, stackCoreProgram: null, stackCoreUniforms: {}, noiseStackProgram: null, noiseStackUniforms: {}, noiseDiffuseStackProgram: null, noiseDiffuseStackUniforms: {}, glassProgram: null, glassUniforms: {}, glassFallbackActive: false, glassV2Program: null, glassV2Uniforms: {}, glassV2FallbackActive: false, glassTileProgram: null, glassTileUniforms: {}, glassTileFallbackActive: false, prismProgram: null, prismUniforms: {}, prismCompositeProgram: null, prismCompositeUniforms: {}, particleProgram: null, particleUniforms: {}, particleVao: null, particleQuadBuffer: null, particleInstanceBuffer: null, particleInstanceCount: 0, particleInstanceSeed: Number.NaN, flowGradient, normalFbo, normalTexture, hBlurFbo, hBlurTexture, postprocessFboA, postprocessTextureA, postprocessFboB, postprocessTextureB, prismScratchFbo, prismScratchTexture, prismBlurFbo, prismBlurTexture, prismGlowFbo, prismGlowTexture, shaderCompileExt, lazyProgramState: createLazyProgramState(), lazyProgramCompileQueue: createSerialAsyncQueue(), resourceLedger, hasPresentedFrame: false, disposed: false };
   initializedContext = ctx;
+  for (const key of NOISE_VARIANT_PROGRAM_KEYS) {
+    ctx.lazyProgramState[key] = getNoiseVariantState(ctx, key, ctx.activeNoiseVariants[key]);
+  }
   effectStackTransitionResources.set(ctx, {
     program: transitionProgram,
     from: gl.getUniformLocation(transitionProgram, 'u_transitionFrom'),
@@ -932,6 +790,8 @@ export function disposeWebGL(ctx: WebGLContext): void {
 
   const programs = [
     ctx.program,
+    ctx.bootstrapProgram,
+    ...Array.from(ctx.noiseVariantPrograms.values(), entry => entry.program),
     ctx.generatorProgram,
     ctx.normalMapProgram,
     ctx.blurProgram,
@@ -1362,12 +1222,17 @@ function getGeneratorUniforms(gl: WebGL2RenderingContext, program: WebGLProgram)
   }) as Record<string, WebGLUniformLocation | null>;
 }
 
-async function compileLazyProgram(ctx: WebGLContext, key: LazyProgramKey): Promise<void> {
+async function compileLazyProgram(
+  ctx: WebGLContext,
+  key: LazyProgramKey,
+  noiseVariant: number | undefined,
+): Promise<void> {
   const { gl } = ctx;
-  if (ctx.disposed || gl.isContextLost() || lazyProgramReady(ctx, key)) return;
+  if (ctx.disposed || gl.isContextLost() || lazyProgramReady(ctx, key, noiseVariant)) return;
 
-  const source = getProgramSource(key);
+  const source = getProgramSource(key, { noiseVariant });
   const fragSrc = source.fragment;
+  const label = lazyProgramQueueId(key, noiseVariant);
   const compileStartedAt = performance.now();
   const shaderCompileExt = selectShaderCompileExtensionForSnapshot(
     ctx.shaderCompileExt,
@@ -1380,7 +1245,7 @@ async function compileLazyProgram(ctx: WebGLContext, key: LazyProgramKey): Promi
       fragSrc,
       shaderCompileExt,
       source.vertex,
-      key,
+      label,
       key === 'glass' || key === 'glassV2' || key === 'glassTile'
         ? GLASS_PARALLEL_SHADER_COMPILE_TIMEOUT_MS
         : PARALLEL_SHADER_COMPILE_TIMEOUT_MS,
@@ -1393,14 +1258,14 @@ async function compileLazyProgram(ctx: WebGLContext, key: LazyProgramKey): Promi
     // Reflect uniforms before publishing the program. If webgl-lint or a
     // driver rejects reflection, no partially initialized program can enter
     // the render path and make the whole effect stack unusable.
-    installLazyProgram(ctx, key, program);
+    installLazyProgram(ctx, key, program, noiseVariant);
   } catch (error) {
     if (ctx.disposed) {
       if (program) gl.deleteProgram(program);
       return;
     }
     console.error('[WebGL shader] compile failed', {
-      program: key,
+      program: label,
       durationMs: Math.round(performance.now() - compileStartedAt),
       fragmentSourceLength: fragSrc.length,
       parallelCompile: Boolean(shaderCompileExt),
@@ -1411,14 +1276,19 @@ async function compileLazyProgram(ctx: WebGLContext, key: LazyProgramKey): Promi
   }
 }
 
-function installLazyProgram(ctx: WebGLContext, key: LazyProgramKey, program: WebGLProgram): void {
+function installLazyProgram(
+  ctx: WebGLContext,
+  key: LazyProgramKey,
+  program: WebGLProgram,
+  noiseVariant: number | undefined,
+): void {
   const { gl } = ctx;
-  if (key === 'generator') {
-    const generatorUniforms = getGeneratorUniforms(gl, program);
-    ctx.generatorProgram = program;
-    ctx.generatorUniforms = generatorUniforms;
-    ctx.program = program;
-    ctx.uniforms = generatorUniforms;
+  if (isNoiseVariantProgramKey(key)) {
+    const uniforms = key === 'generator' ? getGeneratorUniforms(gl, program) : getPostprocessUniforms(gl, program);
+    const variant = noiseVariant ?? ctx.activeNoiseVariants[key];
+    ctx.noiseVariantPrograms.set(noiseVariantId(key, variant), { program, uniforms });
+    if (ctx.activeNoiseVariants[key] === variant) applyActiveNoiseVariantProgram(ctx, key);
+    touchNoiseVariantProgram(ctx, key, variant);
   } else if (key === 'blur') {
     const uniforms = getBlurUniforms(gl, program);
     ctx.blurProgram = program;
@@ -1439,14 +1309,6 @@ function installLazyProgram(ctx: WebGLContext, key: LazyProgramKey, program: Web
     const uniforms = getPostprocessUniforms(gl, program);
     ctx.stackCoreProgram = program;
     ctx.stackCoreUniforms = uniforms;
-  } else if (key === 'noiseStack') {
-    const uniforms = getPostprocessUniforms(gl, program);
-    ctx.noiseStackProgram = program;
-    ctx.noiseStackUniforms = uniforms;
-  } else if (key === 'noiseDiffuseStack') {
-    const uniforms = getPostprocessUniforms(gl, program);
-    ctx.noiseDiffuseStackProgram = program;
-    ctx.noiseDiffuseStackUniforms = uniforms;
   } else if (key === 'glass') {
     const uniforms = getPostprocessUniforms(gl, program);
     ctx.glassProgram = program;
@@ -1497,44 +1359,162 @@ function installLazyProgram(ctx: WebGLContext, key: LazyProgramKey, program: Web
   }
 }
 
+/**
+ * Resolves the Noise variant a request refers to. Programs outside
+ * NOISE_VARIANT_PROGRAM_KEYS have none; the others default to the variant
+ * the latest frame selected.
+ */
+function resolveNoiseVariant(ctx: WebGLContext, key: LazyProgramKey, noiseVariant?: number): number | undefined {
+  if (!isNoiseVariantProgramKey(key)) return undefined;
+  return noiseVariant ?? ctx.activeNoiseVariants[key];
+}
+
+function lazyProgramStateFor(ctx: WebGLContext, key: LazyProgramKey, noiseVariant: number | undefined): LazyProgramState {
+  return noiseVariant === undefined || !isNoiseVariantProgramKey(key)
+    ? ctx.lazyProgramState[key]
+    : getNoiseVariantState(ctx, key, noiseVariant);
+}
+
+function lazyProgramQueueId(key: LazyProgramKey, noiseVariant: number | undefined): string {
+  return noiseVariant === undefined || !isNoiseVariantProgramKey(key) ? key : noiseVariantId(key, noiseVariant);
+}
+
 function requestLazyProgram(
   ctx: WebGLContext,
   key: LazyProgramKey,
   priority: LazyCompilePriority = 'demand',
+  requestedNoiseVariant?: number,
 ): boolean {
-  if (ctx.disposed || lazyProgramReady(ctx, key)) return !ctx.disposed;
+  const noiseVariant = resolveNoiseVariant(ctx, key, requestedNoiseVariant);
+  if (ctx.disposed || lazyProgramReady(ctx, key, noiseVariant)) return !ctx.disposed;
 
-  const state = ctx.lazyProgramState[key];
+  const state = lazyProgramStateFor(ctx, key, noiseVariant);
+  const queueId = lazyProgramQueueId(key, noiseVariant);
+  // Status events describe the variant the canvas currently uses; a variant
+  // prepared for another Noise type stays silent.
+  const isActiveVariant = () => noiseVariant === undefined
+    || ctx.activeNoiseVariants[key as NoiseVariantProgramKey] === noiseVariant;
   if (state.promise) {
     // A program first queued by warmup/prefetch must not keep a user request waiting.
-    ctx.lazyProgramCompileQueue.promote(key, priority);
+    ctx.lazyProgramCompileQueue.promote(queueId, priority);
   } else if (!state.failed) {
-    window.dispatchEvent(new CustomEvent('kgg:webgl-lazy-program-state', {
-      detail: { key, state: 'loading' as const },
-    }));
+    if (isActiveVariant()) dispatchLazyProgramState(key, 'loading');
     state.promise = ctx.lazyProgramCompileQueue.enqueue(
-      () => compileLazyProgram(ctx, key),
-      { priority, id: key },
+      () => compileLazyProgram(ctx, key, noiseVariant),
+      { priority, id: queueId },
     ).catch((error) => {
       if (ctx.disposed) return;
       state.failed = true;
       state.timedOut = error instanceof Error && error.message.includes('timed out');
-      console.error(`[WebGL] Lazy shader compile failed (${key}):`, error);
-      window.dispatchEvent(new CustomEvent('kgg:webgl-lazy-program-state', {
-        detail: { key, state: 'failed' as const },
-      }));
+      console.error(`[WebGL] Lazy shader compile failed (${queueId}):`, error);
+      if (isActiveVariant()) dispatchLazyProgramState(key, 'failed');
     }).finally(() => {
       state.promise = null;
-      if (ctx.disposed) return;
-      if (!state.failed) {
-        window.dispatchEvent(new CustomEvent('kgg:webgl-lazy-program-state', {
-          detail: { key, state: 'ready' as const },
-        }));
-        window.dispatchEvent(new CustomEvent('kgg:webgl-lazy-program-ready'));
-      }
+      if (ctx.disposed || state.failed) return;
+      if (isActiveVariant()) dispatchLazyProgramState(key, 'ready');
+      // An inactive variant can still change the next frame: the Generator
+      // variant prepared while Noise is drawn by its stack pass takes over
+      // once it is ready, so the preview must redraw.
+      window.dispatchEvent(new CustomEvent('kgg:webgl-lazy-program-ready'));
     });
   }
   return false;
+}
+
+function dispatchLazyProgramState(key: LazyProgramKey, state: 'loading' | 'ready' | 'failed' | 'fallback'): void {
+  window.dispatchEvent(new CustomEvent('kgg:webgl-lazy-program-state', {
+    detail: state === 'fallback' ? { key, state, fallback: true } : { key, state },
+  }));
+}
+
+function createInitialNoiseVariants(): Record<NoiseVariantProgramKey, number> {
+  return {
+    generator: GENERATOR_WITHOUT_NOISE_VARIANT,
+    noiseStack: NOISE_TYPE_MAP.simplex,
+    noiseDiffuseStack: NOISE_TYPE_MAP.simplex,
+  };
+}
+
+function noiseVariantId(key: NoiseVariantProgramKey, noiseVariant: number): string {
+  return `${key}:${noiseVariant}`;
+}
+
+function getNoiseVariantState(ctx: WebGLContext, key: NoiseVariantProgramKey, noiseVariant: number): LazyProgramState {
+  const id = noiseVariantId(key, noiseVariant);
+  let state = ctx.noiseVariantStates.get(id);
+  if (!state) {
+    state = { promise: null, failed: false, timedOut: false, fallback: false };
+    ctx.noiseVariantStates.set(id, state);
+  }
+  return state;
+}
+
+/** Compiled variants kept per Noise-dependent program, including the active one. */
+const MAX_CACHED_NOISE_VARIANTS = 3;
+
+/**
+ * Marks a compiled variant as recently used (Map order doubles as recency)
+ * and releases the least recently used inactive variants beyond the cache
+ * size, so switching through Noise types does not keep every program alive.
+ */
+function touchNoiseVariantProgram(ctx: WebGLContext, key: NoiseVariantProgramKey, noiseVariant: number): void {
+  const id = noiseVariantId(key, noiseVariant);
+  const entry = ctx.noiseVariantPrograms.get(id);
+  if (!entry) return;
+  ctx.noiseVariantPrograms.delete(id);
+  ctx.noiseVariantPrograms.set(id, entry);
+  const activeId = noiseVariantId(key, ctx.activeNoiseVariants[key]);
+  const bootstrapId = noiseVariantId('generator', GENERATOR_WITHOUT_NOISE_VARIANT);
+  const evictable = [...ctx.noiseVariantPrograms.keys()]
+    .filter(candidate => candidate.startsWith(`${key}:`) && candidate !== bootstrapId);
+  let excess = evictable.length - MAX_CACHED_NOISE_VARIANTS;
+  for (const candidate of evictable) {
+    if (excess <= 0) break;
+    if (candidate === activeId) continue;
+    ctx.gl.deleteProgram(ctx.noiseVariantPrograms.get(candidate)!.program);
+    ctx.noiseVariantPrograms.delete(candidate);
+    ctx.noiseVariantStates.delete(candidate);
+    excess -= 1;
+  }
+}
+
+/** Publishes the active variant of `key` (or its absence) into the program fields. */
+function applyActiveNoiseVariantProgram(ctx: WebGLContext, key: NoiseVariantProgramKey): void {
+  const installed = ctx.noiseVariantPrograms.get(noiseVariantId(key, ctx.activeNoiseVariants[key])) ?? null;
+  if (key === 'generator') {
+    ctx.generatorProgram = installed?.program ?? null;
+    ctx.generatorUniforms = installed?.uniforms ?? {};
+    // Draws made before the variant is ready keep the Noise-free Base frame.
+    ctx.program = installed?.program ?? ctx.bootstrapProgram;
+    ctx.uniforms = installed?.uniforms ?? ctx.bootstrapUniforms;
+  } else if (key === 'noiseStack') {
+    ctx.noiseStackProgram = installed?.program ?? null;
+    ctx.noiseStackUniforms = installed?.uniforms ?? {};
+  } else {
+    ctx.noiseDiffuseStackProgram = installed?.program ?? null;
+    ctx.noiseDiffuseStackUniforms = installed?.uniforms ?? {};
+  }
+}
+
+/**
+ * Points the Noise-dependent program fields at the variants a frame needs.
+ * A variant that is not compiled yet reads as not ready, so the existing
+ * readiness checks request it and keep the Base frame meanwhile.
+ */
+export function selectNoiseProgramVariants(ctx: WebGLContext, variants: NoiseProgramVariants): void {
+  for (const key of NOISE_VARIANT_PROGRAM_KEYS) {
+    const noiseVariant = variants[key];
+    if (ctx.activeNoiseVariants[key] === noiseVariant) continue;
+    ctx.activeNoiseVariants[key] = noiseVariant;
+    const state = getNoiseVariantState(ctx, key, noiseVariant);
+    ctx.lazyProgramState[key] = state;
+    applyActiveNoiseVariantProgram(ctx, key);
+    touchNoiseVariantProgram(ctx, key, noiseVariant);
+    if (ctx.noiseVariantPrograms.has(noiseVariantId(key, noiseVariant))) dispatchLazyProgramState(key, 'ready');
+    else if (state.failed) dispatchLazyProgramState(key, 'failed');
+    else if (state.promise) dispatchLazyProgramState(key, 'loading');
+    if (state.fallback) dispatchLazyProgramState(key, 'fallback');
+  }
 }
 
 function requestNoiseStackProgram(ctx: WebGLContext, fallbackProgram: 'postprocess' = 'postprocess'): boolean {
@@ -1576,7 +1556,10 @@ function markNoiseDiffuseStackFallback(ctx: WebGLContext): void {
   }));
 }
 
-function lazyProgramReady(ctx: WebGLContext, key: LazyProgramKey): boolean {
+function lazyProgramReady(ctx: WebGLContext, key: LazyProgramKey, noiseVariant?: number): boolean {
+  if (noiseVariant !== undefined && isNoiseVariantProgramKey(key)) {
+    return ctx.noiseVariantPrograms.has(noiseVariantId(key, noiseVariant));
+  }
   const resources = {
     generator: [ctx.generatorProgram, ctx.generatorUniforms],
     blur: [ctx.blurProgram, ctx.blurUniforms],
@@ -1611,12 +1594,14 @@ async function waitForLazyProgram(
   ctx: WebGLContext,
   key: LazyProgramKey,
   signal?: AbortSignal,
+  requestedNoiseVariant?: number,
 ): Promise<void> {
   if (signal?.aborted) throw abortError();
-  if (lazyProgramReady(ctx, key)) return;
+  const noiseVariant = resolveNoiseVariant(ctx, key, requestedNoiseVariant);
+  if (lazyProgramReady(ctx, key, noiseVariant)) return;
 
-  requestLazyProgram(ctx, key);
-  const pending = ctx.lazyProgramState[key].promise;
+  requestLazyProgram(ctx, key, 'demand', noiseVariant);
+  const pending = lazyProgramStateFor(ctx, key, noiseVariant).promise;
   if (pending) {
     if (signal) {
       await new Promise<void>((resolve, reject) => {
@@ -1632,7 +1617,7 @@ async function waitForLazyProgram(
   }
 
   if (signal?.aborted) throw abortError();
-  if (!lazyProgramReady(ctx, key)) {
+  if (!lazyProgramReady(ctx, key, noiseVariant)) {
     throw new Error(`Required WebGL program is unavailable: ${key}`);
   }
 }
@@ -1647,8 +1632,9 @@ export function requestLazyProgramCompile(
   ctx: WebGLContext,
   key: LazyProgramKey,
   priority: LazyCompilePriority,
+  noiseVariant?: number,
 ): boolean {
-  return requestLazyProgram(ctx, key, priority);
+  return requestLazyProgram(ctx, key, priority, noiseVariant);
 }
 
 /**
@@ -1660,13 +1646,15 @@ export async function settleLazyProgram(
   ctx: WebGLContext,
   key: LazyProgramKey,
   priority: LazyCompilePriority,
+  requestedNoiseVariant?: number,
 ): Promise<LazyProgramSettleResult> {
   if (ctx.disposed) return 'disposed';
-  if (requestLazyProgram(ctx, key, priority)) return 'ready';
-  const pending = ctx.lazyProgramState[key].promise;
+  const noiseVariant = resolveNoiseVariant(ctx, key, requestedNoiseVariant);
+  if (requestLazyProgram(ctx, key, priority, noiseVariant)) return 'ready';
+  const pending = lazyProgramStateFor(ctx, key, noiseVariant).promise;
   if (pending) await pending.catch(() => undefined);
   if (ctx.disposed) return 'disposed';
-  return lazyProgramReady(ctx, key) ? 'ready' : 'failed';
+  return lazyProgramReady(ctx, key, noiseVariant) ? 'ready' : 'failed';
 }
 
 /**
@@ -1693,7 +1681,10 @@ export async function prepareExportPrograms(
   signal?: AbortSignal,
 ): Promise<void> {
   const required = getRequiredSceneProgramKeys(state);
-  for (const key of required) await waitForLazyProgram(ctx, key, signal);
+  const variants = getSceneNoiseProgramVariants(state);
+  for (const key of required) {
+    await waitForLazyProgram(ctx, key, signal, isNoiseVariantProgramKey(key) ? variants[key] : undefined);
+  }
 }
 
 // Compatibility export: program selection belongs to the pure scene plan.
@@ -1924,7 +1915,7 @@ export function hexToRgb(hex: string): [number, number, number] {
   return [r, g, b];
 }
 
-export const NOISE_TYPE_MAP = { simplex: 0, fbm: 1, voronoi: 2, curl: 3, domain_warp_anim: 4, seamless: 5, ridged_fbm: 6, ae_fractal: 7, fast_curl: 8, caustics: 9, phasor: 10, perlin: 11, chladni: 12 } as const;
+export { NOISE_TYPE_MAP } from './webglShaderSources';
 export const GRADIENT_TYPE_MAP = { linear: 0, radial: 1, fourcolor: 2, diamond: 3, angle: 4, bezier: 5, mesh: 6 } as const;
 const DIFFUSE_MODE_MAP = { block: 0, smooth: 1, dither: 2, halftone: 3, ascii: 4, legacy: 5 } as const;
 const PARTICLE_EMITTER_TYPE_MAP = { field: 0, line: 1, burst: 2, point: 3 } as const;
@@ -3742,7 +3733,7 @@ export function render(
     : false;
   const threeDActive = threeDRequested && requestLazyProgram(ctx, 'threeD');
   const threeDPending = threeDRequested && !threeDActive && !ctx.lazyProgramState.threeD.failed;
-  const { gl, program, uniforms, gradientRampTexture, meshGradientTexture, sourceImageTexture, imageGradientTexture, imageMaskTexture } = ctx;
+  const { gl, gradientRampTexture, meshGradientTexture, sourceImageTexture, imageGradientTexture, imageMaskTexture } = ctx;
   gradient = { ...gradient, angle: clampParameter(gradient.angle, 0, getParameterLimit('gradient.angle')) };
   noiseDistortion = {
     ...noiseDistortion,
@@ -3810,25 +3801,60 @@ export function render(
   const textureRequested = isV2Pipeline && effectPipeline
     ? isEffectStackLayerEnabled(effectPipeline, 'texture')
     : false;
-  const renderPlan = isV2Pipeline && effectPipeline
-    ? getSceneRenderPlan(getSceneRenderPlanInput({
-      gradient,
-      noiseDistortion,
-      diffuse,
-      imageGradient,
-      normalMap,
-      postprocess,
-      effectPipeline,
-      clothGradient,
-      seamless,
-      flowGradient,
-      sourceImageCanvas,
-      imageGradientSource,
-    }, {
-      imageGradientEnabled: imageGradientProtected,
-      flowGradientEnabled: flowRequested,
-    }))
+  const planScene = {
+    gradient,
+    noiseDistortion,
+    diffuse,
+    imageGradient,
+    normalMap,
+    postprocess,
+    effectPipeline: effectPipeline!,
+    clothGradient,
+    seamless,
+    flowGradient,
+    sourceImageCanvas,
+    imageGradientSource,
+  };
+  const planOverrides = {
+    imageGradientEnabled: imageGradientProtected,
+    flowGradientEnabled: flowRequested,
+  };
+  const noiseVariantsFor = (plan: V2RenderPlan | null) => getNoiseProgramVariants(
+    noiseDistortion.type,
+    generatorNeedsNoiseVariant({
+      isV2Pipeline,
+      imageGradientProtected,
+      renderPlan: plan,
+      noiseEnabled: noiseDistortion.enabled,
+      manualDistortEnabled: manualDistort.enabled,
+    }),
+  );
+  let renderPlan = isV2Pipeline && effectPipeline
+    ? getSceneRenderPlan(getSceneRenderPlanInput(planScene, planOverrides))
     : null;
+  let noiseVariants = noiseVariantsFor(renderPlan);
+  if (
+    renderPlan?.analyticPrefix.consumedLayers.includes('noise')
+    && !ctx.disposed
+    && !lazyProgramReady(ctx, 'generator', noiseVariants.generator)
+  ) {
+    // The Generator variant for this Noise type compiles for seconds on
+    // ANGLE/Direct3D. Present Noise through its fast stack pass meanwhile;
+    // the analytic path takes over once the variant is ready. Queue the
+    // variant after this frame's requests, below demand, so the stack pass
+    // programs compile first.
+    const pendingVariant = noiseVariants.generator;
+    queueMicrotask(() => {
+      requestLazyProgram(ctx, 'generator', 'prefetch', pendingVariant);
+    });
+    renderPlan = getSceneRenderPlan(getSceneRenderPlanInput(planScene, {
+      ...planOverrides,
+      analyticNoisePending: true,
+    }));
+    noiseVariants = noiseVariantsFor(renderPlan);
+  }
+  selectNoiseProgramVariants(ctx, noiseVariants);
+  const { program, uniforms } = ctx;
   const analyticPrefixEnabled = renderPlan?.analyticPrefix.enabled === true;
   // Legacy and protected Image Gradient rendering still use the full
   // generator. V2 requests it only when the Render Plan can safely consume a

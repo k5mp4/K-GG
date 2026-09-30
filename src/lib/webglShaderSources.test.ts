@@ -8,6 +8,37 @@ import { GRADIENT_TYPE_MAP, NOISE_TYPE_MAP } from './webgl';
 // drivers) and the integer contracts shared between TypeScript and GLSL.
 
 describe('webglShaderSources compile boundaries', () => {
+  it('guards each Noise dispatcher branch with its NOISE_TYPE_MAP index', () => {
+    const source = getProgramSource('generator').fragment.replace(/\r\n?/g, '\n');
+    const constants: Record<string, keyof typeof NOISE_TYPE_MAP> = {
+      CAUSTICS_NOISE_TYPE: 'caustics',
+      PHASOR_NOISE_TYPE: 'phasor',
+      PERLIN_NOISE_TYPE: 'perlin',
+      CHLADNI_NOISE_TYPE: 'chladni',
+    };
+    const guards = [...source.matchAll(
+      /#if KGG_NOISE_VARIANT < 0 \|\| KGG_NOISE_VARIANT == (\d+)\n\s*if \((?:noiseType|KGG_NOISE_TYPE) == (\w+)\)/g,
+    )];
+    for (const [, guarded, compared] of guards) {
+      const expected = constants[compared] ? NOISE_TYPE_MAP[constants[compared]] : Number(compared);
+      expect(Number(guarded)).toBe(expected);
+    }
+    // Every type but Seamless (the dispatcher's final branch) has a guarded
+    // branch; Curl and Fast Curl are also dispatched by the Generator itself.
+    const guardedTypes = new Set(guards.map(([, guarded]) => Number(guarded)));
+    for (const [name, value] of Object.entries(NOISE_TYPE_MAP)) {
+      if (name !== 'seamless') expect(guardedTypes.has(value), name).toBe(true);
+    }
+    expect(source).toContain(`#if KGG_NOISE_VARIANT < 0 || KGG_NOISE_VARIANT == ${NOISE_TYPE_MAP.seamless}\n`);
+  });
+
+  it('keeps Manual Distort out of the bootstrap Generator', () => {
+    const initial = getInitialProgramSource().fragment;
+    expect(initial).toContain('#if !defined(KGG_BOOTSTRAP)\n    if (u_manualDistortEnabled && !rawSourceActive) {');
+    expect(initial).toContain('#if !defined(KGG_BOOTSTRAP)\n    if (u_manualDistortEnabled && !u_imageGradientEnabled && !meshGradient) {');
+    expect(initial).toContain('#if !defined(KGG_BOOTSTRAP)\n      if (u_manualDistortEnabled && !u_imageGradientEnabled) {');
+  });
+
   it('keeps the bootstrap program free of the heavy noise implementations', () => {
     const initial = getInitialProgramSource().fragment;
     expect(initial).toContain('#define KGG_BOOTSTRAP');

@@ -5,9 +5,9 @@ title: 起動とスプラッシュスクリーン
 status: current
 owners: [maintainer]
 created: 2026-09-25
-updated: 2026-09-25
+updated: 2026-09-29
 requirement_ids: [STARTUP-001, STARTUP-002, STARTUP-003, STARTUP-004, STARTUP-005, STARTUP-006]
-related_adrs: [ADR-0015, ADR-0022]
+related_adrs: [ADR-0015, ADR-0022, ADR-20260929-noise-shader-variants]
 related_changes: [CHANGE-055]
 related_code: [index.html, vite.config.ts, src/appVersion.ts, src/main.tsx, src/branding/brand.ts, src/features/splash/SplashScreen.tsx, src/features/splash/SplashScreen.css, src/features/splash/splashPolicy.ts, src/features/splash/splashVisual.ts, src/features/splash/staticSplashVisual.ts, src/features/splash/mediaSplashVisual.ts, src/lib/shaderWarmup.ts, src/hooks/useWebGL.ts, src/i18n/messages.ts]
 related_tests: [src/features/splash/splash.test.ts, src/lib/shaderWarmup.test.ts, 'manual: Browser / Tauri startup splash check', 'manual: splash media codec fallback check']
@@ -33,7 +33,7 @@ JavaScriptの読み込み前から、黒い背景に`K-GG`の表記とアプリ�
 
 スプラッシュは次のいずれかで閉じる。
 
-- WebGLが初期化され、現在のシーンに必要なShaderがすべて準備完了または失敗し、最低表示時間（既定600ms）を経過した。
+- WebGLが初期化され、現在のシーンに必要なShaderがすべて準備完了または失敗し、最低表示時間（既定600ms）を経過した。必要なShaderは、GeneratorのNoise variantを待たずにNoiseをStack passで表示できる構成で求める（PERF-010、PERF-011）。
 - WebGL2が使えない、または初期化に失敗した（CPU Previewを表示する）。
 - 最大表示時間（既定4秒）を経過した。
 - 利用者がクリック、Esc、Enter、Spaceでスキップした。

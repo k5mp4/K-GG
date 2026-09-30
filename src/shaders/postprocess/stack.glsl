@@ -125,7 +125,8 @@ vec2 stackNoiseUv(vec2 uv) {
 #else
   if (!u_noiseEnabled) return uv;
   float evolution = u_noiseEvolution + u_time;
-  if (u_noiseType == 3) {
+#if KGG_NOISE_VARIANT < 0 || KGG_NOISE_VARIANT == 3
+  if (KGG_NOISE_TYPE == 3) {
     vec2 current = applyStackCurlNoiseUv(uv, evolution, u_time * u_curlSpeed);
     float blend = loopBlendWeight();
     if (blend <= 0.0001) return current;
@@ -136,15 +137,18 @@ vec2 stackNoiseUv(vec2 uv) {
     );
     return mix(current, wrapped, blend);
   }
-  if (u_noiseType == 8) {
+#endif
+#if KGG_NOISE_VARIANT < 0 || KGG_NOISE_VARIANT == 8
+  if (KGG_NOISE_TYPE == 8) {
     return applyFastCurlNoiseUV(uv, evolution);
   }
-  if ((u_noiseType == CAUSTICS_NOISE_TYPE && u_noiseAmount == 0.0)
-    || (u_noiseType == PHASOR_NOISE_TYPE && (u_noiseAmount == 0.0 || u_phasorWarpStrength == 0.0))
-    || (u_noiseType == CHLADNI_NOISE_TYPE && (u_noiseAmount == 0.0 || u_chladniWarpStrength == 0.0))) {
+#endif
+  if ((KGG_NOISE_TYPE == CAUSTICS_NOISE_TYPE && u_noiseAmount == 0.0)
+    || (KGG_NOISE_TYPE == PHASOR_NOISE_TYPE && (u_noiseAmount == 0.0 || u_phasorWarpStrength == 0.0))
+    || (KGG_NOISE_TYPE == CHLADNI_NOISE_TYPE && (u_noiseAmount == 0.0 || u_chladniWarpStrength == 0.0))) {
     return uv;
   }
-  vec2 offset = noiseDisplace(uv, u_noiseScale, evolution, u_noiseType, u_noiseOctaves);
+  vec2 offset = noiseDisplace(uv, u_noiseScale, evolution, KGG_NOISE_TYPE, u_noiseOctaves);
   return uv + offset * u_noiseAmount;
 #endif
 }
@@ -180,45 +184,31 @@ vec2 snapStackSlitOffset(vec2 offsetUv) {
   return floor(offsetUv * u_fullResolution + 0.5) / u_fullResolution;
 }
 
-vec2 stackSlitDeltaAt(int index) {
-  if (index == 0) return u_stackSlitDelta01.xy;
-  if (index == 1) return u_stackSlitDelta01.zw;
-  if (index == 2) return u_stackSlitDelta23.xy;
-  if (index == 3) return u_stackSlitDelta23.zw;
-  if (index == 4) return u_stackSlitDelta45.xy;
-  if (index == 5) return u_stackSlitDelta45.zw;
-  if (index == 6) return u_stackSlitDelta67.xy;
-  if (index == 7) return u_stackSlitDelta67.zw;
-  if (index == 8) return u_stackSlitDelta89.xy;
-  if (index == 9) return u_stackSlitDelta89.zw;
-  if (index == 10) return u_stackSlitDeltaAB.xy;
-  if (index == 11) return u_stackSlitDeltaAB.zw;
-  if (index == 12) return u_stackSlitDeltaCD.xy;
-  if (index == 13) return u_stackSlitDeltaCD.zw;
-  if (index == 14) return u_stackSlitDeltaEF.xy;
-  if (index == 15) return u_stackSlitDeltaEF.zw;
-  if (index == 16) return u_stackSlitDeltaGH.xy;
-  if (index == 17) return u_stackSlitDeltaGH.zw;
-  if (index == 18) return u_stackSlitDeltaIJ.xy;
-  if (index == 19) return u_stackSlitDeltaIJ.zw;
-  if (index == 20) return u_stackSlitDeltaKL.xy;
-  if (index == 21) return u_stackSlitDeltaKL.zw;
-  if (index == 22) return u_stackSlitDeltaMN.xy;
-  if (index == 23) return u_stackSlitDeltaMN.zw;
-  if (index == 24) return u_stackSlitDeltaOP.xy;
-  if (index == 25) return u_stackSlitDeltaOP.zw;
-  if (index == 26) return u_stackSlitDeltaQR.xy;
-  if (index == 27) return u_stackSlitDeltaQR.zw;
-  if (index == 28) return u_stackSlitDeltaST.xy;
-  if (index == 29) return u_stackSlitDeltaST.zw;
-  if (index == 30) return u_stackSlitDeltaUV.xy;
-  return u_stackSlitDeltaUV.zw;
-}
-
 float computeStackSlitIndex(float warpedCoord, float slitWidth) {
+  // Index a local copy of the delta table. Selecting each entry through a
+  // 32-way branch inside this 32-step loop made the ANGLE/Direct3D compile
+  // several times slower for every program that includes the Slit layer.
+  vec4 deltas[16];
+  deltas[0] = u_stackSlitDelta01;
+  deltas[1] = u_stackSlitDelta23;
+  deltas[2] = u_stackSlitDelta45;
+  deltas[3] = u_stackSlitDelta67;
+  deltas[4] = u_stackSlitDelta89;
+  deltas[5] = u_stackSlitDeltaAB;
+  deltas[6] = u_stackSlitDeltaCD;
+  deltas[7] = u_stackSlitDeltaEF;
+  deltas[8] = u_stackSlitDeltaGH;
+  deltas[9] = u_stackSlitDeltaIJ;
+  deltas[10] = u_stackSlitDeltaKL;
+  deltas[11] = u_stackSlitDeltaMN;
+  deltas[12] = u_stackSlitDeltaOP;
+  deltas[13] = u_stackSlitDeltaQR;
+  deltas[14] = u_stackSlitDeltaST;
+  deltas[15] = u_stackSlitDeltaUV;
   float cumulativeDelta = 0.0;
   for (int index = 0; index < 32; index++) {
-    vec2 entry = stackSlitDeltaAt(index);
+    vec4 pair = deltas[index / 2];
+    vec2 entry = index - (index / 2) * 2 == 0 ? pair.xy : pair.zw;
     if (entry.x <= -9000.0) continue;
     float left = entry.x * slitWidth + cumulativeDelta;
     float right = left + slitWidth + entry.y;
