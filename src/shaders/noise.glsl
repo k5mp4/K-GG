@@ -119,6 +119,19 @@
     return fract((p3.xx + p3.yz) * p3.zy) * 2.0 - 1.0;
   }
 
+// A program compiled for one Noise type defines KGG_NOISE_VARIANT as its
+// NOISE_TYPE_MAP index, so only that type's algorithm reaches the driver.
+// ANGLE on Direct3D otherwise translates every algorithm, which can take
+// more than a minute. Without the define all types stay selectable at runtime.
+#ifndef KGG_NOISE_VARIANT
+#define KGG_NOISE_VARIANT -1
+#endif
+#if KGG_NOISE_VARIANT >= 0
+#define KGG_NOISE_TYPE KGG_NOISE_VARIANT
+#else
+#define KGG_NOISE_TYPE u_noiseType
+#endif
+
 // KGG_BOOTSTRAP_NOISE_BEGIN
 #if !defined(KGG_BOOTSTRAP)
 
@@ -1225,21 +1238,34 @@
   }
 
   vec2 noiseDisplaceRaw(vec2 uv, float scale, float evolution, int noiseType, int octaves) {
+#if KGG_NOISE_VARIANT >= 0
+    noiseType = KGG_NOISE_VARIANT;
+#endif
     vec2 p = uv * scale + linearDrift(noiseAnimDir(), evolution, 1.0);
     p += vec2(u_noiseSeed * 127.1, u_noiseSeed * 311.7);
     float nx, ny;
+#if KGG_NOISE_VARIANT < 0 || KGG_NOISE_VARIANT == 0
     if (noiseType == 0) {
       nx = simplex2D(p);
       ny = simplex2D(p + vec2(43.7, 17.3));
-    } else if (noiseType == 1) {
+    } else
+#endif
+#if KGG_NOISE_VARIANT < 0 || KGG_NOISE_VARIANT == 1
+    if (noiseType == 1) {
       nx = fbm(p, octaves);
       ny = fbm(p + vec2(43.7, 17.3), octaves);
-    } else if (noiseType == 2) {
+    } else
+#endif
+#if KGG_NOISE_VARIANT < 0 || KGG_NOISE_VARIANT == 2
+    if (noiseType == 2) {
       float v1 = voronoiScalar(p);
       float v2 = voronoiScalar(p + vec2(17.9, 43.5));
       nx = v1 * 2.0 - 1.0;
       ny = v2 * 2.0 - 1.0;
-    } else if (noiseType == 3) {
+    } else
+#endif
+#if KGG_NOISE_VARIANT < 0 || KGG_NOISE_VARIANT == 3
+    if (noiseType == 3) {
       float eps = 0.01;
       float phi_r = fbm(p + vec2( eps, 0.0), octaves);
       float phi_l = fbm(p + vec2(-eps, 0.0), octaves);
@@ -1247,7 +1273,10 @@
       float phi_d = fbm(p + vec2(0.0, -eps), octaves);
       nx =  (phi_u - phi_d) / (2.0 * eps);
       ny = -(phi_r - phi_l) / (2.0 * eps);
-    } else if (noiseType == 4) {
+    } else
+#endif
+#if KGG_NOISE_VARIANT < 0 || KGG_NOISE_VARIANT == 4
+    if (noiseType == 4) {
       mat2 dwRot = mat2(cos(u_dwRotAngle1),  sin(u_dwRotAngle1),
                         -sin(u_dwRotAngle2), cos(u_dwRotAngle2));
       vec2 drift = vec2(cos(u_dwDriftAngle), sin(u_dwDriftAngle));
@@ -1266,28 +1295,49 @@
       );
       nx = fbmDW(st + u_dwInitVal * s,                   octaves, dwRot) * 2.0 - 1.0;
       ny = fbmDW(st + u_dwInitVal * s + vec2(43.7, 17.3), octaves, dwRot) * 2.0 - 1.0;
-    } else if (noiseType == 6) {
+    } else
+#endif
+#if KGG_NOISE_VARIANT < 0 || KGG_NOISE_VARIANT == 6
+    if (noiseType == 6) {
       // Ridged fBm: 明るい稜線が流れるオーラ状テクスチャ
       nx = ridgedFbm(p, octaves) * 2.0 - 1.0;
       ny = ridgedFbm(p + vec2(43.7, 17.3), octaves) * 2.0 - 1.0;
-    } else if (noiseType == 7) {
+    } else
+#endif
+#if KGG_NOISE_VARIANT < 0 || KGG_NOISE_VARIANT == 7
+    if (noiseType == 7) {
       // AE Fractal Noise: 各オクターブに累積回転を適用したfbm
       nx = aeFractalNoise(p, octaves) * 2.0 - 1.0;
       ny = aeFractalNoise(p + vec2(43.7, 17.3), octaves) * 2.0 - 1.0;
-    } else if (noiseType == PERLIN_NOISE_TYPE) {
+    } else
+#endif
+#if KGG_NOISE_VARIANT < 0 || KGG_NOISE_VARIANT == 11
+    if (noiseType == PERLIN_NOISE_TYPE) {
       // Perlin samples XY + time-Z itself with its own reduced drift.
       return perlinDistortion(uv, scale, evolution, octaves);
-    } else if (noiseType == CHLADNI_NOISE_TYPE) {
+    } else
+#endif
+#if KGG_NOISE_VARIANT < 0 || KGG_NOISE_VARIANT == 12
+    if (noiseType == CHLADNI_NOISE_TYPE) {
       // Chladni is a gradient vector field that loops on its own; no drift.
       return chladniDistortion(uv, scale, evolution);
-    } else if (noiseType == PHASOR_NOISE_TYPE) {
+    } else
+#endif
+#if KGG_NOISE_VARIANT < 0 || KGG_NOISE_VARIANT == 10
+    if (noiseType == PHASOR_NOISE_TYPE) {
       // Phasor is already a phase-gradient vector field; do not duplicate its
       // scalar line signal into X/Y like the legacy scalar noise types.
       return phasorDistortion(uv, evolution, scale, octaves);
-    } else if (noiseType == CAUSTICS_NOISE_TYPE) {
+    } else
+#endif
+#if KGG_NOISE_VARIANT < 0 || KGG_NOISE_VARIANT == 9
+    if (noiseType == CAUSTICS_NOISE_TYPE) {
       // Caustics is already a vector field; keep it out of scalar duplication.
       return causticsDistortion(uv, evolution, scale, octaves);
-    } else {
+    } else
+#endif
+    {
+#if KGG_NOISE_VARIANT < 0 || KGG_NOISE_VARIANT == 5
       float aspect = u_resolution.x / u_resolution.y;
       vec2 ctr = uv - 0.5;
       ctr.x *= aspect;
@@ -1324,11 +1374,18 @@
         nx = simplex3D(p3d);
         ny = simplex3D(p3d + vec3(43.7, 17.3, 7.1));
       }
+#else
+      nx = 0.0;
+      ny = 0.0;
+#endif
     }
     return vec2(nx, ny);
   }
 
   vec2 noiseDisplace(vec2 uv, float scale, float evolution, int noiseType, int octaves) {
+#if KGG_NOISE_VARIANT >= 0
+    noiseType = KGG_NOISE_VARIANT;
+#endif
     vec2 current = noiseDisplaceRaw(uv, scale, evolution, noiseType, octaves);
     float blend = loopBlendWeight();
     if (blend <= 0.0001) return current;
