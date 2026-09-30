@@ -183,7 +183,7 @@ export function ColorHistogram({ sourceCanvasRef }: Props) {
         };
 
         if (histogram.showRampDistribution) {
-          const rampData = buildRampTextureData(gradient.stops, gradient.rampInterpolation, gradient.rampMirror ?? false, gradient.opacityStops, gradient.rampColorMode, gradient.rampVariable, gradient.rampRepeat);
+          const rampData = buildRampTextureData(gradient.stops, gradient.rampInterpolation, gradient.rampMirror ?? false, gradient.opacityStops, gradient.rampColorMode, gradient.rampVariable, gradient.rampRepeat, gradient.rampOffset);
           for (let i = 0; i < 256; i++) {
             ctx.fillStyle = `rgb(${rampData[i*4]}, ${rampData[i*4+1]}, ${rampData[i*4+2]})`;
             ctx.fillRect((i/255)*w, h-2, (1/255)*w + 1, 2);
@@ -203,7 +203,7 @@ export function ColorHistogram({ sourceCanvasRef }: Props) {
 
     rafId = requestAnimationFrame(update);
     return () => cancelAnimationFrame(rafId);
-  }, [sourceCanvasRef, histogram.enabled, histogram.showRampDistribution, gradient.stops, gradient.opacityStops, gradient.rampColorMode, gradient.rampInterpolation, gradient.rampVariable, gradient.rampRepeat, gradient.rampMirror, uniqueStops]);
+  }, [sourceCanvasRef, histogram.enabled, histogram.showRampDistribution, gradient.stops, gradient.opacityStops, gradient.rampColorMode, gradient.rampInterpolation, gradient.rampVariable, gradient.rampRepeat, gradient.rampOffset, gradient.rampMirror, uniqueStops]);
 
   if (!histogram.enabled) {
     return (

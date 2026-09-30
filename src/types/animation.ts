@@ -24,6 +24,8 @@ export type AnimationConfig = {
   enabled: boolean;
   previewLoop: boolean;
   speed: number;
+  /** Whole ramp cycles per loop for the Gradient Ramp color offset (signed integer, 0 = off). Integers keep the loop seamless. */
+  rampOffsetSpeed?: number;
   intensity: number;
   duration: number;
   fps: 24 | 30 | 60;

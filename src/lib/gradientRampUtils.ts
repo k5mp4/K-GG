@@ -532,7 +532,20 @@ export function applyRampRepeatT(t: number, repeat = 1): number {
 }
 
 /**
+ * ランプの色をサイクル単位でずらす（1 = ランプ1周）。範囲外は周回する。
+ * offset が 0 のときは t をそのまま返し、従来の描画結果を変えない。
+ * 継ぎ目ちょうどに乗った t>0 は 1 側へ寄せ、整数周のオフセットで終端色（t=1）が先頭色へ化けないようにする。
+ */
+export function applyRampOffsetT(t: number, offset = 0): number {
+  if (!Number.isFinite(offset) || offset === 0) return t;
+  const shifted = t + offset;
+  const wrapped = shifted - Math.floor(shifted);
+  return wrapped === 0 && t > 0 ? 1 : wrapped;
+}
+
+/**
  * ColorStop 配列から 256×1 RGBA テクスチャデータを生成する
+ * `rampOffset` はリピート後・ミラー前のランプ位置をずらす（周回する）。
  */
 export function buildRampTextureData(
   stops: ColorStop[],
@@ -542,6 +555,7 @@ export function buildRampTextureData(
   colorMode?: RampColorMode,
   variable = 0,
   repeat = 1,
+  rampOffset = 0,
 ): Uint8Array {
   const settings = normalizeRampSettings(colorMode ?? interpolation, interpolation);
   const data = new Uint8Array(RAMP_TEX_WIDTH * 4);
@@ -566,7 +580,7 @@ export function buildRampTextureData(
         : i === RAMP_TEX_WIDTH - 1
           ? 1
           : Math.max(0, Math.min(1, (i + 0.5 + offset) / RAMP_TEX_WIDTH));
-      const repeatedT = applyRampRepeatT(rawT, repeat);
+      const repeatedT = applyRampOffsetT(applyRampRepeatT(rawT, repeat), rampOffset);
       const t = mirror ? applyMirrorT(repeatedT) : repeatedT;
       const tc = Math.max(sorted[0].position, Math.min(sorted[sorted.length - 1].position, t));
       let segmentIndex = Math.max(0, sorted.length - 2);

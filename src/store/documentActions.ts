@@ -9,7 +9,7 @@ import {
   type Vec2Tuple,
 } from '../types/gradient';
 import { evaluateMeshPatch } from '../lib/meshGradientField';
-import { applyMirrorT, applyRampRepeatT, getColorAtPosition } from '../lib/gradientRampUtils';
+import { applyMirrorT, applyRampOffsetT, applyRampRepeatT, getColorAtPosition } from '../lib/gradientRampUtils';
 import { stripSlitPhaseMotionFields, type NoiseDistortionConfig } from '../types/distortion';
 import { DEFAULT_DIFFUSE_ASCII_CHARSET, DEFAULT_DIFFUSE_BACKGROUND_COLOR, normalizeDiffuseApplyMode } from '../types/distortion';
 import { normalizeClothGradientConfig } from '../types/clothGradient';
@@ -137,7 +137,7 @@ export function createDocumentActions(set: DocumentStoreSet, defaults: DocumentD
     // Switch to direct: bake the current ramp colors (sampled along v) into
     // per-point hex colors so the look is continuous before editing.
     const rampColorAt = (t: number): string => {
-      const repeated = applyRampRepeatT(t, s.gradient.rampRepeat ?? 1);
+      const repeated = applyRampOffsetT(applyRampRepeatT(t, s.gradient.rampRepeat ?? 1), s.gradient.rampOffset ?? 0);
       const mapped = s.gradient.rampMirror ? applyMirrorT(repeated) : repeated;
       return getColorAtPosition(s.gradient.stops, mapped, s.gradient.rampInterpolation, s.gradient.rampColorMode, s.gradient.rampVariable ?? 0);
     };
@@ -160,7 +160,7 @@ export function createDocumentActions(set: DocumentStoreSet, defaults: DocumentD
     const pointColors = existing ?? mesh.points.map((_, pointIndex) => {
       const row = Math.floor(pointIndex / mesh.columns);
       const v = mesh.rows <= 1 ? 0 : row / (mesh.rows - 1);
-      const repeated = applyRampRepeatT(v, s.gradient.rampRepeat ?? 1);
+      const repeated = applyRampOffsetT(applyRampRepeatT(v, s.gradient.rampRepeat ?? 1), s.gradient.rampOffset ?? 0);
       const mapped = s.gradient.rampMirror ? applyMirrorT(repeated) : repeated;
       return getColorAtPosition(s.gradient.stops, mapped, s.gradient.rampInterpolation, s.gradient.rampColorMode, s.gradient.rampVariable ?? 0);
     });
@@ -350,6 +350,7 @@ export function createDocumentActions(set: DocumentStoreSet, defaults: DocumentD
       ...nextAnimation,
       previewLoop: nextAnimation.previewLoop ?? true,
       speed: clampParameter(nextAnimation.speed, s.animation.speed, getParameterLimit('animation.speed')),
+      rampOffsetSpeed: clampParameter(nextAnimation.rampOffsetSpeed ?? 0, s.animation.rampOffsetSpeed ?? 0, getParameterLimit('animation.rampOffsetSpeed')),
       duration: beatSyncEnabled
         ? getBeatSyncDurationSeconds(beatSync?.bpm ?? 120)
         : clampParameter(nextAnimation.duration, s.animation.duration, getParameterLimit('animation.duration')),

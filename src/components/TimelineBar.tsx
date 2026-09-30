@@ -745,6 +745,16 @@ export function TimelineBar({ animLoopRef, onSeek, exportProgress = null, export
             compact
             className="hidden w-[166px] items-center lg:flex"
           />
+          <SliderField
+            label={t('animation.rampOffsetSpeed')}
+            labelClassName="text-[8px] text-tab-inactive uppercase tracking-wider"
+            value={animation.rampOffsetSpeed ?? 0}
+            onChange={value => setAnimation({ rampOffsetSpeed: value })}
+            format={value => `${Math.round(value)}`}
+            limitKey="animation.rampOffsetSpeed"
+            compact
+            className="hidden w-[182px] items-center lg:flex"
+          />
           <label className="hidden items-center gap-1 text-[8px] uppercase tracking-wider text-tab-inactive xl:flex">
             {t('animation.direction')}
             <span
