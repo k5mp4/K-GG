@@ -1745,43 +1745,6 @@ uniform float u_crystalReflection;
 uniform float u_crystalCameraDistance;
 uniform float u_crystalBackdropZ;
 uniform float u_crystalBackdropHalfHeight;
-// 0 renders the crystals; 1 is the Dispersion Blur pass over that render.
-uniform int u_crystalPass;
-uniform float u_crystalDispersionBlur;
-// How strongly each pixel lies on a colored edge, written by the first pass.
-uniform sampler2D u_crystalMaskTex;
-// The first pass also writes that to a second render target.
-layout(location = 1) out vec4 kggCrystalMask;
-
-// Change per pixel of the offset between an end of the spectrum and its
-// middle (canvas widths) from which Dispersion Blur starts and is full.
-const float CRYSTAL_FRINGE_START = 0.02;
-const float CRYSTAL_FRINGE_FULL = 0.1;
-// Blur radius at Dispersion Blur 1, as a share of the frame height.
-const float CRYSTAL_BLUR_RADIUS = 0.02;
-const int CRYSTAL_BLUR_TAPS = 24;
-
-// Backdrop points of the ends and the middle of the last traced spectrum,
-// and the share of the refraction the pixel shows.
-vec2 g_crystalLow = vec2(0.0);
-vec2 g_crystalMiddle = vec2(0.0);
-vec2 g_crystalHigh = vec2(0.0);
-float g_crystalMask = 0.0;
-
-// How strongly this pixel lies on a colored edge: where an end of the
-// spectrum jumps to another face without the middle, the offset between them
-// changes abruptly from one pixel to the next. Where all wavelengths jump
-// together, at an ordinary facet edge, and inside a face, it changes slowly.
-// Screen derivatives, so main() calls it outside any branch.
-float crystalFringe() {
-  vec2 low = g_crystalLow - g_crystalMiddle;
-  vec2 high = g_crystalHigh - g_crystalMiddle;
-  float jump = max(
-    max(length(dFdx(low)), length(dFdy(low))),
-    max(length(dFdx(high)), length(dFdy(high)))
-  );
-  return smoothstep(CRYSTAL_FRINGE_START, CRYSTAL_FRINGE_FULL, jump) * g_crystalMask;
-}
 
 // Directions of three adjacent hexagon side faces; the other three face the opposite way.
 const vec2 CRYSTAL_RADIALS[3] = vec2[3](vec2(1.0, 0.0), vec2(0.5, 0.8660254), vec2(-0.5, 0.8660254));
@@ -1892,9 +1855,37 @@ vec2 crystalSpan(vec3 origin, vec3 direction, vec4 shape, out vec3 entryNormal, 
   return result.span;
 }
 
+// Whether a ray in a crystal's frame meets the cylinder around its long
+// axis that holds it: within `reach` of the axis and `halfLength` along it.
+// Far cheaper than the faces, and long crystals leave most of their
+// bounding sphere empty.
+bool crystalCylinderHit(vec3 origin, vec3 direction, float reach, float halfLength) {
+  vec2 along = vec2(-1.0e9, 1.0e9);
+  if (abs(direction.y) > 1.0e-7) {
+    float near = (-halfLength - origin.y) / direction.y;
+    float far = (halfLength - origin.y) / direction.y;
+    along = vec2(min(near, far), max(near, far));
+  } else if (abs(origin.y) > halfLength) {
+    return false;
+  }
+  float a = dot(direction.xz, direction.xz);
+  float b = dot(origin.xz, direction.xz);
+  float c = dot(origin.xz, origin.xz) - reach * reach;
+  vec2 around = vec2(-1.0e9, 1.0e9);
+  if (a > 1.0e-9) {
+    float discriminant = b * b - a * c;
+    if (discriminant < 0.0) return false;
+    float root = sqrt(discriminant);
+    around = vec2(-b - root, -b + root) / a;
+  } else if (c > 0.0) {
+    return false;
+  }
+  return max(along.x, around.x) <= min(along.y, around.y) && min(along.y, around.y) > 0.0;
+}
+
 // The span of crystal i along a world ray with world normals, or
-// (CRYSTAL_NO_HIT, -CRYSTAL_NO_HIT) when the ray misses its bounding sphere or
-// the crystal.
+// (CRYSTAL_NO_HIT, -CRYSTAL_NO_HIT) when the ray misses its bounding sphere,
+// the cylinder around its axis, or the crystal.
 vec2 crystalWorldSpan(int i, vec3 origin, vec3 direction, out vec3 entryNormal, out vec3 exitNormal) {
   entryNormal = vec3(0.0, 0.0, 1.0);
   exitNormal = vec3(0.0, 0.0, 1.0);
@@ -1905,10 +1896,17 @@ vec2 crystalWorldSpan(int i, vec3 origin, vec3 direction, out vec3 entryNormal, 
   float offAxis = dot(relative, relative) - bound.w * bound.w;
   if (offAxis > 0.0 && (along > 0.0 || along * along < offAxis)) return miss;
   mat3 rotation = u_crystalRotation[i];
+  // Row-vector products: the inverse rotation into the crystal frame.
+  vec3 localOrigin = relative * rotation;
+  vec3 localDirection = direction * rotation;
+  vec4 shape = u_crystalShape[i];
+  // The hexagonal forms reach their circumradius; the others carry their
+  // reach in z (see getCrystalUniforms).
+  float reach = shape.w < 1.5 ? shape.x : shape.z;
+  if (!crystalCylinderHit(localOrigin, localDirection, reach, shape.y)) return miss;
   vec3 localEntry;
   vec3 localExit;
-  // Row-vector products: the inverse rotation into the crystal frame.
-  vec2 span = crystalSpan(relative * rotation, direction * rotation, u_crystalShape[i], localEntry, localExit);
+  vec2 span = crystalSpan(localOrigin, localDirection, shape, localEntry, localExit);
   if (span.x > span.y) return miss;
   entryNormal = rotation * localEntry;
   exitNormal = rotation * localExit;
@@ -1984,11 +1982,30 @@ vec4 crystalEnvironment(vec3 direction) {
   return crystalBackdropSample(uv);
 }
 
-// Backdrop point seen through the crystals from the camera for one index of
-// refraction, whether the camera starts in the air or in the glass.
-vec2 crystalTrace(vec3 origin, vec3 direction, float ior) {
+// Bends a ray at a crystal face with outward `normal`, from air into glass
+// where it enters the crystal and from glass into air where it leaves,
+// reflecting it internally past the critical angle up to CRYSTAL_BOUNCES
+// times; past the last reflection a trapped ray goes through unbent.
+void crystalCross(inout vec3 direction, vec3 normal, bool entering, float ior, inout int bounces) {
+  // The face normal turned against the ray, as refract() expects.
+  vec3 facing = entering ? normal : -normal;
+  vec3 bent = refract(direction, facing, entering ? 1.0 / ior : ior);
+  if (dot(bent, bent) > 0.0) {
+    direction = bent;
+  } else if (bounces < CRYSTAL_BOUNCES) {
+    direction = reflect(direction, facing);
+    bounces++;
+  }
+}
+
+// Backdrop point seen through the crystals for one index of refraction. The
+// camera ray reaches the same first face for every wavelength, so the trace
+// starts at that face (origin, outward normal, entered or left) instead of
+// searching for it again.
+vec2 crystalTrace(vec3 origin, vec3 direction, vec3 firstNormal, bool firstEntering, float ior) {
   int bounces = 0;
-  for (int event = 0; event < CRYSTAL_EVENTS; event++) {
+  crystalCross(direction, firstNormal, firstEntering, ior, bounces);
+  for (int event = 1; event < CRYSTAL_EVENTS; event++) {
     int crystal;
     vec3 normal;
     bool entering;
@@ -1996,16 +2013,7 @@ vec2 crystalTrace(vec3 origin, vec3 direction, float ior) {
     float distance = crystalNextFace(origin, direction, crystal, normal, entering, layers);
     if (distance < 0.0) break;
     origin += direction * distance;
-    // The face normal turned against the ray, as refract() expects.
-    vec3 facing = entering ? normal : -normal;
-    vec3 bent = refract(direction, facing, entering ? 1.0 / ior : ior);
-    if (dot(bent, bent) > 0.0) {
-      direction = bent;
-    } else if (bounces < CRYSTAL_BOUNCES) {
-      direction = reflect(direction, facing);
-      bounces++;
-    }
-    // Past the last internal reflection a trapped ray goes through unbent.
+    crystalCross(direction, normal, entering, ior, bounces);
   }
   return crystalBackdropUv(origin, direction);
 }
@@ -2026,7 +2034,7 @@ vec3 crystalSpectrumWeight(float wavelength) {
 // `traced` is false when opaque faces hide the refraction. The traces run in a
 // loop whose length comes from uniforms, so ANGLE's HLSL compiler keeps it as
 // a loop instead of flattening a skipped branch into always running it.
-vec4 crystalRefraction(vec3 origin, vec3 direction, bool traced) {
+vec4 crystalRefraction(vec3 origin, vec3 direction, vec3 firstNormal, bool firstEntering, bool traced) {
   float ior = max(u_crystalIor, 1.0);
   int steps = clamp(u_crystalDispersionSteps, 1, CRYSTAL_DISPERSION_STEPS);
   int traces = traced ? (steps == 1 ? 1 : 3) : 0;
@@ -2038,16 +2046,13 @@ vec4 crystalRefraction(vec3 origin, vec3 direction, bool traced) {
     float traceIor = trace == 0 ? ior
       : trace == 1 ? max(ior - 0.5 * u_crystalDispersion, 1.0)
       : ior + 0.5 * u_crystalDispersion;
-    vec2 point = crystalTrace(origin, direction, traceIor);
+    vec2 point = crystalTrace(origin, direction, firstNormal, firstEntering, traceIor);
     if (trace == 0) middle = point;
     else if (trace == 1) low = point;
     else high = point;
   }
   if (traces == 0) return vec4(0.0, 0.0, 0.0, 1.0);
   if (traces == 1) return crystalBackdropSample(middle);
-  g_crystalLow = low;
-  g_crystalMiddle = middle;
-  g_crystalHigh = high;
   vec3 sum = vec3(0.0);
   vec3 weights = vec3(0.0);
   for (int step = 0; step < CRYSTAL_DISPERSION_STEPS; step++) {
@@ -2113,8 +2118,7 @@ ThreeDHit crystalHit(vec3 localRay) {
   float faceWeight = faces ? clamp(u_crystalFaceOpacity, 0.0, 1.0) : 0.0;
   // Opaque faces hide the refraction, so it is not traced.
   bool traced = faceWeight < 0.999;
-  vec4 color = crystalRefraction(rayOrigin, rayDirection, traced);
-  g_crystalMask = traced ? 1.0 - faceWeight : 0.0;
+  vec4 color = crystalRefraction(entry, rayDirection, firstNormal, firstEntering, traced);
   if (traced) {
     // The head light from the camera's upper left, for Shade and the glints.
     vec3 light = normalize(-g_cameraForward + g_cameraUp * 0.6 - g_cameraRight * 0.4);
@@ -2152,36 +2156,6 @@ ThreeDHit crystalHit(vec3 localRay) {
   result.distance = firstDistance;
   result.mapScale = 0.5;
   return result;
-}
-
-// Dispersion Blur, the second pass: u_sourceTex holds the rendered crystals
-// and u_crystalMaskTex how strongly each pixel lies on a colored edge (see
-// crystalFringe). The edges are thin, so the strength around each pixel is
-// gathered from two rings up to the largest radius, fading with distance,
-// and a disc of CRYSTAL_BLUR_TAPS taps on a golden-angle spiral blurs the
-// pixel with a radius that follows it. The colored copies of an edge and the
-// bands between them melt into a gradient, while facet edges the whole
-// spectrum shares and the faces themselves stay sharp.
-vec4 crystalDispersionBlur(vec2 globalUv) {
-  vec2 pixel = 1.0 / max(u_fullResolution, vec2(1.0));
-  float reach = clamp(u_crystalDispersionBlur, 0.0, 1.0) * CRYSTAL_BLUR_RADIUS * u_fullResolution.y;
-  float strength = texture2D(u_crystalMaskTex, sourceUvFromGlobal(globalUv)).r;
-  for (int ring = 1; ring <= 2; ring++) {
-    float distance = float(ring) / 2.0;
-    for (int side = 0; side < 8; side++) {
-      float angle = (float(side) + 0.5 * float(ring)) * TAU / 8.0;
-      vec2 around = globalUv + vec2(cos(angle), sin(angle)) * distance * reach * pixel;
-      strength = max(strength, texture2D(u_crystalMaskTex, sourceUvFromGlobal(around)).r * (1.0 - 0.75 * distance));
-    }
-  }
-  float radius = reach * strength;
-  vec4 sum = coneTextureLookup(globalUv);
-  for (int tap = 0; tap < CRYSTAL_BLUR_TAPS; tap++) {
-    float along = sqrt((float(tap) + 0.5) / float(CRYSTAL_BLUR_TAPS));
-    float angle = float(tap) * 2.3999632;
-    sum += coneTextureLookup(globalUv + vec2(cos(angle), sin(angle)) * along * radius * pixel);
-  }
-  return sum / float(CRYSTAL_BLUR_TAPS + 1);
 }
 #endif
 
@@ -2235,13 +2209,6 @@ vec4 threeDApplyFog(vec4 color, float distance, float fogScale) {
 
 void main() {
   vec2 globalUv = (gl_FragCoord.xy + u_tileOffset) / max(u_fullResolution, vec2(1.0));
-#if KGG_THREE_D_SHAPE < 0 || KGG_THREE_D_SHAPE == 8
-  kggCrystalMask = vec4(0.0);
-  if (u_crystalPass == 1) {
-    gl_FragColor = crystalDispersionBlur(globalUv);
-    return;
-  }
-#endif
   vec4 background = vec4(0.0, 0.0, 0.0, 1.0);
 
 #if KGG_THREE_D_SHAPE < 0 || KGG_THREE_D_SHAPE == 0
@@ -2350,8 +2317,5 @@ void main() {
   if (ownShading && g_crystalFaceWeight > 0.0) color = mix(color, threeDSurfaceColor(hit), g_crystalFaceWeight);
   color.rgb *= hit.fade;
   gl_FragColor = threeDApplyFog(color, hit.distance, fogScale);
-#if KGG_THREE_D_SHAPE < 0 || KGG_THREE_D_SHAPE == 8
-  kggCrystalMask = vec4(crystalFringe(), 0.0, 0.0, 1.0);
-#endif
 #endif
 }

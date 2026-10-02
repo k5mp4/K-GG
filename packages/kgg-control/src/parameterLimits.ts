@@ -204,7 +204,6 @@ export const PARAMETER_LIMITS = {
   'cone.crystalIor': { min: 1, max: 2.4, step: 0.01, defaultValue: 1.6 },
   'cone.crystalDispersion': { min: 0, max: 0.3, step: 0.005, defaultValue: 0.08 },
   'cone.crystalDispersionSteps': { min: 1, max: 10, step: 1, defaultValue: 3, integer: true },
-  'cone.crystalDispersionBlur': { min: 0, max: 1, step: 0.01, defaultValue: 0.5 },
   'cone.crystalFaceOpacity': { min: 0, max: 1, step: 0.01, defaultValue: 1 },
   'cone.crystalReflection': { min: 0, max: 1, step: 0.01, defaultValue: 0.35 },
   'cone.crystalBackdrop': { min: 0.1, max: 4, step: 0.01, defaultValue: 1 },

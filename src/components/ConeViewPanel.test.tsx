@@ -112,7 +112,7 @@ describe('ConeViewPanel shape controls', () => {
 
   it('shows the Crystals controls and Surface Mapping only for the Faces material', () => {
     const markup = renderShape('crystal');
-    for (const label of ['Material', 'Face Opacity', 'Form', 'Crystals', 'Size', 'Length', 'Field Depth', 'Seed', 'IOR', 'Dispersion', 'Dispersion Steps', 'Dispersion Blur', 'Reflection', 'Backdrop', 'Spin', 'Revolve', 'Shade', 'Fog']) {
+    for (const label of ['Material', 'Face Opacity', 'Form', 'Crystals', 'Size', 'Length', 'Field Depth', 'Seed', 'IOR', 'Dispersion', 'Dispersion Steps', 'Reflection', 'Backdrop', 'Spin', 'Revolve', 'Shade', 'Fog']) {
       expect(hasLabel(markup, label), label).toBe(true);
     }
     expect(hasLabel(markup, 'Surface Mapping')).toBe(false);

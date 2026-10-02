@@ -722,7 +722,7 @@ function getCrystalVertices(faces: readonly CrystalHalfSpace[]): Vector3[] {
 }
 
 /** Bounding radius, reach from the long axis, and half extent along it. */
-function getCrystalExtents(crystal: CrystalSolid): { boundRadius: number; reach: number; axisExtent: number } {
+export function getCrystalExtents(crystal: CrystalSolid): { boundRadius: number; reach: number; axisExtent: number } {
   const vertices = getCrystalVertices(getCrystalFaces(crystal));
   return {
     boundRadius: Math.max(...vertices.map(vertex => Math.hypot(...vertex))),
@@ -946,17 +946,18 @@ export type CrystalUniforms = {
   centers: number[];
   /** Column-major mat3 per crystal, from the crystal frame to the world. */
   rotations: number[];
-  /** Radius, half length, pyramid height, and CRYSTAL_SHAPE_INDEX per crystal. */
+  /**
+   * Radius, half length, CRYSTAL_SHAPE_INDEX, and in z the pyramid height of
+   * the hexagonal forms or the reach from the long axis of the others.
+   */
   shapes: number[];
   /** 0 for clear refracting glass, 1 for the canvas mapped onto the faces. */
   material: number;
   faceOpacity: number;
   ior: number;
   dispersion: number;
-  /** Wavelengths read across the dispersion range; 1 when Dispersion is 0. */
+  /** Wavelengths traced across the dispersion range; 1 when Dispersion is 0. */
   dispersionSteps: number;
-  /** Dispersion Blur strength; 0 when nothing is dispersed, which skips the blur pass. */
-  dispersionBlur: number;
   reflection: number;
   /** Camera distance from the origin along +Z. */
   cameraDistance: number;
@@ -989,7 +990,8 @@ export function getCrystalUniforms(config: ConeViewConfig, normalizedTime: numbe
     const center = transformVector(revolve, crystal.center);
     centers.splice(index * 4, 4, center[0], center[1], center[2], crystal.boundRadius);
     rotations.splice(index * 9, 9, ...rotation);
-    shapes.splice(index * 4, 4, crystal.radius, crystal.halfLength, crystal.capHeight, CRYSTAL_SHAPE_INDEX[crystal.form]);
+    const hexagonal = crystal.form === 'quartz' || crystal.form === 'bipyramid';
+    shapes.splice(index * 4, 4, crystal.radius, crystal.halfLength, hexagonal ? crystal.capHeight : crystal.reach, CRYSTAL_SHAPE_INDEX[crystal.form]);
     back = Math.max(back, -crystal.center[2] + crystal.boundRadius);
   });
   const tanHalfFov = getCrystalTanHalfFov(config);
@@ -1006,10 +1008,6 @@ export function getCrystalUniforms(config: ConeViewConfig, normalizedTime: numbe
     ior: Math.max(1, safeFinite(config.crystalIor, 1.6)),
     dispersion,
     dispersionSteps: dispersion > 0 ? clamp(Math.round(safeFinite(config.crystalDispersionSteps, 3)), 1, 10) : 1,
-    // Only refracted light disperses, and opaque faces hide all of it.
-    dispersionBlur: dispersion > 0 && config.crystalDispersionSteps > 1 && !(config.crystalMaterial === 'faces' && config.crystalFaceOpacity >= 0.999)
-      ? clamp(safeFinite(config.crystalDispersionBlur, 0), 0, 1)
-      : 0,
     reflection: clamp(safeFinite(config.crystalReflection, 0), 0, 1),
     cameraDistance,
     backdropZ,

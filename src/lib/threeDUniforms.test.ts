@@ -76,7 +76,6 @@ describe('3D uniform upload', () => {
       u_crystalCenter: {} as WebGLUniformLocation,
       u_crystalRotation: {} as WebGLUniformLocation,
       u_crystalShape: {} as WebGLUniformLocation,
-      u_crystalDispersionBlur: {} as WebGLUniformLocation,
     };
     const params = getThreeDRenderParams({ ...DEFAULT_CONE_VIEW, shape: 'crystal' }, 0.2, 16 / 9);
     uploadThreeDUniforms(gl as unknown as WebGL2RenderingContext, crystalUniforms, params);
@@ -84,6 +83,5 @@ describe('3D uniform upload', () => {
     expect(gl.uniform4fv).toHaveBeenCalledWith(crystalUniforms.u_crystalCenter, params.crystal.centers);
     expect(gl.uniform4fv).toHaveBeenCalledWith(crystalUniforms.u_crystalShape, params.crystal.shapes);
     expect(gl.uniformMatrix3fv).toHaveBeenCalledWith(crystalUniforms.u_crystalRotation, false, params.crystal.rotations);
-    expect(gl.uniform1f).toHaveBeenCalledWith(crystalUniforms.u_crystalDispersionBlur, params.crystal.dispersionBlur);
   });
 });

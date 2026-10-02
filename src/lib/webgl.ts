@@ -338,8 +338,6 @@ export type WebGLContext = {
   shapesFrameSize: [number, number];
   /** Geometry Field model atlas (unit 13) and the model version it holds, 0 when none. */
   fieldModelTexture: WebGLTexture;
-  /** Crystals Dispersion Blur: how far the spectrum spread per pixel, sized like a postprocess target. */
-  crystalSpreadTexture: WebGLTexture;
   fieldModelVersion: number;
   videoMotionFieldTexture: WebGLTexture;
   /** Ping-pong pair: one holds the previous Datamosh output, the other receives this frame. */
@@ -739,13 +737,6 @@ export async function initWebGL(canvas: HTMLCanvasElement): Promise<WebGLContext
   gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
   gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
   gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
-  const crystalSpreadTexture = createOwnedTexture();
-  gl.bindTexture(gl.TEXTURE_2D, crystalSpreadTexture);
-  gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, 1, 1, 0, gl.RGBA, gl.UNSIGNED_BYTE, new Uint8Array([0, 0, 0, 255]));
-  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
-  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
-  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
-  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
   const videoMotionFieldTexture = createOwnedTexture();
   const initialMotionField = new Uint8Array(VIDEO_MOTION_FIELD_WIDTH * VIDEO_MOTION_FIELD_HEIGHT * 4);
   for (let index = 0; index < initialMotionField.length; index += 4) {
@@ -776,7 +767,7 @@ export async function initWebGL(canvas: HTMLCanvasElement): Promise<WebGLContext
   ownedFlowGradient = flowGradient;
   const transitionTextureFrom = ownTexture(createTexture(gl));
   const transitionTextureTo = ownTexture(createTexture(gl));
-  const ctx: WebGLContext = { gl, performanceProfiler, gpuDiagnostics, renderOptimization, program, uniforms, geometryBuffer, transitionGeometryBuffer, generatorProgram: program, generatorUniforms: uniforms, bootstrapProgram: program, bootstrapUniforms: uniforms, activeNoiseVariants: createInitialNoiseVariants(), noiseVariantPrograms: new Map([[noiseVariantId('generator', GENERATOR_WITHOUT_NOISE_VARIANT), { program, uniforms }]]), noiseVariantStates: new Map(), gradientRampTexture, meshGradientTexture, meshGradientTextureSignature: '', diffuseCurveTexture, diffuseCurveSignature: '', diffuseAsciiTexture, diffuseAsciiSignature: '', diffuseAsciiCount: 1, diffuseAsciiRows: ASCII_ATLAS_MAX_ROWS, diffuseHistogramAt: 0, manualDistortTexture, manualDistortDisplacement: null, manualDistortSmoothMask: null, manualDistortMapResolution: 0, sourceImageTexture, sourceImageCanvas: null, imageGradientTexture, imageGradientSource: null, imageMaskTexture, imageMaskSource: null, normalMapProgram: null, normalMapUniforms: {}, datamoshProgram: null, datamoshUniforms: {}, threeDPrograms: {}, textureProgram: null, textureUniforms: {}, textureImageTexture, textureImageSource: null, shapesProgram: null, shapesUniforms: {}, shapesMaskTexture, shapesMaskKey: null, shapesFrameTexture, shapesFrameSize: [1, 1], fieldModelTexture, fieldModelVersion: 0, crystalSpreadTexture, videoMotionFieldTexture, datamoshHistoryFbos: [datamoshHistoryFboA, datamoshHistoryFboB], datamoshHistoryTextures: [datamoshHistoryTextureA, datamoshHistoryTextureB], datamoshInputFbos: [datamoshInputFboA, datamoshInputFboB], datamoshInputTextures: [datamoshInputTextureA, datamoshInputTextureB], datamoshHistory: createDatamoshHistoryState(), gradFbo, gradTexture, blurProgram: null, blurUniforms: {}, stretchProgram: null, stretchUniforms: {}, seamlessProgram: null, seamlessUniforms: {}, postprocessProgram: null, postprocessUniforms: {}, stackCoreProgram: null, stackCoreUniforms: {}, noiseStackProgram: null, noiseStackUniforms: {}, noiseDiffuseStackProgram: null, noiseDiffuseStackUniforms: {}, glassProgram: null, glassUniforms: {}, glassFallbackActive: false, glassV2Program: null, glassV2Uniforms: {}, glassV2FallbackActive: false, glassTileProgram: null, glassTileUniforms: {}, glassTileFallbackActive: false, prismProgram: null, prismUniforms: {}, prismCompositeProgram: null, prismCompositeUniforms: {}, particleProgram: null, particleUniforms: {}, particleVao: null, particleQuadBuffer: null, particleInstanceBuffer: null, particleInstanceCount: 0, particleInstanceSeed: Number.NaN, flowGradient, normalFbo, normalTexture, hBlurFbo, hBlurTexture, postprocessFboA, postprocessTextureA, postprocessFboB, postprocessTextureB, prismScratchFbo, prismScratchTexture, prismBlurFbo, prismBlurTexture, prismGlowFbo, prismGlowTexture, shaderCompileExt, lazyProgramState: createLazyProgramState(), lazyProgramCompileQueue: createSerialAsyncQueue(), resourceLedger, hasPresentedFrame: false, disposed: false };
+  const ctx: WebGLContext = { gl, performanceProfiler, gpuDiagnostics, renderOptimization, program, uniforms, geometryBuffer, transitionGeometryBuffer, generatorProgram: program, generatorUniforms: uniforms, bootstrapProgram: program, bootstrapUniforms: uniforms, activeNoiseVariants: createInitialNoiseVariants(), noiseVariantPrograms: new Map([[noiseVariantId('generator', GENERATOR_WITHOUT_NOISE_VARIANT), { program, uniforms }]]), noiseVariantStates: new Map(), gradientRampTexture, meshGradientTexture, meshGradientTextureSignature: '', diffuseCurveTexture, diffuseCurveSignature: '', diffuseAsciiTexture, diffuseAsciiSignature: '', diffuseAsciiCount: 1, diffuseAsciiRows: ASCII_ATLAS_MAX_ROWS, diffuseHistogramAt: 0, manualDistortTexture, manualDistortDisplacement: null, manualDistortSmoothMask: null, manualDistortMapResolution: 0, sourceImageTexture, sourceImageCanvas: null, imageGradientTexture, imageGradientSource: null, imageMaskTexture, imageMaskSource: null, normalMapProgram: null, normalMapUniforms: {}, datamoshProgram: null, datamoshUniforms: {}, threeDPrograms: {}, textureProgram: null, textureUniforms: {}, textureImageTexture, textureImageSource: null, shapesProgram: null, shapesUniforms: {}, shapesMaskTexture, shapesMaskKey: null, shapesFrameTexture, shapesFrameSize: [1, 1], fieldModelTexture, fieldModelVersion: 0, videoMotionFieldTexture, datamoshHistoryFbos: [datamoshHistoryFboA, datamoshHistoryFboB], datamoshHistoryTextures: [datamoshHistoryTextureA, datamoshHistoryTextureB], datamoshInputFbos: [datamoshInputFboA, datamoshInputFboB], datamoshInputTextures: [datamoshInputTextureA, datamoshInputTextureB], datamoshHistory: createDatamoshHistoryState(), gradFbo, gradTexture, blurProgram: null, blurUniforms: {}, stretchProgram: null, stretchUniforms: {}, seamlessProgram: null, seamlessUniforms: {}, postprocessProgram: null, postprocessUniforms: {}, stackCoreProgram: null, stackCoreUniforms: {}, noiseStackProgram: null, noiseStackUniforms: {}, noiseDiffuseStackProgram: null, noiseDiffuseStackUniforms: {}, glassProgram: null, glassUniforms: {}, glassFallbackActive: false, glassV2Program: null, glassV2Uniforms: {}, glassV2FallbackActive: false, glassTileProgram: null, glassTileUniforms: {}, glassTileFallbackActive: false, prismProgram: null, prismUniforms: {}, prismCompositeProgram: null, prismCompositeUniforms: {}, particleProgram: null, particleUniforms: {}, particleVao: null, particleQuadBuffer: null, particleInstanceBuffer: null, particleInstanceCount: 0, particleInstanceSeed: Number.NaN, flowGradient, normalFbo, normalTexture, hBlurFbo, hBlurTexture, postprocessFboA, postprocessTextureA, postprocessFboB, postprocessTextureB, prismScratchFbo, prismScratchTexture, prismBlurFbo, prismBlurTexture, prismGlowFbo, prismGlowTexture, shaderCompileExt, lazyProgramState: createLazyProgramState(), lazyProgramCompileQueue: createSerialAsyncQueue(), resourceLedger, hasPresentedFrame: false, disposed: false };
   initializedContext = ctx;
   for (const key of NOISE_VARIANT_PROGRAM_KEYS) {
     ctx.lazyProgramState[key] = getNoiseVariantState(ctx, key, ctx.activeNoiseVariants[key]);
@@ -870,7 +861,6 @@ export function disposeWebGL(ctx: WebGLContext): void {
     ctx.shapesMaskTexture,
     ctx.shapesFrameTexture,
     ctx.fieldModelTexture,
-    ctx.crystalSpreadTexture,
     ctx.videoMotionFieldTexture,
     ...ctx.datamoshHistoryTextures,
     ...ctx.datamoshInputTextures,
@@ -3607,16 +3597,6 @@ function drawDatamoshPass(
   return ctx.datamoshHistoryTextures[writeIndex];
 }
 
-/** Texture unit of the Crystals spread map in the Dispersion Blur pass; no other pass uses it. */
-const CRYSTAL_SPREAD_TEXTURE_UNIT = 14;
-
-/**
- * Draws the 3D layer from `sourceTexture` into the postprocess target and
- * returns the texture holding the result, or null when the program is not
- * ready. Crystals with Dispersion Blur also write how far the spectrum spread
- * per pixel to a second render target, then blur their render by it into the
- * other postprocess target, which the source no longer needs.
- */
 function drawThreeDPass(
   ctx: WebGLContext,
   sourceTexture: WebGLTexture,
@@ -3628,10 +3608,11 @@ function drawThreeDPass(
   fullHeight: number,
   offsetX: number,
   offsetY: number,
-): WebGLTexture | null {
+  targetFramebuffer: WebGLFramebuffer | null,
+): boolean {
   const config = normalizeConeViewConfig(coneView);
   const threeD = ctx.threeDPrograms[getThreeDProgramKey(config.shape)];
-  if (!threeD) return null;
+  if (!threeD) return false;
   const { gl } = ctx;
   const uniforms = threeD.uniforms;
   const params = getThreeDRenderParams(
@@ -3639,22 +3620,10 @@ function drawThreeDPass(
     normalizedTime,
     fullWidth / Math.max(fullHeight, 1),
   );
-  const target = choosePostprocessTarget(ctx, sourceTexture);
-  const blurring = config.shape === 'crystal' && params.crystal.dispersionBlur > 0;
   gl.useProgram(threeD.program);
   gl.viewport(0, 0, width, height);
   gl.disable(gl.BLEND);
-  gl.bindFramebuffer(gl.FRAMEBUFFER, target.fbo);
-  // The spread map is drawn to in this pass, so no sampler may hold it: its
-  // unit stays empty until the blur pass reads it.
-  gl.activeTexture(gl.TEXTURE0 + CRYSTAL_SPREAD_TEXTURE_UNIT);
-  if (blurring) {
-    ensureWebGLTargetStorage(gl, ctx.crystalSpreadTexture, width, height);
-    gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT1, gl.TEXTURE_2D, ctx.crystalSpreadTexture, 0);
-    gl.drawBuffers([gl.COLOR_ATTACHMENT0, gl.COLOR_ATTACHMENT1]);
-  }
-  gl.bindTexture(gl.TEXTURE_2D, null);
-  setUniform1i(gl, uniforms.u_crystalMaskTex, CRYSTAL_SPREAD_TEXTURE_UNIT);
+  gl.bindFramebuffer(gl.FRAMEBUFFER, targetFramebuffer);
   gl.activeTexture(gl.TEXTURE3);
   gl.bindTexture(gl.TEXTURE_2D, sourceTexture);
   setUniform1i(gl, uniforms.u_sourceTex, 3);
@@ -3662,24 +3631,10 @@ function drawThreeDPass(
   gl.uniform2f(uniforms.u_tileOffset, offsetX, offsetY);
   gl.uniform2f(uniforms.u_tileResolution, width, height);
   uploadThreeDUniforms(gl, uniforms, params);
-  setUniform1i(gl, uniforms.u_crystalPass, 0);
   ctx.fieldModelVersion = bindFieldModelTexture(gl, uniforms, ctx.fieldModelTexture, getFieldModel(), ctx.fieldModelVersion);
   drawArrays(ctx, '3D', gl.TRIANGLES, 0, 6);
-  if (!blurring) return target.texture;
-
-  gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT1, gl.TEXTURE_2D, null, 0);
-  gl.drawBuffers([gl.COLOR_ATTACHMENT0]);
-  const blurred = choosePostprocessTarget(ctx, target.texture);
-  gl.bindFramebuffer(gl.FRAMEBUFFER, blurred.fbo);
-  gl.activeTexture(gl.TEXTURE3);
-  gl.bindTexture(gl.TEXTURE_2D, target.texture);
-  gl.activeTexture(gl.TEXTURE0 + CRYSTAL_SPREAD_TEXTURE_UNIT);
-  gl.bindTexture(gl.TEXTURE_2D, ctx.crystalSpreadTexture);
-  setUniform1i(gl, uniforms.u_crystalPass, 1);
-  drawArrays(ctx, '3D dispersion blur', gl.TRIANGLES, 0, 6);
-  setUniform1i(gl, uniforms.u_crystalPass, 0);
-  gl.bindTexture(gl.TEXTURE_2D, null);
-  return blurred.texture;
+  if (targetFramebuffer === null) ctx.hasPresentedFrame = true;
+  return true;
 }
 
 function drawFlowGradientPass(
@@ -4575,8 +4530,10 @@ export function render(
         // The 3D layer has its own lazily compiled program. If that program
         // failed, leave the layer out instead of freezing the stack.
         if (!threeDActive) continue;
-        const rendered = drawThreeDPass(ctx, currentTexture, coneView, flowNormalizedTime, vpW, vpH, width, height, tileOx, tileOy);
-        if (rendered) currentTexture = rendered;
+        const target = choosePostprocessTarget(ctx, currentTexture);
+        if (drawThreeDPass(ctx, currentTexture, coneView, flowNormalizedTime, vpW, vpH, width, height, tileOx, tileOy, target.fbo)) {
+          currentTexture = target.texture;
+        }
         continue;
       }
       // A Diffuse immediately before Slit is evaluated in Slit's destination

@@ -22,6 +22,7 @@ import {
   getCrystalInscribedRadius,
   getCrystalAxisSpheres,
   getCrystalFaces,
+  getCrystalExtents,
   CAMERA_MAX_OFFSET,
   CRYSTAL_FILL_CAMERA_GAP,
   CRYSTAL_MAX,
@@ -296,22 +297,16 @@ describe('3D render parameters', () => {
     const layout = getCrystalLayout(config, 1);
     const { shapes } = getCrystalUniforms(config, 0, 1);
     layout.forEach((crystal, index) => {
+      const hexagonal = crystal.form === 'quartz' || crystal.form === 'bipyramid';
       expect(shapes.slice(index * 4, index * 4 + 4)).toEqual([
-        crystal.radius, crystal.halfLength, crystal.capHeight, CRYSTAL_SHAPE_INDEX[crystal.form],
+        crystal.radius, crystal.halfLength, hexagonal ? crystal.capHeight : crystal.reach, CRYSTAL_SHAPE_INDEX[crystal.form],
       ]);
+      // The shader culls with the cylinder of radius reach and half length h,
+      // which must hold the crystal: the hexagonal forms reach their radius.
+      if (hexagonal) expect(crystal.reach).toBeCloseTo(crystal.radius, 9);
     });
     // Mix draws from every form.
     expect(new Set(layout.map(crystal => crystal.form)).size).toBeGreaterThan(3);
-  });
-
-  it('runs the Dispersion Blur pass only where a spectrum can split', () => {
-    const crystal = { ...DEFAULT_CONE_VIEW, shape: 'crystal' as const, crystalDispersionBlur: 0.7 };
-    expect(getCrystalUniforms(crystal, 0, 1).dispersionBlur).toBe(0.7);
-    expect(getCrystalUniforms({ ...crystal, crystalDispersion: 0 }, 0, 1).dispersionBlur).toBe(0);
-    expect(getCrystalUniforms({ ...crystal, crystalDispersionSteps: 1 }, 0, 1).dispersionBlur).toBe(0);
-    // Opaque faces hide the refraction; translucent ones still show its fringes.
-    expect(getCrystalUniforms({ ...crystal, crystalMaterial: 'faces', crystalFaceOpacity: 1 }, 0, 1).dispersionBlur).toBe(0);
-    expect(getCrystalUniforms({ ...crystal, crystalMaterial: 'faces', crystalFaceOpacity: 0.5 }, 0, 1).dispersionBlur).toBe(0.7);
   });
 
   it('traces Dispersion Steps wavelengths only while Dispersion splits them', () => {
@@ -411,6 +406,15 @@ describe('3D render parameters', () => {
       expect(exit).toBeLessThan(10);
     }
     expect(getCrystalInscribedRadius(solid)).toBeCloseTo(Math.min(...faces.map(face => face.offset)), 12);
+  });
+
+  it.each(solids)('fits the $form in the cylinder the shader culls with', (solid) => {
+    // Radius reach around the long axis (the hexagon radius for the
+    // hexagonal forms) and half length h along it.
+    const { reach, axisExtent, boundRadius } = getCrystalExtents(solid);
+    expect(axisExtent).toBeLessThanOrEqual(solid.halfLength + 1e-9);
+    if (solid.form === 'quartz' || solid.form === 'bipyramid') expect(reach).toBeCloseTo(solid.radius, 9);
+    expect(boundRadius).toBeLessThanOrEqual(Math.hypot(reach, axisExtent) + 1e-9);
   });
 
   it.each(solids)('keeps the axis spheres of the $form inside every face', (solid) => {

@@ -280,8 +280,7 @@ const SHAPES_VERTEX_SOURCE = THREE_D_VERTEX_SOURCE;
 
 const THREE_D_FRAGMENT_PRELUDE = `#version 300 es
 precision highp float;
-// Explicit, since the Crystals program adds a second output at location 1.
-layout(location = 0) out vec4 kggThreeDColor;
+out vec4 kggThreeDColor;
 #define gl_FragColor kggThreeDColor
 #define texture2D texture
 `;
