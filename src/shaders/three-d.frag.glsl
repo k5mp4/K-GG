@@ -49,6 +49,9 @@ uniform float u_coneCameraDistance;
 uniform float u_coneDepth;
 uniform float u_coneApertureRadius;
 uniform vec2 u_coneApexOffset;
+uniform float u_coneTwist;
+// 0: classic fixed camera, 1: the shared Camera settings.
+uniform int u_coneCameraMode;
 
 uniform float u_torusMajorRadius;
 uniform float u_ringRepeat;
@@ -61,12 +64,14 @@ uniform float u_latticeThickness;
 uniform float u_terrainHeight;
 uniform float u_terrainAltitude;
 
-uniform float u_extrudeCells;
-uniform float u_extrudeHeight;
-uniform float u_extrudeGap;
-
+uniform float u_ribbonCount;
+uniform float u_ribbonRadius;
+uniform float u_ribbonStagger;
+uniform float u_ribbonTwistTurns;
+uniform float u_ribbonLoopLength;
 uniform float u_ribbonHalfTwists;
 uniform float u_ribbonWidth;
+uniform float u_ribbonSpin;
 
 uniform int u_ringsPattern;
 uniform int u_ringsMapping;
@@ -99,6 +104,25 @@ uniform float u_fieldWire;
 uniform float u_fieldSpin;
 uniform float u_fieldVariation;
 
+uniform int u_discsForm;
+uniform float u_discsCount;
+uniform float u_discsGap;
+uniform float u_discsThickness;
+uniform float u_discsSpread;
+uniform float u_discsWaves;
+uniform float u_discsScatter;
+uniform int u_discsSpinPattern;
+uniform float u_discsSpin;
+uniform float u_discsTwist;
+uniform float u_discsOffset;
+uniform float u_discsTilt;
+uniform float u_discsTiltTurns;
+uniform float u_discsView;
+uniform float u_discsOrbit;
+uniform float u_discsTime;
+uniform float u_discsFrameDistance;
+uniform float u_discsOuterRadius;
+
 const float PI = 3.141592653589793;
 const float TAU = 6.283185307179586;
 
@@ -106,10 +130,10 @@ const int SHAPE_CONE = 0;
 const int SHAPE_TORUS = 1;
 const int SHAPE_LATTICE = 2;
 const int SHAPE_TERRAIN = 3;
-const int SHAPE_EXTRUSION = 4;
-const int SHAPE_RIBBON = 5;
-const int SHAPE_RINGS = 6;
-const int SHAPE_FIELD = 7;
+const int SHAPE_RIBBON = 4;
+const int SHAPE_RINGS = 5;
+const int SHAPE_FIELD = 6;
+const int SHAPE_DISCS = 7;
 
 const int MAPPING_UV = 0;
 const int MAPPING_TRIPLANAR = 1;
@@ -259,7 +283,7 @@ struct ThreeDHit {
   bool hasUv;
   // The uv already includes Texture Repeat on both axes.
   bool uvTiled;
-  // The shape resolved its own color (Extrusion cells and floor).
+  // The shape resolved its own color (Geometry Field objects, Discs).
   bool hasColor;
   vec4 color;
   float distance;
@@ -305,9 +329,11 @@ void threeDSetCameraBasis(vec3 forward, vec3 up) {
 
 #if KGG_THREE_D_SHAPE < 0 || KGG_THREE_D_SHAPE == 0
 // ---------------------------------------------------------------------------
-// Cone: the ray/cone intersection of the original Cone layer.
-
-vec2 coneMappedUv(vec2 globalUv, out bool hitCone) {
+// Classic Cone: the original analytic intersection. The fixed camera at the
+// origin looks down -Z through a 60 degree screen ray, and only the surface
+// between the opening and the apex exists, so the apex handle keeps its
+// original behavior. Rays that miss that part are black.
+vec2 coneClassicMappedUv(vec2 globalUv, out bool hitCone) {
   float aspect = u_fullResolution.x / max(u_fullResolution.y, 1.0);
   vec2 ndc = globalUv * 2.0 - 1.0;
   vec3 rayDirection = vec3(
@@ -350,6 +376,57 @@ vec2 coneMappedUv(vec2 globalUv, out bool hitCone) {
   float v = clamp((distance - cameraDistance) / depth, 0.0, 1.0);
   hitCone = true;
   return vec2(u, v);
+}
+
+// Free Cone: the camera's base frame sits at the origin looking down -Z. The
+// opening of radius u_coneApertureRadius lies at z = -cameraDistance and the
+// apex at (apexOffset, -(cameraDistance + depth)); every cross-section is a
+// z-plane. The surface continues behind the opening, past the camera, so a
+// wider FOV, a camera move, or a wiggle never reveals its rim. Returns u
+// around the axis and v from the opening (0) to the apex (1); v is negative
+// behind the opening.
+
+vec2 coneFreeMappedUv(vec3 rayOrigin, vec3 rayDirection, out bool hitCone) {
+  hitCone = false;
+  float depth = max(u_coneDepth, 0.001);
+  float cameraDistance = max(u_coneCameraDistance, 0.001);
+  vec2 apexOffset = u_coneApexOffset;
+  float radiusSlope = u_coneApertureRadius / depth;
+  // With s = -z the distance in front of the camera plane, the section center
+  // is apexOffset * (s - cameraDistance) / depth and its radius
+  // radiusSlope * (cameraDistance + depth - s); both are linear along the ray.
+  vec2 centerFrom = rayOrigin.xy - apexOffset * (-rayOrigin.z - cameraDistance) / depth;
+  vec2 centerStep = rayDirection.xy + apexOffset * rayDirection.z / depth;
+  float radiusFrom = radiusSlope * (cameraDistance + depth + rayOrigin.z);
+  float radiusStep = radiusSlope * rayDirection.z;
+  float qa = dot(centerStep, centerStep) - radiusStep * radiusStep;
+  float qb = 2.0 * (dot(centerFrom, centerStep) - radiusFrom * radiusStep);
+  float qc = dot(centerFrom, centerFrom) - radiusFrom * radiusFrom;
+  // Keep the nearest hit in front of the camera on the near nappe; roots
+  // beyond the apex have a negative radius.
+  float distance = -1.0;
+  if (abs(qa) < 0.000001) {
+    if (abs(qb) < 0.000001) return vec2(0.0);
+    float linearDistance = -qc / qb;
+    if (linearDistance > 0.0 && radiusFrom + radiusStep * linearDistance >= 0.0) distance = linearDistance;
+  } else {
+    float discriminant = qb * qb - 4.0 * qa * qc;
+    if (discriminant < 0.0) return vec2(0.0);
+    float root = sqrt(discriminant);
+    float firstDistance = (-qb - root) / (2.0 * qa);
+    float secondDistance = (-qb + root) / (2.0 * qa);
+    float nearDistance = min(firstDistance, secondDistance);
+    float farDistance = max(firstDistance, secondDistance);
+    if (nearDistance > 0.0 && radiusFrom + radiusStep * nearDistance >= 0.0) distance = nearDistance;
+    else if (farDistance > 0.0 && radiusFrom + radiusStep * farDistance >= 0.0) distance = farDistance;
+  }
+  if (distance < 0.0) return vec2(0.0);
+  vec3 surfacePoint = rayOrigin + rayDirection * distance;
+  float depthFraction = (-surfacePoint.z - cameraDistance) / depth;
+  vec2 radialPoint = surfacePoint.xy - apexOffset * depthFraction;
+  float u = fract(atan(radialPoint.x, radialPoint.y) / TAU);
+  hitCone = true;
+  return vec2(u, min(depthFraction, 1.0));
 }
 #endif
 
@@ -496,7 +573,7 @@ ThreeDHit latticeHit(vec3 localRay) {
 }
 #endif
 
-#if KGG_THREE_D_SHAPE < 0 || KGG_THREE_D_SHAPE == 3 || KGG_THREE_D_SHAPE == 4
+#if KGG_THREE_D_SHAPE < 0 || KGG_THREE_D_SHAPE == 3
 // ---------------------------------------------------------------------------
 // Terrain: the canvas luminance lifts a heightfield that repeats every tile
 // (4 / Texture Repeat world units). The camera glides forward at Altitude and
@@ -578,168 +655,114 @@ ThreeDHit terrainHit(vec3 localRay) {
 
 #if KGG_THREE_D_SHAPE < 0 || KGG_THREE_D_SHAPE == 4
 // ---------------------------------------------------------------------------
-// Extrusion: the canvas is split into Cells x Cells columns over [-1, 1]^2,
-// each raised by its cell color's luminance. A 2D DDA walks the cells along
-// the ray and tests each column box, so the first box hit is the nearest.
-// The camera orbits the city once per Flow Cycle.
+// Ribbons: Count flat bands (half width Width, thickness 2 * RIBBON_THICKNESS)
+// spaced evenly around a tube axis at Radius. Along the axis every band spirals
+// around it by Twist whole turns and turns about its own center line by Half
+// Twists half turns per Loop Length. The camera travels down the axis (-Z)
+// and each band grows ahead of it: band i ends in a tapered tip a fixed
+// distance in front of the camera, scattered by Stagger, so the bands stretch
+// out while the camera chases them. Everything is evaluated relative to the
+// camera's travel position. Flow moves the camera by Laps loop lengths per
+// Flow Cycle; the spiral, the band turn, and the texture repeat over a loop
+// length (two with odd half twists, which flip each band across its width),
+// and the tips keep their distance, so integer Flow Cycles loop seamlessly.
 
-ThreeDHit extrusionHit(vec3 localRay) {
-  ThreeDHit result = threeDMiss();
-  float cells = max(floor(u_extrudeCells + 0.5), 1.0);
-  float cellSize = 2.0 / cells;
-  float maxHeight = max(u_extrudeHeight, 0.001);
-  float orbit = u_threeDTravel * TAU;
-  float elevation = 0.55;
-  // Frame the unit city tighter than the sphere at the same Distance.
-  float cameraDistance = max(u_threeDDistance * 0.7, 1.5);
-  vec3 cameraPosition = vec3(sin(orbit) * cos(elevation), sin(elevation), cos(orbit) * cos(elevation)) * cameraDistance;
-  vec3 forward = normalize(vec3(0.0, maxHeight * 0.15, 0.0) - cameraPosition);
-  vec3 up = vec3(0.0, 1.0, 0.0);
-  threeDSetCameraBasis(forward, up);
-  vec3 rayDirection = threeDWorldDirection(localRay, forward, up);
-  vec3 right = normalize(cross(forward, up));
-  vec2 offset = threeDRollMatrix() * u_cameraOffset * cameraDistance * 0.3;
-  vec3 rayOrigin = cameraPosition + right * offset.x + cross(right, forward) * offset.y
-    + g_cameraForward * u_cameraDolly * cameraDistance * 0.5;
-  result.rayDirection = rayDirection;
+const float RIBBON_THICKNESS = 0.012;
+// Distance of the farthest tip ahead of the camera.
+const float RIBBON_LEAD = 6.0;
+// Length over which a tip widens to the full band width.
+const float RIBBON_TAPER = 1.5;
+const float RIBBON_MAX_DISTANCE = 60.0;
 
-  vec3 safeDirection = rayDirection + vec3(
-    abs(rayDirection.x) < 0.000001 ? 0.000001 : 0.0,
-    abs(rayDirection.y) < 0.000001 ? 0.000001 : 0.0,
-    abs(rayDirection.z) < 0.000001 ? 0.000001 : 0.0
-  );
-  vec3 inverse = 1.0 / safeDirection;
-  vec3 boxNear = (vec3(-1.0, 0.0, -1.0) - rayOrigin) * inverse;
-  vec3 boxFar = (vec3(1.0, maxHeight, 1.0) - rayOrigin) * inverse;
-  vec3 entry = min(boxNear, boxFar);
-  vec3 exit = max(boxNear, boxFar);
-  float enter = max(max(entry.x, entry.y), max(entry.z, 0.0));
-  float leave = min(min(exit.x, exit.y), exit.z);
-  bool found = false;
-  if (leave > enter) {
-    float distance = enter + 0.00001;
-    vec3 position = rayOrigin + rayDirection * distance;
-    vec2 cell = clamp(floor((position.xz + 1.0) / cellSize), vec2(0.0), vec2(cells - 1.0));
-    vec2 stepDirection = vec2(safeDirection.x >= 0.0 ? 1.0 : -1.0, safeDirection.z >= 0.0 ? 1.0 : -1.0);
-    vec2 boundary = (cell + max(stepDirection, vec2(0.0))) * cellSize - 1.0;
-    vec2 crossing = distance + (boundary - position.xz) * inverse.xz;
-    vec2 delta = cellSize * abs(inverse.xz);
-    float halfSize = 0.5 * cellSize * (1.0 - clamp(u_extrudeGap, 0.0, 0.95));
-    for (int i = 0; i < 280; i++) {
-      if (cell.x < 0.0 || cell.y < 0.0 || cell.x > cells - 1.0 || cell.y > cells - 1.0) break;
-      vec2 cellUv = (cell + 0.5) / cells;
-      vec4 cellColor = coneTextureLookup(cellUv);
-      float height = maxHeight * threeDLuminance(cellColor.rgb);
-      if (height > 0.0005) {
-        vec2 center = -1.0 + (cell + 0.5) * cellSize;
-        vec3 columnNear = (vec3(center.x - halfSize, 0.0, center.y - halfSize) - rayOrigin) * inverse;
-        vec3 columnFar = (vec3(center.x + halfSize, height, center.y + halfSize) - rayOrigin) * inverse;
-        vec3 columnEntry = min(columnNear, columnFar);
-        vec3 columnExit = max(columnNear, columnFar);
-        float columnEnter = max(max(columnEntry.x, columnEntry.y), columnEntry.z);
-        float columnLeave = min(min(columnExit.x, columnExit.y), columnExit.z);
-        if (columnLeave >= max(columnEnter, 0.0)) {
-          vec3 normal = columnEntry.x >= columnEntry.y && columnEntry.x >= columnEntry.z
-            ? vec3(-stepDirection.x, 0.0, 0.0)
-            : columnEntry.y >= columnEntry.z
-              ? vec3(0.0, safeDirection.y >= 0.0 ? -1.0 : 1.0, 0.0)
-              : vec3(0.0, 0.0, -stepDirection.y);
-          result.hit = true;
-          result.position = rayOrigin + rayDirection * columnEnter;
-          result.normal = normal;
-          result.uv = cellUv;
-          result.hasColor = true;
-          result.color = cellColor;
-          result.distance = columnEnter;
-          found = true;
-          break;
-        }
-      }
-      if (crossing.x < crossing.y) {
-        cell.x += stepDirection.x;
-        crossing.x += delta.x;
-      } else {
-        cell.y += stepDirection.y;
-        crossing.y += delta.y;
-      }
-    }
-  }
-  if (!found && rayDirection.y < 0.0) {
-    // The floor between the columns shows the canvas dimmed.
-    float floorDistance = -rayOrigin.y / rayDirection.y;
-    vec3 position = rayOrigin + rayDirection * floorDistance;
-    if (abs(position.x) <= 1.0 && abs(position.z) <= 1.0) {
-      result.hit = true;
-      result.position = position;
-      result.normal = vec3(0.0, 1.0, 0.0);
-      result.uv = (position.xz + 1.0) * 0.5;
-      result.hasColor = true;
-      result.color = vec4(coneTextureLookup(result.uv).rgb * 0.25, 1.0);
-      result.distance = floorDistance;
-    }
-  }
-  result.mapScale = 0.5;
-  return result;
+// Phases at the camera's travel position, set once per pixel by ribbonHit.
+float g_ribbonSpiralPhase = 0.0;
+float g_ribbonRollPhase = 0.0;
+float g_ribbonAlongPhase = 0.0;
+// Conservative step factor: the spiral and the band turn stretch distances.
+float g_ribbonStepScale = 1.0;
+
+float ribbonHash(float n) {
+  vec2 p = fract(vec2(n + 0.37) * vec2(0.1031, 0.1030));
+  p += dot(p, p.yx + 33.33);
+  return fract((p.x + p.y) * p.x);
 }
-#endif
 
-#if KGG_THREE_D_SHAPE < 0 || KGG_THREE_D_SHAPE == 5
-// ---------------------------------------------------------------------------
-// Ribbon: a flat band swept around a unit circle in the XZ plane. Its cross
-// section turns by Half Twists / 2 turns per revolution, so an odd count
-// makes a Mobius band; the rectangle's symmetry keeps the surface continuous
-// where the ring angle wraps. The texture runs along the band in Ring Repeat
-// tiles. The camera rides just above the band, following its twist, and Flow
-// carries it along the band.
-
+// Distance to the nearest band; only the bands in the angular sectors around
+// the point can be nearest. bandUv runs along the band (x) and across it (y).
 float ribbonDistance(vec3 position, out vec2 bandUv) {
-  float ringAngle = atan(position.z, position.x);
-  vec2 section = vec2(length(position.xz) - 1.0, position.y);
-  float twist = u_ribbonHalfTwists * 0.5 * ringAngle;
-  float c = cos(twist);
-  float s = sin(twist);
-  section = vec2(c * section.x + s * section.y, -s * section.x + c * section.y);
+  float count = max(floor(u_ribbonCount + 0.5), 1.0);
+  float loopLength = max(u_ribbonLoopLength, 1.0);
   float halfWidth = max(u_ribbonWidth, 0.01);
-  bandUv = vec2(ringAngle / TAU * max(u_ringRepeat, 1.0), section.x / (2.0 * halfWidth) + 0.5);
-  vec2 d = abs(section) - vec2(halfWidth, 0.012);
-  // The twist stretches distances away from the ring, so step conservatively.
-  return (length(max(d, 0.0)) + min(max(d.x, d.y), 0.0)) * 0.5;
+  // Forward is -Z, so the loop-length position grows with -z.
+  float along = -position.z / loopLength;
+  float spiral = g_ribbonSpiralPhase + TAU * u_ribbonTwistTurns * along;
+  float roll = g_ribbonRollPhase + PI * u_ribbonHalfTwists * along;
+  float rollCos = cos(roll);
+  float rollSin = sin(roll);
+  float sector = TAU / count;
+  float nearest = floor((atan(position.y, position.x) - spiral) / sector + 0.5);
+  float best = 1e5;
+  bandUv = vec2(0.0);
+  for (int j = -1; j <= 1; j++) {
+    float index = mod(nearest + float(j), count);
+    float bandAngle = spiral + index * sector;
+    vec2 radial = vec2(cos(bandAngle), sin(bandAngle));
+    vec2 tangential = vec2(-radial.y, radial.x);
+    vec2 across = rollCos * tangential + rollSin * radial;
+    vec2 normal = -rollSin * tangential + rollCos * radial;
+    vec2 section = position.xy - radial * max(u_ribbonRadius, 0.0);
+    float acrossDistance = dot(section, across);
+    float normalDistance = dot(section, normal);
+    // The tip sits RIBBON_LEAD ahead, pulled toward the camera by Stagger.
+    float lead = RIBBON_LEAD * (1.0 - 0.85 * clamp(u_ribbonStagger, 0.0, 1.0) * ribbonHash(index));
+    float behindTip = position.z + lead;
+    float width = halfWidth * sqrt(clamp(behindTip / RIBBON_TAPER, 0.0, 1.0));
+    vec3 box = vec3(abs(acrossDistance) - width, abs(normalDistance) - RIBBON_THICKNESS, -behindTip);
+    float distance = length(max(box, 0.0)) + min(max(box.x, max(box.y, box.z)), 0.0);
+    if (distance < best) {
+      best = distance;
+      bandUv = vec2(
+        (g_ribbonAlongPhase + along) * max(u_ringRepeat, 1.0) + ribbonHash(index + 11.0),
+        acrossDistance / (2.0 * halfWidth) + 0.5
+      );
+    }
+  }
+  return best * g_ribbonStepScale;
 }
 
 ThreeDHit ribbonHit(vec3 localRay) {
   ThreeDHit result = threeDMiss();
+  float loopLength = max(u_ribbonLoopLength, 1.0);
+  float radius = max(u_ribbonRadius, 0.0);
   float halfWidth = max(u_ribbonWidth, 0.01);
-  // One Flow Cycle is one closed ride: a Mobius band brings the camera back
-  // to the same side only after two laps. Dolly steps along the band.
-  float laps = mod(u_ribbonHalfTwists, 2.0) > 0.5 ? 2.0 : 1.0;
-  float ringAngle = (u_threeDTravel * laps + u_cameraDolly * 0.08) * TAU;
-  // The band frame at the camera, matching the section rotation in
-  // ribbonDistance: `across` spans the width, `bandNormal` faces off the band.
-  vec3 radial = vec3(cos(ringAngle), 0.0, sin(ringAngle));
-  vec3 tangent = vec3(-sin(ringAngle), 0.0, cos(ringAngle));
-  float twist = u_ribbonHalfTwists * 0.5 * ringAngle;
-  vec3 across = cos(twist) * radial + sin(twist) * vec3(0.0, 1.0, 0.0);
-  vec3 bandNormal = -sin(twist) * radial + cos(twist) * vec3(0.0, 1.0, 0.0);
-  // Aim slightly into the ring's bend so the band ahead stays in view.
-  float aim = 0.3;
-  vec3 forward = normalize(tangent * cos(aim) - radial * sin(aim));
-  threeDSetCameraBasis(forward, bandNormal);
-  vec3 rayDirection = threeDWorldDirection(localRay, forward, bandNormal);
-  // Camera X moves across the width, Camera Y changes the ride height.
-  vec2 offset = threeDRollMatrix() * u_cameraOffset;
-  vec3 rayOrigin = radial + across * offset.x * halfWidth + bandNormal * (0.15 + 0.35 * offset.y);
+  // Whole spiral turns, whole band half-turn pairs, and whole texture tiles
+  // fold out of the travel, which keeps the phases precise on long loops.
+  g_ribbonSpiralPhase = u_ribbonSpin + TAU * fract(u_threeDTravel * u_ribbonTwistTurns);
+  g_ribbonRollPhase = TAU * fract(u_threeDTravel * u_ribbonHalfTwists * 0.5);
+  g_ribbonAlongPhase = fract(u_threeDTravel * max(u_ringRepeat, 1.0)) / max(u_ringRepeat, 1.0);
+  float stretch = (TAU * abs(u_ribbonTwistTurns) * (radius + halfWidth) + PI * abs(u_ribbonHalfTwists) * halfWidth) / loopLength;
+  g_ribbonStepScale = 0.8 / sqrt(1.0 + stretch * stretch);
+
+  vec3 forward = vec3(0.0, 0.0, -1.0);
+  vec3 up = vec3(0.0, 1.0, 0.0);
+  threeDSetCameraBasis(forward, up);
+  vec3 rayDirection = threeDWorldDirection(localRay, forward, up);
+  // Camera Position moves the camera off the axis in Radius units, and Dolly
+  // moves it toward or away from the tips.
+  vec3 rayOrigin = vec3(threeDRollMatrix() * u_cameraOffset * max(radius, 0.2), 0.0)
+    + g_cameraForward * u_cameraDolly * 3.0;
   result.rayDirection = rayDirection;
   float distance = 0.0;
   bool hit = false;
   vec2 bandUv = vec2(0.0);
-  for (int i = 0; i < 220; i++) {
+  for (int i = 0; i < 200; i++) {
     float surfaceDistance = ribbonDistance(rayOrigin + rayDirection * distance, bandUv);
     if (surfaceDistance < 0.0004 * (1.0 + distance)) {
       hit = true;
       break;
     }
     distance += surfaceDistance;
-    if (distance > 8.0) break;
+    if (distance > RIBBON_MAX_DISTANCE) break;
   }
   if (!hit) return result;
   vec3 position = rayOrigin + rayDirection * distance;
@@ -751,18 +774,22 @@ ThreeDHit ribbonHit(vec3 localRay) {
     ribbonDistance(position + vec3(0.0, 0.0, epsilon), unusedUv) - ribbonDistance(position - vec3(0.0, 0.0, epsilon), unusedUv)
   );
   result.hit = true;
-  result.position = position;
+  // Triplanar runs one texture tile per loop length; shifting by the
+  // travel's fraction of a loop length keeps it on the world-fixed bands.
+  result.position = position - vec3(0.0, 0.0, fract(u_threeDTravel) * loopLength);
   result.normal = normalize(gradient);
   result.uv = bandUv;
   result.hasUv = true;
   result.uvTiled = true;
   result.distance = distance;
-  result.mapScale = 0.5;
+  result.mapScale = 1.0 / loopLength;
+  // Bands fade out before the march limit instead of ending abruptly.
+  result.fade = 1.0 - smoothstep(RIBBON_MAX_DISTANCE * 0.6, RIBBON_MAX_DISTANCE, distance);
   return result;
 }
 #endif
 
-#if KGG_THREE_D_SHAPE < 0 || KGG_THREE_D_SHAPE == 6
+#if KGG_THREE_D_SHAPE < 0 || KGG_THREE_D_SHAPE == 5
 // ---------------------------------------------------------------------------
 // Square Rings: square frames (outer half size 1, bar width Thickness, depth
 // Depth, all times the frame's pulse scale) placed one Spacing apart along a
@@ -1004,7 +1031,7 @@ ThreeDHit ringsHit(vec3 localRay) {
 }
 #endif
 
-#if KGG_THREE_D_SHAPE < 0 || KGG_THREE_D_SHAPE == 7
+#if KGG_THREE_D_SHAPE < 0 || KGG_THREE_D_SHAPE == 6
 // ---------------------------------------------------------------------------
 // Geometry Field: space is split into unit slices along z, and each slice
 // into unit cells whose grid is shifted by a per-slice random offset so the
@@ -1415,6 +1442,252 @@ ThreeDHit fieldHit(vec3 localRay) {
 }
 #endif
 
+#if KGG_THREE_D_SHAPE < 0 || KGG_THREE_D_SHAPE == 7
+// ---------------------------------------------------------------------------
+// Discs: the Slit circle made solid. The canvas (half height 1, half width
+// aspect) is cut into Count concentric rings out to its half diagonal, each a
+// slab of Thickness whose front face carries the canvas where it lies. In the
+// Rings form every ring sits on a depth wave along the view axis (Spread,
+// Waves across the rings, Scatter for a random phase per ring) that Flow moves
+// by whole periods and wobbles by Tilt around an axis that precesses Tilt
+// Turns per loop, with the same phase per ring. The Discs form fills every
+// ring to the center, so neighbors would cut through each other; it stacks
+// them instead along one shared, wobbling axis, smallest in front, and the
+// wave opens and closes the gaps between them, never below Thickness, so no
+// two discs ever overlap. Every ring turns
+// by Spin whole turns per loop (together, alternating, or in eased steps that
+// cascade from the center outward) plus fixed Twist and random Offset turns.
+// Every motion closes on whole periods, so the loop is seamless. The camera
+// always looks at the center: it frames the canvas head-on at the base FOV,
+// leans View degrees below the ring axis, and revolves Orbit times per loop
+// around the vertical axis through the center, passing the side and the back
+// of the stack. Its distance comes from getDiscsFrameDistance. Rings are
+// intersected analytically and the nearest hit wins.
+
+const int DISCS_FORM_SOLID = 1;
+const int DISCS_PATTERN_ALTERNATE = 1;
+const int DISCS_PATTERN_STAGGER = 2;
+const int DISCS_MAX = 48;
+// Space left between stacked discs so their faces never touch.
+const float DISCS_STACK_CLEARANCE = 0.004;
+// Side walls are darker than the faces so the rings read as solid.
+const float DISCS_WALL_SHADE = 0.55;
+
+float discsHash(float n) {
+  vec2 p = fract(vec2(n + 0.61) * vec2(0.1031, 0.1030));
+  p += dot(p, p.yx + 33.33);
+  return fract((p.x + p.y) * p.x);
+}
+
+vec3 discsRotate(vec3 value, vec3 axis, float angle) {
+  float c = cos(angle);
+  float s = sin(angle);
+  return value * c + cross(axis, value) * s + axis * dot(axis, value) * (1.0 - c);
+}
+
+// Cubic ease in and out: each Stagger step starts and stops gently.
+float discsEase(float x) {
+  return x < 0.5 ? 4.0 * x * x * x : 1.0 - 0.5 * pow(2.0 - 2.0 * x, 3.0);
+}
+
+float discsSpinAngle(float k, float count) {
+  float turns = u_discsSpin;
+  if (u_discsSpinPattern == DISCS_PATTERN_STAGGER) {
+    // Whole eased steps; ring k starts half a step after the center ring
+    // times k / count. The progress grows by |turns| over the loop.
+    float progress = u_discsTime * abs(turns) - 0.5 * k / count;
+    return TAU * sign(turns) * (floor(progress) + discsEase(fract(progress)));
+  }
+  float angle = TAU * turns * u_discsTime;
+  if (u_discsSpinPattern == DISCS_PATTERN_ALTERNATE && mod(k, 2.0) > 0.5) angle = -angle;
+  return angle;
+}
+
+float discsPhase(float k, float count) {
+  return u_discsWaves * k / count + u_discsScatter * discsHash(k);
+}
+
+// Distance from the front face of stacked disc k to the next one: Thickness
+// plus a gap that the depth wave opens between 0 and 4 * Spread / count, so
+// the whole stack stretches by 2 * Spread on average.
+float discsStackStep(float k, float count) {
+  float wave = 0.5 + 0.5 * sin(TAU * (discsPhase(k, count) - fract(u_threeDTravel)));
+  return max(u_discsThickness, 0.001) + DISCS_STACK_CLEARANCE + 4.0 * u_discsSpread / count * wave;
+}
+
+struct DiscsRing {
+  vec3 center;
+  // Local x and y span the ring; local z is its axis toward the camera.
+  vec3 axisX;
+  vec3 axisY;
+  vec3 axisZ;
+  float spin;
+};
+
+// Ring k. A stacked disc (Discs form) sits at stackPosition along the shared
+// axis and tilts with the whole stack; a ring (Rings form) rides its own depth
+// wave and tilts with its own phase.
+DiscsRing discsRingAt(float k, float count, bool stacked, float stackPosition) {
+  DiscsRing ring;
+  float phase = discsPhase(k, count);
+  float tiltDirection = TAU * (u_discsTiltTurns * u_discsTime + (stacked ? 0.0 : phase));
+  vec3 tiltAxis = vec3(cos(tiltDirection), sin(tiltDirection), 0.0);
+  ring.axisX = discsRotate(vec3(1.0, 0.0, 0.0), tiltAxis, u_discsTilt);
+  ring.axisY = discsRotate(vec3(0.0, 1.0, 0.0), tiltAxis, u_discsTilt);
+  ring.axisZ = discsRotate(vec3(0.0, 0.0, 1.0), tiltAxis, u_discsTilt);
+  // fract keeps the wave phase exact after whole Flow periods.
+  ring.center = stacked
+    ? ring.axisZ * stackPosition
+    : vec3(0.0, 0.0, u_discsSpread * sin(TAU * (phase - fract(u_threeDTravel))));
+  ring.spin = discsSpinAngle(k, count) + u_discsTwist * k
+    + u_discsOffset * PI * (discsHash(k + 7.0) * 2.0 - 1.0);
+  return ring;
+}
+
+// Ray against an annular slab in its local space: inner <= |xy| <= outer and
+// -thickness <= z <= 0, so the front face lies on z = 0. Returns the nearest
+// distance or -1, the local normal, and whether a side wall was hit.
+float discsRingIntersect(vec3 origin, vec3 direction, float inner, float outer, float thickness, out vec3 normal, out bool wall) {
+  float best = -1.0;
+  normal = vec3(0.0, 0.0, 1.0);
+  wall = false;
+  if (abs(direction.z) > 0.000001) {
+    for (int face = 0; face < 2; face++) {
+      float z = face == 0 ? 0.0 : -thickness;
+      float t = (z - origin.z) / direction.z;
+      if (t > 0.0001 && (best < 0.0 || t < best)) {
+        float radius = length(origin.xy + direction.xy * t);
+        if (radius >= inner && radius <= outer) {
+          best = t;
+          normal = vec3(0.0, 0.0, face == 0 ? 1.0 : -1.0);
+          wall = false;
+        }
+      }
+    }
+  }
+  float a = dot(direction.xy, direction.xy);
+  if (a > 0.00000001) {
+    float b = dot(origin.xy, direction.xy);
+    for (int side = 0; side < 2; side++) {
+      float radius = side == 0 ? outer : inner;
+      if (radius <= 0.0) continue;
+      float discriminant = b * b - a * (dot(origin.xy, origin.xy) - radius * radius);
+      if (discriminant < 0.0) continue;
+      float root = sqrt(discriminant);
+      for (int rootSide = 0; rootSide < 2; rootSide++) {
+        float t = (-b + (rootSide == 0 ? -root : root)) / a;
+        if (t > 0.0001 && (best < 0.0 || t < best)) {
+          float z = origin.z + direction.z * t;
+          if (z <= 0.0 && z >= -thickness) {
+            best = t;
+            normal = vec3((origin.xy + direction.xy * t) / radius, 0.0);
+            wall = true;
+          }
+        }
+      }
+    }
+  }
+  return best;
+}
+
+ThreeDHit discsHit(vec3 localRay) {
+  ThreeDHit result = threeDMiss();
+  float count = clamp(floor(u_discsCount + 0.5), 1.0, float(DISCS_MAX));
+  float frameDistance = max(u_discsFrameDistance, 0.1);
+  // The camera sits View below the ring axis (+Z), so the near edge of the
+  // rings is at the bottom of the frame, and revolves around +Y looking at
+  // the center. Up stays vertical; View stays below 90 degrees, so the
+  // forward direction never lines up with it.
+  vec3 cameraPosition = vec3(
+    cos(u_discsView) * sin(u_discsOrbit),
+    -sin(u_discsView),
+    cos(u_discsView) * cos(u_discsOrbit)
+  ) * frameDistance;
+  vec3 forward = -normalize(cameraPosition);
+  vec3 up = normalize(cross(normalize(cross(forward, vec3(0.0, 1.0, 0.0))), forward));
+  threeDSetCameraBasis(forward, up);
+  vec3 rayDirection = threeDWorldDirection(localRay, forward, up);
+  vec3 right = normalize(cross(forward, up));
+  // Camera Position moves the camera across the view in half outer radii,
+  // and Dolly along the view in framing distances.
+  vec2 offset = threeDRollMatrix() * u_cameraOffset * u_discsOuterRadius * 0.5;
+  vec3 rayOrigin = cameraPosition + right * offset.x + cross(right, forward) * offset.y
+    + g_cameraForward * u_cameraDolly * frameDistance;
+  result.rayDirection = rayDirection;
+
+  float width = max(u_discsOuterRadius, 0.01) / count;
+  float halfGap = 0.5 * clamp(u_discsGap, 0.0, 0.95) * width;
+  float thickness = max(u_discsThickness, 0.001);
+  float best = -1.0;
+  vec3 bestNormal = vec3(0.0, 0.0, 1.0);
+  vec3 bestLocal = vec3(0.0);
+  bool bestWall = false;
+  DiscsRing bestRing;
+  bool stacked = u_discsForm == DISCS_FORM_SOLID;
+  // The stack is centered on the origin: the first front face sits half its
+  // length in front.
+  float stackPosition = 0.0;
+  if (stacked) {
+    for (int i = 0; i < DISCS_MAX - 1; i++) {
+      float k = float(i);
+      if (k >= count - 1.0) break;
+      stackPosition += discsStackStep(k, count);
+    }
+    stackPosition *= 0.5;
+  }
+  for (int i = 0; i < DISCS_MAX; i++) {
+    float k = float(i);
+    if (k >= count) break;
+    // The center ring is a full disc, as in the Slit circle, and the Discs
+    // form fills every ring.
+    float inner = i == 0 || stacked ? 0.0 : k * width + halfGap;
+    float outer = (k + 1.0) * width - halfGap;
+    DiscsRing ring = discsRingAt(k, count, stacked, stackPosition);
+    if (stacked) stackPosition -= discsStackStep(k, count);
+    vec3 relative = rayOrigin - ring.center;
+    // Skip rings whose bounding sphere the ray misses.
+    float bound = outer + thickness;
+    float along = dot(relative, rayDirection);
+    float offAxis = dot(relative, relative) - bound * bound;
+    if (offAxis > 0.0 && (along > 0.0 || along * along < offAxis)) continue;
+    vec3 origin = vec3(dot(relative, ring.axisX), dot(relative, ring.axisY), dot(relative, ring.axisZ));
+    vec3 direction = vec3(dot(rayDirection, ring.axisX), dot(rayDirection, ring.axisY), dot(rayDirection, ring.axisZ));
+    vec3 normal;
+    bool wall;
+    float t = discsRingIntersect(origin, direction, inner, outer, thickness, normal, wall);
+    if (t > 0.0 && (best < 0.0 || t < best)) {
+      best = t;
+      bestNormal = normal;
+      bestLocal = origin + direction * t;
+      bestWall = wall;
+      bestRing = ring;
+    }
+  }
+  if (best < 0.0) return result;
+  // The canvas turns with its ring.
+  float spinCos = cos(bestRing.spin);
+  float spinSin = sin(bestRing.spin);
+  vec2 canvasPoint = vec2(
+    spinCos * bestLocal.x + spinSin * bestLocal.y,
+    -spinSin * bestLocal.x + spinCos * bestLocal.y
+  );
+  float aspect = u_fullResolution.x / max(u_fullResolution.y, 1.0);
+  vec2 canvasUv = 0.5 + vec2(canvasPoint.x / aspect, canvasPoint.y) * 0.5;
+  vec4 color = coneTextureLookup(canvasUv);
+  if (bestWall) color.rgb *= DISCS_WALL_SHADE;
+  result.hit = true;
+  result.position = rayOrigin + rayDirection * best;
+  result.normal = normalize(bestRing.axisX * bestNormal.x + bestRing.axisY * bestNormal.y + bestRing.axisZ * bestNormal.z);
+  result.uv = canvasUv;
+  result.hasUv = true;
+  result.hasColor = true;
+  result.color = color;
+  result.distance = best;
+  result.mapScale = 0.5;
+  return result;
+}
+#endif
+
 // ---------------------------------------------------------------------------
 // Mapping, shading, and fog.
 
@@ -1469,12 +1742,31 @@ void main() {
 
 #if KGG_THREE_D_SHAPE < 0 || KGG_THREE_D_SHAPE == 0
   if (KGG_THREE_D_SHAPE == 0 || u_threeDShape == SHAPE_CONE) {
+    // The Cone keeps its unlit UV mapping in both camera modes.
     bool hitCone;
-    vec2 mappedUv = coneMappedUv(globalUv, hitCone);
+    vec2 mappedUv;
+    if (u_coneCameraMode == 0) {
+      mappedUv = coneClassicMappedUv(globalUv, hitCone);
+    } else {
+      bool validConeRay;
+      vec3 coneRay = threeDLookRay(threeDProjectedRay(globalUv, validConeRay));
+      if (!validConeRay) {
+        gl_FragColor = background;
+        return;
+      }
+      // The free Cone's base camera is its own frame. Camera Position moves it
+      // in aperture radii and Dolly toward the apex in units of the distance
+      // to the middle of the cone.
+      vec3 coneOrigin = vec3(threeDRollMatrix() * u_cameraOffset * u_coneApertureRadius, 0.0)
+        + threeDLookRay(vec3(0.0, 0.0, -1.0)) * u_cameraDolly * (u_coneCameraDistance + 0.5 * u_coneDepth);
+      mappedUv = coneFreeMappedUv(coneOrigin, coneRay, hitCone);
+    }
     if (!hitCone) {
       gl_FragColor = background;
       return;
     }
+    // Twist turns the texture around the axis in proportion to the depth.
+    mappedUv.x += u_coneTwist * mappedUv.y;
     gl_FragColor = threeDSampleUnwrapped(mappedUv * vec2(u_coneTextureRepeat, 1.0) + u_coneTextureOffset);
     return;
   }
@@ -1499,18 +1791,18 @@ void main() {
   } else if (u_threeDShape == SHAPE_TERRAIN) {
     hit = terrainHit(localRay);
     fogScale = 0.15;
-  } else if (u_threeDShape == SHAPE_EXTRUSION) {
-    hit = extrusionHit(localRay);
-    fogScale = 0.3;
   } else if (u_threeDShape == SHAPE_RIBBON) {
     hit = ribbonHit(localRay);
-    fogScale = 0.3;
+    fogScale = 0.15;
   } else if (u_threeDShape == SHAPE_RINGS) {
     hit = ringsHit(localRay);
     fogScale = 0.25 / max(u_ringsSpacing, 0.05);
   } else if (u_threeDShape == SHAPE_FIELD) {
     hit = fieldHit(localRay);
     fogScale = 0.12;
+  } else if (u_threeDShape == SHAPE_DISCS) {
+    hit = discsHit(localRay);
+    fogScale = 0.15;
   } else {
     hit = torusHit(localRay);
   }
@@ -1523,17 +1815,17 @@ void main() {
   hit = terrainHit(localRay);
   fogScale = 0.15;
 #elif KGG_THREE_D_SHAPE == 4
-  hit = extrusionHit(localRay);
-  fogScale = 0.3;
-#elif KGG_THREE_D_SHAPE == 5
   hit = ribbonHit(localRay);
-  fogScale = 0.3;
-#elif KGG_THREE_D_SHAPE == 6
+  fogScale = 0.15;
+#elif KGG_THREE_D_SHAPE == 5
   hit = ringsHit(localRay);
   fogScale = 0.25 / max(u_ringsSpacing, 0.05);
-#elif KGG_THREE_D_SHAPE == 7
+#elif KGG_THREE_D_SHAPE == 6
   hit = fieldHit(localRay);
   fogScale = 0.12;
+#elif KGG_THREE_D_SHAPE == 7
+  hit = discsHit(localRay);
+  fogScale = 0.15;
 #endif
   if (!hit.hit) {
     gl_FragColor = background;

@@ -2,15 +2,15 @@ import { renderToStaticMarkup } from 'react-dom/server';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { LanguageProvider } from '../i18n/LanguageProvider';
 import { useGradientStore } from '../store/gradientStore';
-import { DEFAULT_CONE_VIEW, type ConeShape } from '../types/coneView';
+import { DEFAULT_CONE_VIEW, type ConeShape, type ConeViewConfig } from '../types/coneView';
 import { ConeViewPanel } from './ConeViewPanel';
 
 // Server rendering reads the store's initial state (zustand useStore), so
 // the shape is set there for the duration of one render.
-function renderShape(shape: ConeShape): string {
+function renderShape(shape: ConeShape, overrides: Partial<ConeViewConfig> = {}): string {
   const initialState = useGradientStore.getInitialState();
   const previousConeView = initialState.coneView;
-  initialState.coneView = { ...DEFAULT_CONE_VIEW, shape };
+  initialState.coneView = { ...DEFAULT_CONE_VIEW, ...overrides, shape };
   try {
     return renderToStaticMarkup(
       <LanguageProvider>
@@ -67,10 +67,51 @@ describe('ConeViewPanel shape controls', () => {
     expect(hasLabel(markup, 'Camera Roll')).toBe(true);
   });
 
-  it('keeps Depth and Rotation for the Cone', () => {
+  it('keeps the classic Cone camera fixed by default', () => {
     const markup = renderShape('cone');
-    expect(hasLabel(markup, 'Depth')).toBe(true);
-    expect(hasLabel(markup, 'Rotation')).toBe(true);
+    for (const label of ['Depth', 'Rotation', 'Twist', 'Camera Mode']) {
+      expect(hasLabel(markup, label), label).toBe(true);
+    }
+    expect(markup).toContain('Classic · Fixed camera');
+    for (const label of ['FOV', 'Dolly', 'Camera Yaw', 'Camera Wiggle']) {
+      expect(hasLabel(markup, label), label).toBe(false);
+    }
+    expect(markup).not.toContain('data-three-d-camera-position');
+  });
+
+  it('adds the camera to the free Cone', () => {
+    const markup = renderShape('cone', { coneCameraMode: 'free' });
+    for (const label of ['Depth', 'Rotation', 'Twist', 'FOV', 'Dolly', 'Camera Yaw', 'Camera Pitch', 'Camera Wiggle', 'Wiggle Amount']) {
+      expect(hasLabel(markup, label), label).toBe(true);
+    }
+    expect(markup).toContain('data-three-d-camera-position');
+    // Rotation is the Cone's texture rotation, so there is no separate camera roll.
+    expect(hasLabel(markup, 'Camera Roll')).toBe(false);
+    // The Cone stays unlit.
+    expect(hasLabel(markup, 'Shade')).toBe(false);
     expect(hasLabel(markup, 'Bend')).toBe(false);
+  });
+
+  it('shows the Ribbon controls', () => {
+    const markup = renderShape('ribbon');
+    for (const label of ['Ribbons', 'Radius', 'Width', 'Stagger', 'Loop Length', 'Twist', 'Band Twist', 'Spin', 'Ring Repeat']) {
+      expect(hasLabel(markup, label), label).toBe(true);
+    }
+    expect(hasLabel(markup, 'Depth')).toBe(false);
+    expect(hasLabel(markup, 'Camera Roll')).toBe(true);
+  });
+
+  it('shows the Discs controls', () => {
+    const markup = renderShape('discs');
+    for (const label of ['Form', 'Rings', 'Gap', 'Thickness', 'Z Spread', 'Waves', 'Scatter', 'Spin Pattern', 'Spin', 'Twist', 'Offset', 'Tilt', 'Tilt Turns', 'View Angle', 'Orbit']) {
+      expect(hasLabel(markup, label), label).toBe(true);
+    }
+    expect(hasLabel(markup, 'Depth')).toBe(false);
+    expect(hasLabel(markup, 'Camera Roll')).toBe(true);
+  });
+
+  it('no longer offers the Extrusion shape', () => {
+    const markup = renderShape('cone');
+    expect(markup).not.toContain('Pixel city');
   });
 });

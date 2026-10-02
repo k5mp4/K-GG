@@ -8,9 +8,12 @@ import { InputPosition } from 'tweeq';
 import { getParameterLimit } from '../lib/parameterLimits';
 import {
   CAMERA_WIGGLE_PRESET_OPTIONS,
+  CONE_CAMERA_MODE_OPTIONS,
   CONE_SEAM_MODE_OPTIONS,
   CONE_SHAPE_OPTIONS,
   DEFAULT_CONE_VIEW,
+  DISCS_FORM_OPTIONS,
+  DISCS_SPIN_PATTERN_OPTIONS,
   FIELD_GEOMETRY_OPTIONS,
   FIELD_RENDER_OPTIONS,
   LATTICE_TYPE_OPTIONS,
@@ -19,9 +22,12 @@ import {
   THREE_D_PROJECTION_OPTIONS,
   THREE_D_SURFACE_MAPPING_OPTIONS,
   type CameraWigglePreset,
+  type ConeCameraMode,
   type ConeSeamMode,
   type ConeShape,
   type ConeViewConfig,
+  type DiscsForm,
+  type DiscsSpinPattern,
   type FieldGeometry,
   type FieldRender,
   type LatticeType,
@@ -41,14 +47,14 @@ const CAMERA_X_LIMIT = getParameterLimit('cone.cameraX');
 const CAMERA_Y_LIMIT = getParameterLimit('cone.cameraY');
 
 const SHAPE_TEXT: Record<ConeShape, { title: MessageKey; description: MessageKey; hint?: MessageKey }> = {
-  cone: { title: 'cone.surface', description: 'cone.description' },
+  cone: { title: 'cone.surface', description: 'cone.description', hint: 'cone.coneHint' },
   torus: { title: 'cone.torusSurface', description: 'cone.torusDescription', hint: 'cone.torusHint' },
   lattice: { title: 'cone.latticeSurface', description: 'cone.latticeDescription', hint: 'cone.latticeHint' },
   terrain: { title: 'cone.terrainSurface', description: 'cone.terrainDescription', hint: 'cone.terrainHint' },
-  extrusion: { title: 'cone.extrusionSurface', description: 'cone.extrusionDescription', hint: 'cone.extrusionHint' },
   ribbon: { title: 'cone.ribbonSurface', description: 'cone.ribbonDescription', hint: 'cone.ribbonHint' },
   rings: { title: 'cone.ringsSurface', description: 'cone.ringsDescription', hint: 'cone.ringsHint' },
   field: { title: 'cone.fieldSurface', description: 'cone.fieldDescription', hint: 'cone.fieldHint' },
+  discs: { title: 'cone.discsSurface', description: 'cone.discsDescription', hint: 'cone.discsHint' },
 };
 
 /** Serpent bends its path and Tumble scatters its frames with the same amount. */
@@ -166,20 +172,61 @@ function ShapeControls({ coneView, setConeView }: { coneView: ConeViewConfig; se
     );
   }
   if (coneView.shape === 'ribbon') {
+    const integer = (value: number) => `${Math.round(value)}`;
     return (
       <>
         <SliderField
-          label="Half Twists"
-          value={coneView.ribbonHalfTwists}
-          limitKey="cone.ribbonHalfTwists"
-          format={(value) => `${Math.round(value)}`}
-          onChange={(ribbonHalfTwists) => setConeView({ ribbonHalfTwists })}
+          label="Ribbons"
+          value={coneView.ribbonCount}
+          limitKey="cone.ribbonCount"
+          format={integer}
+          onChange={(ribbonCount) => setConeView({ ribbonCount })}
+        />
+        <SliderField
+          label="Radius"
+          value={coneView.ribbonRadius}
+          limitKey="cone.ribbonRadius"
+          onChange={(ribbonRadius) => setConeView({ ribbonRadius })}
         />
         <SliderField
           label="Width"
           value={coneView.ribbonWidth}
           limitKey="cone.ribbonWidth"
           onChange={(ribbonWidth) => setConeView({ ribbonWidth })}
+        />
+        <SliderField
+          label="Stagger"
+          value={coneView.ribbonStagger}
+          limitKey="cone.ribbonStagger"
+          format={(value) => `${Math.round(value * 100)}%`}
+          onChange={(ribbonStagger) => setConeView({ ribbonStagger })}
+        />
+        <SliderField
+          label="Loop Length"
+          value={coneView.ribbonLength}
+          limitKey="cone.ribbonLength"
+          onChange={(ribbonLength) => setConeView({ ribbonLength })}
+        />
+        <SliderField
+          label="Twist"
+          value={coneView.ribbonTwist}
+          limitKey="cone.ribbonTwist"
+          format={integer}
+          onChange={(ribbonTwist) => setConeView({ ribbonTwist })}
+        />
+        <SliderField
+          label="Band Twist"
+          value={coneView.ribbonHalfTwists}
+          limitKey="cone.ribbonHalfTwists"
+          format={integer}
+          onChange={(ribbonHalfTwists) => setConeView({ ribbonHalfTwists })}
+        />
+        <SliderField
+          label="Spin"
+          value={coneView.spin}
+          limitKey="cone.spin"
+          format={integer}
+          onChange={(spin) => setConeView({ spin })}
         />
         <SliderField
           label="Ring Repeat"
@@ -379,6 +426,120 @@ function ShapeControls({ coneView, setConeView }: { coneView: ConeViewConfig; se
       </>
     );
   }
+  if (coneView.shape === 'discs') {
+    const integer = (value: number) => `${Math.round(value)}`;
+    const percent = (value: number) => `${Math.round(value * 100)}%`;
+    return (
+      <>
+        <CustomSelect
+          label="Form"
+          value={coneView.discsForm}
+          localizeLabel={false}
+          localizeOptions={false}
+          options={[...DISCS_FORM_OPTIONS]}
+          onChange={(discsForm) => setConeView({ discsForm: discsForm as DiscsForm })}
+        />
+        <SliderField
+          label="Rings"
+          value={coneView.discsCount}
+          limitKey="cone.discsCount"
+          format={integer}
+          onChange={(discsCount) => setConeView({ discsCount })}
+        />
+        <SliderField
+          label="Gap"
+          value={coneView.discsGap}
+          limitKey="cone.discsGap"
+          format={percent}
+          onChange={(discsGap) => setConeView({ discsGap })}
+        />
+        <SliderField
+          label="Thickness"
+          value={coneView.discsThickness}
+          limitKey="cone.discsThickness"
+          onChange={(discsThickness) => setConeView({ discsThickness })}
+        />
+        <SliderField
+          label="Z Spread"
+          value={coneView.discsSpread}
+          limitKey="cone.discsSpread"
+          onChange={(discsSpread) => setConeView({ discsSpread })}
+        />
+        <SliderField
+          label="Waves"
+          value={coneView.discsWaves}
+          limitKey="cone.discsWaves"
+          format={(value) => value.toFixed(2)}
+          onChange={(discsWaves) => setConeView({ discsWaves })}
+        />
+        <SliderField
+          label="Scatter"
+          value={coneView.discsScatter}
+          limitKey="cone.discsScatter"
+          format={percent}
+          onChange={(discsScatter) => setConeView({ discsScatter })}
+        />
+        <CustomSelect
+          label="Spin Pattern"
+          value={coneView.discsSpinPattern}
+          localizeLabel={false}
+          localizeOptions={false}
+          options={[...DISCS_SPIN_PATTERN_OPTIONS]}
+          onChange={(discsSpinPattern) => setConeView({ discsSpinPattern: discsSpinPattern as DiscsSpinPattern })}
+        />
+        <SliderField
+          label="Spin"
+          value={coneView.discsSpin}
+          limitKey="cone.discsSpin"
+          format={integer}
+          onChange={(discsSpin) => setConeView({ discsSpin })}
+        />
+        <SliderField
+          label="Twist"
+          value={coneView.discsTwist}
+          limitKey="cone.discsTwist"
+          format={(value) => `${value > 0 ? '+' : ''}${value.toFixed(1)}°`}
+          onChange={(discsTwist) => setConeView({ discsTwist })}
+        />
+        <SliderField
+          label="Offset"
+          value={coneView.discsOffset}
+          limitKey="cone.discsOffset"
+          format={percent}
+          onChange={(discsOffset) => setConeView({ discsOffset })}
+        />
+        <SliderField
+          label="Tilt"
+          value={coneView.discsTilt}
+          limitKey="cone.discsTilt"
+          format={formatDegrees}
+          onChange={(discsTilt) => setConeView({ discsTilt })}
+        />
+        <SliderField
+          label="Tilt Turns"
+          value={coneView.discsTiltTurns}
+          limitKey="cone.discsTiltTurns"
+          disabled={coneView.discsTilt === 0}
+          format={integer}
+          onChange={(discsTiltTurns) => setConeView({ discsTiltTurns })}
+        />
+        <SliderField
+          label="View Angle"
+          value={coneView.discsView}
+          limitKey="cone.discsView"
+          format={formatDegrees}
+          onChange={(discsView) => setConeView({ discsView })}
+        />
+        <SliderField
+          label="Orbit"
+          value={coneView.discsOrbit}
+          limitKey="cone.discsOrbit"
+          format={integer}
+          onChange={(discsOrbit) => setConeView({ discsOrbit })}
+        />
+      </>
+    );
+  }
   if (coneView.shape === 'terrain') {
     return (
       <>
@@ -429,38 +590,6 @@ function ShapeControls({ coneView, setConeView }: { coneView: ConeViewConfig; se
       </>
     );
   }
-  if (coneView.shape === 'extrusion') {
-    return (
-      <>
-        <SliderField
-          label="Cells"
-          value={coneView.extrudeCells}
-          limitKey="cone.extrudeCells"
-          format={(value) => `${Math.round(value)}`}
-          onChange={(extrudeCells) => setConeView({ extrudeCells })}
-        />
-        <SliderField
-          label="Height"
-          value={coneView.extrudeHeight}
-          limitKey="cone.extrudeHeight"
-          onChange={(extrudeHeight) => setConeView({ extrudeHeight })}
-        />
-        <SliderField
-          label="Gap"
-          value={coneView.extrudeGap}
-          limitKey="cone.extrudeGap"
-          format={(value) => `${Math.round(value * 100)}%`}
-          onChange={(extrudeGap) => setConeView({ extrudeGap })}
-        />
-        <SliderField
-          label="Distance"
-          value={coneView.depth}
-          limitKey="cone.depth"
-          onChange={(depth) => setConeView({ depth })}
-        />
-      </>
-    );
-  }
   return (
     <>
       <SliderField
@@ -476,6 +605,21 @@ function ShapeControls({ coneView, setConeView }: { coneView: ConeViewConfig; se
         control="angle"
         format={formatDegrees}
         onChange={(rotation) => setConeView({ rotation })}
+      />
+      <SliderField
+        label="Twist"
+        value={coneView.coneTwist}
+        limitKey="cone.coneTwist"
+        format={(value) => value.toFixed(2)}
+        onChange={(coneTwist) => setConeView({ coneTwist })}
+      />
+      <CustomSelect
+        label="Camera Mode"
+        value={coneView.coneCameraMode}
+        localizeLabel={false}
+        localizeOptions={false}
+        options={[...CONE_CAMERA_MODE_OPTIONS]}
+        onChange={(coneCameraMode) => setConeView({ coneCameraMode: coneCameraMode as ConeCameraMode })}
       />
     </>
   );
@@ -564,14 +708,17 @@ function CameraControls({ coneView, setConeView, resetLabel }: { coneView: ConeV
           onChange={(torusAim) => setConeView({ torusAim })}
         />
       )}
-      <SliderField
-        label="Camera Roll"
-        value={coneView.rotation}
-        limitKey="cone.rotation"
-        control="angle"
-        format={formatDegrees}
-        onChange={(rotation) => setConeView({ rotation })}
-      />
+      {/* The Cone keeps Rotation as its texture rotation in the Shape section. */}
+      {coneView.shape !== 'cone' && (
+        <SliderField
+          label="Camera Roll"
+          value={coneView.rotation}
+          limitKey="cone.rotation"
+          control="angle"
+          format={formatDegrees}
+          onChange={(rotation) => setConeView({ rotation })}
+        />
+      )}
       <SliderField
         label="Camera Yaw"
         value={coneView.cameraYaw}
@@ -644,6 +791,8 @@ export function ConeViewPanel() {
   const { coneView } = useGradientStore();
   const { setConeView } = applicationCommands;
   const isCone = coneView.shape === 'cone';
+  // The classic Cone camera is fixed, so it has no Camera section.
+  const showCamera = !isCone || coneView.coneCameraMode === 'free';
   const shapeText = SHAPE_TEXT[coneView.shape];
 
   return (
@@ -680,7 +829,7 @@ export function ConeViewPanel() {
         </Section>
       )}
 
-      {!isCone && (
+      {showCamera && (
         <Section title="Camera">
           <CameraControls coneView={coneView} setConeView={setConeView} resetLabel={t('cone.resetPosition')} />
         </Section>
