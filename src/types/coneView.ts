@@ -2,8 +2,8 @@ import { clampParameter, getParameterDefault, getParameterLimit } from '../lib/p
 
 export type ConeMappingMode = 'flow' | 'projection';
 /** Geometry of the 3D layer. The layer kind and preset key stay `cone` for compatibility. */
-export type ConeShape = 'cone' | 'torus' | 'lattice' | 'terrain' | 'ribbon' | 'rings' | 'field' | 'discs';
-export const CONE_SHAPES = ['cone', 'torus', 'lattice', 'terrain', 'ribbon', 'rings', 'field', 'discs'] as const satisfies readonly ConeShape[];
+export type ConeShape = 'cone' | 'torus' | 'lattice' | 'terrain' | 'ribbon' | 'rings' | 'field' | 'discs' | 'crystal';
+export const CONE_SHAPES = ['cone', 'torus', 'lattice', 'terrain', 'ribbon', 'rings', 'field', 'discs', 'crystal'] as const satisfies readonly ConeShape[];
 export const CONE_SHAPE_INDEX = {
   cone: 0,
   torus: 1,
@@ -13,6 +13,7 @@ export const CONE_SHAPE_INDEX = {
   rings: 5,
   field: 6,
   discs: 7,
+  crystal: 8,
 } as const satisfies Record<ConeShape, number>;
 export const CONE_SHAPE_OPTIONS: { value: ConeShape; label: string }[] = [
   { value: 'cone', label: 'Cone' },
@@ -23,6 +24,39 @@ export const CONE_SHAPE_OPTIONS: { value: ConeShape; label: string }[] = [
   { value: 'rings', label: 'Square Rings · Frame tunnel' },
   { value: 'field', label: 'Geometry Field · Scattered flythrough' },
   { value: 'discs', label: 'Discs · Slit rings in 3D' },
+  { value: 'crystal', label: 'Crystals · Refraction' },
+];
+
+/**
+ * Shape of each Crystals object, all along a long axis that Length stretches:
+ * `quartz` is a hexagonal prism with a pyramid on both ends, `bipyramid`
+ * drops the prism so the two pyramids meet, `prism` is a triangular prism,
+ * `octahedron` a diamond-like double pyramid on a square, `rhombohedron` a
+ * skewed cube like calcite, `dodecahedron` the rhombic dodecahedron of
+ * garnet, and `mix` picks one at random per crystal. The faces are defined
+ * in src/lib/coneView.ts (getCrystalFaces) and three-d.frag.glsl.
+ */
+export type CrystalForm = 'quartz' | 'bipyramid' | 'prism' | 'octahedron' | 'rhombohedron' | 'dodecahedron' | 'mix';
+export const CRYSTAL_FORMS = ['quartz', 'bipyramid', 'prism', 'octahedron', 'rhombohedron', 'dodecahedron', 'mix'] as const satisfies readonly CrystalForm[];
+export const CRYSTAL_FORM_OPTIONS: { value: CrystalForm; label: string }[] = [
+  { value: 'quartz', label: 'Quartz · Pointed prism' },
+  { value: 'bipyramid', label: 'Bipyramid · Double point' },
+  { value: 'prism', label: 'Prism · Triangular' },
+  { value: 'octahedron', label: 'Octahedron · Diamond' },
+  { value: 'rhombohedron', label: 'Rhombohedron · Calcite' },
+  { value: 'dodecahedron', label: 'Dodecahedron · Garnet' },
+  { value: 'mix', label: 'Mix · Per crystal' },
+];
+
+/**
+ * Surface of the Crystals. `refract` is clear glass that bends the canvas
+ * behind it; `faces` maps the canvas onto every face with Surface Mapping.
+ */
+export type CrystalMaterial = 'refract' | 'faces';
+export const CRYSTAL_MATERIALS = ['refract', 'faces'] as const satisfies readonly CrystalMaterial[];
+export const CRYSTAL_MATERIAL_OPTIONS: { value: CrystalMaterial; label: string }[] = [
+  { value: 'refract', label: 'Refraction · Clear glass' },
+  { value: 'faces', label: 'Faces · Canvas on faces' },
 ];
 
 /**
@@ -335,6 +369,36 @@ export type ConeViewConfig = {
   discsView: number;
   /** Discs only: whole camera revolutions per loop around the vertical axis through the center. */
   discsOrbit: number;
+  /** Crystals only: clear refracting glass, or the canvas mapped onto the faces. */
+  crystalMaterial: CrystalMaterial;
+  /** Crystals only: share of the face mapping over the refraction in the Faces material. */
+  crystalFaceOpacity: number;
+  /** Crystals only: crystal form, or a random choice per crystal. */
+  crystalForm: CrystalForm;
+  /** Crystals only: number of crystals. */
+  crystalCount: number;
+  /** Crystals only: crystal size; larger crystals cover the view from farther away. */
+  crystalSize: number;
+  /** Crystals only: crystal length divided by its width. */
+  crystalLength: number;
+  /** Crystals only: how far back the crystals may start before covering pulls them in (Field Depth). */
+  crystalSpread: number;
+  /** Crystals only: random layout and orientation variant. */
+  crystalSeed: number;
+  /** Crystals only: index of refraction of the green channel. */
+  crystalIor: number;
+  /** Crystals only: index difference from red to blue, which splits the colors. */
+  crystalDispersion: number;
+  /** Crystals only: wavelengths read across the Dispersion range; only the ends and middle are traced, 1 traces one. */
+  crystalDispersionSteps: number;
+  /** Crystals only: strength of the mirrored surroundings and glints on the outer faces. */
+  crystalReflection: number;
+  /** Crystals only: distance from the farthest crystal to the canvas behind it. */
+  crystalBackdrop: number;
+  /** Crystals only: whole turns of each crystal about its long axis per loop. */
+  crystalSpin: number;
+  /** Crystals only: whole turns of all crystals about the view axis per loop. */
+  crystalRevolve: number;
 };
 
 /** Normalized apex movement limit; ±2 reaches 50% of the canvas outside its edge. */
@@ -428,6 +492,21 @@ export const DEFAULT_CONE_VIEW: ConeViewConfig = {
   discsTiltTurns: getParameterDefault('cone.discsTiltTurns'),
   discsView: getParameterDefault('cone.discsView'),
   discsOrbit: getParameterDefault('cone.discsOrbit'),
+  crystalMaterial: 'refract',
+  crystalFaceOpacity: getParameterDefault('cone.crystalFaceOpacity'),
+  crystalForm: 'quartz',
+  crystalCount: getParameterDefault('cone.crystalCount'),
+  crystalSize: getParameterDefault('cone.crystalSize'),
+  crystalLength: getParameterDefault('cone.crystalLength'),
+  crystalSpread: getParameterDefault('cone.crystalSpread'),
+  crystalSeed: getParameterDefault('cone.crystalSeed'),
+  crystalIor: getParameterDefault('cone.crystalIor'),
+  crystalDispersion: getParameterDefault('cone.crystalDispersion'),
+  crystalDispersionSteps: getParameterDefault('cone.crystalDispersionSteps'),
+  crystalReflection: getParameterDefault('cone.crystalReflection'),
+  crystalBackdrop: getParameterDefault('cone.crystalBackdrop'),
+  crystalSpin: getParameterDefault('cone.crystalSpin'),
+  crystalRevolve: getParameterDefault('cone.crystalRevolve'),
 };
 
 function normalizeOption<T extends string>(value: unknown, options: readonly T[], fallback: T): T {
@@ -525,5 +604,20 @@ export function normalizeConeViewConfig(value: unknown): ConeViewConfig {
     discsTiltTurns: clampParameter(raw.discsTiltTurns, DEFAULT_CONE_VIEW.discsTiltTurns, getParameterLimit('cone.discsTiltTurns')),
     discsView: clampParameter(raw.discsView, DEFAULT_CONE_VIEW.discsView, getParameterLimit('cone.discsView')),
     discsOrbit: clampParameter(raw.discsOrbit, DEFAULT_CONE_VIEW.discsOrbit, getParameterLimit('cone.discsOrbit')),
+    crystalMaterial: normalizeOption(raw.crystalMaterial, CRYSTAL_MATERIALS, DEFAULT_CONE_VIEW.crystalMaterial),
+    crystalFaceOpacity: clampParameter(raw.crystalFaceOpacity, DEFAULT_CONE_VIEW.crystalFaceOpacity, getParameterLimit('cone.crystalFaceOpacity')),
+    crystalForm: normalizeOption(raw.crystalForm, CRYSTAL_FORMS, DEFAULT_CONE_VIEW.crystalForm),
+    crystalCount: clampParameter(raw.crystalCount, DEFAULT_CONE_VIEW.crystalCount, getParameterLimit('cone.crystalCount')),
+    crystalSize: clampParameter(raw.crystalSize, DEFAULT_CONE_VIEW.crystalSize, getParameterLimit('cone.crystalSize')),
+    crystalLength: clampParameter(raw.crystalLength, DEFAULT_CONE_VIEW.crystalLength, getParameterLimit('cone.crystalLength')),
+    crystalSpread: clampParameter(raw.crystalSpread, DEFAULT_CONE_VIEW.crystalSpread, getParameterLimit('cone.crystalSpread')),
+    crystalSeed: clampParameter(raw.crystalSeed, DEFAULT_CONE_VIEW.crystalSeed, getParameterLimit('cone.crystalSeed')),
+    crystalIor: clampParameter(raw.crystalIor, DEFAULT_CONE_VIEW.crystalIor, getParameterLimit('cone.crystalIor')),
+    crystalDispersion: clampParameter(raw.crystalDispersion, DEFAULT_CONE_VIEW.crystalDispersion, getParameterLimit('cone.crystalDispersion')),
+    crystalDispersionSteps: clampParameter(raw.crystalDispersionSteps, DEFAULT_CONE_VIEW.crystalDispersionSteps, getParameterLimit('cone.crystalDispersionSteps')),
+    crystalReflection: clampParameter(raw.crystalReflection, DEFAULT_CONE_VIEW.crystalReflection, getParameterLimit('cone.crystalReflection')),
+    crystalBackdrop: clampParameter(raw.crystalBackdrop, DEFAULT_CONE_VIEW.crystalBackdrop, getParameterLimit('cone.crystalBackdrop')),
+    crystalSpin: clampParameter(raw.crystalSpin, DEFAULT_CONE_VIEW.crystalSpin, getParameterLimit('cone.crystalSpin')),
+    crystalRevolve: clampParameter(raw.crystalRevolve, DEFAULT_CONE_VIEW.crystalRevolve, getParameterLimit('cone.crystalRevolve')),
   };
 }

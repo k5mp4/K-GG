@@ -17,7 +17,16 @@ import {
   getCameraWiggle,
   getRibbonLaps,
   getDiscsFrameDistance,
+  getCrystalLayout,
+  getCrystalUniforms,
+  getCrystalInscribedRadius,
+  getCrystalAxisSpheres,
+  getCrystalFaces,
+  getCrystalExtents,
   CAMERA_MAX_OFFSET,
+  CRYSTAL_FILL_CAMERA_GAP,
+  CRYSTAL_MAX,
+  CRYSTAL_SHAPE_INDEX,
 } from './coneView';
 import { CAMERA_WIGGLE_PRESETS } from '../types/coneView';
 
@@ -266,6 +275,206 @@ describe('3D render parameters', () => {
     // for the whole loop whatever the View Angle is.
     expect(getDiscsFrameDistance({ ...still, discsOrbit: 1, discsView: 0 }, 2)).toBeCloseTo(sideView, 10);
     expect(getDiscsFrameDistance({ ...still, discsOrbit: -2, discsView: 60 }, 2)).toBeCloseTo(sideView, 10);
+  });
+
+  it('passes the Crystals through as shader arrays with Flow as backdrop travel', () => {
+    const crystal = { ...DEFAULT_CONE_VIEW, shape: 'crystal' as const, flowCycles: 2, crystalIor: 1.8, crystalDispersion: 0.1, crystalReflection: 0.5 };
+    const params = getThreeDRenderParams(crystal, 0.25, 16 / 9);
+    expect(params.shape).toBe(8);
+    expect(params.textureOffset).toEqual([0, 0]);
+    expect(params.travel).toBe(0.5);
+    expect(getThreeDRenderParams({ ...crystal, mappingMode: 'projection' }, 0.25, 1).travel).toBe(0);
+    expect(params.crystal).toMatchObject({ count: 12, material: 0, faceOpacity: 1, ior: 1.8, dispersion: 0.1, dispersionSteps: 3, reflection: 0.5 });
+    expect(params.crystal.centers).toHaveLength(CRYSTAL_MAX * 4);
+    expect(params.crystal.rotations).toHaveLength(CRYSTAL_MAX * 9);
+    expect(params.crystal.shapes).toHaveLength(CRYSTAL_MAX * 4);
+    const faces = getCrystalUniforms({ ...crystal, crystalMaterial: 'faces', crystalFaceOpacity: 0.4 }, 0.25, 1);
+    expect(faces).toMatchObject({ material: 1, faceOpacity: 0.4 });
+  });
+
+  it('passes each crystal\'s radius, half length, pyramid height, and form index to the shader', () => {
+    const config = { ...DEFAULT_CONE_VIEW, shape: 'crystal' as const, crystalForm: 'mix' as const, crystalCount: 24 };
+    const layout = getCrystalLayout(config, 1);
+    const { shapes } = getCrystalUniforms(config, 0, 1);
+    layout.forEach((crystal, index) => {
+      const hexagonal = crystal.form === 'quartz' || crystal.form === 'bipyramid';
+      expect(shapes.slice(index * 4, index * 4 + 4)).toEqual([
+        crystal.radius, crystal.halfLength, hexagonal ? crystal.capHeight : crystal.reach, CRYSTAL_SHAPE_INDEX[crystal.form],
+      ]);
+      // The shader culls with the cylinder of radius reach and half length h,
+      // which must hold the crystal: the hexagonal forms reach their radius.
+      if (hexagonal) expect(crystal.reach).toBeCloseTo(crystal.radius, 9);
+    });
+    // Mix draws from every form.
+    expect(new Set(layout.map(crystal => crystal.form)).size).toBeGreaterThan(3);
+  });
+
+  it('traces Dispersion Steps wavelengths only while Dispersion splits them', () => {
+    const crystal = { ...DEFAULT_CONE_VIEW, shape: 'crystal' as const, crystalDispersionSteps: 10 };
+    expect(getCrystalUniforms(crystal, 0, 1).dispersionSteps).toBe(10);
+    expect(getCrystalUniforms({ ...crystal, crystalDispersion: 0 }, 0, 1).dispersionSteps).toBe(1);
+  });
+
+  it.each([
+    { seed: 0, count: 12, aspect: 16 / 9, fov: 60, size: 1.2, form: 'quartz' as const, revolve: 0 },
+    { seed: 3, count: 12, aspect: 16 / 9, fov: 60, size: 1.2, form: 'quartz' as const, revolve: 2 },
+    { seed: 7, count: 1, aspect: 1, fov: 90, size: 0.3, form: 'bipyramid' as const, revolve: 0 },
+    { seed: 42, count: 24, aspect: 9 / 16, fov: 30, size: 2, form: 'mix' as const, revolve: -1 },
+    { seed: 9, count: 5, aspect: 2.4, fov: 75, size: 0.6, form: 'prism' as const, revolve: 0 },
+    { seed: 11, count: 12, aspect: 16 / 9, fov: 60, size: 1.2, form: 'octahedron' as const, revolve: 0 },
+    { seed: 13, count: 12, aspect: 16 / 9, fov: 60, size: 1.2, form: 'rhombohedron' as const, revolve: 0 },
+    { seed: 17, count: 8, aspect: 1, fov: 50, size: 1, form: 'dodecahedron' as const, revolve: 1 },
+  ])('covers every camera ray with a crystal for $form, seed $seed, $count crystals, Revolve $revolve', ({ seed, count, aspect, fov, size, form, revolve }) => {
+    const config = {
+      ...DEFAULT_CONE_VIEW, shape: 'crystal' as const, crystalSeed: seed, crystalCount: count,
+      crystalSize: size, crystalForm: form, cameraFov: fov, crystalSpin: 3, crystalRevolve: revolve, crystalSpread: 2,
+    };
+    const layout = getCrystalLayout(config, aspect);
+    const tanHalfFov = Math.tan(fov * Math.PI / 360);
+    for (const time of [0, 0.37, 0.81]) {
+      const pose = getCrystalUniforms(config, time, aspect);
+      expect(pose.cameraDistance).toBeCloseTo(1 / tanHalfFov, 10);
+      // Spin rolls each crystal about its long axis (the rotation's second
+      // column), which keeps the spheres along that axis in place.
+      const spheres = layout.flatMap((crystal, index) => {
+        const center = pose.centers.slice(index * 4, index * 4 + 3);
+        const axis = pose.rotations.slice(index * 9 + 3, index * 9 + 6);
+        return getCrystalAxisSpheres(crystal).map(({ offset, radius }) => ({
+          center: center.map((value, component) => value + axis[component] * offset),
+          radius,
+        }));
+      });
+      for (let column = 0; column <= 40; column += 1) {
+        for (let row = 0; row <= 24; row += 1) {
+          const ray = [(column / 20 - 1) * aspect * tanHalfFov, (row / 12 - 1) * tanHalfFov, -1];
+          const covered = spheres.some(({ center, radius }) => {
+            const toCenter = [center[0], center[1], center[2] - pose.cameraDistance];
+            const along = (toCenter[0] * ray[0] + toCenter[1] * ray[1] + toCenter[2] * ray[2]) / Math.hypot(...ray);
+            const squared = toCenter[0] ** 2 + toCenter[1] ** 2 + toCenter[2] ** 2;
+            return squared <= radius * radius || (along > 0 && squared - along * along <= radius * radius);
+          });
+          expect(covered, `ray ${column},${row} at ${time}`).toBe(true);
+        }
+      }
+    }
+  });
+
+  it.each([0, 7, 42])('keeps the camera outside every crystal of seed %s', (seed) => {
+    const config = { ...DEFAULT_CONE_VIEW, shape: 'crystal' as const, crystalForm: 'mix' as const, crystalSeed: seed, crystalSpin: 2 };
+    const layout = getCrystalLayout(config, 16 / 9);
+    for (const time of [0, 0.29, 0.73]) {
+      const pose = getCrystalUniforms(config, time, 16 / 9);
+      layout.forEach((crystal, index) => {
+        const [x, y, z] = pose.centers.slice(index * 4, index * 4 + 3);
+        const toCenter = [x, y, z - pose.cameraDistance];
+        const distance = Math.hypot(...toCenter);
+        // The long axis (the rotation's second column) lies across the line
+        // of sight, so the crystal reaches toward the camera by its reach only.
+        const axis = pose.rotations.slice(index * 9 + 3, index * 9 + 6);
+        expect(Math.abs(axis[0] * toCenter[0] + axis[1] * toCenter[1] + axis[2] * toCenter[2]) / distance).toBeLessThan(1e-9);
+        expect(distance).toBeGreaterThanOrEqual(CRYSTAL_FILL_CAMERA_GAP * crystal.reach - 1e-9);
+      });
+    }
+  });
+
+  const solids = [
+    { form: 'quartz' as const, radius: 1, halfLength: 2.6, capHeight: 1 },
+    { form: 'bipyramid' as const, radius: 1, halfLength: 1, capHeight: 1 },
+    { form: 'prism' as const, radius: 0.7, halfLength: 1.8, capHeight: 0 },
+    { form: 'octahedron' as const, radius: 1, halfLength: 2, capHeight: 0 },
+    { form: 'rhombohedron' as const, radius: 0.8, halfLength: 1.5, capHeight: 0 },
+    { form: 'dodecahedron' as const, radius: 1, halfLength: 1.4, capHeight: 0 },
+  ];
+
+  it.each(solids)('bounds the $form by faces that close around its center', (solid) => {
+    const faces = getCrystalFaces(solid);
+    // The center lies strictly inside, and every face normal is a unit vector.
+    for (const face of faces) {
+      expect(Math.hypot(...face.normal)).toBeCloseTo(1, 12);
+      expect(face.offset).toBeGreaterThan(0);
+    }
+    // Rays from the center in every direction leave through some face, so the
+    // solid is closed and holds no direction to infinity.
+    for (let index = 0; index < 200; index += 1) {
+      const z = index / 199 * 2 - 1;
+      const angle = index * 2.399963;
+      const direction = [Math.sqrt(1 - z * z) * Math.cos(angle), z, Math.sqrt(1 - z * z) * Math.sin(angle)];
+      const exit = Math.min(...faces.map(face => {
+        const approach = face.normal[0] * direction[0] + face.normal[1] * direction[1] + face.normal[2] * direction[2];
+        return approach > 1e-9 ? face.offset / approach : Infinity;
+      }));
+      expect(exit).toBeLessThan(10);
+    }
+    expect(getCrystalInscribedRadius(solid)).toBeCloseTo(Math.min(...faces.map(face => face.offset)), 12);
+  });
+
+  it.each(solids)('fits the $form in the cylinder the shader culls with', (solid) => {
+    // Radius reach around the long axis (the hexagon radius for the
+    // hexagonal forms) and half length h along it.
+    const { reach, axisExtent, boundRadius } = getCrystalExtents(solid);
+    expect(axisExtent).toBeLessThanOrEqual(solid.halfLength + 1e-9);
+    if (solid.form === 'quartz' || solid.form === 'bipyramid') expect(reach).toBeCloseTo(solid.radius, 9);
+    expect(boundRadius).toBeLessThanOrEqual(Math.hypot(reach, axisExtent) + 1e-9);
+  });
+
+  it.each(solids)('keeps the axis spheres of the $form inside every face', (solid) => {
+    const faces = getCrystalFaces(solid);
+    const spheres = getCrystalAxisSpheres(solid);
+    expect(spheres.length).toBeGreaterThan(0);
+    for (const { offset, radius } of spheres) {
+      expect(radius).toBeGreaterThan(0);
+      // Distance from the axis point (0, offset, 0) to every face plane.
+      for (const face of faces) expect(face.offset - face.normal[1] * offset).toBeGreaterThanOrEqual(radius - 1e-12);
+    }
+  });
+
+  it('keeps the inscribed sphere of the hexagonal forms at the apothem or the pyramid faces', () => {
+    const apothem = Math.cos(Math.PI / 6);
+    expect(getCrystalInscribedRadius({ form: 'quartz', radius: 1, halfLength: 2.6, capHeight: 1 })).toBeCloseTo(apothem, 10);
+    // Flat points reach closer to the center than the side faces.
+    expect(getCrystalInscribedRadius({ form: 'bipyramid', radius: 1, halfLength: 1, capHeight: 1 }))
+      .toBeCloseTo(apothem / Math.hypot(1, apothem), 10);
+  });
+
+  it('lays the Crystals out the same way every time and differently per seed', () => {
+    const config = { ...DEFAULT_CONE_VIEW, shape: 'crystal' as const };
+    expect(getCrystalLayout(config, 1)).toEqual(getCrystalLayout(config, 1));
+    expect(getCrystalLayout({ ...config, crystalSeed: 1 }, 1)).not.toEqual(getCrystalLayout(config, 1));
+    const bipyramids = getCrystalLayout({ ...config, crystalForm: 'bipyramid' }, 1);
+    expect(bipyramids.every(crystal => crystal.capHeight === crystal.halfLength)).toBe(true);
+    const quartz = getCrystalLayout({ ...config, crystalForm: 'quartz', crystalLength: 3 }, 1);
+    expect(quartz.every(crystal => crystal.halfLength > crystal.capHeight && Math.abs(crystal.capHeight - crystal.radius) < 1e-9)).toBe(true);
+    const octahedra = getCrystalLayout({ ...config, crystalForm: 'octahedron' }, 1);
+    expect(octahedra.every(crystal => crystal.form === 'octahedron' && crystal.capHeight === 0)).toBe(true);
+  });
+
+  it('closes Spin and Revolve on the loop and keeps the backdrop behind', () => {
+    const config = { ...DEFAULT_CONE_VIEW, shape: 'crystal' as const, crystalSpin: 3, crystalRevolve: -2 };
+    const start = getCrystalUniforms(config, 0, 16 / 9);
+    const end = getCrystalUniforms(config, 1, 16 / 9);
+    start.rotations.forEach((value, index) => expect(end.rotations[index]).toBeCloseTo(value, 9));
+    start.centers.forEach((value, index) => expect(end.centers[index]).toBeCloseTo(value, 9));
+    const middle = getCrystalUniforms(config, 0.37, 16 / 9);
+    expect(middle.rotations).not.toEqual(start.rotations);
+    for (const pose of [start, middle]) {
+      for (let index = 0; index < pose.count; index += 1) {
+        const [, , z, bound] = pose.centers.slice(index * 4, index * 4 + 4);
+        // Revolve rolls about the view axis, which keeps every depth.
+        expect(z - bound).toBeGreaterThan(pose.backdropZ);
+        expect(z).toBeCloseTo(start.centers[index * 4 + 2], 9);
+      }
+      expect(pose.backdropZ).toBe(start.backdropZ);
+    }
+  });
+
+  it('frames the canvas on the Crystals backdrop with the base FOV', () => {
+    const config = { ...DEFAULT_CONE_VIEW, shape: 'crystal' as const, cameraFov: 90 };
+    const uniforms = getCrystalUniforms(config, 0, 1);
+    expect(uniforms.cameraDistance).toBeCloseTo(1, 10);
+    expect(uniforms.backdropHalfHeight).toBeCloseTo(uniforms.cameraDistance - uniforms.backdropZ, 10);
+    // A zoom wiggle changes the lens, not the framing.
+    const zooming = getThreeDRenderParams({ ...config, wigglePreset: 'zoomPulse' }, 0.1, 1).crystal;
+    expect(zooming.backdropHalfHeight).toBeCloseTo(uniforms.backdropHalfHeight, 10);
   });
 
   it('travels the ribbons one loop length per Flow Cycle, two with odd half twists', () => {

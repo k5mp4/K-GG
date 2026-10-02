@@ -118,6 +118,21 @@ describe('cone view configuration', () => {
       discsTiltTurns: 1,
       discsView: 35,
       discsOrbit: 1,
+      crystalMaterial: 'refract',
+      crystalFaceOpacity: 1,
+      crystalForm: 'quartz',
+      crystalCount: 12,
+      crystalSize: 1.2,
+      crystalLength: 2.6,
+      crystalSpread: 1,
+      crystalSeed: 0,
+      crystalIor: 1.6,
+      crystalDispersion: 0.08,
+      crystalDispersionSteps: 3,
+      crystalReflection: 0.35,
+      crystalBackdrop: 1,
+      crystalSpin: 1,
+      crystalRevolve: 0,
     });
   });
 
@@ -157,6 +172,47 @@ describe('cone view configuration', () => {
     expect(normalizeConeViewConfig({ discsSpinPattern: 'wobble' }).discsSpinPattern).toBe('stagger');
     expect(normalizeConeViewConfig({ discsForm: 'discs' }).discsForm).toBe('discs');
     expect(normalizeConeViewConfig({ discsForm: 'cubes' }).discsForm).toBe('rings');
+  });
+
+  it('normalizes the Crystals settings', () => {
+    expect(normalizeConeViewConfig({ shape: 'crystal' }).shape).toBe('crystal');
+    expect(normalizeConeViewConfig({
+      crystalFaceOpacity: 3,
+      crystalDispersionSteps: 14.2,
+      crystalCount: 40,
+      crystalSize: 0,
+      crystalLength: 9,
+      crystalSpread: -1,
+      crystalSeed: 12.6,
+      crystalIor: 0.5,
+      crystalDispersion: 1,
+      crystalReflection: 2,
+      crystalBackdrop: 0,
+      crystalSpin: -2.4,
+      crystalRevolve: 7,
+    })).toMatchObject({
+      crystalFaceOpacity: 1,
+      crystalDispersionSteps: 10,
+      crystalCount: 24,
+      crystalSize: 0.3,
+      crystalLength: 5,
+      crystalSpread: 0.2,
+      crystalSeed: 13,
+      crystalIor: 1,
+      crystalDispersion: 0.3,
+      crystalReflection: 1,
+      crystalBackdrop: 0.1,
+      crystalSpin: -2,
+      crystalRevolve: 4,
+    });
+    expect(normalizeConeViewConfig({ crystalForm: 'mix' }).crystalForm).toBe('mix');
+    expect(normalizeConeViewConfig({ crystalForm: 'cube' }).crystalForm).toBe('quartz');
+    expect(normalizeConeViewConfig({ crystalMaterial: 'faces' }).crystalMaterial).toBe('faces');
+    expect(normalizeConeViewConfig({ crystalMaterial: 'metal' }).crystalMaterial).toBe('refract');
+    for (const form of ['prism', 'octahedron', 'rhombohedron', 'dodecahedron'] as const) {
+      expect(normalizeConeViewConfig({ crystalForm: form }).crystalForm).toBe(form);
+    }
+    expect(normalizeConeViewConfig({ crystalDispersionSteps: 0 }).crystalDispersionSteps).toBe(1);
   });
 
   it('keeps presets without a shape on the cone and normalizes the torus shape', () => {

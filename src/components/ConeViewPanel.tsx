@@ -11,6 +11,8 @@ import {
   CONE_CAMERA_MODE_OPTIONS,
   CONE_SEAM_MODE_OPTIONS,
   CONE_SHAPE_OPTIONS,
+  CRYSTAL_FORM_OPTIONS,
+  CRYSTAL_MATERIAL_OPTIONS,
   DEFAULT_CONE_VIEW,
   DISCS_FORM_OPTIONS,
   DISCS_SPIN_PATTERN_OPTIONS,
@@ -26,6 +28,8 @@ import {
   type ConeSeamMode,
   type ConeShape,
   type ConeViewConfig,
+  type CrystalForm,
+  type CrystalMaterial,
   type DiscsForm,
   type DiscsSpinPattern,
   type FieldGeometry,
@@ -55,6 +59,7 @@ const SHAPE_TEXT: Record<ConeShape, { title: MessageKey; description: MessageKey
   rings: { title: 'cone.ringsSurface', description: 'cone.ringsDescription', hint: 'cone.ringsHint' },
   field: { title: 'cone.fieldSurface', description: 'cone.fieldDescription', hint: 'cone.fieldHint' },
   discs: { title: 'cone.discsSurface', description: 'cone.discsDescription', hint: 'cone.discsHint' },
+  crystal: { title: 'cone.crystalSurface', description: 'cone.crystalDescription', hint: 'cone.crystalHint' },
 };
 
 /** Serpent bends its path and Tumble scatters its frames with the same amount. */
@@ -540,6 +545,122 @@ function ShapeControls({ coneView, setConeView }: { coneView: ConeViewConfig; se
       </>
     );
   }
+  if (coneView.shape === 'crystal') {
+    const integer = (value: number) => `${Math.round(value)}`;
+    const percent = (value: number) => `${Math.round(value * 100)}%`;
+    return (
+      <>
+        <CustomSelect
+          label="Material"
+          value={coneView.crystalMaterial}
+          localizeLabel={false}
+          localizeOptions={false}
+          options={[...CRYSTAL_MATERIAL_OPTIONS]}
+          onChange={(crystalMaterial) => setConeView({ crystalMaterial: crystalMaterial as CrystalMaterial })}
+        />
+        <SliderField
+          label="Face Opacity"
+          value={coneView.crystalFaceOpacity}
+          limitKey="cone.crystalFaceOpacity"
+          disabled={coneView.crystalMaterial !== 'faces'}
+          format={percent}
+          onChange={(crystalFaceOpacity) => setConeView({ crystalFaceOpacity })}
+        />
+        <CustomSelect
+          label="Form"
+          value={coneView.crystalForm}
+          localizeLabel={false}
+          localizeOptions={false}
+          options={[...CRYSTAL_FORM_OPTIONS]}
+          onChange={(crystalForm) => setConeView({ crystalForm: crystalForm as CrystalForm })}
+        />
+        <SliderField
+          label="Crystals"
+          value={coneView.crystalCount}
+          limitKey="cone.crystalCount"
+          format={integer}
+          onChange={(crystalCount) => setConeView({ crystalCount })}
+        />
+        <SliderField
+          label="Size"
+          value={coneView.crystalSize}
+          limitKey="cone.crystalSize"
+          format={percent}
+          onChange={(crystalSize) => setConeView({ crystalSize })}
+        />
+        <SliderField
+          label="Length"
+          value={coneView.crystalLength}
+          limitKey="cone.crystalLength"
+          format={(value) => `×${value.toFixed(2)}`}
+          onChange={(crystalLength) => setConeView({ crystalLength })}
+        />
+        <SliderField
+          label="Field Depth"
+          value={coneView.crystalSpread}
+          limitKey="cone.crystalSpread"
+          format={percent}
+          onChange={(crystalSpread) => setConeView({ crystalSpread })}
+        />
+        <SliderField
+          label="Seed"
+          value={coneView.crystalSeed}
+          limitKey="cone.crystalSeed"
+          format={integer}
+          onChange={(crystalSeed) => setConeView({ crystalSeed })}
+        />
+        <SliderField
+          label="IOR"
+          value={coneView.crystalIor}
+          limitKey="cone.crystalIor"
+          format={(value) => value.toFixed(2)}
+          onChange={(crystalIor) => setConeView({ crystalIor })}
+        />
+        <SliderField
+          label="Dispersion"
+          value={coneView.crystalDispersion}
+          limitKey="cone.crystalDispersion"
+          format={(value) => value.toFixed(3)}
+          onChange={(crystalDispersion) => setConeView({ crystalDispersion })}
+        />
+        <SliderField
+          label="Dispersion Steps"
+          value={coneView.crystalDispersionSteps}
+          limitKey="cone.crystalDispersionSteps"
+          disabled={coneView.crystalDispersion === 0}
+          format={integer}
+          onChange={(crystalDispersionSteps) => setConeView({ crystalDispersionSteps })}
+        />
+        <SliderField
+          label="Reflection"
+          value={coneView.crystalReflection}
+          limitKey="cone.crystalReflection"
+          format={percent}
+          onChange={(crystalReflection) => setConeView({ crystalReflection })}
+        />
+        <SliderField
+          label="Backdrop"
+          value={coneView.crystalBackdrop}
+          limitKey="cone.crystalBackdrop"
+          onChange={(crystalBackdrop) => setConeView({ crystalBackdrop })}
+        />
+        <SliderField
+          label="Spin"
+          value={coneView.crystalSpin}
+          limitKey="cone.crystalSpin"
+          format={integer}
+          onChange={(crystalSpin) => setConeView({ crystalSpin })}
+        />
+        <SliderField
+          label="Revolve"
+          value={coneView.crystalRevolve}
+          limitKey="cone.crystalRevolve"
+          format={integer}
+          onChange={(crystalRevolve) => setConeView({ crystalRevolve })}
+        />
+      </>
+    );
+  }
   if (coneView.shape === 'terrain') {
     return (
       <>
@@ -628,14 +749,17 @@ function ShapeControls({ coneView, setConeView }: { coneView: ConeViewConfig; se
 function SurfaceControls({ coneView, setConeView }: { coneView: ConeViewConfig; setConeView: SetConeView }) {
   return (
     <>
-      <CustomSelect
-        label="Surface Mapping"
-        value={coneView.surfaceMapping}
-        localizeLabel={false}
-        localizeOptions={false}
-        options={[...THREE_D_SURFACE_MAPPING_OPTIONS]}
-        onChange={(surfaceMapping) => setConeView({ surfaceMapping: surfaceMapping as ThreeDSurfaceMapping })}
-      />
+      {/* Clear crystals color their faces with the refracted canvas, not a mapping. */}
+      {(coneView.shape !== 'crystal' || coneView.crystalMaterial === 'faces') && (
+        <CustomSelect
+          label="Surface Mapping"
+          value={coneView.surfaceMapping}
+          localizeLabel={false}
+          localizeOptions={false}
+          options={[...THREE_D_SURFACE_MAPPING_OPTIONS]}
+          onChange={(surfaceMapping) => setConeView({ surfaceMapping: surfaceMapping as ThreeDSurfaceMapping })}
+        />
+      )}
       <SliderField
         label="Shade"
         value={coneView.shade}
