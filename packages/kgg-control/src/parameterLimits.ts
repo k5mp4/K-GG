@@ -195,7 +195,7 @@ export const PARAMETER_LIMITS = {
   'cone.discsTilt': { min: 0, max: 75, step: 0.5, defaultValue: 12 },
   'cone.discsTiltTurns': { min: -4, max: 4, step: 1, defaultValue: 1, integer: true },
   'cone.discsView': { min: 0, max: 85, step: 0.5, defaultValue: 35 },
-  'cone.discsOrbit': { min: -4, max: 4, step: 1, defaultValue: 0, integer: true },
+  'cone.discsOrbit': { min: -4, max: 4, step: 1, defaultValue: 1, integer: true },
   'cone.ringsPerTile': { min: 1, max: 32, step: 1, defaultValue: 8, integer: true },
   'cone.ringsSpacing': { min: 0.3, max: 4, step: 0.01, defaultValue: 1 },
   'cone.ringsThickness': { min: 0.02, max: 0.6, step: 0.01, defaultValue: 0.12 },

@@ -11,6 +11,7 @@ import {
   CONE_SEAM_MODE_OPTIONS,
   CONE_SHAPE_OPTIONS,
   DEFAULT_CONE_VIEW,
+  DISCS_FORM_OPTIONS,
   DISCS_SPIN_PATTERN_OPTIONS,
   FIELD_GEOMETRY_OPTIONS,
   FIELD_RENDER_OPTIONS,
@@ -23,6 +24,7 @@ import {
   type ConeSeamMode,
   type ConeShape,
   type ConeViewConfig,
+  type DiscsForm,
   type DiscsSpinPattern,
   type FieldGeometry,
   type FieldRender,
@@ -427,6 +429,14 @@ function ShapeControls({ coneView, setConeView }: { coneView: ConeViewConfig; se
     const percent = (value: number) => `${Math.round(value * 100)}%`;
     return (
       <>
+        <CustomSelect
+          label="Form"
+          value={coneView.discsForm}
+          localizeLabel={false}
+          localizeOptions={false}
+          options={[...DISCS_FORM_OPTIONS]}
+          onChange={(discsForm) => setConeView({ discsForm: discsForm as DiscsForm })}
+        />
         <SliderField
           label="Rings"
           value={coneView.discsCount}

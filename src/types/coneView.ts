@@ -26,6 +26,17 @@ export const CONE_SHAPE_OPTIONS: { value: ConeShape; label: string }[] = [
 ];
 
 /**
+ * Shape of each Discs object: `rings` keeps the Slit circle's annuli, and
+ * `discs` fills every object to the center so they stack like coins.
+ */
+export type DiscsForm = 'rings' | 'discs';
+export const DISCS_FORMS = ['rings', 'discs'] as const satisfies readonly DiscsForm[];
+export const DISCS_FORM_OPTIONS: { value: DiscsForm; label: string }[] = [
+  { value: 'rings', label: 'Rings · Slit circle' },
+  { value: 'discs', label: 'Discs · Solid' },
+];
+
+/**
  * How the Discs rings turn. `together` spins every ring at the same speed,
  * `alternate` reverses every other ring, and `stagger` turns each ring in
  * eased steps that start one ring after another from the center outward.
@@ -279,6 +290,8 @@ export type ConeViewConfig = {
   fieldWire: number;
   /** Geometry Field only: how far each object's texture is shifted from the others. */
   fieldVariation: number;
+  /** Discs only: annuli or solid discs. */
+  discsForm: DiscsForm;
   /** Discs only: concentric rings cut from the canvas. */
   discsCount: number;
   /** Discs only: share of each ring width left empty between rings. */
@@ -305,7 +318,7 @@ export type ConeViewConfig = {
   discsTiltTurns: number;
   /** Discs only: camera angle from the ring axis in degrees; 0 looks straight at the rings. */
   discsView: number;
-  /** Discs only: whole camera turns around the ring axis per loop. */
+  /** Discs only: whole camera revolutions per loop around the vertical axis through the center. */
   discsOrbit: number;
 };
 
@@ -384,6 +397,7 @@ export const DEFAULT_CONE_VIEW: ConeViewConfig = {
   fieldArmWidth: getParameterDefault('cone.fieldArmWidth'),
   fieldWire: getParameterDefault('cone.fieldWire'),
   fieldVariation: getParameterDefault('cone.fieldVariation'),
+  discsForm: 'rings',
   discsCount: getParameterDefault('cone.discsCount'),
   discsGap: getParameterDefault('cone.discsGap'),
   discsThickness: getParameterDefault('cone.discsThickness'),
@@ -479,6 +493,7 @@ export function normalizeConeViewConfig(value: unknown): ConeViewConfig {
     fieldArmWidth: clampParameter(raw.fieldArmWidth, DEFAULT_CONE_VIEW.fieldArmWidth, getParameterLimit('cone.fieldArmWidth')),
     fieldWire: clampParameter(raw.fieldWire, DEFAULT_CONE_VIEW.fieldWire, getParameterLimit('cone.fieldWire')),
     fieldVariation: clampParameter(raw.fieldVariation, DEFAULT_CONE_VIEW.fieldVariation, getParameterLimit('cone.fieldVariation')),
+    discsForm: normalizeOption(raw.discsForm, DISCS_FORMS, DEFAULT_CONE_VIEW.discsForm),
     discsCount: clampParameter(raw.discsCount, DEFAULT_CONE_VIEW.discsCount, getParameterLimit('cone.discsCount')),
     discsGap: clampParameter(raw.discsGap, DEFAULT_CONE_VIEW.discsGap, getParameterLimit('cone.discsGap')),
     discsThickness: clampParameter(raw.discsThickness, DEFAULT_CONE_VIEW.discsThickness, getParameterLimit('cone.discsThickness')),

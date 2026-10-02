@@ -127,6 +127,7 @@ export function uploadThreeDUniforms(
   float('u_fieldWire', params.field.wire);
   float('u_fieldSpin', params.field.spinRadians);
   float('u_fieldVariation', params.field.variation);
+  int('u_discsForm', params.discs.form);
   float('u_discsCount', params.discs.count);
   float('u_discsGap', params.discs.gap);
   float('u_discsThickness', params.discs.thickness);

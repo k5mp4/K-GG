@@ -102,6 +102,7 @@ describe('cone view configuration', () => {
       fieldArmWidth: 0.35,
       fieldWire: 0.03,
       fieldVariation: 1,
+      discsForm: 'rings',
       discsCount: 12,
       discsGap: 0.2,
       discsThickness: 0.06,
@@ -115,7 +116,7 @@ describe('cone view configuration', () => {
       discsTilt: 12,
       discsTiltTurns: 1,
       discsView: 35,
-      discsOrbit: 0,
+      discsOrbit: 1,
     });
   });
 
@@ -153,6 +154,8 @@ describe('cone view configuration', () => {
       discsOrbit: 1,
     });
     expect(normalizeConeViewConfig({ discsSpinPattern: 'wobble' }).discsSpinPattern).toBe('stagger');
+    expect(normalizeConeViewConfig({ discsForm: 'discs' }).discsForm).toBe('discs');
+    expect(normalizeConeViewConfig({ discsForm: 'cubes' }).discsForm).toBe('rings');
   });
 
   it('keeps presets without a shape on the cone and normalizes the torus shape', () => {

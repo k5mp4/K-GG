@@ -2,6 +2,7 @@ import {
   CONE_APEX_LIMIT,
   CONE_SEAM_MODE_INDEX,
   CONE_SHAPE_INDEX,
+  DISCS_FORMS,
   DISCS_SPIN_PATTERNS,
   LATTICE_TYPES,
   FIELD_GEOMETRIES,
@@ -399,6 +400,8 @@ export type ThreeDRenderParams = {
     variation: number;
   };
   discs: {
+    /** 0 for annuli, 1 for solid discs. */
+    form: number;
     count: number;
     gap: number;
     thickness: number;
@@ -413,11 +416,11 @@ export type ThreeDRenderParams = {
     tiltRadians: number;
     tiltTurns: number;
     viewRadians: number;
-    /** Camera turn around the ring axis from Orbit, in [0, 2π). */
+    /** Camera revolution around the vertical axis from Orbit, in [0, 2π). */
     orbitRadians: number;
     /** Loop-normalized time in [0, 1] that drives Spin and the tilt wobble. */
     time: number;
-    /** Camera distance that frames the canvas half height at the base FOV. */
+    /** Camera distance to the center, pulled back as the camera leaves the ring axis. */
     frameDistance: number;
     /** Outer ring radius: the canvas half diagonal in canvas half heights. */
     outerRadius: number;
@@ -451,12 +454,19 @@ export function getRibbonLaps(config: ConeViewConfig): number {
 }
 
 /**
- * Distance at which a camera with the base FOV frames the canvas half height
- * (1 world unit), so the Discs seen head-on fill the canvas like the 2D Slit.
+ * Camera distance of the Discs. Head-on, a camera with the base FOV frames
+ * the canvas half height (1 world unit) so the rings fill the canvas like the
+ * 2D Slit. Leaning off the ring axis pulls it back until the whole stack
+ * fits; an orbiting camera reaches the side view, so it keeps the distance
+ * of a side view for the whole loop instead of zooming as it revolves.
  */
-export function getDiscsFrameDistance(config: ConeViewConfig): number {
+export function getDiscsFrameDistance(config: ConeViewConfig, aspect = 1): number {
   const fov = clamp(safeFinite(config.cameraFov, CONE_CAMERA_FOV), CAMERA_FOV_MIN, CAMERA_FOV_MAX);
-  return 1 / Math.tan(fov * Math.PI / 360);
+  const headOn = 1 / Math.tan(fov * Math.PI / 360);
+  const orbiting = Math.round(safeFinite(config.discsOrbit, 0)) !== 0;
+  const offAxis = orbiting ? 1 : Math.sin(clamp(safeFinite(config.discsView, 0), 0, 89) * Math.PI / 180);
+  const sideView = Math.max(1.5 * Math.hypot(Math.max(0.001, safeFinite(aspect, 1)), 1), 1);
+  return headOn * (1 + (sideView - 1) * Math.sqrt(offAxis));
 }
 
 /** Fraction in [0, 1) of `count` whole cycles at a loop-normalized time. */
@@ -588,6 +598,7 @@ export function getThreeDRenderParams(
       variation: config.fieldVariation,
     },
     discs: {
+      form: Math.max(0, DISCS_FORMS.indexOf(config.discsForm)),
       count: Math.max(1, Math.round(safeFinite(config.discsCount, 12))),
       gap: clamp(safeFinite(config.discsGap, 0), 0, 0.95),
       thickness: Math.max(0.001, safeFinite(config.discsThickness, 0.06)),
@@ -603,7 +614,7 @@ export function getThreeDRenderParams(
       viewRadians: clamp(safeFinite(config.discsView, 0), 0, 89) * Math.PI / 180,
       orbitRadians: wholeCyclePhase(config.discsOrbit, normalizedTime) * 2 * Math.PI,
       time: Math.max(0, Math.min(1, safeFinite(normalizedTime, 0))),
-      frameDistance: getDiscsFrameDistance(config),
+      frameDistance: getDiscsFrameDistance(config, safeAspect),
       outerRadius: Math.hypot(safeAspect, 1),
     },
   };

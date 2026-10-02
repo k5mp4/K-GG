@@ -102,6 +102,7 @@ uniform float u_fieldWire;
 uniform float u_fieldSpin;
 uniform float u_fieldVariation;
 
+uniform int u_discsForm;
 uniform float u_discsCount;
 uniform float u_discsGap;
 uniform float u_discsThickness;
@@ -1394,21 +1395,30 @@ ThreeDHit fieldHit(vec3 localRay) {
 // ---------------------------------------------------------------------------
 // Discs: the Slit circle made solid. The canvas (half height 1, half width
 // aspect) is cut into Count concentric rings out to its half diagonal, each a
-// slab of Thickness whose front face carries the canvas where it lies. Every
-// ring sits on a depth wave along the view axis (Spread, Waves across the
-// rings, Scatter for a random phase per ring) that Flow moves by whole periods,
-// wobbles by Tilt around an axis that precesses Tilt Turns per loop, and turns
+// slab of Thickness whose front face carries the canvas where it lies. In the
+// Rings form every ring sits on a depth wave along the view axis (Spread,
+// Waves across the rings, Scatter for a random phase per ring) that Flow moves
+// by whole periods and wobbles by Tilt around an axis that precesses Tilt
+// Turns per loop, with the same phase per ring. The Discs form fills every
+// ring to the center, so neighbors would cut through each other; it stacks
+// them instead along one shared, wobbling axis, smallest in front, and the
+// wave opens and closes the gaps between them, never below Thickness, so no
+// two discs ever overlap. Every ring turns
 // by Spin whole turns per loop (together, alternating, or in eased steps that
 // cascade from the center outward) plus fixed Twist and random Offset turns.
 // Every motion closes on whole periods, so the loop is seamless. The camera
-// frames the canvas head-on at the base FOV, then leans View degrees off the
-// ring axis, backing off as it leans so the whole stack stays in view, and
-// orbits it Orbit turns per loop. Rings are intersected
-// analytically and the nearest hit wins.
+// always looks at the center: it frames the canvas head-on at the base FOV,
+// leans View degrees below the ring axis, and revolves Orbit times per loop
+// around the vertical axis through the center, passing the side and the back
+// of the stack. Its distance comes from getDiscsFrameDistance. Rings are
+// intersected analytically and the nearest hit wins.
 
+const int DISCS_FORM_SOLID = 1;
 const int DISCS_PATTERN_ALTERNATE = 1;
 const int DISCS_PATTERN_STAGGER = 2;
 const int DISCS_MAX = 48;
+// Space left between stacked discs so their faces never touch.
+const float DISCS_STACK_CLEARANCE = 0.004;
 // Side walls are darker than the faces so the rings read as solid.
 const float DISCS_WALL_SHADE = 0.55;
 
@@ -1442,6 +1452,18 @@ float discsSpinAngle(float k, float count) {
   return angle;
 }
 
+float discsPhase(float k, float count) {
+  return u_discsWaves * k / count + u_discsScatter * discsHash(k);
+}
+
+// Distance from the front face of stacked disc k to the next one: Thickness
+// plus a gap that the depth wave opens between 0 and 4 * Spread / count, so
+// the whole stack stretches by 2 * Spread on average.
+float discsStackStep(float k, float count) {
+  float wave = 0.5 + 0.5 * sin(TAU * (discsPhase(k, count) - fract(u_threeDTravel)));
+  return max(u_discsThickness, 0.001) + DISCS_STACK_CLEARANCE + 4.0 * u_discsSpread / count * wave;
+}
+
 struct DiscsRing {
   vec3 center;
   // Local x and y span the ring; local z is its axis toward the camera.
@@ -1451,16 +1473,21 @@ struct DiscsRing {
   float spin;
 };
 
-DiscsRing discsRingAt(float k, float count) {
+// Ring k. A stacked disc (Discs form) sits at stackPosition along the shared
+// axis and tilts with the whole stack; a ring (Rings form) rides its own depth
+// wave and tilts with its own phase.
+DiscsRing discsRingAt(float k, float count, bool stacked, float stackPosition) {
   DiscsRing ring;
-  float phase = u_discsWaves * k / count + u_discsScatter * discsHash(k);
-  // fract keeps the wave phase exact after whole Flow periods.
-  ring.center = vec3(0.0, 0.0, u_discsSpread * sin(TAU * (phase - fract(u_threeDTravel))));
-  float tiltDirection = TAU * (u_discsTiltTurns * u_discsTime + phase);
+  float phase = discsPhase(k, count);
+  float tiltDirection = TAU * (u_discsTiltTurns * u_discsTime + (stacked ? 0.0 : phase));
   vec3 tiltAxis = vec3(cos(tiltDirection), sin(tiltDirection), 0.0);
   ring.axisX = discsRotate(vec3(1.0, 0.0, 0.0), tiltAxis, u_discsTilt);
   ring.axisY = discsRotate(vec3(0.0, 1.0, 0.0), tiltAxis, u_discsTilt);
   ring.axisZ = discsRotate(vec3(0.0, 0.0, 1.0), tiltAxis, u_discsTilt);
+  // fract keeps the wave phase exact after whole Flow periods.
+  ring.center = stacked
+    ? ring.axisZ * stackPosition
+    : vec3(0.0, 0.0, u_discsSpread * sin(TAU * (phase - fract(u_threeDTravel))));
   ring.spin = discsSpinAngle(k, count) + u_discsTwist * k
     + u_discsOffset * PI * (discsHash(k + 7.0) * 2.0 - 1.0);
   return ring;
@@ -1515,20 +1542,18 @@ float discsRingIntersect(vec3 origin, vec3 direction, float inner, float outer, 
 ThreeDHit discsHit(vec3 localRay) {
   ThreeDHit result = threeDMiss();
   float count = clamp(floor(u_discsCount + 0.5), 1.0, float(DISCS_MAX));
-  // Head-on the camera frames the canvas like the 2D Slit; leaning off the
-  // axis pulls it back until the whole outer ring fits.
-  float frameDistance = max(u_discsFrameDistance, 0.1)
-    * mix(1.0, max(u_discsOuterRadius * 1.5, 1.0), sqrt(sin(u_discsView)));
-  // The camera leans View off the ring axis (+Z) toward -Y, so the near edge
-  // of the rings sits at the bottom of the frame, and orbits the axis.
-  float orbitCos = cos(u_discsOrbit);
-  float orbitSin = sin(u_discsOrbit);
-  mat2 orbit = mat2(orbitCos, orbitSin, -orbitSin, orbitCos);
-  vec3 cameraPosition = vec3(0.0, -sin(u_discsView), cos(u_discsView)) * frameDistance;
-  vec3 up = vec3(0.0, cos(u_discsView), sin(u_discsView));
-  cameraPosition.xy = orbit * cameraPosition.xy;
-  up.xy = orbit * up.xy;
+  float frameDistance = max(u_discsFrameDistance, 0.1);
+  // The camera sits View below the ring axis (+Z), so the near edge of the
+  // rings is at the bottom of the frame, and revolves around +Y looking at
+  // the center. Up stays vertical; View stays below 90 degrees, so the
+  // forward direction never lines up with it.
+  vec3 cameraPosition = vec3(
+    cos(u_discsView) * sin(u_discsOrbit),
+    -sin(u_discsView),
+    cos(u_discsView) * cos(u_discsOrbit)
+  ) * frameDistance;
   vec3 forward = -normalize(cameraPosition);
+  vec3 up = normalize(cross(normalize(cross(forward, vec3(0.0, 1.0, 0.0))), forward));
   threeDSetCameraBasis(forward, up);
   vec3 rayDirection = threeDWorldDirection(localRay, forward, up);
   vec3 right = normalize(cross(forward, up));
@@ -1547,13 +1572,27 @@ ThreeDHit discsHit(vec3 localRay) {
   vec3 bestLocal = vec3(0.0);
   bool bestWall = false;
   DiscsRing bestRing;
+  bool stacked = u_discsForm == DISCS_FORM_SOLID;
+  // The stack is centered on the origin: the first front face sits half its
+  // length in front.
+  float stackPosition = 0.0;
+  if (stacked) {
+    for (int i = 0; i < DISCS_MAX - 1; i++) {
+      float k = float(i);
+      if (k >= count - 1.0) break;
+      stackPosition += discsStackStep(k, count);
+    }
+    stackPosition *= 0.5;
+  }
   for (int i = 0; i < DISCS_MAX; i++) {
     float k = float(i);
     if (k >= count) break;
-    // The center ring is a full disc, as in the Slit circle.
-    float inner = i == 0 ? 0.0 : k * width + halfGap;
+    // The center ring is a full disc, as in the Slit circle, and the Discs
+    // form fills every ring.
+    float inner = i == 0 || stacked ? 0.0 : k * width + halfGap;
     float outer = (k + 1.0) * width - halfGap;
-    DiscsRing ring = discsRingAt(k, count);
+    DiscsRing ring = discsRingAt(k, count, stacked, stackPosition);
+    if (stacked) stackPosition -= discsStackStep(k, count);
     vec3 relative = rayOrigin - ring.center;
     // Skip rings whose bounding sphere the ray misses.
     float bound = outer + thickness;

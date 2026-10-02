@@ -91,7 +91,7 @@ describe('ConeViewPanel shape controls', () => {
 
   it('shows the Discs controls', () => {
     const markup = renderShape('discs');
-    for (const label of ['Rings', 'Gap', 'Thickness', 'Z Spread', 'Waves', 'Scatter', 'Spin Pattern', 'Spin', 'Twist', 'Offset', 'Tilt', 'Tilt Turns', 'View Angle', 'Orbit']) {
+    for (const label of ['Form', 'Rings', 'Gap', 'Thickness', 'Z Spread', 'Waves', 'Scatter', 'Spin Pattern', 'Spin', 'Twist', 'Offset', 'Tilt', 'Tilt Turns', 'View Angle', 'Orbit']) {
       expect(hasLabel(markup, label), label).toBe(true);
     }
     expect(hasLabel(markup, 'Depth')).toBe(false);

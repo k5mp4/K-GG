@@ -199,6 +199,7 @@ describe('3D render parameters', () => {
     const discs = getThreeDRenderParams({
       ...DEFAULT_CONE_VIEW,
       shape: 'discs',
+      discsForm: 'discs',
       discsCount: 16,
       discsGap: 0.3,
       discsThickness: 0.1,
@@ -217,6 +218,7 @@ describe('3D render parameters', () => {
     expect(discs.shape).toBe(7);
     expect(discs.textureOffset).toEqual([0, 0]);
     expect(discs.discs).toMatchObject({
+      form: 1,
       count: 16,
       gap: 0.3,
       thickness: 0.1,
@@ -245,12 +247,25 @@ describe('3D render parameters', () => {
     expect(getThreeDRenderParams({ ...discs, mappingMode: 'projection' }, 0.5, 1).travel).toBe(0);
   });
 
-  it('frames the canvas half height with the base FOV for the Discs', () => {
-    expect(getDiscsFrameDistance({ ...DEFAULT_CONE_VIEW, cameraFov: 90 })).toBeCloseTo(1, 10);
-    expect(getDiscsFrameDistance(DEFAULT_CONE_VIEW)).toBeCloseTo(Math.sqrt(3), 10);
+  it('frames the canvas half height with the base FOV for the head-on Discs', () => {
+    const headOn = { ...DEFAULT_CONE_VIEW, discsView: 0, discsOrbit: 0 };
+    expect(getDiscsFrameDistance({ ...headOn, cameraFov: 90 })).toBeCloseTo(1, 10);
+    expect(getDiscsFrameDistance(headOn)).toBeCloseTo(Math.sqrt(3), 10);
     // A zoom wiggle changes the lens, not the framing distance.
-    const zooming = { ...DEFAULT_CONE_VIEW, shape: 'discs' as const, wigglePreset: 'zoomPulse' as const };
+    const zooming = { ...headOn, shape: 'discs' as const, wigglePreset: 'zoomPulse' as const };
     expect(getThreeDRenderParams(zooming, 0.1, 1).discs.frameDistance).toBeCloseTo(Math.sqrt(3), 10);
+  });
+
+  it('pulls the Discs camera back as it leans and keeps the side-view distance while orbiting', () => {
+    const still = { ...DEFAULT_CONE_VIEW, discsOrbit: 0 };
+    const sideView = Math.sqrt(3) * 1.5 * Math.hypot(2, 1);
+    const leaning = getDiscsFrameDistance({ ...still, discsView: 30 }, 2);
+    expect(leaning).toBeGreaterThan(Math.sqrt(3));
+    expect(leaning).toBeLessThan(sideView);
+    // An orbit passes the side of the stack, so it uses the side-view distance
+    // for the whole loop whatever the View Angle is.
+    expect(getDiscsFrameDistance({ ...still, discsOrbit: 1, discsView: 0 }, 2)).toBeCloseTo(sideView, 10);
+    expect(getDiscsFrameDistance({ ...still, discsOrbit: -2, discsView: 60 }, 2)).toBeCloseTo(sideView, 10);
   });
 
   it('travels the ribbons one loop length per Flow Cycle, two with odd half twists', () => {
