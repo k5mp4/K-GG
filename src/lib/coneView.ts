@@ -318,6 +318,8 @@ export type ThreeDRenderParams = {
   lensDistortion: number;
   /** Cone only: texture turns around the cone from the opening to the apex. */
   coneTwist: number;
+  /** Cone only: 0 for the classic fixed camera, 1 for the shared Camera settings. */
+  coneCameraMode: number;
   /** Torus only: 0..1 strength of the aim into the bend. */
   torusAim: number;
   /** Camera distance of the shapes seen from outside. */
@@ -494,16 +496,20 @@ export function getThreeDRenderParams(
 ): ThreeDRenderParams {
   const transform = getConeTextureTransform(config, normalizedTime);
   const safeAspect = Math.max(0.001, safeFinite(aspect, 1));
-  // The opening keeps its 60 degree framing so FOV zooms the Cone, while the
-  // apex follows the base FOV so its handle stays on it.
+  const isCone = config.shape === 'cone';
+  // The classic Cone keeps its original fixed 60 degree camera and ignores
+  // every Camera setting.
+  const classicCone = isCone && config.coneCameraMode !== 'free';
+  // The opening keeps its 60 degree framing so FOV zooms the free Cone, while
+  // the apex follows the base FOV so its handle stays on it.
   const apexOffset = getConeApexOffset(
-    CONE_CAMERA_DISTANCE, config.depth, safeAspect, config.apexX, config.apexY, config.cameraFov,
+    CONE_CAMERA_DISTANCE, config.depth, safeAspect, config.apexX, config.apexY,
+    classicCone ? CONE_CAMERA_FOV : config.cameraFov,
   );
   const camera = getThreeDCamera(config, normalizedTime);
   const geometryMotion = GEOMETRY_MOTION_SHAPES.has(config.shape);
   const ringsPerTile = getRingsPerTile(config);
   const ringsMotion = getRingsMotion(config, normalizedTime);
-  const isCone = config.shape === 'cone';
   return {
     shape: getConeShapeIndex(config),
     surfaceMapping: THREE_D_SURFACE_MAPPING_INDEX[config.surfaceMapping] ?? 0,
@@ -511,6 +517,7 @@ export function getThreeDRenderParams(
     fisheyeHalfAngle: clamp(safeFinite(config.fisheyeAngle, 180), 90, 360) * Math.PI / 360,
     lensDistortion: clamp(safeFinite(config.lensDistortion, 0), -0.5, 0.5),
     coneTwist: safeFinite(config.coneTwist, 0),
+    coneCameraMode: classicCone ? 0 : 1,
     torusAim: clamp(safeFinite(config.torusAim, 1), 0, 1),
     distance: config.depth * 0.5,
     fog: clamp(safeFinite(config.fog, 0), 0, 1),
@@ -526,7 +533,7 @@ export function getThreeDRenderParams(
               : 1
       )
       : 0,
-    tangentHalfFov: Math.tan(camera.fovDegrees * Math.PI / 360),
+    tangentHalfFov: Math.tan((classicCone ? CONE_CAMERA_FOV : camera.fovDegrees) * Math.PI / 360),
     textureRepeat: transform.repeatU,
     // The Torus camera rides the ring while Spin still turns its texture.
     textureOffset: config.shape === 'torus'
@@ -536,8 +543,13 @@ export function getThreeDRenderParams(
         : [transform.offsetU, transform.offsetV],
     seamBlend: transform.seamBlend,
     seamMode: CONE_SEAM_MODE_INDEX[transform.seamMode],
-    // The Cone keeps Rotation as a texture offset, so only the wiggle rolls it.
-    camera: isCone ? { ...camera, rollRadians: getCameraWiggle(config, normalizedTime).roll * Math.PI / 180 } : camera,
+    // The Cone keeps Rotation as a texture offset, so only the wiggle rolls
+    // the free Cone camera; the classic Cone camera does not move at all.
+    camera: classicCone
+      ? { offsetX: 0, offsetY: 0, yawRadians: 0, pitchRadians: 0, rollRadians: 0, fovDegrees: CONE_CAMERA_FOV, dolly: 0 }
+      : isCone
+        ? { ...camera, rollRadians: getCameraWiggle(config, normalizedTime).roll * Math.PI / 180 }
+        : camera,
     cone: {
       cameraDistance: CONE_CAMERA_DISTANCE,
       depth: config.depth,

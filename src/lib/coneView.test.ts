@@ -113,9 +113,9 @@ describe('3D render parameters', () => {
     expect(cone.shape).toBe(0);
     expect(cone.camera.rollRadians).toBe(0);
     expect(cone.textureOffset[0]).toBeCloseTo(0.25, 10);
-    // Only the wiggle rolls the Cone camera; Rotation stays the texture offset.
+    // Only the wiggle rolls the free Cone camera; Rotation stays the texture offset.
     const swaying = { ...DEFAULT_CONE_VIEW, rotation: 90, wigglePreset: 'sway' as const };
-    expect(getThreeDRenderParams(swaying, 0.25, 1).camera.rollRadians).toBeCloseTo(14 * Math.PI / 180, 10);
+    expect(getThreeDRenderParams({ ...swaying, coneCameraMode: 'free' }, 0.25, 1).camera.rollRadians).toBeCloseTo(14 * Math.PI / 180, 10);
 
     const torus = getThreeDRenderParams({
       ...DEFAULT_CONE_VIEW,
@@ -433,24 +433,43 @@ describe('torus tunnel', () => {
     expect(getConeTextureTransform({ ...torus, spin: -1 }, 0.25).offsetU).toBeCloseTo(0.75, 10);
   });
 
-  it('uses the camera FOV for every shape, the Cone included', () => {
+  it('uses the camera FOV for every shape and the free Cone', () => {
     const wide = getThreeDRenderParams({ ...torus, cameraFov: 90 }, 0, 1);
     expect(wide.tangentHalfFov).toBeCloseTo(1, 10);
-    const cone = getThreeDRenderParams({ ...DEFAULT_CONE_VIEW, cameraFov: 90 }, 0, 1);
+    const cone = getThreeDRenderParams({ ...DEFAULT_CONE_VIEW, coneCameraMode: 'free', cameraFov: 90 }, 0, 1);
+    expect(cone.coneCameraMode).toBe(1);
     expect(cone.tangentHalfFov).toBeCloseTo(1, 10);
-    // The default FOV keeps the original 60 degree Cone camera.
-    expect(getThreeDRenderParams(DEFAULT_CONE_VIEW, 0, 1).tangentHalfFov).toBeCloseTo(Math.tan(Math.PI / 6), 10);
   });
 
-  it('keeps the Cone opening fixed while its FOV and zoom wiggle change', () => {
-    const base = getThreeDRenderParams(DEFAULT_CONE_VIEW, 0, 16 / 9);
-    const zoomed = getThreeDRenderParams({ ...DEFAULT_CONE_VIEW, cameraFov: 100, wigglePreset: 'zoomPulse' }, 0.1, 16 / 9);
+  it('keeps the classic Cone on its original fixed camera whatever the Camera settings are', () => {
+    const classic = getThreeDRenderParams({
+      ...DEFAULT_CONE_VIEW,
+      cameraFov: 120,
+      cameraYaw: 30,
+      cameraPitch: 10,
+      cameraX: 0.4,
+      cameraDolly: 0.5,
+      wigglePreset: 'handheld',
+      apexX: 0.5,
+    }, 0.3, 2);
+    expect(classic.coneCameraMode).toBe(0);
+    expect(classic.tangentHalfFov).toBeCloseTo(Math.tan(Math.PI / 6), 10);
+    expect(classic.camera).toEqual({ offsetX: 0, offsetY: 0, yawRadians: 0, pitchRadians: 0, rollRadians: 0, fovDegrees: 60, dolly: 0 });
+    // The apex keeps the original 60 degree placement.
+    const original = getConeApexOffset(CONE_CAMERA_DISTANCE, DEFAULT_CONE_VIEW.depth, 2, 0.5, 0);
+    expect(classic.cone.apexOffset).toEqual([original.x, original.y]);
+  });
+
+  it('keeps the free Cone opening fixed while its FOV and zoom wiggle change', () => {
+    const free = { ...DEFAULT_CONE_VIEW, coneCameraMode: 'free' as const };
+    const base = getThreeDRenderParams(free, 0, 16 / 9);
+    const zoomed = getThreeDRenderParams({ ...free, cameraFov: 100, wigglePreset: 'zoomPulse' }, 0.1, 16 / 9);
     expect(zoomed.cone.apertureRadius).toBe(base.cone.apertureRadius);
     expect(zoomed.tangentHalfFov).not.toBeCloseTo(base.tangentHalfFov, 3);
   });
 
-  it('places the Cone apex at its screen point through the base FOV', () => {
-    const config = { ...DEFAULT_CONE_VIEW, cameraFov: 90, apexX: 0.5, apexY: -0.25 };
+  it('places the free Cone apex at its screen point through the base FOV', () => {
+    const config = { ...DEFAULT_CONE_VIEW, coneCameraMode: 'free' as const, cameraFov: 90, apexX: 0.5, apexY: -0.25 };
     const params = getThreeDRenderParams(config, 0, 2);
     const apexDistance = CONE_CAMERA_DISTANCE + config.depth;
     // Projected through tan(45°) = 1 the apex lands on the requested point.

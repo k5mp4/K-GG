@@ -8,6 +8,7 @@ import { InputPosition } from 'tweeq';
 import { getParameterLimit } from '../lib/parameterLimits';
 import {
   CAMERA_WIGGLE_PRESET_OPTIONS,
+  CONE_CAMERA_MODE_OPTIONS,
   CONE_SEAM_MODE_OPTIONS,
   CONE_SHAPE_OPTIONS,
   DEFAULT_CONE_VIEW,
@@ -21,6 +22,7 @@ import {
   THREE_D_PROJECTION_OPTIONS,
   THREE_D_SURFACE_MAPPING_OPTIONS,
   type CameraWigglePreset,
+  type ConeCameraMode,
   type ConeSeamMode,
   type ConeShape,
   type ConeViewConfig,
@@ -611,6 +613,14 @@ function ShapeControls({ coneView, setConeView }: { coneView: ConeViewConfig; se
         format={(value) => value.toFixed(2)}
         onChange={(coneTwist) => setConeView({ coneTwist })}
       />
+      <CustomSelect
+        label="Camera Mode"
+        value={coneView.coneCameraMode}
+        localizeLabel={false}
+        localizeOptions={false}
+        options={[...CONE_CAMERA_MODE_OPTIONS]}
+        onChange={(coneCameraMode) => setConeView({ coneCameraMode: coneCameraMode as ConeCameraMode })}
+      />
     </>
   );
 }
@@ -781,6 +791,8 @@ export function ConeViewPanel() {
   const { coneView } = useGradientStore();
   const { setConeView } = applicationCommands;
   const isCone = coneView.shape === 'cone';
+  // The classic Cone camera is fixed, so it has no Camera section.
+  const showCamera = !isCone || coneView.coneCameraMode === 'free';
   const shapeText = SHAPE_TEXT[coneView.shape];
 
   return (
@@ -817,9 +829,11 @@ export function ConeViewPanel() {
         </Section>
       )}
 
-      <Section title="Camera">
-        <CameraControls coneView={coneView} setConeView={setConeView} resetLabel={t('cone.resetPosition')} />
-      </Section>
+      {showCamera && (
+        <Section title="Camera">
+          <CameraControls coneView={coneView} setConeView={setConeView} resetLabel={t('cone.resetPosition')} />
+        </Section>
+      )}
 
       <Section
         title="Texture & Motion"

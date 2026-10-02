@@ -123,6 +123,19 @@ export const LATTICE_TYPE_OPTIONS: { value: LatticeType; label: string }[] = [
 export type ConeSeamMode = 'mirror' | 'weld' | 'reapply';
 
 /**
+ * Camera of the Cone shape. `classic` keeps the original fixed 60 degree
+ * camera and the cone bounded by its opening, so the apex handle behaves as
+ * it always has; `free` applies the shared Camera settings and extends the
+ * cone behind its opening.
+ */
+export type ConeCameraMode = 'classic' | 'free';
+export const CONE_CAMERA_MODES = ['classic', 'free'] as const satisfies readonly ConeCameraMode[];
+export const CONE_CAMERA_MODE_OPTIONS: { value: ConeCameraMode; label: string }[] = [
+  { value: 'classic', label: 'Classic · Fixed camera' },
+  { value: 'free', label: 'Free · Camera controls' },
+];
+
+/**
  * How the canvas is applied to a 3D surface. `uv` uses the shape's own surface
  * coordinates (shapes without them fall back to `triplanar`), `triplanar`
  * projects along the three world axes, and `matcap` looks the canvas up by the
@@ -201,6 +214,8 @@ export type ConeViewConfig = {
   spin: number;
   /** Cone only: turns of the texture around the cone from the opening to the apex. */
   coneTwist: number;
+  /** Cone only: fixed original camera, or the shared Camera settings. */
+  coneCameraMode: ConeCameraMode;
   /** Camera offset in screen right/up. The torus measures it in tube radii inside the cross-section. */
   cameraX: number;
   cameraY: number;
@@ -351,6 +366,7 @@ export const DEFAULT_CONE_VIEW: ConeViewConfig = {
   torusTwist: getParameterDefault('cone.torusTwist'),
   spin: getParameterDefault('cone.spin'),
   coneTwist: getParameterDefault('cone.coneTwist'),
+  coneCameraMode: 'classic',
   cameraX: getParameterDefault('cone.cameraX'),
   cameraY: getParameterDefault('cone.cameraY'),
   cameraYaw: getParameterDefault('cone.cameraYaw'),
@@ -447,6 +463,7 @@ export function normalizeConeViewConfig(value: unknown): ConeViewConfig {
     torusTwist: clampParameter(raw.torusTwist, DEFAULT_CONE_VIEW.torusTwist, getParameterLimit('cone.torusTwist')),
     spin: clampParameter(raw.spin, DEFAULT_CONE_VIEW.spin, getParameterLimit('cone.spin')),
     coneTwist: clampParameter(raw.coneTwist, DEFAULT_CONE_VIEW.coneTwist, getParameterLimit('cone.coneTwist')),
+    coneCameraMode: normalizeOption(raw.coneCameraMode, CONE_CAMERA_MODES, DEFAULT_CONE_VIEW.coneCameraMode),
     cameraX: clampParameter(raw.cameraX, DEFAULT_CONE_VIEW.cameraX, getParameterLimit('cone.cameraX')),
     cameraY: clampParameter(raw.cameraY, DEFAULT_CONE_VIEW.cameraY, getParameterLimit('cone.cameraY')),
     cameraYaw: clampParameter(raw.cameraYaw, DEFAULT_CONE_VIEW.cameraYaw, getParameterLimit('cone.cameraYaw')),

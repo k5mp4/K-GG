@@ -56,6 +56,7 @@ describe('cone view configuration', () => {
       torusTwist: 0,
       spin: 0,
       coneTwist: 0,
+      coneCameraMode: 'classic',
       cameraX: 0,
       cameraY: 0,
       cameraYaw: 0,
@@ -207,6 +208,12 @@ describe('cone view configuration', () => {
       terrainHeight: 2,
       terrainAltitude: 0.1,
     });
+  });
+
+  it('keeps presets without a Cone camera mode on the classic camera', () => {
+    expect(normalizeConeViewConfig({}).coneCameraMode).toBe('classic');
+    expect(normalizeConeViewConfig({ coneCameraMode: 'free' }).coneCameraMode).toBe('free');
+    expect(normalizeConeViewConfig({ coneCameraMode: 'orbit' }).coneCameraMode).toBe('classic');
   });
 
   it('clamps the Cone twist', () => {

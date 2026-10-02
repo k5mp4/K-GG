@@ -50,6 +50,8 @@ uniform float u_coneDepth;
 uniform float u_coneApertureRadius;
 uniform vec2 u_coneApexOffset;
 uniform float u_coneTwist;
+// 0: classic fixed camera, 1: the shared Camera settings.
+uniform int u_coneCameraMode;
 
 uniform float u_torusMajorRadius;
 uniform float u_ringRepeat;
@@ -327,7 +329,56 @@ void threeDSetCameraBasis(vec3 forward, vec3 up) {
 
 #if KGG_THREE_D_SHAPE < 0 || KGG_THREE_D_SHAPE == 0
 // ---------------------------------------------------------------------------
-// Cone: the camera's base frame sits at the origin looking down -Z. The
+// Classic Cone: the original analytic intersection. The fixed camera at the
+// origin looks down -Z through a 60 degree screen ray, and only the surface
+// between the opening and the apex exists, so the apex handle keeps its
+// original behavior. Rays that miss that part are black.
+vec2 coneClassicMappedUv(vec2 globalUv, out bool hitCone) {
+  float aspect = u_fullResolution.x / max(u_fullResolution.y, 1.0);
+  vec2 ndc = globalUv * 2.0 - 1.0;
+  vec3 rayDirection = vec3(
+    ndc.x * aspect * u_coneTangentHalfFov,
+    ndc.y * u_coneTangentHalfFov,
+    -1.0
+  );
+  float depth = max(u_coneDepth, 0.001);
+  float cameraDistance = max(u_coneCameraDistance, 0.001);
+  vec2 apexOffset = u_coneApexOffset;
+  vec2 rayFromBase = rayDirection.xy - apexOffset / depth;
+  vec2 baseOffset = apexOffset * cameraDistance / depth;
+  float radiusSlope = u_coneApertureRadius / depth;
+  float radiusIntercept = u_coneApertureRadius * (cameraDistance + depth) / depth;
+  float qa = dot(rayFromBase, rayFromBase) - radiusSlope * radiusSlope;
+  float qb = 2.0 * dot(rayFromBase, baseOffset) + 2.0 * radiusSlope * radiusIntercept;
+  float qc = dot(baseOffset, baseOffset) - radiusIntercept * radiusIntercept;
+  hitCone = false;
+  float minDistance = cameraDistance;
+  float maxDistance = cameraDistance + depth;
+  float distance = maxDistance + 1.0;
+  if (abs(qa) < 0.000001) {
+    if (abs(qb) < 0.000001) return vec2(0.0);
+    float linearDistance = -qc / qb;
+    if (linearDistance >= minDistance && linearDistance <= maxDistance) distance = linearDistance;
+  } else {
+    float discriminant = qb * qb - 4.0 * qa * qc;
+    if (discriminant < 0.0) return vec2(0.0);
+    float root = sqrt(max(discriminant, 0.0));
+    float firstDistance = (-qb - root) / (2.0 * qa);
+    float secondDistance = (-qb + root) / (2.0 * qa);
+    if (firstDistance >= minDistance && firstDistance <= maxDistance) distance = firstDistance;
+    if (secondDistance >= minDistance && secondDistance <= maxDistance) distance = min(distance, secondDistance);
+  }
+  if (distance < minDistance || distance > maxDistance) return vec2(0.0);
+  vec2 surfacePoint = rayDirection.xy * distance;
+  float depthFraction = (distance - cameraDistance) / depth;
+  vec2 radialPoint = surfacePoint - apexOffset * depthFraction;
+  float u = fract(atan(radialPoint.x, radialPoint.y) / TAU);
+  float v = clamp((distance - cameraDistance) / depth, 0.0, 1.0);
+  hitCone = true;
+  return vec2(u, v);
+}
+
+// Free Cone: the camera's base frame sits at the origin looking down -Z. The
 // opening of radius u_coneApertureRadius lies at z = -cameraDistance and the
 // apex at (apexOffset, -(cameraDistance + depth)); every cross-section is a
 // z-plane. The surface continues behind the opening, past the camera, so a
@@ -335,7 +386,7 @@ void threeDSetCameraBasis(vec3 forward, vec3 up) {
 // around the axis and v from the opening (0) to the apex (1); v is negative
 // behind the opening.
 
-vec2 coneMappedUv(vec3 rayOrigin, vec3 rayDirection, out bool hitCone) {
+vec2 coneFreeMappedUv(vec3 rayOrigin, vec3 rayDirection, out bool hitCone) {
   hitCone = false;
   float depth = max(u_coneDepth, 0.001);
   float cameraDistance = max(u_coneCameraDistance, 0.001);
@@ -1689,22 +1740,27 @@ void main() {
   vec2 globalUv = (gl_FragCoord.xy + u_tileOffset) / max(u_fullResolution, vec2(1.0));
   vec4 background = vec4(0.0, 0.0, 0.0, 1.0);
 
-  bool validRay;
-  vec3 localRay = threeDLookRay(threeDProjectedRay(globalUv, validRay));
-  if (!validRay) {
-    gl_FragColor = background;
-    return;
-  }
-
 #if KGG_THREE_D_SHAPE < 0 || KGG_THREE_D_SHAPE == 0
   if (KGG_THREE_D_SHAPE == 0 || u_threeDShape == SHAPE_CONE) {
-    // The Cone's base camera is its own frame. Camera Position moves it in
-    // aperture radii and Dolly toward the apex in units of the distance to
-    // the middle of the cone. The Cone keeps its unlit UV mapping.
-    vec3 coneOrigin = vec3(threeDRollMatrix() * u_cameraOffset * u_coneApertureRadius, 0.0)
-      + threeDLookRay(vec3(0.0, 0.0, -1.0)) * u_cameraDolly * (u_coneCameraDistance + 0.5 * u_coneDepth);
+    // The Cone keeps its unlit UV mapping in both camera modes.
     bool hitCone;
-    vec2 mappedUv = coneMappedUv(coneOrigin, localRay, hitCone);
+    vec2 mappedUv;
+    if (u_coneCameraMode == 0) {
+      mappedUv = coneClassicMappedUv(globalUv, hitCone);
+    } else {
+      bool validConeRay;
+      vec3 coneRay = threeDLookRay(threeDProjectedRay(globalUv, validConeRay));
+      if (!validConeRay) {
+        gl_FragColor = background;
+        return;
+      }
+      // The free Cone's base camera is its own frame. Camera Position moves it
+      // in aperture radii and Dolly toward the apex in units of the distance
+      // to the middle of the cone.
+      vec3 coneOrigin = vec3(threeDRollMatrix() * u_cameraOffset * u_coneApertureRadius, 0.0)
+        + threeDLookRay(vec3(0.0, 0.0, -1.0)) * u_cameraDolly * (u_coneCameraDistance + 0.5 * u_coneDepth);
+      mappedUv = coneFreeMappedUv(coneOrigin, coneRay, hitCone);
+    }
     if (!hitCone) {
       gl_FragColor = background;
       return;
@@ -1719,6 +1775,13 @@ void main() {
 #if KGG_THREE_D_SHAPE == 0
   gl_FragColor = background;
 #else
+  bool validRay;
+  vec3 localRay = threeDLookRay(threeDProjectedRay(globalUv, validRay));
+  if (!validRay) {
+    gl_FragColor = background;
+    return;
+  }
+
   ThreeDHit hit;
   float fogScale = 0.25;
 #if KGG_THREE_D_SHAPE < 0

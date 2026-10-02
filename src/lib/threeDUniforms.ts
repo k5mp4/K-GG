@@ -87,6 +87,7 @@ export function uploadThreeDUniforms(
   float('u_coneApertureRadius', params.cone.apertureRadius);
   vec2('u_coneApexOffset', params.cone.apexOffset);
   float('u_coneTwist', params.coneTwist);
+  int('u_coneCameraMode', params.coneCameraMode);
   float('u_torusMajorRadius', params.torus.majorRadius);
   float('u_ringRepeat', params.torus.ringRepeat);
   float('u_torusTwistTurns', params.torus.twistTurns);
