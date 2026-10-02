@@ -953,8 +953,10 @@ export type CrystalUniforms = {
   faceOpacity: number;
   ior: number;
   dispersion: number;
-  /** Wavelengths traced across the dispersion range; 1 when Dispersion is 0. */
+  /** Wavelengths read across the dispersion range; 1 when Dispersion is 0. */
   dispersionSteps: number;
+  /** Dispersion Blur strength; 0 when nothing is dispersed, which skips the blur pass. */
+  dispersionBlur: number;
   reflection: number;
   /** Camera distance from the origin along +Z. */
   cameraDistance: number;
@@ -1004,6 +1006,10 @@ export function getCrystalUniforms(config: ConeViewConfig, normalizedTime: numbe
     ior: Math.max(1, safeFinite(config.crystalIor, 1.6)),
     dispersion,
     dispersionSteps: dispersion > 0 ? clamp(Math.round(safeFinite(config.crystalDispersionSteps, 3)), 1, 10) : 1,
+    // Only refracted light disperses, and opaque faces hide all of it.
+    dispersionBlur: dispersion > 0 && config.crystalDispersionSteps > 1 && !(config.crystalMaterial === 'faces' && config.crystalFaceOpacity >= 0.999)
+      ? clamp(safeFinite(config.crystalDispersionBlur, 0), 0, 1)
+      : 0,
     reflection: clamp(safeFinite(config.crystalReflection, 0), 0, 1),
     cameraDistance,
     backdropZ,

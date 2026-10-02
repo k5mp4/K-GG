@@ -389,8 +389,10 @@ export type ConeViewConfig = {
   crystalIor: number;
   /** Crystals only: index difference from red to blue, which splits the colors. */
   crystalDispersion: number;
-  /** Crystals only: wavelengths traced across the Dispersion range, blended into a continuous spectrum; 1 traces one. */
+  /** Crystals only: wavelengths read across the Dispersion range; 1 does not split the light. */
   crystalDispersionSteps: number;
+  /** Crystals only: blur over the pixels where the dispersed spectrum spreads, softening its fringes. */
+  crystalDispersionBlur: number;
   /** Crystals only: strength of the mirrored surroundings and glints on the outer faces. */
   crystalReflection: number;
   /** Crystals only: distance from the farthest crystal to the canvas behind it. */
@@ -503,6 +505,7 @@ export const DEFAULT_CONE_VIEW: ConeViewConfig = {
   crystalIor: getParameterDefault('cone.crystalIor'),
   crystalDispersion: getParameterDefault('cone.crystalDispersion'),
   crystalDispersionSteps: getParameterDefault('cone.crystalDispersionSteps'),
+  crystalDispersionBlur: getParameterDefault('cone.crystalDispersionBlur'),
   crystalReflection: getParameterDefault('cone.crystalReflection'),
   crystalBackdrop: getParameterDefault('cone.crystalBackdrop'),
   crystalSpin: getParameterDefault('cone.crystalSpin'),
@@ -615,6 +618,7 @@ export function normalizeConeViewConfig(value: unknown): ConeViewConfig {
     crystalIor: clampParameter(raw.crystalIor, DEFAULT_CONE_VIEW.crystalIor, getParameterLimit('cone.crystalIor')),
     crystalDispersion: clampParameter(raw.crystalDispersion, DEFAULT_CONE_VIEW.crystalDispersion, getParameterLimit('cone.crystalDispersion')),
     crystalDispersionSteps: clampParameter(raw.crystalDispersionSteps, DEFAULT_CONE_VIEW.crystalDispersionSteps, getParameterLimit('cone.crystalDispersionSteps')),
+    crystalDispersionBlur: clampParameter(raw.crystalDispersionBlur, DEFAULT_CONE_VIEW.crystalDispersionBlur, getParameterLimit('cone.crystalDispersionBlur')),
     crystalReflection: clampParameter(raw.crystalReflection, DEFAULT_CONE_VIEW.crystalReflection, getParameterLimit('cone.crystalReflection')),
     crystalBackdrop: clampParameter(raw.crystalBackdrop, DEFAULT_CONE_VIEW.crystalBackdrop, getParameterLimit('cone.crystalBackdrop')),
     crystalSpin: clampParameter(raw.crystalSpin, DEFAULT_CONE_VIEW.crystalSpin, getParameterLimit('cone.crystalSpin')),

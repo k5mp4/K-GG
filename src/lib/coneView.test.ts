@@ -304,6 +304,16 @@ describe('3D render parameters', () => {
     expect(new Set(layout.map(crystal => crystal.form)).size).toBeGreaterThan(3);
   });
 
+  it('runs the Dispersion Blur pass only where a spectrum can split', () => {
+    const crystal = { ...DEFAULT_CONE_VIEW, shape: 'crystal' as const, crystalDispersionBlur: 0.7 };
+    expect(getCrystalUniforms(crystal, 0, 1).dispersionBlur).toBe(0.7);
+    expect(getCrystalUniforms({ ...crystal, crystalDispersion: 0 }, 0, 1).dispersionBlur).toBe(0);
+    expect(getCrystalUniforms({ ...crystal, crystalDispersionSteps: 1 }, 0, 1).dispersionBlur).toBe(0);
+    // Opaque faces hide the refraction; translucent ones still show its fringes.
+    expect(getCrystalUniforms({ ...crystal, crystalMaterial: 'faces', crystalFaceOpacity: 1 }, 0, 1).dispersionBlur).toBe(0);
+    expect(getCrystalUniforms({ ...crystal, crystalMaterial: 'faces', crystalFaceOpacity: 0.5 }, 0, 1).dispersionBlur).toBe(0.7);
+  });
+
   it('traces Dispersion Steps wavelengths only while Dispersion splits them', () => {
     const crystal = { ...DEFAULT_CONE_VIEW, shape: 'crystal' as const, crystalDispersionSteps: 10 };
     expect(getCrystalUniforms(crystal, 0, 1).dispersionSteps).toBe(10);

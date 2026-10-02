@@ -1722,8 +1722,6 @@ const int CRYSTAL_DISPERSION_STEPS = 10;
 // Sharpness and brightness of the head-light glint on the outer faces.
 const float CRYSTAL_GLINT_POWER = 48.0;
 const float CRYSTAL_GLINT_STRENGTH = 0.9;
-// Wavelengths that integrate the dispersed spectrum of a pixel.
-const int CRYSTAL_SPECTRUM_SAMPLES = 24;
 const int CRYSTAL_MATERIAL_FACES = 1;
 const float CRYSTAL_EPSILON = 0.0004;
 const float CRYSTAL_NO_HIT = 1.0e9;
@@ -1747,6 +1745,43 @@ uniform float u_crystalReflection;
 uniform float u_crystalCameraDistance;
 uniform float u_crystalBackdropZ;
 uniform float u_crystalBackdropHalfHeight;
+// 0 renders the crystals; 1 is the Dispersion Blur pass over that render.
+uniform int u_crystalPass;
+uniform float u_crystalDispersionBlur;
+// How strongly each pixel lies on a colored edge, written by the first pass.
+uniform sampler2D u_crystalMaskTex;
+// The first pass also writes that to a second render target.
+layout(location = 1) out vec4 kggCrystalMask;
+
+// Change per pixel of the offset between an end of the spectrum and its
+// middle (canvas widths) from which Dispersion Blur starts and is full.
+const float CRYSTAL_FRINGE_START = 0.02;
+const float CRYSTAL_FRINGE_FULL = 0.1;
+// Blur radius at Dispersion Blur 1, as a share of the frame height.
+const float CRYSTAL_BLUR_RADIUS = 0.02;
+const int CRYSTAL_BLUR_TAPS = 24;
+
+// Backdrop points of the ends and the middle of the last traced spectrum,
+// and the share of the refraction the pixel shows.
+vec2 g_crystalLow = vec2(0.0);
+vec2 g_crystalMiddle = vec2(0.0);
+vec2 g_crystalHigh = vec2(0.0);
+float g_crystalMask = 0.0;
+
+// How strongly this pixel lies on a colored edge: where an end of the
+// spectrum jumps to another face without the middle, the offset between them
+// changes abruptly from one pixel to the next. Where all wavelengths jump
+// together, at an ordinary facet edge, and inside a face, it changes slowly.
+// Screen derivatives, so main() calls it outside any branch.
+float crystalFringe() {
+  vec2 low = g_crystalLow - g_crystalMiddle;
+  vec2 high = g_crystalHigh - g_crystalMiddle;
+  float jump = max(
+    max(length(dFdx(low)), length(dFdy(low))),
+    max(length(dFdx(high)), length(dFdy(high)))
+  );
+  return smoothstep(CRYSTAL_FRINGE_START, CRYSTAL_FRINGE_FULL, jump) * g_crystalMask;
+}
 
 // Directions of three adjacent hexagon side faces; the other three face the opposite way.
 const vec2 CRYSTAL_RADIALS[3] = vec2[3](vec2(1.0, 0.0), vec2(0.5, 0.8660254), vec2(-0.5, 0.8660254));
@@ -1983,45 +2018,48 @@ vec3 crystalSpectrumWeight(float wavelength) {
   return exp(-offset * offset);
 }
 
-float crystalTraceIor(float wavelength) {
-  return max(max(u_crystalIor, 1.0) + u_crystalDispersion * (wavelength - 0.5), 1.0);
-}
-
-// Dispersion traces Dispersion Steps wavelengths spread evenly over IOR ±
-// Dispersion / 2, ends included, and integrates the spectrum with
-// CRYSTAL_SPECTRUM_SAMPLES wavelengths in between: each one reads the canvas
-// on the straight line between the backdrop points of the two traced
-// wavelengths around it. The fringes therefore blend into a continuous
-// gradient instead of splitting into one copy per traced wavelength, also
-// where the wavelengths leave the crystals through different faces; more
-// steps follow the real paths more closely, at one trace each.
-// `traced` is false when opaque faces hide the refraction. Every trace runs in
-// a loop whose length comes from uniforms, so ANGLE's HLSL compiler keeps it
-// as a loop instead of flattening a skipped branch into always running it.
+// Dispersion traces the two ends of the IOR range and its middle, then
+// spreads Dispersion Steps wavelengths evenly over the range: each one reads
+// the canvas where the quadratic through the three traced backdrop points
+// puts it, so more steps cost texture reads, not traces, and fill the fringe
+// in with a continuous spectrum.
+// `traced` is false when opaque faces hide the refraction. The traces run in a
+// loop whose length comes from uniforms, so ANGLE's HLSL compiler keeps it as
+// a loop instead of flattening a skipped branch into always running it.
 vec4 crystalRefraction(vec3 origin, vec3 direction, bool traced) {
+  float ior = max(u_crystalIor, 1.0);
   int steps = clamp(u_crystalDispersionSteps, 1, CRYSTAL_DISPERSION_STEPS);
-  int traces = traced ? steps : 0;
-  vec3 sum = vec3(0.0);
-  vec3 weights = vec3(0.0);
-  vec2 previous = vec2(0.5);
-  int perSpan = max(CRYSTAL_SPECTRUM_SAMPLES / max(steps - 1, 1), 1);
-  for (int trace = 0; trace < CRYSTAL_DISPERSION_STEPS; trace++) {
+  int traces = traced ? (steps == 1 ? 1 : 3) : 0;
+  vec2 middle = vec2(0.5);
+  vec2 low = vec2(0.5);
+  vec2 high = vec2(0.5);
+  for (int trace = 0; trace < 3; trace++) {
     if (trace >= traces) break;
-    float wavelength = steps == 1 ? 0.5 : float(trace) / float(steps - 1);
-    vec2 point = crystalTrace(origin, direction, crystalTraceIor(wavelength));
-    if (steps == 1) return crystalBackdropSample(point);
-    // Samples of the span from the previous traced wavelength to this one.
-    int samples = trace == 0 ? 0 : perSpan;
-    for (int index = 0; index < CRYSTAL_SPECTRUM_SAMPLES; index++) {
-      if (index >= samples) break;
-      float along = (float(index) + 0.5) / float(samples);
-      vec3 weight = crystalSpectrumWeight((float(trace - 1) + along) / float(steps - 1));
-      sum += crystalBackdropSample(mix(previous, point, along)).rgb * weight;
-      weights += weight;
-    }
-    previous = point;
+    float traceIor = trace == 0 ? ior
+      : trace == 1 ? max(ior - 0.5 * u_crystalDispersion, 1.0)
+      : ior + 0.5 * u_crystalDispersion;
+    vec2 point = crystalTrace(origin, direction, traceIor);
+    if (trace == 0) middle = point;
+    else if (trace == 1) low = point;
+    else high = point;
   }
   if (traces == 0) return vec4(0.0, 0.0, 0.0, 1.0);
+  if (traces == 1) return crystalBackdropSample(middle);
+  g_crystalLow = low;
+  g_crystalMiddle = middle;
+  g_crystalHigh = high;
+  vec3 sum = vec3(0.0);
+  vec3 weights = vec3(0.0);
+  for (int step = 0; step < CRYSTAL_DISPERSION_STEPS; step++) {
+    if (step >= steps) break;
+    float wavelength = (float(step) + 0.5) / float(steps);
+    vec2 uv = low * (2.0 * wavelength - 1.0) * (wavelength - 1.0)
+      + middle * 4.0 * wavelength * (1.0 - wavelength)
+      + high * wavelength * (2.0 * wavelength - 1.0);
+    vec3 weight = crystalSpectrumWeight(wavelength);
+    sum += crystalBackdropSample(uv).rgb * weight;
+    weights += weight;
+  }
   return vec4(sum / weights, 1.0);
 }
 
@@ -2076,6 +2114,7 @@ ThreeDHit crystalHit(vec3 localRay) {
   // Opaque faces hide the refraction, so it is not traced.
   bool traced = faceWeight < 0.999;
   vec4 color = crystalRefraction(rayOrigin, rayDirection, traced);
+  g_crystalMask = traced ? 1.0 - faceWeight : 0.0;
   if (traced) {
     // The head light from the camera's upper left, for Shade and the glints.
     vec3 light = normalize(-g_cameraForward + g_cameraUp * 0.6 - g_cameraRight * 0.4);
@@ -2113,6 +2152,36 @@ ThreeDHit crystalHit(vec3 localRay) {
   result.distance = firstDistance;
   result.mapScale = 0.5;
   return result;
+}
+
+// Dispersion Blur, the second pass: u_sourceTex holds the rendered crystals
+// and u_crystalMaskTex how strongly each pixel lies on a colored edge (see
+// crystalFringe). The edges are thin, so the strength around each pixel is
+// gathered from two rings up to the largest radius, fading with distance,
+// and a disc of CRYSTAL_BLUR_TAPS taps on a golden-angle spiral blurs the
+// pixel with a radius that follows it. The colored copies of an edge and the
+// bands between them melt into a gradient, while facet edges the whole
+// spectrum shares and the faces themselves stay sharp.
+vec4 crystalDispersionBlur(vec2 globalUv) {
+  vec2 pixel = 1.0 / max(u_fullResolution, vec2(1.0));
+  float reach = clamp(u_crystalDispersionBlur, 0.0, 1.0) * CRYSTAL_BLUR_RADIUS * u_fullResolution.y;
+  float strength = texture2D(u_crystalMaskTex, sourceUvFromGlobal(globalUv)).r;
+  for (int ring = 1; ring <= 2; ring++) {
+    float distance = float(ring) / 2.0;
+    for (int side = 0; side < 8; side++) {
+      float angle = (float(side) + 0.5 * float(ring)) * TAU / 8.0;
+      vec2 around = globalUv + vec2(cos(angle), sin(angle)) * distance * reach * pixel;
+      strength = max(strength, texture2D(u_crystalMaskTex, sourceUvFromGlobal(around)).r * (1.0 - 0.75 * distance));
+    }
+  }
+  float radius = reach * strength;
+  vec4 sum = coneTextureLookup(globalUv);
+  for (int tap = 0; tap < CRYSTAL_BLUR_TAPS; tap++) {
+    float along = sqrt((float(tap) + 0.5) / float(CRYSTAL_BLUR_TAPS));
+    float angle = float(tap) * 2.3999632;
+    sum += coneTextureLookup(globalUv + vec2(cos(angle), sin(angle)) * along * radius * pixel);
+  }
+  return sum / float(CRYSTAL_BLUR_TAPS + 1);
 }
 #endif
 
@@ -2166,6 +2235,13 @@ vec4 threeDApplyFog(vec4 color, float distance, float fogScale) {
 
 void main() {
   vec2 globalUv = (gl_FragCoord.xy + u_tileOffset) / max(u_fullResolution, vec2(1.0));
+#if KGG_THREE_D_SHAPE < 0 || KGG_THREE_D_SHAPE == 8
+  kggCrystalMask = vec4(0.0);
+  if (u_crystalPass == 1) {
+    gl_FragColor = crystalDispersionBlur(globalUv);
+    return;
+  }
+#endif
   vec4 background = vec4(0.0, 0.0, 0.0, 1.0);
 
 #if KGG_THREE_D_SHAPE < 0 || KGG_THREE_D_SHAPE == 0
@@ -2274,5 +2350,8 @@ void main() {
   if (ownShading && g_crystalFaceWeight > 0.0) color = mix(color, threeDSurfaceColor(hit), g_crystalFaceWeight);
   color.rgb *= hit.fade;
   gl_FragColor = threeDApplyFog(color, hit.distance, fogScale);
+#if KGG_THREE_D_SHAPE < 0 || KGG_THREE_D_SHAPE == 8
+  kggCrystalMask = vec4(crystalFringe(), 0.0, 0.0, 1.0);
+#endif
 #endif
 }

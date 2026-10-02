@@ -129,6 +129,7 @@ describe('cone view configuration', () => {
       crystalIor: 1.6,
       crystalDispersion: 0.08,
       crystalDispersionSteps: 3,
+      crystalDispersionBlur: 0.5,
       crystalReflection: 0.35,
       crystalBackdrop: 1,
       crystalSpin: 1,
@@ -179,6 +180,7 @@ describe('cone view configuration', () => {
     expect(normalizeConeViewConfig({
       crystalFaceOpacity: 3,
       crystalDispersionSteps: 14.2,
+      crystalDispersionBlur: 4,
       crystalCount: 40,
       crystalSize: 0,
       crystalLength: 9,
@@ -193,6 +195,7 @@ describe('cone view configuration', () => {
     })).toMatchObject({
       crystalFaceOpacity: 1,
       crystalDispersionSteps: 10,
+      crystalDispersionBlur: 1,
       crystalCount: 24,
       crystalSize: 0.3,
       crystalLength: 5,

@@ -158,6 +158,7 @@ export function uploadThreeDUniforms(
   float('u_crystalIor', params.crystal.ior);
   float('u_crystalDispersion', params.crystal.dispersion);
   int('u_crystalDispersionSteps', params.crystal.dispersionSteps);
+  float('u_crystalDispersionBlur', params.crystal.dispersionBlur);
   float('u_crystalReflection', params.crystal.reflection);
   float('u_crystalCameraDistance', params.crystal.cameraDistance);
   float('u_crystalBackdropZ', params.crystal.backdropZ);

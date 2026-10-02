@@ -632,6 +632,14 @@ function ShapeControls({ coneView, setConeView }: { coneView: ConeViewConfig; se
           onChange={(crystalDispersionSteps) => setConeView({ crystalDispersionSteps })}
         />
         <SliderField
+          label="Dispersion Blur"
+          value={coneView.crystalDispersionBlur}
+          limitKey="cone.crystalDispersionBlur"
+          disabled={coneView.crystalDispersion === 0 || coneView.crystalDispersionSteps <= 1}
+          format={percent}
+          onChange={(crystalDispersionBlur) => setConeView({ crystalDispersionBlur })}
+        />
+        <SliderField
           label="Reflection"
           value={coneView.crystalReflection}
           limitKey="cone.crystalReflection"
