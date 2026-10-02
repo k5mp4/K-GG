@@ -12,7 +12,6 @@ import {
   CONE_SEAM_MODE_OPTIONS,
   CONE_SHAPE_OPTIONS,
   CRYSTAL_FORM_OPTIONS,
-  CRYSTAL_LAYOUT_OPTIONS,
   CRYSTAL_MATERIAL_OPTIONS,
   DEFAULT_CONE_VIEW,
   DISCS_FORM_OPTIONS,
@@ -30,7 +29,6 @@ import {
   type ConeShape,
   type ConeViewConfig,
   type CrystalForm,
-  type CrystalLayout,
   type CrystalMaterial,
   type DiscsForm,
   type DiscsSpinPattern,
@@ -553,14 +551,6 @@ function ShapeControls({ coneView, setConeView }: { coneView: ConeViewConfig; se
     return (
       <>
         <CustomSelect
-          label="Layout"
-          value={coneView.crystalLayout}
-          localizeLabel={false}
-          localizeOptions={false}
-          options={[...CRYSTAL_LAYOUT_OPTIONS]}
-          onChange={(crystalLayout) => setConeView({ crystalLayout: crystalLayout as CrystalLayout })}
-        />
-        <CustomSelect
           label="Material"
           value={coneView.crystalMaterial}
           localizeLabel={false}
@@ -606,7 +596,7 @@ function ShapeControls({ coneView, setConeView }: { coneView: ConeViewConfig; se
           onChange={(crystalLength) => setConeView({ crystalLength })}
         />
         <SliderField
-          label={coneView.crystalLayout === 'fill' ? 'Field Depth' : 'Spread'}
+          label="Field Depth"
           value={coneView.crystalSpread}
           limitKey="cone.crystalSpread"
           format={percent}

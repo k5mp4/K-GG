@@ -1693,26 +1693,24 @@ ThreeDHit discsHit(vec3 localRay) {
 
 #if KGG_THREE_D_SHAPE < 0 || KGG_THREE_D_SHAPE == 8
 // ---------------------------------------------------------------------------
-// Crystals: hexagonal crystals between the camera and the canvas, which lies
-// on a backdrop plane behind them. Every crystal is a convex solid: a
-// hexagonal prism (apothem shape.x, half length shape.y) along its local +Y
-// axis with a six-sided pyramid of height shape.z on both ends; Bipyramids
-// have no prism. Rays are intersected analytically against its 18 face
-// planes. Crystals may intersect and hold the camera (the Fill layout lets
-// them), and every crystal stays its own piece of glass: a ray refracts by
-// Snell's law at every face it crosses, as from air into glass where it
-// enters a crystal and from glass into air where it leaves one, also where
-// crystals overlap, reflects internally where it would leave past the
-// critical angle, and carries on through the crystals behind, so crystals
-// stacked on screen bend the canvas behind them again and again. Without
-// overlaps this is plain glass of index IOR in air. Dispersion spreads Dispersion
-// Steps wavelengths over IOR ± Dispersion / 2 and blends them with
-// overlapping red, green, and blue weights into a spectrum (see
-// crystalRefraction). The first outer face also mirrors the canvas by a
-// Schlick Fresnel term scaled by Reflection. The Faces material lays the
-// shared surface mapping of the first face over the refraction by Face
-// Opacity (main() blends it). The layout, the poses for this frame, the
-// camera distance, and the backdrop come from getCrystalUniforms.
+// Crystals: crystals fill the view between the camera and the canvas, which
+// lies on a backdrop plane behind them. Every crystal is a convex solid along
+// its local +Y axis (see crystalSpan for the forms), intersected analytically
+// against its face planes. Crystals may intersect and hold the camera, and
+// every crystal stays its own piece of glass: a ray refracts by Snell's law
+// at every face it crosses, as from air into glass where it enters a crystal
+// and from glass into air where it leaves one, also where crystals overlap,
+// reflects internally where it would leave past the critical angle, and
+// carries on through the crystals behind, so crystals stacked on screen bend
+// the canvas behind them again and again. Without overlaps this is plain
+// glass of index IOR in air. Dispersion spreads Dispersion Steps wavelengths
+// over IOR ± Dispersion / 2 and blends them with overlapping red, green, and
+// blue weights into a spectrum (see crystalRefraction). The first outer face
+// also mirrors the canvas by a Schlick Fresnel term scaled by Reflection. The
+// Faces material lays the shared surface mapping of the first face over the
+// refraction by Face Opacity (main() blends it). The layout, the poses for
+// this frame, the camera distance, and the backdrop come from
+// getCrystalUniforms.
 
 const int CRYSTAL_MAX = 24;
 // Face crossings one wavelength follows: entries, exits, and reflections.
@@ -1731,7 +1729,7 @@ uniform int u_crystalCount;
 uniform vec4 u_crystalCenter[CRYSTAL_MAX];
 // From the crystal frame to the world.
 uniform mat3 u_crystalRotation[CRYSTAL_MAX];
-// Apothem, prism half length, pyramid height.
+// Radius, half length, pyramid height, and form (CRYSTAL_SHAPE_INDEX).
 uniform vec4 u_crystalShape[CRYSTAL_MAX];
 // 0: clear refracting glass, 1: the canvas mapped onto the faces.
 uniform int u_crystalMaterial;
@@ -1744,58 +1742,113 @@ uniform float u_crystalCameraDistance;
 uniform float u_crystalBackdropZ;
 uniform float u_crystalBackdropHalfHeight;
 
-// Directions of three adjacent side faces; the other three face the opposite way.
+// Directions of three adjacent hexagon side faces; the other three face the opposite way.
 const vec2 CRYSTAL_RADIALS[3] = vec2[3](vec2(1.0, 0.0), vec2(0.5, 0.8660254), vec2(-0.5, 0.8660254));
+// Tangent of the Rhombohedron face tilt (CRYSTAL_RHOMBOHEDRON_TAN, tan 50 degrees).
+const float CRYSTAL_RHOMBOHEDRON_TAN = 1.1917536;
+
+// The span of a ray through convex faces, built up one face at a time: x is
+// where it enters the last face it crosses inward, y where it leaves through
+// the first face it crosses outward, with the outward normals of both.
+struct CrystalSpan {
+  vec2 span;
+  vec3 entryNormal;
+  vec3 exitNormal;
+};
+
+CrystalSpan crystalSpanStart() {
+  CrystalSpan result;
+  result.span = vec2(-1.0e9, 1.0e9);
+  result.entryNormal = vec3(0.0, 0.0, 1.0);
+  result.exitNormal = vec3(0.0, 0.0, 1.0);
+  return result;
+}
+
+// Cuts the span by the half-space dot(normal, p) <= offset, and by its
+// opposite half-space too when it is one face of a slab.
+void crystalCut(inout CrystalSpan result, vec3 normal, float offset, bool slab, vec3 origin, vec3 direction) {
+  float approach = dot(normal, direction);
+  float position = dot(normal, origin);
+  if (abs(approach) < 1.0e-7) {
+    if (position > offset || (slab && position < -offset)) result.span = vec2(1.0, -1.0);
+    return;
+  }
+  float toPositive = (offset - position) / approach;
+  // Without the opposite face the ray stays inside on the other side forever.
+  float toNegative = slab ? (-offset - position) / approach : (approach < 0.0 ? 1.0e9 : -1.0e9);
+  vec3 facing = approach < 0.0 ? normal : -normal;
+  float enter = min(toPositive, toNegative);
+  float leave = max(toPositive, toNegative);
+  if (enter > result.span.x) {
+    result.span.x = enter;
+    result.entryNormal = facing;
+  }
+  if (leave < result.span.y) {
+    result.span.y = leave;
+    result.exitNormal = -facing;
+  }
+}
+
+// A unit face of a form scaled to radius r across the long axis and half
+// length h along it: dot(n, p) <= d becomes dot(n / s, p) <= d with s = (r, h, r).
+void crystalScaledCut(inout CrystalSpan result, vec3 unitNormal, float unitOffset, vec3 scale, bool slab, vec3 origin, vec3 direction) {
+  vec3 normal = unitNormal / scale;
+  float size = max(length(normal), 1.0e-9);
+  crystalCut(result, normal / size, unitOffset / size, slab, origin, direction);
+}
 
 // Entry (x) and exit (y) distances of a ray against one crystal in its local
-// frame, with the outward normals of the entry and exit faces. The ray misses
-// when x > y. The 18 faces form 9 pairs of parallel opposite faces: side k
-// with side k + 3, and each pyramid face with the face of the other pyramid
-// on the opposite side. Each pair is one slab |dot(n, p)| <= offset.
+// frame (long axis +Y), with the outward normals of the entry and exit faces.
+// The ray misses when x > y. shape holds the radius r, the half length h, the
+// pyramid height, and the form (CRYSTAL_SHAPE_INDEX); the faces match
+// getCrystalFaces in src/lib/coneView.ts.
 vec2 crystalSpan(vec3 origin, vec3 direction, vec4 shape, out vec3 entryNormal, out vec3 exitNormal) {
-  float apothem = shape.x;
-  float tip = shape.y + shape.z;
-  // A pyramid face holds the tip and the matching prism edge.
-  float slopeScale = inversesqrt(shape.z * shape.z + apothem * apothem);
-  float near = -1.0e9;
-  float far = 1.0e9;
-  entryNormal = vec3(0.0, 0.0, 1.0);
-  exitNormal = vec3(0.0, 0.0, 1.0);
-  for (int side = 0; side < 3; side++) {
-    vec2 radial = CRYSTAL_RADIALS[side];
-    for (int face = 0; face < 3; face++) {
-      vec3 normal = vec3(radial.x, 0.0, radial.y);
-      float offset = apothem;
-      if (face > 0) {
-        float end = face == 1 ? 1.0 : -1.0;
-        normal = vec3(radial.x * shape.z, end * apothem, radial.y * shape.z) * slopeScale;
-        offset = apothem * tip * slopeScale;
-      }
-      float approach = dot(normal, direction);
-      float position = dot(normal, origin);
-      if (abs(approach) < 1.0e-7) {
-        if (abs(position) > offset) return vec2(1.0, -1.0);
-        continue;
-      }
-      float toPositive = (offset - position) / approach;
-      float toNegative = (-offset - position) / approach;
-      // The ray enters through the face of the pair that faces it.
-      vec3 facing = approach < 0.0 ? normal : -normal;
-      float enter = min(toPositive, toNegative);
-      float leave = max(toPositive, toNegative);
-      if (enter > near) {
-        near = enter;
-        entryNormal = facing;
-      }
-      if (leave < far) {
-        far = leave;
-        exitNormal = -facing;
-      }
+  CrystalSpan result = crystalSpanStart();
+  int form = int(shape.w + 0.5);
+  vec3 scale = vec3(shape.x, shape.y, shape.x);
+  if (form <= 1) {
+    // Quartz and Bipyramid: a hexagonal prism (apothem a) with a pyramid of
+    // height shape.z on both ends. Side k pairs with side k + 3, and each
+    // pyramid face with the face of the other pyramid on the opposite side.
+    float apothem = shape.x * 0.8660254;
+    float slopeScale = inversesqrt(shape.z * shape.z + apothem * apothem);
+    for (int side = 0; side < 3; side++) {
+      vec2 radial = CRYSTAL_RADIALS[side];
+      crystalCut(result, vec3(radial.x, 0.0, radial.y), apothem, true, origin, direction);
+      crystalCut(result, vec3(radial.x * shape.z, apothem, radial.y * shape.z) * slopeScale, apothem * shape.y * slopeScale, true, origin, direction);
+      crystalCut(result, vec3(radial.x * shape.z, -apothem, radial.y * shape.z) * slopeScale, apothem * shape.y * slopeScale, true, origin, direction);
       // Most rays that reach the bounding sphere miss the crystal itself.
-      if (near > far) return vec2(1.0, -1.0);
+      if (result.span.x > result.span.y) return vec2(1.0, -1.0);
     }
+  } else if (form == 2) {
+    // Prism: a triangle of circumradius 1 across the axis with flat ends.
+    crystalScaledCut(result, vec3(0.0, 0.0, 1.0), 0.5, scale, false, origin, direction);
+    crystalScaledCut(result, vec3(-0.8660254, 0.0, -0.5), 0.5, scale, false, origin, direction);
+    crystalScaledCut(result, vec3(0.8660254, 0.0, -0.5), 0.5, scale, false, origin, direction);
+    crystalScaledCut(result, vec3(0.0, 1.0, 0.0), 1.0, scale, true, origin, direction);
+  } else if (form == 3) {
+    // Octahedron: |x| + |y| + |z| <= 1.
+    crystalScaledCut(result, vec3(1.0, 1.0, 1.0), 1.0, scale, true, origin, direction);
+    crystalScaledCut(result, vec3(1.0, 1.0, -1.0), 1.0, scale, true, origin, direction);
+    crystalScaledCut(result, vec3(-1.0, 1.0, 1.0), 1.0, scale, true, origin, direction);
+    crystalScaledCut(result, vec3(-1.0, 1.0, -1.0), 1.0, scale, true, origin, direction);
+  } else if (form == 4) {
+    // Rhombohedron: three slabs tilted around the axis.
+    crystalScaledCut(result, vec3(CRYSTAL_RHOMBOHEDRON_TAN, 1.0, 0.0), 1.0, scale, true, origin, direction);
+    crystalScaledCut(result, vec3(-0.5 * CRYSTAL_RHOMBOHEDRON_TAN, 1.0, 0.8660254 * CRYSTAL_RHOMBOHEDRON_TAN), 1.0, scale, true, origin, direction);
+    crystalScaledCut(result, vec3(-0.5 * CRYSTAL_RHOMBOHEDRON_TAN, 1.0, -0.8660254 * CRYSTAL_RHOMBOHEDRON_TAN), 1.0, scale, true, origin, direction);
+  } else {
+    // Dodecahedron: |x| + |y|, |y| + |z|, and |x| + |z| all at most 1.
+    crystalScaledCut(result, vec3(1.0, 1.0, 0.0), 1.0, scale, true, origin, direction);
+    crystalScaledCut(result, vec3(1.0, -1.0, 0.0), 1.0, scale, true, origin, direction);
+    crystalScaledCut(result, vec3(0.0, 1.0, 1.0), 1.0, scale, true, origin, direction);
+    crystalScaledCut(result, vec3(0.0, 1.0, -1.0), 1.0, scale, true, origin, direction);
+    crystalScaledCut(result, vec3(1.0, 0.0, 1.0), 1.0, scale, true, origin, direction);
+    crystalScaledCut(result, vec3(1.0, 0.0, -1.0), 1.0, scale, true, origin, direction);
   }
-  return vec2(near, far);
+  entryNormal = result.entryNormal;
+  exitNormal = result.exitNormal;
+  return result.span;
 }
 
 // The span of crystal i along a world ray with world normals, or
@@ -1955,14 +2008,15 @@ vec4 crystalRefraction(vec3 origin, vec3 direction, bool traced) {
 }
 
 // Planar coordinates on the face that holds a crystal-frame point, across the
-// face and along the crystal axis, so every face shows the canvas once.
+// face (one radius per tile, a hexagon side) and along the crystal axis (its
+// full length), so every face shows the canvas about once. Faces across the
+// axis, like the Prism ends, run along x instead.
 vec2 crystalFaceUv(vec3 local, vec3 localNormal, vec4 shape) {
-  vec3 across = normalize(cross(vec3(0.0, 1.0, 0.0), localNormal));
+  vec3 across = abs(localNormal.y) > 0.99
+    ? vec3(1.0, 0.0, 0.0)
+    : normalize(cross(vec3(0.0, 1.0, 0.0), localNormal));
   vec3 along = cross(localNormal, across);
-  // Half a hexagon side is apothem * tan(30 degrees).
-  float halfSide = shape.x * 0.57735027;
-  float tip = shape.y + shape.z;
-  return vec2(dot(local, across) / (2.0 * halfSide), dot(local, along) / (2.0 * tip)) + 0.5;
+  return vec2(dot(local, across) / max(shape.x, 1.0e-4), dot(local, along) / max(2.0 * shape.y, 1.0e-4)) + 0.5;
 }
 
 ThreeDHit crystalHit(vec3 localRay) {

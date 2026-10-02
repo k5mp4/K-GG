@@ -2,6 +2,7 @@ import {
   CONE_APEX_LIMIT,
   CONE_SEAM_MODE_INDEX,
   CONE_SHAPE_INDEX,
+  CRYSTAL_FORMS,
   DISCS_FORMS,
   DISCS_SPIN_PATTERNS,
   LATTICE_TYPES,
@@ -12,6 +13,7 @@ import {
   THREE_D_PROJECTIONS,
   THREE_D_SURFACE_MAPPING_INDEX,
   type ConeViewConfig,
+  type CrystalForm,
   type ConeSeamMode,
   type CameraWigglePreset,
 } from '../types/coneView';
@@ -492,45 +494,64 @@ export function getRingsMotion(config: ConeViewConfig, normalizedTime: number): 
 
 /** Most crystals the shader holds; its uniform arrays have this length. */
 export const CRYSTAL_MAX = 24;
-// Space kept between the bounding spheres of neighboring Cluster crystals.
-const CRYSTAL_CLEARANCE = 0.03;
-// Circumradius of a full-size crystal in canvas half heights, per layout.
-const CRYSTAL_BASE_RADIUS = { cluster: 0.16, fill: 0.5 } as const;
+// Circumradius of a full-size crystal in canvas half heights.
+const CRYSTAL_BASE_RADIUS = 0.5;
 // Pyramid height of a Quartz point relative to the circumradius.
 const CRYSTAL_QUARTZ_CAP = 1;
-// Candidate positions each Cluster crystal tries before it shrinks.
-const CRYSTAL_CANDIDATES = 48;
-// Fill crystals cover a disc slightly wider than the frame diagonal, so the
-// view stays covered while Revolve rolls them about the view axis.
+// The crystals cover the frame with this margin, or the disc around it.
 export const CRYSTAL_FILL_REACH = 1.05;
-// Extra reach of each Fill crystal over the widest gap it has to cover.
+// Extra reach of each crystal's central sphere over the widest gap in the fallback.
 const CRYSTAL_COVER_MARGIN = 1.05;
-// Grid steps across the disc when the widest gap between Fill directions is measured.
+// Grid steps across the covered region when coverage is checked.
 const CRYSTAL_COVER_GRID = 64;
-// Least distance from the camera to a Fill crystal center, in hexagon radii,
-// whenever covering the view allows it; the crystal reaches 1 radius toward it.
+// Least distance from the camera to a crystal center, in its reach across the
+// long axis, whenever covering the view allows it.
 export const CRYSTAL_FILL_CAMERA_GAP = 1.15;
+// Spheres along the long axis that measure what a crystal covers.
+const CRYSTAL_AXIS_SPHERES = 9;
+// Tangent of the face tilt of the Rhombohedron, about calcite's 50 degrees.
+export const CRYSTAL_RHOMBOHEDRON_TAN = Math.tan(50 * Math.PI / 180);
 const GOLDEN_ANGLE = Math.PI * (3 - Math.sqrt(5));
 
+/** Shader index of every crystal form; Quartz and Bipyramid share the hexagonal code. */
+export const CRYSTAL_SHAPE_INDEX = {
+  quartz: 0,
+  bipyramid: 1,
+  prism: 2,
+  octahedron: 3,
+  rhombohedron: 4,
+  dodecahedron: 5,
+} as const satisfies Record<CrystalShape, number>;
+
+export type CrystalShape = Exclude<CrystalForm, 'mix'>;
+const CRYSTAL_SHAPES = CRYSTAL_FORMS.filter((form): form is CrystalShape => form !== 'mix');
+
+type Vector3 = [number, number, number];
+
+/** The half-space dot(normal, p) <= offset in the crystal frame. */
+export type CrystalHalfSpace = { normal: Vector3; offset: number };
+
 export type CrystalPlacement = {
+  form: CrystalShape;
   /** Position before Revolve. */
-  center: [number, number, number];
-  /** Hexagon circumradius. */
+  center: Vector3;
+  /** Circumradius across the long axis before the form's own proportions. */
   radius: number;
-  /** Half length of the hexagonal prism between the two points. */
-  prismHalf: number;
-  /** Height of each pyramid point. */
+  /** Half length along the long axis (+Y). */
+  halfLength: number;
+  /** Height of each pyramid point; Quartz and Bipyramid only, otherwise 0. */
   capHeight: number;
   /** Radius of the sphere around the center that holds the crystal in any orientation. */
   boundRadius: number;
+  /** Farthest the crystal reaches from its long axis. */
+  reach: number;
   /** Column-major rotation from the crystal frame (long axis +Y) to the world. */
   rotation: number[];
-  spinAxis: [number, number, number];
-  /** Whole turns per loop per Spin about spinAxis: ±1 or ±2. */
-  spinRate: number;
-  /** Whole turns per loop per Spin about the crystal's own long axis. */
+  /** Whole turns per loop per Spin about the long axis: ±1 or ±2. */
   rollRate: number;
 };
+
+type CrystalSolid = Pick<CrystalPlacement, 'form' | 'radius' | 'halfLength' | 'capHeight'>;
 
 /** Seeded generator in [0, 1), so a layout is the same on every frame and export. */
 function createRandom(seed: number): () => number {
@@ -544,7 +565,7 @@ function createRandom(seed: number): () => number {
   };
 }
 
-function randomUnitVector(random: () => number): [number, number, number] {
+function randomUnitVector(random: () => number): Vector3 {
   const z = random() * 2 - 1;
   const angle = random() * 2 * Math.PI;
   const ring = Math.sqrt(Math.max(0, 1 - z * z));
@@ -576,7 +597,7 @@ function multiplyMatrices(a: readonly number[], b: readonly number[]): number[] 
   return result;
 }
 
-function transformVector(matrix: readonly number[], value: readonly number[]): [number, number, number] {
+function transformVector(matrix: readonly number[], value: readonly number[]): Vector3 {
   return [
     matrix[0] * value[0] + matrix[3] * value[1] + matrix[6] * value[2],
     matrix[1] * value[0] + matrix[4] * value[1] + matrix[7] * value[2],
@@ -600,29 +621,133 @@ function getCrystalTanHalfFov(config: ConeViewConfig): number {
 }
 
 /**
- * Radius of the sphere around the center that stays inside the crystal in any
- * orientation: the apothem, or the distance to a pyramid face when the points
- * are steeper than the prism is wide.
+ * Faces of a form scaled to `radius` across the long axis and `halfLength`
+ * along it: a unit face dot(n, p) <= d becomes dot(n / s, p) <= d with
+ * s = (radius, halfLength, radius). A slab is the face and its opposite.
  */
-export function getCrystalInscribedRadius(crystal: Pick<CrystalPlacement, 'radius' | 'prismHalf' | 'capHeight'>): number {
-  const apothem = crystal.radius * Math.cos(Math.PI / 6);
-  const tip = crystal.prismHalf + crystal.capHeight;
-  return Math.min(apothem, apothem * tip / Math.hypot(crystal.capHeight, apothem));
+function scaledFaces(
+  faces: readonly { normal: Vector3; offset: number; slab: boolean }[],
+  radius: number,
+  halfLength: number,
+): CrystalHalfSpace[] {
+  return faces.flatMap(({ normal, offset, slab }) => {
+    const scaled: Vector3 = [normal[0] / radius, normal[1] / halfLength, normal[2] / radius];
+    const length = Math.hypot(...scaled);
+    const unit = scaled.map(value => value / length) as Vector3;
+    const face = { normal: unit, offset: offset / length };
+    return slab ? [face, { normal: unit.map(value => -value) as Vector3, offset: face.offset }] : [face];
+  });
 }
 
 /**
- * Spheres along the long axis (offsets in the crystal frame) that stay inside
- * the crystal however it rolls about that axis: within the hexagonal prism
- * the apothem, and toward the points the distance to the pyramid faces.
+ * The faces of a crystal in its frame (long axis +Y), matching crystalSpan in
+ * three-d.frag.glsl:
+ * - Quartz and Bipyramid: a hexagonal prism with a six-sided pyramid of height
+ *   capHeight on both ends; Bipyramid has no prism.
+ * - Prism: a triangular prism across the long axis with flat ends.
+ * - Octahedron: |x| / r + |y| / h + |z| / r <= 1.
+ * - Rhombohedron: three slabs tilted CRYSTAL_RHOMBOHEDRON_TAN off the axis,
+ *   a skewed cube standing on a corner like calcite.
+ * - Dodecahedron: the rhombic dodecahedron of garnet, |x| + |y| <= 1 and its
+ *   two companions, scaled.
  */
-export function getCrystalAxisSpheres(crystal: Pick<CrystalPlacement, 'radius' | 'prismHalf' | 'capHeight'>): { offset: number; radius: number }[] {
-  const apothem = crystal.radius * Math.cos(Math.PI / 6);
-  const tip = crystal.prismHalf + crystal.capHeight;
-  const slope = Math.hypot(crystal.capHeight, apothem);
-  return Array.from({ length: 9 }, (_, index) => {
-    const offset = tip * 0.85 * (index / 4 - 1);
-    return { offset, radius: Math.min(apothem, apothem * (tip - Math.abs(offset)) / slope) };
-  });
+export function getCrystalFaces(crystal: CrystalSolid): CrystalHalfSpace[] {
+  const { radius, halfLength } = crystal;
+  if (crystal.form === 'quartz' || crystal.form === 'bipyramid') {
+    const apothem = radius * Math.cos(Math.PI / 6);
+    const slope = Math.hypot(crystal.capHeight, apothem);
+    return Array.from({ length: 6 }, (_, side) => {
+      const angle = side * Math.PI / 3;
+      const [x, z] = [Math.cos(angle), Math.sin(angle)];
+      return [-1, 0, 1].map(end => (end === 0
+        ? { normal: [x, 0, z] as Vector3, offset: apothem }
+        : {
+          normal: [x * crystal.capHeight / slope, end * apothem / slope, z * crystal.capHeight / slope] as Vector3,
+          offset: apothem * halfLength / slope,
+        }));
+    }).flat();
+  }
+  if (crystal.form === 'prism') {
+    return scaledFaces([
+      ...[0, 1, 2].map(side => {
+        const angle = Math.PI / 2 + side * 2 * Math.PI / 3;
+        return { normal: [Math.cos(angle), 0, Math.sin(angle)] as Vector3, offset: 0.5, slab: false };
+      }),
+      { normal: [0, 1, 0], offset: 1, slab: true },
+    ], radius, halfLength);
+  }
+  if (crystal.form === 'octahedron') {
+    return scaledFaces([[1, 1], [1, -1], [-1, 1], [-1, -1]].map(([x, z]) => (
+      { normal: [x, 1, z] as Vector3, offset: 1, slab: true }
+    )), radius, halfLength);
+  }
+  if (crystal.form === 'rhombohedron') {
+    return scaledFaces([0, 1, 2].map(side => {
+      const angle = side * 2 * Math.PI / 3;
+      return {
+        normal: [CRYSTAL_RHOMBOHEDRON_TAN * Math.cos(angle), 1, CRYSTAL_RHOMBOHEDRON_TAN * Math.sin(angle)] as Vector3,
+        offset: 1,
+        slab: true,
+      };
+    }), radius, halfLength);
+  }
+  return scaledFaces(([[1, 1, 0], [1, -1, 0], [0, 1, 1], [0, 1, -1], [1, 0, 1], [1, 0, -1]] as Vector3[]).map(normal => (
+    { normal, offset: 1, slab: true }
+  )), radius, halfLength);
+}
+
+/** Corners of the solid bounded by `faces`, found as feasible meeting points of three faces. */
+function getCrystalVertices(faces: readonly CrystalHalfSpace[]): Vector3[] {
+  const vertices: Vector3[] = [];
+  for (let a = 0; a < faces.length; a += 1) {
+    for (let b = a + 1; b < faces.length; b += 1) {
+      for (let c = b + 1; c < faces.length; c += 1) {
+        const [n1, n2, n3] = [faces[a].normal, faces[b].normal, faces[c].normal];
+        const cross23: Vector3 = [n2[1] * n3[2] - n2[2] * n3[1], n2[2] * n3[0] - n2[0] * n3[2], n2[0] * n3[1] - n2[1] * n3[0]];
+        const determinant = n1[0] * cross23[0] + n1[1] * cross23[1] + n1[2] * cross23[2];
+        if (Math.abs(determinant) < 1e-9) continue;
+        const cross31: Vector3 = [n3[1] * n1[2] - n3[2] * n1[1], n3[2] * n1[0] - n3[0] * n1[2], n3[0] * n1[1] - n3[1] * n1[0]];
+        const cross12: Vector3 = [n1[1] * n2[2] - n1[2] * n2[1], n1[2] * n2[0] - n1[0] * n2[2], n1[0] * n2[1] - n1[1] * n2[0]];
+        const point = [0, 1, 2].map(axis => (
+          faces[a].offset * cross23[axis] + faces[b].offset * cross31[axis] + faces[c].offset * cross12[axis]
+        ) / determinant) as Vector3;
+        const inside = faces.every(face => (
+          face.normal[0] * point[0] + face.normal[1] * point[1] + face.normal[2] * point[2] <= face.offset + 1e-9
+        ));
+        if (inside) vertices.push(point);
+      }
+    }
+  }
+  return vertices;
+}
+
+/** Bounding radius, reach from the long axis, and half extent along it. */
+function getCrystalExtents(crystal: CrystalSolid): { boundRadius: number; reach: number; axisExtent: number } {
+  const vertices = getCrystalVertices(getCrystalFaces(crystal));
+  return {
+    boundRadius: Math.max(...vertices.map(vertex => Math.hypot(...vertex))),
+    reach: Math.max(...vertices.map(vertex => Math.hypot(vertex[0], vertex[2]))),
+    axisExtent: Math.max(...vertices.map(vertex => Math.abs(vertex[1]))),
+  };
+}
+
+/**
+ * Spheres centered on the long axis (offsets in the crystal frame) that stay
+ * inside the crystal however it rolls about that axis: each radius is the
+ * distance from its center to the nearest face.
+ */
+export function getCrystalAxisSpheres(crystal: CrystalSolid): { offset: number; radius: number }[] {
+  const faces = getCrystalFaces(crystal);
+  const { axisExtent } = getCrystalExtents(crystal);
+  return Array.from({ length: CRYSTAL_AXIS_SPHERES }, (_, index) => {
+    const offset = axisExtent * 0.85 * (2 * index / (CRYSTAL_AXIS_SPHERES - 1) - 1);
+    return { offset, radius: Math.min(...faces.map(face => face.offset - face.normal[1] * offset)) };
+  }).filter(sphere => sphere.radius > 0);
+}
+
+/** Radius of the sphere around the center that stays inside the crystal in any orientation. */
+export function getCrystalInscribedRadius(crystal: CrystalSolid): number {
+  return Math.min(...getCrystalFaces(crystal).map(face => face.offset));
 }
 
 /**
@@ -650,36 +775,29 @@ function getCoveringRadius(points: readonly (readonly [number, number])[], radiu
 let crystalLayoutCache: { key: string; layout: CrystalPlacement[] } | null = null;
 
 /**
- * Places the Crystals deterministically from Seed. Each crystal gets a random
- * size, orientation, and spin axis.
- *
- * Fill always covers the whole view. It aims the crystals at the frame (with
- * a CRYSTAL_FILL_REACH margin) on a jittered grid or, while Revolve rolls them
- * about the view axis, at the disc around it on a jittered sunflower spiral,
- * and places each one along its direction from the camera, which frames the
- * canvas half height at the base FOV. Each crystal lies across its line of
- * sight, and Spin only rolls it about its own long axis, so the spheres along
- * that axis (see getCrystalAxisSpheres) stay inside it and in place, and it
- * reaches toward the camera only by its hexagon radius. The crystals start at
- * random depths, from 2 to 2 + 3 * Spread (Field Depth) hexagon radii away;
- * while a point of the region is left uncovered by the axis spheres, the
- * crystal that comes closest to it moves 10% closer, but never within
- * CRYSTAL_FILL_CAMERA_GAP radii of the camera. If that cannot cover the view,
- * every crystal comes as close as needed for its central sphere to span the
- * widest gap between the directions over the disc, which covers it by
- * construction. Every ray of the base camera therefore meets a crystal.
+ * Places the Crystals deterministically from Seed so that they always cover
+ * the whole view. Each crystal gets a random form (Mix) and size, and aims at
+ * the frame (with a CRYSTAL_FILL_REACH margin) on a jittered grid or, while
+ * Revolve rolls the crystals about the view axis, at the disc around it on a
+ * jittered sunflower spiral. It sits along its direction from the camera,
+ * which frames the canvas half height at the base FOV, and lies across its
+ * line of sight; Spin only rolls it about its own long axis, so the spheres
+ * along that axis (see getCrystalAxisSpheres) stay inside it and in place,
+ * and it reaches toward the camera only by its reach from that axis. The
+ * crystals start at random depths, from 2 to 2 + 3 * Spread (Field Depth)
+ * radii away; while a point of the region is left uncovered by the axis
+ * spheres, the crystal that comes closest to it moves 10% closer, but never
+ * within CRYSTAL_FILL_CAMERA_GAP reaches of the camera. If that cannot cover
+ * the view, every crystal comes as close as needed for its central sphere to
+ * span the widest gap between the directions over the disc, which covers it
+ * by construction. Every ray of the base camera therefore meets a crystal.
  * Crystals may intersect each other.
- *
- * Cluster places each crystal inside an ellipsoid sized by Spread (wider with
- * the canvas) where its bounding sphere stays clear of every crystal placed
- * before it. A crystal that finds no room shrinks and tries again, and is left
- * out after a few attempts, so no two crystals ever intersect.
  */
 export function getCrystalLayout(config: ConeViewConfig, aspect = 1): CrystalPlacement[] {
   // Poses are evaluated every frame, but the layout only changes with these.
   const key = JSON.stringify([
-    config.crystalSeed, config.crystalLayout, config.crystalCount, config.crystalSize, config.crystalLength,
-    config.crystalSpread, config.crystalForm, config.cameraFov, Math.round(config.crystalRevolve) !== 0, aspect,
+    config.crystalSeed, config.crystalCount, config.crystalSize, config.crystalLength, config.crystalSpread,
+    config.crystalForm, config.cameraFov, Math.round(config.crystalRevolve) !== 0, aspect,
   ]);
   if (crystalLayoutCache?.key !== key) crystalLayoutCache = { key, layout: computeCrystalLayout(config, aspect) };
   return crystalLayoutCache.layout;
@@ -687,183 +805,138 @@ export function getCrystalLayout(config: ConeViewConfig, aspect = 1): CrystalPla
 
 function computeCrystalLayout(config: ConeViewConfig, aspect: number): CrystalPlacement[] {
   const random = createRandom(safeFinite(config.crystalSeed, 0));
-  const fill = config.crystalLayout !== 'cluster';
   const count = clamp(Math.round(safeFinite(config.crystalCount, 12)), 1, CRYSTAL_MAX);
   const size = Math.max(0.05, safeFinite(config.crystalSize, 1));
   const length = Math.max(1, safeFinite(config.crystalLength, 2.6));
   const spread = Math.max(0.05, safeFinite(config.crystalSpread, 1));
   const safeAspect = clamp(safeFinite(aspect, 1), 0.25, 4);
-  // Deep enough that crystals line up behind one another on screen, so their
-  // refractions stack.
-  const extent = [0.75 * spread * safeAspect, 0.75 * spread, 0.9 * spread];
-  // Draw every random value up front, so one crystal's layout does not depend
-  // on how many tries another one needed.
+  // Draw every random value up front, so one crystal does not shift another.
   const drafts = Array.from({ length: count }, () => {
-    const radius = CRYSTAL_BASE_RADIUS[fill ? 'fill' : 'cluster'] * size * (0.6 + 0.4 * random());
+    const radius = CRYSTAL_BASE_RADIUS * size * (0.6 + 0.4 * random());
     const formPick = random();
-    const form = config.crystalForm === 'mix' ? (formPick < 0.5 ? 'quartz' : 'bipyramid') : config.crystalForm;
-    const rotation = alignUpMatrix(randomUnitVector(random), random() * 2 * Math.PI);
-    const spinAxis = randomUnitVector(random);
-    const spinRate = (random() < 0.5 ? -1 : 1) * (random() < 0.6 ? 1 : 2);
-    const slot = [random(), random(), random()];
-    // Points inside the unit ball, scaled to the ellipsoid.
-    const candidates: [number, number, number][] = [];
-    while (!fill && candidates.length < CRYSTAL_CANDIDATES) {
-      const point = [random() * 2 - 1, random() * 2 - 1, random() * 2 - 1];
-      if (point[0] * point[0] + point[1] * point[1] + point[2] * point[2] > 1) continue;
-      candidates.push([point[0] * extent[0], point[1] * extent[1], point[2] * extent[2]]);
-    }
+    const form: CrystalShape = config.crystalForm === 'mix'
+      ? CRYSTAL_SHAPES[Math.min(Math.floor(formPick * CRYSTAL_SHAPES.length), CRYSTAL_SHAPES.length - 1)]
+      : config.crystalForm;
+    const axis = randomUnitVector(random);
     const rollRate = (random() < 0.5 ? -1 : 1) * (random() < 0.6 ? 1 : 2);
-    return { radius, form, rotation, spinAxis, spinRate, rollRate, slot, candidates };
-  });
-  const shapeOf = (form: string, radius: number) => {
+    const slot = [random(), random(), random(), random()];
     const halfLength = radius * length;
-    const capHeight = form === 'bipyramid' ? halfLength : Math.min(halfLength, CRYSTAL_QUARTZ_CAP * radius);
-    const prismHalf = halfLength - capHeight;
-    return { radius, prismHalf, capHeight, boundRadius: Math.max(Math.hypot(radius, prismHalf), halfLength) };
-  };
+    const capHeight = form === 'bipyramid' ? halfLength : form === 'quartz' ? Math.min(halfLength, CRYSTAL_QUARTZ_CAP * radius) : 0;
+    const solid: CrystalSolid = { form, radius, halfLength, capHeight };
+    return { solid, ...getCrystalExtents(solid), axis, rollRate, slot };
+  });
 
-  if (fill) {
-    const tanHalfFov = getCrystalTanHalfFov(config);
-    const cameraDistance = 1 / tanHalfFov;
-    // The region of the image plane, at distance 1 from the camera, that the
-    // crystals cover: the frame with a margin, or the disc around it while
-    // Revolve rolls the crystals about the view axis.
-    const halfWidth = CRYSTAL_FILL_REACH * safeAspect * tanHalfFov;
-    const halfHeight = CRYSTAL_FILL_REACH * tanHalfFov;
-    const reach = Math.hypot(halfWidth, halfHeight);
-    const rolling = Math.round(safeFinite(config.crystalRevolve, 0)) !== 0;
-    // Directions on a jittered grid over the frame, or a jittered sunflower
-    // spiral over the disc.
-    const rows = Math.max(1, Math.round(Math.sqrt(count * halfHeight / halfWidth)));
-    const columns = Math.ceil(count / rows);
-    const directions = drafts.map((draft, index) => {
-      if (rolling) {
-        const angle = index * GOLDEN_ANGLE + (draft.slot[0] - 0.5) * GOLDEN_ANGLE;
-        const ring = reach * Math.sqrt((index + draft.slot[1]) / count);
-        return [ring * Math.cos(angle), ring * Math.sin(angle)] as const;
-      }
-      const column = index % columns;
-      const row = Math.floor(index / columns);
-      return [
-        halfWidth * (2 * (column + 0.2 + 0.6 * draft.slot[0]) / columns - 1),
-        halfHeight * (2 * (row + 0.2 + 0.6 * draft.slot[1]) / rows - 1),
-      ] as const;
-    });
-    const crystals = drafts.map((draft, index) => {
-      const shape = shapeOf(draft.form, draft.radius);
-      const [x, y] = directions[index];
-      const view = [x, y, -1].map(value => value / Math.hypot(x, y, 1));
-      // Lay the random long axis into the plane across the line of sight.
-      const random = draft.spinAxis;
-      const along = random[0] * view[0] + random[1] * view[1] + random[2] * view[2];
-      let across = random.map((value, axis) => value - along * view[axis]);
-      if (Math.hypot(...across) < 1e-6) across = [view[1], -view[0], 0];
-      const acrossLength = Math.hypot(...across);
-      return {
-        shape,
-        view,
-        axis: across.map(value => value / acrossLength),
-        spheres: getCrystalAxisSpheres(shape),
-        nearest: CRYSTAL_FILL_CAMERA_GAP * shape.radius,
-        // Field Depth sends crystals back at random; covering pulls them in.
-        distance: shape.radius * (2 + 3 * Math.min(spread, 2) * draft.slot[2]),
-      };
-    });
-    // A sphere of radius rho at distance d spans sin = rho / d around its
-    // direction, which is never wider in the image plane than it looks there.
-    const discsOf = (crystal: typeof crystals[number]) => crystal.spheres.map(({ offset, radius }) => {
-      const point = crystal.view.map((value, axis) => value * crystal.distance + crystal.axis[axis] * offset);
-      return { x: point[0] / -point[2], y: point[1] / -point[2], radius: radius / Math.hypot(...point) };
-    });
-    const discs = crystals.map(discsOf);
-    // Grid points over the region and one step past it. A point covered with
-    // half a grid diagonal to spare covers every point of its cell.
-    const step = 2 * Math.max(rolling ? reach : halfWidth, rolling ? reach : halfHeight) / CRYSTAL_COVER_GRID;
-    const pad = step * Math.SQRT1_2;
-    const points: [number, number][] = [];
-    const extentX = (rolling ? reach : halfWidth) + step;
-    const extentY = (rolling ? reach : halfHeight) + step;
-    for (let x = -extentX; x <= extentX + 1e-9; x += step) {
-      for (let y = -extentY; y <= extentY + 1e-9; y += step) {
-        if (!rolling || Math.hypot(x, y) <= reach + step) points.push([x, y]);
-      }
+  const tanHalfFov = getCrystalTanHalfFov(config);
+  const cameraDistance = 1 / tanHalfFov;
+  // The region of the image plane, at distance 1 from the camera, that the
+  // crystals cover: the frame with a margin, or the disc around it while
+  // Revolve rolls the crystals about the view axis.
+  const halfWidth = CRYSTAL_FILL_REACH * safeAspect * tanHalfFov;
+  const halfHeight = CRYSTAL_FILL_REACH * tanHalfFov;
+  const discRadius = Math.hypot(halfWidth, halfHeight);
+  const rolling = Math.round(safeFinite(config.crystalRevolve, 0)) !== 0;
+  // Directions on a jittered grid over the frame, or a jittered sunflower
+  // spiral over the disc.
+  const rows = Math.max(1, Math.round(Math.sqrt(count * halfHeight / halfWidth)));
+  const columns = Math.ceil(count / rows);
+  const directions = drafts.map((draft, index) => {
+    if (rolling) {
+      const angle = index * GOLDEN_ANGLE + (draft.slot[0] - 0.5) * GOLDEN_ANGLE;
+      const ring = discRadius * Math.sqrt((index + draft.slot[1]) / count);
+      return [ring * Math.cos(angle), ring * Math.sin(angle)] as const;
     }
-    const slack = (index: number, x: number, y: number) => Math.min(
-      ...discs[index].map(disc => Math.hypot(x - disc.x, y - disc.y) - disc.radius + pad),
-    );
-    const coverOf = (x: number, y: number) => discs.findIndex((_, index) => slack(index, x, y) <= 0);
-    const coverers = points.map(([x, y]) => coverOf(x, y));
-    let covered = false;
-    for (let attempt = 0; attempt < CRYSTAL_MAX * 20; attempt += 1) {
-      const gap = coverers.indexOf(-1);
-      if (gap < 0) {
-        covered = true;
-        break;
-      }
-      const [gapX, gapY] = points[gap];
-      // Pull in the crystal that comes closest to the gap, unless it would
-      // reach the camera.
-      let best = -1;
-      for (let index = 0; index < crystals.length; index += 1) {
-        if (crystals[index].distance * 0.9 < crystals[index].nearest) continue;
-        if (best < 0 || slack(index, gapX, gapY) < slack(best, gapX, gapY)) best = index;
-      }
-      if (best < 0) break;
-      crystals[best].distance *= 0.9;
-      discs[best] = discsOf(crystals[best]);
-      points.forEach(([x, y], point) => {
-        if (coverers[point] === best && slack(best, x, y) > 0) coverers[point] = coverOf(x, y);
-        else if (coverers[point] < 0 && slack(best, x, y) <= 0) coverers[point] = best;
-      });
+    const column = index % columns;
+    const row = Math.floor(index / columns);
+    return [
+      halfWidth * (2 * (column + 0.2 + 0.6 * draft.slot[0]) / columns - 1),
+      halfHeight * (2 * (row + 0.2 + 0.6 * draft.slot[1]) / rows - 1),
+    ] as const;
+  });
+  const crystals = drafts.map((draft, index) => {
+    const [x, y] = directions[index];
+    const view = [x, y, -1].map(value => value / Math.hypot(x, y, 1));
+    // Lay the random long axis into the plane across the line of sight.
+    const along = draft.axis[0] * view[0] + draft.axis[1] * view[1] + draft.axis[2] * view[2];
+    let across = draft.axis.map((value, axis) => value - along * view[axis]);
+    if (Math.hypot(...across) < 1e-6) across = [view[1], -view[0], 0];
+    const acrossLength = Math.hypot(...across);
+    return {
+      view,
+      axis: across.map(value => value / acrossLength),
+      spheres: getCrystalAxisSpheres(draft.solid),
+      nearest: CRYSTAL_FILL_CAMERA_GAP * draft.reach,
+      // Field Depth sends crystals back at random; covering pulls them in.
+      distance: draft.solid.radius * (2 + 3 * Math.min(spread, 2) * draft.slot[2]),
+    };
+  });
+  // A sphere of radius rho at distance d spans sin = rho / d around its
+  // direction, which is never wider in the image plane than it looks there.
+  const discsOf = (crystal: typeof crystals[number]) => crystal.spheres.map(({ offset, radius }) => {
+    const point = crystal.view.map((value, axis) => value * crystal.distance + crystal.axis[axis] * offset);
+    return { x: point[0] / -point[2], y: point[1] / -point[2], radius: radius / Math.hypot(...point) };
+  });
+  const discs = crystals.map(discsOf);
+  // Grid points over the region and one step past it. A point covered with
+  // half a grid diagonal to spare covers every point of its cell.
+  const extentX = rolling ? discRadius : halfWidth;
+  const extentY = rolling ? discRadius : halfHeight;
+  const step = 2 * Math.max(extentX, extentY) / CRYSTAL_COVER_GRID;
+  const pad = step * Math.SQRT1_2;
+  const points: [number, number][] = [];
+  for (let x = -extentX - step; x <= extentX + step + 1e-9; x += step) {
+    for (let y = -extentY - step; y <= extentY + step + 1e-9; y += step) {
+      if (!rolling || Math.hypot(x, y) <= discRadius + step) points.push([x, y]);
     }
-    if (!covered) {
-      // Fall back to distances at which the central sphere of each crystal
-      // spans the widest gap between directions over the disc, which covers
-      // the view by construction even if a crystal then holds the camera.
-      const widest = getCoveringRadius(directions, reach) * CRYSTAL_COVER_MARGIN;
-      for (const crystal of crystals) {
-        crystal.distance = Math.min(crystal.distance, getCrystalInscribedRadius(crystal.shape) / widest);
-      }
-    }
-    return crystals.map((crystal, index) => ({
-      center: [
-        crystal.view[0] * crystal.distance,
-        crystal.view[1] * crystal.distance,
-        cameraDistance + crystal.view[2] * crystal.distance,
-      ],
-      ...crystal.shape,
-      rotation: alignUpMatrix(crystal.axis, drafts[index].slot[0] * 2 * Math.PI),
-      spinAxis: crystal.view as [number, number, number],
-      spinRate: 0,
-      rollRate: drafts[index].rollRate,
-    }));
   }
-
-  // Larger crystals claim their room first.
-  const order = drafts.map((_, index) => index).sort((a, b) => drafts[b].radius - drafts[a].radius);
-  const placed: CrystalPlacement[] = [];
-  for (const index of order) {
-    const draft = drafts[index];
-    for (let attempt = 0; attempt < 5; attempt += 1) {
-      const shape = shapeOf(draft.form, draft.radius * 0.8 ** attempt);
-      const center = draft.candidates.find(candidate => placed.every(other => (
-        Math.hypot(candidate[0] - other.center[0], candidate[1] - other.center[1], candidate[2] - other.center[2])
-          >= shape.boundRadius + other.boundRadius + CRYSTAL_CLEARANCE
-      )));
-      if (!center) continue;
-      placed.push({
-        center,
-        ...shape,
-        rotation: draft.rotation,
-        spinAxis: draft.spinAxis,
-        spinRate: draft.spinRate,
-        rollRate: 0,
-      });
+  const slack = (index: number, x: number, y: number) => Math.min(
+    ...discs[index].map(disc => Math.hypot(x - disc.x, y - disc.y) - disc.radius + pad),
+  );
+  const coverOf = (x: number, y: number) => discs.findIndex((_, index) => slack(index, x, y) <= 0);
+  const coverers = points.map(([x, y]) => coverOf(x, y));
+  let covered = false;
+  for (let attempt = 0; attempt < CRYSTAL_MAX * 20; attempt += 1) {
+    const gap = coverers.indexOf(-1);
+    if (gap < 0) {
+      covered = true;
       break;
     }
+    const [gapX, gapY] = points[gap];
+    // Pull in the crystal that comes closest to the gap, unless it would
+    // reach the camera.
+    let best = -1;
+    for (let index = 0; index < crystals.length; index += 1) {
+      if (crystals[index].distance * 0.9 < crystals[index].nearest) continue;
+      if (best < 0 || slack(index, gapX, gapY) < slack(best, gapX, gapY)) best = index;
+    }
+    if (best < 0) break;
+    crystals[best].distance *= 0.9;
+    discs[best] = discsOf(crystals[best]);
+    points.forEach(([x, y], point) => {
+      if (coverers[point] === best && slack(best, x, y) > 0) coverers[point] = coverOf(x, y);
+      else if (coverers[point] < 0 && slack(best, x, y) <= 0) coverers[point] = best;
+    });
   }
-  return placed;
+  if (!covered) {
+    // Fall back to distances at which the central sphere of each crystal
+    // spans the widest gap between directions over the disc, which covers
+    // the view by construction even if a crystal then holds the camera.
+    const widest = getCoveringRadius(directions, discRadius) * CRYSTAL_COVER_MARGIN;
+    crystals.forEach((crystal, index) => {
+      crystal.distance = Math.min(crystal.distance, getCrystalInscribedRadius(drafts[index].solid) / widest);
+    });
+  }
+  return crystals.map((crystal, index) => ({
+    ...drafts[index].solid,
+    center: [
+      crystal.view[0] * crystal.distance,
+      crystal.view[1] * crystal.distance,
+      cameraDistance + crystal.view[2] * crystal.distance,
+    ],
+    boundRadius: drafts[index].boundRadius,
+    reach: drafts[index].reach,
+    rotation: alignUpMatrix(crystal.axis, drafts[index].slot[3] * 2 * Math.PI),
+    rollRate: drafts[index].rollRate,
+  }));
 }
 
 /** Every uniform of the Crystals shape; the arrays hold CRYSTAL_MAX entries. */
@@ -873,7 +946,7 @@ export type CrystalUniforms = {
   centers: number[];
   /** Column-major mat3 per crystal, from the crystal frame to the world. */
   rotations: number[];
-  /** Hexagon apothem, prism half length, and pyramid height per crystal; w is unused. */
+  /** Radius, half length, pyramid height, and CRYSTAL_SHAPE_INDEX per crystal. */
   shapes: number[];
   /** 0 for clear refracting glass, 1 for the canvas mapped onto the faces. */
   material: number;
@@ -892,43 +965,33 @@ export type CrystalUniforms = {
 };
 
 /**
- * Poses the Crystals at a loop-normalized time. Each crystal turns about its
- * own spin axis by its rate times Spin whole turns per loop, and Revolve turns
- * the whole layout whole turns per loop, so the loop closes. Cluster revolves
- * about the vertical axis; Fill rolls about the view axis, which keeps every
- * depth and the view covered. The camera looks down -Z at the origin from the
- * distance that frames the canvas half height at the base FOV, which a Cluster
- * pulls back to clear its nearest crystal, and the canvas on the backdrop
- * fills its frame.
+ * Poses the Crystals at a loop-normalized time. Spin rolls each crystal about
+ * its own long axis by its rate times Spin whole turns per loop, and Revolve
+ * rolls all of them about the view axis whole turns per loop, which keeps
+ * every depth and the view covered, so the loop closes. The camera looks down
+ * -Z at the origin from the distance that frames the canvas half height at
+ * the base FOV, and the canvas on the backdrop fills its frame.
  */
 export function getCrystalUniforms(config: ConeViewConfig, normalizedTime: number, aspect = 1): CrystalUniforms {
   const layout = getCrystalLayout(config, aspect);
-  const fill = config.crystalLayout !== 'cluster';
   const spin = Math.round(safeFinite(config.crystalSpin, 0));
-  const revolving = !fill && Math.round(safeFinite(config.crystalRevolve, 0)) !== 0;
-  const revolve = axisAngleMatrix(fill ? [0, 0, 1] : [0, 1, 0], wholeCyclePhase(config.crystalRevolve, normalizedTime) * 2 * Math.PI);
+  const revolve = axisAngleMatrix([0, 0, 1], wholeCyclePhase(config.crystalRevolve, normalizedTime) * 2 * Math.PI);
   const centers = new Array<number>(CRYSTAL_MAX * 4).fill(0);
   const rotations = new Array<number>(CRYSTAL_MAX * 9).fill(0);
   const shapes = new Array<number>(CRYSTAL_MAX * 4).fill(0);
-  // Farthest reach toward the camera and away from it over the whole loop.
-  let front = 0;
+  // Farthest reach away from the camera; rolling about the view axis keeps it.
   let back = 0;
   layout.forEach((crystal, index) => {
-    const spinAngle = wholeCyclePhase(crystal.spinRate * spin, normalizedTime) * 2 * Math.PI;
     const rollAngle = wholeCyclePhase(crystal.rollRate * spin, normalizedTime) * 2 * Math.PI;
-    const rolled = multiplyMatrices(crystal.rotation, axisAngleMatrix([0, 1, 0], rollAngle));
-    const rotation = multiplyMatrices(revolve, multiplyMatrices(axisAngleMatrix(crystal.spinAxis, spinAngle), rolled));
+    const rotation = multiplyMatrices(revolve, multiplyMatrices(crystal.rotation, axisAngleMatrix([0, 1, 0], rollAngle)));
     const center = transformVector(revolve, crystal.center);
     centers.splice(index * 4, 4, center[0], center[1], center[2], crystal.boundRadius);
     rotations.splice(index * 9, 9, ...rotation);
-    shapes.splice(index * 4, 4, crystal.radius * Math.cos(Math.PI / 6), crystal.prismHalf, crystal.capHeight, 0);
-    const swing = Math.hypot(crystal.center[0], crystal.center[2]);
-    front = Math.max(front, (revolving ? swing : crystal.center[2]) + crystal.boundRadius);
-    back = Math.max(back, (revolving ? swing : -crystal.center[2]) + crystal.boundRadius);
+    shapes.splice(index * 4, 4, crystal.radius, crystal.halfLength, crystal.capHeight, CRYSTAL_SHAPE_INDEX[crystal.form]);
+    back = Math.max(back, -crystal.center[2] + crystal.boundRadius);
   });
   const tanHalfFov = getCrystalTanHalfFov(config);
-  // Fill already keeps its crystals clear of the framing distance.
-  const cameraDistance = fill ? 1 / tanHalfFov : Math.max(1 / tanHalfFov, front + 0.3);
+  const cameraDistance = 1 / tanHalfFov;
   const backdropZ = -(back + Math.max(0, safeFinite(config.crystalBackdrop, 1)));
   const dispersion = Math.max(0, safeFinite(config.crystalDispersion, 0));
   return {

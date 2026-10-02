@@ -118,7 +118,6 @@ describe('cone view configuration', () => {
       discsTiltTurns: 1,
       discsView: 35,
       discsOrbit: 1,
-      crystalLayout: 'fill',
       crystalMaterial: 'refract',
       crystalFaceOpacity: 1,
       crystalForm: 'quartz',
@@ -208,8 +207,11 @@ describe('cone view configuration', () => {
     });
     expect(normalizeConeViewConfig({ crystalForm: 'mix' }).crystalForm).toBe('mix');
     expect(normalizeConeViewConfig({ crystalForm: 'cube' }).crystalForm).toBe('quartz');
-    expect(normalizeConeViewConfig({ crystalLayout: 'cluster', crystalMaterial: 'faces' })).toMatchObject({ crystalLayout: 'cluster', crystalMaterial: 'faces' });
-    expect(normalizeConeViewConfig({ crystalLayout: 'grid', crystalMaterial: 'metal' })).toMatchObject({ crystalLayout: 'fill', crystalMaterial: 'refract' });
+    expect(normalizeConeViewConfig({ crystalMaterial: 'faces' }).crystalMaterial).toBe('faces');
+    expect(normalizeConeViewConfig({ crystalMaterial: 'metal' }).crystalMaterial).toBe('refract');
+    for (const form of ['prism', 'octahedron', 'rhombohedron', 'dodecahedron'] as const) {
+      expect(normalizeConeViewConfig({ crystalForm: form }).crystalForm).toBe(form);
+    }
     expect(normalizeConeViewConfig({ crystalDispersionSteps: 0 }).crystalDispersionSteps).toBe(1);
   });
 

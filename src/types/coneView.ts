@@ -28,28 +28,24 @@ export const CONE_SHAPE_OPTIONS: { value: ConeShape; label: string }[] = [
 ];
 
 /**
- * Shape of each Crystals object: `quartz` is a hexagonal prism with a
- * pyramid on both ends, `bipyramid` drops the prism so the two pyramids meet,
- * and `mix` picks one of them at random per crystal.
+ * Shape of each Crystals object, all along a long axis that Length stretches:
+ * `quartz` is a hexagonal prism with a pyramid on both ends, `bipyramid`
+ * drops the prism so the two pyramids meet, `prism` is a triangular prism,
+ * `octahedron` a diamond-like double pyramid on a square, `rhombohedron` a
+ * skewed cube like calcite, `dodecahedron` the rhombic dodecahedron of
+ * garnet, and `mix` picks one at random per crystal. The faces are defined
+ * in src/lib/coneView.ts (getCrystalFaces) and three-d.frag.glsl.
  */
-export type CrystalForm = 'quartz' | 'bipyramid' | 'mix';
-export const CRYSTAL_FORMS = ['quartz', 'bipyramid', 'mix'] as const satisfies readonly CrystalForm[];
+export type CrystalForm = 'quartz' | 'bipyramid' | 'prism' | 'octahedron' | 'rhombohedron' | 'dodecahedron' | 'mix';
+export const CRYSTAL_FORMS = ['quartz', 'bipyramid', 'prism', 'octahedron', 'rhombohedron', 'dodecahedron', 'mix'] as const satisfies readonly CrystalForm[];
 export const CRYSTAL_FORM_OPTIONS: { value: CrystalForm; label: string }[] = [
   { value: 'quartz', label: 'Quartz · Pointed prism' },
   { value: 'bipyramid', label: 'Bipyramid · Double point' },
+  { value: 'prism', label: 'Prism · Triangular' },
+  { value: 'octahedron', label: 'Octahedron · Diamond' },
+  { value: 'rhombohedron', label: 'Rhombohedron · Calcite' },
+  { value: 'dodecahedron', label: 'Dodecahedron · Garnet' },
   { value: 'mix', label: 'Mix · Per crystal' },
-];
-
-/**
- * Placement of the Crystals. `fill` packs large crystals into the view so
- * the camera looks through them everywhere and lets them intersect;
- * `cluster` floats a group of separate crystals in front of the canvas.
- */
-export type CrystalLayout = 'fill' | 'cluster';
-export const CRYSTAL_LAYOUTS = ['fill', 'cluster'] as const satisfies readonly CrystalLayout[];
-export const CRYSTAL_LAYOUT_OPTIONS: { value: CrystalLayout; label: string }[] = [
-  { value: 'fill', label: 'Fill · Through the crystals' },
-  { value: 'cluster', label: 'Cluster · Floating group' },
 ];
 
 /**
@@ -373,8 +369,6 @@ export type ConeViewConfig = {
   discsView: number;
   /** Discs only: whole camera revolutions per loop around the vertical axis through the center. */
   discsOrbit: number;
-  /** Crystals only: crystals filling the view, or a floating group. */
-  crystalLayout: CrystalLayout;
   /** Crystals only: clear refracting glass, or the canvas mapped onto the faces. */
   crystalMaterial: CrystalMaterial;
   /** Crystals only: share of the face mapping over the refraction in the Faces material. */
@@ -383,11 +377,11 @@ export type ConeViewConfig = {
   crystalForm: CrystalForm;
   /** Crystals only: number of crystals. */
   crystalCount: number;
-  /** Crystals only: crystal size; crystals shrink when the cluster has no room for them. */
+  /** Crystals only: crystal size; larger crystals cover the view from farther away. */
   crystalSize: number;
   /** Crystals only: crystal length divided by its width. */
   crystalLength: number;
-  /** Crystals only: size of the cluster region, or depth of the filled view. */
+  /** Crystals only: how far back the crystals may start before covering pulls them in (Field Depth). */
   crystalSpread: number;
   /** Crystals only: random layout and orientation variant. */
   crystalSeed: number;
@@ -399,11 +393,11 @@ export type ConeViewConfig = {
   crystalDispersionSteps: number;
   /** Crystals only: strength of the Fresnel reflection on the faces. */
   crystalReflection: number;
-  /** Crystals only: distance from the cluster to the canvas behind it. */
+  /** Crystals only: distance from the farthest crystal to the canvas behind it. */
   crystalBackdrop: number;
-  /** Crystals only: whole turns of each crystal per loop. */
+  /** Crystals only: whole turns of each crystal about its long axis per loop. */
   crystalSpin: number;
-  /** Crystals only: whole turns of the cluster around the vertical axis per loop. */
+  /** Crystals only: whole turns of all crystals about the view axis per loop. */
   crystalRevolve: number;
 };
 
@@ -498,7 +492,6 @@ export const DEFAULT_CONE_VIEW: ConeViewConfig = {
   discsTiltTurns: getParameterDefault('cone.discsTiltTurns'),
   discsView: getParameterDefault('cone.discsView'),
   discsOrbit: getParameterDefault('cone.discsOrbit'),
-  crystalLayout: 'fill',
   crystalMaterial: 'refract',
   crystalFaceOpacity: getParameterDefault('cone.crystalFaceOpacity'),
   crystalForm: 'quartz',
@@ -611,7 +604,6 @@ export function normalizeConeViewConfig(value: unknown): ConeViewConfig {
     discsTiltTurns: clampParameter(raw.discsTiltTurns, DEFAULT_CONE_VIEW.discsTiltTurns, getParameterLimit('cone.discsTiltTurns')),
     discsView: clampParameter(raw.discsView, DEFAULT_CONE_VIEW.discsView, getParameterLimit('cone.discsView')),
     discsOrbit: clampParameter(raw.discsOrbit, DEFAULT_CONE_VIEW.discsOrbit, getParameterLimit('cone.discsOrbit')),
-    crystalLayout: normalizeOption(raw.crystalLayout, CRYSTAL_LAYOUTS, DEFAULT_CONE_VIEW.crystalLayout),
     crystalMaterial: normalizeOption(raw.crystalMaterial, CRYSTAL_MATERIALS, DEFAULT_CONE_VIEW.crystalMaterial),
     crystalFaceOpacity: clampParameter(raw.crystalFaceOpacity, DEFAULT_CONE_VIEW.crystalFaceOpacity, getParameterLimit('cone.crystalFaceOpacity')),
     crystalForm: normalizeOption(raw.crystalForm, CRYSTAL_FORMS, DEFAULT_CONE_VIEW.crystalForm),
