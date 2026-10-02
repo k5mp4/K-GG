@@ -1715,7 +1715,7 @@ ThreeDHit discsHit(vec3 localRay) {
 
 const int CRYSTAL_MAX = 24;
 // Face crossings one wavelength follows: entries, exits, and reflections.
-const int CRYSTAL_EVENTS = 10;
+const int CRYSTAL_EVENTS = 5;
 // Internal reflections before a trapped ray is let through unbent.
 const int CRYSTAL_BOUNCES = 2;
 const int CRYSTAL_DISPERSION_STEPS = 10;
