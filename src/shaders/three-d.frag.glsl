@@ -1706,7 +1706,8 @@ ThreeDHit discsHit(vec3 localRay) {
 // glass of index IOR in air. Dispersion spreads Dispersion Steps wavelengths
 // over IOR ± Dispersion / 2 and blends them with overlapping red, green, and
 // blue weights into a spectrum (see crystalRefraction). The first outer face
-// also mirrors the canvas by a Schlick Fresnel term scaled by Reflection. The
+// also mirrors the canvas wrapped around the scene and catches a glint, both
+// scaled by Reflection. The
 // Faces material lays the shared surface mapping of the first face over the
 // refraction by Face Opacity (main() blends it). The layout, the poses for
 // this frame, the camera distance, and the backdrop come from
@@ -1718,6 +1719,11 @@ const int CRYSTAL_EVENTS = 10;
 // Internal reflections before a trapped ray is let through unbent.
 const int CRYSTAL_BOUNCES = 2;
 const int CRYSTAL_DISPERSION_STEPS = 10;
+// Sharpness and brightness of the head-light glint on the outer faces.
+const float CRYSTAL_GLINT_POWER = 48.0;
+const float CRYSTAL_GLINT_STRENGTH = 0.9;
+// Wavelengths that integrate the dispersed spectrum of a pixel.
+const int CRYSTAL_SPECTRUM_SAMPLES = 24;
 const int CRYSTAL_MATERIAL_FACES = 1;
 const float CRYSTAL_EPSILON = 0.0004;
 const float CRYSTAL_NO_HIT = 1.0e9;
@@ -1931,6 +1937,18 @@ vec4 crystalBackdrop(vec3 origin, vec3 direction) {
   return crystalBackdropSample(crystalBackdropUv(origin, direction));
 }
 
+// The canvas wrapped around the scene for reflections: longitude runs across
+// it twice, mirrored, so its seam behind the scene is continuous, and
+// latitude up it. Every flat face mirrors one direction and so its own part
+// of the canvas.
+vec4 crystalEnvironment(vec3 direction) {
+  vec2 uv = vec2(
+    2.0 * (atan(direction.x, direction.z) / TAU + 0.5),
+    asin(clamp(direction.y, -1.0, 1.0)) / PI + 0.5
+  );
+  return crystalBackdropSample(uv);
+}
+
 // Backdrop point seen through the crystals from the camera for one index of
 // refraction, whether the camera starts in the air or in the glass.
 vec2 crystalTrace(vec3 origin, vec3 direction, float ior) {
@@ -1965,45 +1983,45 @@ vec3 crystalSpectrumWeight(float wavelength) {
   return exp(-offset * offset);
 }
 
-// Dispersion traces the two ends of the IOR range and its middle, then
-// spreads Dispersion Steps wavelengths evenly over the range: each one reads
-// the canvas where the quadratic through the three traced backdrop points
-// puts it, so more steps cost texture reads, not traces, and fill the fringe
-// in with a continuous spectrum.
-// `traced` is false when opaque faces hide the refraction. The traces run in a
-// loop whose length comes from uniforms, so ANGLE's HLSL compiler keeps it as
-// a loop instead of flattening a skipped branch into always running it.
+float crystalTraceIor(float wavelength) {
+  return max(max(u_crystalIor, 1.0) + u_crystalDispersion * (wavelength - 0.5), 1.0);
+}
+
+// Dispersion traces Dispersion Steps wavelengths spread evenly over IOR ±
+// Dispersion / 2, ends included, and integrates the spectrum with
+// CRYSTAL_SPECTRUM_SAMPLES wavelengths in between: each one reads the canvas
+// on the straight line between the backdrop points of the two traced
+// wavelengths around it. The fringes therefore blend into a continuous
+// gradient instead of splitting into one copy per traced wavelength, also
+// where the wavelengths leave the crystals through different faces; more
+// steps follow the real paths more closely, at one trace each.
+// `traced` is false when opaque faces hide the refraction. Every trace runs in
+// a loop whose length comes from uniforms, so ANGLE's HLSL compiler keeps it
+// as a loop instead of flattening a skipped branch into always running it.
 vec4 crystalRefraction(vec3 origin, vec3 direction, bool traced) {
-  float ior = max(u_crystalIor, 1.0);
   int steps = clamp(u_crystalDispersionSteps, 1, CRYSTAL_DISPERSION_STEPS);
-  int traces = traced ? (steps == 1 ? 1 : 3) : 0;
-  vec2 middle = vec2(0.5);
-  vec2 low = vec2(0.5);
-  vec2 high = vec2(0.5);
-  for (int trace = 0; trace < 3; trace++) {
-    if (trace >= traces) break;
-    float traceIor = trace == 0 ? ior
-      : trace == 1 ? max(ior - 0.5 * u_crystalDispersion, 1.0)
-      : ior + 0.5 * u_crystalDispersion;
-    vec2 point = crystalTrace(origin, direction, traceIor);
-    if (trace == 0) middle = point;
-    else if (trace == 1) low = point;
-    else high = point;
-  }
-  if (traces == 0) return vec4(0.0, 0.0, 0.0, 1.0);
-  if (traces == 1) return crystalBackdropSample(middle);
+  int traces = traced ? steps : 0;
   vec3 sum = vec3(0.0);
   vec3 weights = vec3(0.0);
-  for (int step = 0; step < CRYSTAL_DISPERSION_STEPS; step++) {
-    if (step >= steps) break;
-    float wavelength = (float(step) + 0.5) / float(steps);
-    vec2 uv = low * (2.0 * wavelength - 1.0) * (wavelength - 1.0)
-      + middle * 4.0 * wavelength * (1.0 - wavelength)
-      + high * wavelength * (2.0 * wavelength - 1.0);
-    vec3 weight = crystalSpectrumWeight(wavelength);
-    sum += crystalBackdropSample(uv).rgb * weight;
-    weights += weight;
+  vec2 previous = vec2(0.5);
+  int perSpan = max(CRYSTAL_SPECTRUM_SAMPLES / max(steps - 1, 1), 1);
+  for (int trace = 0; trace < CRYSTAL_DISPERSION_STEPS; trace++) {
+    if (trace >= traces) break;
+    float wavelength = steps == 1 ? 0.5 : float(trace) / float(steps - 1);
+    vec2 point = crystalTrace(origin, direction, crystalTraceIor(wavelength));
+    if (steps == 1) return crystalBackdropSample(point);
+    // Samples of the span from the previous traced wavelength to this one.
+    int samples = trace == 0 ? 0 : perSpan;
+    for (int index = 0; index < CRYSTAL_SPECTRUM_SAMPLES; index++) {
+      if (index >= samples) break;
+      float along = (float(index) + 0.5) / float(samples);
+      vec3 weight = crystalSpectrumWeight((float(trace - 1) + along) / float(steps - 1));
+      sum += crystalBackdropSample(mix(previous, point, along)).rgb * weight;
+      weights += weight;
+    }
+    previous = point;
   }
+  if (traces == 0) return vec4(0.0, 0.0, 0.0, 1.0);
   return vec4(sum / weights, 1.0);
 }
 
@@ -2059,19 +2077,22 @@ ThreeDHit crystalHit(vec3 localRay) {
   bool traced = faceWeight < 0.999;
   vec4 color = crystalRefraction(rayOrigin, rayDirection, traced);
   if (traced) {
-    // Schlick Fresnel: the outer faces mirror the canvas most at grazing
-    // angles. Seen from inside, the reflection stays in the glass and is
-    // part of the trace.
+    // The head light from the camera's upper left, for Shade and the glints.
+    vec3 light = normalize(-g_cameraForward + g_cameraUp * 0.6 - g_cameraRight * 0.4);
+    // Reflection: the outer faces mirror the canvas wrapped around the scene
+    // by a Schlick Fresnel term, three times as strong so a face seen head-on
+    // still shows it, and catch a glint of the head light. Seen from inside,
+    // the reflection stays in the glass and is part of the trace.
     if (!cameraInside) {
       float ior = max(u_crystalIor, 1.0);
       float cosine = clamp(-dot(rayDirection, firstNormal), 0.0, 1.0);
       float f0 = pow((ior - 1.0) / (ior + 1.0), 2.0);
       float fresnel = f0 + (1.0 - f0) * pow(1.0 - cosine, 5.0);
-      vec4 reflected = crystalBackdrop(entry, reflect(rayDirection, firstNormal));
-      color = mix(color, reflected, clamp(2.0 * fresnel * u_crystalReflection, 0.0, 1.0));
+      vec3 mirrored = reflect(rayDirection, firstNormal);
+      color = mix(color, crystalEnvironment(mirrored), clamp(3.0 * fresnel * u_crystalReflection, 0.0, 1.0));
+      float glint = pow(max(dot(mirrored, light), 0.0), CRYSTAL_GLINT_POWER);
+      color.rgb += u_crystalReflection * CRYSTAL_GLINT_STRENGTH * glint;
     }
-    // Shade lights the faces from the camera's upper left so the facets read.
-    vec3 light = normalize(-g_cameraForward + g_cameraUp * 0.6 - g_cameraRight * 0.4);
     float lambert = 0.3 + 0.7 * max(dot(firstEntering ? firstNormal : -firstNormal, light), 0.0);
     color.rgb *= mix(1.0, lambert, clamp(u_threeDShade, 0.0, 1.0));
   }

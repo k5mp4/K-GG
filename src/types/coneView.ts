@@ -389,9 +389,9 @@ export type ConeViewConfig = {
   crystalIor: number;
   /** Crystals only: index difference from red to blue, which splits the colors. */
   crystalDispersion: number;
-  /** Crystals only: wavelengths traced across the Dispersion range; 1 traces one. */
+  /** Crystals only: wavelengths traced across the Dispersion range, blended into a continuous spectrum; 1 traces one. */
   crystalDispersionSteps: number;
-  /** Crystals only: strength of the Fresnel reflection on the faces. */
+  /** Crystals only: strength of the mirrored surroundings and glints on the outer faces. */
   crystalReflection: number;
   /** Crystals only: distance from the farthest crystal to the canvas behind it. */
   crystalBackdrop: number;
