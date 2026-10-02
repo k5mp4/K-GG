@@ -134,6 +134,7 @@ const int SHAPE_RIBBON = 4;
 const int SHAPE_RINGS = 5;
 const int SHAPE_FIELD = 6;
 const int SHAPE_DISCS = 7;
+const int SHAPE_CRYSTAL = 8;
 
 const int MAPPING_UV = 0;
 const int MAPPING_TRIPLANAR = 1;
@@ -315,6 +316,8 @@ ThreeDHit threeDMiss() {
 vec3 g_cameraRight = vec3(1.0, 0.0, 0.0);
 vec3 g_cameraUp = vec3(0.0, 1.0, 0.0);
 vec3 g_cameraForward = vec3(0.0, 0.0, -1.0);
+// Share of the shared surface mapping laid over the Crystals refraction.
+float g_crystalFaceWeight = 0.0;
 
 void threeDSetCameraBasis(vec3 forward, vec3 up) {
   vec3 right = normalize(cross(forward, up));
@@ -1688,6 +1691,356 @@ ThreeDHit discsHit(vec3 localRay) {
 }
 #endif
 
+#if KGG_THREE_D_SHAPE < 0 || KGG_THREE_D_SHAPE == 8
+// ---------------------------------------------------------------------------
+// Crystals: hexagonal crystals between the camera and the canvas, which lies
+// on a backdrop plane behind them. Every crystal is a convex solid: a
+// hexagonal prism (apothem shape.x, half length shape.y) along its local +Y
+// axis with a six-sided pyramid of height shape.z on both ends; Bipyramids
+// have no prism. Rays are intersected analytically against its 18 face
+// planes. Crystals may intersect and hold the camera (the Fill layout lets
+// them), and every crystal stays its own piece of glass: a ray refracts by
+// Snell's law at every face it crosses, as from air into glass where it
+// enters a crystal and from glass into air where it leaves one, also where
+// crystals overlap, reflects internally where it would leave past the
+// critical angle, and carries on through the crystals behind, so crystals
+// stacked on screen bend the canvas behind them again and again. Without
+// overlaps this is plain glass of index IOR in air. Dispersion spreads Dispersion
+// Steps wavelengths over IOR ± Dispersion / 2 and blends them with
+// overlapping red, green, and blue weights into a spectrum (see
+// crystalRefraction). The first outer face also mirrors the canvas by a
+// Schlick Fresnel term scaled by Reflection. The Faces material lays the
+// shared surface mapping of the first face over the refraction by Face
+// Opacity (main() blends it). The layout, the poses for this frame, the
+// camera distance, and the backdrop come from getCrystalUniforms.
+
+const int CRYSTAL_MAX = 24;
+// Face crossings one wavelength follows: entries, exits, and reflections.
+const int CRYSTAL_EVENTS = 10;
+// Internal reflections before a trapped ray is let through unbent.
+const int CRYSTAL_BOUNCES = 2;
+const int CRYSTAL_DISPERSION_STEPS = 10;
+const int CRYSTAL_MATERIAL_FACES = 1;
+const float CRYSTAL_EPSILON = 0.0004;
+const float CRYSTAL_NO_HIT = 1.0e9;
+// Backward-facing rays see the backdrop mirrored; this keeps grazing rays finite.
+const float CRYSTAL_MIN_DEPTH_SLOPE = 0.12;
+
+uniform int u_crystalCount;
+// xyz center and bounding radius.
+uniform vec4 u_crystalCenter[CRYSTAL_MAX];
+// From the crystal frame to the world.
+uniform mat3 u_crystalRotation[CRYSTAL_MAX];
+// Apothem, prism half length, pyramid height.
+uniform vec4 u_crystalShape[CRYSTAL_MAX];
+// 0: clear refracting glass, 1: the canvas mapped onto the faces.
+uniform int u_crystalMaterial;
+uniform float u_crystalFaceOpacity;
+uniform float u_crystalIor;
+uniform float u_crystalDispersion;
+uniform int u_crystalDispersionSteps;
+uniform float u_crystalReflection;
+uniform float u_crystalCameraDistance;
+uniform float u_crystalBackdropZ;
+uniform float u_crystalBackdropHalfHeight;
+
+// Directions of three adjacent side faces; the other three face the opposite way.
+const vec2 CRYSTAL_RADIALS[3] = vec2[3](vec2(1.0, 0.0), vec2(0.5, 0.8660254), vec2(-0.5, 0.8660254));
+
+// Entry (x) and exit (y) distances of a ray against one crystal in its local
+// frame, with the outward normals of the entry and exit faces. The ray misses
+// when x > y. The 18 faces form 9 pairs of parallel opposite faces: side k
+// with side k + 3, and each pyramid face with the face of the other pyramid
+// on the opposite side. Each pair is one slab |dot(n, p)| <= offset.
+vec2 crystalSpan(vec3 origin, vec3 direction, vec4 shape, out vec3 entryNormal, out vec3 exitNormal) {
+  float apothem = shape.x;
+  float tip = shape.y + shape.z;
+  // A pyramid face holds the tip and the matching prism edge.
+  float slopeScale = inversesqrt(shape.z * shape.z + apothem * apothem);
+  float near = -1.0e9;
+  float far = 1.0e9;
+  entryNormal = vec3(0.0, 0.0, 1.0);
+  exitNormal = vec3(0.0, 0.0, 1.0);
+  for (int side = 0; side < 3; side++) {
+    vec2 radial = CRYSTAL_RADIALS[side];
+    for (int face = 0; face < 3; face++) {
+      vec3 normal = vec3(radial.x, 0.0, radial.y);
+      float offset = apothem;
+      if (face > 0) {
+        float end = face == 1 ? 1.0 : -1.0;
+        normal = vec3(radial.x * shape.z, end * apothem, radial.y * shape.z) * slopeScale;
+        offset = apothem * tip * slopeScale;
+      }
+      float approach = dot(normal, direction);
+      float position = dot(normal, origin);
+      if (abs(approach) < 1.0e-7) {
+        if (abs(position) > offset) return vec2(1.0, -1.0);
+        continue;
+      }
+      float toPositive = (offset - position) / approach;
+      float toNegative = (-offset - position) / approach;
+      // The ray enters through the face of the pair that faces it.
+      vec3 facing = approach < 0.0 ? normal : -normal;
+      float enter = min(toPositive, toNegative);
+      float leave = max(toPositive, toNegative);
+      if (enter > near) {
+        near = enter;
+        entryNormal = facing;
+      }
+      if (leave < far) {
+        far = leave;
+        exitNormal = -facing;
+      }
+      // Most rays that reach the bounding sphere miss the crystal itself.
+      if (near > far) return vec2(1.0, -1.0);
+    }
+  }
+  return vec2(near, far);
+}
+
+// The span of crystal i along a world ray with world normals, or
+// (CRYSTAL_NO_HIT, -CRYSTAL_NO_HIT) when the ray misses its bounding sphere or
+// the crystal.
+vec2 crystalWorldSpan(int i, vec3 origin, vec3 direction, out vec3 entryNormal, out vec3 exitNormal) {
+  entryNormal = vec3(0.0, 0.0, 1.0);
+  exitNormal = vec3(0.0, 0.0, 1.0);
+  vec2 miss = vec2(CRYSTAL_NO_HIT, -CRYSTAL_NO_HIT);
+  vec4 bound = u_crystalCenter[i];
+  vec3 relative = origin - bound.xyz;
+  float along = dot(relative, direction);
+  float offAxis = dot(relative, relative) - bound.w * bound.w;
+  if (offAxis > 0.0 && (along > 0.0 || along * along < offAxis)) return miss;
+  mat3 rotation = u_crystalRotation[i];
+  vec3 localEntry;
+  vec3 localExit;
+  // Row-vector products: the inverse rotation into the crystal frame.
+  vec2 span = crystalSpan(relative * rotation, direction * rotation, u_crystalShape[i], localEntry, localExit);
+  if (span.x > span.y) return miss;
+  entryNormal = rotation * localEntry;
+  exitNormal = rotation * localExit;
+  return span;
+}
+
+// The next crystal face along the ray: returns its distance, or -1 when the
+// ray meets none, with the crystal, the outward normal of the face, whether
+// the ray enters that crystal there, and how many crystals hold the origin.
+float crystalNextFace(vec3 origin, vec3 direction, out int crystal, out vec3 normal, out bool entering, out int layers) {
+  crystal = -1;
+  normal = vec3(0.0, 0.0, 1.0);
+  entering = false;
+  layers = 0;
+  float nearest = CRYSTAL_NO_HIT;
+  vec3 entryNormal;
+  vec3 exitNormal;
+  for (int i = 0; i < CRYSTAL_MAX; i++) {
+    if (i >= u_crystalCount) break;
+    vec2 span = crystalWorldSpan(i, origin, direction, entryNormal, exitNormal);
+    if (span.x <= CRYSTAL_EPSILON && span.y > CRYSTAL_EPSILON) {
+      layers++;
+      if (span.y < nearest) {
+        nearest = span.y;
+        crystal = i;
+        normal = exitNormal;
+        entering = false;
+      }
+    } else if (span.x > CRYSTAL_EPSILON && span.x < nearest) {
+      nearest = span.x;
+      crystal = i;
+      normal = entryNormal;
+      entering = true;
+    }
+  }
+  return crystal >= 0 ? nearest : -1.0;
+}
+
+// Where a ray meets the canvas on the backdrop plane, in canvas coordinates
+// that run past 0..1 beyond its edges. The canvas is sized so the base camera
+// sees it fill the frame, and Flow slides it up by one mirrored pair of
+// canvases per Flow Cycle. Rays heading back toward the camera see the
+// backdrop mirrored as well, so every direction finds a point.
+vec2 crystalBackdropUv(vec3 origin, vec3 direction) {
+  float aspect = u_fullResolution.x / max(u_fullResolution.y, 1.0);
+  float slope = max(abs(direction.z), CRYSTAL_MIN_DEPTH_SLOPE);
+  vec2 point = origin.xy + direction.xy * max(origin.z - u_crystalBackdropZ, 0.0) / slope;
+  vec2 uv = point / (2.0 * max(u_crystalBackdropHalfHeight, 0.001) * vec2(aspect, 1.0));
+  uv = uv * max(u_coneTextureRepeat, 1.0) + 0.5;
+  uv.y -= 2.0 * fract(u_threeDTravel);
+  return uv;
+}
+
+// Beyond its edges the canvas repeats mirrored, so refracted rays find a
+// continuous gradient in every direction; Seam Mode does not apply.
+vec4 crystalBackdropSample(vec2 uv) {
+  return coneTextureLookup(1.0 - abs(1.0 - mod(uv, 2.0)));
+}
+
+vec4 crystalBackdrop(vec3 origin, vec3 direction) {
+  return crystalBackdropSample(crystalBackdropUv(origin, direction));
+}
+
+// Backdrop point seen through the crystals from the camera for one index of
+// refraction, whether the camera starts in the air or in the glass.
+vec2 crystalTrace(vec3 origin, vec3 direction, float ior) {
+  int bounces = 0;
+  for (int event = 0; event < CRYSTAL_EVENTS; event++) {
+    int crystal;
+    vec3 normal;
+    bool entering;
+    int layers;
+    float distance = crystalNextFace(origin, direction, crystal, normal, entering, layers);
+    if (distance < 0.0) break;
+    origin += direction * distance;
+    // The face normal turned against the ray, as refract() expects.
+    vec3 facing = entering ? normal : -normal;
+    vec3 bent = refract(direction, facing, entering ? 1.0 / ior : ior);
+    if (dot(bent, bent) > 0.0) {
+      direction = bent;
+    } else if (bounces < CRYSTAL_BOUNCES) {
+      direction = reflect(direction, facing);
+      bounces++;
+    }
+    // Past the last internal reflection a trapped ray goes through unbent.
+  }
+  return crystalBackdropUv(origin, direction);
+}
+
+// Red, green, and blue weights of a wavelength from 0 (red) to 1 (blue). The
+// bands overlap, so a single wavelength still weighs every channel and the
+// spectrum of an undispersed ray sums back to its color.
+vec3 crystalSpectrumWeight(float wavelength) {
+  vec3 offset = (wavelength - vec3(0.15, 0.5, 0.85)) / 0.25;
+  return exp(-offset * offset);
+}
+
+// Dispersion traces the two ends of the IOR range and its middle, then
+// spreads Dispersion Steps wavelengths evenly over the range: each one reads
+// the canvas where the quadratic through the three traced backdrop points
+// puts it, so more steps cost texture reads, not traces, and fill the fringe
+// in with a continuous spectrum.
+// `traced` is false when opaque faces hide the refraction. The traces run in a
+// loop whose length comes from uniforms, so ANGLE's HLSL compiler keeps it as
+// a loop instead of flattening a skipped branch into always running it.
+vec4 crystalRefraction(vec3 origin, vec3 direction, bool traced) {
+  float ior = max(u_crystalIor, 1.0);
+  int steps = clamp(u_crystalDispersionSteps, 1, CRYSTAL_DISPERSION_STEPS);
+  int traces = traced ? (steps == 1 ? 1 : 3) : 0;
+  vec2 middle = vec2(0.5);
+  vec2 low = vec2(0.5);
+  vec2 high = vec2(0.5);
+  for (int trace = 0; trace < 3; trace++) {
+    if (trace >= traces) break;
+    float traceIor = trace == 0 ? ior
+      : trace == 1 ? max(ior - 0.5 * u_crystalDispersion, 1.0)
+      : ior + 0.5 * u_crystalDispersion;
+    vec2 point = crystalTrace(origin, direction, traceIor);
+    if (trace == 0) middle = point;
+    else if (trace == 1) low = point;
+    else high = point;
+  }
+  if (traces == 0) return vec4(0.0, 0.0, 0.0, 1.0);
+  if (traces == 1) return crystalBackdropSample(middle);
+  vec3 sum = vec3(0.0);
+  vec3 weights = vec3(0.0);
+  for (int step = 0; step < CRYSTAL_DISPERSION_STEPS; step++) {
+    if (step >= steps) break;
+    float wavelength = (float(step) + 0.5) / float(steps);
+    vec2 uv = low * (2.0 * wavelength - 1.0) * (wavelength - 1.0)
+      + middle * 4.0 * wavelength * (1.0 - wavelength)
+      + high * wavelength * (2.0 * wavelength - 1.0);
+    vec3 weight = crystalSpectrumWeight(wavelength);
+    sum += crystalBackdropSample(uv).rgb * weight;
+    weights += weight;
+  }
+  return vec4(sum / weights, 1.0);
+}
+
+// Planar coordinates on the face that holds a crystal-frame point, across the
+// face and along the crystal axis, so every face shows the canvas once.
+vec2 crystalFaceUv(vec3 local, vec3 localNormal, vec4 shape) {
+  vec3 across = normalize(cross(vec3(0.0, 1.0, 0.0), localNormal));
+  vec3 along = cross(localNormal, across);
+  // Half a hexagon side is apothem * tan(30 degrees).
+  float halfSide = shape.x * 0.57735027;
+  float tip = shape.y + shape.z;
+  return vec2(dot(local, across) / (2.0 * halfSide), dot(local, along) / (2.0 * tip)) + 0.5;
+}
+
+ThreeDHit crystalHit(vec3 localRay) {
+  ThreeDHit result = threeDMiss();
+  float cameraDistance = max(u_crystalCameraDistance, 0.1);
+  vec3 forward = vec3(0.0, 0.0, -1.0);
+  vec3 up = vec3(0.0, 1.0, 0.0);
+  threeDSetCameraBasis(forward, up);
+  vec3 rayDirection = threeDWorldDirection(localRay, forward, up);
+  vec3 right = normalize(cross(forward, up));
+  // Camera Position moves the camera across the view in half canvas
+  // diagonals, and Dolly along the view in camera distances.
+  float aspect = u_fullResolution.x / max(u_fullResolution.y, 1.0);
+  vec2 offset = threeDRollMatrix() * u_cameraOffset * 0.5 * length(vec2(aspect, 1.0));
+  vec3 rayOrigin = vec3(0.0, 0.0, cameraDistance) + right * offset.x + up * offset.y
+    + g_cameraForward * u_cameraDolly * cameraDistance;
+  result.rayDirection = rayDirection;
+  result.hit = true;
+  result.hasColor = true;
+  g_crystalFaceWeight = 0.0;
+
+  int first;
+  vec3 firstNormal;
+  bool firstEntering;
+  int cameraLayers;
+  // Fill may hold the camera inside crystals; the first face is then one the
+  // ray leaves or enters from within the glass.
+  float firstDistance = crystalNextFace(rayOrigin, rayDirection, first, firstNormal, firstEntering, cameraLayers);
+  bool cameraInside = cameraLayers > 0;
+  if (firstDistance < 0.0) {
+    result.color = crystalBackdrop(rayOrigin, rayDirection);
+    result.distance = max(rayOrigin.z - u_crystalBackdropZ, 0.0) / max(abs(rayDirection.z), CRYSTAL_MIN_DEPTH_SLOPE);
+    result.position = rayOrigin + rayDirection * result.distance;
+    return result;
+  }
+  vec3 entry = rayOrigin + rayDirection * firstDistance;
+  bool faces = u_crystalMaterial == CRYSTAL_MATERIAL_FACES;
+  float faceWeight = faces ? clamp(u_crystalFaceOpacity, 0.0, 1.0) : 0.0;
+  // Opaque faces hide the refraction, so it is not traced.
+  bool traced = faceWeight < 0.999;
+  vec4 color = crystalRefraction(rayOrigin, rayDirection, traced);
+  if (traced) {
+    // Schlick Fresnel: the outer faces mirror the canvas most at grazing
+    // angles. Seen from inside, the reflection stays in the glass and is
+    // part of the trace.
+    if (!cameraInside) {
+      float ior = max(u_crystalIor, 1.0);
+      float cosine = clamp(-dot(rayDirection, firstNormal), 0.0, 1.0);
+      float f0 = pow((ior - 1.0) / (ior + 1.0), 2.0);
+      float fresnel = f0 + (1.0 - f0) * pow(1.0 - cosine, 5.0);
+      vec4 reflected = crystalBackdrop(entry, reflect(rayDirection, firstNormal));
+      color = mix(color, reflected, clamp(2.0 * fresnel * u_crystalReflection, 0.0, 1.0));
+    }
+    // Shade lights the faces from the camera's upper left so the facets read.
+    vec3 light = normalize(-g_cameraForward + g_cameraUp * 0.6 - g_cameraRight * 0.4);
+    float lambert = 0.3 + 0.7 * max(dot(firstEntering ? firstNormal : -firstNormal, light), 0.0);
+    color.rgb *= mix(1.0, lambert, clamp(u_threeDShade, 0.0, 1.0));
+  }
+  if (faces) {
+    // Surface UV runs over each face; Flow slides it a whole tile per cycle.
+    mat3 rotation = u_crystalRotation[first];
+    vec3 local = (entry - u_crystalCenter[first].xyz) * rotation;
+    result.uv = crystalFaceUv(local, firstNormal * rotation, u_crystalShape[first]) * max(u_coneTextureRepeat, 1.0)
+      - vec2(0.0, fract(u_threeDTravel));
+    result.hasUv = true;
+    result.uvTiled = true;
+    result.hasColor = false;
+    g_crystalFaceWeight = faceWeight;
+  }
+  result.color = color;
+  result.position = entry;
+  result.normal = firstNormal;
+  result.distance = firstDistance;
+  result.mapScale = 0.5;
+  return result;
+}
+#endif
+
 // ---------------------------------------------------------------------------
 // Mapping, shading, and fog.
 
@@ -1784,6 +2137,9 @@ void main() {
 
   ThreeDHit hit;
   float fogScale = 0.25;
+  // Crystals resolve their own shading from the refracted canvas; the Faces
+  // material lays the shared mapping over it by g_crystalFaceWeight.
+  bool ownShading = false;
 #if KGG_THREE_D_SHAPE < 0
   if (u_threeDShape == SHAPE_LATTICE) {
     hit = latticeHit(localRay);
@@ -1803,6 +2159,10 @@ void main() {
   } else if (u_threeDShape == SHAPE_DISCS) {
     hit = discsHit(localRay);
     fogScale = 0.15;
+  } else if (u_threeDShape == SHAPE_CRYSTAL) {
+    hit = crystalHit(localRay);
+    fogScale = 0.3;
+    ownShading = true;
   } else {
     hit = torusHit(localRay);
   }
@@ -1826,12 +2186,17 @@ void main() {
 #elif KGG_THREE_D_SHAPE == 7
   hit = discsHit(localRay);
   fogScale = 0.15;
+#elif KGG_THREE_D_SHAPE == 8
+  hit = crystalHit(localRay);
+  fogScale = 0.3;
+  ownShading = true;
 #endif
   if (!hit.hit) {
     gl_FragColor = background;
     return;
   }
-  vec4 color = threeDSurfaceColor(hit);
+  vec4 color = ownShading ? hit.color : threeDSurfaceColor(hit);
+  if (ownShading && g_crystalFaceWeight > 0.0) color = mix(color, threeDSurfaceColor(hit), g_crystalFaceWeight);
   color.rgb *= hit.fade;
   gl_FragColor = threeDApplyFog(color, hit.distance, fogScale);
 #endif

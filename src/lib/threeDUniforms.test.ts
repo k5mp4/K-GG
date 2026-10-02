@@ -1,5 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
-import { FIELD_MODEL_TEXTURE_UNIT, bindFieldModelTexture } from './threeDUniforms';
+import { FIELD_MODEL_TEXTURE_UNIT, bindFieldModelTexture, uploadThreeDUniforms } from './threeDUniforms';
+import { getThreeDRenderParams } from './coneView';
+import { DEFAULT_CONE_VIEW } from '../types/coneView';
 import type { FieldModel } from './fieldModelRuntime';
 
 function fakeGl() {
@@ -57,5 +59,29 @@ describe('Geometry Field model texture', () => {
     expect(bindFieldModelTexture(gl as unknown as WebGL2RenderingContext, uniforms, {} as WebGLTexture, null, 5)).toBe(5);
     expect(gl.texImage2D).not.toHaveBeenCalled();
     expect(gl.uniform1f).toHaveBeenCalledWith(uniforms.u_fieldModelReady, 0);
+  });
+});
+
+describe('3D uniform upload', () => {
+  it('uploads the Crystals arrays in one call each', () => {
+    const gl = {
+      uniform1f: vi.fn(),
+      uniform1i: vi.fn(),
+      uniform2f: vi.fn(),
+      uniform4fv: vi.fn(),
+      uniformMatrix3fv: vi.fn(),
+    };
+    const crystalUniforms = {
+      u_crystalCount: {} as WebGLUniformLocation,
+      u_crystalCenter: {} as WebGLUniformLocation,
+      u_crystalRotation: {} as WebGLUniformLocation,
+      u_crystalShape: {} as WebGLUniformLocation,
+    };
+    const params = getThreeDRenderParams({ ...DEFAULT_CONE_VIEW, shape: 'crystal' }, 0.2, 16 / 9);
+    uploadThreeDUniforms(gl as unknown as WebGL2RenderingContext, crystalUniforms, params);
+    expect(gl.uniform1i).toHaveBeenCalledWith(crystalUniforms.u_crystalCount, params.crystal.count);
+    expect(gl.uniform4fv).toHaveBeenCalledWith(crystalUniforms.u_crystalCenter, params.crystal.centers);
+    expect(gl.uniform4fv).toHaveBeenCalledWith(crystalUniforms.u_crystalShape, params.crystal.shapes);
+    expect(gl.uniformMatrix3fv).toHaveBeenCalledWith(crystalUniforms.u_crystalRotation, false, params.crystal.rotations);
   });
 });

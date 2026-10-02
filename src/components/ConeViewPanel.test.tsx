@@ -110,6 +110,20 @@ describe('ConeViewPanel shape controls', () => {
     expect(hasLabel(markup, 'Camera Roll')).toBe(true);
   });
 
+  it('shows the Crystals controls and Surface Mapping only for the Faces material', () => {
+    const markup = renderShape('crystal');
+    for (const label of ['Layout', 'Material', 'Face Opacity', 'Form', 'Crystals', 'Size', 'Length', 'Field Depth', 'Seed', 'IOR', 'Dispersion', 'Dispersion Steps', 'Reflection', 'Backdrop', 'Spin', 'Revolve', 'Shade', 'Fog']) {
+      expect(hasLabel(markup, label), label).toBe(true);
+    }
+    expect(hasLabel(markup, 'Surface Mapping')).toBe(false);
+    expect(hasLabel(markup, 'Depth')).toBe(false);
+    expect(hasLabel(markup, 'Camera Roll')).toBe(true);
+    expect(hasLabel(renderShape('discs'), 'Surface Mapping')).toBe(true);
+    // The Faces material maps the canvas with Surface Mapping; the Cluster names Spread.
+    expect(hasLabel(renderShape('crystal', { crystalMaterial: 'faces' }), 'Surface Mapping')).toBe(true);
+    expect(hasLabel(renderShape('crystal', { crystalLayout: 'cluster' }), 'Spread')).toBe(true);
+  });
+
   it('no longer offers the Extrusion shape', () => {
     const markup = renderShape('cone');
     expect(markup).not.toContain('Pixel city');

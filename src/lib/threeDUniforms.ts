@@ -146,4 +146,20 @@ export function uploadThreeDUniforms(
   float('u_discsTime', params.discs.time);
   float('u_discsFrameDistance', params.discs.frameDistance);
   float('u_discsOuterRadius', params.discs.outerRadius);
+  int('u_crystalCount', params.crystal.count);
+  const crystalCenter = uniforms.u_crystalCenter;
+  if (crystalCenter) gl.uniform4fv(crystalCenter, params.crystal.centers);
+  const crystalRotation = uniforms.u_crystalRotation;
+  if (crystalRotation) gl.uniformMatrix3fv(crystalRotation, false, params.crystal.rotations);
+  const crystalShape = uniforms.u_crystalShape;
+  if (crystalShape) gl.uniform4fv(crystalShape, params.crystal.shapes);
+  int('u_crystalMaterial', params.crystal.material);
+  float('u_crystalFaceOpacity', params.crystal.faceOpacity);
+  float('u_crystalIor', params.crystal.ior);
+  float('u_crystalDispersion', params.crystal.dispersion);
+  int('u_crystalDispersionSteps', params.crystal.dispersionSteps);
+  float('u_crystalReflection', params.crystal.reflection);
+  float('u_crystalCameraDistance', params.crystal.cameraDistance);
+  float('u_crystalBackdropZ', params.crystal.backdropZ);
+  float('u_crystalBackdropHalfHeight', params.crystal.backdropHalfHeight);
 }
