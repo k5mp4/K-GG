@@ -2,27 +2,40 @@ import { clampParameter, getParameterDefault, getParameterLimit } from '../lib/p
 
 export type ConeMappingMode = 'flow' | 'projection';
 /** Geometry of the 3D layer. The layer kind and preset key stay `cone` for compatibility. */
-export type ConeShape = 'cone' | 'torus' | 'lattice' | 'terrain' | 'extrusion' | 'ribbon' | 'rings' | 'field';
-export const CONE_SHAPES = ['cone', 'torus', 'lattice', 'terrain', 'extrusion', 'ribbon', 'rings', 'field'] as const satisfies readonly ConeShape[];
+export type ConeShape = 'cone' | 'torus' | 'lattice' | 'terrain' | 'ribbon' | 'rings' | 'field' | 'discs';
+export const CONE_SHAPES = ['cone', 'torus', 'lattice', 'terrain', 'ribbon', 'rings', 'field', 'discs'] as const satisfies readonly ConeShape[];
 export const CONE_SHAPE_INDEX = {
   cone: 0,
   torus: 1,
   lattice: 2,
   terrain: 3,
-  extrusion: 4,
-  ribbon: 5,
-  rings: 6,
-  field: 7,
+  ribbon: 4,
+  rings: 5,
+  field: 6,
+  discs: 7,
 } as const satisfies Record<ConeShape, number>;
 export const CONE_SHAPE_OPTIONS: { value: ConeShape; label: string }[] = [
   { value: 'cone', label: 'Cone' },
   { value: 'torus', label: 'Torus · Tunnel' },
   { value: 'lattice', label: 'Lattice · Gyroid tunnel' },
   { value: 'terrain', label: 'Terrain · Heightfield flyover' },
-  { value: 'extrusion', label: 'Extrusion · Pixel city' },
-  { value: 'ribbon', label: 'Ribbon · Twisted band' },
+  { value: 'ribbon', label: 'Ribbons · Growing bands' },
   { value: 'rings', label: 'Square Rings · Frame tunnel' },
   { value: 'field', label: 'Geometry Field · Scattered flythrough' },
+  { value: 'discs', label: 'Discs · Slit rings in 3D' },
+];
+
+/**
+ * How the Discs rings turn. `together` spins every ring at the same speed,
+ * `alternate` reverses every other ring, and `stagger` turns each ring in
+ * eased steps that start one ring after another from the center outward.
+ */
+export type DiscsSpinPattern = 'together' | 'alternate' | 'stagger';
+export const DISCS_SPIN_PATTERNS = ['together', 'alternate', 'stagger'] as const satisfies readonly DiscsSpinPattern[];
+export const DISCS_SPIN_PATTERN_OPTIONS: { value: DiscsSpinPattern; label: string }[] = [
+  { value: 'together', label: 'Together · Same speed' },
+  { value: 'alternate', label: 'Alternate · Counter-rotating' },
+  { value: 'stagger', label: 'Stagger · Eased cascade' },
 ];
 
 /**
@@ -77,8 +90,8 @@ export const RINGS_MAPPING_OPTIONS: { value: RingsMapping; label: string }[] = [
 ];
 
 /**
- * Camera projection of every shape except the Cone. Fisheye is a 180 degree
- * dome master and Equirect a full 360 x 180 degree panorama for VR.
+ * Camera projection of every shape. Fisheye is a 180 degree dome master and
+ * Equirect a full 360 x 180 degree panorama for VR.
  */
 export type ThreeDProjection = 'perspective' | 'fisheye' | 'equirect';
 export const THREE_D_PROJECTIONS = ['perspective', 'fisheye', 'equirect'] as const satisfies readonly ThreeDProjection[];
@@ -159,7 +172,6 @@ export type ConeViewConfig = {
   mappingMode: ConeMappingMode;
   /** Not used by the Cone shape, which keeps its original unlit UV mapping. */
   surfaceMapping: ThreeDSurfaceMapping;
-  /** Not used by the Cone shape. */
   projection: ThreeDProjection;
   /** Fades distant surfaces to black. */
   fog: number;
@@ -176,6 +188,8 @@ export type ConeViewConfig = {
   torusTwist: number;
   /** Torus only: whole turns of the texture around the tube per loop. */
   spin: number;
+  /** Cone only: turns of the texture around the cone from the opening to the apex. */
+  coneTwist: number;
   /** Camera offset in screen right/up. The torus measures it in tube radii inside the cross-section. */
   cameraX: number;
   cameraY: number;
@@ -207,15 +221,19 @@ export type ConeViewConfig = {
   terrainHeight: number;
   /** Terrain only: camera height above the ground plane. */
   terrainAltitude: number;
-  /** Extrusion only: columns per side. */
-  extrudeCells: number;
-  /** Extrusion only: height of the brightest cell. */
-  extrudeHeight: number;
-  /** Extrusion only: share of each cell left empty between columns. */
-  extrudeGap: number;
-  /** Ribbon only: half turns of the band per revolution; odd values make a Mobius band. */
+  /** Ribbon only: bands spaced evenly around the tube axis. */
+  ribbonCount: number;
+  /** Ribbon only: distance of the bands from the tube axis the camera travels on. */
+  ribbonRadius: number;
+  /** Ribbon only: how far the band tips scatter along the travel direction. */
+  ribbonStagger: number;
+  /** Ribbon only: whole turns of the bands around the tube axis per Loop Length. */
+  ribbonTwist: number;
+  /** Ribbon only: world length after which the bands repeat; each Flow Cycle travels it. */
+  ribbonLength: number;
+  /** Ribbon only: half turns of each band about its own center line per Loop Length. */
   ribbonHalfTwists: number;
-  /** Ribbon only: half width of the band relative to the unit ring radius. */
+  /** Ribbon only: half width of each band. */
   ribbonWidth: number;
   /** Square Rings only: frame layout. */
   ringsPattern: RingsPattern;
@@ -261,6 +279,34 @@ export type ConeViewConfig = {
   fieldWire: number;
   /** Geometry Field only: how far each object's texture is shifted from the others. */
   fieldVariation: number;
+  /** Discs only: concentric rings cut from the canvas. */
+  discsCount: number;
+  /** Discs only: share of each ring width left empty between rings. */
+  discsGap: number;
+  /** Discs only: ring thickness along its axis, in canvas half heights. */
+  discsThickness: number;
+  /** Discs only: amplitude of the ring positions along the view axis. */
+  discsSpread: number;
+  /** Discs only: sine periods of the depth wave across the rings. */
+  discsWaves: number;
+  /** Discs only: random phase added to each ring's depth wave and tilt. */
+  discsScatter: number;
+  /** Discs only: how the rings turn. */
+  discsSpinPattern: DiscsSpinPattern;
+  /** Discs only: whole turns of each ring per loop. */
+  discsSpin: number;
+  /** Discs only: fixed turn in degrees from one ring to the next. */
+  discsTwist: number;
+  /** Discs only: random fixed turn of each ring, as in the Slit circle; 1 is up to half a turn. */
+  discsOffset: number;
+  /** Discs only: wobble tilt of the rings in degrees. */
+  discsTilt: number;
+  /** Discs only: whole turns of the wobble per loop. */
+  discsTiltTurns: number;
+  /** Discs only: camera angle from the ring axis in degrees; 0 looks straight at the rings. */
+  discsView: number;
+  /** Discs only: whole camera turns around the ring axis per loop. */
+  discsOrbit: number;
 };
 
 /** Normalized apex movement limit; ±2 reaches 50% of the canvas outside its edge. */
@@ -291,6 +337,7 @@ export const DEFAULT_CONE_VIEW: ConeViewConfig = {
   ringRepeat: getParameterDefault('cone.ringRepeat'),
   torusTwist: getParameterDefault('cone.torusTwist'),
   spin: getParameterDefault('cone.spin'),
+  coneTwist: getParameterDefault('cone.coneTwist'),
   cameraX: getParameterDefault('cone.cameraX'),
   cameraY: getParameterDefault('cone.cameraY'),
   cameraYaw: getParameterDefault('cone.cameraYaw'),
@@ -308,9 +355,11 @@ export const DEFAULT_CONE_VIEW: ConeViewConfig = {
   latticeThickness: getParameterDefault('cone.latticeThickness'),
   terrainHeight: getParameterDefault('cone.terrainHeight'),
   terrainAltitude: getParameterDefault('cone.terrainAltitude'),
-  extrudeCells: getParameterDefault('cone.extrudeCells'),
-  extrudeHeight: getParameterDefault('cone.extrudeHeight'),
-  extrudeGap: getParameterDefault('cone.extrudeGap'),
+  ribbonCount: getParameterDefault('cone.ribbonCount'),
+  ribbonRadius: getParameterDefault('cone.ribbonRadius'),
+  ribbonStagger: getParameterDefault('cone.ribbonStagger'),
+  ribbonTwist: getParameterDefault('cone.ribbonTwist'),
+  ribbonLength: getParameterDefault('cone.ribbonLength'),
   ribbonHalfTwists: getParameterDefault('cone.ribbonHalfTwists'),
   ribbonWidth: getParameterDefault('cone.ribbonWidth'),
   ringsPattern: 'corridor',
@@ -335,6 +384,20 @@ export const DEFAULT_CONE_VIEW: ConeViewConfig = {
   fieldArmWidth: getParameterDefault('cone.fieldArmWidth'),
   fieldWire: getParameterDefault('cone.fieldWire'),
   fieldVariation: getParameterDefault('cone.fieldVariation'),
+  discsCount: getParameterDefault('cone.discsCount'),
+  discsGap: getParameterDefault('cone.discsGap'),
+  discsThickness: getParameterDefault('cone.discsThickness'),
+  discsSpread: getParameterDefault('cone.discsSpread'),
+  discsWaves: getParameterDefault('cone.discsWaves'),
+  discsScatter: getParameterDefault('cone.discsScatter'),
+  discsSpinPattern: 'stagger',
+  discsSpin: getParameterDefault('cone.discsSpin'),
+  discsTwist: getParameterDefault('cone.discsTwist'),
+  discsOffset: getParameterDefault('cone.discsOffset'),
+  discsTilt: getParameterDefault('cone.discsTilt'),
+  discsTiltTurns: getParameterDefault('cone.discsTiltTurns'),
+  discsView: getParameterDefault('cone.discsView'),
+  discsOrbit: getParameterDefault('cone.discsOrbit'),
 };
 
 function normalizeOption<T extends string>(value: unknown, options: readonly T[], fallback: T): T {
@@ -369,6 +432,7 @@ export function normalizeConeViewConfig(value: unknown): ConeViewConfig {
     ringRepeat: clampParameter(raw.ringRepeat, DEFAULT_CONE_VIEW.ringRepeat, getParameterLimit('cone.ringRepeat')),
     torusTwist: clampParameter(raw.torusTwist, DEFAULT_CONE_VIEW.torusTwist, getParameterLimit('cone.torusTwist')),
     spin: clampParameter(raw.spin, DEFAULT_CONE_VIEW.spin, getParameterLimit('cone.spin')),
+    coneTwist: clampParameter(raw.coneTwist, DEFAULT_CONE_VIEW.coneTwist, getParameterLimit('cone.coneTwist')),
     cameraX: clampParameter(raw.cameraX, DEFAULT_CONE_VIEW.cameraX, getParameterLimit('cone.cameraX')),
     cameraY: clampParameter(raw.cameraY, DEFAULT_CONE_VIEW.cameraY, getParameterLimit('cone.cameraY')),
     cameraYaw: clampParameter(raw.cameraYaw, DEFAULT_CONE_VIEW.cameraYaw, getParameterLimit('cone.cameraYaw')),
@@ -386,9 +450,11 @@ export function normalizeConeViewConfig(value: unknown): ConeViewConfig {
     latticeThickness: clampParameter(raw.latticeThickness, DEFAULT_CONE_VIEW.latticeThickness, getParameterLimit('cone.latticeThickness')),
     terrainHeight: clampParameter(raw.terrainHeight, DEFAULT_CONE_VIEW.terrainHeight, getParameterLimit('cone.terrainHeight')),
     terrainAltitude: clampParameter(raw.terrainAltitude, DEFAULT_CONE_VIEW.terrainAltitude, getParameterLimit('cone.terrainAltitude')),
-    extrudeCells: clampParameter(raw.extrudeCells, DEFAULT_CONE_VIEW.extrudeCells, getParameterLimit('cone.extrudeCells')),
-    extrudeHeight: clampParameter(raw.extrudeHeight, DEFAULT_CONE_VIEW.extrudeHeight, getParameterLimit('cone.extrudeHeight')),
-    extrudeGap: clampParameter(raw.extrudeGap, DEFAULT_CONE_VIEW.extrudeGap, getParameterLimit('cone.extrudeGap')),
+    ribbonCount: clampParameter(raw.ribbonCount, DEFAULT_CONE_VIEW.ribbonCount, getParameterLimit('cone.ribbonCount')),
+    ribbonRadius: clampParameter(raw.ribbonRadius, DEFAULT_CONE_VIEW.ribbonRadius, getParameterLimit('cone.ribbonRadius')),
+    ribbonStagger: clampParameter(raw.ribbonStagger, DEFAULT_CONE_VIEW.ribbonStagger, getParameterLimit('cone.ribbonStagger')),
+    ribbonTwist: clampParameter(raw.ribbonTwist, DEFAULT_CONE_VIEW.ribbonTwist, getParameterLimit('cone.ribbonTwist')),
+    ribbonLength: clampParameter(raw.ribbonLength, DEFAULT_CONE_VIEW.ribbonLength, getParameterLimit('cone.ribbonLength')),
     ribbonHalfTwists: clampParameter(raw.ribbonHalfTwists, DEFAULT_CONE_VIEW.ribbonHalfTwists, getParameterLimit('cone.ribbonHalfTwists')),
     ribbonWidth: clampParameter(raw.ribbonWidth, DEFAULT_CONE_VIEW.ribbonWidth, getParameterLimit('cone.ribbonWidth')),
     ringsPattern: normalizeOption(raw.ringsPattern, RINGS_PATTERNS, DEFAULT_CONE_VIEW.ringsPattern),
@@ -413,5 +479,19 @@ export function normalizeConeViewConfig(value: unknown): ConeViewConfig {
     fieldArmWidth: clampParameter(raw.fieldArmWidth, DEFAULT_CONE_VIEW.fieldArmWidth, getParameterLimit('cone.fieldArmWidth')),
     fieldWire: clampParameter(raw.fieldWire, DEFAULT_CONE_VIEW.fieldWire, getParameterLimit('cone.fieldWire')),
     fieldVariation: clampParameter(raw.fieldVariation, DEFAULT_CONE_VIEW.fieldVariation, getParameterLimit('cone.fieldVariation')),
+    discsCount: clampParameter(raw.discsCount, DEFAULT_CONE_VIEW.discsCount, getParameterLimit('cone.discsCount')),
+    discsGap: clampParameter(raw.discsGap, DEFAULT_CONE_VIEW.discsGap, getParameterLimit('cone.discsGap')),
+    discsThickness: clampParameter(raw.discsThickness, DEFAULT_CONE_VIEW.discsThickness, getParameterLimit('cone.discsThickness')),
+    discsSpread: clampParameter(raw.discsSpread, DEFAULT_CONE_VIEW.discsSpread, getParameterLimit('cone.discsSpread')),
+    discsWaves: clampParameter(raw.discsWaves, DEFAULT_CONE_VIEW.discsWaves, getParameterLimit('cone.discsWaves')),
+    discsScatter: clampParameter(raw.discsScatter, DEFAULT_CONE_VIEW.discsScatter, getParameterLimit('cone.discsScatter')),
+    discsSpinPattern: normalizeOption(raw.discsSpinPattern, DISCS_SPIN_PATTERNS, DEFAULT_CONE_VIEW.discsSpinPattern),
+    discsSpin: clampParameter(raw.discsSpin, DEFAULT_CONE_VIEW.discsSpin, getParameterLimit('cone.discsSpin')),
+    discsTwist: clampParameter(raw.discsTwist, DEFAULT_CONE_VIEW.discsTwist, getParameterLimit('cone.discsTwist')),
+    discsOffset: clampParameter(raw.discsOffset, DEFAULT_CONE_VIEW.discsOffset, getParameterLimit('cone.discsOffset')),
+    discsTilt: clampParameter(raw.discsTilt, DEFAULT_CONE_VIEW.discsTilt, getParameterLimit('cone.discsTilt')),
+    discsTiltTurns: clampParameter(raw.discsTiltTurns, DEFAULT_CONE_VIEW.discsTiltTurns, getParameterLimit('cone.discsTiltTurns')),
+    discsView: clampParameter(raw.discsView, DEFAULT_CONE_VIEW.discsView, getParameterLimit('cone.discsView')),
+    discsOrbit: clampParameter(raw.discsOrbit, DEFAULT_CONE_VIEW.discsOrbit, getParameterLimit('cone.discsOrbit')),
   };
 }

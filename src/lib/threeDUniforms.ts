@@ -86,6 +86,7 @@ export function uploadThreeDUniforms(
   float('u_coneDepth', params.cone.depth);
   float('u_coneApertureRadius', params.cone.apertureRadius);
   vec2('u_coneApexOffset', params.cone.apexOffset);
+  float('u_coneTwist', params.coneTwist);
   float('u_torusMajorRadius', params.torus.majorRadius);
   float('u_ringRepeat', params.torus.ringRepeat);
   float('u_torusTwistTurns', params.torus.twistTurns);
@@ -94,11 +95,14 @@ export function uploadThreeDUniforms(
   float('u_latticeThickness', params.lattice.thickness);
   float('u_terrainHeight', params.terrain.height);
   float('u_terrainAltitude', params.terrain.altitude);
-  float('u_extrudeCells', params.extrusion.cells);
-  float('u_extrudeHeight', params.extrusion.height);
-  float('u_extrudeGap', params.extrusion.gap);
+  float('u_ribbonCount', params.ribbon.count);
+  float('u_ribbonRadius', params.ribbon.radius);
+  float('u_ribbonStagger', params.ribbon.stagger);
+  float('u_ribbonTwistTurns', params.ribbon.twistTurns);
+  float('u_ribbonLoopLength', params.ribbon.loopLength);
   float('u_ribbonHalfTwists', params.ribbon.halfTwists);
   float('u_ribbonWidth', params.ribbon.width);
+  float('u_ribbonSpin', params.ribbon.spinRadians);
   int('u_ringsPattern', params.rings.pattern);
   int('u_ringsMapping', params.rings.mapping);
   float('u_ringsPerTile', params.rings.perTile);
@@ -123,4 +127,21 @@ export function uploadThreeDUniforms(
   float('u_fieldWire', params.field.wire);
   float('u_fieldSpin', params.field.spinRadians);
   float('u_fieldVariation', params.field.variation);
+  float('u_discsCount', params.discs.count);
+  float('u_discsGap', params.discs.gap);
+  float('u_discsThickness', params.discs.thickness);
+  float('u_discsSpread', params.discs.spread);
+  float('u_discsWaves', params.discs.waves);
+  float('u_discsScatter', params.discs.scatter);
+  int('u_discsSpinPattern', params.discs.spinPattern);
+  float('u_discsSpin', params.discs.spin);
+  float('u_discsTwist', params.discs.twistRadians);
+  float('u_discsOffset', params.discs.offset);
+  float('u_discsTilt', params.discs.tiltRadians);
+  float('u_discsTiltTurns', params.discs.tiltTurns);
+  float('u_discsView', params.discs.viewRadians);
+  float('u_discsOrbit', params.discs.orbitRadians);
+  float('u_discsTime', params.discs.time);
+  float('u_discsFrameDistance', params.discs.frameDistance);
+  float('u_discsOuterRadius', params.discs.outerRadius);
 }

@@ -67,10 +67,39 @@ describe('ConeViewPanel shape controls', () => {
     expect(hasLabel(markup, 'Camera Roll')).toBe(true);
   });
 
-  it('keeps Depth and Rotation for the Cone', () => {
+  it('keeps Depth and Rotation for the Cone and adds Twist and the camera', () => {
     const markup = renderShape('cone');
-    expect(hasLabel(markup, 'Depth')).toBe(true);
-    expect(hasLabel(markup, 'Rotation')).toBe(true);
+    for (const label of ['Depth', 'Rotation', 'Twist', 'FOV', 'Dolly', 'Camera Yaw', 'Camera Pitch', 'Camera Wiggle', 'Wiggle Amount']) {
+      expect(hasLabel(markup, label), label).toBe(true);
+    }
+    expect(markup).toContain('data-three-d-camera-position');
+    // Rotation is the Cone's texture rotation, so there is no separate camera roll.
+    expect(hasLabel(markup, 'Camera Roll')).toBe(false);
+    // The Cone stays unlit.
+    expect(hasLabel(markup, 'Shade')).toBe(false);
     expect(hasLabel(markup, 'Bend')).toBe(false);
+  });
+
+  it('shows the Ribbon controls', () => {
+    const markup = renderShape('ribbon');
+    for (const label of ['Ribbons', 'Radius', 'Width', 'Stagger', 'Loop Length', 'Twist', 'Band Twist', 'Spin', 'Ring Repeat']) {
+      expect(hasLabel(markup, label), label).toBe(true);
+    }
+    expect(hasLabel(markup, 'Depth')).toBe(false);
+    expect(hasLabel(markup, 'Camera Roll')).toBe(true);
+  });
+
+  it('shows the Discs controls', () => {
+    const markup = renderShape('discs');
+    for (const label of ['Rings', 'Gap', 'Thickness', 'Z Spread', 'Waves', 'Scatter', 'Spin Pattern', 'Spin', 'Twist', 'Offset', 'Tilt', 'Tilt Turns', 'View Angle', 'Orbit']) {
+      expect(hasLabel(markup, label), label).toBe(true);
+    }
+    expect(hasLabel(markup, 'Depth')).toBe(false);
+    expect(hasLabel(markup, 'Camera Roll')).toBe(true);
+  });
+
+  it('no longer offers the Extrusion shape', () => {
+    const markup = renderShape('cone');
+    expect(markup).not.toContain('Pixel city');
   });
 });

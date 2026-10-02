@@ -15,6 +15,8 @@ import {
   getTorusMajorRadius,
   getTorusTwistTurns,
   getCameraWiggle,
+  getRibbonLaps,
+  getDiscsFrameDistance,
   CAMERA_MAX_OFFSET,
 } from './coneView';
 import { CAMERA_WIGGLE_PRESETS } from '../types/coneView';
@@ -111,6 +113,9 @@ describe('3D render parameters', () => {
     expect(cone.shape).toBe(0);
     expect(cone.camera.rollRadians).toBe(0);
     expect(cone.textureOffset[0]).toBeCloseTo(0.25, 10);
+    // Only the wiggle rolls the Cone camera; Rotation stays the texture offset.
+    const swaying = { ...DEFAULT_CONE_VIEW, rotation: 90, wigglePreset: 'sway' as const };
+    expect(getThreeDRenderParams(swaying, 0.25, 1).camera.rollRadians).toBeCloseTo(14 * Math.PI / 180, 10);
 
     const torus = getThreeDRenderParams({
       ...DEFAULT_CONE_VIEW,
@@ -127,7 +132,7 @@ describe('3D render parameters', () => {
     expect(torus.camera.rollRadians).toBeCloseTo(Math.PI / 2, 10);
   });
 
-  it.each(['lattice', 'terrain', 'extrusion', 'ribbon'] as const)('moves the %s geometry with Flow instead of the texture', (shape) => {
+  it.each(['lattice', 'terrain'] as const)('moves the %s geometry with Flow instead of the texture', (shape) => {
     const config = { ...DEFAULT_CONE_VIEW, shape, flowCycles: 3 };
     const middle = getThreeDRenderParams(config, 0.5, 1);
     expect(middle.travel).toBeCloseTo(1.5, 10);
@@ -142,19 +147,16 @@ describe('3D render parameters', () => {
     expect(params.projection).toBe(1);
   });
 
-  it('passes the terrain and extrusion settings through', () => {
+  it('passes the terrain settings through', () => {
     const params = getThreeDRenderParams({
       ...DEFAULT_CONE_VIEW,
-      shape: 'extrusion',
+      shape: 'terrain',
       terrainHeight: 1.1,
       terrainAltitude: 0.4,
-      extrudeCells: 48,
-      extrudeHeight: 1.5,
-      extrudeGap: 0.3,
     }, 0, 1);
-    expect(params.shape).toBe(4);
+    expect(params.shape).toBe(3);
     expect(params.terrain).toEqual({ height: 1.1, altitude: 0.4 });
-    expect(params.extrusion).toEqual({ cells: 48, height: 1.5, gap: 0.3 });
+    expect(params).not.toHaveProperty('extrusion');
   });
 
   it('rides the torus camera around the ring with Flow while Spin turns the texture', () => {
@@ -166,16 +168,112 @@ describe('3D render parameters', () => {
     expect(getThreeDRenderParams({ ...torus, mappingMode: 'projection' }, 0.5, 1).travel).toBe(0);
   });
 
-  it('passes the ribbon band settings through', () => {
-    const ribbon = getThreeDRenderParams({ ...DEFAULT_CONE_VIEW, shape: 'ribbon', ribbonHalfTwists: 5 }, 0, 1);
-    expect(ribbon.shape).toBe(5);
-    expect(ribbon.ribbon).toEqual({ halfTwists: 5, width: 0.25 });
+  it('passes the ribbon settings through', () => {
+    const ribbon = getThreeDRenderParams({
+      ...DEFAULT_CONE_VIEW,
+      shape: 'ribbon',
+      ribbonCount: 4,
+      ribbonRadius: 0.9,
+      ribbonStagger: 0.3,
+      ribbonTwist: -2,
+      ribbonLength: 20,
+      ribbonHalfTwists: 5,
+      ribbonWidth: 0.2,
+      spin: 1,
+    }, 0.25, 1);
+    expect(ribbon.shape).toBe(4);
+    expect(ribbon.ribbon).toEqual({
+      count: 4,
+      radius: 0.9,
+      stagger: 0.3,
+      twistTurns: -2,
+      loopLength: 20,
+      halfTwists: 5,
+      width: 0.2,
+      laps: 2,
+      spinRadians: Math.PI / 2,
+    });
+  });
+
+  it('passes the Discs settings through in shader units', () => {
+    const discs = getThreeDRenderParams({
+      ...DEFAULT_CONE_VIEW,
+      shape: 'discs',
+      discsCount: 16,
+      discsGap: 0.3,
+      discsThickness: 0.1,
+      discsSpread: 0.8,
+      discsWaves: 1.5,
+      discsScatter: 0.4,
+      discsSpinPattern: 'alternate',
+      discsSpin: -2,
+      discsTwist: 9,
+      discsOffset: 0.5,
+      discsTilt: 30,
+      discsTiltTurns: 2,
+      discsView: 45,
+      discsOrbit: 1,
+    }, 0.25, 16 / 9);
+    expect(discs.shape).toBe(7);
+    expect(discs.textureOffset).toEqual([0, 0]);
+    expect(discs.discs).toMatchObject({
+      count: 16,
+      gap: 0.3,
+      thickness: 0.1,
+      spread: 0.8,
+      waves: 1.5,
+      scatter: 0.4,
+      spinPattern: 1,
+      spin: -2,
+      offset: 0.5,
+      tiltTurns: 2,
+      time: 0.25,
+    });
+    expect(discs.discs.twistRadians).toBeCloseTo(Math.PI / 20, 10);
+    expect(discs.discs.tiltRadians).toBeCloseTo(Math.PI / 6, 10);
+    expect(discs.discs.viewRadians).toBeCloseTo(Math.PI / 4, 10);
+    expect(discs.discs.orbitRadians).toBeCloseTo(Math.PI / 2, 10);
+    expect(discs.discs.outerRadius).toBeCloseTo(Math.hypot(16 / 9, 1), 10);
+  });
+
+  it('moves the Discs depth wave with Flow and closes Orbit on the loop', () => {
+    const discs = { ...DEFAULT_CONE_VIEW, shape: 'discs' as const, flowCycles: 2, discsOrbit: 3 };
+    expect(getThreeDRenderParams(discs, 0.5, 1).travel).toBe(1);
+    expect(getThreeDRenderParams(discs, 1, 1).travel).toBe(2);
+    expect(getThreeDRenderParams(discs, 0, 1).discs.orbitRadians).toBe(0);
+    expect(getThreeDRenderParams(discs, 1, 1).discs.orbitRadians).toBe(0);
+    expect(getThreeDRenderParams({ ...discs, mappingMode: 'projection' }, 0.5, 1).travel).toBe(0);
+  });
+
+  it('frames the canvas half height with the base FOV for the Discs', () => {
+    expect(getDiscsFrameDistance({ ...DEFAULT_CONE_VIEW, cameraFov: 90 })).toBeCloseTo(1, 10);
+    expect(getDiscsFrameDistance(DEFAULT_CONE_VIEW)).toBeCloseTo(Math.sqrt(3), 10);
+    // A zoom wiggle changes the lens, not the framing distance.
+    const zooming = { ...DEFAULT_CONE_VIEW, shape: 'discs' as const, wigglePreset: 'zoomPulse' as const };
+    expect(getThreeDRenderParams(zooming, 0.1, 1).discs.frameDistance).toBeCloseTo(Math.sqrt(3), 10);
+  });
+
+  it('travels the ribbons one loop length per Flow Cycle, two with odd half twists', () => {
+    const even = { ...DEFAULT_CONE_VIEW, shape: 'ribbon' as const, flowCycles: 3, ribbonHalfTwists: 2 };
+    expect(getRibbonLaps(even)).toBe(1);
+    expect(getThreeDRenderParams(even, 0.5, 1).travel).toBeCloseTo(1.5, 10);
+    expect(getThreeDRenderParams(even, 0.5, 1).textureOffset).toEqual([0, 0]);
+    expect(getThreeDRenderParams(even, 1, 1).travel).toBe(3);
+    const odd = { ...even, ribbonHalfTwists: 3 };
+    expect(getRibbonLaps(odd)).toBe(2);
+    expect(getThreeDRenderParams(odd, 1, 1).travel).toBe(6);
+    expect(getRibbonLaps({ ...odd, ribbonHalfTwists: 0 })).toBe(1);
+    expect(getThreeDRenderParams({ ...odd, mappingMode: 'projection' }, 0.5, 1).travel).toBe(0);
+    // Spin closes the loop with whole turns.
+    const spinning = { ...even, spin: 2 };
+    expect(getThreeDRenderParams(spinning, 0, 1).ribbon.spinRadians).toBe(0);
+    expect(getThreeDRenderParams(spinning, 1, 1).ribbon.spinRadians).toBe(0);
   });
 
   it('flies through one tile of square rings per Flow Cycle', () => {
     const rings = { ...DEFAULT_CONE_VIEW, shape: 'rings' as const, flowCycles: 2, ringsPerTile: 6 };
     const quarter = getThreeDRenderParams(rings, 0.25, 1);
-    expect(quarter.shape).toBe(6);
+    expect(quarter.shape).toBe(5);
     expect(quarter.travel).toBeCloseTo(3, 10);
     expect(quarter.textureOffset).toEqual([0, 0]);
     expect(getThreeDRenderParams(rings, 1, 1).travel).toBe(12);
@@ -218,7 +316,7 @@ describe('3D render parameters', () => {
   it('flies through one repeat of the geometry field per Flow Cycle', () => {
     const field = { ...DEFAULT_CONE_VIEW, shape: 'field' as const, flowCycles: 3, fieldLoopCells: 10 };
     const middle = getThreeDRenderParams(field, 0.5, 1);
-    expect(middle.shape).toBe(7);
+    expect(middle.shape).toBe(6);
     expect(middle.travel).toBeCloseTo(15, 10);
     expect(middle.textureOffset).toEqual([0, 0]);
     expect(getThreeDRenderParams(field, 1, 1).travel).toBe(30);
@@ -320,11 +418,34 @@ describe('torus tunnel', () => {
     expect(getConeTextureTransform({ ...torus, spin: -1 }, 0.25).offsetU).toBeCloseTo(0.75, 10);
   });
 
-  it('uses the camera FOV for every shape except the fixed Cone camera', () => {
+  it('uses the camera FOV for every shape, the Cone included', () => {
     const wide = getThreeDRenderParams({ ...torus, cameraFov: 90 }, 0, 1);
     expect(wide.tangentHalfFov).toBeCloseTo(1, 10);
     const cone = getThreeDRenderParams({ ...DEFAULT_CONE_VIEW, cameraFov: 90 }, 0, 1);
-    expect(cone.tangentHalfFov).toBeCloseTo(Math.tan(Math.PI / 6), 10);
+    expect(cone.tangentHalfFov).toBeCloseTo(1, 10);
+    // The default FOV keeps the original 60 degree Cone camera.
+    expect(getThreeDRenderParams(DEFAULT_CONE_VIEW, 0, 1).tangentHalfFov).toBeCloseTo(Math.tan(Math.PI / 6), 10);
+  });
+
+  it('keeps the Cone opening fixed while its FOV and zoom wiggle change', () => {
+    const base = getThreeDRenderParams(DEFAULT_CONE_VIEW, 0, 16 / 9);
+    const zoomed = getThreeDRenderParams({ ...DEFAULT_CONE_VIEW, cameraFov: 100, wigglePreset: 'zoomPulse' }, 0.1, 16 / 9);
+    expect(zoomed.cone.apertureRadius).toBe(base.cone.apertureRadius);
+    expect(zoomed.tangentHalfFov).not.toBeCloseTo(base.tangentHalfFov, 3);
+  });
+
+  it('places the Cone apex at its screen point through the base FOV', () => {
+    const config = { ...DEFAULT_CONE_VIEW, cameraFov: 90, apexX: 0.5, apexY: -0.25 };
+    const params = getThreeDRenderParams(config, 0, 2);
+    const apexDistance = CONE_CAMERA_DISTANCE + config.depth;
+    // Projected through tan(45°) = 1 the apex lands on the requested point.
+    expect(params.cone.apexOffset[0] / (apexDistance * 2)).toBeCloseTo(0.5, 10);
+    expect(params.cone.apexOffset[1] / apexDistance).toBeCloseTo(-0.25, 10);
+  });
+
+  it('passes the Cone twist through', () => {
+    expect(getThreeDRenderParams({ ...DEFAULT_CONE_VIEW, coneTwist: -1.5 }, 0, 1).coneTwist).toBe(-1.5);
+    expect(getThreeDRenderParams(DEFAULT_CONE_VIEW, 0, 1).coneTwist).toBe(0);
   });
 
   it('converts the fisheye angle, lens, dolly, and aim settings', () => {

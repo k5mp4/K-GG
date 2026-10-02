@@ -79,7 +79,7 @@ export type LazyProgramKey =
   | 'texture'
   | 'shapes';
 
-const THREE_D_SHAPES = ['cone', 'torus', 'lattice', 'terrain', 'extrusion', 'ribbon', 'rings', 'field'] as const satisfies readonly ConeShape[];
+const THREE_D_SHAPES = ['cone', 'torus', 'lattice', 'terrain', 'ribbon', 'rings', 'field', 'discs'] as const satisfies readonly ConeShape[];
 
 /**
  * The 3D layer compiles one program per shape (`KGG_THREE_D_SHAPE`). A single

@@ -1042,10 +1042,10 @@ function createLazyProgramState(): Record<LazyProgramKey, LazyProgramState> {
     threeDTorus: { promise: null, failed: false, timedOut: false, fallback: false },
     threeDLattice: { promise: null, failed: false, timedOut: false, fallback: false },
     threeDTerrain: { promise: null, failed: false, timedOut: false, fallback: false },
-    threeDExtrusion: { promise: null, failed: false, timedOut: false, fallback: false },
     threeDRibbon: { promise: null, failed: false, timedOut: false, fallback: false },
     threeDRings: { promise: null, failed: false, timedOut: false, fallback: false },
     threeDField: { promise: null, failed: false, timedOut: false, fallback: false },
+    threeDDiscs: { promise: null, failed: false, timedOut: false, fallback: false },
     texture: { promise: null, failed: false, timedOut: false, fallback: false },
     shapes: { promise: null, failed: false, timedOut: false, fallback: false },
   };

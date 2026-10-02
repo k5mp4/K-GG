@@ -2,6 +2,7 @@ import {
   CONE_APEX_LIMIT,
   CONE_SEAM_MODE_INDEX,
   CONE_SHAPE_INDEX,
+  DISCS_SPIN_PATTERNS,
   LATTICE_TYPES,
   FIELD_GEOMETRIES,
   FIELD_RENDERS,
@@ -57,18 +58,25 @@ export function getConeApertureRadius(
   return Math.hypot(halfWidth, halfHeight) * Math.max(1, safeFinite(overscan, 1));
 }
 
+/**
+ * World offset of the apex that puts it at the normalized screen point
+ * (apexX, apexY) through a camera with the given vertical field of view, so
+ * the apex handle stays on the apex whatever the Cone's FOV is.
+ */
 export function getConeApexOffset(
   cameraDistance: number,
   depth: number,
   aspect: number,
   apexX: number,
   apexY: number,
+  fovDegrees = CONE_CAMERA_FOV,
 ): ConeApexOffset {
   const safeDistance = Math.max(0.001, safeFinite(cameraDistance, CONE_CAMERA_DISTANCE));
   const safeDepth = Math.max(0.001, safeFinite(depth, 6));
   const safeAspect = Math.max(0.001, safeFinite(aspect, 1));
+  const safeFov = clamp(safeFinite(fovDegrees, CONE_CAMERA_FOV), CAMERA_FOV_MIN, CAMERA_FOV_MAX);
   const apexDistance = safeDistance + safeDepth;
-  const halfHeight = apexDistance * Math.tan(CONE_CAMERA_FOV * Math.PI / 360);
+  const halfHeight = apexDistance * Math.tan(safeFov * Math.PI / 360);
   const halfWidth = halfHeight * safeAspect;
   return {
     x: clamp(safeFinite(apexX, 0), -CONE_APEX_LIMIT, CONE_APEX_LIMIT) * halfWidth,
@@ -307,6 +315,8 @@ export type ThreeDRenderParams = {
   /** Half of the Fisheye angle in radians. */
   fisheyeHalfAngle: number;
   lensDistortion: number;
+  /** Cone only: texture turns around the cone from the opening to the apex. */
+  coneTwist: number;
   /** Torus only: 0..1 strength of the aim into the bend. */
   torusAim: number;
   /** Camera distance of the shapes seen from outside. */
@@ -341,14 +351,20 @@ export type ThreeDRenderParams = {
     height: number;
     altitude: number;
   };
-  extrusion: {
-    cells: number;
-    height: number;
-    gap: number;
-  };
   ribbon: {
+    count: number;
+    radius: number;
+    stagger: number;
+    /** Whole turns of the bands around the tube axis per loop length. */
+    twistTurns: number;
+    loopLength: number;
+    /** Half turns of each band about its center line per loop length. */
     halfTwists: number;
     width: number;
+    /** Loop lengths travelled per Flow Cycle: 2 when odd half twists need two to repeat. */
+    laps: number;
+    /** Turn of the band formation from Spin, in [0, 2π). */
+    spinRadians: number;
   };
   rings: {
     pattern: number;
@@ -382,6 +398,30 @@ export type ThreeDRenderParams = {
     spinRadians: number;
     variation: number;
   };
+  discs: {
+    count: number;
+    gap: number;
+    thickness: number;
+    spread: number;
+    waves: number;
+    scatter: number;
+    spinPattern: number;
+    /** Whole turns per loop; the shader eases or reverses them per ring. */
+    spin: number;
+    twistRadians: number;
+    offset: number;
+    tiltRadians: number;
+    tiltTurns: number;
+    viewRadians: number;
+    /** Camera turn around the ring axis from Orbit, in [0, 2π). */
+    orbitRadians: number;
+    /** Loop-normalized time in [0, 1] that drives Spin and the tilt wobble. */
+    time: number;
+    /** Camera distance that frames the canvas half height at the base FOV. */
+    frameDistance: number;
+    /** Outer ring radius: the canvas half diagonal in canvas half heights. */
+    outerRadius: number;
+  };
 };
 
 /**
@@ -389,7 +429,7 @@ export type ThreeDRenderParams = {
  * texture. Their loop-normalized travel is the Flow offset, and the texture
  * offset stays at zero except for the Torus Spin around the tube.
  */
-const GEOMETRY_MOTION_SHAPES: ReadonlySet<ConeViewConfig['shape']> = new Set(['torus', 'lattice', 'terrain', 'extrusion', 'ribbon', 'rings', 'field']);
+const GEOMETRY_MOTION_SHAPES: ReadonlySet<ConeViewConfig['shape']> = new Set(['torus', 'lattice', 'terrain', 'ribbon', 'rings', 'field', 'discs']);
 
 /** Frames of one Square Rings texture tile; the camera passes this many per Flow Cycle. */
 export function getRingsPerTile(config: ConeViewConfig): number {
@@ -399,6 +439,24 @@ export function getRingsPerTile(config: ConeViewConfig): number {
 /** Cells after which the Geometry Field repeats; the camera passes this many per Flow Cycle. */
 export function getFieldLoopCells(config: ConeViewConfig): number {
   return Math.max(1, Math.round(safeFinite(config.fieldLoopCells, 16)));
+}
+
+/**
+ * Loop lengths the Ribbon camera travels per Flow Cycle. An odd half twist
+ * count flips every band across its width after one loop length, so the view
+ * repeats only after two.
+ */
+export function getRibbonLaps(config: ConeViewConfig): number {
+  return Math.abs(Math.round(safeFinite(config.ribbonHalfTwists, 0))) % 2 === 1 ? 2 : 1;
+}
+
+/**
+ * Distance at which a camera with the base FOV frames the canvas half height
+ * (1 world unit), so the Discs seen head-on fill the canvas like the 2D Slit.
+ */
+export function getDiscsFrameDistance(config: ConeViewConfig): number {
+  const fov = clamp(safeFinite(config.cameraFov, CONE_CAMERA_FOV), CAMERA_FOV_MIN, CAMERA_FOV_MAX);
+  return 1 / Math.tan(fov * Math.PI / 360);
 }
 
 /** Fraction in [0, 1) of `count` whole cycles at a loop-normalized time. */
@@ -426,28 +484,39 @@ export function getThreeDRenderParams(
 ): ThreeDRenderParams {
   const transform = getConeTextureTransform(config, normalizedTime);
   const safeAspect = Math.max(0.001, safeFinite(aspect, 1));
-  const apexOffset = getConeApexOffset(CONE_CAMERA_DISTANCE, config.depth, safeAspect, config.apexX, config.apexY);
+  // The opening keeps its 60 degree framing so FOV zooms the Cone, while the
+  // apex follows the base FOV so its handle stays on it.
+  const apexOffset = getConeApexOffset(
+    CONE_CAMERA_DISTANCE, config.depth, safeAspect, config.apexX, config.apexY, config.cameraFov,
+  );
   const camera = getThreeDCamera(config, normalizedTime);
   const geometryMotion = GEOMETRY_MOTION_SHAPES.has(config.shape);
   const ringsPerTile = getRingsPerTile(config);
   const ringsMotion = getRingsMotion(config, normalizedTime);
+  const isCone = config.shape === 'cone';
   return {
     shape: getConeShapeIndex(config),
     surfaceMapping: THREE_D_SURFACE_MAPPING_INDEX[config.surfaceMapping] ?? 0,
     projection: Math.max(0, THREE_D_PROJECTIONS.indexOf(config.projection)),
     fisheyeHalfAngle: clamp(safeFinite(config.fisheyeAngle, 180), 90, 360) * Math.PI / 360,
     lensDistortion: clamp(safeFinite(config.lensDistortion, 0), -0.5, 0.5),
+    coneTwist: safeFinite(config.coneTwist, 0),
     torusAim: clamp(safeFinite(config.torusAim, 1), 0, 1),
     distance: config.depth * 0.5,
     fog: clamp(safeFinite(config.fog, 0), 0, 1),
     shade: clamp(safeFinite(config.shade, 0), 0, 1),
     // The Square Rings travel in frames, one tile of frames per Flow Cycle,
-    // and the Geometry Field in cells, one repeat of its layout per cycle.
+    // the Geometry Field in cells, one repeat of its layout per cycle, and the
+    // Ribbon in loop lengths, two per cycle when its view needs two to repeat.
     travel: geometryMotion
-      ? transform.offsetV * (config.shape === 'rings' ? ringsPerTile : config.shape === 'field' ? getFieldLoopCells(config) : 1)
+      ? transform.offsetV * (
+        config.shape === 'rings' ? ringsPerTile
+          : config.shape === 'field' ? getFieldLoopCells(config)
+            : config.shape === 'ribbon' ? getRibbonLaps(config)
+              : 1
+      )
       : 0,
-    // The Cone keeps its fixed 60 degree camera; other shapes use the FOV.
-    tangentHalfFov: Math.tan((config.shape === 'cone' ? CONE_CAMERA_FOV : camera.fovDegrees) * Math.PI / 360),
+    tangentHalfFov: Math.tan(camera.fovDegrees * Math.PI / 360),
     textureRepeat: transform.repeatU,
     // The Torus camera rides the ring while Spin still turns its texture.
     textureOffset: config.shape === 'torus'
@@ -457,8 +526,8 @@ export function getThreeDRenderParams(
         : [transform.offsetU, transform.offsetV],
     seamBlend: transform.seamBlend,
     seamMode: CONE_SEAM_MODE_INDEX[transform.seamMode],
-    // The Cone keeps Rotation as a texture offset, so it does not roll.
-    camera: config.shape === 'cone' ? { ...camera, rollRadians: 0 } : camera,
+    // The Cone keeps Rotation as a texture offset, so only the wiggle rolls it.
+    camera: isCone ? { ...camera, rollRadians: getCameraWiggle(config, normalizedTime).roll * Math.PI / 180 } : camera,
     cone: {
       cameraDistance: CONE_CAMERA_DISTANCE,
       depth: config.depth,
@@ -479,14 +548,16 @@ export function getThreeDRenderParams(
       height: config.terrainHeight,
       altitude: config.terrainAltitude,
     },
-    extrusion: {
-      cells: Math.round(config.extrudeCells),
-      height: config.extrudeHeight,
-      gap: config.extrudeGap,
-    },
     ribbon: {
-      halfTwists: Math.round(config.ribbonHalfTwists),
+      count: Math.max(1, Math.round(safeFinite(config.ribbonCount, 6))),
+      radius: config.ribbonRadius,
+      stagger: clamp(safeFinite(config.ribbonStagger, 0), 0, 1),
+      twistTurns: Math.round(safeFinite(config.ribbonTwist, 0)),
+      loopLength: Math.max(1, safeFinite(config.ribbonLength, 16)),
+      halfTwists: Math.round(safeFinite(config.ribbonHalfTwists, 0)),
       width: config.ribbonWidth,
+      laps: getRibbonLaps(config),
+      spinRadians: wholeCyclePhase(config.spin, normalizedTime) * 2 * Math.PI,
     },
     rings: {
       pattern: Math.max(0, RINGS_PATTERNS.indexOf(config.ringsPattern)),
@@ -515,6 +586,25 @@ export function getThreeDRenderParams(
       wire: config.fieldWire,
       spinRadians: wholeCyclePhase(config.spin, normalizedTime) * 2 * Math.PI,
       variation: config.fieldVariation,
+    },
+    discs: {
+      count: Math.max(1, Math.round(safeFinite(config.discsCount, 12))),
+      gap: clamp(safeFinite(config.discsGap, 0), 0, 0.95),
+      thickness: Math.max(0.001, safeFinite(config.discsThickness, 0.06)),
+      spread: Math.max(0, safeFinite(config.discsSpread, 0)),
+      waves: safeFinite(config.discsWaves, 0),
+      scatter: clamp(safeFinite(config.discsScatter, 0), 0, 1),
+      spinPattern: Math.max(0, DISCS_SPIN_PATTERNS.indexOf(config.discsSpinPattern)),
+      spin: Math.round(safeFinite(config.discsSpin, 0)),
+      twistRadians: safeFinite(config.discsTwist, 0) * Math.PI / 180,
+      offset: clamp(safeFinite(config.discsOffset, 0), 0, 1),
+      tiltRadians: clamp(safeFinite(config.discsTilt, 0), 0, 89) * Math.PI / 180,
+      tiltTurns: Math.round(safeFinite(config.discsTiltTurns, 0)),
+      viewRadians: clamp(safeFinite(config.discsView, 0), 0, 89) * Math.PI / 180,
+      orbitRadians: wholeCyclePhase(config.discsOrbit, normalizedTime) * 2 * Math.PI,
+      time: Math.max(0, Math.min(1, safeFinite(normalizedTime, 0))),
+      frameDistance: getDiscsFrameDistance(config),
+      outerRadius: Math.hypot(safeAspect, 1),
     },
   };
 }

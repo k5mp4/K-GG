@@ -35,7 +35,7 @@ test('every WebGL program compiles and links in a real WebGL2 context', async ({
         'flowComposite', 'datamosh', 'texture', 'shapes',
         // One program per 3D shape.
         'threeDCone', 'threeDTorus', 'threeDLattice', 'threeDTerrain',
-        'threeDExtrusion', 'threeDRibbon', 'threeDRings', 'threeDField',
+        'threeDRibbon', 'threeDRings', 'threeDField', 'threeDDiscs',
       ].map(key => [key, getProgramSource(key)] as [string, Source]),
       // The renderer compiles Noise-dependent programs once per Noise type.
       ...(NOISE_VARIANT_PROGRAM_KEYS as readonly string[]).flatMap(key => (

@@ -55,6 +55,7 @@ describe('cone view configuration', () => {
       ringRepeat: 7,
       torusTwist: 0,
       spin: 0,
+      coneTwist: 0,
       cameraX: 0,
       cameraY: 0,
       cameraYaw: 0,
@@ -72,11 +73,13 @@ describe('cone view configuration', () => {
       latticeThickness: 0.25,
       terrainHeight: 0.6,
       terrainAltitude: 1,
-      extrudeCells: 32,
-      extrudeHeight: 0.8,
-      extrudeGap: 0.15,
+      ribbonCount: 6,
+      ribbonRadius: 0.7,
+      ribbonStagger: 0.5,
+      ribbonTwist: 1,
+      ribbonLength: 16,
       ribbonHalfTwists: 1,
-      ribbonWidth: 0.25,
+      ribbonWidth: 0.15,
       ringsPattern: 'corridor',
       ringsMapping: 'wrap',
       ringsPerTile: 8,
@@ -99,7 +102,57 @@ describe('cone view configuration', () => {
       fieldArmWidth: 0.35,
       fieldWire: 0.03,
       fieldVariation: 1,
+      discsCount: 12,
+      discsGap: 0.2,
+      discsThickness: 0.06,
+      discsSpread: 0.5,
+      discsWaves: 1,
+      discsScatter: 0,
+      discsSpinPattern: 'stagger',
+      discsSpin: 1,
+      discsTwist: 0,
+      discsOffset: 0.3,
+      discsTilt: 12,
+      discsTiltTurns: 1,
+      discsView: 35,
+      discsOrbit: 0,
     });
+  });
+
+  it('normalizes the Discs settings', () => {
+    expect(normalizeConeViewConfig({ shape: 'discs' }).shape).toBe('discs');
+    expect(normalizeConeViewConfig({
+      discsCount: 99.4,
+      discsGap: 2,
+      discsThickness: 0,
+      discsSpread: -1,
+      discsWaves: 9,
+      discsScatter: 3,
+      discsSpinPattern: 'alternate',
+      discsSpin: 2.6,
+      discsTwist: 99,
+      discsOffset: -1,
+      discsTilt: 120,
+      discsTiltTurns: -9.2,
+      discsView: 99,
+      discsOrbit: 1.4,
+    })).toMatchObject({
+      discsCount: 48,
+      discsGap: 0.9,
+      discsThickness: 0.01,
+      discsSpread: 0,
+      discsWaves: 4,
+      discsScatter: 1,
+      discsSpinPattern: 'alternate',
+      discsSpin: 3,
+      discsTwist: 45,
+      discsOffset: 0,
+      discsTilt: 75,
+      discsTiltTurns: -4,
+      discsView: 85,
+      discsOrbit: 1,
+    });
+    expect(normalizeConeViewConfig({ discsSpinPattern: 'wobble' }).discsSpinPattern).toBe('stagger');
   });
 
   it('keeps presets without a shape on the cone and normalizes the torus shape', () => {
@@ -137,33 +190,48 @@ describe('cone view configuration', () => {
     expect(normalizeConeViewConfig({ projection: 'orthographic' }).projection).toBe('perspective');
     expect(normalizeConeViewConfig({ shape: 'sphere' }).shape).toBe('cone');
     expect(normalizeConeViewConfig({ shape: 'mirrorRoom' }).shape).toBe('cone');
+    expect(normalizeConeViewConfig({ shape: 'extrusion' }).shape).toBe('cone');
+    expect(normalizeConeViewConfig({ shape: 'extrusion', extrudeCells: 12 })).not.toHaveProperty('extrudeCells');
   });
 
-  it('clamps the terrain and extrusion settings', () => {
+  it('clamps the terrain settings', () => {
     expect(normalizeConeViewConfig({
       shape: 'terrain',
       terrainHeight: 9,
       terrainAltitude: 0,
-      extrudeCells: 200.4,
-      extrudeHeight: -1,
-      extrudeGap: 2,
     })).toMatchObject({
       shape: 'terrain',
       terrainHeight: 2,
       terrainAltitude: 0.1,
-      extrudeCells: 128,
-      extrudeHeight: 0,
-      extrudeGap: 0.8,
     });
-    expect(normalizeConeViewConfig({ shape: 'extrusion', extrudeCells: 12.6 })).toMatchObject({ shape: 'extrusion', extrudeCells: 13 });
   });
 
-  it('rounds the ribbon twist and clamps its width', () => {
-    expect(normalizeConeViewConfig({ shape: 'ribbon', ribbonHalfTwists: 2.6, ribbonWidth: 3 })).toMatchObject({
+  it('clamps the Cone twist', () => {
+    expect(normalizeConeViewConfig({ coneTwist: 9 }).coneTwist).toBe(4);
+    expect(normalizeConeViewConfig({ coneTwist: -1.25 }).coneTwist).toBe(-1.25);
+  });
+
+  it('rounds the ribbon counts and twists and clamps the ribbon ranges', () => {
+    expect(normalizeConeViewConfig({
       shape: 'ribbon',
+      ribbonCount: 40.2,
+      ribbonRadius: 0,
+      ribbonStagger: 3,
+      ribbonTwist: 2.6,
+      ribbonLength: 1,
+      ribbonHalfTwists: 2.6,
+      ribbonWidth: 3,
+    })).toMatchObject({
+      shape: 'ribbon',
+      ribbonCount: 12,
+      ribbonRadius: 0.2,
+      ribbonStagger: 1,
+      ribbonTwist: 3,
+      ribbonLength: 4,
       ribbonHalfTwists: 3,
       ribbonWidth: 0.6,
     });
+    expect(normalizeConeViewConfig({ ribbonTwist: -99, ribbonCount: 0 })).toMatchObject({ ribbonTwist: -8, ribbonCount: 1 });
   });
 
   it('normalizes the square ring settings', () => {
