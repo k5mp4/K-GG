@@ -1,4 +1,16 @@
-import type { NativeFfmpegStatus, NativeVideoFormat } from '../adapters';
+import type { MovCodec, NativeFfmpegStatus, NativeVideoFormat } from '../adapters';
+
+export const MOV_CODECS = [
+  { value: 'h264', label: 'H.264', supportsQuality: true, description: '容量を抑える圧縮形式です。品質を上げるとサイズも増えます。透過には対応しません。' },
+  { value: 'prores', label: 'ProRes 422', supportsQuality: true, description: '編集向けの形式です。HighはHQ、Balancedは422、SmallはLTで出力します。透過には対応しません。' },
+  { value: 'qtrle', label: 'Animation (Lossless)', supportsQuality: false, description: 'RGBをロスレスで保持します。ファイルサイズは大きくなります。透過には対応しません。' },
+] as const;
+
+export function availableMovCodecs(status: NativeFfmpegStatus | null): MovCodec[] {
+  if (!status?.available) return [];
+  const reported = status.movCodecs ?? ['qtrle'];
+  return MOV_CODECS.map(codec => codec.value).filter(codec => reported.includes(codec));
+}
 
 /**
  * 動画書き出し形式の登録表。
@@ -24,13 +36,13 @@ export type NativeVideoFormatDefinition = {
 export const NATIVE_VIDEO_FORMATS: readonly NativeVideoFormatDefinition[] = [
   {
     value: 'mov',
-    label: 'MOV (QuickTime Animation)',
+    label: 'MOV',
     shortLabel: 'MOV',
     extension: 'mov',
     fileSuffix: '',
-    supportsQuality: false,
+    supportsQuality: true,
     afterEffectsCompatible: true,
-    description: 'RGBをロスレスで保持します。ファイルサイズは大きくなります。',
+    description: 'コーデックと品質を選んでQuickTime動画を書き出します。',
   },
   {
     value: 'mp4',

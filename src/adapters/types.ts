@@ -34,6 +34,7 @@ export type AeRuntime = 'browser-bridge' | 'tauri-native';
 
 /** FFmpegで生成するネイティブ動画形式。Rust側`NativeVideoFormat::id`と一致させる。 */
 export type NativeVideoFormat = 'mov' | 'mp4' | 'gif' | 'webm';
+export type MovCodec = 'h264' | 'prores' | 'qtrle';
 
 export type NativeVideoArtifact = {
   kind: 'native-path';
@@ -147,6 +148,7 @@ export type VideoExportConfig = {
   speed: number;
   easing?: AnimationEasing;
   mp4Quality?: Mp4QualityPreset;
+  movCodec?: MovCodec;
   /** MP4をGPUエンコーダー（NVENC/QSV/AMF/VideoToolbox）で書き出す。利用不可・失敗時はCPUへ戻る。 */
   useGpu?: boolean;
   /** GIFをこのサイズ未満に収める。超えた場合は解像度を下げて再エンコードする。 */
@@ -170,6 +172,8 @@ export type NativeFfmpegStatus = {
   ffprobeVersion: string | null;
   /** 検出したFFmpegで書き出せる形式。未報告の場合はMOV・MP4のみとみなす。 */
   videoFormats?: NativeVideoFormat[];
+  /** MOVで使用できるコーデック。未報告の旧バックエンドではqtrleのみ。 */
+  movCodecs?: MovCodec[];
   /** MP4書き出しに使えるGPUエンコーダー名（テストエンコード成功時のみ）。未検出・未報告はnull。 */
   gpuEncoder?: string | null;
 };

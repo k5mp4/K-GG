@@ -111,7 +111,8 @@ export const tauriVideoExportService: VideoExportService = {
         inputPattern: await join(exportTemp, 'frame_%04d.png'),
         outputPath,
         fps: config.fps,
-        quality: config.mp4Quality ?? 'high',
+        quality: config.mp4Quality ?? (format === 'mov' ? 'balanced' : 'high'),
+        movCodec: format === 'mov' ? config.movCodec ?? 'h264' : null,
         gifMaxFileMb: format === 'gif' ? config.gifMaxFileMb ?? GIF_MAX_FILE_MB.default : null,
         useGpu: format === 'mp4' && config.useGpu === true,
       });

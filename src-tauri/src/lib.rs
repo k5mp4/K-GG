@@ -100,6 +100,7 @@ struct NativeFfmpegStatus {
     ffprobe_version: Option<String>,
     /// 検出したFFmpegで書き出せる動画形式ID（`NativeVideoFormat::id`）。
     video_formats: Vec<&'static str>,
+    mov_codecs: Vec<&'static str>,
     /// MP4（H.264）の書き出しに使えるGPUエンコーダー。テストエンコードに成功したものだけを返す。
     gpu_encoder: Option<&'static str>,
 }
@@ -116,6 +117,7 @@ struct ValidatedFfmpeg {
     path: PathBuf,
     version: String,
     video_formats: Vec<&'static str>,
+    mov_codecs: Vec<&'static str>,
     /// FFmpegのビルドに含まれるH.264 GPUエンコーダー（優先順）。実際に動作するかは未確認。
     hardware_h264_encoders: Vec<&'static str>,
 }
@@ -405,8 +407,7 @@ impl NativeVideoFormat {
         gif_scale: f64,
     ) -> Result<Vec<String>, String> {
         match self {
-            NativeVideoFormat::Mov => Ok(qtrle_ffmpeg_args(input_pattern, output_path, fps)),
-            NativeVideoFormat::Mp4 => {
+            NativeVideoFormat::Mov | NativeVideoFormat::Mp4 => {
                 h264_rgb_ffmpeg_args(input_pattern, output_path, fps, quality)
             }
             NativeVideoFormat::Gif => {
@@ -424,6 +425,79 @@ fn available_video_formats(encoders: &str) -> Vec<&'static str> {
         .into_iter()
         .filter(|format| encoder_list_has(encoders, format.encoder()))
         .map(NativeVideoFormat::id)
+        .collect()
+}
+
+#[derive(Clone, Copy, Debug, PartialEq)]
+enum MovCodec {
+    H264,
+    Prores,
+    Qtrle,
+}
+
+impl MovCodec {
+    const ALL: [Self; 3] = [Self::H264, Self::Prores, Self::Qtrle];
+
+    fn parse(value: &str) -> Result<Self, String> {
+        Self::ALL
+            .into_iter()
+            .find(|codec| codec.id() == value)
+            .ok_or_else(|| format!("MOVコーデックが不正です: {value}"))
+    }
+
+    fn id(self) -> &'static str {
+        match self {
+            Self::H264 => "h264",
+            Self::Prores => "prores",
+            Self::Qtrle => "qtrle",
+        }
+    }
+
+    fn encoder(self) -> &'static str {
+        match self {
+            Self::H264 => "libx264",
+            Self::Prores => "prores_ks",
+            Self::Qtrle => "qtrle",
+        }
+    }
+
+    fn ffmpeg_args(
+        self,
+        input: &Path,
+        output: &Path,
+        fps: u32,
+        quality: &str,
+    ) -> Result<Vec<String>, String> {
+        match self {
+            Self::H264 => h264_rgb_ffmpeg_args(input, output, fps, quality),
+            Self::Qtrle => Ok(qtrle_ffmpeg_args(input, output, fps)),
+            Self::Prores => {
+                let profile = match quality {
+                    "high" => "3",
+                    "balanced" => "2",
+                    "small" => "1",
+                    _ => return Err(format!("動画品質が不正です: {quality}")),
+                };
+                let mut args = image_sequence_input_args(input, fps);
+                args.extend([
+                    "-c:v", "prores_ks", "-profile:v", profile,
+                    "-vf", "pad=ceil(iw/2)*2:ih:0:0,format=yuv422p10le,setsar=1",
+                    "-pix_fmt", "yuv422p10le", "-color_range", "tv",
+                    "-colorspace", "bt709", "-color_primaries", "bt709", "-color_trc", "bt709",
+                    "-movflags", "+faststart",
+                ].into_iter().map(str::to_string));
+                args.push(output.to_string_lossy().into_owned());
+                Ok(args)
+            }
+        }
+    }
+}
+
+fn available_mov_codecs(encoders: &str) -> Vec<&'static str> {
+    MovCodec::ALL
+        .into_iter()
+        .filter(|codec| encoder_list_has(encoders, codec.encoder()))
+        .map(MovCodec::id)
         .collect()
 }
 
@@ -474,6 +548,7 @@ fn validate_ffmpeg(path: &Path) -> Result<ValidatedFfmpeg, String> {
         path: path.to_path_buf(),
         version,
         video_formats: available_video_formats(&encoders),
+        mov_codecs: available_mov_codecs(&encoders),
         hardware_h264_encoders: hardware_h264_encoders(&encoders),
     })
 }
@@ -759,6 +834,7 @@ fn status_from_validated(
             .map(|(path, _)| path.to_string_lossy().into_owned()),
         ffprobe_version: ffprobe.map(|(_, version)| version),
         video_formats: validated.video_formats,
+        mov_codecs: validated.mov_codecs,
         gpu_encoder,
     }
 }
@@ -780,6 +856,7 @@ fn native_ffmpeg_status(app: &tauri::AppHandle) -> NativeFfmpegStatus {
             ffprobe_path: None,
             ffprobe_version: None,
             video_formats: Vec::new(),
+            mov_codecs: Vec::new(),
             gpu_encoder: None,
         };
     }
@@ -861,6 +938,7 @@ fn native_ffmpeg_status(app: &tauri::AppHandle) -> NativeFfmpegStatus {
             .map(|(path, _)| path.to_string_lossy().into_owned()),
         ffprobe_version: ffprobe.map(|(_, version)| version),
         video_formats: Vec::new(),
+        mov_codecs: Vec::new(),
         gpu_encoder: None,
     }
 }
@@ -1506,8 +1584,14 @@ fn encode_native_video_blocking(
     quality: String,
     gif_max_file_mb: Option<u32>,
     use_gpu: bool,
+    mov_codec: Option<String>,
 ) -> Result<String, String> {
     let format = NativeVideoFormat::parse(&format)?;
+    let mov_codec = if format == NativeVideoFormat::Mov {
+        Some(MovCodec::parse(mov_codec.as_deref().unwrap_or("h264"))?)
+    } else {
+        None
+    };
     let gif_limit_bytes = if format == NativeVideoFormat::Gif {
         gif_max_file_bytes(gif_max_file_mb)?
     } else {
@@ -1517,6 +1601,14 @@ fn encode_native_video_blocking(
     let ffmpeg_path = status
         .path
         .ok_or_else(|| "利用可能なFFmpegが見つかりません。".to_string())?;
+    if let Some(codec) = mov_codec {
+        if !status.mov_codecs.contains(&codec.id()) {
+            return Err(format!(
+                "検出したFFmpegは{}エンコーダーに対応していません。",
+                codec.encoder()
+            ));
+        }
+    }
     if !status.video_formats.contains(&format.id()) {
         return Err(format!(
             "検出したFFmpegは{}エンコーダーに対応していません。",
@@ -1549,10 +1641,16 @@ fn encode_native_video_blocking(
 
     let mut scale = 1.0;
     for attempt in 1..=GIF_SIZE_FIT_MAX_ATTEMPTS {
-        let args = format.ffmpeg_args(&input_pattern, &output_path, fps, &quality, scale)?;
+        let args = match mov_codec {
+            Some(codec) => codec.ffmpeg_args(&input_pattern, &output_path, fps, &quality)?,
+            None => format.ffmpeg_args(&input_pattern, &output_path, fps, &quality, scale)?,
+        };
         run_ffmpeg(&ffmpeg_path, args, format)?;
         let Some(limit_bytes) = gif_limit_bytes else {
-            return Ok(format.encoder().to_string());
+            return Ok(mov_codec
+                .map(MovCodec::encoder)
+                .unwrap_or_else(|| format.encoder())
+                .to_string());
         };
         let actual_bytes = std::fs::metadata(&output_path)
             .map_err(|err| format!("書き出したGIFのサイズを確認できません: {err}"))?
@@ -1612,8 +1710,11 @@ async fn encode_native_video(
     quality: Option<String>,
     gif_max_file_mb: Option<u32>,
     use_gpu: Option<bool>,
+    mov_codec: Option<String>,
 ) -> Result<String, String> {
-    let quality = quality.unwrap_or_else(|| "high".to_string());
+    let quality = quality.unwrap_or_else(|| {
+        if format == "mov" { "balanced" } else { "high" }.to_string()
+    });
     let use_gpu = use_gpu.unwrap_or(false);
     tauri::async_runtime::spawn_blocking(move || {
         encode_native_video_blocking(
@@ -1625,6 +1726,7 @@ async fn encode_native_video(
             quality,
             gif_max_file_mb,
             use_gpu,
+            mov_codec,
         )
     })
     .await
@@ -1633,6 +1735,7 @@ async fn encode_native_video(
 
 #[cfg(test)]
 mod tests {
+    use super::{available_mov_codecs, MovCodec};
     use super::{
         append_ffmpeg_candidates_from_path_value, available_video_formats, backup_path,
         choose_candidate, encoder_list_has, gif_ffmpeg_args, gif_max_file_bytes,
@@ -1656,6 +1759,30 @@ mod tests {
     fn has_pair(args: &[String], first: &str, second: &str) -> bool {
         args.windows(2)
             .any(|pair| pair[0] == first && pair[1] == second)
+    }
+
+    #[test]
+    fn mov_codecs_select_compression_and_reject_unknown_options() {
+        let input = Path::new("frame_%04d.png");
+        let output = Path::new("output.mov");
+        for (quality, crf, profile) in [("high", "18", "3"), ("balanced", "22", "2"), ("small", "27", "1")] {
+            let h264 = MovCodec::H264.ffmpeg_args(input, output, 30, quality).unwrap();
+            assert!(has_pair(&h264, "-c:v", "libx264"));
+            assert!(has_pair(&h264, "-crf", crf));
+            assert!(has_pair(&h264, "-pix_fmt", "yuv420p"));
+            assert!(has_pair(&h264, "-movflags", "+faststart"));
+            assert!(has_pair(&h264, "-colorspace", "bt709"));
+            let prores = MovCodec::Prores.ffmpeg_args(input, output, 30, quality).unwrap();
+            assert!(has_pair(&prores, "-c:v", "prores_ks"));
+            assert!(has_pair(&prores, "-profile:v", profile));
+            assert!(has_pair(&prores, "-pix_fmt", "yuv422p10le"));
+        }
+        assert!(has_pair(&MovCodec::Qtrle.ffmpeg_args(input, output, 30, "balanced").unwrap(), "-c:v", "qtrle"));
+        assert!(MovCodec::parse("injected-codec").is_err());
+        assert!(MovCodec::H264.ffmpeg_args(input, output, 30, "invalid").is_err());
+        assert!(MovCodec::Prores.ffmpeg_args(input, output, 30, "invalid").is_err());
+        assert_eq!(available_mov_codecs(" V..... qtrle\n V..... libx264\n"), vec!["h264", "qtrle"]);
+        assert_eq!(available_mov_codecs(" V..... prores_ks\n V..... qtrle\n V..... libx264\n"), vec!["h264", "prores", "qtrle"]);
     }
 
     #[test]

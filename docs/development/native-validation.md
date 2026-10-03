@@ -26,6 +26,8 @@ title: Native / FFmpeg / Tauri validation
 `tools/ffmpeg-native-smoke.mjs`は16×16・4フレームのPNG sequenceを一時フォルダに生成し、アプリのRust commandと同じ引数で次を実行します。これは実FFmpeg processの証拠であり、Rust引数テストやmock adapter testだけでは代替できません。
 
 - qtrle / `rgb24` のMOV
+- libx264 / `yuv420p` のMOV（Balanced、BT.709、video range、SAR `1:1`）
+- `prores_ks`対応ビルドではProRes 422のHQ／422／LT MOV。非対応は個別に`not-run`を記録
 - libx264 / `yuv420p` のMP4（BT.709、video range、SAR `1:1`）
 - `codec_name`、`pix_fmt`、width、height、frame count、SAR、color metadata、file size、SHA-256
 - smoke終了後の一時フォルダ削除

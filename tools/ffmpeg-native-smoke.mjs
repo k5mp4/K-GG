@@ -195,6 +195,36 @@ async function main() {
     ]);
     if (mp4Result.code !== 0) throw new Error(`libx264 encode failed: ${mp4Result.stderr.trim()}`);
     report.outputs.mp4 = await probeVideo(mp4, 'h264', ['yuv420p']);
+    // MOV uses the same H.264 settings as MP4, with a QuickTime container.
+    const movH264 = path.join(tempDirectory, 'h264.mov');
+    const h264MovResult = await runCommand(ffmpegPath, [
+      '-y', '-hide_banner', '-loglevel', 'error',
+      '-framerate', String(fps), '-start_number', '0', '-i', inputPattern,
+      '-c:v', 'libx264', '-crf', '22', '-preset', 'slow',
+      '-vf', 'pad=ceil(iw/2)*2:ceil(ih/2)*2:0:0,format=yuv420p,setsar=1',
+      '-pix_fmt', 'yuv420p', '-color_range', 'tv', '-colorspace', 'bt709',
+      '-x264-params', 'colorprim=bt709:transfer=bt709:colormatrix=bt709',
+      '-color_primaries', 'bt709', '-color_trc', 'bt709', '-movflags', '+faststart', movH264,
+    ]);
+    if (h264MovResult.code !== 0) throw new Error(`H.264 MOV encode failed: ${h264MovResult.stderr.trim()}`);
+    report.outputs.movH264 = await probeVideo(movH264, 'h264', ['yuv420p']);
+    if (encoderAvailable(encoderText, 'prores_ks')) {
+      for (const [quality, profile] of [['high', '3'], ['balanced', '2'], ['small', '1']]) {
+        const proresMov = path.join(tempDirectory, `prores-${quality}.mov`);
+        const proresResult = await runCommand(ffmpegPath, [
+          '-y', '-hide_banner', '-loglevel', 'error',
+          '-framerate', String(fps), '-start_number', '0', '-i', inputPattern,
+          '-c:v', 'prores_ks', '-profile:v', profile,
+          '-vf', 'pad=ceil(iw/2)*2:ih:0:0,format=yuv422p10le,setsar=1',
+          '-pix_fmt', 'yuv422p10le', '-color_range', 'tv', '-colorspace', 'bt709',
+          '-color_primaries', 'bt709', '-color_trc', 'bt709', '-movflags', '+faststart', proresMov,
+        ]);
+        if (proresResult.code !== 0) throw new Error(`ProRes MOV encode failed: ${proresResult.stderr.trim()}`);
+        report.outputs[`movProres${quality}`] = await probeVideo(proresMov, 'prores', ['yuv422p10le']);
+      }
+    } else {
+      report.outputs.movProres = { status: 'not-run', reason: 'prores_ks is unavailable' };
+    }
     if (report.outputs.mp4.sampleAspectRatio !== '1:1') {
       throw new Error(`MP4 sample aspect ratio is ${report.outputs.mp4.sampleAspectRatio}, expected 1:1`);
     }
