@@ -27,7 +27,9 @@ import { useNativeFfmpeg } from '../native/useNativeFfmpeg';
 import { LEFT_TABS, type LeftTab } from './tabs';
 import type { CanvasWorkspaceProps } from './CanvasWorkspace';
 import { refreshPresetLibrary } from '../../lib/presetLibraryCache';
-import { clampLeftPanelWidth, RIGHT_PANEL_MAX_WIDTH, RIGHT_PANEL_MIN_WIDTH } from '../../lib/panelLayout';
+import { LEFT_PANEL_MAX_WIDTH } from '../../lib/panelLayout';
+import { useWorkspaceLayout } from './useWorkspaceLayout';
+import { WORKSPACE_LAYOUT_POLICY } from './workspaceLayout';
 
 const MAX_DISPLAY_W = 1000;
 
@@ -247,6 +249,10 @@ export function useWorkspaceController({ translate }: WorkspaceControllerOptions
     activeLeftTabRef.current = nextTab;
     setLeftTab(nextTab);
     setLeftPanelOpen(true);
+    if (layout.panels === 'overlay') {
+      setShowLeftSidebar(true);
+      setShowRightSidebar(false);
+    }
   };
 
   // Preset読込で設定が一括変更されたときは、タイムラインを開かない。
@@ -268,7 +274,10 @@ export function useWorkspaceController({ translate }: WorkspaceControllerOptions
     activeLeftTabRef.current = value;
     setLeftTab(value);
     setLeftPanelOpen(true);
-    if (window.matchMedia('(max-width: 767px)').matches) setShowLeftSidebar(true);
+    if (layout.panels === 'overlay') {
+      setShowLeftSidebar(true);
+      setShowRightSidebar(false);
+    }
     if (value === 'export') void refreshFfmpegStatus(true);
     if (!tabHoverSwitchEnabled) return;
     setIsHoverLocked(true);
@@ -280,7 +289,7 @@ export function useWorkspaceController({ translate }: WorkspaceControllerOptions
   };
 
   const handleTabMouseEnter = (value: LeftTab) => {
-    if (tabHoverSwitchEnabled && !isHoverLocked) {
+    if (layout.panels === 'docked' && tabHoverSwitchEnabled && !isHoverLocked) {
       activeLeftTabRef.current = value;
       setLeftTab(value);
     }
@@ -347,22 +356,26 @@ export function useWorkspaceController({ translate }: WorkspaceControllerOptions
 
   const [leftPanelW, setLeftPanelW] = useState(288);
   const [rightPanelW, setRightPanelW] = useState(320);
+  const workspaceRef = useRef<HTMLDivElement>(null);
+  const layout = useWorkspaceLayout(workspaceRef, {
+    leftWidth: leftPanelW, rightWidth: rightPanelW,
+    leftOpen: leftPanelOpen, rightOpen: rightPanelOpen,
+    timelineHeight, timelineOpen: showTimeline,
+  });
   const [activeResizeSide, setActiveResizeSide] = useState<'left' | 'right' | null>(null);
   const resizingRef = useRef<'left' | 'right' | null>(null);
-
-  // ウィンドウを縮めたときに左サイドバーがプレビューを押し潰さないよう、幅を追従させる。
-  useEffect(() => {
-    const onResize = () => setLeftPanelW(width => clampLeftPanelWidth(width, window.innerWidth));
-    onResize();
-    window.addEventListener('resize', onResize);
-    return () => window.removeEventListener('resize', onResize);
-  }, []);
+  const resizeOriginRef = useRef({ x: 0, width: 0 });
 
   useEffect(() => {
     const onMove = (event: PointerEvent) => {
-      if (resizingRef.current === 'left') setLeftPanelW(clampLeftPanelWidth(event.clientX, window.innerWidth));
-      if (resizingRef.current === 'right') setRightPanelW(Math.max(RIGHT_PANEL_MIN_WIDTH, Math.min(RIGHT_PANEL_MAX_WIDTH, window.innerWidth - event.clientX)));
-      if (timelineResizingRef.current) setTimelineHeight(Math.max(100, Math.min(window.innerHeight * 0.8, window.innerHeight - event.clientY)));
+      if (!resizingRef.current && !timelineResizingRef.current) return;
+      const bounds = workspaceRef.current?.getBoundingClientRect();
+      if (!bounds) return;
+      const origin = resizeOriginRef.current;
+      const { panelMinWidth, previewMinWidth, timelineMinHeight } = WORKSPACE_LAYOUT_POLICY;
+      if (resizingRef.current === 'left') setLeftPanelW(Math.max(panelMinWidth, Math.min(LEFT_PANEL_MAX_WIDTH, bounds.width - previewMinWidth - (rightPanelOpen ? layout.rightWidth : 0), origin.width + event.clientX - origin.x)));
+      if (resizingRef.current === 'right') setRightPanelW(Math.max(panelMinWidth, Math.min(600, bounds.width - previewMinWidth - (leftPanelOpen ? layout.leftWidth : 0), origin.width + origin.x - event.clientX)));
+      if (timelineResizingRef.current) setTimelineHeight(Math.max(timelineMinHeight, Math.min(layout.timelineMaxHeight, bounds.bottom - event.clientY)));
     };
     const onUp = () => {
       resizingRef.current = null;
@@ -382,10 +395,12 @@ export function useWorkspaceController({ translate }: WorkspaceControllerOptions
       window.removeEventListener('blur', onUp);
       document.removeEventListener('visibilitychange', onUp);
     };
-  }, []);
+  }, [layout.leftWidth, layout.rightWidth, layout.timelineMaxHeight, leftPanelOpen, rightPanelOpen]);
 
   const handlePanelResizeStart = (side: 'left' | 'right', event: ReactPointerEvent<HTMLDivElement>) => {
     event.preventDefault();
+    if (layout.panels !== 'docked') return;
+    resizeOriginRef.current = { x: event.clientX, width: side === 'left' ? layout.leftWidth : layout.rightWidth };
     resizingRef.current = side;
     setActiveResizeSide(side);
     document.body.style.cursor = 'col-resize';
@@ -411,8 +426,8 @@ export function useWorkspaceController({ translate }: WorkspaceControllerOptions
     return () => resizeObserver.disconnect();
   }, [viewportRef]);
 
-  const availableW = viewportSize.w > 0 ? viewportSize.w - 48 : MAX_DISPLAY_W;
-  const availableH = viewportSize.h > 0 ? viewportSize.h - 48 : 9999;
+  const availableW = viewportSize.w > 0 ? Math.max(1, viewportSize.w - 48) : MAX_DISPLAY_W;
+  const availableH = viewportSize.h > 0 ? Math.max(1, viewportSize.h - 48) : 9999;
   const fitByW = Math.min(canvasW, MAX_DISPLAY_W, availableW);
   const fitHByW = Math.round(fitByW * (canvasH / canvasW));
   const displayW = fitHByW <= availableH ? fitByW : Math.round(availableH * (canvasW / canvasH));
@@ -485,7 +500,7 @@ export function useWorkspaceController({ translate }: WorkspaceControllerOptions
     if (typeof patch.showGradientAnchors === 'boolean') setShowGradientAnchors(patch.showGradientAnchors);
     if (patch.overlayImageMode === 'overlay' || patch.overlayImageMode === 'mask' || patch.overlayImageMode === 'off') setOverlayImageMode(patch.overlayImageMode);
     if (typeof patch.overlayOpacity === 'number') setOverlayOpacity(patch.overlayOpacity);
-    if (typeof patch.leftPanelW === 'number') setLeftPanelW(clampLeftPanelWidth(patch.leftPanelW, window.innerWidth));
+    if (typeof patch.leftPanelW === 'number') setLeftPanelW(patch.leftPanelW);
     if (typeof patch.rightPanelW === 'number') setRightPanelW(patch.rightPanelW);
     if (typeof patch.showHelp === 'boolean') setShowHelp(patch.showHelp);
     if (typeof patch.showFeedback === 'boolean') setShowFeedback(patch.showFeedback);
@@ -564,10 +579,12 @@ export function useWorkspaceController({ translate }: WorkspaceControllerOptions
   const handleOpenLeftSidebar = () => {
     setLeftPanelOpen(true);
     setShowLeftSidebar(true);
+    setShowRightSidebar(false);
   };
   const handleToggleRightSidebar = () => {
     setRightPanelOpen(true);
     setShowRightSidebar(value => !value);
+    setShowLeftSidebar(false);
   };
   const handleClothUnavailable = () => {
     setClothReady(false);
@@ -592,6 +609,8 @@ export function useWorkspaceController({ translate }: WorkspaceControllerOptions
       canvasH,
     },
     chrome: {
+      panelsPresentation: layout.panels,
+      toolsPresentation: layout.tools,
       showLeftSidebar,
       showRightSidebar,
       onOpenLeftSidebar: handleOpenLeftSidebar,
@@ -675,7 +694,9 @@ export function useWorkspaceController({ translate }: WorkspaceControllerOptions
     setShowTimeline,
     showTimeRemap,
     setShowTimeRemap,
-    timelineHeight,
+    timelineHeight: layout.timelineHeight,
+    workspaceRef,
+    layout,
     setTimelineHeight,
     leftPanelOpen,
     setLeftPanelOpen,

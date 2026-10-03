@@ -15,6 +15,7 @@ title: 仕様一覧
 | CURRENT-VIDEO-EXPORT | [動画・連番フレーム出力](./current/video-export) | current |
 | CURRENT-PRESET | [Preset System](./current/preset-system) | current |
 | CURRENT-UI-CONTROLS | [UI入力コントロール](./current/ui-controls) | current |
+| CURRENT-WORKSPACE-LAYOUT | [ワークスペースと小画面レイアウト](./current/workspace-layout) | current |
 | CURRENT-WEBGL-PERFORMANCE | [WebGL Performance Debug / Profiler](./current/webgl-performance) | current |
 | CURRENT-MCP-DEVELOPER-INTERFACE | [MCP Developer Interface](./current/mcp-developer-interface) | current |
 | CURRENT-AFTER-EFFECTS-INTEGRATION | [After Effects連携](./current/after-effects-integration) | current |

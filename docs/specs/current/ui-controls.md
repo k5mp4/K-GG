@@ -5,7 +5,7 @@ title: UI入力コントロール
 status: current
 owners: [maintainer]
 created: 2026-07-28
-updated: 2026-09-30
+updated: 2026-10-03
 requirement_ids: [UI-001, UI-002, UI-003, UI-004, UI-005, UI-006, UI-007, UI-008, UI-009, UI-010, UI-011, UI-012, UI-013, UI-014, UI-015, UI-019, UI-021, UI-022, UI-023, UI-024, UI-025, UI-026, UI-027, UI-028, UI-029, UI-030, UI-031]
 related_adrs: [ADR-0009, ADR-0011, ADR-0012, ADR-20260926-native-secondary-windows, ADR-20260929-sandbox-texture-material-stage, ADR-20260930-sandbox-shapes-final-stage]
 related_changes: [CHANGE-010, CHANGE-012, CHANGE-013, CHANGE-014, CHANGE-015, CHANGE-018, CHANGE-019, CHANGE-024, CHANGE-025, CHANGE-026, CHANGE-027, CHANGE-030, CHANGE-031, CHANGE-032, CHANGE-034, CHANGE-037, CHANGE-038, CHANGE-039, CHANGE-041, CHANGE-046, CHANGE-047, CHANGE-048, CHANGE-051, CHANGE-053]
@@ -71,7 +71,7 @@ PostprocessのEdit LayerからGlassTileを選択できます。PatternとEdge Mo
 
 ### UI-009 Effect Stackの表示形態
 
-Effect Stackはワークスペース内に幅200pxのパネルとしてインライン表示します。各行はドラッグハンドル、レイヤー名、状態、ON／OFFトグルで構成し、Texture／Transform／Structureの分類ラベルは表示しません。Tauri版ではパネルのヘッダー右端（ブラウザー版で`Stack V2`を表示する位置）に別ウィンドウボタンを表示し、押すとEffect Stackを別のネイティブウィンドウ（タイトル`Effect Stack - KAGARIBI Grad`、初期220×490、最小200×120、サイズ変更可）で開きます。別ウィンドウではヘッダー（ランダム化ボタンを含む）を常に上端に表示し、ウィンドウの高さに収まらないレイヤー行は縦スクロールで表示します。幅を狭めてもドラッグハンドルとON／OFFトグルは縮めず、レイヤー名と状態を省略表示します。ツールウィンドウにはメインウィンドウのページ最小幅（320px）を適用せず、内容をウィンドウ幅に収めます。すでに開いている場合は前面へ出します。ウィンドウが開いている間はワークスペース上のインラインパネルを表示せず、Color Histogramが先頭位置へ移ります。ウィンドウを閉じるとインラインパネルが戻り、メインウィンドウを閉じるとEffect Stackウィンドウも閉じます。ウィンドウを作成できなかった場合はインライン表示のままです。
+Effect Stackはワークスペース内に幅200pxのパネルとして表示します。Previewの幅・高さに余裕がある場合はインライン表示し、狭い場合は「レイヤー・ヒストグラム」から開閉するスクロール領域へ表示します。表示方法と境界は[Workspace Layout](./workspace-layout.md)のLAYOUT-004に従います。各行はドラッグハンドル、レイヤー名、状態、ON／OFFトグルで構成し、Texture／Transform／Structureの分類ラベルは表示しません。Tauri版ではパネルのヘッダー右端（ブラウザー版で`Stack V2`を表示する位置）に別ウィンドウボタンを表示し、押すとEffect Stackを別のネイティブウィンドウ（タイトル`Effect Stack - KAGARIBI Grad`、初期220×490、最小200×120、サイズ変更可）で開きます。別ウィンドウではヘッダー（ランダム化ボタンを含む）を常に上端に表示し、ウィンドウの高さに収まらないレイヤー行は縦スクロールで表示します。幅を狭めてもドラッグハンドルとON／OFFトグルは縮めず、レイヤー名と状態を省略表示します。ツールウィンドウにはメインウィンドウのページ最小幅（320px）を適用せず、内容をウィンドウ幅に収めます。すでに開いている場合は前面へ出します。ウィンドウが開いている間はワークスペース上のインラインパネルを表示せず、Color Histogramが先頭位置へ移ります。ウィンドウを閉じるとインラインパネルが戻り、メインウィンドウを閉じるとEffect Stackウィンドウも閉じます。ウィンドウを作成できなかった場合はインライン表示のままです。
 
 別ウィンドウでも、レイヤーの選択、ON／OFF、Altクリックのソロ、ドラッグ並べ替え、順序のランダム化（行の移動アニメーションを含む）、準備状態・保護・`STAY`の表示、Image Gradientの保護表示をインラインと同じ動作で提供します。操作はメインウィンドウのキャンバス、プロパティモジュール、Undo履歴へ反映されます。別ウィンドウではパネルの折りたたみとColor Histogramとの位置交換ボタンを表示しません。ブラウザー版では別ウィンドウボタンを表示せず`Stack V2`を表示します。Document Picture-in-Pictureとポップアップは使いません。Gradient Ramp editorの表示形態はUI-029で定めます。
 

@@ -22,6 +22,7 @@ import type { MessageKey } from '../../i18n/messages';
 import type { Replacements } from '../../i18n/language';
 import type { GestureFeedback, OverlayImageMode, Pan } from '../../types/workspace';
 import type { LeftTab } from './tabs';
+import type { PanelPresentation, ToolPresentation } from './workspaceLayout';
 
 type CanvasWorkspaceViewportProps = {
   viewportRef: RefObject<HTMLDivElement | null>;
@@ -40,6 +41,8 @@ type CanvasWorkspaceViewportProps = {
 };
 
 type CanvasWorkspaceChromeProps = {
+  panelsPresentation: PanelPresentation;
+  toolsPresentation: ToolPresentation;
   showLeftSidebar: boolean;
   showRightSidebar: boolean;
   onOpenLeftSidebar: () => void;
@@ -124,6 +127,8 @@ export function CanvasWorkspace({
     canvasH,
   } = viewport;
   const {
+    panelsPresentation,
+    toolsPresentation,
     showLeftSidebar,
     showRightSidebar,
     onOpenLeftSidebar,
@@ -172,7 +177,8 @@ export function CanvasWorkspace({
   return (
     <div
       ref={viewportRef}
-      className="flex-1 flex flex-col min-w-0 overflow-hidden relative"
+      data-canvas-workspace
+      className="flex-1 flex flex-col min-h-0 min-w-0 overflow-hidden relative"
       style={{ cursor }}
       onMouseDown={onMouseDown}
       onMouseMove={onMouseMove}
@@ -191,10 +197,11 @@ export function CanvasWorkspace({
       </div>
 
       <button
+        data-viewport-ui
         onClick={onOpenLeftSidebar}
         title={translate('panel.toggle', { action: translate('common.open'), panel: translate('settings.title') })}
         aria-label={translate('panel.toggle', { action: translate('common.open'), panel: translate('settings.title') })}
-        className={`md:hidden absolute top-4 left-4 p-3 bg-k-surface/80 border border-panel-border border-panel rounded-sm text-k-text z-10 transition-opacity ${showLeftSidebar || showRightSidebar ? 'opacity-0 pointer-events-none' : 'opacity-100'}`}
+        className={`${panelsPresentation === 'overlay' ? 'block' : 'hidden'} absolute top-4 left-4 p-3 bg-k-surface/80 border border-panel-border border-panel rounded-sm text-k-text z-10`}
       >
         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
           <rect x="3" y="3" width="18" height="18" rx="2"></rect>
@@ -202,7 +209,7 @@ export function CanvasWorkspace({
         </svg>
       </button>
 
-      <div className={`md:hidden absolute top-4 right-4 flex gap-2 z-10 transition-opacity ${showLeftSidebar || showRightSidebar ? 'opacity-0 pointer-events-none' : 'opacity-100'}`}>
+      <div data-viewport-ui className={`${panelsPresentation === 'overlay' ? 'flex' : 'hidden'} absolute top-4 right-4 gap-2 z-10`}>
         <button
           onClick={undo}
           title={translate('common.undo')}
@@ -227,7 +234,7 @@ export function CanvasWorkspace({
         </button>
       </div>
 
-      <div className="absolute top-6 right-6 z-20 hidden flex-col gap-2 md:flex">
+      <div data-viewport-ui className={`absolute right-4 z-20 flex gap-2 ${panelsPresentation === 'overlay' ? 'bottom-3 flex-row' : 'top-6 flex-col'}`}>
         <button
           type="button"
           onClick={(event) => { showFeedback(); event.currentTarget.blur(); }}
@@ -281,10 +288,11 @@ export function CanvasWorkspace({
         </button>
       </div>
 
-      <div className="relative flex-1 flex items-center justify-center p-2 md:p-6 overflow-visible">
+      <div className="relative min-h-0 flex-1 flex items-center justify-center p-2 md:p-6 overflow-visible">
         <EffectStackWorkspace
           sourceCanvasRef={canvasRef}
-          hidden={showLeftSidebar || showRightSidebar}
+          hidden={panelsPresentation === 'overlay' && (showLeftSidebar || showRightSidebar)}
+          presentation={toolsPresentation}
           onSelectEffectStack={onSelectEffectStack}
         />
         <div style={{
@@ -384,6 +392,7 @@ export function CanvasWorkspace({
           </div>
         )}
         <div
+          data-viewport-ui
           className="absolute right-4 bottom-4 w-[220px] max-h-[calc(100%-32px)] bg-k-bg/98 border border-panel-border/70 z-30 overflow-y-auto p-3 scrollbar-thin shadow-[0_18px_48px_rgba(0,0,0,0.35)]"
           style={{ display: (showTimeRemap && exportProgress === null) ? 'block' : 'none' }}
         >

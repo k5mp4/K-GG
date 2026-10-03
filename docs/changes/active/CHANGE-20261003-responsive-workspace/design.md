@@ -1,0 +1,13 @@
+# 表示判断と編集状態の分離
+
+`workspaceLayout.ts`を寸法と制約の一次情報にする。実寸、希望パネル幅、開閉状態、希望Timeline高さを入力し、dock／overlay、inline／drawer、有効な幅・高さを返す。専用hookがrootのResizeObserverを所有し、部品は結果を消費する。
+
+幅1000px以上では両側に最低240px、Previewに最低360pxを確保する。希望幅が収まらない場合は最低幅を超える部分だけを比例縮小する。希望幅のstateを書き換えないため、画面を広げると戻る。drag開始時は実表示幅を起点にし、相手のpanelとPreviewを残せる範囲で変更する。
+
+Timelineはroot高さの45%まで、最低180pxとする。幅が足りないときは内部だけ横スクロールする。Preview内が幅640pxまたは高さ560px未満ならEffect Stack／Histogramを開閉式のスクロール領域で表示する。既存のnative別ウインドウと順序交換は維持する。
+
+DockPanelへpresentationを明示し、個別の768px判定をなくす。overlayは上部barとTimelineの間へ置き、barから編集対象を切り替えられる。閉じたbodyと非選択モジュールをinertにし、開いたときはCloseへfocusする。内容はマウントしたまま維持する。
+
+将来の用途別配置はpolicyとworkspaceのcompositionで変更する。今回は自由配置のframeworkや保存形式を導入しない。ロールバックではpolicy、composition、Tauri最小値を戻す。文書データの移行は不要。
+
+Preview内の操作UIを`data-viewport-ui`で明示し、ホイール・タッチ・中ボタン入力をviewportのpan／zoomから除外する。開閉式Effect Stackではドラッグ開始の選択をプロパティ表示通知から分離する。native別ウインドウのaction／intent契約は変更しない。

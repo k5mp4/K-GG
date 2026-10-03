@@ -5,9 +5,11 @@ import type { UpdateState } from '../updater/types';
 import type { MessageKey } from '../../i18n/messages';
 import type { Replacements } from '../../i18n/language';
 import type { LeftTab, LeftTabDefinition } from './tabs';
+import type { PanelPresentation } from './workspaceLayout';
 
 export type WorkspaceTopBarProps = {
   leftTab: LeftTab;
+  panelsPresentation: PanelPresentation;
   tabHoverSwitchEnabled: boolean;
   isHoverLocked: boolean;
   showRightSidebar: boolean;
@@ -50,6 +52,7 @@ function getTabClassName(value: LeftTab, leftTab: LeftTab, tabHoverSwitchEnabled
 
 export function WorkspaceTopBar({
   leftTab,
+  panelsPresentation,
   tabHoverSwitchEnabled,
   isHoverLocked,
   showRightSidebar,
@@ -64,15 +67,17 @@ export function WorkspaceTopBar({
   onToggleRightSidebar,
 }: WorkspaceTopBarProps) {
   return (
-    <div className="z-30 flex shrink-0 items-center gap-2 border-b border-panel-border bg-k-bg/95 px-2 py-1.5">
-      <div className="inline-flex min-w-0 flex-1 bg-k-surface/80 overflow-x-auto no-scrollbar scroll-smooth">
+    <div className="z-30 flex min-w-0 shrink-0 items-center gap-2 border-b border-panel-border bg-k-bg/95 px-2 py-1.5">
+      <nav aria-label={translate('settings.title')} className="inline-flex min-w-0 flex-1 bg-k-surface/80 overflow-x-auto scrollbar-thin scroll-smooth">
         {tabs.map(({ value, labelKey }) => {
           const enabled = getTabEnabled(value);
           return (
             <button
               key={value}
-              onMouseEnter={() => onTabMouseEnter(value)}
-              onClick={(event) => { onTabClick(value); blur(event); }}
+              onMouseEnter={() => { if (panelsPresentation === 'docked') onTabMouseEnter(value); }}
+              aria-pressed={leftTab === value}
+              aria-controls="property-modules-panel"
+              onClick={(event) => { onTabClick(value); if (panelsPresentation === 'docked') blur(event); }}
               className={`h-10 w-[86px] !border-0 px-2 py-1 text-[10px] font-display font-semibold uppercase tracking-wider transition-all flex flex-col items-center justify-center gap-0.5 shrink-0 focus:outline-none focus-visible:ring-2 focus-visible:ring-fire ${getTabClassName(value, leftTab, tabHoverSwitchEnabled, isHoverLocked)}`}
             >
               {translate(labelKey)}
@@ -84,11 +89,11 @@ export function WorkspaceTopBar({
             </button>
           );
         })}
-      </div>
+      </nav>
 
       <div className="ml-auto flex h-10 shrink-0 items-stretch gap-1">
         <div
-          className="hidden min-w-0 max-w-[240px] items-center gap-2 border border-cream/20 bg-k-surface px-3 text-tab-inactive md:flex"
+          className={`${panelsPresentation === 'docked' ? 'flex' : 'hidden'} min-w-0 max-w-[160px] items-center gap-2 border border-cream/20 bg-k-surface px-3 text-tab-inactive`}
           title={gpuInfo.title}
         >
           <Icon name="memory" className="text-[16px] text-deep" />
@@ -120,10 +125,12 @@ export function WorkspaceTopBar({
       </div>
 
       <button
-        onClick={(event) => { onToggleRightSidebar(); blur(event); }}
+        onClick={onToggleRightSidebar}
         title={translate('panel.toggle', { action: showRightSidebar ? translate('common.close') : translate('common.open'), panel: 'K-GG' })}
         aria-label={translate('panel.toggle', { action: showRightSidebar ? translate('common.close') : translate('common.open'), panel: 'K-GG' })}
-        className="md:hidden ml-1 h-10 w-10 bg-k-surface border border-panel-border text-k-text hover:text-cream focus:outline-none focus-visible:ring-2 focus-visible:ring-fire"
+        aria-controls="gradient-settings-panel"
+        aria-expanded={showRightSidebar}
+        className={`${panelsPresentation === 'overlay' ? 'block' : 'hidden'} ml-1 h-10 w-10 shrink-0 p-0 bg-k-surface border border-panel-border text-k-text hover:text-cream focus:outline-none focus-visible:ring-2 focus-visible:ring-fire`}
       >
         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
           <line x1="3" y1="12" x2="21" y2="12"></line>
