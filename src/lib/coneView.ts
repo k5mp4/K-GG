@@ -1,4 +1,5 @@
 import {
+  ABSTRACT_MATERIALS,
   CONE_APEX_LIMIT,
   CONE_SEAM_MODE_INDEX,
   CONE_SHAPE_INDEX,
@@ -10,8 +11,10 @@ import {
   FIELD_RENDERS,
   RINGS_MAPPINGS,
   RINGS_PATTERNS,
+  THREE_D_ANTIALIAS_SAMPLES,
   THREE_D_PROJECTIONS,
   THREE_D_SURFACE_MAPPING_INDEX,
+  type AbstractForm,
   type ConeViewConfig,
   type CrystalForm,
   type ConeSeamMode,
@@ -315,6 +318,8 @@ export type ThreeDRenderParams = {
   shape: number;
   surfaceMapping: number;
   projection: number;
+  /** Rays traced and averaged per pixel: 1, 4, or 9. */
+  samples: number;
   /** Half of the Fisheye angle in radians. */
   fisheyeHalfAngle: number;
   lensDistortion: number;
@@ -430,6 +435,7 @@ export type ThreeDRenderParams = {
     outerRadius: number;
   };
   crystal: CrystalUniforms;
+  abstract: AbstractUniforms;
 };
 
 /**
@@ -437,7 +443,7 @@ export type ThreeDRenderParams = {
  * texture. Their loop-normalized travel is the Flow offset, and the texture
  * offset stays at zero except for the Torus Spin around the tube.
  */
-const GEOMETRY_MOTION_SHAPES: ReadonlySet<ConeViewConfig['shape']> = new Set(['torus', 'lattice', 'terrain', 'ribbon', 'rings', 'field', 'discs', 'crystal']);
+const GEOMETRY_MOTION_SHAPES: ReadonlySet<ConeViewConfig['shape']> = new Set(['torus', 'lattice', 'terrain', 'ribbon', 'rings', 'field', 'discs', 'crystal', 'abstract']);
 
 /** Frames of one Square Rings texture tile; the camera passes this many per Flow Cycle. */
 export function getRingsPerTile(config: ConeViewConfig): number {
@@ -1015,6 +1021,224 @@ export function getCrystalUniforms(config: ConeViewConfig, normalizedTime: numbe
   };
 }
 
+/** Most Metaball spheres the shader holds; its uniform array has this length. */
+export const ABSTRACT_MAX_BALLS = 8;
+// Radius of a full-size Abstract sculpture in canvas half heights.
+const ABSTRACT_BASE_RADIUS = 0.6;
+/**
+ * Waves of the Abstract noise, matching abstractNoise in three-d.frag.glsl:
+ * frequency relative to Frequency per radius, amplitude, whole morph cycles
+ * per Morph cycle, and how strongly the first wave warps its phase.
+ */
+const ABSTRACT_WAVES = [
+  { frequency: 1, amplitude: 0.5, cycles: 1, warp: 0 },
+  { frequency: 1.9, amplitude: 0.5, cycles: -1, warp: 1.3 },
+  { frequency: 3.1, amplitude: 0.3, cycles: 2, warp: 0.9 },
+  { frequency: 4.7, amplitude: 0.2, cycles: -2, warp: -1.1 },
+] as const;
+// Sum of the wave amplitudes; the shader divides the noise by it.
+const ABSTRACT_NOISE_RANGE = 1.5;
+// Displacement at Displace 1, in radii.
+const ABSTRACT_DISPLACE_SCALE = 0.4;
+// Size swing at Pulse 1.
+const ABSTRACT_PULSE_SCALE = 0.25;
+// Torus ring and tube radii in radii, the tube swell of each lobe, and the lobes.
+export const ABSTRACT_TORUS_RING = 0.72;
+export const ABSTRACT_TORUS_TUBE = 0.34;
+const ABSTRACT_TORUS_SWELL = 0.3;
+const ABSTRACT_TORUS_LOBES = 3;
+// Metaball orbit size and the smooth-union width, in radii.
+const ABSTRACT_BALL_ORBIT = 0.62;
+const ABSTRACT_BALL_BLEND = 0.4;
+// Gyroid frequency in radians per radius at Frequency 1.
+const ABSTRACT_CELL_FREQUENCY = 5;
+// Times per loop the Metaball paths are sampled to bound them.
+const ABSTRACT_BALL_SAMPLES = 96;
+
+export const ABSTRACT_FORM_INDEX = {
+  blob: 0,
+  metaball: 1,
+  torus: 2,
+  cellular: 3,
+} as const satisfies Record<AbstractForm, number>;
+
+/** Every uniform of the Abstract shape; balls holds ABSTRACT_MAX_BALLS entries. */
+export type AbstractUniforms = {
+  form: number;
+  /** 0 glass, 1 chrome, 2 the shared Surface Mapping. */
+  material: number;
+  /** Sculpture radius at this frame, after Pulse. */
+  radius: number;
+  /** Noise displacement in world units. */
+  displace: number;
+  /** Per wave: direction times frequency (xyz) and phase at this frame (w). */
+  waves: number[];
+  /** Per Metaball sphere: center xyz and radius at this frame. */
+  balls: number[];
+  ballCount: number;
+  /** Smooth-union width of the Metaball spheres. */
+  blend: number;
+  /** Twist in radians per world unit of height. */
+  twist: number;
+  /**
+   * Column-major rotation from the sculpture frame to the world: Spin about
+   * its vertical axis, then Elevation and Tumble about the horizontal axis.
+   */
+  rotation: number[];
+  /** Phase of the Torus lobes in radians. */
+  lobePhase: number;
+  /** Gyroid frequency of the Cellular form in radians per world unit. */
+  cellFrequency: number;
+  /** Radius of the sphere that holds the sculpture for the whole loop. */
+  bound: number;
+  /** Share of the distance estimate a ray march step may take. */
+  step: number;
+  ior: number;
+  dispersion: number;
+  /** Wavelengths read across the dispersion range; 1 when Dispersion is 0. */
+  dispersionSteps: number;
+  reflection: number;
+  thinFilm: number;
+  /** Mean film thickness in nanometers. */
+  filmThickness: number;
+  lights: number;
+  background: number;
+  /** 1 when the camera stands at the sculpture center (Inside), else 0. */
+  inside: number;
+  /** Camera distance from the origin along +Z; 0 Inside. */
+  cameraDistance: number;
+  /** The canvas plane z = backdropZ lies behind the sculpture for the whole loop. */
+  backdropZ: number;
+  /** Half height of the canvas on the backdrop, so the base camera sees it fill the frame. */
+  backdropHalfHeight: number;
+};
+
+/**
+ * Shapes the Abstract sculpture at a loop-normalized time. Morph advances
+ * every noise wave, the Metaball drift, the Torus lobes, and the Pulse by
+ * whole cycles per loop, and Spin turns the sculpture about +Y by whole
+ * turns, so the loop closes. Elevation and Tumble turn the sculpture toward
+ * the camera about the horizontal axis, which shows it from above or below
+ * while the camera, the lights, and the canvas stay where they are; Tumble
+ * adds whole turns per loop. The noise directions, phases, and Metaball
+ * orbits come from Seed. The bound and the backdrop hold the sculpture for
+ * the whole loop, so the backdrop does not move while it breathes.
+ */
+export function getAbstractUniforms(config: ConeViewConfig, normalizedTime: number): AbstractUniforms {
+  const random = createRandom(safeFinite(config.abstractSeed, 0) + 1000);
+  const baseRadius = ABSTRACT_BASE_RADIUS * Math.max(0.05, safeFinite(config.abstractSize, 1));
+  const phase = wholeCyclePhase(config.abstractMorph, normalizedTime) * 2 * Math.PI;
+  const pulse = clamp(safeFinite(config.abstractPulse, 0), 0, 1) * ABSTRACT_PULSE_SCALE;
+  const scale = 1 + pulse * Math.sin(phase);
+  const maxScale = 1 + pulse;
+  const radius = baseRadius * scale;
+  const displace = clamp(safeFinite(config.abstractDisplace, 0), 0, 1) * ABSTRACT_DISPLACE_SCALE * baseRadius;
+  const frequency = Math.max(0.05, safeFinite(config.abstractFrequency, 1.4)) / baseRadius;
+  const form: AbstractForm = config.abstractForm in ABSTRACT_FORM_INDEX ? config.abstractForm : 'blob';
+
+  // Draw every random value up front, so the Metaball count does not shift the noise.
+  const waves: number[] = [];
+  let noiseSlope = 0;
+  const firstWave = ABSTRACT_WAVES[0].frequency * frequency;
+  for (const wave of ABSTRACT_WAVES) {
+    const direction = randomUnitVector(random);
+    const waveFrequency = wave.frequency * frequency;
+    waves.push(...direction.map(value => value * waveFrequency), random() * 2 * Math.PI + wave.cycles * phase);
+    noiseSlope += wave.amplitude * (waveFrequency + Math.abs(wave.warp) * firstWave);
+  }
+  noiseSlope /= ABSTRACT_NOISE_RANGE;
+  const orbits = Array.from({ length: ABSTRACT_MAX_BALLS }, () => ({
+    rates: [0, 1, 2].map(() => (random() < 0.5 ? -1 : 1) * (random() < 0.6 ? 1 : 2)),
+    phases: [0, 1, 2].map(() => random() * 2 * Math.PI),
+    size: 0.8 + 0.4 * random(),
+  }));
+
+  const ballCount = form === 'metaball' ? clamp(Math.round(safeFinite(config.abstractCount, 5)), 2, ABSTRACT_MAX_BALLS) : 0;
+  // Spheres shrink as they multiply so the sculpture keeps about its volume.
+  const ballRadius = baseRadius * 0.5 * Math.cbrt(5 / Math.max(ballCount, 1));
+  const orbit = baseRadius * ABSTRACT_BALL_ORBIT;
+  const blend = baseRadius * ABSTRACT_BALL_BLEND;
+  // The vertical orbit is flatter, so the spheres mostly drift across the
+  // view. The spheres are centered on their mean, so the group stays in the
+  // middle of the frame while they part and merge.
+  const orbitAxes = [1, 0.8, 1];
+  const centersAt = (at: number): number[][] => {
+    const centers = orbits.slice(0, ballCount).map(({ rates, phases }) => (
+      rates.map((rate, axis) => orbit * orbitAxes[axis] * Math.sin(rate * at + phases[axis]))
+    ));
+    const mean = [0, 1, 2].map(axis => centers.reduce((sum, center) => sum + center[axis], 0) / Math.max(ballCount, 1));
+    return centers.map(center => center.map((value, axis) => value - mean[axis]));
+  };
+  const balls = new Array<number>(ABSTRACT_MAX_BALLS * 4).fill(0);
+  centersAt(phase).forEach((center, index) => {
+    balls.splice(index * 4, 4, center[0], center[1], center[2], ballRadius * orbits[index].size * scale);
+  });
+  // Farthest any sphere reaches over the loop, sampled along the paths.
+  let ballReach = 0;
+  for (let sample = 0; ballCount > 0 && sample < ABSTRACT_BALL_SAMPLES; sample += 1) {
+    centersAt(sample / ABSTRACT_BALL_SAMPLES * 2 * Math.PI).forEach((center, index) => {
+      ballReach = Math.max(ballReach, Math.hypot(...center) + ballRadius * orbits[index].size);
+    });
+  }
+
+  // Extent of the form before displacement, for the whole loop; the sampled
+  // Metaball reach gets a margin for the motion between samples.
+  const extent = form === 'metaball'
+    ? ballReach * 1.05 * maxScale + blend * 0.25
+    : form === 'torus'
+      ? baseRadius * (ABSTRACT_TORUS_RING + ABSTRACT_TORUS_TUBE * (1 + ABSTRACT_TORUS_SWELL)) * maxScale
+      : baseRadius * maxScale;
+  const bound = (extent + displace) * 1.02 + 0.01;
+  const twist = safeFinite(config.abstractTwist, 0) * Math.PI / 180 / baseRadius;
+  // A ray march step may take the distance estimate divided by how fast the
+  // displaced, twisted field can change: its Lipschitz bound.
+  const shapeSlope = form === 'torus'
+    ? 1 + ABSTRACT_TORUS_TUBE * ABSTRACT_TORUS_SWELL * ABSTRACT_TORUS_LOBES / (ABSTRACT_TORUS_RING - ABSTRACT_TORUS_TUBE * (1 + ABSTRACT_TORUS_SWELL))
+    : form === 'cellular' ? 1.5 : 1;
+  const slope = (shapeSlope + displace * noiseSlope) * Math.hypot(1, twist * bound);
+
+  const tanHalfFov = getCrystalTanHalfFov(config);
+  const inside = config.abstractView === 'inside';
+  // Outside, the camera frames the canvas half height at the origin.
+  const cameraDistance = inside ? 0 : 1 / tanHalfFov;
+  const backdropZ = -(bound + Math.max(0, safeFinite(config.abstractBackdrop, 1)));
+  const spin = axisAngleMatrix([0, 1, 0], wholeCyclePhase(config.abstractSpin, normalizedTime) * 2 * Math.PI);
+  // A positive elevation tilts the top toward the camera, as if it rose above.
+  const elevation = safeFinite(config.abstractElevation, 0) * Math.PI / 180
+    + wholeCyclePhase(config.abstractTumble, normalizedTime) * 2 * Math.PI;
+  const tilt = axisAngleMatrix([1, 0, 0], elevation);
+  const dispersion = Math.max(0, safeFinite(config.abstractDispersion, 0));
+  const material = Math.max(0, ABSTRACT_MATERIALS.indexOf(config.abstractMaterial));
+  return {
+    form: ABSTRACT_FORM_INDEX[form],
+    material,
+    radius,
+    displace,
+    waves,
+    balls,
+    ballCount,
+    blend,
+    twist,
+    rotation: multiplyMatrices(tilt, spin),
+    lobePhase: phase,
+    cellFrequency: ABSTRACT_CELL_FREQUENCY * Math.max(0.05, safeFinite(config.abstractFrequency, 1.4)) / baseRadius,
+    bound,
+    step: clamp(1 / slope, 0.2, 1),
+    ior: Math.max(1, safeFinite(config.abstractIor, 1.45)),
+    dispersion,
+    dispersionSteps: dispersion > 0 ? clamp(Math.round(safeFinite(config.abstractDispersionSteps, 6)), 1, 10) : 1,
+    reflection: clamp(safeFinite(config.abstractReflection, 0), 0, 1),
+    thinFilm: clamp(safeFinite(config.abstractThinFilm, 0), 0, 1),
+    filmThickness: Math.max(0, safeFinite(config.abstractFilmThickness, 420)),
+    lights: clamp(safeFinite(config.abstractLights, 0), 0, 1),
+    background: clamp(safeFinite(config.abstractBackground, 1), 0, 1),
+    inside: inside ? 1 : 0,
+    cameraDistance,
+    backdropZ,
+    backdropHalfHeight: (cameraDistance - backdropZ) * tanHalfFov,
+  };
+}
+
 export function getThreeDRenderParams(
   config: ConeViewConfig,
   normalizedTime: number,
@@ -1040,6 +1264,7 @@ export function getThreeDRenderParams(
     shape: getConeShapeIndex(config),
     surfaceMapping: THREE_D_SURFACE_MAPPING_INDEX[config.surfaceMapping] ?? 0,
     projection: Math.max(0, THREE_D_PROJECTIONS.indexOf(config.projection)),
+    samples: THREE_D_ANTIALIAS_SAMPLES[config.antialias] ?? 1,
     fisheyeHalfAngle: clamp(safeFinite(config.fisheyeAngle, 180), 90, 360) * Math.PI / 360,
     lensDistortion: clamp(safeFinite(config.lensDistortion, 0), -0.5, 0.5),
     coneTwist: safeFinite(config.coneTwist, 0),
@@ -1156,6 +1381,7 @@ export function getThreeDRenderParams(
       outerRadius: Math.hypot(safeAspect, 1),
     },
     crystal: getCrystalUniforms(config, normalizedTime, safeAspect),
+    abstract: getAbstractUniforms(config, normalizedTime),
   };
 }
 

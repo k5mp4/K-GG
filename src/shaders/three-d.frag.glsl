@@ -29,6 +29,8 @@ uniform float u_threeDFog;
 uniform float u_threeDShade;
 uniform float u_threeDTravel;
 uniform float u_threeDDistance;
+// Rays per pixel for antialiasing: 1, 4, or 9 (THREE_D_MAX_SAMPLES).
+uniform int u_threeDSamples;
 
 uniform float u_coneTangentHalfFov;
 uniform float u_coneTextureRepeat;
@@ -135,6 +137,7 @@ const int SHAPE_RINGS = 5;
 const int SHAPE_FIELD = 6;
 const int SHAPE_DISCS = 7;
 const int SHAPE_CRYSTAL = 8;
+const int SHAPE_ABSTRACT = 9;
 
 const int MAPPING_UV = 0;
 const int MAPPING_TRIPLANAR = 1;
@@ -148,8 +151,11 @@ vec2 sourceUvFromGlobal(vec2 globalUv) {
 // Texture lookup with the Cone seam modes. `unwrapped` may exceed [0, 1]; the
 // seam mode decides how neighboring tiles meet.
 
+// The stack texture has no mip levels, so an explicit LOD 0 reads the same
+// texel without derivatives, which ANGLE cannot take inside the antialiasing
+// sample loop (see main).
 vec4 coneTextureLookup(vec2 uv) {
-  return texture2D(u_sourceTex, sourceUvFromGlobal(uv));
+  return textureLod(u_sourceTex, sourceUvFromGlobal(uv), 0.0);
 }
 
 float coneSeamWeight(float coordinate, float blendWidth) {
@@ -318,6 +324,9 @@ vec3 g_cameraUp = vec3(0.0, 1.0, 0.0);
 vec3 g_cameraForward = vec3(0.0, 0.0, -1.0);
 // Share of the shared surface mapping laid over the Crystals refraction.
 float g_crystalFaceWeight = 0.0;
+// Reflections the Abstract Surface material lays over the shared surface
+// mapping: premultiplied color and the share of the mapping they replace.
+vec4 g_abstractOverlay = vec4(0.0);
 
 void threeDSetCameraBasis(vec3 forward, vec3 up) {
   vec3 right = normalize(cross(forward, up));
@@ -2159,6 +2168,450 @@ ThreeDHit crystalHit(vec3 localRay) {
 }
 #endif
 
+#if KGG_THREE_D_SHAPE < 0 || KGG_THREE_D_SHAPE == 9
+// ---------------------------------------------------------------------------
+// Abstract: one organic sculpture floats at the origin in front of the
+// canvas, which lies on a backdrop plane behind it as for the Crystals. The
+// sculpture is a signed distance field (a blob, melting metaballs, a lobed
+// torus, or a sponge ball carved by a gyroid) swollen by a smooth noise of four
+// warped sine waves, twisted about its vertical axis, and found by sphere
+// tracing. Glass refracts the camera ray at every face it crosses, also where
+// it leaves and enters again, and reflects it internally past the critical
+// angle; Chrome mirrors the canvas wrapped around the scene; Surface lays the
+// shared Surface Mapping on it (main() blends the reflections over it with
+// g_abstractOverlay). Every material mirrors the surroundings by a Fresnel
+// term, tints its reflections by thin-film interference, and catches the
+// strip lights. The shape, its pose for this frame, the camera distance, and
+// the backdrop come from getAbstractUniforms.
+
+const int ABSTRACT_MAX_BALLS = 8;
+const int ABSTRACT_STEPS = 96;
+// Faces the glass ray crosses or reflects at, like CRYSTAL_EVENTS.
+const int ABSTRACT_EVENTS = 5;
+const int ABSTRACT_DISPERSION_STEPS = 10;
+const int ABSTRACT_FORM_METABALL = 1;
+const int ABSTRACT_FORM_TORUS = 2;
+const int ABSTRACT_FORM_CELLULAR = 3;
+const int ABSTRACT_MATERIAL_GLASS = 0;
+const int ABSTRACT_MATERIAL_CHROME = 1;
+const int ABSTRACT_MATERIAL_SURFACE = 2;
+const float ABSTRACT_HIT = 0.0015;
+const float ABSTRACT_MIN_DEPTH_SLOPE = 0.12;
+// Torus ring and tube in radii, tube swell, and lobes (ABSTRACT_TORUS_* in coneView.ts).
+const float ABSTRACT_TORUS_RING = 0.72;
+const float ABSTRACT_TORUS_TUBE = 0.34;
+const float ABSTRACT_TORUS_SWELL = 0.3;
+const float ABSTRACT_TORUS_LOBES = 3.0;
+// Gyroid level below which the Cellular ball is solid; above 0 it is more
+// solid than hollow.
+const float ABSTRACT_CELL_FILL = 0.35;
+// Sum of the noise wave amplitudes (ABSTRACT_NOISE_RANGE in coneView.ts).
+const float ABSTRACT_NOISE_RANGE = 1.5;
+// Index of refraction of the thin film, as a soap film.
+const float ABSTRACT_FILM_INDEX = 1.33;
+// Index of refraction behind the Fresnel term of Chrome and Surface.
+const float ABSTRACT_SURFACE_IOR = 1.5;
+// Brightness of the light cards at Light Cards 100%.
+const float ABSTRACT_LIGHT_STRENGTH = 1.6;
+
+uniform int u_abstractForm;
+// 0: glass, 1: chrome, 2: the shared Surface Mapping.
+uniform int u_abstractMaterial;
+uniform float u_abstractRadius;
+uniform float u_abstractDisplace;
+// Per wave: direction times frequency, and phase.
+uniform vec4 u_abstractWaves[4];
+// Per Metaball sphere: center and radius.
+uniform vec4 u_abstractBalls[ABSTRACT_MAX_BALLS];
+uniform int u_abstractBallCount;
+uniform float u_abstractBlend;
+uniform float u_abstractTwist;
+// From the sculpture frame to the world.
+uniform mat3 u_abstractRotation;
+uniform float u_abstractLobePhase;
+uniform float u_abstractCellFrequency;
+uniform float u_abstractBound;
+uniform float u_abstractStep;
+uniform float u_abstractIor;
+uniform float u_abstractDispersion;
+uniform int u_abstractDispersionSteps;
+uniform float u_abstractReflection;
+uniform float u_abstractThinFilm;
+uniform float u_abstractFilmThickness;
+uniform float u_abstractLights;
+uniform float u_abstractBackground;
+// 1: the camera stands at the sculpture center (Inside).
+uniform int u_abstractInside;
+uniform float u_abstractCameraDistance;
+uniform float u_abstractBackdropZ;
+uniform float u_abstractBackdropHalfHeight;
+
+// Faces the glass ray met for the middle index of refraction: outward
+// normal, whether it entered the glass there, and whether it reflected.
+vec3 g_abstractNormals[ABSTRACT_EVENTS];
+bool g_abstractEntering[ABSTRACT_EVENTS];
+bool g_abstractReflected[ABSTRACT_EVENTS];
+
+// Smooth noise in [-1, 1]: four sine waves whose phases the first one warps,
+// so the swells curl into each other instead of lining up. The amplitudes
+// and warps match ABSTRACT_WAVES in src/lib/coneView.ts.
+float abstractNoise(vec3 p) {
+  float warp = sin(dot(p, u_abstractWaves[0].xyz) + u_abstractWaves[0].w);
+  float noise = 0.5 * warp
+    + 0.5 * sin(dot(p, u_abstractWaves[1].xyz) + u_abstractWaves[1].w + 1.3 * warp)
+    + 0.3 * sin(dot(p, u_abstractWaves[2].xyz) + u_abstractWaves[2].w + 0.9 * warp)
+    + 0.2 * sin(dot(p, u_abstractWaves[3].xyz) + u_abstractWaves[3].w - 1.1 * warp);
+  return noise / ABSTRACT_NOISE_RANGE;
+}
+
+// Polynomial smooth minimum; it lies at most k / 4 below min(a, b).
+float abstractSmoothMin(float a, float b, float k) {
+  float h = clamp(0.5 + 0.5 * (b - a) / k, 0.0, 1.0);
+  return mix(b, a, h) - k * h * (1.0 - h);
+}
+
+// Signed distance of the undisplaced form in the sculpture frame.
+float abstractFormDistance(vec3 p) {
+  float radius = u_abstractRadius;
+  if (u_abstractForm == ABSTRACT_FORM_METABALL) {
+    float distance = 1.0e9;
+    for (int i = 0; i < ABSTRACT_MAX_BALLS; i++) {
+      if (i >= u_abstractBallCount) break;
+      vec4 ball = u_abstractBalls[i];
+      float sphere = length(p - ball.xyz) - ball.w;
+      distance = i == 0 ? sphere : abstractSmoothMin(distance, sphere, u_abstractBlend);
+    }
+    return distance;
+  }
+  if (u_abstractForm == ABSTRACT_FORM_TORUS) {
+    // The ring faces the camera; its tube swells in lobes that travel around it.
+    float angle = atan(p.y, p.x);
+    float tube = ABSTRACT_TORUS_TUBE * radius * (1.0 + ABSTRACT_TORUS_SWELL * sin(ABSTRACT_TORUS_LOBES * angle + u_abstractLobePhase));
+    return length(vec2(length(p.xy) - ABSTRACT_TORUS_RING * radius, p.z)) - tube;
+  }
+  float sphere = length(p) - radius;
+  if (u_abstractForm == ABSTRACT_FORM_CELLULAR) {
+    // A sponge: the ball keeps one side of the gyroid, so tunnels of the
+    // other side run through it and open as pores on its surface.
+    vec3 q = p * u_abstractCellFrequency;
+    float gyroid = dot(sin(q), cos(q.yzx));
+    return max(sphere, (gyroid - ABSTRACT_CELL_FILL) / (1.5 * u_abstractCellFrequency));
+  }
+  return sphere;
+}
+
+// The sculpture frame of a world point: Spin turned back, then the Twist
+// about the vertical axis in proportion to the height.
+vec3 abstractLocal(vec3 position) {
+  // Row-vector product: the inverse rotation into the sculpture frame.
+  vec3 p = position * u_abstractRotation;
+  float angle = u_abstractTwist * p.y;
+  float c = cos(angle);
+  float s = sin(angle);
+  p.xz = mat2(c, s, -s, c) * p.xz;
+  return p;
+}
+
+float abstractDistance(vec3 position) {
+  vec3 p = abstractLocal(position);
+  return abstractFormDistance(p) - u_abstractDisplace * abstractNoise(p);
+}
+
+// The gradient from the four corners of a tetrahedron, taken in a loop so
+// the compiler inlines the distance field once instead of four times.
+vec3 abstractNormal(vec3 p) {
+  vec3 normal = vec3(0.0);
+  for (int corner = 0; corner < 4; corner++) {
+    vec3 offset = 2.0 * vec3(float(((corner + 3) / 2) % 2), float((corner / 2) % 2), float(corner % 2)) - 1.0;
+    normal += offset * abstractDistance(p + offset * ABSTRACT_HIT);
+  }
+  return normalize(normal);
+}
+
+// Entry and exit distances of a ray through the sphere that holds the
+// sculpture; the ray misses when x > y.
+vec2 abstractBoundSpan(vec3 origin, vec3 direction) {
+  float along = dot(origin, direction);
+  float offset = dot(origin, origin) - u_abstractBound * u_abstractBound;
+  float discriminant = along * along - offset;
+  if (discriminant < 0.0) return vec2(1.0, -1.0);
+  float root = sqrt(discriminant);
+  return vec2(-along - root, -along + root);
+}
+
+// Sphere traces from `origin` outside (side 1) or inside (side -1) the
+// surface; side 0 takes the side `origin` lies on and returns it. Steps
+// shrink by u_abstractStep, the Lipschitz bound of the displaced field.
+// Returns the distance to the surface, or -1 when the ray passes `limit` or
+// runs out of steps first.
+float abstractMarch(vec3 origin, vec3 direction, inout float side, float limit) {
+  float t = 0.0;
+  for (int i = 0; i < ABSTRACT_STEPS; i++) {
+    float field = abstractDistance(origin + direction * t);
+    if (side == 0.0) side = field < 0.0 ? -1.0 : 1.0;
+    float distance = side * field;
+    if (distance < ABSTRACT_HIT) return t;
+    t += max(distance * u_abstractStep, 0.5 * ABSTRACT_HIT);
+    if (t > limit) break;
+  }
+  return -1.0;
+}
+
+struct AbstractTrace {
+  // Distance to the first hit, or -1 when the ray misses the sculpture.
+  float firstDistance;
+  vec3 firstPoint;
+  vec3 firstNormal;
+  // Faces recorded in the g_abstract arrays.
+  int count;
+  // Where the ray finally heads for the backdrop.
+  vec3 exitPoint;
+  // The camera stands inside the sculpture, so the first face is one it leaves.
+  bool cameraInside;
+};
+
+// Sphere traces the camera ray to the sculpture and, for glass (`limit`
+// faces), follows it through for the middle index of refraction: it
+// refracts where it enters or leaves, also where it leaves and enters again,
+// reflects internally past the critical angle, and each face goes into the
+// g_abstract arrays. One loop holds every march, so the compiler inlines the
+// distance field once; `limit` comes from a uniform, so ANGLE keeps the loop
+// instead of always running it.
+AbstractTrace abstractTrace(vec3 origin, vec3 direction, float ior, int limit) {
+  AbstractTrace trace;
+  trace.firstDistance = -1.0;
+  trace.firstPoint = origin;
+  trace.firstNormal = vec3(0.0, 0.0, 1.0);
+  trace.count = 0;
+  trace.exitPoint = origin;
+  trace.cameraInside = false;
+  vec2 span = abstractBoundSpan(origin, direction);
+  if (span.x > span.y || span.y <= 0.0) return trace;
+  float lead = max(span.x, 0.0);
+  vec3 start = origin + direction * lead;
+  // A camera within the bound may stand inside the sculpture (Inside, or a
+  // Dolly into it); the first march then finds out which side it is on.
+  float side = lead > 0.0 ? 1.0 : 0.0;
+  float reach = span.y - lead;
+  bool entering = true;
+  for (int segment = 0; segment <= ABSTRACT_EVENTS; segment++) {
+    float t = reach > 0.0 ? abstractMarch(start, direction, side, reach) : -1.0;
+    if (segment == 0) {
+      trace.cameraInside = side < 0.0;
+      entering = !trace.cameraInside;
+    }
+    if (t < 0.0) {
+      trace.exitPoint = start;
+      break;
+    }
+    vec3 point = start + direction * t;
+    vec3 normal = abstractNormal(point);
+    trace.exitPoint = point;
+    if (segment == 0) {
+      trace.firstDistance = lead + t;
+      trace.firstPoint = point;
+      trace.firstNormal = normal;
+    }
+    if (segment >= limit) break;
+    vec3 facing = entering ? normal : -normal;
+    vec3 bent = refract(direction, facing, entering ? 1.0 / ior : ior);
+    bool reflected = dot(bent, bent) == 0.0;
+    direction = reflected ? reflect(direction, facing) : bent;
+    g_abstractNormals[segment] = normal;
+    g_abstractEntering[segment] = entering;
+    g_abstractReflected[segment] = reflected;
+    trace.count = segment + 1;
+    if (trace.count >= limit) break;
+    // Inside unless the ray left through the face.
+    bool inside = entering || reflected;
+    start = point + normal * (inside ? -3.0 : 3.0) * ABSTRACT_HIT;
+    side = inside ? -1.0 : 1.0;
+    reach = inside ? 2.0 * u_abstractBound : abstractBoundSpan(start, direction).y;
+    entering = !inside;
+  }
+  return trace;
+}
+
+// The camera ray bent at the recorded faces for another index of
+// refraction. The faces stay where the middle index met them, which keeps
+// Dispersion at one trace; a face that reflected still reflects.
+vec3 abstractBend(vec3 direction, float ior, int count) {
+  for (int event = 0; event < ABSTRACT_EVENTS; event++) {
+    if (event >= count) break;
+    bool entering = g_abstractEntering[event];
+    vec3 facing = entering ? g_abstractNormals[event] : -g_abstractNormals[event];
+    if (g_abstractReflected[event]) {
+      direction = reflect(direction, facing);
+    } else {
+      vec3 bent = refract(direction, facing, entering ? 1.0 / ior : ior);
+      if (dot(bent, bent) > 0.0) direction = bent;
+    }
+  }
+  return direction;
+}
+
+// The backdrop as for the Crystals: the canvas fills the base camera's frame
+// on the plane z = u_abstractBackdropZ, repeats mirrored past its edges, and
+// Flow slides it up one mirrored pair per Flow Cycle.
+vec2 abstractBackdropUv(vec3 origin, vec3 direction) {
+  float aspect = u_fullResolution.x / max(u_fullResolution.y, 1.0);
+  float slope = max(abs(direction.z), ABSTRACT_MIN_DEPTH_SLOPE);
+  vec2 point = origin.xy + direction.xy * max(origin.z - u_abstractBackdropZ, 0.0) / slope;
+  vec2 uv = point / (2.0 * max(u_abstractBackdropHalfHeight, 0.001) * vec2(aspect, 1.0));
+  uv = uv * max(u_coneTextureRepeat, 1.0) + 0.5;
+  uv.y -= 2.0 * fract(u_threeDTravel);
+  return uv;
+}
+
+vec4 abstractBackdropSample(vec2 uv) {
+  return coneTextureLookup(1.0 - abs(1.0 - mod(uv, 2.0)));
+}
+
+// The canvas wrapped around the scene, as crystalEnvironment.
+vec3 abstractEnvironment(vec3 direction) {
+  vec2 uv = vec2(
+    2.0 * (atan(direction.x, direction.z) / TAU + 0.5),
+    asin(clamp(direction.y, -1.0, 1.0)) / PI + 0.5
+  );
+  return abstractBackdropSample(uv).rgb;
+}
+
+// Studio lights around the sculpture, by the direction they are seen in
+// (+Z toward the camera): two tall strip lights at 55 degrees left and right
+// of the camera, a weaker pair of rim strips behind the sculpture, and a
+// softbox overhead. Long strips draw long highlights along the curvature.
+float abstractLightCards(vec3 direction) {
+  float azimuth = abs(atan(direction.x, direction.z));
+  float height = 1.0 - smoothstep(0.55, 0.7, abs(direction.y));
+  float front = 1.0 - smoothstep(0.04, 0.08, abs(azimuth - 0.96));
+  float rim = 1.0 - smoothstep(0.05, 0.1, abs(azimuth - 2.5));
+  float softbox = smoothstep(0.78, 0.86, direction.y) * (1.0 - smoothstep(0.3, 0.42, abs(direction.x)));
+  return (front + 0.6 * rim) * height + 0.7 * softbox;
+}
+
+// Thin-film interference: the reflectance of a film of index
+// ABSTRACT_FILM_INDEX and `thickness` nanometers at the red, green, and blue
+// wavelengths, scaled to average 1 so it tints the reflection instead of
+// dimming it. Thicker films and steeper angles run through more bands.
+vec3 abstractThinFilm(float cosine, float thickness) {
+  float sine2 = (1.0 - cosine * cosine) / (ABSTRACT_FILM_INDEX * ABSTRACT_FILM_INDEX);
+  float path = 2.0 * ABSTRACT_FILM_INDEX * thickness * sqrt(max(1.0 - sine2, 0.0));
+  return 1.0 - cos(TAU * path / vec3(650.0, 532.0, 450.0));
+}
+
+// Red, green, and blue weights of a wavelength from 0 (red) to 1 (blue), as
+// crystalSpectrumWeight.
+vec3 abstractSpectrumWeight(float wavelength) {
+  vec3 offset = (wavelength - vec3(0.15, 0.5, 0.85)) / 0.25;
+  return exp(-offset * offset);
+}
+
+// The canvas seen through the glass. Dispersion bends the recorded faces for
+// the two ends of the IOR range as well and reads Dispersion Steps
+// wavelengths on the quadratic through the three backdrop points, as the
+// Crystals do.
+vec3 abstractRefraction(vec3 exitPoint, vec3 direction, int count) {
+  float ior = max(u_abstractIor, 1.0);
+  int steps = clamp(u_abstractDispersionSteps, 1, ABSTRACT_DISPERSION_STEPS);
+  vec2 middle = abstractBackdropUv(exitPoint, abstractBend(direction, ior, count));
+  if (steps == 1) return abstractBackdropSample(middle).rgb;
+  vec2 low = abstractBackdropUv(exitPoint, abstractBend(direction, max(ior - 0.5 * u_abstractDispersion, 1.0), count));
+  vec2 high = abstractBackdropUv(exitPoint, abstractBend(direction, ior + 0.5 * u_abstractDispersion, count));
+  vec3 sum = vec3(0.0);
+  vec3 weights = vec3(0.0);
+  for (int step = 0; step < ABSTRACT_DISPERSION_STEPS; step++) {
+    if (step >= steps) break;
+    float wavelength = (float(step) + 0.5) / float(steps);
+    vec2 uv = low * (2.0 * wavelength - 1.0) * (wavelength - 1.0)
+      + middle * 4.0 * wavelength * (1.0 - wavelength)
+      + high * wavelength * (2.0 * wavelength - 1.0);
+    vec3 weight = abstractSpectrumWeight(wavelength);
+    sum += abstractBackdropSample(uv).rgb * weight;
+    weights += weight;
+  }
+  return sum / weights;
+}
+
+ThreeDHit abstractHit(vec3 localRay) {
+  ThreeDHit result = threeDMiss();
+  bool insideView = u_abstractInside == 1;
+  float cameraDistance = max(u_abstractCameraDistance, 0.0);
+  vec3 forward = vec3(0.0, 0.0, -1.0);
+  vec3 up = vec3(0.0, 1.0, 0.0);
+  threeDSetCameraBasis(forward, up);
+  vec3 rayDirection = threeDWorldDirection(localRay, forward, up);
+  vec3 right = normalize(cross(forward, up));
+  // Outside, Camera Position and Dolly move the camera as for the Crystals;
+  // Inside, both move it from the center in radii of the bound.
+  float aspect = u_fullResolution.x / max(u_fullResolution.y, 1.0);
+  vec2 offset = threeDRollMatrix() * u_cameraOffset
+    * (insideView ? u_abstractBound : 0.5 * length(vec2(aspect, 1.0)));
+  vec3 rayOrigin = vec3(0.0, 0.0, cameraDistance) + right * offset.x + up * offset.y
+    + g_cameraForward * u_cameraDolly * (insideView ? u_abstractBound : cameraDistance);
+  result.rayDirection = rayDirection;
+  result.hit = true;
+  result.hasColor = true;
+  g_abstractOverlay = vec4(0.0);
+
+  float ior = max(u_abstractIor, 1.0);
+  int limit = u_abstractMaterial == ABSTRACT_MATERIAL_GLASS ? ABSTRACT_EVENTS : 0;
+  AbstractTrace trace = abstractTrace(rayOrigin, rayDirection, ior, limit);
+  if (trace.firstDistance < 0.0) {
+    // Background dims only the canvas seen past the sculpture.
+    result.color = vec4(abstractBackdropSample(abstractBackdropUv(rayOrigin, rayDirection)).rgb * u_abstractBackground, 1.0);
+    result.distance = max(rayOrigin.z - u_abstractBackdropZ, 0.0) / max(abs(rayDirection.z), ABSTRACT_MIN_DEPTH_SLOPE);
+    result.position = rayOrigin + rayDirection * result.distance;
+    return result;
+  }
+
+  vec3 point = trace.firstPoint;
+  // Seen from inside, the face turns toward the camera for the reflections and Shade.
+  vec3 normal = trace.cameraInside ? -trace.firstNormal : trace.firstNormal;
+  float cosine = clamp(-dot(rayDirection, normal), 0.0, 1.0);
+  // IOR belongs to the glass; the other materials reflect like common glass.
+  float surfaceIor = u_abstractMaterial == ABSTRACT_MATERIAL_GLASS ? ior : ABSTRACT_SURFACE_IOR;
+  float f0 = pow((surfaceIor - 1.0) / (surfaceIor + 1.0), 2.0);
+  float fresnel = f0 + (1.0 - f0) * pow(1.0 - cosine, 5.0);
+  vec3 mirrored = reflect(rayDirection, normal);
+  // The film thickness wanders over the surface, so the colors run in bands.
+  float thickness = u_abstractFilmThickness * (1.0 + 0.6 * abstractNoise(0.7 * abstractLocal(point)));
+  vec3 film = mix(vec3(1.0), abstractThinFilm(cosine, thickness), clamp(u_abstractThinFilm, 0.0, 1.0));
+  vec3 lights = film * (u_abstractLights * ABSTRACT_LIGHT_STRENGTH * abstractLightCards(mirrored));
+  vec3 reflection = abstractEnvironment(mirrored) * film;
+  // The head light from the camera's upper left, for Shade.
+  vec3 light = normalize(-g_cameraForward + g_cameraUp * 0.6 - g_cameraRight * 0.4);
+  float shade = mix(1.0, 0.3 + 0.7 * max(dot(normal, light), 0.0), clamp(u_threeDShade, 0.0, 1.0));
+  // Reflection mixes the surroundings in by three times the Schlick Fresnel
+  // term, as for the Crystals; the lights also show head-on, being bright.
+  float reflectWeight = clamp(3.0 * fresnel * u_abstractReflection, 0.0, 1.0);
+  vec3 highlight = lights * mix(0.35, 1.0, fresnel);
+  // Inside the glass, light reflected at the face stays in the glass and is
+  // part of the trace, as for the Crystals.
+  if (trace.cameraInside && u_abstractMaterial == ABSTRACT_MATERIAL_GLASS) {
+    reflectWeight = 0.0;
+    highlight = vec3(0.0);
+  }
+
+  vec3 color;
+  if (u_abstractMaterial == ABSTRACT_MATERIAL_CHROME) {
+    color = (reflection * mix(0.75, 1.0, fresnel) + lights) * shade;
+  } else if (u_abstractMaterial == ABSTRACT_MATERIAL_SURFACE) {
+    // main() lays the reflection over the shared Surface Mapping.
+    g_abstractOverlay = vec4(reflection * reflectWeight + highlight, reflectWeight);
+    result.hasColor = false;
+    color = vec3(0.0);
+  } else {
+    color = mix(abstractRefraction(trace.exitPoint, rayDirection, trace.count) * shade, reflection, reflectWeight) + highlight;
+  }
+  result.color = vec4(color, 1.0);
+  result.position = point;
+  result.normal = normal;
+  result.distance = trace.firstDistance;
+  result.mapScale = 1.0;
+  return result;
+}
+#endif
+
 // ---------------------------------------------------------------------------
 // Mapping, shading, and fog.
 
@@ -2207,8 +2660,8 @@ vec4 threeDApplyFog(vec4 color, float distance, float fogScale) {
 
 // ---------------------------------------------------------------------------
 
-void main() {
-  vec2 globalUv = (gl_FragCoord.xy + u_tileOffset) / max(u_fullResolution, vec2(1.0));
+// One ray through `globalUv`; main() averages several per pixel.
+vec4 threeDRenderSample(vec2 globalUv) {
   vec4 background = vec4(0.0, 0.0, 0.0, 1.0);
 
 #if KGG_THREE_D_SHAPE < 0 || KGG_THREE_D_SHAPE == 0
@@ -2222,8 +2675,7 @@ void main() {
       bool validConeRay;
       vec3 coneRay = threeDLookRay(threeDProjectedRay(globalUv, validConeRay));
       if (!validConeRay) {
-        gl_FragColor = background;
-        return;
+        return background;
       }
       // The free Cone's base camera is its own frame. Camera Position moves it
       // in aperture radii and Dolly toward the apex in units of the distance
@@ -2233,30 +2685,28 @@ void main() {
       mappedUv = coneFreeMappedUv(coneOrigin, coneRay, hitCone);
     }
     if (!hitCone) {
-      gl_FragColor = background;
-      return;
+      return background;
     }
     // Twist turns the texture around the axis in proportion to the depth.
     mappedUv.x += u_coneTwist * mappedUv.y;
-    gl_FragColor = threeDSampleUnwrapped(mappedUv * vec2(u_coneTextureRepeat, 1.0) + u_coneTextureOffset);
-    return;
+    return threeDSampleUnwrapped(mappedUv * vec2(u_coneTextureRepeat, 1.0) + u_coneTextureOffset);
   }
 #endif
 
 #if KGG_THREE_D_SHAPE == 0
-  gl_FragColor = background;
+  return background;
 #else
   bool validRay;
   vec3 localRay = threeDLookRay(threeDProjectedRay(globalUv, validRay));
   if (!validRay) {
-    gl_FragColor = background;
-    return;
+    return background;
   }
 
   ThreeDHit hit;
   float fogScale = 0.25;
   // Crystals resolve their own shading from the refracted canvas; the Faces
-  // material lays the shared mapping over it by g_crystalFaceWeight.
+  // material lays the shared mapping over it by g_crystalFaceWeight. The
+  // Abstract sculpture shades itself unless it uses the Surface material.
   bool ownShading = false;
 #if KGG_THREE_D_SHAPE < 0
   if (u_threeDShape == SHAPE_LATTICE) {
@@ -2281,6 +2731,10 @@ void main() {
     hit = crystalHit(localRay);
     fogScale = 0.3;
     ownShading = true;
+  } else if (u_threeDShape == SHAPE_ABSTRACT) {
+    hit = abstractHit(localRay);
+    fogScale = 0.3;
+    ownShading = hit.hasColor;
   } else {
     hit = torusHit(localRay);
   }
@@ -2308,14 +2762,47 @@ void main() {
   hit = crystalHit(localRay);
   fogScale = 0.3;
   ownShading = true;
+#elif KGG_THREE_D_SHAPE == 9
+  hit = abstractHit(localRay);
+  fogScale = 0.3;
+  ownShading = hit.hasColor;
 #endif
   if (!hit.hit) {
-    gl_FragColor = background;
-    return;
+    return background;
   }
   vec4 color = ownShading ? hit.color : threeDSurfaceColor(hit);
   if (ownShading && g_crystalFaceWeight > 0.0) color = mix(color, threeDSurfaceColor(hit), g_crystalFaceWeight);
+  color.rgb = color.rgb * (1.0 - g_abstractOverlay.a) + g_abstractOverlay.rgb;
   color.rgb *= hit.fade;
-  gl_FragColor = threeDApplyFog(color, hit.distance, fogScale);
+  return threeDApplyFog(color, hit.distance, fogScale);
 #endif
+}
+
+const int THREE_D_MAX_SAMPLES = 9;
+// Rotated grid: four samples that each fall in their own row and column of
+// the pixel, which smooths near-horizontal and near-vertical edges best.
+const vec2 THREE_D_ROTATED_GRID[4] = vec2[4](
+  vec2(-0.125, 0.375), vec2(0.375, 0.125), vec2(0.125, -0.375), vec2(-0.375, -0.125)
+);
+
+// Sub-pixel offset of sample `index` of `count`, in pixels from the center.
+vec2 threeDSampleOffset(int index, int count) {
+  if (count == 4) return THREE_D_ROTATED_GRID[index];
+  if (count == 9) return (vec2(float(index % 3), float(index / 3)) - 1.0) / 3.0;
+  return vec2(0.0);
+}
+
+// Antialiasing traces u_threeDSamples rays through each pixel and averages
+// them, so silhouettes, thin walls, and refracted edges resolve smoothly. The
+// count comes from a uniform, so the loop stays a loop and one sample costs
+// what the layer did before.
+void main() {
+  int samples = clamp(u_threeDSamples, 1, THREE_D_MAX_SAMPLES);
+  vec4 sum = vec4(0.0);
+  for (int index = 0; index < THREE_D_MAX_SAMPLES; index++) {
+    if (index >= samples) break;
+    vec2 pixel = gl_FragCoord.xy + threeDSampleOffset(index, samples);
+    sum += threeDRenderSample((pixel + u_tileOffset) / max(u_fullResolution, vec2(1.0)));
+  }
+  gl_FragColor = sum / float(samples);
 }

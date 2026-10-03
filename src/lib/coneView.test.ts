@@ -17,6 +17,7 @@ import {
   getCameraWiggle,
   getRibbonLaps,
   getDiscsFrameDistance,
+  getAbstractUniforms,
   getCrystalLayout,
   getCrystalUniforms,
   getCrystalInscribedRadius,
@@ -477,6 +478,103 @@ describe('3D render parameters', () => {
     expect(zooming.backdropHalfHeight).toBeCloseTo(uniforms.backdropHalfHeight, 10);
   });
 
+  it('closes the Abstract morph, pulse, Metaball drift, and spin on the loop', () => {
+    for (const abstractForm of ['blob', 'metaball', 'torus', 'cellular'] as const) {
+      const config = { ...DEFAULT_CONE_VIEW, shape: 'abstract' as const, abstractForm, abstractMorph: 3, abstractSpin: -2, abstractPulse: 1 };
+      const start = getAbstractUniforms(config, 0);
+      const end = getAbstractUniforms(config, 1);
+      expect(end.radius).toBeCloseTo(start.radius, 9);
+      expect(end.lobePhase).toBeCloseTo(start.lobePhase, 9);
+      start.waves.forEach((value, index) => {
+        // Wave phases may differ by whole turns.
+        const difference = (end.waves[index] - value) / (2 * Math.PI);
+        expect(index % 4 === 3 ? difference - Math.round(difference) : end.waves[index] - value).toBeCloseTo(0, 9);
+      });
+      start.balls.forEach((value, index) => expect(end.balls[index]).toBeCloseTo(value, 9));
+      start.rotation.forEach((value, index) => expect(end.rotation[index]).toBeCloseTo(value, 9));
+      const middle = getAbstractUniforms(config, 0.37);
+      expect(middle.radius).not.toBeCloseTo(start.radius, 3);
+      // The bound and the backdrop hold still while the sculpture breathes.
+      expect(middle.bound).toBe(start.bound);
+      expect(middle.backdropZ).toBe(start.backdropZ);
+    }
+    const still = getAbstractUniforms({ ...DEFAULT_CONE_VIEW, abstractMorph: 0, abstractSpin: 0 }, 0.4);
+    expect(still).toEqual(getAbstractUniforms({ ...DEFAULT_CONE_VIEW, abstractMorph: 0, abstractSpin: 0 }, 0));
+  });
+
+  it('keeps the Metaball spheres centered and inside the Abstract bound', () => {
+    const config = { ...DEFAULT_CONE_VIEW, shape: 'abstract' as const, abstractForm: 'metaball' as const, abstractCount: 7, abstractMorph: 2, abstractPulse: 1 };
+    for (let sample = 0; sample <= 40; sample += 1) {
+      const uniforms = getAbstractUniforms(config, sample / 40);
+      expect(uniforms.ballCount).toBe(7);
+      const mean = [0, 0, 0];
+      for (let index = 0; index < uniforms.ballCount; index += 1) {
+        const [x, y, z, radius] = uniforms.balls.slice(index * 4, index * 4 + 4);
+        [x, y, z].forEach((value, axis) => { mean[axis] += value / uniforms.ballCount; });
+        expect(Math.hypot(x, y, z) + radius).toBeLessThan(uniforms.bound);
+      }
+      mean.forEach(value => expect(value).toBeCloseTo(0, 9));
+    }
+    expect(getAbstractUniforms({ ...config, abstractForm: 'blob' }, 0).ballCount).toBe(0);
+    // More spheres do not change the noise.
+    expect(getAbstractUniforms({ ...config, abstractCount: 3 }, 0.2).waves).toEqual(getAbstractUniforms(config, 0.2).waves);
+    expect(getAbstractUniforms({ ...config, abstractSeed: 4 }, 0.2).balls).not.toEqual(getAbstractUniforms(config, 0.2).balls);
+  });
+
+  it('shows the Abstract sculpture from above with Elevation and closes Tumble on the loop', () => {
+    const config = { ...DEFAULT_CONE_VIEW, shape: 'abstract' as const, abstractSpin: 0 };
+    // Columns of the rotation: where the sculpture's axes point in the world.
+    const top = (rotation: number[]) => rotation.slice(3, 6);
+    expect(top(getAbstractUniforms(config, 0).rotation)).toEqual([0, 1, 0]);
+    // From above, the top of the sculpture faces the camera on +Z.
+    const above = top(getAbstractUniforms({ ...config, abstractElevation: 90 }, 0).rotation);
+    [0, 0, 1].forEach((value, axis) => expect(above[axis]).toBeCloseTo(value, 10));
+    const below = top(getAbstractUniforms({ ...config, abstractElevation: -90 }, 0).rotation);
+    [0, 0, -1].forEach((value, axis) => expect(below[axis]).toBeCloseTo(value, 10));
+    const tumbling = { ...config, abstractTumble: 2, abstractSpin: 1, abstractElevation: 20 };
+    const start = getAbstractUniforms(tumbling, 0).rotation;
+    const end = getAbstractUniforms(tumbling, 1).rotation;
+    start.forEach((value, index) => expect(end[index]).toBeCloseTo(value, 9));
+    // Half way through one Tumble turn the view comes from below.
+    const half = top(getAbstractUniforms({ ...config, abstractTumble: 1 }, 0.5).rotation);
+    [0, -1, 0].forEach((value, axis) => expect(half[axis]).toBeCloseTo(value, 9));
+  });
+
+  it('stands the Abstract Inside camera at the sculpture center', () => {
+    const config = { ...DEFAULT_CONE_VIEW, shape: 'abstract' as const, cameraFov: 90, abstractView: 'inside' as const };
+    const inside = getAbstractUniforms(config, 0);
+    expect(inside.inside).toBe(1);
+    expect(inside.cameraDistance).toBe(0);
+    // The canvas still fills the frame seen from the center.
+    expect(inside.backdropHalfHeight).toBeCloseTo(-inside.backdropZ, 10);
+    const outside = getAbstractUniforms({ ...config, abstractView: 'outside' }, 0);
+    expect(outside.inside).toBe(0);
+    expect(outside.cameraDistance).toBeCloseTo(1, 10);
+    expect(outside.backdropZ).toBe(inside.backdropZ);
+  });
+
+  it('places the Abstract backdrop behind the sculpture and frames it with the base FOV', () => {
+    const config = { ...DEFAULT_CONE_VIEW, shape: 'abstract' as const, cameraFov: 90, abstractBackdrop: 2 };
+    const uniforms = getThreeDRenderParams(config, 0.3, 16 / 9).abstract;
+    expect(uniforms.cameraDistance).toBeCloseTo(1, 10);
+    expect(uniforms.backdropZ).toBeCloseTo(-(uniforms.bound + 2), 10);
+    expect(uniforms.backdropHalfHeight).toBeCloseTo(uniforms.cameraDistance - uniforms.backdropZ, 10);
+    expect(uniforms.step).toBeGreaterThanOrEqual(0.2);
+    expect(uniforms.step).toBeLessThanOrEqual(1);
+    // A stronger displacement or twist takes shorter steps.
+    expect(getAbstractUniforms({ ...config, abstractDisplace: 1, abstractTwist: 300 }, 0).step).toBeLessThan(uniforms.step);
+    expect(uniforms.material).toBe(0);
+    expect(getAbstractUniforms({ ...config, abstractMaterial: 'chrome' }, 0).material).toBe(1);
+    expect(getAbstractUniforms({ ...config, abstractMaterial: 'surface' }, 0).material).toBe(2);
+    expect(uniforms.dispersionSteps).toBe(6);
+    expect(getAbstractUniforms({ ...config, abstractDispersion: 0 }, 0).dispersionSteps).toBe(1);
+    // Flow slides the backdrop, as for the Crystals.
+    const flowing = getThreeDRenderParams({ ...config, flowCycles: 2 }, 0.25, 1);
+    expect(flowing.shape).toBe(9);
+    expect(flowing.travel).toBeCloseTo(0.5, 10);
+    expect(flowing.textureOffset).toEqual([0, 0]);
+  });
+
   it('travels the ribbons one loop length per Flow Cycle, two with odd half twists', () => {
     const even = { ...DEFAULT_CONE_VIEW, shape: 'ribbon' as const, flowCycles: 3, ribbonHalfTwists: 2 };
     expect(getRibbonLaps(even)).toBe(1);
@@ -689,6 +787,15 @@ describe('torus tunnel', () => {
   it('passes the Cone twist through', () => {
     expect(getThreeDRenderParams({ ...DEFAULT_CONE_VIEW, coneTwist: -1.5 }, 0, 1).coneTwist).toBe(-1.5);
     expect(getThreeDRenderParams(DEFAULT_CONE_VIEW, 0, 1).coneTwist).toBe(0);
+  });
+
+  it('traces one ray per pixel unless antialiasing is on, for every shape', () => {
+    for (const shape of ['cone', 'torus', 'crystal', 'abstract'] as const) {
+      const config = { ...DEFAULT_CONE_VIEW, shape };
+      expect(getThreeDRenderParams(config, 0, 1).samples).toBe(1);
+      expect(getThreeDRenderParams({ ...config, antialias: 'x4' }, 0, 1).samples).toBe(4);
+      expect(getThreeDRenderParams({ ...config, antialias: 'x9' }, 0, 1).samples).toBe(9);
+    }
   });
 
   it('converts the fisheye angle, lens, dolly, and aim settings', () => {

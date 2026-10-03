@@ -84,4 +84,34 @@ describe('3D uniform upload', () => {
     expect(gl.uniform4fv).toHaveBeenCalledWith(crystalUniforms.u_crystalShape, params.crystal.shapes);
     expect(gl.uniformMatrix3fv).toHaveBeenCalledWith(crystalUniforms.u_crystalRotation, false, params.crystal.rotations);
   });
+
+  it('uploads the Abstract waves, Metaball spheres, and spin', () => {
+    const gl = {
+      uniform1f: vi.fn(),
+      uniform1i: vi.fn(),
+      uniform2f: vi.fn(),
+      uniform4fv: vi.fn(),
+      uniformMatrix3fv: vi.fn(),
+    };
+    const abstractUniforms = {
+      u_abstractForm: {} as WebGLUniformLocation,
+      u_abstractWaves: {} as WebGLUniformLocation,
+      u_abstractBalls: {} as WebGLUniformLocation,
+      u_abstractRotation: {} as WebGLUniformLocation,
+      u_abstractBound: {} as WebGLUniformLocation,
+    };
+    const params = getThreeDRenderParams({ ...DEFAULT_CONE_VIEW, shape: 'abstract', abstractForm: 'metaball' }, 0.2, 16 / 9);
+    uploadThreeDUniforms(gl as unknown as WebGL2RenderingContext, abstractUniforms, params);
+    expect(gl.uniform1i).toHaveBeenCalledWith(abstractUniforms.u_abstractForm, 1);
+    const antialiased = getThreeDRenderParams({ ...DEFAULT_CONE_VIEW, antialias: 'x9' }, 0, 1);
+    const samples = { u_threeDSamples: {} as WebGLUniformLocation };
+    uploadThreeDUniforms(gl as unknown as WebGL2RenderingContext, samples, antialiased);
+    expect(gl.uniform1i).toHaveBeenCalledWith(samples.u_threeDSamples, 9);
+    expect(gl.uniform4fv).toHaveBeenCalledWith(abstractUniforms.u_abstractWaves, params.abstract.waves);
+    expect(gl.uniform4fv).toHaveBeenCalledWith(abstractUniforms.u_abstractBalls, params.abstract.balls);
+    expect(gl.uniformMatrix3fv).toHaveBeenCalledWith(abstractUniforms.u_abstractRotation, false, params.abstract.rotation);
+    expect(gl.uniform1f).toHaveBeenCalledWith(abstractUniforms.u_abstractBound, params.abstract.bound);
+    expect(params.abstract.waves).toHaveLength(16);
+    expect(params.abstract.balls).toHaveLength(32);
+  });
 });

@@ -124,6 +124,23 @@ describe('ConeViewPanel shape controls', () => {
     expect(hasLabel(renderShape('crystal', { crystalMaterial: 'faces' }), 'Surface Mapping')).toBe(true);
   });
 
+  it('shows the Abstract controls and Surface Mapping only for the Surface material', () => {
+    const markup = renderShape('abstract');
+    for (const label of ['Form', 'Material', 'Spheres', 'Size', 'Displace', 'Frequency', 'Twist', 'Seed', 'IOR', 'Dispersion', 'Dispersion Steps', 'Reflection', 'Thin Film', 'Film Thickness', 'Light Cards', 'Background', 'Backdrop', 'Morph', 'Pulse', 'Spin', 'View', 'Elevation', 'Tumble', 'Shade', 'Fog', 'Camera Roll']) {
+      expect(hasLabel(markup, label), label).toBe(true);
+    }
+    expect(hasLabel(markup, 'Surface Mapping')).toBe(false);
+    expect(hasLabel(markup, 'Depth')).toBe(false);
+    expect(hasLabel(renderShape('abstract', { abstractMaterial: 'chrome' }), 'Surface Mapping')).toBe(false);
+    expect(hasLabel(renderShape('abstract', { abstractMaterial: 'surface' }), 'Surface Mapping')).toBe(true);
+  });
+
+  it('offers Antialias for every shape, also the classic Cone', () => {
+    for (const shape of ['cone', 'torus', 'crystal', 'abstract'] as const) {
+      expect(hasLabel(renderShape(shape), 'Antialias'), shape).toBe(true);
+    }
+  });
+
   it('no longer offers the Extrusion shape', () => {
     const markup = renderShape('cone');
     expect(markup).not.toContain('Pixel city');

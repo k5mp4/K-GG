@@ -7,6 +7,9 @@ import { applicationCommands } from '../application/commands';
 import { InputPosition } from 'tweeq';
 import { getParameterLimit } from '../lib/parameterLimits';
 import {
+  ABSTRACT_FORM_OPTIONS,
+  ABSTRACT_MATERIAL_OPTIONS,
+  ABSTRACT_VIEW_OPTIONS,
   CAMERA_WIGGLE_PRESET_OPTIONS,
   CONE_CAMERA_MODE_OPTIONS,
   CONE_SEAM_MODE_OPTIONS,
@@ -21,8 +24,12 @@ import {
   LATTICE_TYPE_OPTIONS,
   RINGS_MAPPING_OPTIONS,
   RINGS_PATTERN_OPTIONS,
+  THREE_D_ANTIALIAS_OPTIONS,
   THREE_D_PROJECTION_OPTIONS,
   THREE_D_SURFACE_MAPPING_OPTIONS,
+  type AbstractForm,
+  type AbstractMaterial,
+  type AbstractView,
   type CameraWigglePreset,
   type ConeCameraMode,
   type ConeSeamMode,
@@ -37,6 +44,7 @@ import {
   type LatticeType,
   type RingsMapping,
   type RingsPattern,
+  type ThreeDAntialias,
   type ThreeDProjection,
   type ThreeDSurfaceMapping,
 } from '../types/coneView';
@@ -60,6 +68,7 @@ const SHAPE_TEXT: Record<ConeShape, { title: MessageKey; description: MessageKey
   field: { title: 'cone.fieldSurface', description: 'cone.fieldDescription', hint: 'cone.fieldHint' },
   discs: { title: 'cone.discsSurface', description: 'cone.discsDescription', hint: 'cone.discsHint' },
   crystal: { title: 'cone.crystalSurface', description: 'cone.crystalDescription', hint: 'cone.crystalHint' },
+  abstract: { title: 'cone.abstractSurface', description: 'cone.abstractDescription', hint: 'cone.abstractHint' },
 };
 
 /** Serpent bends its path and Tumble scatters its frames with the same amount. */
@@ -661,6 +670,185 @@ function ShapeControls({ coneView, setConeView }: { coneView: ConeViewConfig; se
       </>
     );
   }
+  if (coneView.shape === 'abstract') {
+    const integer = (value: number) => `${Math.round(value)}`;
+    const percent = (value: number) => `${Math.round(value * 100)}%`;
+    const glass = coneView.abstractMaterial === 'glass';
+    return (
+      <>
+        <CustomSelect
+          label="Form"
+          value={coneView.abstractForm}
+          localizeLabel={false}
+          localizeOptions={false}
+          options={[...ABSTRACT_FORM_OPTIONS]}
+          onChange={(abstractForm) => setConeView({ abstractForm: abstractForm as AbstractForm })}
+        />
+        <CustomSelect
+          label="Material"
+          value={coneView.abstractMaterial}
+          localizeLabel={false}
+          localizeOptions={false}
+          options={[...ABSTRACT_MATERIAL_OPTIONS]}
+          onChange={(abstractMaterial) => setConeView({ abstractMaterial: abstractMaterial as AbstractMaterial })}
+        />
+        <SliderField
+          label="Spheres"
+          value={coneView.abstractCount}
+          limitKey="cone.abstractCount"
+          disabled={coneView.abstractForm !== 'metaball'}
+          format={integer}
+          onChange={(abstractCount) => setConeView({ abstractCount })}
+        />
+        <SliderField
+          label="Size"
+          value={coneView.abstractSize}
+          limitKey="cone.abstractSize"
+          format={percent}
+          onChange={(abstractSize) => setConeView({ abstractSize })}
+        />
+        <SliderField
+          label="Displace"
+          value={coneView.abstractDisplace}
+          limitKey="cone.abstractDisplace"
+          format={percent}
+          onChange={(abstractDisplace) => setConeView({ abstractDisplace })}
+        />
+        <SliderField
+          label="Frequency"
+          value={coneView.abstractFrequency}
+          limitKey="cone.abstractFrequency"
+          format={(value) => value.toFixed(2)}
+          onChange={(abstractFrequency) => setConeView({ abstractFrequency })}
+        />
+        <SliderField
+          label="Twist"
+          value={coneView.abstractTwist}
+          limitKey="cone.abstractTwist"
+          format={formatDegrees}
+          onChange={(abstractTwist) => setConeView({ abstractTwist })}
+        />
+        <SliderField
+          label="Seed"
+          value={coneView.abstractSeed}
+          limitKey="cone.abstractSeed"
+          format={integer}
+          onChange={(abstractSeed) => setConeView({ abstractSeed })}
+        />
+        <SliderField
+          label="IOR"
+          value={coneView.abstractIor}
+          limitKey="cone.abstractIor"
+          disabled={!glass}
+          format={(value) => value.toFixed(2)}
+          onChange={(abstractIor) => setConeView({ abstractIor })}
+        />
+        <SliderField
+          label="Dispersion"
+          value={coneView.abstractDispersion}
+          limitKey="cone.abstractDispersion"
+          disabled={!glass}
+          format={(value) => value.toFixed(3)}
+          onChange={(abstractDispersion) => setConeView({ abstractDispersion })}
+        />
+        <SliderField
+          label="Dispersion Steps"
+          value={coneView.abstractDispersionSteps}
+          limitKey="cone.abstractDispersionSteps"
+          disabled={!glass || coneView.abstractDispersion === 0}
+          format={integer}
+          onChange={(abstractDispersionSteps) => setConeView({ abstractDispersionSteps })}
+        />
+        <SliderField
+          label="Reflection"
+          value={coneView.abstractReflection}
+          limitKey="cone.abstractReflection"
+          disabled={coneView.abstractMaterial === 'chrome'}
+          format={percent}
+          onChange={(abstractReflection) => setConeView({ abstractReflection })}
+        />
+        <SliderField
+          label="Thin Film"
+          value={coneView.abstractThinFilm}
+          limitKey="cone.abstractThinFilm"
+          format={percent}
+          onChange={(abstractThinFilm) => setConeView({ abstractThinFilm })}
+        />
+        <SliderField
+          label="Film Thickness"
+          value={coneView.abstractFilmThickness}
+          limitKey="cone.abstractFilmThickness"
+          disabled={coneView.abstractThinFilm === 0}
+          format={(value) => `${Math.round(value)} nm`}
+          onChange={(abstractFilmThickness) => setConeView({ abstractFilmThickness })}
+        />
+        <SliderField
+          label="Light Cards"
+          value={coneView.abstractLights}
+          limitKey="cone.abstractLights"
+          format={percent}
+          onChange={(abstractLights) => setConeView({ abstractLights })}
+        />
+        <SliderField
+          label="Background"
+          value={coneView.abstractBackground}
+          limitKey="cone.abstractBackground"
+          format={percent}
+          onChange={(abstractBackground) => setConeView({ abstractBackground })}
+        />
+        <SliderField
+          label="Backdrop"
+          value={coneView.abstractBackdrop}
+          limitKey="cone.abstractBackdrop"
+          onChange={(abstractBackdrop) => setConeView({ abstractBackdrop })}
+        />
+        <SliderField
+          label="Morph"
+          value={coneView.abstractMorph}
+          limitKey="cone.abstractMorph"
+          format={integer}
+          onChange={(abstractMorph) => setConeView({ abstractMorph })}
+        />
+        <SliderField
+          label="Pulse"
+          value={coneView.abstractPulse}
+          limitKey="cone.abstractPulse"
+          disabled={coneView.abstractMorph === 0}
+          format={percent}
+          onChange={(abstractPulse) => setConeView({ abstractPulse })}
+        />
+        <SliderField
+          label="Spin"
+          value={coneView.abstractSpin}
+          limitKey="cone.abstractSpin"
+          format={integer}
+          onChange={(abstractSpin) => setConeView({ abstractSpin })}
+        />
+        <CustomSelect
+          label="View"
+          value={coneView.abstractView}
+          localizeLabel={false}
+          localizeOptions={false}
+          options={[...ABSTRACT_VIEW_OPTIONS]}
+          onChange={(abstractView) => setConeView({ abstractView: abstractView as AbstractView })}
+        />
+        <SliderField
+          label="Elevation"
+          value={coneView.abstractElevation}
+          limitKey="cone.abstractElevation"
+          format={formatDegrees}
+          onChange={(abstractElevation) => setConeView({ abstractElevation })}
+        />
+        <SliderField
+          label="Tumble"
+          value={coneView.abstractTumble}
+          limitKey="cone.abstractTumble"
+          format={integer}
+          onChange={(abstractTumble) => setConeView({ abstractTumble })}
+        />
+      </>
+    );
+  }
   if (coneView.shape === 'terrain') {
     return (
       <>
@@ -749,8 +937,9 @@ function ShapeControls({ coneView, setConeView }: { coneView: ConeViewConfig; se
 function SurfaceControls({ coneView, setConeView }: { coneView: ConeViewConfig; setConeView: SetConeView }) {
   return (
     <>
-      {/* Clear crystals color their faces with the refracted canvas, not a mapping. */}
-      {(coneView.shape !== 'crystal' || coneView.crystalMaterial === 'faces') && (
+      {/* Clear crystals and the glass or chrome Abstract color themselves from the canvas, not a mapping. */}
+      {(coneView.shape !== 'crystal' || coneView.crystalMaterial === 'faces')
+        && (coneView.shape !== 'abstract' || coneView.abstractMaterial === 'surface') && (
         <CustomSelect
           label="Surface Mapping"
           value={coneView.surfaceMapping}
@@ -1005,6 +1194,17 @@ export function ConeViewPanel() {
           limitKey="cone.flowCycles"
           disabled={coneView.mappingMode === 'projection'}
           onChange={(flowCycles) => setConeView({ flowCycles })}
+        />
+      </Section>
+
+      <Section title="Quality" hint={t('cone.antialiasHint')}>
+        <CustomSelect
+          label="Antialias"
+          value={coneView.antialias}
+          localizeLabel={false}
+          localizeOptions={false}
+          options={[...THREE_D_ANTIALIAS_OPTIONS]}
+          onChange={(antialias) => setConeView({ antialias: antialias as ThreeDAntialias })}
         />
       </Section>
 

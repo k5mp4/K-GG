@@ -49,6 +49,7 @@ describe('cone view configuration', () => {
       mappingMode: 'flow',
       surfaceMapping: 'uv',
       projection: 'perspective',
+      antialias: 'off',
       fog: 0,
       shade: 0,
       torusBend: 0.9,
@@ -133,7 +134,84 @@ describe('cone view configuration', () => {
       crystalBackdrop: 1,
       crystalSpin: 1,
       crystalRevolve: 0,
+      abstractForm: 'blob',
+      abstractMaterial: 'glass',
+      abstractCount: 5,
+      abstractSize: 1,
+      abstractDisplace: 0.45,
+      abstractFrequency: 1.4,
+      abstractTwist: 30,
+      abstractMorph: 1,
+      abstractPulse: 0.3,
+      abstractSeed: 0,
+      abstractIor: 1.45,
+      abstractDispersion: 0.12,
+      abstractDispersionSteps: 6,
+      abstractReflection: 0.6,
+      abstractThinFilm: 0.4,
+      abstractFilmThickness: 420,
+      abstractLights: 0.7,
+      abstractBackground: 0.25,
+      abstractBackdrop: 1,
+      abstractSpin: 1,
+      abstractView: 'outside',
+      abstractElevation: 0,
+      abstractTumble: 0,
     });
+  });
+
+  it('normalizes the Abstract settings', () => {
+    expect(normalizeConeViewConfig({ shape: 'abstract' }).shape).toBe('abstract');
+    expect(normalizeConeViewConfig({
+      abstractCount: 12.4,
+      abstractSize: 0,
+      abstractDisplace: 2,
+      abstractFrequency: 9,
+      abstractTwist: -999,
+      abstractMorph: 2.6,
+      abstractPulse: -1,
+      abstractSeed: 3.4,
+      abstractIor: 3,
+      abstractDispersion: -1,
+      abstractDispersionSteps: 0,
+      abstractReflection: 2,
+      abstractThinFilm: 5,
+      abstractFilmThickness: 20,
+      abstractLights: -2,
+      abstractBackground: 4,
+      abstractBackdrop: 0,
+      abstractSpin: -7,
+    })).toMatchObject({
+      abstractCount: 8,
+      abstractSize: 0.3,
+      abstractDisplace: 1,
+      abstractFrequency: 4,
+      abstractTwist: -360,
+      abstractMorph: 3,
+      abstractPulse: 0,
+      abstractSeed: 3,
+      abstractIor: 2.4,
+      abstractDispersion: 0,
+      abstractDispersionSteps: 1,
+      abstractReflection: 1,
+      abstractThinFilm: 1,
+      abstractFilmThickness: 100,
+      abstractLights: 0,
+      abstractBackground: 1,
+      abstractBackdrop: 0.1,
+      abstractSpin: -4,
+    });
+    for (const form of ['metaball', 'torus', 'cellular'] as const) {
+      expect(normalizeConeViewConfig({ abstractForm: form }).abstractForm).toBe(form);
+    }
+    expect(normalizeConeViewConfig({ abstractForm: 'knot' }).abstractForm).toBe('blob');
+    expect(normalizeConeViewConfig({ abstractMaterial: 'chrome' }).abstractMaterial).toBe('chrome');
+    expect(normalizeConeViewConfig({ abstractMaterial: 'surface' }).abstractMaterial).toBe('surface');
+    expect(normalizeConeViewConfig({ abstractMaterial: 'wood' }).abstractMaterial).toBe('glass');
+    expect(normalizeConeViewConfig({ abstractView: 'inside' }).abstractView).toBe('inside');
+    expect(normalizeConeViewConfig({ abstractView: 'above' }).abstractView).toBe('outside');
+    expect(normalizeConeViewConfig({ abstractElevation: 120, abstractTumble: 1.6 })).toMatchObject({ abstractElevation: 90, abstractTumble: 2 });
+    expect(normalizeConeViewConfig({ abstractElevation: -120, abstractTumble: -9 })).toMatchObject({ abstractElevation: -90, abstractTumble: -4 });
   });
 
   it('normalizes the Discs settings', () => {
@@ -213,6 +291,13 @@ describe('cone view configuration', () => {
       expect(normalizeConeViewConfig({ crystalForm: form }).crystalForm).toBe(form);
     }
     expect(normalizeConeViewConfig({ crystalDispersionSteps: 0 }).crystalDispersionSteps).toBe(1);
+  });
+
+  it('normalizes the 3D antialiasing and keeps it off for older presets', () => {
+    expect(normalizeConeViewConfig({ depth: 8 }).antialias).toBe('off');
+    expect(normalizeConeViewConfig({ antialias: 'x4' }).antialias).toBe('x4');
+    expect(normalizeConeViewConfig({ antialias: 'x9' }).antialias).toBe('x9');
+    expect(normalizeConeViewConfig({ antialias: 'x16' }).antialias).toBe('off');
   });
 
   it('keeps presets without a shape on the cone and normalizes the torus shape', () => {
