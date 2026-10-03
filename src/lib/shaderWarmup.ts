@@ -49,7 +49,8 @@ export type ShaderWarmupSnapshot = {
 
 /** The WebGL-facing operations warmup needs. Implemented by `shaderWarmupHost.ts`. */
 export type ShaderWarmupHost = {
-  settle(key: LazyProgramKey, priority: LazyCompilePriority): Promise<LazyProgramSettleResult>;
+  /** `noiseVariant` overrides the variant of the current scene, for programs a Preset needs. */
+  settle(key: LazyProgramKey, priority: LazyCompilePriority, noiseVariant?: number): Promise<LazyProgramSettleResult>;
   request(key: LazyProgramKey, priority: LazyCompilePriority): void;
   canWarmInBackground(): boolean;
   /** Pauses background warmup, for example while an export owns the GPU. */
@@ -74,6 +75,20 @@ export const INITIAL_SHADER_WARMUP_SNAPSHOT: ShaderWarmupSnapshot = {
 let snapshot: ShaderWarmupSnapshot = INITIAL_SHADER_WARMUP_SNAPSHOT;
 const listeners = new Set<() => void>();
 let activeHost: ShaderWarmupHost | null = null;
+
+/** A program (and the Noise variant) that a Preset needs, compiled ahead of its first use. */
+export type ShaderWarmupTarget = { key: LazyProgramKey; noiseVariant?: number };
+
+type PresetWarmupContext = { host: ShaderWarmupHost; scheduleIdle: IdleScheduler; signal: AbortSignal };
+
+let presetTargets: readonly ShaderWarmupTarget[] = [];
+const presetWarmed = new Set<string>();
+let presetContext: PresetWarmupContext | null = null;
+let presetLoopActive = false;
+
+function targetId(target: ShaderWarmupTarget): string {
+  return `${target.key}:${target.noiseVariant ?? ''}`;
+}
 
 function publish(next: Partial<ShaderWarmupSnapshot>): void {
   snapshot = { ...snapshot, ...next };
@@ -101,6 +116,10 @@ export function resetShaderWarmupForTests(): void {
   snapshot = INITIAL_SHADER_WARMUP_SNAPSHOT;
   listeners.clear();
   activeHost = null;
+  presetTargets = [];
+  presetWarmed.clear();
+  presetContext = null;
+  presetLoopActive = false;
 }
 
 export const defaultIdleScheduler: IdleScheduler = (callback) => {
@@ -147,6 +166,8 @@ export function startShaderWarmup(
   const controller = new AbortController();
   const { signal } = controller;
   activeHost = host;
+  presetContext = null;
+  presetWarmed.clear();
 
   const run = async () => {
     let critical = host.getRequiredKeys();
@@ -191,6 +212,9 @@ export function startShaderWarmup(
       publish({ backgroundSettled });
     }
     publish({ status: 'done' });
+    // The current scene and the Effect Stack are ready; now prepare what saved Presets need.
+    presetContext = { host, scheduleIdle, signal };
+    void runPresetWarmup(presetContext);
   };
 
   void run().catch((error) => {
@@ -202,7 +226,45 @@ export function startShaderWarmup(
   return () => {
     controller.abort();
     if (activeHost === host) activeHost = null;
+    if (presetContext?.host === host) presetContext = null;
   };
+}
+
+/**
+ * Compiles, one program per idle period at warmup priority, the programs the
+ * Presets need, so applying a Preset for the first time does not wait for a
+ * cold compile. Runs only after the base warmup finished and never ahead of a
+ * user request, which keeps its higher priority.
+ */
+async function runPresetWarmup(context: PresetWarmupContext): Promise<void> {
+  if (presetLoopActive) return;
+  presetLoopActive = true;
+  try {
+    for (;;) {
+      const next = presetTargets.find(target => !presetWarmed.has(targetId(target)));
+      if (!next) return;
+      do {
+        await waitForIdle(context.scheduleIdle, context.signal);
+        if (context.signal.aborted) return;
+      } while (context.host.isBusy());
+      presetWarmed.add(targetId(next));
+      const result = await context.host.settle(next.key, 'warmup', next.noiseVariant);
+      if (context.signal.aborted || result === 'disposed') return;
+    }
+  } catch (error) {
+    if (!context.signal.aborted) console.warn('[WebGL shader] Preset warmup stopped', error);
+  } finally {
+    presetLoopActive = false;
+  }
+}
+
+/**
+ * Registers the programs the Presets need. Compilation starts once the base
+ * warmup is done; programs already compiled in this context are not compiled twice.
+ */
+export function setPresetWarmupTargets(targets: readonly ShaderWarmupTarget[]): void {
+  presetTargets = targets;
+  if (presetContext) void runPresetWarmup(presetContext);
 }
 
 /**

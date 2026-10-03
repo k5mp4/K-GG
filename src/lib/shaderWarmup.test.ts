@@ -3,6 +3,7 @@ import {
   getShaderWarmupSnapshot,
   prefetchEffectStackLayer,
   resetShaderWarmupForTests,
+  setPresetWarmupTargets,
   startShaderWarmup,
   subscribeShaderWarmup,
   type IdleScheduler,
@@ -157,6 +158,51 @@ describe('shader warmup', () => {
     stop();
     prefetchEffectStackLayer('glass');
     expect(requested).toHaveLength(2);
+  });
+
+  it('compiles the programs Presets need after the base warmup, once each, at warmup priority', async () => {
+    const idle = createManualIdle();
+    const settled: Array<Call & { noiseVariant?: number }> = [];
+    const { host } = createHost({
+      settle: async (key, priority, noiseVariant) => {
+        settled.push({ key, priority, noiseVariant });
+        return 'ready' satisfies LazyProgramSettleResult;
+      },
+    });
+    setPresetWarmupTargets([{ key: 'datamosh' }, { key: 'noiseStack', noiseVariant: 3 }]);
+    const stop = startShaderWarmup(host, { plan: ['blur'], scheduleIdle: idle.schedule });
+
+    await idle.flush();
+    const presetCalls = settled.filter(call => call.priority === 'warmup' && call.key !== 'blur');
+    expect(presetCalls).toEqual([
+      { key: 'datamosh', priority: 'warmup', noiseVariant: undefined },
+      { key: 'noiseStack', priority: 'warmup', noiseVariant: 3 },
+    ]);
+    // The base plan finishes before the Preset programs start.
+    expect(settled.findIndex(call => call.key === 'blur')).toBeLessThan(settled.findIndex(call => call.key === 'datamosh'));
+
+    setPresetWarmupTargets([{ key: 'datamosh' }, { key: 'noiseStack', noiseVariant: 3 }, { key: 'texture' }]);
+    await idle.flush();
+    expect(settled.filter(call => call.key === 'datamosh')).toHaveLength(1);
+    expect(settled.filter(call => call.key === 'texture')).toHaveLength(1);
+    stop();
+  });
+
+  it('does not compile Preset programs while an export owns the GPU', async () => {
+    const idle = createManualIdle();
+    let busy = true;
+    const { host, settled } = createHost({ isBusy: () => busy });
+    const stop = startShaderWarmup(host, { plan: [], scheduleIdle: idle.schedule });
+    await idle.flush();
+
+    setPresetWarmupTargets([{ key: 'texture' }]);
+    await idle.flush();
+    expect(settled.some(call => call.key === 'texture')).toBe(false);
+
+    busy = false;
+    await idle.flush();
+    expect(settled.some(call => call.key === 'texture')).toBe(true);
+    stop();
   });
 
   it('notifies subscribers on progress', async () => {

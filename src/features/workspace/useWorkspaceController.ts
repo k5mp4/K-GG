@@ -26,6 +26,8 @@ import { useAppUpdater } from '../updater/useAppUpdater';
 import { useNativeFfmpeg } from '../native/useNativeFfmpeg';
 import { LEFT_TABS, type LeftTab } from './tabs';
 import type { CanvasWorkspaceProps } from './CanvasWorkspace';
+import { refreshPresetLibrary } from '../../lib/presetLibraryCache';
+import { LEFT_PANEL_MAX_WIDTH } from '../../lib/panelLayout';
 import { useWorkspaceLayout } from './useWorkspaceLayout';
 import { WORKSPACE_LAYOUT_POLICY } from './workspaceLayout';
 
@@ -253,7 +255,11 @@ export function useWorkspaceController({ translate }: WorkspaceControllerOptions
     }
   };
 
+  // Preset読込で設定が一括変更されたときは、タイムラインを開かない。
+  const skipTimelineAutoOpenRef = useRef(false);
+
   useEffect(() => {
+    if (skipTimelineAutoOpenRef.current) return;
     if (animation.enabled && (noiseDistortion.enabled || slitScan.animEnabled || stretch.enabled)) {
       const id = setTimeout(() => setShowTimeline(true), 180);
       return () => clearTimeout(id);
@@ -367,7 +373,7 @@ export function useWorkspaceController({ translate }: WorkspaceControllerOptions
       if (!bounds) return;
       const origin = resizeOriginRef.current;
       const { panelMinWidth, previewMinWidth, timelineMinHeight } = WORKSPACE_LAYOUT_POLICY;
-      if (resizingRef.current === 'left') setLeftPanelW(Math.max(panelMinWidth, Math.min(520, bounds.width - previewMinWidth - (rightPanelOpen ? layout.rightWidth : 0), origin.width + event.clientX - origin.x)));
+      if (resizingRef.current === 'left') setLeftPanelW(Math.max(panelMinWidth, Math.min(LEFT_PANEL_MAX_WIDTH, bounds.width - previewMinWidth - (rightPanelOpen ? layout.rightWidth : 0), origin.width + event.clientX - origin.x)));
       if (resizingRef.current === 'right') setRightPanelW(Math.max(panelMinWidth, Math.min(600, bounds.width - previewMinWidth - (leftPanelOpen ? layout.leftWidth : 0), origin.width + origin.x - event.clientX)));
       if (timelineResizingRef.current) setTimelineHeight(Math.max(timelineMinHeight, Math.min(layout.timelineMaxHeight, bounds.bottom - event.clientY)));
     };
@@ -519,8 +525,15 @@ export function useWorkspaceController({ translate }: WorkspaceControllerOptions
     const library = await adapters.presetRepository.loadPresetLibrary();
     return library.presets.find(preset => preset.id === presetId) ?? null;
   };
-  kggProjectAdapter.savePreset = (name, state, folderId, thumbnail) => adapters.presetRepository.savePreset(name, state as PresetStoreSnapshot, folderId, thumbnail);
-  kggProjectAdapter.deletePreset = presetId => adapters.presetRepository.deletePreset(presetId);
+  kggProjectAdapter.savePreset = async (name, state, folderId, thumbnail) => {
+    const saved = await adapters.presetRepository.savePreset(name, state as PresetStoreSnapshot, folderId, thumbnail);
+    void refreshPresetLibrary();
+    return saved;
+  };
+  kggProjectAdapter.deletePreset = async presetId => {
+    await adapters.presetRepository.deletePreset(presetId);
+    void refreshPresetLibrary();
+  };
   kggProjectAdapter.exportPresetPackage = scope => {
     if (scope.kind === 'library') return adapters.presetRepository.exportPresetPackage({ kind: 'library' });
     if (!scope.id) throw new Error('An id is required for this export scope');
@@ -551,6 +564,9 @@ export function useWorkspaceController({ translate }: WorkspaceControllerOptions
     }
   };
   const handlePresetLoad = () => {
+    // 読込で変わった設定による自動オープンだけを止め、次の操作では通常どおり開く。
+    skipTimelineAutoOpenRef.current = true;
+    setTimeout(() => { skipTimelineAutoOpenRef.current = false; }, 0);
     setClothReady(false);
     setClothUnavailable(false);
     setRenderViewMode('canvas');

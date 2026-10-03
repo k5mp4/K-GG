@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState, type ChangeEvent, type DragEvent, type MutableRefObject } from 'react';
+import { memo, useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore, type ChangeEvent, type DragEvent, type MutableRefObject } from 'react';
 import { createEmptyManualDistortMap, createEmptyManualSmoothMask, normalizeNoiseDistortionConfig, normalizePostprocessConfig, STORE_DEFAULTS, useGradientStore } from '../store/gradientStore';
 import { createDefaultEffectPipeline, normalizeEffectPipelineConfig } from '../lib/effectPipeline';
 import { normalizeClothGradientConfig } from '../types/clothGradient';
@@ -19,7 +19,6 @@ import {
   deletePreset,
   exportPresetPackage,
   importPresetPackage,
-  loadPresetLibrary,
   movePreset,
   renameFolder,
   savePreset,
@@ -29,13 +28,15 @@ import {
   type PresetLibrary,
 } from '../lib/presets';
 import { loadUserColorPalettes, mergeUserColorPalettes } from '../lib/colorPalettes';
-import { getChildFolders, getFolderPreviewPresets, getPresetsInFolder, normalizePresetLibrary } from '../lib/presetLibrary';
+import { getChildFolders, getFolderPath, getFolderPreviewPresets, getPresetsInFolder } from '../lib/presetLibrary';
+import { builtinPresetLibrary, ensurePresetLibraryLoaded, getPresetLibrarySnapshot, isBuiltinPresetId, refreshPresetLibrary, subscribePresetLibrary } from '../lib/presetLibraryCache';
 import { PresetPreview } from './PresetPreview';
 import { capturePresetThumbnail } from '../lib/presetThumbnail';
-import defaultPresets from '../assets/gradPreset_kg_defaultPresets.json';
 import { useLanguage } from '../i18n/LanguageProvider';
 import { IconButton } from './IconButton';
 import { applicationCommands } from '../application/commands';
+import { SidebarSection } from './SidebarSection';
+import { InputRadio } from 'tweeq';
 
 type PresetPanelProps = {
   canvasW: number;
@@ -47,6 +48,9 @@ type PresetPanelProps = {
 };
 
 type ViewMode = 'grid' | 'list';
+
+const EXPORT_SCOPES = ['preset', 'folder', 'library'] as const;
+type ExportScope = (typeof EXPORT_SCOPES)[number];
 
 type FolderTreeProps = {
   folders: PresetFolder[];
@@ -147,89 +151,141 @@ function FolderTree({ folders, selectedFolderId, onSelect, onDropPreset }: Folde
   );
 }
 
-function PresetCard({
-  preset,
-  folders,
-  isBuiltin,
-  isActive,
-  viewMode,
-  onLoad,
-  onDelete,
-  onMove,
-}: {
+const GRID_GAP_PX = 6;
+const MAX_GRID_COLUMNS = 4;
+
+/** カードの最小幅を保ちつつ、サイドバーの幅に応じて最大4列まで並べる。 */
+function responsiveColumns(minWidthPx: number) {
+  const capWidth = `calc((100% - ${(MAX_GRID_COLUMNS - 1) * GRID_GAP_PX}px) / ${MAX_GRID_COLUMNS})`;
+  return { gridTemplateColumns: `repeat(auto-fill, minmax(max(${minWidthPx}px, ${capWidth}), 1fr))` } as const;
+}
+
+const PRESET_GRID_STYLE = responsiveColumns(100);
+const FOLDER_GRID_STYLE = responsiveColumns(120);
+
+type PresetCardProps = {
   preset: Preset;
-  folders: PresetFolder[];
+  folderOptions: FolderOption[];
   isBuiltin: boolean;
   isActive: boolean;
   viewMode: ViewMode;
-  onLoad: () => void;
-  onDelete: () => void;
-  onMove: (folderId: string | null) => void;
-}) {
+  onLoad: (preset: Preset) => void;
+  onDelete: (id: string) => void;
+  onMove: (id: string, folderId: string | null) => void;
+};
+
+const PresetCard = memo(function PresetCard({ preset, folderOptions, isBuiltin, isActive, viewMode, onLoad, onDelete, onMove }: PresetCardProps) {
   const { t } = useLanguage();
-  const folderOptions = useMemo(() => flattenFolderOptions(folders), [folders]);
+  const title = isBuiltin ? `${preset.name} · ${t('preset.builtIn')}` : preset.name;
+  const dragProps = {
+    draggable: !isBuiltin,
+    onDragStart: (event: DragEvent<HTMLElement>) => {
+      if (isBuiltin) return;
+      event.dataTransfer.setData(PRESET_DRAG_TYPE, preset.id);
+      event.dataTransfer.effectAllowed = 'move';
+    },
+  };
+  const moveSelect = !isBuiltin && (
+    <select
+      aria-label={t('preset.destination', { name: preset.name })}
+      value={preset.folderId ?? ''}
+      onChange={event => onMove(preset.id, event.target.value || null)}
+      className="max-w-[78px] bg-k-bg/90 px-1 py-0.5 text-[9px] text-tab-inactive outline-none"
+    >
+      <option value="">{t('preset.root')}</option>
+      {folderOptions.map(option => <option key={option.id} value={option.id}>{option.label}</option>)}
+    </select>
+  );
+
   if (viewMode === 'list') {
     return (
       <article
-        draggable={!isBuiltin}
-        onDragStart={event => { if (!isBuiltin) { event.dataTransfer.setData(PRESET_DRAG_TYPE, preset.id); event.dataTransfer.effectAllowed = 'move'; } }}
-        className={`flex min-w-0 items-center gap-2 border border-cream/10 bg-k-surface/65 p-1.5 transition-colors ${isActive ? 'border-fire/70 bg-fire/10' : 'hover:border-cream/25'} ${!isBuiltin ? 'cursor-grab active:cursor-grabbing' : ''}`}
+        {...dragProps}
+        className={`flex min-w-0 items-center gap-1 border bg-k-surface/65 p-1.5 transition-colors ${isActive ? 'border-fire/70 bg-fire/10' : 'border-cream/10 hover:border-cream/25'} ${!isBuiltin ? 'cursor-grab active:cursor-grabbing' : ''}`}
       >
-        <div className="h-11 w-16 shrink-0 overflow-hidden border border-cream/15 bg-deep/40">
-          <PresetPreview preset={preset} />
-        </div>
-        <div className="min-w-0 flex-1">
-          <p className="truncate text-[11px] font-semibold text-k-text" title={preset.name}>{preset.name}</p>
-          <p className="text-[9px] uppercase tracking-wider text-tab-inactive">{isBuiltin ? t('preset.builtIn') : t('preset.saved')}</p>
-        </div>
-        {!isBuiltin && (
-          <select
-            aria-label={t('preset.destination', { name: preset.name })}
-            value={preset.folderId ?? ''}
-            onChange={event => onMove(event.target.value || null)}
-            className="max-w-[78px] bg-k-bg px-1 py-1 text-[9px] text-tab-inactive outline-none"
-          >
-            <option value="">{t('preset.root')}</option>
-            {folderOptions.map(option => <option key={option.id} value={option.id}>{option.label}</option>)}
-          </select>
-        )}
-        <button type="button" onClick={onLoad} className="shrink-0 px-1.5 py-1 text-[10px] font-bold text-fire hover:text-cream">{t('common.load')}</button>
-        {!isBuiltin && <IconButton icon="delete" onClick={onDelete} className="shrink-0 px-1 text-red-400 hover:text-red-300" label={t('preset.deleteNamed', { name: preset.name })} />}
+        <button type="button" onClick={() => onLoad(preset)} title={title} aria-current={isActive || undefined} className="flex min-w-0 flex-1 items-center gap-2 text-left">
+          <span className="block h-11 w-16 shrink-0 overflow-hidden border border-cream/15 bg-deep/40">
+            <PresetPreview preset={preset} />
+          </span>
+          <span className="min-w-0 flex-1 truncate text-[11px] font-semibold text-k-text">{preset.name}</span>
+        </button>
+        {moveSelect}
+        {!isBuiltin && <IconButton icon="delete" onClick={() => onDelete(preset.id)} className="shrink-0 px-1 text-red-400 hover:text-red-300" label={t('preset.deleteNamed', { name: preset.name })} />}
       </article>
     );
   }
 
   return (
     <article
-      draggable={!isBuiltin}
-      onDragStart={event => { if (!isBuiltin) { event.dataTransfer.setData(PRESET_DRAG_TYPE, preset.id); event.dataTransfer.effectAllowed = 'move'; } }}
-      className={`group min-w-0 overflow-hidden border bg-k-surface/70 transition-all ${isActive ? 'border-fire/80 bg-fire/10 shadow-[0_0_0_1px_rgba(213,73,43,0.25)]' : 'border-cream/10 hover:-translate-y-0.5 hover:border-cream/30'} ${!isBuiltin ? 'cursor-grab active:cursor-grabbing' : ''}`}
+      {...dragProps}
+      className={`group relative min-w-0 overflow-hidden border bg-k-surface/70 transition-all ${isActive ? 'border-fire/80 shadow-[0_0_0_1px_rgba(213,73,43,0.25)]' : 'border-cream/10 hover:-translate-y-0.5 hover:border-cream/30'} ${!isBuiltin ? 'cursor-grab active:cursor-grabbing' : ''}`}
     >
-      <button type="button" onClick={onLoad} className="block w-full text-left">
-        <div className="aspect-[16/10] overflow-hidden border-b border-cream/10 bg-deep/40">
-          <PresetPreview preset={preset} />
-        </div>
-        <div className="px-2 pt-1.5">
-          <p className="truncate text-[11px] font-semibold text-k-text" title={preset.name}>{preset.name}</p>
-          <p className="text-[9px] uppercase tracking-[0.16em] text-tab-inactive">{isBuiltin ? t('preset.builtIn') : t('preset.saved')}</p>
-        </div>
+      <button type="button" onClick={() => onLoad(preset)} title={title} aria-current={isActive || undefined} className="relative block aspect-[16/10] w-full overflow-hidden bg-deep/40 text-left">
+        <PresetPreview preset={preset} />
+        <span className="pointer-events-none absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/80 via-black/45 to-transparent px-1.5 pb-1 pt-4">
+          <span className={`block truncate text-[10px] font-semibold leading-tight drop-shadow ${isActive ? 'text-cream' : 'text-white'}`}>{preset.name}</span>
+        </span>
       </button>
-      <div className="flex items-center gap-1 px-2 pb-1.5 pt-1">
-        {!isBuiltin && (
-          <select
-            aria-label={t('preset.destination', { name: preset.name })}
-            value={preset.folderId ?? ''}
-            onChange={event => onMove(event.target.value || null)}
-            className="min-w-0 flex-1 bg-k-bg px-1 py-1 text-[9px] text-tab-inactive outline-none"
-          >
-            <option value="">{t('preset.root')}</option>
-            {folderOptions.map(option => <option key={option.id} value={option.id}>{option.label}</option>)}
-          </select>
-        )}
-        <button type="button" onClick={onLoad} className="shrink-0 px-1.5 py-1 text-[10px] font-bold text-fire hover:text-cream">{t('common.load')}</button>
-        {!isBuiltin && <IconButton icon="delete" onClick={onDelete} className="shrink-0 px-1 text-red-400 hover:text-red-300" label={t('preset.deleteNamed', { name: preset.name })} />}
-      </div>
+      {!isBuiltin && (
+        <div className="absolute right-1 top-1 flex items-center gap-0.5 opacity-0 transition-opacity focus-within:opacity-100 group-hover:opacity-100 [@media(hover:none)]:opacity-100">
+          {moveSelect}
+          <IconButton icon="delete" onClick={() => onDelete(preset.id)} className="shrink-0 bg-k-bg/90 px-1 text-red-400 hover:text-red-300" label={t('preset.deleteNamed', { name: preset.name })} />
+        </div>
+      )}
     </article>
+  );
+});
+
+type BreadcrumbProps = {
+  path: PresetFolder[];
+  onSelect: (folderId: string | null) => void;
+  onDropPreset: (presetId: string, folderId: string | null) => void;
+};
+
+/** Folder path from the root. Each ancestor navigates back and accepts a dropped Preset. */
+function FolderBreadcrumb({ path, onSelect, onDropPreset }: BreadcrumbProps) {
+  const { t } = useLanguage();
+  const [dragOverId, setDragOverId] = useState<string | null | undefined>(undefined);
+  const crumbs: Array<{ id: string | null; label: string }> = [
+    { id: null, label: t('preset.root') },
+    ...path.map(folder => ({ id: folder.id, label: folder.name })),
+  ];
+
+  return (
+    <nav aria-label={t('preset.breadcrumb')} className="shrink-0">
+      <ol className="flex min-w-0 flex-wrap items-center gap-x-0.5 gap-y-0.5 text-[10px]">
+        {crumbs.map((crumb, index) => {
+          const isCurrent = index === crumbs.length - 1;
+          return (
+            <li key={crumb.id ?? 'root'} className="flex min-w-0 items-center gap-0.5">
+              {index > 0 && <span aria-hidden="true" className="text-tab-inactive/60">›</span>}
+              <button
+                type="button"
+                title={crumb.label}
+                aria-current={isCurrent ? 'page' : undefined}
+                onClick={() => onSelect(crumb.id)}
+                onDragOver={event => {
+                  if (!event.dataTransfer.types.includes(PRESET_DRAG_TYPE)) return;
+                  event.preventDefault();
+                  event.dataTransfer.dropEffect = 'move';
+                  setDragOverId(crumb.id);
+                }}
+                onDragLeave={() => setDragOverId(undefined)}
+                onDrop={event => {
+                  event.preventDefault();
+                  const presetId = getDraggedPresetId(event);
+                  setDragOverId(undefined);
+                  if (presetId) onDropPreset(presetId, crumb.id);
+                }}
+                className={`max-w-[9rem] truncate px-1.5 py-1 transition-colors ${dragOverId === crumb.id ? 'bg-fire/30 text-cream ring-1 ring-fire' : isCurrent ? 'font-semibold text-cream' : 'text-tab-inactive hover:bg-k-surface hover:text-k-text'}`}
+              >
+                {crumb.label}
+              </button>
+            </li>
+          );
+        })}
+      </ol>
+    </nav>
   );
 }
 
@@ -268,35 +324,40 @@ function FolderCard({ folder, library, onOpen, onDropPreset }: { folder: PresetF
 
 export function PresetPanel({ canvasW, canvasH, setCanvasW, setCanvasH, aspectRatioRef, onPresetLoad }: PresetPanelProps) {
   const { t } = useLanguage();
-  const store = useGradientStore();
-  const [library, setLibrary] = useState<PresetLibrary>({ format: 'kgg-preset-library', version: 2, folders: [], presets: [] });
+  // 全体を購読すると、パラメータ操作のたびに全Cardが再描画されるため必要な値だけ購読する。
+  const presetName = useGradientStore(state => state.presetName);
+  const { library, status } = useSyncExternalStore(subscribePresetLibrary, getPresetLibrarySnapshot);
   const [name, setName] = useState('');
   const [folderName, setFolderName] = useState('');
   const [selectedFolderId, setSelectedFolderId] = useState<string | null>(null);
   const [selectedPresetId, setSelectedPresetId] = useState<string | null>(null);
   const [viewMode, setViewMode] = useState<ViewMode>(getViewMode);
-  const [exportScope, setExportScope] = useState<'preset' | 'folder' | 'library'>('preset');
+  const [exportScope, setExportScope] = useState<ExportScope>('preset');
+  const [exportOpen, setExportOpen] = useState(false);
+  const [folderOpen, setFolderOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const importRef = useRef<HTMLInputElement>(null);
-  const builtinLibrary = useMemo(() => normalizePresetLibrary(defaultPresets), []);
 
+  // 保存先の読み込みは起動時に済んでいる。ここでは変更後の更新だけを行う。
   async function refresh() {
-    try {
-      setLibrary(await loadPresetLibrary());
-      setError(null);
-    } catch {
-      setError(t('preset.loadFailed'));
-    }
+    await refreshPresetLibrary();
+    setError(null);
   }
 
-  useEffect(() => { void refresh(); }, []);
+  useEffect(() => { void ensurePresetLibraryLoaded(); }, []);
 
   const currentFolder = library.folders.find(folder => folder.id === selectedFolderId) ?? null;
-  const childFolders = getChildFolders(library, selectedFolderId);
-  const userPresets = getPresetsInFolder(library, selectedFolderId);
-  const visiblePresets = selectedFolderId === null ? [...builtinLibrary.presets, ...userPresets] : userPresets;
+  const childFolders = useMemo(() => getChildFolders(library, selectedFolderId), [library, selectedFolderId]);
+  const folderPath = useMemo(() => getFolderPath(library, selectedFolderId), [library, selectedFolderId]);
+  const userPresets = useMemo(() => getPresetsInFolder(library, selectedFolderId), [library, selectedFolderId]);
+  const visiblePresets = useMemo(
+    () => selectedFolderId === null ? [...builtinPresetLibrary.presets, ...userPresets] : userPresets,
+    [selectedFolderId, userPresets],
+  );
+  const folderOptions = useMemo(() => flattenFolderOptions(library.folders), [library.folders]);
   const allUserPresets = library.presets;
+  const displayedError = error ?? (status === 'error' ? t('preset.loadFailed') : null);
 
   function setDisplayMode(nextMode: ViewMode) {
     setViewMode(nextMode);
@@ -382,7 +443,7 @@ export function PresetPanel({ canvasW, canvasH, setCanvasW, setCanvasH, aspectRa
   async function handleSave() {
     const trimmed = name.trim();
     if (!trimmed) return;
-    const { gradient, noiseDistortion, diffuse, imageGradient, slitScan, stretch, animation, normalMap, clothGradient, coneView, seamless, texture, shapes, flowGradient, datamosh, manualDistort, postprocess, effectPipeline, keyframeTracks } = store;
+    const { gradient, noiseDistortion, diffuse, imageGradient, slitScan, stretch, animation, normalMap, clothGradient, coneView, seamless, texture, shapes, flowGradient, datamosh, manualDistort, postprocess, effectPipeline, keyframeTracks } = useGradientStore.getState();
     const state = createPresetSaveState({
       gradient, noiseDistortion, diffuse, imageGradient, slitScan, stretch,
       animation, normalMap, clothGradient, coneView, seamless, texture, shapes, flowGradient, datamosh,
@@ -443,6 +504,13 @@ export function PresetPanel({ canvasW, canvasH, setCanvasW, setCanvasH, aspectRa
     catch (deleteError) { setError(deleteError instanceof Error ? deleteError.message : t('preset.deleteFailed')); }
   }
 
+  // PresetCardをmemo化するため、最新のハンドラーをrefで参照する安定した関数を渡す。
+  const handlersRef = useRef({ load: handleLoad, remove: handleDeletePreset, move: handleMovePreset });
+  handlersRef.current = { load: handleLoad, remove: handleDeletePreset, move: handleMovePreset };
+  const loadPresetStable = useCallback((preset: Preset) => handlersRef.current.load(preset), []);
+  const deletePresetStable = useCallback((id: string) => { void handlersRef.current.remove(id); }, []);
+  const movePresetStable = useCallback((id: string, folderId: string | null) => { void handlersRef.current.move(id, folderId); }, []);
+
   async function handleExport() {
     const scope: PresetExportScope = exportScope === 'library'
       ? { kind: 'library' }
@@ -477,52 +545,63 @@ export function PresetPanel({ canvasW, canvasH, setCanvasW, setCanvasH, aspectRa
         </div>
       </div>
 
-      <section className="shrink-0 border border-cream/10 bg-k-surface/45 p-1.5">
-          <p className="mb-1 px-1 text-[9px] font-bold tracking-[0.18em] text-tab-inactive">{t('preset.folderTree')}</p>
-          <div className="max-h-36 overflow-y-auto pr-0.5 scrollbar-thin"><FolderTree folders={library.folders} selectedFolderId={selectedFolderId} onSelect={setSelectedFolderId} onDropPreset={(presetId, folderId) => void handleMovePreset(presetId, folderId)} /></div>
-          <div className="mt-2 border-t border-cream/10 pt-2">
-            <div className="flex gap-1">
-              <input value={folderName} onChange={event => setFolderName(event.target.value)} onKeyDown={event => { if (event.key === 'Enter') void handleCreateFolder(); }} placeholder={t('preset.newFolder')} className="min-w-0 flex-1 bg-k-bg px-1.5 py-1 text-[10px] text-k-text outline-none ring-1 ring-cream/10 focus:ring-fire/60" />
-              <button type="button" onClick={() => void handleCreateFolder()} className="bg-fire/80 px-2 text-[13px] font-bold text-cream hover:bg-fire" aria-label={t('preset.createFolder')}>＋</button>
-            </div>
-            {currentFolder && <div className="mt-1 flex gap-1"><button type="button" onClick={() => void handleRenameFolder()} className="flex-1 px-1 py-1 text-[9px] text-tab-inactive hover:bg-k-surface hover:text-k-text">{t('preset.renameFolder')}</button><button type="button" onClick={() => void handleDeleteFolder()} className="flex-1 px-1 py-1 text-[9px] text-red-400 hover:bg-red-400/10">{t('common.delete')}</button></div>}
-          </div>
-      </section>
+        <div className="shrink-0 border-b border-cream/10 pb-1">
+          <FolderBreadcrumb path={folderPath} onSelect={setSelectedFolderId} onDropPreset={handleMovePreset} />
+        </div>
 
         <main className="min-h-0 flex-1 space-y-2 overflow-y-auto pr-0.5 scrollbar-thin">
-          <div className="flex min-w-0 items-center gap-2 border-b border-cream/10 pb-1">
-            <span className="min-w-0 flex-1 truncate text-[10px] font-semibold uppercase tracking-[0.16em] text-cream">{selectedFolderLabel}</span>
-            <span className="text-[9px] text-tab-inactive">{t('preset.folderCount', { count: childFolders.length })}</span>
-          </div>
-
-          {childFolders.length > 0 && <div className="grid grid-cols-2 gap-1.5">{childFolders.map(folder => <FolderCard key={folder.id} folder={folder} library={library} onOpen={() => setSelectedFolderId(folder.id)} onDropPreset={handleMovePreset} />)}</div>}
+          {childFolders.length > 0 && <div className="grid gap-1.5" style={FOLDER_GRID_STYLE}>{childFolders.map(folder => <FolderCard key={folder.id} folder={folder} library={library} onOpen={() => setSelectedFolderId(folder.id)} onDropPreset={handleMovePreset} />)}</div>}
 
           {visiblePresets.length === 0 ? (
             <div className="border border-dashed border-cream/15 px-3 py-6 text-center text-[10px] italic text-tab-inactive">{t('preset.empty')}</div>
           ) : (
-            <div className={viewMode === 'grid' ? 'grid grid-cols-2 gap-1.5' : 'space-y-1'}>
-              {visiblePresets.map(preset => <PresetCard key={preset.id} preset={preset} folders={library.folders} isBuiltin={builtinLibrary.presets.some(candidate => candidate.id === preset.id)} isActive={store.presetName === preset.name} viewMode={viewMode} onLoad={() => handleLoad(preset)} onDelete={() => void handleDeletePreset(preset.id)} onMove={folderId => void handleMovePreset(preset.id, folderId)} />)}
+            <div className={viewMode === 'grid' ? 'grid gap-1.5' : 'space-y-1'} style={viewMode === 'grid' ? PRESET_GRID_STYLE : undefined}>
+              {visiblePresets.map(preset => <PresetCard key={preset.id} preset={preset} folderOptions={folderOptions} isBuiltin={isBuiltinPresetId(preset.id)} isActive={presetName === preset.name} viewMode={viewMode} onLoad={loadPresetStable} onDelete={deletePresetStable} onMove={movePresetStable} />)}
             </div>
           )}
         </main>
 
-      <div className="shrink-0 space-y-2 border-t border-cream/15 bg-k-bg/95 pt-2 backdrop-blur">
+      {displayedError && <p role="alert" className="shrink-0 border border-red-400/30 bg-red-400/10 px-2 py-1.5 text-[10px] text-red-300">{displayedError}</p>}
+
+      <div className="max-h-[60%] shrink-0 space-y-2 overflow-y-auto bg-k-bg/95 backdrop-blur scrollbar-thin">
+        <SidebarSection id="preset-folders" title={t('preset.folderTree')} open={folderOpen} onToggle={() => setFolderOpen(value => !value)}>
+          <div className="border border-cream/10 bg-k-surface/45 p-1.5">
+            <div className="max-h-36 overflow-y-auto pr-0.5 scrollbar-thin"><FolderTree folders={library.folders} selectedFolderId={selectedFolderId} onSelect={setSelectedFolderId} onDropPreset={(presetId, folderId) => void handleMovePreset(presetId, folderId)} /></div>
+            <div className="mt-2 border-t border-cream/10 pt-2">
+              <div className="flex gap-1">
+                <input value={folderName} onChange={event => setFolderName(event.target.value)} onKeyDown={event => { if (event.key === 'Enter') void handleCreateFolder(); }} placeholder={t('preset.newFolder')} className="min-w-0 flex-1 bg-k-bg px-1.5 py-1 text-[10px] text-k-text outline-none ring-1 ring-cream/10 focus:ring-fire/60" />
+                <button type="button" onClick={() => void handleCreateFolder()} className="bg-fire/80 px-2 text-[13px] font-bold text-cream hover:bg-fire" aria-label={t('preset.createFolder')}>＋</button>
+              </div>
+              {currentFolder && <div className="mt-1 flex gap-1"><button type="button" onClick={() => void handleRenameFolder()} className="flex-1 px-1 py-1 text-[9px] text-tab-inactive hover:bg-k-surface hover:text-k-text">{t('preset.renameFolder')}</button><button type="button" onClick={() => void handleDeleteFolder()} className="flex-1 px-1 py-1 text-[9px] text-red-400 hover:bg-red-400/10">{t('common.delete')}</button></div>}
+            </div>
+          </div>
+        </SidebarSection>
+
         <div className="flex gap-1.5">
           <input type="text" value={name} onChange={event => setName(event.target.value)} onKeyDown={event => { if (event.key === 'Enter') void handleSave(); }} placeholder={t('preset.saveTo', { name: selectedFolderLabel })} className="min-w-0 flex-1 bg-k-surface px-2 py-1.5 text-[10px] text-k-text outline-none ring-1 ring-cream/15 focus:ring-fire/70" />
-          <button type="button" onClick={() => void handleSave()} disabled={!name.trim() || saving} className="bg-fire px-2.5 py-1 text-[10px] font-bold text-cream transition-opacity disabled:opacity-40">{saving ? t('common.saving') : t('common.save')}</button>
+          <button type="button" onClick={() => void handleSave()} disabled={!name.trim() || saving} className="shrink-0 bg-fire px-2.5 py-1 text-[10px] font-bold text-cream transition-opacity disabled:opacity-40">{saving ? t('common.saving') : t('common.save')}</button>
+          <IconButton icon="upload" label={t('preset.importTo', { name: selectedFolderLabel })} onClick={() => importRef.current?.click()} className="shrink-0 border-cream/15 bg-k-surface/70 px-2 hover:border-fire/50" />
+          <input ref={importRef} type="file" accept=".json,.zip,.kggpresets" className="hidden" onChange={handleImport} />
         </div>
-        <div className="grid grid-cols-[minmax(0,1fr)_auto] gap-1.5">
-          <select value={exportScope} onChange={event => setExportScope(event.target.value as typeof exportScope)} className="min-w-0 bg-k-surface px-2 py-1.5 text-[10px] text-k-text outline-none">
-            <option value="preset">{t('preset.exportSelected')}</option>
-            <option value="folder">{t('preset.exportFolder')}</option>
-            <option value="library">{t('preset.exportLibrary')}</option>
-          </select>
-          <button type="button" onClick={() => void handleExport()} className="bg-k-muted px-2 py-1.5 text-[10px] text-k-text hover:bg-k-muted/70">{t('common.export')}</button>
-        </div>
-        {exportScope === 'preset' && <select value={selectedPresetId ?? ''} onChange={event => setSelectedPresetId(event.target.value || null)} className="w-full bg-k-surface px-2 py-1.5 text-[10px] text-k-text outline-none"><option value="">{t('preset.select')}</option>{allUserPresets.map(preset => <option key={preset.id} value={preset.id}>{preset.name}</option>)}</select>}
-        <button type="button" onClick={() => importRef.current?.click()} className="w-full border border-cream/15 bg-k-surface/70 py-1.5 text-[10px] text-tab-inactive hover:border-fire/50 hover:text-k-text">{t('preset.importTo', { name: selectedFolderLabel })}</button>
-        <input ref={importRef} type="file" accept=".json,.zip,.kggpresets" className="hidden" onChange={handleImport} />
-        {error && <p role="alert" className="border border-red-400/30 bg-red-400/10 px-2 py-1.5 text-[10px] text-red-300">{error}</p>}
+
+        <SidebarSection id="preset-export" title={t('preset.exportSection')} open={exportOpen} onToggle={() => setExportOpen(value => !value)} nested>
+          <div className="space-y-2">
+            <div className="space-y-1">
+              <p className="text-[10px] text-deep">{t('preset.exportScope')}</p>
+              <InputRadio
+                value={exportScope}
+                options={EXPORT_SCOPES}
+                labels={[t('preset.scopePreset'), t('preset.scopeFolder'), t('preset.scopeLibrary')]}
+                onChange={scope => scope !== undefined && setExportScope(scope)}
+                aria-label={t('preset.exportScope')}
+                className="w-full"
+              />
+            </div>
+            {exportScope === 'preset' && <select aria-label={t('preset.select')} value={selectedPresetId ?? ''} onChange={event => setSelectedPresetId(event.target.value || null)} className="w-full bg-k-surface px-2 py-1.5 text-[10px] text-k-text outline-none"><option value="">{t('preset.select')}</option>{allUserPresets.map(preset => <option key={preset.id} value={preset.id}>{preset.name}</option>)}</select>}
+            {exportScope === 'folder' && <p className="truncate text-[10px] text-tab-inactive">{t(currentFolder ? 'preset.exportFolderTarget' : 'preset.exportRootTarget', { name: selectedFolderLabel })}</p>}
+            <button type="button" onClick={() => void handleExport()} className="w-full bg-k-muted px-2 py-1.5 text-[10px] text-k-text hover:bg-k-muted/70">{t('common.export')}</button>
+          </div>
+        </SidebarSection>
       </div>
     </div>
   );

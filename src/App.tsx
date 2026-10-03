@@ -26,11 +26,19 @@ import { TimelineWorkspace } from './features/workspace/TimelineWorkspace';
 import { CanvasWorkspace } from './features/workspace/CanvasWorkspace';
 import { useWorkspaceController } from './features/workspace/useWorkspaceController';
 import { disposePresetThumbnailRenderer } from './lib/presetThumbnail';
+import { ensurePresetLibraryLoaded } from './lib/presetLibraryCache';
+import { startPresetShaderWarmupSync } from './lib/presetShaderWarmup';
 
 export default function App() {
   useEffect(() => () => {
     void disposePresetThumbnailRenderer();
   }, []);
+
+  // Preset一覧は起動時に一括で読み込み、Thumbnailもデコードしておく。
+  useEffect(() => { void ensurePresetLibraryLoaded(); }, []);
+
+  // 全Presetが使うShaderを、起動後のアイドル時間に先にコンパイルしておく。
+  useEffect(() => startPresetShaderWarmupSync(), []);
 
   const { t } = useLanguage();
   const {

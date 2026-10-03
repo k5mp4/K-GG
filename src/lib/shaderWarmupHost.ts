@@ -26,7 +26,7 @@ export function createPreviewShaderWarmupHost(
     return latest ? getSceneNoiseProgramVariants(latest)[key] : undefined;
   };
   return {
-    settle: (key, priority) => settleLazyProgram(ctx, key, priority, noiseVariantFor(key)),
+    settle: (key, priority, noiseVariant) => settleLazyProgram(ctx, key, priority, noiseVariant ?? noiseVariantFor(key)),
     request: (key, priority) => {
       requestLazyProgramCompile(ctx, key, priority, noiseVariantFor(key));
     },

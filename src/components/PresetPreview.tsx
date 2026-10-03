@@ -1,4 +1,4 @@
-import { useLayoutEffect, useRef } from 'react';
+import { memo, useLayoutEffect, useRef } from 'react';
 import type { Preset } from '../lib/presetModel';
 import { renderFallbackPreview } from '../lib/presetPreview';
 
@@ -7,7 +7,7 @@ type PresetPreviewProps = {
   className?: string;
 };
 
-export function PresetPreview({ preset, className = '' }: PresetPreviewProps) {
+export const PresetPreview = memo(function PresetPreview({ preset, className = '' }: PresetPreviewProps) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const width = preset.state.resolution?.width ?? 800;
   const height = preset.state.resolution?.height ?? 800;
@@ -19,7 +19,7 @@ export function PresetPreview({ preset, className = '' }: PresetPreviewProps) {
   }, [height, preset.state.gradient, preset.thumbnail, width]);
 
   if (preset.thumbnail) {
-    return <img src={preset.thumbnail} alt="" aria-hidden="true" loading="lazy" className={`block h-full w-full object-cover ${className}`} />;
+    return <img src={preset.thumbnail} alt="" aria-hidden="true" decoding="async" draggable={false} className={`block h-full w-full object-cover ${className}`} />;
   }
 
   return (
@@ -30,4 +30,4 @@ export function PresetPreview({ preset, className = '' }: PresetPreviewProps) {
       style={{ background: 'repeating-conic-gradient(#353a39 0% 25%, #202523 0% 50%) 50% / 12px 12px' }}
     />
   );
-}
+});
