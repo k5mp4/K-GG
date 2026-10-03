@@ -10,6 +10,10 @@ const MAX_ZOOM = 5;
 const MULTI_TAP_MS = 280;
 const MULTI_TAP_MOVE_PX = 14;
 
+function isViewportUiTarget(target: EventTarget | null): boolean {
+  return target instanceof Element && Boolean(target.closest('[data-viewport-ui]'));
+}
+
 export function useViewportControl() {
   const [zoom, setZoom] = useState(1);
   const [pan, setPan] = useState<Pan>({ x: 0, y: 0 });
@@ -178,6 +182,7 @@ export function useViewportControl() {
 
     const onWheel = (e: WheelEvent) => {
       if (!isViewportControlEnabledRef.current) return;
+      if (isViewportUiTarget(e.target)) return;
       e.preventDefault();
       const factor = e.deltaY < 0 ? 1.1 : 0.9;
       const rect = el.getBoundingClientRect();
@@ -193,6 +198,7 @@ export function useViewportControl() {
     const handleTouchPointerDown = (e: PointerEvent) => {
       // ペンは除外（板タブ対応）
       if (e.pointerType !== 'touch') return;
+      if (isViewportUiTarget(e.target)) return;
       e.preventDefault();
       activeTouchPointersRef.current.set(e.pointerId, { x: e.clientX, y: e.clientY });
       if (!touchGestureRef.current || activeTouchPointersRef.current.size === 1) {
@@ -248,6 +254,7 @@ export function useViewportControl() {
 
     const handleTouchPointerUp = (e: PointerEvent) => {
       if (e.pointerType !== 'touch') return;
+      if (!activeTouchPointersRef.current.has(e.pointerId)) return;
       e.preventDefault();
       const gesture = touchGestureRef.current;
       const endedPointerCount = activeTouchPointersRef.current.size;
@@ -308,6 +315,7 @@ export function useViewportControl() {
   }, []);
 
   function handleMiddleDown(e: React.MouseEvent) {
+    if (isViewportUiTarget(e.target)) return;
     const isSpaceDrag = isSpacePressedRef.current && !animationEnabled && e.button === 0;
     if (e.button !== 1 && !isSpaceDrag) return;
     e.preventDefault();

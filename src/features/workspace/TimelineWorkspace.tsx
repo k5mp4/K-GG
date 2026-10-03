@@ -45,8 +45,8 @@ export function TimelineWorkspace({
             className="absolute top-0 left-0 right-0 h-1.5 cursor-row-resize z-[70] hover:bg-fire/40 transition-colors"
             onPointerDown={onResizeStart}
           />
-          <div className="flex min-h-0" style={{ height }}>
-            <div className="min-w-0 flex-1">
+          <div className="flex min-h-0 overflow-x-auto scrollbar-thin" style={{ height }}>
+            <div className="min-w-[640px] flex-1">
               <TimelineBar
                 animLoopRef={animLoopRef}
                 onSeek={onSeek}

@@ -6,9 +6,10 @@ import { useLanguage } from '../i18n/LanguageProvider';
 
 interface Props {
   sourceCanvasRef: React.RefObject<HTMLCanvasElement | null>;
+  active?: boolean;
 }
 
-export function ColorHistogram({ sourceCanvasRef }: Props) {
+export function ColorHistogram({ sourceCanvasRef, active = true }: Props) {
   const { t } = useLanguage();
   const histogramCanvasRef = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -63,7 +64,7 @@ export function ColorHistogram({ sourceCanvasRef }: Props) {
   }, [gradient.stops]);
 
   useEffect(() => {
-    if (!histogram.enabled) return;
+    if (!active || !histogram.enabled) return;
 
     const offscreen = document.createElement('canvas');
     offscreen.width = 64;
@@ -203,7 +204,7 @@ export function ColorHistogram({ sourceCanvasRef }: Props) {
 
     rafId = requestAnimationFrame(update);
     return () => cancelAnimationFrame(rafId);
-  }, [sourceCanvasRef, histogram.enabled, histogram.showRampDistribution, gradient.stops, gradient.opacityStops, gradient.rampColorMode, gradient.rampInterpolation, gradient.rampVariable, gradient.rampRepeat, gradient.rampOffset, gradient.rampMirror, uniqueStops]);
+  }, [active, sourceCanvasRef, histogram.enabled, histogram.showRampDistribution, gradient.stops, gradient.opacityStops, gradient.rampColorMode, gradient.rampInterpolation, gradient.rampVariable, gradient.rampRepeat, gradient.rampOffset, gradient.rampMirror, uniqueStops]);
 
   if (!histogram.enabled) {
     return (

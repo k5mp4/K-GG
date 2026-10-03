@@ -15,8 +15,8 @@
         "title": "KAGARIBI Grad",
         "width": 1440,
         "height": 960,
-        "minWidth": 1024,
-        "minHeight": 720,
+        "minWidth": 640,
+        "minHeight": 480,
         "additionalBrowserArgs": "--disable-features=msWebOOUI,msPdfOOUI --force_high_performance_gpu --enable-gpu-rasterization",
         "resizable": true,
         "fullscreen": false

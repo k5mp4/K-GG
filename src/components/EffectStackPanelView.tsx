@@ -53,6 +53,8 @@ type ViewProps = {
   onSwapWorkspace?: () => void;
   /** Shown in place of the version label when the stack can open in its own window. */
   onPopOut?: () => void;
+  /** Select without opening an editor when reordering inside a compact drawer. */
+  onDragSelect?: (kind: EffectStackKind) => void;
 };
 
 /** The Effect Stack panel, rendered from a serializable view and driven by actions. */
@@ -62,6 +64,7 @@ export function EffectStackPanelView({
   variant = 'inline',
   onSwapWorkspace,
   onPopOut,
+  onDragSelect,
 }: ViewProps) {
   const { t } = useLanguage();
   const stack = view.layers;
@@ -181,7 +184,8 @@ export function EffectStackPanelView({
     cancelDrag();
     e.preventDefault();
     e.stopPropagation();
-    actions.select(kind, false);
+    if (onDragSelect) onDragSelect(kind);
+    else actions.select(kind, false);
     const startY = e.clientY;
     const captureTarget = e.currentTarget as HTMLElement;
     document.body.style.cursor = 'grabbing';
@@ -353,6 +357,7 @@ export function EffectStackPanelView({
                 aria-label={t('stack.drag', { effect: LABELS[layer.kind] })}
                 title={t('stack.drag', { effect: LABELS[layer.kind] })}
                 onPointerDown={(e) => startDrag(e, layer.kind, index)}
+                onClick={onDragSelect ? event => event.stopPropagation() : undefined}
               >
                 <Icon name="gripVertical" className="text-[15px]" />
               </button>

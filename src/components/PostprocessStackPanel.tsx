@@ -4,6 +4,7 @@ import type { EffectStackKind } from '../types/distortion';
 import {
   createLocalEffectStackActions,
   getEffectStackViewStore,
+  selectEffectStackLayer,
 } from '../features/effectStack/effectStackController';
 import { EffectStackPanelView } from './EffectStackPanelView';
 
@@ -11,6 +12,7 @@ type Props = {
   onSwapWorkspace?: () => void;
   onSelectEffectStack?: (kind: EffectStackKind) => void;
   onPopOut?: () => void;
+  openPropertiesOnDrag?: boolean;
 };
 
 /** The inline Effect Stack panel of the main window. */
@@ -18,6 +20,7 @@ export function PostprocessStackPanel({
   onSwapWorkspace,
   onSelectEffectStack,
   onPopOut,
+  openPropertiesOnDrag = true,
 }: Props = {}) {
   const view = useStore(getEffectStackViewStore(), state => state.view);
   const selectEffectStackRef = useRef(onSelectEffectStack);
@@ -29,6 +32,7 @@ export function PostprocessStackPanel({
       actions={actions}
       onSwapWorkspace={onSwapWorkspace}
       onPopOut={onPopOut}
+      onDragSelect={openPropertiesOnDrag ? undefined : kind => selectEffectStackLayer(kind, false)}
     />
   );
 }
