@@ -33,6 +33,7 @@ import type { WebGLContext } from './webgl';
 import { renderBridge } from './renderBridge';
 import { expandPresetState, type StoreSnapshot } from './presetModel';
 import { getShaderErrors } from './shaderDiagnostics';
+import { LEFT_PANEL_MAX_WIDTH, LEFT_PANEL_MIN_WIDTH, RIGHT_PANEL_MAX_WIDTH, RIGHT_PANEL_MIN_WIDTH } from './panelLayout';
 import type { ColorStop, GradientConfig, MeshEdge, OpacityStop, Vec2Tuple } from '../types/gradient';
 import type { AnimationMode, InterpolationType, Keyframe } from '../types/keyframe';
 
@@ -882,7 +883,8 @@ export class KggControlRuntime {
       } else if (key === 'timelineHeight') {
         if (typeof value !== 'number' || !Number.isFinite(value) || value < 100 || value > 2000) return error('invalid_ui_control', 'timelineHeight must be between 100 and 2000');
       } else if (key === 'leftPanelW' || key === 'rightPanelW') {
-        if (typeof value !== 'number' || !Number.isFinite(value) || value < 240 || value > 600) return error('invalid_ui_control', `${key} must be between 240 and 600`);
+        const [min, max] = key === 'leftPanelW' ? [LEFT_PANEL_MIN_WIDTH, LEFT_PANEL_MAX_WIDTH] : [RIGHT_PANEL_MIN_WIDTH, RIGHT_PANEL_MAX_WIDTH];
+        if (typeof value !== 'number' || !Number.isFinite(value) || value < min || value > max) return error('invalid_ui_control', `${key} must be between ${min} and ${max}`);
       } else if (key === 'showHelp' || key === 'showFeedback' || key === 'showPropertyModulesSettings') {
         if (typeof value !== 'boolean') return error('invalid_ui_control', `${key} must be a boolean`);
       } else if (key === 'renderViewMode' && value !== 'canvas' && value !== 'cloth' && value !== 'cone') {

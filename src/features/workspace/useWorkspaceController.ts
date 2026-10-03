@@ -27,6 +27,7 @@ import { useNativeFfmpeg } from '../native/useNativeFfmpeg';
 import { LEFT_TABS, type LeftTab } from './tabs';
 import type { CanvasWorkspaceProps } from './CanvasWorkspace';
 import { refreshPresetLibrary } from '../../lib/presetLibraryCache';
+import { clampLeftPanelWidth, RIGHT_PANEL_MAX_WIDTH, RIGHT_PANEL_MIN_WIDTH } from '../../lib/panelLayout';
 
 const MAX_DISPLAY_W = 1000;
 
@@ -345,10 +346,18 @@ export function useWorkspaceController({ translate }: WorkspaceControllerOptions
   const [activeResizeSide, setActiveResizeSide] = useState<'left' | 'right' | null>(null);
   const resizingRef = useRef<'left' | 'right' | null>(null);
 
+  // ウィンドウを縮めたときに左サイドバーがプレビューを押し潰さないよう、幅を追従させる。
+  useEffect(() => {
+    const onResize = () => setLeftPanelW(width => clampLeftPanelWidth(width, window.innerWidth));
+    onResize();
+    window.addEventListener('resize', onResize);
+    return () => window.removeEventListener('resize', onResize);
+  }, []);
+
   useEffect(() => {
     const onMove = (event: PointerEvent) => {
-      if (resizingRef.current === 'left') setLeftPanelW(Math.max(240, Math.min(520, event.clientX)));
-      if (resizingRef.current === 'right') setRightPanelW(Math.max(240, Math.min(600, window.innerWidth - event.clientX)));
+      if (resizingRef.current === 'left') setLeftPanelW(clampLeftPanelWidth(event.clientX, window.innerWidth));
+      if (resizingRef.current === 'right') setRightPanelW(Math.max(RIGHT_PANEL_MIN_WIDTH, Math.min(RIGHT_PANEL_MAX_WIDTH, window.innerWidth - event.clientX)));
       if (timelineResizingRef.current) setTimelineHeight(Math.max(100, Math.min(window.innerHeight * 0.8, window.innerHeight - event.clientY)));
     };
     const onUp = () => {
@@ -472,7 +481,7 @@ export function useWorkspaceController({ translate }: WorkspaceControllerOptions
     if (typeof patch.showGradientAnchors === 'boolean') setShowGradientAnchors(patch.showGradientAnchors);
     if (patch.overlayImageMode === 'overlay' || patch.overlayImageMode === 'mask' || patch.overlayImageMode === 'off') setOverlayImageMode(patch.overlayImageMode);
     if (typeof patch.overlayOpacity === 'number') setOverlayOpacity(patch.overlayOpacity);
-    if (typeof patch.leftPanelW === 'number') setLeftPanelW(patch.leftPanelW);
+    if (typeof patch.leftPanelW === 'number') setLeftPanelW(clampLeftPanelWidth(patch.leftPanelW, window.innerWidth));
     if (typeof patch.rightPanelW === 'number') setRightPanelW(patch.rightPanelW);
     if (typeof patch.showHelp === 'boolean') setShowHelp(patch.showHelp);
     if (typeof patch.showFeedback === 'boolean') setShowFeedback(patch.showFeedback);

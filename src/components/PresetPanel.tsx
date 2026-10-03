@@ -151,8 +151,17 @@ function FolderTree({ folders, selectedFolderId, onSelect, onDropPreset }: Folde
   );
 }
 
-const PRESET_GRID_STYLE = { gridTemplateColumns: 'repeat(auto-fill, minmax(112px, 1fr))' } as const;
-const FOLDER_GRID_STYLE = { gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))' } as const;
+const GRID_GAP_PX = 6;
+const MAX_GRID_COLUMNS = 4;
+
+/** カードの最小幅を保ちつつ、サイドバーの幅に応じて最大4列まで並べる。 */
+function responsiveColumns(minWidthPx: number) {
+  const capWidth = `calc((100% - ${(MAX_GRID_COLUMNS - 1) * GRID_GAP_PX}px) / ${MAX_GRID_COLUMNS})`;
+  return { gridTemplateColumns: `repeat(auto-fill, minmax(max(${minWidthPx}px, ${capWidth}), 1fr))` } as const;
+}
+
+const PRESET_GRID_STYLE = responsiveColumns(100);
+const FOLDER_GRID_STYLE = responsiveColumns(120);
 
 type PresetCardProps = {
   preset: Preset;
