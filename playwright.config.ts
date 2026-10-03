@@ -21,6 +21,10 @@ export default defineConfig({
   // renderer state cannot leak from one test into the next test.
   projects: [
     {
+      name: 'workspace-layout',
+      testMatch: '**/workspace-layout.spec.ts',
+    },
+    {
       name: 'export-png',
       testMatch: '**/export.spec.ts',
       grep: /Save PNG downloads a structurally valid image/,

@@ -64,6 +64,8 @@ export default function App() {
     showTimeline,
     showTimeRemap,
     timelineHeight,
+    workspaceRef,
+    layout,
     leftPanelOpen,
     setLeftPanelOpen,
     rightPanelOpen,
@@ -86,8 +88,6 @@ export default function App() {
     setShowPropertyModulesSettings,
     renderViewMode,
     clothReady,
-    leftPanelW,
-    rightPanelW,
     activeResizeSide,
     overlayImageSrc,
     overlayImageName,
@@ -146,9 +146,10 @@ export default function App() {
 
   return (
     <InteractionSettingsProvider value={{ hoverInteractionsEnabled: tabHoverSwitchEnabled }}>
-      <div className="h-[100dvh] text-k-text flex flex-col overflow-hidden relative">
+      <div ref={workspaceRef} data-workspace-layout={layout.panels} className="h-[100dvh] min-w-0 text-k-text flex flex-col overflow-hidden relative">
         <WorkspaceTopBar
           leftTab={leftTab}
+          panelsPresentation={layout.panels}
           tabHoverSwitchEnabled={tabHoverSwitchEnabled}
           isHoverLocked={isHoverLocked}
           showRightSidebar={showRightSidebar}
@@ -163,24 +164,21 @@ export default function App() {
           onToggleRightSidebar={handleToggleRightSidebar}
         />
 
-        <div className="flex-1 flex flex-row overflow-hidden relative">
+        <div className="min-h-0 flex-1 flex flex-row overflow-hidden relative">
           {/* モバイル用左サイドバー開閉オーバーレイ */}
-          {showLeftSidebar && (
-            <div className="md:hidden absolute inset-0 bg-k-bg/50 z-20" onClick={() => setShowLeftSidebar(false)} />
-          )}
-          {/* モバイル用右サイドバー開閉オーバーレイ */}
-          {showRightSidebar && (
-            <div className="md:hidden absolute inset-0 bg-k-bg/50 z-20" onClick={() => setShowRightSidebar(false)} />
+          {layout.panels === 'overlay' && (showLeftSidebar || showRightSidebar) && (
+            <button type="button" tabIndex={-1} className="absolute inset-0 bg-k-bg/50 z-30 !border-0" aria-label={t('common.close')} onClick={() => { setShowLeftSidebar(false); setShowRightSidebar(false); }} />
           )}
 
           {/* 詳細プロパティ表示用の左サイドバー */}
           <DockPanel
             id="property-modules-panel"
             side="left"
+            presentation={layout.panels}
             title={t('settings.title')}
             open={leftPanelOpen}
             mobileOpen={showLeftSidebar}
-            width={leftPanelW}
+            width={layout.leftWidth}
             onOpenChange={setLeftPanelOpen}
             onMobileOpenChange={setShowLeftSidebar}
             resizing={activeResizeSide === 'left'}
@@ -194,7 +192,7 @@ export default function App() {
                 style={{ width: '100%' }}
               >
                 {LEFT_TABS.map(({ value }) => (
-                  <div key={value} className="w-full h-full shrink-0 p-4 overflow-y-auto scrollbar-thin">
+                  <div key={value} data-module={value} inert={value !== leftTab} aria-hidden={value !== leftTab} className="w-full h-full shrink-0 p-4 overflow-y-auto scrollbar-thin">
                     {value === 'diffuse' && <DiffusePanel />}
                     {value === 'noise' && <NoiseDistortionPanel />}
                     {value === 'slit' && (
@@ -262,10 +260,11 @@ export default function App() {
           <DockPanel
             id="gradient-settings-panel"
             side="right"
+            presentation={layout.panels}
             title="K-GG"
             open={rightPanelOpen}
             mobileOpen={showRightSidebar}
-            width={rightPanelW}
+            width={layout.rightWidth}
             onOpenChange={setRightPanelOpen}
             onMobileOpenChange={setShowRightSidebar}
             resizing={activeResizeSide === 'right'}

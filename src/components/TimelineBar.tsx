@@ -681,7 +681,7 @@ export function TimelineBar({ animLoopRef, onSeek, exportProgress = null, export
       className="relative shrink-0 overflow-hidden bg-k-bg/95 backdrop-blur-md border-t border-panel-border flex flex-col"
       style={{ height }}
     >
-      <div className="flex min-h-10 shrink-0 items-center gap-2 border-b border-panel-border/60 bg-k-surface/80 px-3 py-1.5">
+      <div className="flex min-h-10 shrink-0 items-center gap-2 overflow-x-auto scrollbar-thin border-b border-panel-border/60 bg-k-surface/80 px-3 py-1.5 [&>*]:shrink-0">
         <button
           type="button"
           onClick={() => setAnimation({ enabled: !animation.enabled })}
@@ -710,7 +710,7 @@ export function TimelineBar({ animLoopRef, onSeek, exportProgress = null, export
           ))}
         </div>
 
-        <div className="ml-auto flex min-w-0 items-center gap-2">
+        <div className="ml-auto flex shrink-0 items-center gap-2">
           <SliderField
             label={t('animation.duration')}
             labelClassName="text-[8px] text-tab-inactive uppercase tracking-wider"
@@ -720,7 +720,7 @@ export function TimelineBar({ animLoopRef, onSeek, exportProgress = null, export
             limitKey="animation.duration"
             compact
             disabled={beatSyncEnabled}
-            className="hidden w-[182px] items-center sm:flex"
+            className="flex w-[182px] shrink-0 items-center"
           />
           <div className="flex items-center gap-1 text-[8px] uppercase tracking-wider text-tab-inactive">
             <span>FPS</span>
@@ -743,7 +743,7 @@ export function TimelineBar({ animLoopRef, onSeek, exportProgress = null, export
             format={value => `${value.toFixed(2)}×`}
             limitKey="animation.speed"
             compact
-            className="hidden w-[166px] items-center lg:flex"
+            className="flex w-[166px] shrink-0 items-center"
           />
           <SliderField
             label={t('animation.rampOffsetSpeed')}
@@ -753,9 +753,9 @@ export function TimelineBar({ animLoopRef, onSeek, exportProgress = null, export
             format={value => `${Math.round(value)}`}
             limitKey="animation.rampOffsetSpeed"
             compact
-            className="hidden w-[182px] items-center lg:flex"
+            className="flex w-[182px] shrink-0 items-center"
           />
-          <label className="hidden items-center gap-1 text-[8px] uppercase tracking-wider text-tab-inactive xl:flex">
+          <label className="flex shrink-0 items-center gap-1 text-[8px] uppercase tracking-wider text-tab-inactive">
             {t('animation.direction')}
             <span
               className="tq-input-angle h-[26px] flex-none self-center"

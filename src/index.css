@@ -88,6 +88,14 @@ h1 {
   touch-action: manipulation;
 }
 
+/* Workspace drawers must retain native touch scrolling. Canvas gestures keep
+   their existing touch-action contract outside these scroll containers. */
+[data-workspace-layout] aside,
+[data-effect-stack-workspace],
+#animation-timeline-panel {
+  touch-action: pan-x pan-y;
+}
+
 @keyframes gesture-feedback-ring {
   0% {
     opacity: 0;
