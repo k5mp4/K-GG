@@ -28,7 +28,7 @@ import {
   type PresetLibrary,
 } from '../lib/presets';
 import { loadUserColorPalettes, mergeUserColorPalettes } from '../lib/colorPalettes';
-import { getChildFolders, getFolderPreviewPresets, getPresetsInFolder } from '../lib/presetLibrary';
+import { getChildFolders, getFolderPath, getFolderPreviewPresets, getPresetsInFolder } from '../lib/presetLibrary';
 import { builtinPresetLibrary, ensurePresetLibraryLoaded, getPresetLibrarySnapshot, isBuiltinPresetId, refreshPresetLibrary, subscribePresetLibrary } from '../lib/presetLibraryCache';
 import { PresetPreview } from './PresetPreview';
 import { capturePresetThumbnail } from '../lib/presetThumbnail';
@@ -236,6 +236,59 @@ const PresetCard = memo(function PresetCard({ preset, folderOptions, isBuiltin, 
   );
 });
 
+type BreadcrumbProps = {
+  path: PresetFolder[];
+  onSelect: (folderId: string | null) => void;
+  onDropPreset: (presetId: string, folderId: string | null) => void;
+};
+
+/** Folder path from the root. Each ancestor navigates back and accepts a dropped Preset. */
+function FolderBreadcrumb({ path, onSelect, onDropPreset }: BreadcrumbProps) {
+  const { t } = useLanguage();
+  const [dragOverId, setDragOverId] = useState<string | null | undefined>(undefined);
+  const crumbs: Array<{ id: string | null; label: string }> = [
+    { id: null, label: t('preset.root') },
+    ...path.map(folder => ({ id: folder.id, label: folder.name })),
+  ];
+
+  return (
+    <nav aria-label={t('preset.breadcrumb')} className="shrink-0">
+      <ol className="flex min-w-0 flex-wrap items-center gap-x-0.5 gap-y-0.5 text-[10px]">
+        {crumbs.map((crumb, index) => {
+          const isCurrent = index === crumbs.length - 1;
+          return (
+            <li key={crumb.id ?? 'root'} className="flex min-w-0 items-center gap-0.5">
+              {index > 0 && <span aria-hidden="true" className="text-tab-inactive/60">›</span>}
+              <button
+                type="button"
+                title={crumb.label}
+                aria-current={isCurrent ? 'page' : undefined}
+                onClick={() => onSelect(crumb.id)}
+                onDragOver={event => {
+                  if (!event.dataTransfer.types.includes(PRESET_DRAG_TYPE)) return;
+                  event.preventDefault();
+                  event.dataTransfer.dropEffect = 'move';
+                  setDragOverId(crumb.id);
+                }}
+                onDragLeave={() => setDragOverId(undefined)}
+                onDrop={event => {
+                  event.preventDefault();
+                  const presetId = getDraggedPresetId(event);
+                  setDragOverId(undefined);
+                  if (presetId) onDropPreset(presetId, crumb.id);
+                }}
+                className={`max-w-[9rem] truncate px-1.5 py-1 transition-colors ${dragOverId === crumb.id ? 'bg-fire/30 text-cream ring-1 ring-fire' : isCurrent ? 'font-semibold text-cream' : 'text-tab-inactive hover:bg-k-surface hover:text-k-text'}`}
+              >
+                {crumb.label}
+              </button>
+            </li>
+          );
+        })}
+      </ol>
+    </nav>
+  );
+}
+
 function FolderCard({ folder, library, onOpen, onDropPreset }: { folder: PresetFolder; library: PresetLibrary; onOpen: () => void; onDropPreset: (presetId: string, folderId: string | null) => void }) {
   const { t } = useLanguage();
   const samples = getFolderPreviewPresets(library, folder.id);
@@ -296,6 +349,7 @@ export function PresetPanel({ canvasW, canvasH, setCanvasW, setCanvasH, aspectRa
 
   const currentFolder = library.folders.find(folder => folder.id === selectedFolderId) ?? null;
   const childFolders = useMemo(() => getChildFolders(library, selectedFolderId), [library, selectedFolderId]);
+  const folderPath = useMemo(() => getFolderPath(library, selectedFolderId), [library, selectedFolderId]);
   const userPresets = useMemo(() => getPresetsInFolder(library, selectedFolderId), [library, selectedFolderId]);
   const visiblePresets = useMemo(
     () => selectedFolderId === null ? [...builtinPresetLibrary.presets, ...userPresets] : userPresets,
@@ -491,12 +545,11 @@ export function PresetPanel({ canvasW, canvasH, setCanvasW, setCanvasH, aspectRa
         </div>
       </div>
 
-        <main className="min-h-0 flex-1 space-y-2 overflow-y-auto pr-0.5 scrollbar-thin">
-          <div className="flex min-w-0 items-center gap-2 border-b border-cream/10 pb-1">
-            <span className="min-w-0 flex-1 truncate text-[10px] font-semibold uppercase tracking-[0.16em] text-cream">{selectedFolderLabel}</span>
-            <span className="text-[9px] text-tab-inactive">{t('preset.folderCount', { count: childFolders.length })}</span>
-          </div>
+        <div className="shrink-0 border-b border-cream/10 pb-1">
+          <FolderBreadcrumb path={folderPath} onSelect={setSelectedFolderId} onDropPreset={handleMovePreset} />
+        </div>
 
+        <main className="min-h-0 flex-1 space-y-2 overflow-y-auto pr-0.5 scrollbar-thin">
           {childFolders.length > 0 && <div className="grid gap-1.5" style={FOLDER_GRID_STYLE}>{childFolders.map(folder => <FolderCard key={folder.id} folder={folder} library={library} onOpen={() => setSelectedFolderId(folder.id)} onDropPreset={handleMovePreset} />)}</div>}
 
           {visiblePresets.length === 0 ? (

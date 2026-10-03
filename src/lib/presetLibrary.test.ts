@@ -8,6 +8,7 @@ import {
   decodePresetPackage,
   deleteFolder,
   encodePresetExport,
+  getFolderPath,
   getFolderPreviewPresets,
   mergePresetLibrary,
   movePreset,
@@ -49,6 +50,16 @@ describe('presetLibrary', () => {
     expect(trimmed.folders[0]?.name).toBe('Slow');
     expect(trimmed.folders[0]?.parentId).toBe(null);
     expect(trimmed.presets[0]?.folderId).toBe(null);
+  });
+
+  it('returns the folder path from the root for breadcrumb navigation', () => {
+    const parentResult = createFolder(createEmptyPresetLibrary(), 'Motion', null);
+    const childResult = createFolder(parentResult.library, 'Slow', parentResult.folder.id);
+
+    expect(getFolderPath(childResult.library, null)).toEqual([]);
+    expect(getFolderPath(childResult.library, parentResult.folder.id).map(item => item.name)).toEqual(['Motion']);
+    expect(getFolderPath(childResult.library, childResult.folder.id).map(item => item.name)).toEqual(['Motion', 'Slow']);
+    expect(getFolderPath(childResult.library, 'missing')).toEqual([]);
   });
 
   it('selects at most five descendant previews in display order', () => {

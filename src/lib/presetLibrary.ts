@@ -158,6 +158,20 @@ export function getChildFolders(library: PresetLibrary, parentId: string | null)
   return sortByOrder(library.folders.filter(folder => folder.parentId === parentId));
 }
 
+/** Folders from the root's child down to `folderId`, for breadcrumb navigation. Empty for the root. */
+export function getFolderPath(library: PresetLibrary, folderId: string | null): PresetFolder[] {
+  const byId = new Map(library.folders.map(folder => [folder.id, folder]));
+  const path: PresetFolder[] = [];
+  const seen = new Set<string>();
+  let current = folderId === null ? undefined : byId.get(folderId);
+  while (current && !seen.has(current.id)) {
+    seen.add(current.id);
+    path.unshift(current);
+    current = current.parentId === null ? undefined : byId.get(current.parentId);
+  }
+  return path;
+}
+
 export function getPresetsInFolder(library: PresetLibrary, folderId: string | null): Preset[] {
   return sortByOrder(library.presets.filter(preset => (preset.folderId ?? null) === folderId));
 }
