@@ -25,7 +25,10 @@ async function openExportPanel(page: Parameters<typeof waitForWebGLReady>[0]) {
   expect(diagnostics.canvas).toEqual(dimensions);
   expect(diagnostics.webgl.rendererReady).toBe(true);
   expect(diagnostics.webgl.contextLost).toBe(false);
-  await page.getByRole('button', { name: /^Export$/i }).first().click();
+  const exportTab = page.getByRole('navigation').getByRole('button', { name: /^Export\b/i });
+  await exportTab.click();
+  await expect(exportTab).toHaveAttribute('aria-pressed', 'true');
+  await expect(page.locator('[data-module="export"]')).not.toHaveAttribute('inert');
   return { canvas, dimensions };
 }
 

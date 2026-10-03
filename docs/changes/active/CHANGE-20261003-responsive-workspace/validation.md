@@ -42,3 +42,15 @@ OS表示倍率、実タッチ端末、native Effect Stack別ウインドウのde
 ## 人間レビュー
 
 ADRはproposed、人間レビューはrequiredのままとする。追加指示に従いcommit／push／ドラフトPR作成を行う。Issue作成は対象外。人間レビュー完了後、Merge前にCurrent Spec／ADRを同期し`change:finalize`を実施する。未確認の実機動作だけを理由にActiveへ残しているわけではない。
+
+## 2026-10-04 CI書き出しテストの修正
+
+[PR #107の失敗ログ](https://github.com/k5mp4/K-GG/actions/runs/37120262965/job/111194856512)では、小画面テストはpassし、PNG／ZIPテストがExportボタンの検索でtimeoutした。上部タブのaccessible nameは`Export Off`だが、既存テストは`/^Export$/i`を全画面から探していた。非選択moduleをinertにしたことで、その検索は上部タブにも非選択パネル内にも一致しなくなった。
+
+`tests/e2e/export.spec.ts`でnavigation内のExportタブを指定し、`aria-pressed=true`とExport moduleのinert解除を確認する。PNGの寸法／画素比較とZIPのframe検証は維持する。修正前の180秒timeoutをローカルでも再現し、修正後はPNGがpassした。
+
+- `npm run check:merge`: pass。925 tests、lint 0 errors／既存21 warnings、typecheck、build、docs check/build。
+- `CI=1 npm run check:e2e -- --retries=0`: pass。5 tests、2.9分、再試行なし。小画面操作、PNG画素比較、ZIPの6 framesとPreview復帰、ライセンス／Worker、全WebGL2 programの実コンパイルを検証。
+- 初回の全体E2Eでは小画面テストもdrag途中で一度timeoutし、再試行は42.3秒でpass。PNG pass後に実行を中断し、全体チェック終了後にE2E一式を再実行した。
+- 差分はテストと本検証記録のみ。小さな操作先指定の修正のため追加のsimplify／専用reviewは省略し、差分を手動確認する。
+- この修正でRust／Tauri設定は変更していないためNative自動チェックの再実行は対象外。実機確認と人間レビューは引き続き未実施。
