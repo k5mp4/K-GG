@@ -26,6 +26,7 @@ import { useAppUpdater } from '../updater/useAppUpdater';
 import { useNativeFfmpeg } from '../native/useNativeFfmpeg';
 import { LEFT_TABS, type LeftTab } from './tabs';
 import type { CanvasWorkspaceProps } from './CanvasWorkspace';
+import { refreshPresetLibrary } from '../../lib/presetLibraryCache';
 
 const MAX_DISPLAY_W = 1000;
 
@@ -496,8 +497,15 @@ export function useWorkspaceController({ translate }: WorkspaceControllerOptions
     const library = await adapters.presetRepository.loadPresetLibrary();
     return library.presets.find(preset => preset.id === presetId) ?? null;
   };
-  kggProjectAdapter.savePreset = (name, state, folderId, thumbnail) => adapters.presetRepository.savePreset(name, state as PresetStoreSnapshot, folderId, thumbnail);
-  kggProjectAdapter.deletePreset = presetId => adapters.presetRepository.deletePreset(presetId);
+  kggProjectAdapter.savePreset = async (name, state, folderId, thumbnail) => {
+    const saved = await adapters.presetRepository.savePreset(name, state as PresetStoreSnapshot, folderId, thumbnail);
+    void refreshPresetLibrary();
+    return saved;
+  };
+  kggProjectAdapter.deletePreset = async presetId => {
+    await adapters.presetRepository.deletePreset(presetId);
+    void refreshPresetLibrary();
+  };
   kggProjectAdapter.exportPresetPackage = scope => {
     if (scope.kind === 'library') return adapters.presetRepository.exportPresetPackage({ kind: 'library' });
     if (!scope.id) throw new Error('An id is required for this export scope');

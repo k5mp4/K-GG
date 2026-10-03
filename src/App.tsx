@@ -26,11 +26,15 @@ import { TimelineWorkspace } from './features/workspace/TimelineWorkspace';
 import { CanvasWorkspace } from './features/workspace/CanvasWorkspace';
 import { useWorkspaceController } from './features/workspace/useWorkspaceController';
 import { disposePresetThumbnailRenderer } from './lib/presetThumbnail';
+import { ensurePresetLibraryLoaded } from './lib/presetLibraryCache';
 
 export default function App() {
   useEffect(() => () => {
     void disposePresetThumbnailRenderer();
   }, []);
+
+  // Preset一覧は起動時に一括で読み込み、Thumbnailもデコードしておく。
+  useEffect(() => { void ensurePresetLibraryLoaded(); }, []);
 
   const { t } = useLanguage();
   const {

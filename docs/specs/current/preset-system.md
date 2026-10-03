@@ -5,12 +5,12 @@ title: Preset System
 status: current
 owners: [maintainer]
 created: 2026-07-27
-updated: 2026-09-30
-requirement_ids: [PRESET-001, PRESET-002, PRESET-003, PRESET-004, PRESET-005, PRESET-006, PRESET-007, PRESET-008, PRESET-009, PRESET-011, PRESET-012, PRESET-013, PRESET-014, PRESET-016, PRESET-017, PRESET-018, PRESET-019, PRESET-020, PRESET-021]
+updated: 2026-10-03
+requirement_ids: [PRESET-001, PRESET-002, PRESET-003, PRESET-004, PRESET-005, PRESET-006, PRESET-007, PRESET-008, PRESET-009, PRESET-011, PRESET-012, PRESET-013, PRESET-014, PRESET-016, PRESET-017, PRESET-018, PRESET-019, PRESET-020, PRESET-021, PRESET-022]
 related_adrs: [ADR-0007, ADR-0008, ADR-20260927-datamosh-feedback-layer, ADR-20260929-sandbox-texture-material-stage, ADR-20260930-sandbox-shapes-final-stage]
 related_changes: [CHANGE-001, CHANGE-012, CHANGE-013, CHANGE-018, CHANGE-024, CHANGE-025, CHANGE-026, CHANGE-027, CHANGE-030, CHANGE-031, CHANGE-032, CHANGE-034, CHANGE-037, CHANGE-039, CHANGE-046, CHANGE-048, CHANGE-051]
-related_code: [src/lib/presetModel.ts, src/lib/presetLibrary.ts, src/lib/presets.ts, src/lib/presetPreview.ts, src/lib/presetThumbnail.ts, src/lib/flowGradientRenderer.ts, src/types/flowGradient.ts, src/types/datamosh.ts, src/lib/effectPipeline.ts, src/lib/glass.ts, src/lib/postprocessStack.ts, src/store/gradientStore.ts, src/components/PresetPanel.tsx, src/components/FlowGradientPanel.tsx, src/components/DatamoshPanel.tsx, src/components/PresetPreview.tsx, src/components/ClothCanvas.tsx, src/types/coneView.ts, src/adapters/types.ts, src/adapters/browser/presetRepository.ts, src/adapters/tauri/presetRepository.ts, src/lib/kggControlRuntime.ts, src-tauri/src/lib.rs, src/types/texture.ts, src/types/shapes.ts]
-related_tests: [src/lib/presetLibrary.test.ts, src/lib/presetModel.diffuse.test.ts, src/lib/presetModel.slit.test.ts, src/lib/presetModel.removedEffects.test.ts, src/lib/presetModel.compact.test.ts, src/lib/flowGradientPreset.test.ts, src/lib/presetPreview.test.ts, src/lib/presetThumbnail.test.ts, src/lib/presetThumbnail.lifecycle.test.ts, src/lib/glass.test.ts, src/lib/postprocessStack.test.ts, src/store/gradientStore.glass.test.ts, src/store/gradientStore.postprocessStack.test.ts, src/store/gradientStore.animation.test.ts, src/types/coneView.test.ts, src/lib/effectPipeline.test.ts, src/lib/presetModel.texture.test.ts, src/lib/presetModel.shapes.test.ts]
+related_code: [src/lib/presetModel.ts, src/lib/presetLibrary.ts, src/lib/presets.ts, src/lib/presetPreview.ts, src/lib/presetThumbnail.ts, src/lib/presetLibraryCache.ts, src/lib/flowGradientRenderer.ts, src/types/flowGradient.ts, src/types/datamosh.ts, src/lib/effectPipeline.ts, src/lib/glass.ts, src/lib/postprocessStack.ts, src/store/gradientStore.ts, src/components/PresetPanel.tsx, src/components/FlowGradientPanel.tsx, src/components/DatamoshPanel.tsx, src/components/PresetPreview.tsx, src/components/ClothCanvas.tsx, src/types/coneView.ts, src/adapters/types.ts, src/adapters/browser/presetRepository.ts, src/adapters/tauri/presetRepository.ts, src/lib/kggControlRuntime.ts, src-tauri/src/lib.rs, src/types/texture.ts, src/types/shapes.ts]
+related_tests: [src/lib/presetLibrary.test.ts, src/lib/presetModel.diffuse.test.ts, src/lib/presetModel.slit.test.ts, src/lib/presetModel.removedEffects.test.ts, src/lib/presetModel.compact.test.ts, src/lib/flowGradientPreset.test.ts, src/lib/presetPreview.test.ts, src/lib/presetThumbnail.test.ts, src/lib/presetThumbnail.lifecycle.test.ts, src/lib/presetLibraryCache.test.ts, src/lib/glass.test.ts, src/lib/postprocessStack.test.ts, src/store/gradientStore.glass.test.ts, src/store/gradientStore.postprocessStack.test.ts, src/store/gradientStore.animation.test.ts, src/types/coneView.test.ts, src/lib/effectPipeline.test.ts, src/lib/presetModel.texture.test.ts, src/lib/presetModel.shapes.test.ts]
 ---
 
 # Preset System
@@ -138,3 +138,9 @@ Presetの新規保存と書出し（単一JSON、フォルダ／ライブラリZ
 - `effectPipeline.version`が`stack-v2`のPresetにおける`postprocess.effectStack`と`postprocess.diffuse*`。Stack v2は順序を`effectPipeline.effectStack`、Post Diffuseを`diffuse`から取るため、これらはLegacy v1描画だけが読むフィールドです。Legacy v1のPresetでは保存します。
 
 保存済みライブラリ内の既存Presetは自動で書き換えず、書出し時に同じ省略を適用します。省略済みPresetは旧来の完全な形式と同じ描画状態で読み込め、正規化を経ずにストアへ適用するMCPの`apply_preset`は省略したフィールドを補完してから適用し、前の文書の値を残しません。無効な機能の設定値と既定値と同じ値は、再有効化時の復元と既定値変更時の外観維持のため省略しません。
+
+### PRESET-022 一覧表示と起動時の一括ロード
+
+Preset一覧は、起動時に保存済みライブラリを一度だけ読み込んでメモリへ保持し、保存済みThumbnailを先にデコードします。内蔵Presetも起動後に一度だけ正規化します。Presetの適用、一覧の再描画、フォルダ移動の表示では保存先を読み直しません。保存、削除、フォルダ操作、読込み（import）、MCP経由の保存・削除の後だけ、保存先を読み直して一覧を更新します。保存先の読込に失敗した場合は、直前の一覧を保ったままエラーを表示します。
+
+Presetはカードをクリックした時点で適用し、専用のLoadボタンは置きません。グリッド表示ではPreset名をThumbnail画像の下端に重ねて表示し、列数はサイドバーの幅に応じて増減します（幅の下限112px）。適用中のPresetは枠で示します。保存済みPresetのフォルダ移動と削除はカードへの操作時（ホバーまたはフォーカス時。ホバーできない環境では常時）に画像の右上へ表示し、内蔵Presetには表示しません。リスト表示もクリックで適用します。Presetの適用結果、保存形式、Thumbnailの描画は変わりません。
