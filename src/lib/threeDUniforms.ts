@@ -188,6 +188,7 @@ export function uploadThreeDUniforms(
   float('u_abstractFilmThickness', abstract.filmThickness);
   float('u_abstractLights', abstract.lights);
   float('u_abstractBackground', abstract.background);
+  int('u_abstractInside', abstract.inside);
   float('u_abstractCameraDistance', abstract.cameraDistance);
   float('u_abstractBackdropZ', abstract.backdropZ);
   float('u_abstractBackdropHalfHeight', abstract.backdropHalfHeight);

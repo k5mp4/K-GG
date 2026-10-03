@@ -1077,7 +1077,10 @@ export type AbstractUniforms = {
   blend: number;
   /** Twist in radians per world unit of height. */
   twist: number;
-  /** Column-major rotation from the sculpture frame to the world (Spin). */
+  /**
+   * Column-major rotation from the sculpture frame to the world: Spin about
+   * its vertical axis, then Elevation and Tumble about the horizontal axis.
+   */
   rotation: number[];
   /** Phase of the Torus lobes in radians. */
   lobePhase: number;
@@ -1097,7 +1100,9 @@ export type AbstractUniforms = {
   filmThickness: number;
   lights: number;
   background: number;
-  /** Camera distance from the origin along +Z. */
+  /** 1 when the camera stands at the sculpture center (Inside), else 0. */
+  inside: number;
+  /** Camera distance from the origin along +Z; 0 Inside. */
   cameraDistance: number;
   /** The canvas plane z = backdropZ lies behind the sculpture for the whole loop. */
   backdropZ: number;
@@ -1109,7 +1114,10 @@ export type AbstractUniforms = {
  * Shapes the Abstract sculpture at a loop-normalized time. Morph advances
  * every noise wave, the Metaball drift, the Torus lobes, and the Pulse by
  * whole cycles per loop, and Spin turns the sculpture about +Y by whole
- * turns, so the loop closes. The noise directions, phases, and Metaball
+ * turns, so the loop closes. Elevation and Tumble turn the sculpture toward
+ * the camera about the horizontal axis, which shows it from above or below
+ * while the camera, the lights, and the canvas stay where they are; Tumble
+ * adds whole turns per loop. The noise directions, phases, and Metaball
  * orbits come from Seed. The bound and the backdrop hold the sculpture for
  * the whole loop, so the backdrop does not move while it breathes.
  */
@@ -1187,8 +1195,15 @@ export function getAbstractUniforms(config: ConeViewConfig, normalizedTime: numb
   const slope = (shapeSlope + displace * noiseSlope) * Math.hypot(1, twist * bound);
 
   const tanHalfFov = getCrystalTanHalfFov(config);
-  const cameraDistance = 1 / tanHalfFov;
+  const inside = config.abstractView === 'inside';
+  // Outside, the camera frames the canvas half height at the origin.
+  const cameraDistance = inside ? 0 : 1 / tanHalfFov;
   const backdropZ = -(bound + Math.max(0, safeFinite(config.abstractBackdrop, 1)));
+  const spin = axisAngleMatrix([0, 1, 0], wholeCyclePhase(config.abstractSpin, normalizedTime) * 2 * Math.PI);
+  // A positive elevation tilts the top toward the camera, as if it rose above.
+  const elevation = safeFinite(config.abstractElevation, 0) * Math.PI / 180
+    + wholeCyclePhase(config.abstractTumble, normalizedTime) * 2 * Math.PI;
+  const tilt = axisAngleMatrix([1, 0, 0], elevation);
   const dispersion = Math.max(0, safeFinite(config.abstractDispersion, 0));
   const material = Math.max(0, ABSTRACT_MATERIALS.indexOf(config.abstractMaterial));
   return {
@@ -1201,7 +1216,7 @@ export function getAbstractUniforms(config: ConeViewConfig, normalizedTime: numb
     ballCount,
     blend,
     twist,
-    rotation: axisAngleMatrix([0, 1, 0], wholeCyclePhase(config.abstractSpin, normalizedTime) * 2 * Math.PI),
+    rotation: multiplyMatrices(tilt, spin),
     lobePhase: phase,
     cellFrequency: ABSTRACT_CELL_FREQUENCY * Math.max(0.05, safeFinite(config.abstractFrequency, 1.4)) / baseRadius,
     bound,
@@ -1214,6 +1229,7 @@ export function getAbstractUniforms(config: ConeViewConfig, normalizedTime: numb
     filmThickness: Math.max(0, safeFinite(config.abstractFilmThickness, 420)),
     lights: clamp(safeFinite(config.abstractLights, 0), 0, 1),
     background: clamp(safeFinite(config.abstractBackground, 1), 0, 1),
+    inside: inside ? 1 : 0,
     cameraDistance,
     backdropZ,
     backdropHalfHeight: (cameraDistance - backdropZ) * tanHalfFov,

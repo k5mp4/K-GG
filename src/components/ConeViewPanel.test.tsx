@@ -126,7 +126,7 @@ describe('ConeViewPanel shape controls', () => {
 
   it('shows the Abstract controls and Surface Mapping only for the Surface material', () => {
     const markup = renderShape('abstract');
-    for (const label of ['Form', 'Material', 'Spheres', 'Size', 'Displace', 'Frequency', 'Twist', 'Seed', 'IOR', 'Dispersion', 'Dispersion Steps', 'Reflection', 'Thin Film', 'Film Thickness', 'Light Cards', 'Background', 'Backdrop', 'Morph', 'Pulse', 'Spin', 'Shade', 'Fog', 'Camera Roll']) {
+    for (const label of ['Form', 'Material', 'Spheres', 'Size', 'Displace', 'Frequency', 'Twist', 'Seed', 'IOR', 'Dispersion', 'Dispersion Steps', 'Reflection', 'Thin Film', 'Film Thickness', 'Light Cards', 'Background', 'Backdrop', 'Morph', 'Pulse', 'Spin', 'View', 'Elevation', 'Tumble', 'Shade', 'Fog', 'Camera Roll']) {
       expect(hasLabel(markup, label), label).toBe(true);
     }
     expect(hasLabel(markup, 'Surface Mapping')).toBe(false);

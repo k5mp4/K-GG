@@ -9,6 +9,7 @@ import { getParameterLimit } from '../lib/parameterLimits';
 import {
   ABSTRACT_FORM_OPTIONS,
   ABSTRACT_MATERIAL_OPTIONS,
+  ABSTRACT_VIEW_OPTIONS,
   CAMERA_WIGGLE_PRESET_OPTIONS,
   CONE_CAMERA_MODE_OPTIONS,
   CONE_SEAM_MODE_OPTIONS,
@@ -27,6 +28,7 @@ import {
   THREE_D_SURFACE_MAPPING_OPTIONS,
   type AbstractForm,
   type AbstractMaterial,
+  type AbstractView,
   type CameraWigglePreset,
   type ConeCameraMode,
   type ConeSeamMode,
@@ -819,6 +821,28 @@ function ShapeControls({ coneView, setConeView }: { coneView: ConeViewConfig; se
           limitKey="cone.abstractSpin"
           format={integer}
           onChange={(abstractSpin) => setConeView({ abstractSpin })}
+        />
+        <CustomSelect
+          label="View"
+          value={coneView.abstractView}
+          localizeLabel={false}
+          localizeOptions={false}
+          options={[...ABSTRACT_VIEW_OPTIONS]}
+          onChange={(abstractView) => setConeView({ abstractView: abstractView as AbstractView })}
+        />
+        <SliderField
+          label="Elevation"
+          value={coneView.abstractElevation}
+          limitKey="cone.abstractElevation"
+          format={formatDegrees}
+          onChange={(abstractElevation) => setConeView({ abstractElevation })}
+        />
+        <SliderField
+          label="Tumble"
+          value={coneView.abstractTumble}
+          limitKey="cone.abstractTumble"
+          format={integer}
+          onChange={(abstractTumble) => setConeView({ abstractTumble })}
         />
       </>
     );

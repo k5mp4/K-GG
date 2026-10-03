@@ -153,6 +153,9 @@ describe('cone view configuration', () => {
       abstractBackground: 0.25,
       abstractBackdrop: 1,
       abstractSpin: 1,
+      abstractView: 'outside',
+      abstractElevation: 0,
+      abstractTumble: 0,
     });
   });
 
@@ -204,6 +207,10 @@ describe('cone view configuration', () => {
     expect(normalizeConeViewConfig({ abstractMaterial: 'chrome' }).abstractMaterial).toBe('chrome');
     expect(normalizeConeViewConfig({ abstractMaterial: 'surface' }).abstractMaterial).toBe('surface');
     expect(normalizeConeViewConfig({ abstractMaterial: 'wood' }).abstractMaterial).toBe('glass');
+    expect(normalizeConeViewConfig({ abstractView: 'inside' }).abstractView).toBe('inside');
+    expect(normalizeConeViewConfig({ abstractView: 'above' }).abstractView).toBe('outside');
+    expect(normalizeConeViewConfig({ abstractElevation: 120, abstractTumble: 1.6 })).toMatchObject({ abstractElevation: 90, abstractTumble: 2 });
+    expect(normalizeConeViewConfig({ abstractElevation: -120, abstractTumble: -9 })).toMatchObject({ abstractElevation: -90, abstractTumble: -4 });
   });
 
   it('normalizes the Discs settings', () => {

@@ -521,6 +521,38 @@ describe('3D render parameters', () => {
     expect(getAbstractUniforms({ ...config, abstractSeed: 4 }, 0.2).balls).not.toEqual(getAbstractUniforms(config, 0.2).balls);
   });
 
+  it('shows the Abstract sculpture from above with Elevation and closes Tumble on the loop', () => {
+    const config = { ...DEFAULT_CONE_VIEW, shape: 'abstract' as const, abstractSpin: 0 };
+    // Columns of the rotation: where the sculpture's axes point in the world.
+    const top = (rotation: number[]) => rotation.slice(3, 6);
+    expect(top(getAbstractUniforms(config, 0).rotation)).toEqual([0, 1, 0]);
+    // From above, the top of the sculpture faces the camera on +Z.
+    const above = top(getAbstractUniforms({ ...config, abstractElevation: 90 }, 0).rotation);
+    [0, 0, 1].forEach((value, axis) => expect(above[axis]).toBeCloseTo(value, 10));
+    const below = top(getAbstractUniforms({ ...config, abstractElevation: -90 }, 0).rotation);
+    [0, 0, -1].forEach((value, axis) => expect(below[axis]).toBeCloseTo(value, 10));
+    const tumbling = { ...config, abstractTumble: 2, abstractSpin: 1, abstractElevation: 20 };
+    const start = getAbstractUniforms(tumbling, 0).rotation;
+    const end = getAbstractUniforms(tumbling, 1).rotation;
+    start.forEach((value, index) => expect(end[index]).toBeCloseTo(value, 9));
+    // Half way through one Tumble turn the view comes from below.
+    const half = top(getAbstractUniforms({ ...config, abstractTumble: 1 }, 0.5).rotation);
+    [0, -1, 0].forEach((value, axis) => expect(half[axis]).toBeCloseTo(value, 9));
+  });
+
+  it('stands the Abstract Inside camera at the sculpture center', () => {
+    const config = { ...DEFAULT_CONE_VIEW, shape: 'abstract' as const, cameraFov: 90, abstractView: 'inside' as const };
+    const inside = getAbstractUniforms(config, 0);
+    expect(inside.inside).toBe(1);
+    expect(inside.cameraDistance).toBe(0);
+    // The canvas still fills the frame seen from the center.
+    expect(inside.backdropHalfHeight).toBeCloseTo(-inside.backdropZ, 10);
+    const outside = getAbstractUniforms({ ...config, abstractView: 'outside' }, 0);
+    expect(outside.inside).toBe(0);
+    expect(outside.cameraDistance).toBeCloseTo(1, 10);
+    expect(outside.backdropZ).toBe(inside.backdropZ);
+  });
+
   it('places the Abstract backdrop behind the sculpture and frames it with the base FOV', () => {
     const config = { ...DEFAULT_CONE_VIEW, shape: 'abstract' as const, cameraFov: 90, abstractBackdrop: 2 };
     const uniforms = getThreeDRenderParams(config, 0.3, 16 / 9).abstract;

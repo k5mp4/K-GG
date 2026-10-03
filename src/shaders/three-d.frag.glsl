@@ -2235,6 +2235,8 @@ uniform float u_abstractThinFilm;
 uniform float u_abstractFilmThickness;
 uniform float u_abstractLights;
 uniform float u_abstractBackground;
+// 1: the camera stands at the sculpture center (Inside).
+uniform int u_abstractInside;
 uniform float u_abstractCameraDistance;
 uniform float u_abstractBackdropZ;
 uniform float u_abstractBackdropHalfHeight;
@@ -2333,13 +2335,16 @@ vec2 abstractBoundSpan(vec3 origin, vec3 direction) {
 }
 
 // Sphere traces from `origin` outside (side 1) or inside (side -1) the
-// surface. Steps shrink by u_abstractStep, the Lipschitz bound of the
-// displaced field. Returns the distance to the surface, or -1 when the ray
-// passes `limit` or runs out of steps first.
-float abstractMarch(vec3 origin, vec3 direction, float side, float limit) {
+// surface; side 0 takes the side `origin` lies on and returns it. Steps
+// shrink by u_abstractStep, the Lipschitz bound of the displaced field.
+// Returns the distance to the surface, or -1 when the ray passes `limit` or
+// runs out of steps first.
+float abstractMarch(vec3 origin, vec3 direction, inout float side, float limit) {
   float t = 0.0;
   for (int i = 0; i < ABSTRACT_STEPS; i++) {
-    float distance = side * abstractDistance(origin + direction * t);
+    float field = abstractDistance(origin + direction * t);
+    if (side == 0.0) side = field < 0.0 ? -1.0 : 1.0;
+    float distance = side * field;
     if (distance < ABSTRACT_HIT) return t;
     t += max(distance * u_abstractStep, 0.5 * ABSTRACT_HIT);
     if (t > limit) break;
@@ -2356,6 +2361,8 @@ struct AbstractTrace {
   int count;
   // Where the ray finally heads for the backdrop.
   vec3 exitPoint;
+  // The camera stands inside the sculpture, so the first face is one it leaves.
+  bool cameraInside;
 };
 
 // Sphere traces the camera ray to the sculpture and, for glass (`limit`
@@ -2372,15 +2379,22 @@ AbstractTrace abstractTrace(vec3 origin, vec3 direction, float ior, int limit) {
   trace.firstNormal = vec3(0.0, 0.0, 1.0);
   trace.count = 0;
   trace.exitPoint = origin;
+  trace.cameraInside = false;
   vec2 span = abstractBoundSpan(origin, direction);
   if (span.x > span.y || span.y <= 0.0) return trace;
   float lead = max(span.x, 0.0);
   vec3 start = origin + direction * lead;
-  float side = 1.0;
+  // A camera within the bound may stand inside the sculpture (Inside, or a
+  // Dolly into it); the first march then finds out which side it is on.
+  float side = lead > 0.0 ? 1.0 : 0.0;
   float reach = span.y - lead;
   bool entering = true;
   for (int segment = 0; segment <= ABSTRACT_EVENTS; segment++) {
     float t = reach > 0.0 ? abstractMarch(start, direction, side, reach) : -1.0;
+    if (segment == 0) {
+      trace.cameraInside = side < 0.0;
+      entering = !trace.cameraInside;
+    }
     if (t < 0.0) {
       trace.exitPoint = start;
       break;
@@ -2515,17 +2529,20 @@ vec3 abstractRefraction(vec3 exitPoint, vec3 direction, int count) {
 
 ThreeDHit abstractHit(vec3 localRay) {
   ThreeDHit result = threeDMiss();
-  float cameraDistance = max(u_abstractCameraDistance, 0.1);
+  bool insideView = u_abstractInside == 1;
+  float cameraDistance = max(u_abstractCameraDistance, 0.0);
   vec3 forward = vec3(0.0, 0.0, -1.0);
   vec3 up = vec3(0.0, 1.0, 0.0);
   threeDSetCameraBasis(forward, up);
   vec3 rayDirection = threeDWorldDirection(localRay, forward, up);
   vec3 right = normalize(cross(forward, up));
-  // Camera Position and Dolly move the camera as for the Crystals.
+  // Outside, Camera Position and Dolly move the camera as for the Crystals;
+  // Inside, both move it from the center in radii of the bound.
   float aspect = u_fullResolution.x / max(u_fullResolution.y, 1.0);
-  vec2 offset = threeDRollMatrix() * u_cameraOffset * 0.5 * length(vec2(aspect, 1.0));
+  vec2 offset = threeDRollMatrix() * u_cameraOffset
+    * (insideView ? u_abstractBound : 0.5 * length(vec2(aspect, 1.0)));
   vec3 rayOrigin = vec3(0.0, 0.0, cameraDistance) + right * offset.x + up * offset.y
-    + g_cameraForward * u_cameraDolly * cameraDistance;
+    + g_cameraForward * u_cameraDolly * (insideView ? u_abstractBound : cameraDistance);
   result.rayDirection = rayDirection;
   result.hit = true;
   result.hasColor = true;
@@ -2543,7 +2560,8 @@ ThreeDHit abstractHit(vec3 localRay) {
   }
 
   vec3 point = trace.firstPoint;
-  vec3 normal = trace.firstNormal;
+  // Seen from inside, the face turns toward the camera for the reflections and Shade.
+  vec3 normal = trace.cameraInside ? -trace.firstNormal : trace.firstNormal;
   float cosine = clamp(-dot(rayDirection, normal), 0.0, 1.0);
   // IOR belongs to the glass; the other materials reflect like common glass.
   float surfaceIor = u_abstractMaterial == ABSTRACT_MATERIAL_GLASS ? ior : ABSTRACT_SURFACE_IOR;
@@ -2562,6 +2580,12 @@ ThreeDHit abstractHit(vec3 localRay) {
   // term, as for the Crystals; the lights also show head-on, being bright.
   float reflectWeight = clamp(3.0 * fresnel * u_abstractReflection, 0.0, 1.0);
   vec3 highlight = lights * mix(0.35, 1.0, fresnel);
+  // Inside the glass, light reflected at the face stays in the glass and is
+  // part of the trace, as for the Crystals.
+  if (trace.cameraInside && u_abstractMaterial == ABSTRACT_MATERIAL_GLASS) {
+    reflectWeight = 0.0;
+    highlight = vec3(0.0);
+  }
 
   vec3 color;
   if (u_abstractMaterial == ABSTRACT_MATERIAL_CHROME) {

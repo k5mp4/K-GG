@@ -52,6 +52,18 @@ export const ABSTRACT_FORM_OPTIONS: { value: AbstractForm; label: string }[] = [
  */
 export type AbstractMaterial = 'glass' | 'chrome' | 'surface';
 export const ABSTRACT_MATERIALS = ['glass', 'chrome', 'surface'] as const satisfies readonly AbstractMaterial[];
+/**
+ * Where the Abstract camera stands: `outside` looks at the sculpture from in
+ * front, and `inside` stands at its center, so the canvas is seen through
+ * its walls from within.
+ */
+export type AbstractView = 'outside' | 'inside';
+export const ABSTRACT_VIEWS = ['outside', 'inside'] as const satisfies readonly AbstractView[];
+export const ABSTRACT_VIEW_OPTIONS: { value: AbstractView; label: string }[] = [
+  { value: 'outside', label: 'Outside · In front' },
+  { value: 'inside', label: 'Inside · From the center' },
+];
+
 export const ABSTRACT_MATERIAL_OPTIONS: { value: AbstractMaterial; label: string }[] = [
   { value: 'glass', label: 'Glass · Refraction' },
   { value: 'chrome', label: 'Chrome · Mirror' },
@@ -470,6 +482,12 @@ export type ConeViewConfig = {
   abstractBackdrop: number;
   /** Abstract only: whole turns of the sculpture about its vertical axis per loop. */
   abstractSpin: number;
+  /** Abstract only: camera in front of the sculpture or at its center. */
+  abstractView: AbstractView;
+  /** Abstract only: degrees the view rises over the sculpture; 90 looks down on its top. */
+  abstractElevation: number;
+  /** Abstract only: whole turns per loop the view circles over the top and under the bottom. */
+  abstractTumble: number;
 };
 
 /** Normalized apex movement limit; ±2 reaches 50% of the canvas outside its edge. */
@@ -598,6 +616,9 @@ export const DEFAULT_CONE_VIEW: ConeViewConfig = {
   abstractBackground: getParameterDefault('cone.abstractBackground'),
   abstractBackdrop: getParameterDefault('cone.abstractBackdrop'),
   abstractSpin: getParameterDefault('cone.abstractSpin'),
+  abstractView: 'outside',
+  abstractElevation: getParameterDefault('cone.abstractElevation'),
+  abstractTumble: getParameterDefault('cone.abstractTumble'),
 };
 
 function normalizeOption<T extends string>(value: unknown, options: readonly T[], fallback: T): T {
@@ -730,5 +751,8 @@ export function normalizeConeViewConfig(value: unknown): ConeViewConfig {
     abstractBackground: clampParameter(raw.abstractBackground, DEFAULT_CONE_VIEW.abstractBackground, getParameterLimit('cone.abstractBackground')),
     abstractBackdrop: clampParameter(raw.abstractBackdrop, DEFAULT_CONE_VIEW.abstractBackdrop, getParameterLimit('cone.abstractBackdrop')),
     abstractSpin: clampParameter(raw.abstractSpin, DEFAULT_CONE_VIEW.abstractSpin, getParameterLimit('cone.abstractSpin')),
+    abstractView: normalizeOption(raw.abstractView, ABSTRACT_VIEWS, DEFAULT_CONE_VIEW.abstractView),
+    abstractElevation: clampParameter(raw.abstractElevation, DEFAULT_CONE_VIEW.abstractElevation, getParameterLimit('cone.abstractElevation')),
+    abstractTumble: clampParameter(raw.abstractTumble, DEFAULT_CONE_VIEW.abstractTumble, getParameterLimit('cone.abstractTumble')),
   };
 }

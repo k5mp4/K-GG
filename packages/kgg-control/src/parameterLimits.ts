@@ -227,6 +227,8 @@ export const PARAMETER_LIMITS = {
   'cone.abstractBackground': { min: 0, max: 1, step: 0.01, defaultValue: 0.25 },
   'cone.abstractBackdrop': { min: 0.1, max: 4, step: 0.01, defaultValue: 1 },
   'cone.abstractSpin': { min: -4, max: 4, step: 1, defaultValue: 1, integer: true },
+  'cone.abstractElevation': { min: -90, max: 90, step: 1, defaultValue: 0 },
+  'cone.abstractTumble': { min: -4, max: 4, step: 1, defaultValue: 0, integer: true },
   'cone.ringsPerTile': { min: 1, max: 32, step: 1, defaultValue: 8, integer: true },
   'cone.ringsSpacing': { min: 0.3, max: 4, step: 0.01, defaultValue: 1 },
   'cone.ringsThickness': { min: 0.02, max: 0.6, step: 0.01, defaultValue: 0.12 },
