@@ -2,8 +2,8 @@ import { clampParameter, getParameterDefault, getParameterLimit } from '../lib/p
 
 export type ConeMappingMode = 'flow' | 'projection';
 /** Geometry of the 3D layer. The layer kind and preset key stay `cone` for compatibility. */
-export type ConeShape = 'cone' | 'torus' | 'lattice' | 'terrain' | 'ribbon' | 'rings' | 'field' | 'discs' | 'crystal';
-export const CONE_SHAPES = ['cone', 'torus', 'lattice', 'terrain', 'ribbon', 'rings', 'field', 'discs', 'crystal'] as const satisfies readonly ConeShape[];
+export type ConeShape = 'cone' | 'torus' | 'lattice' | 'terrain' | 'ribbon' | 'rings' | 'field' | 'discs' | 'crystal' | 'abstract';
+export const CONE_SHAPES = ['cone', 'torus', 'lattice', 'terrain', 'ribbon', 'rings', 'field', 'discs', 'crystal', 'abstract'] as const satisfies readonly ConeShape[];
 export const CONE_SHAPE_INDEX = {
   cone: 0,
   torus: 1,
@@ -14,6 +14,7 @@ export const CONE_SHAPE_INDEX = {
   field: 6,
   discs: 7,
   crystal: 8,
+  abstract: 9,
 } as const satisfies Record<ConeShape, number>;
 export const CONE_SHAPE_OPTIONS: { value: ConeShape; label: string }[] = [
   { value: 'cone', label: 'Cone' },
@@ -25,6 +26,36 @@ export const CONE_SHAPE_OPTIONS: { value: ConeShape; label: string }[] = [
   { value: 'field', label: 'Geometry Field · Scattered flythrough' },
   { value: 'discs', label: 'Discs · Slit rings in 3D' },
   { value: 'crystal', label: 'Crystals · Refraction' },
+  { value: 'abstract', label: 'Abstract · Organic glass' },
+];
+
+/**
+ * Form of the Abstract sculpture: `blob` is a sphere swelling with smooth
+ * noise, `metaball` melts spheres that drift apart and merge again, `torus`
+ * is a ring whose tube swells in lobes, and `cellular` cuts a sphere into the
+ * porous walls of a gyroid. Every form is displaced by the same noise.
+ */
+export type AbstractForm = 'blob' | 'metaball' | 'torus' | 'cellular';
+export const ABSTRACT_FORMS = ['blob', 'metaball', 'torus', 'cellular'] as const satisfies readonly AbstractForm[];
+export const ABSTRACT_FORM_OPTIONS: { value: AbstractForm; label: string }[] = [
+  { value: 'blob', label: 'Blob · Organic noise' },
+  { value: 'metaball', label: 'Metaball · Split and merge' },
+  { value: 'torus', label: 'Torus · Lobed ring' },
+  { value: 'cellular', label: 'Cellular · Porous gyroid' },
+];
+
+/**
+ * Surface of the Abstract sculpture. `glass` refracts the canvas behind it,
+ * `chrome` mirrors the canvas wrapped around the scene, and `surface` lays
+ * the shared Surface Mapping on it; Reflection, Thin Film, and Light Cards
+ * apply to all three.
+ */
+export type AbstractMaterial = 'glass' | 'chrome' | 'surface';
+export const ABSTRACT_MATERIALS = ['glass', 'chrome', 'surface'] as const satisfies readonly AbstractMaterial[];
+export const ABSTRACT_MATERIAL_OPTIONS: { value: AbstractMaterial; label: string }[] = [
+  { value: 'glass', label: 'Glass · Refraction' },
+  { value: 'chrome', label: 'Chrome · Mirror' },
+  { value: 'surface', label: 'Surface · Canvas mapping' },
 ];
 
 /**
@@ -399,6 +430,46 @@ export type ConeViewConfig = {
   crystalSpin: number;
   /** Crystals only: whole turns of all crystals about the view axis per loop. */
   crystalRevolve: number;
+  /** Abstract only: sculpture form. */
+  abstractForm: AbstractForm;
+  /** Abstract only: glass, chrome, or the shared Surface Mapping. */
+  abstractMaterial: AbstractMaterial;
+  /** Abstract only: spheres of the Metaball form. */
+  abstractCount: number;
+  /** Abstract only: sculpture size relative to the frame. */
+  abstractSize: number;
+  /** Abstract only: strength of the noise that swells the surface. */
+  abstractDisplace: number;
+  /** Abstract only: noise frequency over the sculpture, also the Cellular pore count. */
+  abstractFrequency: number;
+  /** Abstract only: degrees the sculpture twists about its vertical axis per radius of height. */
+  abstractTwist: number;
+  /** Abstract only: whole cycles of the noise morph, the Metaball drift, and the pulse per loop. */
+  abstractMorph: number;
+  /** Abstract only: breathing of the size with Morph; 1 swings it by ±25%. */
+  abstractPulse: number;
+  /** Abstract only: random noise and Metaball variant. */
+  abstractSeed: number;
+  /** Abstract only: index of refraction at the middle of the spectrum. */
+  abstractIor: number;
+  /** Abstract only: index difference from red to blue. */
+  abstractDispersion: number;
+  /** Abstract only: wavelengths read across the Dispersion range. */
+  abstractDispersionSteps: number;
+  /** Abstract only: strength of the Fresnel reflection of the surroundings. */
+  abstractReflection: number;
+  /** Abstract only: strength of the thin-film iridescence. */
+  abstractThinFilm: number;
+  /** Abstract only: mean film thickness in nanometers; thicker films show more bands. */
+  abstractFilmThickness: number;
+  /** Abstract only: brightness of the strip lights and softbox mirrored on the surface. */
+  abstractLights: number;
+  /** Abstract only: brightness of the canvas where it is seen past the sculpture. */
+  abstractBackground: number;
+  /** Abstract only: distance from the sculpture to the canvas behind it. */
+  abstractBackdrop: number;
+  /** Abstract only: whole turns of the sculpture about its vertical axis per loop. */
+  abstractSpin: number;
 };
 
 /** Normalized apex movement limit; ±2 reaches 50% of the canvas outside its edge. */
@@ -507,6 +578,26 @@ export const DEFAULT_CONE_VIEW: ConeViewConfig = {
   crystalBackdrop: getParameterDefault('cone.crystalBackdrop'),
   crystalSpin: getParameterDefault('cone.crystalSpin'),
   crystalRevolve: getParameterDefault('cone.crystalRevolve'),
+  abstractForm: 'blob',
+  abstractMaterial: 'glass',
+  abstractCount: getParameterDefault('cone.abstractCount'),
+  abstractSize: getParameterDefault('cone.abstractSize'),
+  abstractDisplace: getParameterDefault('cone.abstractDisplace'),
+  abstractFrequency: getParameterDefault('cone.abstractFrequency'),
+  abstractTwist: getParameterDefault('cone.abstractTwist'),
+  abstractMorph: getParameterDefault('cone.abstractMorph'),
+  abstractPulse: getParameterDefault('cone.abstractPulse'),
+  abstractSeed: getParameterDefault('cone.abstractSeed'),
+  abstractIor: getParameterDefault('cone.abstractIor'),
+  abstractDispersion: getParameterDefault('cone.abstractDispersion'),
+  abstractDispersionSteps: getParameterDefault('cone.abstractDispersionSteps'),
+  abstractReflection: getParameterDefault('cone.abstractReflection'),
+  abstractThinFilm: getParameterDefault('cone.abstractThinFilm'),
+  abstractFilmThickness: getParameterDefault('cone.abstractFilmThickness'),
+  abstractLights: getParameterDefault('cone.abstractLights'),
+  abstractBackground: getParameterDefault('cone.abstractBackground'),
+  abstractBackdrop: getParameterDefault('cone.abstractBackdrop'),
+  abstractSpin: getParameterDefault('cone.abstractSpin'),
 };
 
 function normalizeOption<T extends string>(value: unknown, options: readonly T[], fallback: T): T {
@@ -619,5 +710,25 @@ export function normalizeConeViewConfig(value: unknown): ConeViewConfig {
     crystalBackdrop: clampParameter(raw.crystalBackdrop, DEFAULT_CONE_VIEW.crystalBackdrop, getParameterLimit('cone.crystalBackdrop')),
     crystalSpin: clampParameter(raw.crystalSpin, DEFAULT_CONE_VIEW.crystalSpin, getParameterLimit('cone.crystalSpin')),
     crystalRevolve: clampParameter(raw.crystalRevolve, DEFAULT_CONE_VIEW.crystalRevolve, getParameterLimit('cone.crystalRevolve')),
+    abstractForm: normalizeOption(raw.abstractForm, ABSTRACT_FORMS, DEFAULT_CONE_VIEW.abstractForm),
+    abstractMaterial: normalizeOption(raw.abstractMaterial, ABSTRACT_MATERIALS, DEFAULT_CONE_VIEW.abstractMaterial),
+    abstractCount: clampParameter(raw.abstractCount, DEFAULT_CONE_VIEW.abstractCount, getParameterLimit('cone.abstractCount')),
+    abstractSize: clampParameter(raw.abstractSize, DEFAULT_CONE_VIEW.abstractSize, getParameterLimit('cone.abstractSize')),
+    abstractDisplace: clampParameter(raw.abstractDisplace, DEFAULT_CONE_VIEW.abstractDisplace, getParameterLimit('cone.abstractDisplace')),
+    abstractFrequency: clampParameter(raw.abstractFrequency, DEFAULT_CONE_VIEW.abstractFrequency, getParameterLimit('cone.abstractFrequency')),
+    abstractTwist: clampParameter(raw.abstractTwist, DEFAULT_CONE_VIEW.abstractTwist, getParameterLimit('cone.abstractTwist')),
+    abstractMorph: clampParameter(raw.abstractMorph, DEFAULT_CONE_VIEW.abstractMorph, getParameterLimit('cone.abstractMorph')),
+    abstractPulse: clampParameter(raw.abstractPulse, DEFAULT_CONE_VIEW.abstractPulse, getParameterLimit('cone.abstractPulse')),
+    abstractSeed: clampParameter(raw.abstractSeed, DEFAULT_CONE_VIEW.abstractSeed, getParameterLimit('cone.abstractSeed')),
+    abstractIor: clampParameter(raw.abstractIor, DEFAULT_CONE_VIEW.abstractIor, getParameterLimit('cone.abstractIor')),
+    abstractDispersion: clampParameter(raw.abstractDispersion, DEFAULT_CONE_VIEW.abstractDispersion, getParameterLimit('cone.abstractDispersion')),
+    abstractDispersionSteps: clampParameter(raw.abstractDispersionSteps, DEFAULT_CONE_VIEW.abstractDispersionSteps, getParameterLimit('cone.abstractDispersionSteps')),
+    abstractReflection: clampParameter(raw.abstractReflection, DEFAULT_CONE_VIEW.abstractReflection, getParameterLimit('cone.abstractReflection')),
+    abstractThinFilm: clampParameter(raw.abstractThinFilm, DEFAULT_CONE_VIEW.abstractThinFilm, getParameterLimit('cone.abstractThinFilm')),
+    abstractFilmThickness: clampParameter(raw.abstractFilmThickness, DEFAULT_CONE_VIEW.abstractFilmThickness, getParameterLimit('cone.abstractFilmThickness')),
+    abstractLights: clampParameter(raw.abstractLights, DEFAULT_CONE_VIEW.abstractLights, getParameterLimit('cone.abstractLights')),
+    abstractBackground: clampParameter(raw.abstractBackground, DEFAULT_CONE_VIEW.abstractBackground, getParameterLimit('cone.abstractBackground')),
+    abstractBackdrop: clampParameter(raw.abstractBackdrop, DEFAULT_CONE_VIEW.abstractBackdrop, getParameterLimit('cone.abstractBackdrop')),
+    abstractSpin: clampParameter(raw.abstractSpin, DEFAULT_CONE_VIEW.abstractSpin, getParameterLimit('cone.abstractSpin')),
   };
 }
