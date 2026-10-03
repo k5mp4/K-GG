@@ -4,6 +4,7 @@ import {
   FRAME_ZIP_FORMAT,
   NATIVE_VIDEO_FORMATS,
   availableNativeVideoFormats,
+  availableMovCodecs,
   gpuEncoderLabel,
   isNativeVideoFormat,
   nativeVideoFileName,
@@ -28,6 +29,13 @@ function status(overrides: Partial<NativeFfmpegStatus>): NativeFfmpegStatus {
 }
 
 describe('video export format registry', () => {
+  it('offers only detected MOV codecs, falling back to Animation for legacy status', () => {
+    expect(availableMovCodecs(status({ movCodecs: ['qtrle', 'h264'] }))).toEqual(['h264', 'qtrle']);
+    expect(availableMovCodecs(status({ movCodecs: ['prores', 'h264', 'qtrle'] }))).toEqual(['h264', 'prores', 'qtrle']);
+    expect(availableMovCodecs(status({}))).toEqual(['qtrle']);
+    expect(availableMovCodecs(null)).toEqual([]);
+    expect(availableMovCodecs(status({ available: false, movCodecs: ['h264'] }))).toEqual([]);
+  });
   it('keeps unique format ids that match their file extension', () => {
     const ids = NATIVE_VIDEO_FORMATS.map(format => format.value);
     expect(new Set(ids).size).toBe(ids.length);

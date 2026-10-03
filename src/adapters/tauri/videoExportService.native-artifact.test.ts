@@ -71,6 +71,7 @@ type EncodeRequest = {
   quality: string;
   gifMaxFileMb: number | null;
   useGpu: boolean;
+  movCodec: string | null;
 };
 
 function encodedRequest(): EncodeRequest {
@@ -88,6 +89,16 @@ beforeEach(() => {
 });
 
 describe('tauriVideoExportService native video artifact contract', () => {
+  it('defaults MOV to balanced H.264 and forwards explicit codec and quality', async () => {
+    await tauriVideoExportService.exportNativeVideo('mov', exportConfig());
+    expect(encodedRequest()).toMatchObject({ movCodec: 'h264', quality: 'balanced' });
+    mocks.invoke.mockClear();
+    await tauriVideoExportService.exportNativeVideo('mov', { ...exportConfig(), movCodec: 'prores', mp4Quality: 'small' });
+    expect(encodedRequest()).toMatchObject({ movCodec: 'prores', quality: 'small' });
+    mocks.invoke.mockClear();
+    await tauriVideoExportService.exportNativeVideo('mp4', exportConfig());
+    expect(encodedRequest()).toMatchObject({ movCodec: null, quality: 'high' });
+  });
   it('sends the GIF max file size only for GIF, defaulting to 15MB', async () => {
     await tauriVideoExportService.exportNativeVideo('gif', exportConfig());
     expect(encodedRequest().gifMaxFileMb).toBe(15);

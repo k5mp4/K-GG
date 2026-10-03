@@ -5,12 +5,12 @@ title: 動画・連番フレーム出力
 status: current
 owners: [maintainer]
 created: 2026-07-31
-updated: 2026-09-29
+updated: 2026-10-03
 requirement_ids: [EXPORT-001, EXPORT-002, EXPORT-003, EXPORT-004, EXPORT-005, EXPORT-006, EXPORT-007, EXPORT-008, EXPORT-009, EXPORT-010, EXPORT-011, EXPORT-012, EXPORT-013, EXPORT-021, EXPORT-022]
 related_adrs: [ADR-0004, ADR-0005, ADR-0018, ADR-0021]
 related_changes: [CHANGE-011, CHANGE-024, CHANGE-025, CHANGE-027, CHANGE-030, CHANGE-031, CHANGE-032, CHANGE-037, CHANGE-038, CHANGE-048, CHANGE-051, CHANGE-052, CHANGE-054]
 related_code: [src/adapters/browser/videoExportService.ts, src/adapters/tauri/videoExportService.ts, src/adapters/browser/exportService.ts, src/adapters/tauri/exportService.ts, src/adapters/tauri/afterEffectsService.ts, src/adapters/types.ts, src/lib/export.ts, src/lib/exportSlits.ts, src/lib/exportVideo.ts, src/lib/videoExportFormats.ts, src/lib/aftereffectsExport.ts, src/lib/aeStatusController.ts, src/lib/videoExportLifecycle.ts, src/lib/renderBridge.ts, src/lib/renderSceneAtTime.ts, src/lib/flowGradientRenderer.ts, src/lib/flowSimulation.ts, src/lib/videoExportFrames.ts, src/lib/tileRender.ts, src/lib/webgl.ts, src/lib/clothGradientRenderer.ts, src/lib/coneSeam.ts, src/components/GradientCanvas.tsx, src/components/ClothCanvas.tsx, src/components/ConeApexEditor.tsx, src/components/ExportPanel.tsx, src-tauri/src/lib.rs, tools/ffmpeg-native-smoke.mjs, tools/verify-macos-signing.sh, tools/tauri-build-macos-verified.sh]
-related_tests: [src/lib/videoExportFormats.test.ts, tests/e2e/export.spec.ts, src/lib/renderBridge.test.ts, src/lib/effectPipeline.test.ts, src/lib/renderFrame.test.ts, src/lib/flowSimulation.test.ts, src/lib/flowGradientPreset.test.ts, src/lib/webglExportPrograms.test.ts, src/lib/webglShaderSources.test.ts, src/lib/glass.test.ts, src/lib/videoExportFrames.test.ts, src/lib/coneView.test.ts, src/lib/coneSeam.test.ts, src/lib/webglPerformance.test.ts, src/lib/aftereffectsExport.test.ts, src/lib/aeStatusController.test.ts, src/lib/videoExportLifecycle.test.ts, src/adapters/tauri/exportService.test.ts, src/adapters/tauri/videoExportService.native-artifact.test.ts, src/adapters/tauri/exportService.native-artifact.test.ts, src/adapters/tauri/afterEffectsService.native-artifact.test.ts]
+related_tests: [src/components/ExportPanel.mov.test.tsx, src/lib/videoExportFormats.test.ts, tests/e2e/export.spec.ts, src/lib/renderBridge.test.ts, src/lib/effectPipeline.test.ts, src/lib/renderFrame.test.ts, src/lib/flowSimulation.test.ts, src/lib/flowGradientPreset.test.ts, src/lib/webglExportPrograms.test.ts, src/lib/webglShaderSources.test.ts, src/lib/glass.test.ts, src/lib/videoExportFrames.test.ts, src/lib/coneView.test.ts, src/lib/coneSeam.test.ts, src/lib/webglPerformance.test.ts, src/lib/aftereffectsExport.test.ts, src/lib/aeStatusController.test.ts, src/lib/videoExportLifecycle.test.ts, src/adapters/tauri/exportService.test.ts, src/adapters/tauri/videoExportService.native-artifact.test.ts, src/adapters/tauri/exportService.native-artifact.test.ts, src/adapters/tauri/afterEffectsService.native-artifact.test.ts]
 ---
 
 # 動画・連番フレーム出力
@@ -81,13 +81,17 @@ Windows x64はアプリローカルデータの`ffmpeg/ffmpeg.exe`を優先し�
 
 保存ファイル名はMOVが`{stem}.mov`、MP4が`{stem}_h264rgb.mp4`、WebMが`{stem}.webm`、GIFが`{stem}.gif`、PNG連番が`{stem}_frames.zip`とする。
 
+MOVはコーデックを選択でき、H.264／ProRes 422ではHigh／Balanced／Smallの品質を選択できる。MOVの既定値はH.264／Balancedとし、MP4／WebMの既定品質Highとは別に保持する。Animationはロスレス固定のため品質選択を表示しない。
+
 ### EXPORT-013 FFmpeg動画形式の登録
 
 Tauri版のネイティブ動画形式は、Rustの形式登録表（`NativeVideoFormat`）で形式ID、必要エンコーダー、一時出力ファイル名、FFmpeg引数を定義し、単一の`encode_native_video` commandで生成する。フロントエンドは同じ形式IDの表示名、保存ファイル名、品質選択とAfter Effects送信の可否を登録表（`src/lib/videoExportFormats.ts`）で定義する。
 
 | 形式 | エンコーダー | 出力 |
 | --- | --- | --- |
-| MOV | `qtrle` | `rgb24`のロスレスQuickTime Animation |
+| MOV（既定） | `libx264` | H.264、CRF High 18／Balanced 22／Small 27。MP4と同じ`yuv420p`、BT.709、video range、SAR、奇数寸法padding、`faststart` |
+| MOV（編集向け） | `prores_ks` | ProRes 422、HighはHQ（profile 3）／Balancedは422（profile 2）／SmallはLT（profile 1）、`yuv422p10le`、BT.709、video range、SAR `1:1`、奇数幅を右端1pxでpadding、`faststart` |
+| MOV（ロスレス） | `qtrle` | `rgb24`のQuickTime Animation。従来の出力を明示選択できる |
 | MP4 | `libx264` | EXPORT-009のH.264／`yuv420p`／BT.709 |
 | WebM | `libvpx-vp9` | CRF（High 24／Balanced 31／Small 38）、`-b:v 0`、`yuv420p`、BT.709メタデータ、奇数寸法は右端・下端を1px以内でpadding |
 | GIF | `gif` | 全フレームから生成した256色パレット（`palettegen`／`paletteuse`）、無限ループ、最大ファイルサイズに合わせた縮小 |
@@ -95,6 +99,8 @@ Tauri版のネイティブ動画形式は、Rustの形式登録表（`NativeVide
 FFmpegの利用可否は従来どおり`qtrle`と`libx264`で判定し、FFmpeg状態は検出したエンコーダーから利用可能な形式を`videoFormats`として返す。WebMとGIFは該当エンコーダーを持つFFmpegでだけ選択肢に表示し、Rust側でも利用できない形式のencode要求を拒否する。GIFの1フレームの表示時間は1/100秒単位のため、60fpsの出力は多くのビューアーで約50fpsとして再生される。
 
 GIFは最大ファイルサイズ（MB、1MB = 1,000,000 bytes、既定15MB、1〜1000MB）を指定でき、書き出し結果がこの値以上の場合は解像度を縮小（面積比の平方根×0.92）して再エンコードする。最大6回試行しても収まらない場合、または5%まで縮小しても収まらない場合はエラーとする。Rust側でも範囲を検証する。
+
+MOVの利用可能コーデックは`movCodecs`（`h264`／`prores`／`qtrle`）として返し、検出されたものだけをUIに表示する。未報告の旧バックエンドでは従来どおりAnimationのみを表示する。Rustは指定されたコーデックIDとエンコーダーの利用可否を検証し、未知・未対応の指定を拒否する。コーデック省略時はH.264、MOVの品質省略時はBalancedを使う。MOVはCPUで生成する。各MOV形式は従来同様alphaを保存しない。圧縮時の画質と容量は映像内容・寸法・FPSで変わり、最大ファイルサイズを保証しない。
 
 ### EXPORT-021 Flow Gradientの論理フレーム
 

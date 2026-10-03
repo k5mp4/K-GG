@@ -26,6 +26,7 @@ import type {
   ExportDirectoryHandle,
   ExportStage,
   Mp4QualityPreset,
+  MovCodec,
   NativeFfmpegStatus,
   NativeVideoArtifact,
   NativeVideoFormat,
@@ -46,6 +47,8 @@ import { DesignAppSendPanel } from './DesignAppSendPanel';
 import { SpoutOutputPanel } from './SpoutOutputPanel';
 import {
   FRAME_ZIP_FORMAT,
+  MOV_CODECS,
+  availableMovCodecs,
   IMAGE_EXPORT_FORMATS,
   LOSSY_IMAGE_QUALITY,
   REQUIRED_NATIVE_VIDEO_FORMATS,
@@ -121,6 +124,8 @@ export function ExportPanel({
   const [exportProgress, setExportProgress] = useState(0);
   const [exportStage, setExportStage] = useState<ExportStage>('preparing');
   const [mp4Quality, setMp4Quality] = useState<Mp4QualityPreset>('high');
+  const [movQuality, setMovQuality] = useState<Mp4QualityPreset>('balanced');
+  const [movCodec, setMovCodec] = useState<MovCodec>('h264');
   const [gifMaxFileMb, setGifMaxFileMb] = useState<number>(GIF_MAX_FILE_MB.default);
   const [useGpuEncode, setUseGpuEncode] = useState(true);
   const [imageFormat, setImageFormat] = useState<ImageExportFormat>('png');
@@ -383,6 +388,11 @@ export function ExportPanel({
     ? nativeVideoFormatDefinition(selectedVideoFormat)
     : null;
   const lastVideoAeExt = lastVideoRef.current ? aeVideoExt(lastVideoRef.current.format) : null;
+  const movCodecOptions = nativeVideoEncodeReady ? availableMovCodecs(ffmpegStatus) : ['h264'] as MovCodec[];
+  const selectedMovCodec = movCodecOptions.includes(movCodec) ? movCodec : movCodecOptions[0];
+  const movDefinition = MOV_CODECS.find(codec => codec.value === selectedMovCodec);
+  const videoQualityEnabled = selectedNativeVideoFormat?.value === 'mov'
+    ? movDefinition?.supportsQuality : selectedNativeVideoFormat?.supportsQuality;
 
   const gpuEncoderName = nativeVideoEncodeReady ? gpuEncoderLabel(ffmpegStatus?.gpuEncoder) : null;
 
@@ -444,7 +454,8 @@ export function ExportPanel({
         duration: animation.duration,
         speed: animation.speed,
         easing: animation.easing,
-        mp4Quality: definition.supportsQuality ? mp4Quality : undefined,
+        mp4Quality: format === 'mov' ? movQuality : definition.supportsQuality ? mp4Quality : undefined,
+        movCodec: format === 'mov' ? selectedMovCodec : undefined,
         gifMaxFileMb: format === 'gif' ? gifMaxFileMb : undefined,
         useGpu: format === 'mp4' && useGpuEncode && gpuEncoderName !== null,
         signal: controller.signal,
@@ -812,16 +823,31 @@ export function ExportPanel({
             />
           </div>
 
-          {selectedNativeVideoFormat?.supportsQuality && (
+          {selectedNativeVideoFormat?.value === 'mov' && (
+            <>
+              <CustomSelect
+                value={selectedMovCodec ?? ''}
+                options={MOV_CODECS.filter(codec => movCodecOptions.includes(codec.value)).map(({ value, label }) => ({ value, label }))}
+                onChange={(value) => setMovCodec(value as MovCodec)}
+                label={t('export.movCodec')}
+                localizeLabel={false}
+                localizeOptions={false}
+              />
+              <p className="text-xs text-deep">{movDefinition?.description}</p>
+            </>
+          )}
+
+          {videoQualityEnabled && (
             <CustomSelect
-              value={mp4Quality}
+              value={selectedNativeVideoFormat?.value === 'mov' ? movQuality : mp4Quality}
               options={MP4_QUALITY_PRESETS.map(({ value, label, crf, description }) => ({
                 value,
-                label: selectedNativeVideoFormat.value === 'mp4'
+                label: selectedNativeVideoFormat?.value === 'mp4'
                   ? `${label} — ${description}（CRF ${crf}）`
                   : `${label} — ${description}`,
               }))}
-              onChange={(value) => setMp4Quality(value as Mp4QualityPreset)}
+              onChange={(value) => selectedNativeVideoFormat?.value === 'mov'
+                ? setMovQuality(value as Mp4QualityPreset) : setMp4Quality(value as Mp4QualityPreset)}
               label={t('export.videoQuality')}
               localizeLabel={false}
               localizeOptions={false}
