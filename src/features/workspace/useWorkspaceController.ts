@@ -5,6 +5,8 @@ import { useGradientStore } from '../../store/gradientStore';
 import { useViewportControl } from '../../hooks/useViewportControl';
 import { useCanvasSize } from '../../hooks/useCanvasSize';
 import { useKeyboardShortcuts } from '../../hooks/useKeyboardShortcuts';
+import { useOscReceiverSync } from '../native/controllerReceiver';
+import { useControllerActions } from '../native/useControllerActions';
 import { useGradientRampEditorHost } from '../gradientRampEditor/useGradientRampEditorHost';
 import { applicationCommands } from '../../application/commands';
 import type { GpuDiagnostics } from '../../lib/gpuDiagnostics';
@@ -209,6 +211,8 @@ export function useWorkspaceController({ translate }: WorkspaceControllerOptions
   } = useViewportControl();
 
   useKeyboardShortcuts();
+  useOscReceiverSync();
+  useControllerActions();
   useGradientRampEditorHost();
 
   useEffect(() => {

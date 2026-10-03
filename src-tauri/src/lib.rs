@@ -12,6 +12,7 @@ use tauri_plugin_opener::OpenerExt;
 
 mod after_effects;
 mod design_app_bridge;
+mod osc_input;
 mod tool_windows;
 mod spout_output;
 mod spout_shared_frames;
@@ -36,6 +37,7 @@ pub fn run() {
         .plugin(tauri_plugin_updater::Builder::new().build())
         .setup(|app| {
             app.manage(design_app_bridge::DesignAppConnectorBridge::start());
+            app.manage(osc_input::OscInputState::default());
             app.manage(spout_output::SpoutOutputState::new());
             app.manage(spout_shared_frames::SpoutSharedFrames::new());
             if native_ffmpeg_supported_target() && cfg!(target_os = "windows") {
@@ -68,6 +70,7 @@ pub fn run() {
             spout_output::start_spout_output,
             spout_output::send_spout_output_frame,
             spout_output::stop_spout_output,
+            osc_input::configure_osc_input,
             spout_shared_frames::create_spout_frame_buffers,
             spout_shared_frames::send_spout_shared_frame,
             spout_shared_frames::release_spout_frame_buffers
@@ -77,6 +80,9 @@ pub fn run() {
         .run(|app, event| {
             if let tauri::RunEvent::Exit = event {
                 // Unregister the Spout sender so receivers do not keep a dead source.
+                if let Some(osc) = app.try_state::<osc_input::OscInputState>() {
+                    osc.shutdown();
+                }
                 if let Some(spout) = app.try_state::<spout_output::SpoutOutputState>() {
                     spout.shutdown();
                 }
