@@ -249,7 +249,11 @@ export function useWorkspaceController({ translate }: WorkspaceControllerOptions
     setLeftPanelOpen(true);
   };
 
+  // Preset読込で設定が一括変更されたときは、タイムラインを開かない。
+  const skipTimelineAutoOpenRef = useRef(false);
+
   useEffect(() => {
+    if (skipTimelineAutoOpenRef.current) return;
     if (animation.enabled && (noiseDistortion.enabled || slitScan.animEnabled || stretch.enabled)) {
       const id = setTimeout(() => setShowTimeline(true), 180);
       return () => clearTimeout(id);
@@ -545,6 +549,9 @@ export function useWorkspaceController({ translate }: WorkspaceControllerOptions
     }
   };
   const handlePresetLoad = () => {
+    // 読込で変わった設定による自動オープンだけを止め、次の操作では通常どおり開く。
+    skipTimelineAutoOpenRef.current = true;
+    setTimeout(() => { skipTimelineAutoOpenRef.current = false; }, 0);
     setClothReady(false);
     setClothUnavailable(false);
     setRenderViewMode('canvas');
