@@ -272,6 +272,7 @@ export function PresetPanel({ canvasW, canvasH, setCanvasW, setCanvasH, aspectRa
   const [viewMode, setViewMode] = useState<ViewMode>(getViewMode);
   const [exportScope, setExportScope] = useState<ExportScope>('preset');
   const [exportOpen, setExportOpen] = useState(false);
+  const [folderOpen, setFolderOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const importRef = useRef<HTMLInputElement>(null);
@@ -500,24 +501,26 @@ export function PresetPanel({ canvasW, canvasH, setCanvasW, setCanvasH, aspectRa
 
       {displayedError && <p role="alert" className="shrink-0 border border-red-400/30 bg-red-400/10 px-2 py-1.5 text-[10px] text-red-300">{displayedError}</p>}
 
-      <div className="max-h-[60%] shrink-0 space-y-2 overflow-y-auto border-t border-cream/15 bg-k-bg/95 pt-2 backdrop-blur scrollbar-thin">
+      <div className="max-h-[60%] shrink-0 space-y-2 overflow-y-auto bg-k-bg/95 backdrop-blur scrollbar-thin">
+        <SidebarSection id="preset-folders" title={t('preset.folderTree')} open={folderOpen} onToggle={() => setFolderOpen(value => !value)}>
+          <div className="border border-cream/10 bg-k-surface/45 p-1.5">
+            <div className="max-h-36 overflow-y-auto pr-0.5 scrollbar-thin"><FolderTree folders={library.folders} selectedFolderId={selectedFolderId} onSelect={setSelectedFolderId} onDropPreset={(presetId, folderId) => void handleMovePreset(presetId, folderId)} /></div>
+            <div className="mt-2 border-t border-cream/10 pt-2">
+              <div className="flex gap-1">
+                <input value={folderName} onChange={event => setFolderName(event.target.value)} onKeyDown={event => { if (event.key === 'Enter') void handleCreateFolder(); }} placeholder={t('preset.newFolder')} className="min-w-0 flex-1 bg-k-bg px-1.5 py-1 text-[10px] text-k-text outline-none ring-1 ring-cream/10 focus:ring-fire/60" />
+                <button type="button" onClick={() => void handleCreateFolder()} className="bg-fire/80 px-2 text-[13px] font-bold text-cream hover:bg-fire" aria-label={t('preset.createFolder')}>＋</button>
+              </div>
+              {currentFolder && <div className="mt-1 flex gap-1"><button type="button" onClick={() => void handleRenameFolder()} className="flex-1 px-1 py-1 text-[9px] text-tab-inactive hover:bg-k-surface hover:text-k-text">{t('preset.renameFolder')}</button><button type="button" onClick={() => void handleDeleteFolder()} className="flex-1 px-1 py-1 text-[9px] text-red-400 hover:bg-red-400/10">{t('common.delete')}</button></div>}
+            </div>
+          </div>
+        </SidebarSection>
+
         <div className="flex gap-1.5">
           <input type="text" value={name} onChange={event => setName(event.target.value)} onKeyDown={event => { if (event.key === 'Enter') void handleSave(); }} placeholder={t('preset.saveTo', { name: selectedFolderLabel })} className="min-w-0 flex-1 bg-k-surface px-2 py-1.5 text-[10px] text-k-text outline-none ring-1 ring-cream/15 focus:ring-fire/70" />
-          <button type="button" onClick={() => void handleSave()} disabled={!name.trim() || saving} className="bg-fire px-2.5 py-1 text-[10px] font-bold text-cream transition-opacity disabled:opacity-40">{saving ? t('common.saving') : t('common.save')}</button>
+          <button type="button" onClick={() => void handleSave()} disabled={!name.trim() || saving} className="shrink-0 bg-fire px-2.5 py-1 text-[10px] font-bold text-cream transition-opacity disabled:opacity-40">{saving ? t('common.saving') : t('common.save')}</button>
+          <IconButton icon="upload" label={t('preset.importTo', { name: selectedFolderLabel })} onClick={() => importRef.current?.click()} className="shrink-0 border-cream/15 bg-k-surface/70 px-2 hover:border-fire/50" />
+          <input ref={importRef} type="file" accept=".json,.zip,.kggpresets" className="hidden" onChange={handleImport} />
         </div>
-        <button type="button" onClick={() => importRef.current?.click()} className="w-full border border-cream/15 bg-k-surface/70 py-1.5 text-[10px] text-tab-inactive hover:border-fire/50 hover:text-k-text">{t('preset.importTo', { name: selectedFolderLabel })}</button>
-        <input ref={importRef} type="file" accept=".json,.zip,.kggpresets" className="hidden" onChange={handleImport} />
-      <section className="border border-cream/10 bg-k-surface/45 p-1.5">
-          <p className="mb-1 px-1 text-[9px] font-bold tracking-[0.18em] text-tab-inactive">{t('preset.folderTree')}</p>
-          <div className="max-h-36 overflow-y-auto pr-0.5 scrollbar-thin"><FolderTree folders={library.folders} selectedFolderId={selectedFolderId} onSelect={setSelectedFolderId} onDropPreset={(presetId, folderId) => void handleMovePreset(presetId, folderId)} /></div>
-          <div className="mt-2 border-t border-cream/10 pt-2">
-            <div className="flex gap-1">
-              <input value={folderName} onChange={event => setFolderName(event.target.value)} onKeyDown={event => { if (event.key === 'Enter') void handleCreateFolder(); }} placeholder={t('preset.newFolder')} className="min-w-0 flex-1 bg-k-bg px-1.5 py-1 text-[10px] text-k-text outline-none ring-1 ring-cream/10 focus:ring-fire/60" />
-              <button type="button" onClick={() => void handleCreateFolder()} className="bg-fire/80 px-2 text-[13px] font-bold text-cream hover:bg-fire" aria-label={t('preset.createFolder')}>＋</button>
-            </div>
-            {currentFolder && <div className="mt-1 flex gap-1"><button type="button" onClick={() => void handleRenameFolder()} className="flex-1 px-1 py-1 text-[9px] text-tab-inactive hover:bg-k-surface hover:text-k-text">{t('preset.renameFolder')}</button><button type="button" onClick={() => void handleDeleteFolder()} className="flex-1 px-1 py-1 text-[9px] text-red-400 hover:bg-red-400/10">{t('common.delete')}</button></div>}
-          </div>
-      </section>
 
         <SidebarSection id="preset-export" title={t('preset.exportSection')} open={exportOpen} onToggle={() => setExportOpen(value => !value)} nested>
           <div className="space-y-2">
