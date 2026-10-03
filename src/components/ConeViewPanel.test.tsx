@@ -135,6 +135,12 @@ describe('ConeViewPanel shape controls', () => {
     expect(hasLabel(renderShape('abstract', { abstractMaterial: 'surface' }), 'Surface Mapping')).toBe(true);
   });
 
+  it('offers Antialias for every shape, also the classic Cone', () => {
+    for (const shape of ['cone', 'torus', 'crystal', 'abstract'] as const) {
+      expect(hasLabel(renderShape(shape), 'Antialias'), shape).toBe(true);
+    }
+  });
+
   it('no longer offers the Extrusion shape', () => {
     const markup = renderShape('cone');
     expect(markup).not.toContain('Pixel city');

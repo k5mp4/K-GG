@@ -789,6 +789,15 @@ describe('torus tunnel', () => {
     expect(getThreeDRenderParams(DEFAULT_CONE_VIEW, 0, 1).coneTwist).toBe(0);
   });
 
+  it('traces one ray per pixel unless antialiasing is on, for every shape', () => {
+    for (const shape of ['cone', 'torus', 'crystal', 'abstract'] as const) {
+      const config = { ...DEFAULT_CONE_VIEW, shape };
+      expect(getThreeDRenderParams(config, 0, 1).samples).toBe(1);
+      expect(getThreeDRenderParams({ ...config, antialias: 'x4' }, 0, 1).samples).toBe(4);
+      expect(getThreeDRenderParams({ ...config, antialias: 'x9' }, 0, 1).samples).toBe(9);
+    }
+  });
+
   it('converts the fisheye angle, lens, dolly, and aim settings', () => {
     const params = getThreeDRenderParams({
       ...torus,

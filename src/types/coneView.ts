@@ -189,6 +189,24 @@ export const THREE_D_PROJECTION_OPTIONS: { value: ThreeDProjection; label: strin
   { value: 'equirect', label: 'Equirect · 360° panorama' },
 ];
 
+/**
+ * Antialiasing of every 3D shape: rays traced per pixel and averaged. `x4`
+ * uses a rotated grid and `x9` a 3x3 grid; each costs that many times the
+ * rendering of the layer.
+ */
+export type ThreeDAntialias = 'off' | 'x4' | 'x9';
+export const THREE_D_ANTIALIAS_MODES = ['off', 'x4', 'x9'] as const satisfies readonly ThreeDAntialias[];
+export const THREE_D_ANTIALIAS_SAMPLES = {
+  off: 1,
+  x4: 4,
+  x9: 9,
+} as const satisfies Record<ThreeDAntialias, number>;
+export const THREE_D_ANTIALIAS_OPTIONS: { value: ThreeDAntialias; label: string }[] = [
+  { value: 'off', label: 'Off' },
+  { value: 'x4', label: '4× · Rotated grid' },
+  { value: 'x9', label: '9× · 3×3 grid' },
+];
+
 /** Triply periodic minimal surfaces used by the Lattice shape. */
 export type LatticeType = 'gyroid' | 'schwarzP';
 export const LATTICE_TYPES = ['gyroid', 'schwarzP'] as const satisfies readonly LatticeType[];
@@ -274,6 +292,8 @@ export type ConeViewConfig = {
   /** Not used by the Cone shape, which keeps its original unlit UV mapping. */
   surfaceMapping: ThreeDSurfaceMapping;
   projection: ThreeDProjection;
+  /** Rays per pixel averaged to smooth jagged edges, for every shape. */
+  antialias: ThreeDAntialias;
   /** Fades distant surfaces to black. */
   fog: number;
   /** Mixes in a head light; 0 keeps the surface unlit. */
@@ -512,6 +532,7 @@ export const DEFAULT_CONE_VIEW: ConeViewConfig = {
   mappingMode: 'flow',
   surfaceMapping: 'uv',
   projection: 'perspective',
+  antialias: 'off',
   fog: getParameterDefault('cone.fog'),
   shade: getParameterDefault('cone.shade'),
   torusBend: getParameterDefault('cone.torusBend'),
@@ -647,6 +668,7 @@ export function normalizeConeViewConfig(value: unknown): ConeViewConfig {
     mappingMode: raw.mappingMode === 'projection' ? 'projection' : DEFAULT_CONE_VIEW.mappingMode,
     surfaceMapping: normalizeOption(raw.surfaceMapping, THREE_D_SURFACE_MAPPINGS, DEFAULT_CONE_VIEW.surfaceMapping),
     projection: normalizeOption(raw.projection, THREE_D_PROJECTIONS, DEFAULT_CONE_VIEW.projection),
+    antialias: normalizeOption(raw.antialias, THREE_D_ANTIALIAS_MODES, DEFAULT_CONE_VIEW.antialias),
     fog: clampParameter(raw.fog, DEFAULT_CONE_VIEW.fog, getParameterLimit('cone.fog')),
     shade: clampParameter(raw.shade, DEFAULT_CONE_VIEW.shade, getParameterLimit('cone.shade')),
     torusBend: clampParameter(raw.torusBend, DEFAULT_CONE_VIEW.torusBend, getParameterLimit('cone.torusBend')),

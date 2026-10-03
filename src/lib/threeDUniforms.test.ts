@@ -103,6 +103,10 @@ describe('3D uniform upload', () => {
     const params = getThreeDRenderParams({ ...DEFAULT_CONE_VIEW, shape: 'abstract', abstractForm: 'metaball' }, 0.2, 16 / 9);
     uploadThreeDUniforms(gl as unknown as WebGL2RenderingContext, abstractUniforms, params);
     expect(gl.uniform1i).toHaveBeenCalledWith(abstractUniforms.u_abstractForm, 1);
+    const antialiased = getThreeDRenderParams({ ...DEFAULT_CONE_VIEW, antialias: 'x9' }, 0, 1);
+    const samples = { u_threeDSamples: {} as WebGLUniformLocation };
+    uploadThreeDUniforms(gl as unknown as WebGL2RenderingContext, samples, antialiased);
+    expect(gl.uniform1i).toHaveBeenCalledWith(samples.u_threeDSamples, 9);
     expect(gl.uniform4fv).toHaveBeenCalledWith(abstractUniforms.u_abstractWaves, params.abstract.waves);
     expect(gl.uniform4fv).toHaveBeenCalledWith(abstractUniforms.u_abstractBalls, params.abstract.balls);
     expect(gl.uniformMatrix3fv).toHaveBeenCalledWith(abstractUniforms.u_abstractRotation, false, params.abstract.rotation);

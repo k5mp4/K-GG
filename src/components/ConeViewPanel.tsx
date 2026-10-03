@@ -24,6 +24,7 @@ import {
   LATTICE_TYPE_OPTIONS,
   RINGS_MAPPING_OPTIONS,
   RINGS_PATTERN_OPTIONS,
+  THREE_D_ANTIALIAS_OPTIONS,
   THREE_D_PROJECTION_OPTIONS,
   THREE_D_SURFACE_MAPPING_OPTIONS,
   type AbstractForm,
@@ -43,6 +44,7 @@ import {
   type LatticeType,
   type RingsMapping,
   type RingsPattern,
+  type ThreeDAntialias,
   type ThreeDProjection,
   type ThreeDSurfaceMapping,
 } from '../types/coneView';
@@ -1192,6 +1194,17 @@ export function ConeViewPanel() {
           limitKey="cone.flowCycles"
           disabled={coneView.mappingMode === 'projection'}
           onChange={(flowCycles) => setConeView({ flowCycles })}
+        />
+      </Section>
+
+      <Section title="Quality" hint={t('cone.antialiasHint')}>
+        <CustomSelect
+          label="Antialias"
+          value={coneView.antialias}
+          localizeLabel={false}
+          localizeOptions={false}
+          options={[...THREE_D_ANTIALIAS_OPTIONS]}
+          onChange={(antialias) => setConeView({ antialias: antialias as ThreeDAntialias })}
         />
       </Section>
 

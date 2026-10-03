@@ -11,6 +11,7 @@ import {
   FIELD_RENDERS,
   RINGS_MAPPINGS,
   RINGS_PATTERNS,
+  THREE_D_ANTIALIAS_SAMPLES,
   THREE_D_PROJECTIONS,
   THREE_D_SURFACE_MAPPING_INDEX,
   type AbstractForm,
@@ -317,6 +318,8 @@ export type ThreeDRenderParams = {
   shape: number;
   surfaceMapping: number;
   projection: number;
+  /** Rays traced and averaged per pixel: 1, 4, or 9. */
+  samples: number;
   /** Half of the Fisheye angle in radians. */
   fisheyeHalfAngle: number;
   lensDistortion: number;
@@ -1261,6 +1264,7 @@ export function getThreeDRenderParams(
     shape: getConeShapeIndex(config),
     surfaceMapping: THREE_D_SURFACE_MAPPING_INDEX[config.surfaceMapping] ?? 0,
     projection: Math.max(0, THREE_D_PROJECTIONS.indexOf(config.projection)),
+    samples: THREE_D_ANTIALIAS_SAMPLES[config.antialias] ?? 1,
     fisheyeHalfAngle: clamp(safeFinite(config.fisheyeAngle, 180), 90, 360) * Math.PI / 360,
     lensDistortion: clamp(safeFinite(config.lensDistortion, 0), -0.5, 0.5),
     coneTwist: safeFinite(config.coneTwist, 0),

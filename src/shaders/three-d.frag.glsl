@@ -29,6 +29,8 @@ uniform float u_threeDFog;
 uniform float u_threeDShade;
 uniform float u_threeDTravel;
 uniform float u_threeDDistance;
+// Rays per pixel for antialiasing: 1, 4, or 9 (THREE_D_MAX_SAMPLES).
+uniform int u_threeDSamples;
 
 uniform float u_coneTangentHalfFov;
 uniform float u_coneTextureRepeat;
@@ -149,8 +151,11 @@ vec2 sourceUvFromGlobal(vec2 globalUv) {
 // Texture lookup with the Cone seam modes. `unwrapped` may exceed [0, 1]; the
 // seam mode decides how neighboring tiles meet.
 
+// The stack texture has no mip levels, so an explicit LOD 0 reads the same
+// texel without derivatives, which ANGLE cannot take inside the antialiasing
+// sample loop (see main).
 vec4 coneTextureLookup(vec2 uv) {
-  return texture2D(u_sourceTex, sourceUvFromGlobal(uv));
+  return textureLod(u_sourceTex, sourceUvFromGlobal(uv), 0.0);
 }
 
 float coneSeamWeight(float coordinate, float blendWidth) {
@@ -2655,8 +2660,8 @@ vec4 threeDApplyFog(vec4 color, float distance, float fogScale) {
 
 // ---------------------------------------------------------------------------
 
-void main() {
-  vec2 globalUv = (gl_FragCoord.xy + u_tileOffset) / max(u_fullResolution, vec2(1.0));
+// One ray through `globalUv`; main() averages several per pixel.
+vec4 threeDRenderSample(vec2 globalUv) {
   vec4 background = vec4(0.0, 0.0, 0.0, 1.0);
 
 #if KGG_THREE_D_SHAPE < 0 || KGG_THREE_D_SHAPE == 0
@@ -2670,8 +2675,7 @@ void main() {
       bool validConeRay;
       vec3 coneRay = threeDLookRay(threeDProjectedRay(globalUv, validConeRay));
       if (!validConeRay) {
-        gl_FragColor = background;
-        return;
+        return background;
       }
       // The free Cone's base camera is its own frame. Camera Position moves it
       // in aperture radii and Dolly toward the apex in units of the distance
@@ -2681,24 +2685,21 @@ void main() {
       mappedUv = coneFreeMappedUv(coneOrigin, coneRay, hitCone);
     }
     if (!hitCone) {
-      gl_FragColor = background;
-      return;
+      return background;
     }
     // Twist turns the texture around the axis in proportion to the depth.
     mappedUv.x += u_coneTwist * mappedUv.y;
-    gl_FragColor = threeDSampleUnwrapped(mappedUv * vec2(u_coneTextureRepeat, 1.0) + u_coneTextureOffset);
-    return;
+    return threeDSampleUnwrapped(mappedUv * vec2(u_coneTextureRepeat, 1.0) + u_coneTextureOffset);
   }
 #endif
 
 #if KGG_THREE_D_SHAPE == 0
-  gl_FragColor = background;
+  return background;
 #else
   bool validRay;
   vec3 localRay = threeDLookRay(threeDProjectedRay(globalUv, validRay));
   if (!validRay) {
-    gl_FragColor = background;
-    return;
+    return background;
   }
 
   ThreeDHit hit;
@@ -2767,13 +2768,41 @@ void main() {
   ownShading = hit.hasColor;
 #endif
   if (!hit.hit) {
-    gl_FragColor = background;
-    return;
+    return background;
   }
   vec4 color = ownShading ? hit.color : threeDSurfaceColor(hit);
   if (ownShading && g_crystalFaceWeight > 0.0) color = mix(color, threeDSurfaceColor(hit), g_crystalFaceWeight);
   color.rgb = color.rgb * (1.0 - g_abstractOverlay.a) + g_abstractOverlay.rgb;
   color.rgb *= hit.fade;
-  gl_FragColor = threeDApplyFog(color, hit.distance, fogScale);
+  return threeDApplyFog(color, hit.distance, fogScale);
 #endif
+}
+
+const int THREE_D_MAX_SAMPLES = 9;
+// Rotated grid: four samples that each fall in their own row and column of
+// the pixel, which smooths near-horizontal and near-vertical edges best.
+const vec2 THREE_D_ROTATED_GRID[4] = vec2[4](
+  vec2(-0.125, 0.375), vec2(0.375, 0.125), vec2(0.125, -0.375), vec2(-0.375, -0.125)
+);
+
+// Sub-pixel offset of sample `index` of `count`, in pixels from the center.
+vec2 threeDSampleOffset(int index, int count) {
+  if (count == 4) return THREE_D_ROTATED_GRID[index];
+  if (count == 9) return (vec2(float(index % 3), float(index / 3)) - 1.0) / 3.0;
+  return vec2(0.0);
+}
+
+// Antialiasing traces u_threeDSamples rays through each pixel and averages
+// them, so silhouettes, thin walls, and refracted edges resolve smoothly. The
+// count comes from a uniform, so the loop stays a loop and one sample costs
+// what the layer did before.
+void main() {
+  int samples = clamp(u_threeDSamples, 1, THREE_D_MAX_SAMPLES);
+  vec4 sum = vec4(0.0);
+  for (int index = 0; index < THREE_D_MAX_SAMPLES; index++) {
+    if (index >= samples) break;
+    vec2 pixel = gl_FragCoord.xy + threeDSampleOffset(index, samples);
+    sum += threeDRenderSample((pixel + u_tileOffset) / max(u_fullResolution, vec2(1.0)));
+  }
+  gl_FragColor = sum / float(samples);
 }

@@ -49,6 +49,7 @@ describe('cone view configuration', () => {
       mappingMode: 'flow',
       surfaceMapping: 'uv',
       projection: 'perspective',
+      antialias: 'off',
       fog: 0,
       shade: 0,
       torusBend: 0.9,
@@ -290,6 +291,13 @@ describe('cone view configuration', () => {
       expect(normalizeConeViewConfig({ crystalForm: form }).crystalForm).toBe(form);
     }
     expect(normalizeConeViewConfig({ crystalDispersionSteps: 0 }).crystalDispersionSteps).toBe(1);
+  });
+
+  it('normalizes the 3D antialiasing and keeps it off for older presets', () => {
+    expect(normalizeConeViewConfig({ depth: 8 }).antialias).toBe('off');
+    expect(normalizeConeViewConfig({ antialias: 'x4' }).antialias).toBe('x4');
+    expect(normalizeConeViewConfig({ antialias: 'x9' }).antialias).toBe('x9');
+    expect(normalizeConeViewConfig({ antialias: 'x16' }).antialias).toBe('off');
   });
 
   it('keeps presets without a shape on the cone and normalizes the torus shape', () => {
