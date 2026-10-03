@@ -22,6 +22,7 @@ title: 仕様一覧
 | CURRENT-DESIGN-APP-CONNECTORS | [Design App Direct Send](./current/design-app-connectors) | current |
 | CURRENT-APP-STARTUP | [起動とスプラッシュスクリーン](./current/app-startup) | current |
 | CURRENT-REALTIME-OUTPUT | [リアルタイム映像出力（Spout）](./current/realtime-output) | current |
+| CURRENT-OSC-INPUT | [OSC入力（Controller）](./current/osc-input) | current |
 
 変更の経緯は[完了済み変更](../changes/archive/)と、下記のLegacy Change Specificationsから確認できます。現行仕様を読む際にLegacy SPECを必須資料にしないでください。
 

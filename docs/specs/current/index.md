@@ -22,6 +22,7 @@ title: 現行仕様
 | CURRENT-DESIGN-APP-CONNECTORS | [Design App Direct Send](./design-app-connectors) | current |
 | CURRENT-APP-STARTUP | [起動とスプラッシュスクリーン](./app-startup) | current |
 | CURRENT-REALTIME-OUTPUT | [リアルタイム映像出力（Spout）](./realtime-output) | current |
+| CURRENT-OSC-INPUT | [OSC入力（Controller）](./osc-input) | current |
 
 ## 読み方
 

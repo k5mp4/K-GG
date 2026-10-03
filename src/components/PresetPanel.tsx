@@ -35,6 +35,8 @@ import { capturePresetThumbnail } from '../lib/presetThumbnail';
 import { useLanguage } from '../i18n/LanguageProvider';
 import { IconButton } from './IconButton';
 import { applicationCommands } from '../application/commands';
+import { useGcInput } from '../features/native/useGcInput';
+import { moveListCursor, type GcCommand } from '../lib/gcInput';
 import { SidebarSection } from './SidebarSection';
 import { InputRadio } from 'tweeq';
 
@@ -168,13 +170,15 @@ type PresetCardProps = {
   folderOptions: FolderOption[];
   isBuiltin: boolean;
   isActive: boolean;
+  /** GCコントローラー操作で選択中の候補。 */
+  isCursor: boolean;
   viewMode: ViewMode;
   onLoad: (preset: Preset) => void;
   onDelete: (id: string) => void;
   onMove: (id: string, folderId: string | null) => void;
 };
 
-const PresetCard = memo(function PresetCard({ preset, folderOptions, isBuiltin, isActive, viewMode, onLoad, onDelete, onMove }: PresetCardProps) {
+const PresetCard = memo(function PresetCard({ preset, folderOptions, isBuiltin, isActive, isCursor, viewMode, onLoad, onDelete, onMove }: PresetCardProps) {
   const { t } = useLanguage();
   const title = isBuiltin ? `${preset.name} · ${t('preset.builtIn')}` : preset.name;
   const dragProps = {
@@ -201,7 +205,8 @@ const PresetCard = memo(function PresetCard({ preset, folderOptions, isBuiltin, 
     return (
       <article
         {...dragProps}
-        className={`flex min-w-0 items-center gap-1 border bg-k-surface/65 p-1.5 transition-colors ${isActive ? 'border-fire/70 bg-fire/10' : 'border-cream/10 hover:border-cream/25'} ${!isBuiltin ? 'cursor-grab active:cursor-grabbing' : ''}`}
+        data-preset-id={preset.id}
+        className={`flex min-w-0 items-center gap-1 border bg-k-surface/65 p-1.5 transition-colors ${isCursor ? 'ring-2 ring-cream' : ''} ${isActive ? 'border-fire/70 bg-fire/10' : 'border-cream/10 hover:border-cream/25'} ${!isBuiltin ? 'cursor-grab active:cursor-grabbing' : ''}`}
       >
         <button type="button" onClick={() => onLoad(preset)} title={title} aria-current={isActive || undefined} className="flex min-w-0 flex-1 items-center gap-2 text-left">
           <span className="block h-11 w-16 shrink-0 overflow-hidden border border-cream/15 bg-deep/40">
@@ -218,7 +223,8 @@ const PresetCard = memo(function PresetCard({ preset, folderOptions, isBuiltin, 
   return (
     <article
       {...dragProps}
-      className={`group relative min-w-0 overflow-hidden border bg-k-surface/70 transition-all ${isActive ? 'border-fire/80 shadow-[0_0_0_1px_rgba(213,73,43,0.25)]' : 'border-cream/10 hover:-translate-y-0.5 hover:border-cream/30'} ${!isBuiltin ? 'cursor-grab active:cursor-grabbing' : ''}`}
+      data-preset-id={preset.id}
+      className={`group relative min-w-0 overflow-hidden border bg-k-surface/70 transition-all ${isCursor ? 'ring-2 ring-cream' : ''} ${isActive ? 'border-fire/80 shadow-[0_0_0_1px_rgba(213,73,43,0.25)]' : 'border-cream/10 hover:-translate-y-0.5 hover:border-cream/30'} ${!isBuiltin ? 'cursor-grab active:cursor-grabbing' : ''}`}
     >
       <button type="button" onClick={() => onLoad(preset)} title={title} aria-current={isActive || undefined} className="relative block aspect-[16/10] w-full overflow-hidden bg-deep/40 text-left">
         <PresetPreview preset={preset} />
@@ -338,6 +344,10 @@ export function PresetPanel({ canvasW, canvasH, setCanvasW, setCanvasH, aspectRa
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const importRef = useRef<HTMLInputElement>(null);
+  const listRef = useRef<HTMLElement>(null);
+  const [cursorId, setCursorId] = useState<string | null>(null);
+  const [cursorToast, setCursorToast] = useState<string | null>(null);
+  const cursorToastTimer = useRef<number | undefined>(undefined);
 
   // 保存先の読み込みは起動時に済んでいる。ここでは変更後の更新だけを行う。
   async function refresh() {
@@ -511,6 +521,49 @@ export function PresetPanel({ canvasW, canvasH, setCanvasW, setCanvasH, aspectRa
   const deletePresetStable = useCallback((id: string) => { void handlersRef.current.remove(id); }, []);
   const movePresetStable = useCallback((id: string, folderId: string | null) => { void handlersRef.current.move(id, folderId); }, []);
 
+  // GCコントローラー: スティックで候補を動かし、決定ボタンで読み込む。フォルダーはボタンで切り替える。
+  // 関数は毎回作り直されるため、useGcInput側は最新の参照を呼ぶ。
+  useGcInput((command: GcCommand) => {
+    const showToast = (text: string) => {
+      setCursorToast(text);
+      window.clearTimeout(cursorToastTimer.current);
+      cursorToastTimer.current = window.setTimeout(() => setCursorToast(null), 2000);
+    };
+    if (command.type === 'action' && (command.action === 'folderPrev' || command.action === 'folderNext' || command.action === 'folderRoot')) {
+      // 先頭をライブラリのルートとして、フォルダーを階層の表示順に並べる。
+      const order: (string | null)[] = [null, ...folderOptions.map(option => option.id)];
+      const index = Math.max(order.indexOf(selectedFolderId), 0);
+      const nextId = command.action === 'folderRoot'
+        ? null
+        : order[Math.min(Math.max(index + (command.action === 'folderNext' ? 1 : -1), 0), order.length - 1)];
+      setSelectedFolderId(nextId);
+      setCursorId(null);
+      showToast(library.folders.find(folder => folder.id === nextId)?.name ?? t('preset.root'));
+      return;
+    }
+    if (visiblePresets.length === 0) return;
+    const cursorIndex = visiblePresets.findIndex(preset => preset.id === cursorId);
+    if (command.type === 'move') {
+      // 初回は読み込み中のPreset、無ければ先頭から動かす。
+      const activeIndex = visiblePresets.findIndex(preset => preset.name === presetName);
+      const from = cursorIndex >= 0 ? cursorIndex : Math.max(activeIndex, 0);
+      // 列数は画面幅で変わるため、同じ行（上端が同じ位置）に並ぶカードの数から測る。
+      const cards = [...(listRef.current?.querySelectorAll<HTMLElement>('[data-preset-id]') ?? [])];
+      const columns = viewMode === 'grid' && cards.length > 0 ? Math.max(cards.filter(card => card.offsetTop === cards[0].offsetTop).length, 1) : 1;
+      const next = visiblePresets[moveListCursor(from, command.direction, visiblePresets.length, columns)];
+      setCursorId(next.id);
+      showToast(next.name);
+      requestAnimationFrame(() => {
+        listRef.current?.querySelector(`[data-preset-id="${CSS.escape(next.id)}"]`)?.scrollIntoView({ block: 'nearest' });
+      });
+    } else if (command.type === 'action' && command.action === 'presetConfirm' && cursorIndex >= 0) {
+      handleLoad(visiblePresets[cursorIndex]);
+      showToast(visiblePresets[cursorIndex].name);
+    }
+  });
+
+  useEffect(() => () => window.clearTimeout(cursorToastTimer.current), []);
+
   async function handleExport() {
     const scope: PresetExportScope = exportScope === 'library'
       ? { kind: 'library' }
@@ -549,14 +602,14 @@ export function PresetPanel({ canvasW, canvasH, setCanvasW, setCanvasH, aspectRa
           <FolderBreadcrumb path={folderPath} onSelect={setSelectedFolderId} onDropPreset={handleMovePreset} />
         </div>
 
-        <main className="min-h-0 flex-1 space-y-2 overflow-y-auto pr-0.5 scrollbar-thin">
+        <main ref={listRef} className="min-h-0 flex-1 space-y-2 overflow-y-auto pr-0.5 scrollbar-thin">
           {childFolders.length > 0 && <div className="grid gap-1.5" style={FOLDER_GRID_STYLE}>{childFolders.map(folder => <FolderCard key={folder.id} folder={folder} library={library} onOpen={() => setSelectedFolderId(folder.id)} onDropPreset={handleMovePreset} />)}</div>}
 
           {visiblePresets.length === 0 ? (
             <div className="border border-dashed border-cream/15 px-3 py-6 text-center text-[10px] italic text-tab-inactive">{t('preset.empty')}</div>
           ) : (
             <div className={viewMode === 'grid' ? 'grid gap-1.5' : 'space-y-1'} style={viewMode === 'grid' ? PRESET_GRID_STYLE : undefined}>
-              {visiblePresets.map(preset => <PresetCard key={preset.id} preset={preset} folderOptions={folderOptions} isBuiltin={isBuiltinPresetId(preset.id)} isActive={presetName === preset.name} viewMode={viewMode} onLoad={loadPresetStable} onDelete={deletePresetStable} onMove={movePresetStable} />)}
+              {visiblePresets.map(preset => <PresetCard key={preset.id} preset={preset} folderOptions={folderOptions} isBuiltin={isBuiltinPresetId(preset.id)} isActive={presetName === preset.name} isCursor={cursorId === preset.id} viewMode={viewMode} onLoad={loadPresetStable} onDelete={deletePresetStable} onMove={movePresetStable} />)}
             </div>
           )}
         </main>
@@ -603,6 +656,7 @@ export function PresetPanel({ canvasW, canvasH, setCanvasW, setCanvasH, aspectRa
           </div>
         </SidebarSection>
       </div>
+      {cursorToast && <div role="status" className="pointer-events-none fixed bottom-6 left-1/2 z-50 max-w-[60vw] -translate-x-1/2 truncate border border-cream/40 bg-deep/90 px-3 py-1.5 text-[12px] font-semibold text-cream shadow-lg">{cursorToast}</div>}
     </div>
   );
 }
