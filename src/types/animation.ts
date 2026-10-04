@@ -17,6 +17,8 @@ export type AnimationEasing = {
     bpm: number;
     beatsPerBar: number;
     subdivision: 3 | 4;
+    /** Tempo multiplier for the loop (1 = 4 beats at `bpm`). Missing means 1. */
+    rate?: 0.25 | 0.5 | 1 | 2;
   };
 };
 

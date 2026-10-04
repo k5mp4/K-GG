@@ -64,11 +64,12 @@ export function SliderField({
 }: Props) {
   const { language, t } = useLanguage();
   const localizedLabel = localizeUiLabel(label, language);
-  const { keyframeTracks, currentTime, animation } = useGradientStore();
+  // ストア全体を購読すると、無関係な変更でも全スライダーが再描画される。必要な値だけを購読する。
+  const track = useGradientStore(state => (trackId ? state.keyframeTracks[trackId] ?? null : null));
+  const currentTime = useGradientStore(state => state.currentTime);
+  const loopEnabled = useGradientStore(state => state.animation.previewLoop ?? true);
   const { addKeyframe, setKeyframe } = applicationCommands;
-  const track = trackId ? keyframeTracks[trackId] : null;
   const isKeyframed = getTrackMode(track) === 'keys';
-  const loopEnabled = animation.previewLoop ?? true;
   useSyncExternalStore(
     isKeyframed ? subscribeTimelineTime : noopSubscribe,
     isKeyframed ? getTimelineTimeSnapshot : zeroSnapshot,

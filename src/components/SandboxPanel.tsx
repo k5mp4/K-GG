@@ -1,9 +1,12 @@
-import { useEffect, useState, type ReactNode } from 'react';
+import { useEffect, useState, useSyncExternalStore, type ReactNode } from 'react';
 import { gradientRampPresets } from '../lib/gradientRampUtils';
 import { useGradientStore } from '../store/gradientStore';
 import { applicationCommands } from '../application/commands';
 import { useLanguage } from '../i18n/LanguageProvider';
 import { ClothGradientPanel } from './ClothGradientPanel';
+import { ControllerPanel } from './ControllerPanel';
+import { useOscReceiverStatus } from '../features/native/controllerReceiver';
+import { getControllerSettings, subscribeControllerSettings, updateControllerSettings } from '../lib/controllerSettings';
 import { CustomSelect } from './CustomSelect';
 import { FlowGradientPanel } from './FlowGradientPanel';
 import { Icon } from './Icon';
@@ -16,7 +19,7 @@ import type { RenderViewMode } from '../types/renderView';
 
 type SandboxProgramKey = 'normalMap' | 'prism' | 'particles' | 'flowGradient' | 'flowSplat' | 'flowTrail' | 'flowComposite' | 'cloth' | 'seamless' | 'shapes';
 type SandboxProgramStatus = 'loading' | 'ready' | 'failed' | 'fallback';
-type SandboxModuleKey = 'cloth' | 'normal' | 'prism' | 'particles' | 'flowGradient' | 'seamless' | 'shapes';
+type SandboxModuleKey = 'cloth' | 'normal' | 'prism' | 'particles' | 'flowGradient' | 'seamless' | 'shapes' | 'controller';
 
 type SandboxModuleProps = {
   id: SandboxModuleKey;
@@ -105,6 +108,8 @@ export function SandboxPanel({ onRenderViewModeChange }: SandboxPanelProps) {
     shapes,
   } = useGradientStore();
   const { setNormalMap, setClothGradient, setGradient, setEffectPipeline, setSeamless, setShapes } = applicationCommands;
+  const controllerSettings = useSyncExternalStore(subscribeControllerSettings, getControllerSettings, getControllerSettings);
+  const oscReceiver = useOscReceiverStatus();
   const [selectedModule, setSelectedModule] = useState<SandboxModuleKey>('cloth');
   const [programStatus, setProgramStatus] = useState<Partial<Record<SandboxProgramKey, SandboxProgramStatus>>>({});
 
@@ -129,6 +134,16 @@ export function SandboxPanel({ onRenderViewModeChange }: SandboxPanelProps) {
   const activeCount = [clothGradient.enabled, normalMap.enabled, effectPipeline.prismEnabled, effectPipeline.particlesEnabled, Boolean(effectPipeline.flowGradientEnabled), seamless.enabled, shapes.enabled]
     .filter(Boolean).length;
 
+  const controllerStatus = !oscReceiver.supported
+    ? { label: t('stack.status.unavailable'), className: 'text-cream/40' }
+    : !controllerSettings.enabled
+      ? { label: t('stack.status.off'), className: 'text-cream/40' }
+      : oscReceiver.error
+        ? { label: t('stack.status.unavailable'), className: 'text-red-300' }
+        : oscReceiver.listening
+          ? { label: t('stack.status.applied'), className: 'text-emerald-300' }
+          : { label: t('stack.status.preparing'), className: 'text-amber-300' };
+
   const setNormalEnabled = (enabled: boolean) => {
     setNormalMap({ enabled });
     if (enabled) setGradient({ stops: [...gradientRampPresets.mono] });
@@ -138,7 +153,7 @@ export function SandboxPanel({ onRenderViewModeChange }: SandboxPanelProps) {
     ? 'Cloth'
     : selectedModule === 'normal'
       ? t('effect.normal')
-    : selectedModule === 'prism' ? 'Prism' : selectedModule === 'particles' ? 'Particles' : selectedModule === 'flowGradient' ? 'Flow Gradient' : selectedModule === 'shapes' ? 'Shapes' : 'Seamless';
+    : selectedModule === 'prism' ? 'Prism' : selectedModule === 'particles' ? 'Particles' : selectedModule === 'flowGradient' ? 'Flow Gradient' : selectedModule === 'shapes' ? 'Shapes' : selectedModule === 'controller' ? 'Controller' : 'Seamless';
 
   return (
     <div className="space-y-4" data-sandbox-panel>
@@ -160,6 +175,7 @@ export function SandboxPanel({ onRenderViewModeChange }: SandboxPanelProps) {
             { value: 'flowGradient', label: 'Flow Gradient' },
             { value: 'seamless', label: 'Seamless' },
             { value: 'shapes', label: 'Shapes' },
+            { value: 'controller', label: 'Controller' },
           ]}
           onChange={(value) => setSelectedModule(value as SandboxModuleKey)}
         />
@@ -258,6 +274,19 @@ export function SandboxPanel({ onRenderViewModeChange }: SandboxPanelProps) {
             badge={<span className="rounded bg-amber-500/20 px-1.5 py-0.5 text-[8px] font-medium tracking-normal text-amber-300" title={t('beta.experimental')}>🧪 Beta</span>}
           >
             <ShapesPanel />
+          </SandboxModule>
+        )}
+
+        {selectedModule === 'controller' && (
+          <SandboxModule
+            id="controller"
+            label={selectedLabel}
+            description={t('sandbox.controllerDescription')}
+            enabled={controllerSettings.enabled}
+            status={controllerStatus}
+            onToggleEnabled={(enabled) => updateControllerSettings({ enabled })}
+          >
+            <ControllerPanel />
           </SandboxModule>
         )}
 

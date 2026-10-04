@@ -353,7 +353,7 @@ export function createDocumentActions(set: DocumentStoreSet, defaults: DocumentD
       speed: clampParameter(nextAnimation.speed, s.animation.speed, getParameterLimit('animation.speed')),
       rampOffsetSpeed: clampParameter(nextAnimation.rampOffsetSpeed ?? 0, s.animation.rampOffsetSpeed ?? 0, getParameterLimit('animation.rampOffsetSpeed')),
       duration: beatSyncEnabled
-        ? getBeatSyncDurationSeconds(beatSync?.bpm ?? 120)
+        ? getBeatSyncDurationSeconds(beatSync?.bpm ?? 120, beatSync?.rate)
         : clampParameter(nextAnimation.duration, s.animation.duration, getParameterLimit('animation.duration')),
     };
     animation.intensity = clampParameter(animation.intensity, s.animation.intensity, getParameterLimit('animation.intensity'));

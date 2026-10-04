@@ -249,6 +249,7 @@ export const STORE_DEFAULTS = {
         bpm: 120,
         beatsPerBar: 4,
         subdivision: 4 as 3 | 4,
+        rate: 1 as const,
       },
     },
     affectNoise: true,
