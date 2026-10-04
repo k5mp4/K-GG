@@ -41,6 +41,25 @@ describe('presetLibrary', () => {
     expect(library.presets.map(item => item.order)).toEqual([0, 1]);
   });
 
+  it('imports a flat array whose presets still reference an unknown folder', () => {
+    const orphaned = [{ ...preset('Orphan', 3), folderId: 'missing-folder' }];
+    const library = normalizePresetLibrary(orphaned);
+
+    expect(library.presets.map(item => item.folderId)).toEqual([null]);
+  });
+
+  it('exports a single preset without its folder reference so it re-imports', () => {
+    const folderResult = createFolder(createEmptyPresetLibrary(), 'Motion', null);
+    const library: PresetLibrary = {
+      ...folderResult.library,
+      presets: [{ ...preset('Loop', 0), folderId: folderResult.folder.id }],
+    };
+    const exported = encodePresetExport(library, { kind: 'preset', presetId: library.presets[0]!.id });
+    const decoded = decodePresetPackage(exported.bytes, exported.filename);
+
+    expect(decoded.presets[0]?.folderId).toBe(null);
+  });
+
   it('keeps nested children and moves contents to the parent when a folder is deleted', () => {
     const root = createEmptyPresetLibrary();
     const parentResult = createFolder(root, 'Motion', null);

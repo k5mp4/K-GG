@@ -100,7 +100,8 @@ export function createEmptyPresetLibrary(): PresetLibrary {
 
 export function normalizePresetLibrary(value: unknown): PresetLibrary {
   if (Array.isArray(value)) {
-    const presets = value.map(normalizePreset);
+    // A flat array carries no folder definitions, so any folderId it holds points outside the file.
+    const presets = value.map((item, index) => ({ ...normalizePreset(item, index), folderId: null }));
     return validatePresetLibrary({
       ...createEmptyPresetLibrary(),
       presets,
@@ -346,7 +347,8 @@ export function encodePresetExport(library: PresetLibrary, scope: PresetExportSc
   if (scope.kind === 'preset') {
     if (!('name' in selected)) throw new Error('Preset not found');
     return {
-      bytes: strToU8(JSON.stringify([compactPreset(selected)], null, 2)),
+      // The file has no folder list, so keep the preset out of a folder that is not in it.
+      bytes: strToU8(JSON.stringify([{ ...compactPreset(selected), folderId: null }], null, 2)),
       filename: `gradPreset_${safeFilename(selected.name)}.json`,
       mimeType: 'application/json',
     };

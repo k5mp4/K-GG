@@ -35,7 +35,7 @@ Image Gradient Sourceの元画像、Image Overlay/Mask、Texture画像、SANDBOX
 
 単一Presetは `id`、`name`、`createdAt`、`state` を必須とし、仮想フォルダの `folderId`、同階層の `order`、任意の画像データURL `thumbnail` を持ちます。旧Presetでは任意フィールドが欠落していても読み込める範囲で既定値を補完します。
 
-フォルダを含むライブラリは `format: kgg-preset-library`、`version: 2`、`folders`、`presets` を持ちます。旧来の単純なPreset配列もライブラリのルートへ正規化できます。既存の識別値と保存済み状態を壊す自動変換は行いません。
+フォルダを含むライブラリは `format: kgg-preset-library`、`version: 2`、`folders`、`presets` を持ちます。旧来の単純なPreset配列もライブラリのルートへ正規化できます。配列にはフォルダ定義がないため、各Presetの`folderId`は読込時に無視してルートへ置き、単一Presetの書出しも`folderId`を`null`にして書き出します（フォルダを含めて書き出すにはフォルダ／ライブラリZIPを使います）。既存の識別値と保存済み状態を壊す自動変換は行いません。
 
 ### PRESET-004 仮想フォルダ
 
