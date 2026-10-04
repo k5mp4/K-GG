@@ -1,15 +1,19 @@
 import { useRef, useCallback, useEffect, useState } from 'react';
-import { InputCubicBezier, type CubicBezierValue } from 'tweeq';
+import { InputCubicBezierPicker, type CubicBezierValue } from 'tweeq';
 import { BEAT_SYNC_BEATS_PER_LOOP, getBeatSyncDurationSeconds, useGradientStore } from '../store/gradientStore';
 import { BEAT_SYNC_RATES, normalizeBeatSyncRate } from '../lib/animationConfig';
 import { applicationCommands } from '../application/commands';
 import { EASING_PRESETS, type EasingPreset } from '../lib/easingBezier';
 import { applyCubicBezierLink } from '../lib/linkedCubicBezier';
 import { Toggle } from './Toggle';
+import { Collapsible } from './Collapsible';
+import { createDebouncedCommit, type DebouncedCommit } from '../lib/debouncedCommit';
 import { useLanguage } from '../i18n/LanguageProvider';
 import { localizeUiLabel } from '../i18n/uiLabels';
 
 const MAX_BPM_TAPS = 16;
+/** ベジェ編集を止めてからストアへ反映するまでの待ち時間。反映のたびにアプリ全体が再描画されるため、入力ごとには反映しない。 */
+const CURVE_COMMIT_DELAY_MS = 150;
 
 const BEAT_RATE_LABELS: Record<(typeof BEAT_SYNC_RATES)[number], string> = { 0.25: '×1/4', 0.5: '×1/2', 1: '×1', 2: '×2' };
 
@@ -31,6 +35,10 @@ export function BezierEasingEditor({ compact = false }: { compact?: boolean }) {
   const bpmInputRef = useRef<HTMLInputElement>(null);
   const [bpmDraft, setBpmDraft] = useState(String(beatSync.bpm));
   const [tapCount, setTapCount] = useState(0);
+  const [curveOpen, setCurveOpen] = useState(false);
+  // ドラッグ中の値。ストアへの反映は間引き、パッド自体は手元の値で即座に描画する。
+  const [curveDraft, setCurveDraft] = useState<CubicBezierValue | null>(null);
+  const curveCommit = useRef<DebouncedCommit<CubicBezierValue> | null>(null);
   const cancelBpmRef = useRef(false);
   const bpmTapTimesRef = useRef<number[]>([]);
 
@@ -90,7 +98,25 @@ export function BezierEasingEditor({ compact = false }: { compact?: boolean }) {
     return () => input.removeEventListener('wheel', onWheel);
   }, [beatSync.bpm, updateBeatSync]);
 
-  const bezierValue: CubicBezierValue = [...easing.p1, ...easing.p2];
+  const bezierValue: CubicBezierValue = curveDraft ?? [...easing.p1, ...easing.p2];
+
+  curveCommit.current ??= createDebouncedCommit<CubicBezierValue>(CURVE_COMMIT_DELAY_MS, (next) => {
+    const current = useGradientStore.getState().animation.easing;
+    setAnimation({ easing: { ...current, p1: [next[0], next[1]], p2: [next[2], next[3]] } });
+  });
+  const curveDebounce = curveCommit.current;
+
+  useEffect(() => () => curveDebounce.cancel(), [curveDebounce]);
+
+  // プリセットなど、ドラッグ以外の理由でカーブが変わった時は、手元の値を捨ててストアの値に従う。
+  useEffect(() => {
+    if (curveDebounce.hasPending()) return;
+    setCurveDraft(draft => (
+      draft && (draft[0] !== easing.p1[0] || draft[1] !== easing.p1[1] || draft[2] !== easing.p2[0] || draft[3] !== easing.p2[1])
+        ? null
+        : draft
+    ));
+  }, [curveDebounce, easing.p1, easing.p2]);
 
   return (
     <div className="space-y-3">
@@ -114,17 +140,49 @@ export function BezierEasingEditor({ compact = false }: { compact?: boolean }) {
         />
       </div>
 
-      <div className={`flex justify-center py-2 ${compact ? 'scale-90' : ''}`}>
-        <InputCubicBezier
-          value={bezierValue}
-          onChange={(candidate) => {
-            const next = applyCubicBezierLink(bezierValue, candidate, easing.linkMode);
-            setAnimation({ easing: { ...easing, p1: [next[0], next[1]], p2: [next[2], next[3]] } });
-          }}
+      {/* ポップアップではなく、パネル内で展開する（枠の外へはみ出さない） */}
+      <div className={`py-1 ${compact ? 'scale-90 origin-top' : ''}`}>
+        <button
+          type="button"
           disabled={!timeRemapActive}
+          aria-expanded={curveOpen}
+          aria-controls="loop-timing-curve-editor"
           aria-label={t('animation.cubicBezier')}
           title={t('animation.cubicBezier')}
-        />
+          onClick={() => setCurveOpen(open => !open)}
+          className={`mx-auto flex h-9 w-9 items-center justify-center border bg-fire/10 transition-colors disabled:opacity-40 ${curveOpen ? 'border-fire' : 'border-fire/50 hover:border-fire'}`}
+        >
+          <svg viewBox="0 0 1 1" aria-hidden="true" className="h-6 w-6 overflow-visible">
+            <path
+              d={`M0 1 C${easing.p1[0]} ${1 - easing.p1[1]} ${easing.p2[0]} ${1 - easing.p2[1]} 1 0`}
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="0.09"
+              strokeLinecap="round"
+              className="text-fire"
+            />
+          </svg>
+        </button>
+        <Collapsible isOpen={curveOpen && timeRemapActive}>
+          <div id="loop-timing-curve-editor" className="pt-2">
+            <div className="mx-auto h-40 w-40 border border-panel-border/70 bg-k-surface/60 p-[9px]">
+              <InputCubicBezierPicker
+                value={bezierValue}
+                onChange={(candidate) => {
+                  const next = applyCubicBezierLink(bezierValue, candidate, easing.linkMode);
+                  setCurveDraft(next);
+                  curveDebounce.schedule(next);
+                }}
+                onConfirm={() => {
+                  curveDebounce.flush();
+                  setCurveDraft(null);
+                }}
+                disabled={!timeRemapActive}
+                aria-label={t('animation.cubicBezier')}
+              />
+            </div>
+          </div>
+        </Collapsible>
       </div>
 
       {/* Control point values */}
