@@ -4,21 +4,27 @@ import { IDENTITY_DIFFUSE_BEZIER } from './diffuseCurve';
 import { makePreset, type StoreSnapshot } from './presetModel';
 
 let stored: PresetLibrary = createEmptyPresetLibrary();
+let failNextWrite = false;
 vi.mock('./presets', () => ({
   loadPresetLibrary: async () => stored,
-  updatePresetLibrary: async (update: (library: PresetLibrary) => PresetLibrary) => { stored = update(stored); },
+  updatePresetLibrary: async (update: (library: PresetLibrary) => PresetLibrary) => {
+    if (failNextWrite) { failNextWrite = false; throw new Error('disk full'); }
+    stored = update(stored);
+  },
 }));
 
 import { canRedo, canUndo, redo, resetHistoryForTest, undo } from './history';
 import { deletePresetsWithHistory, movePresetsWithHistory } from './presetLibraryActions';
-import { ensurePresetLibraryLoaded, getPresetLibrarySnapshot, resetPresetLibraryCacheForTest } from './presetLibraryCache';
+import { ensurePresetLibraryLoaded, getPresetLibrarySnapshot, refreshPresetLibrary, resetPresetLibraryCacheForTest } from './presetLibraryCache';
 
 function item(name: string, folderId: string | null, order: number) {
   return makePreset(name, { diffuse: { luminanceBezier: [...IDENTITY_DIFFUSE_BEZIER] } } as unknown as StoreSnapshot, { folderId, order });
 }
 
-/** Undo/redo run commands through a promise queue, so wait for it to drain. */
-const settle = () => new Promise(resolve => setTimeout(resolve, 0));
+/** Undo/redo and the background writes go through promise queues and a timer, so let a few ticks pass. */
+const settle = async () => {
+  for (let tick = 0; tick < 6; tick += 1) await new Promise(resolve => setTimeout(resolve, 0));
+};
 const names = (folderId: string | null) => stored.presets.filter(preset => (preset.folderId ?? null) === folderId).sort((a, b) => (a.order ?? 0) - (b.order ?? 0)).map(preset => preset.name);
 
 describe('presetLibraryActions', () => {
@@ -26,6 +32,7 @@ describe('presetLibraryActions', () => {
   let ids: Record<string, string>;
 
   beforeEach(async () => {
+    await settle(); // let writes queued by the previous test finish before resetting
     const withFolder = createFolder(createEmptyPresetLibrary(), 'Motion', null);
     folderId = withFolder.folder.id;
     const presets = [item('A', null, 0), item('B', null, 1), item('C', null, 2), item('X', folderId, 0)];
@@ -33,13 +40,17 @@ describe('presetLibraryActions', () => {
     stored = { ...withFolder.library, presets };
     resetPresetLibraryCacheForTest();
     resetHistoryForTest();
+    failNextWrite = false;
     await ensurePresetLibraryLoaded();
   });
 
   it('deletes several presets and restores them in place with undo, then deletes again with redo', async () => {
     await deletePresetsWithHistory([ids.A, ids.C]);
-    expect(names(null)).toEqual(['B']);
+    // The list is updated at once; the stored library follows in the background.
     expect(getPresetLibrarySnapshot().library.presets.map(preset => preset.name).sort()).toEqual(['B', 'X']);
+    expect(names(null)).toEqual(['A', 'B', 'C']);
+    await settle();
+    expect(names(null)).toEqual(['B']);
 
     undo();
     await settle();
@@ -53,6 +64,7 @@ describe('presetLibraryActions', () => {
 
   it('moves several presets together and undoes them to their old folder and order', async () => {
     await movePresetsWithHistory([ids.C, ids.A], folderId);
+    await settle();
     expect(names(null)).toEqual(['B']);
     expect(names(folderId)).toEqual(['X', 'A', 'C']);
 
@@ -68,6 +80,7 @@ describe('presetLibraryActions', () => {
 
   it('puts a restored preset at the root when its folder was deleted in the meantime', async () => {
     await deletePresetsWithHistory([ids.X]);
+    await settle();
     stored = { ...stored, folders: [] };
 
     undo();
@@ -89,5 +102,24 @@ describe('presetLibraryActions', () => {
 
     await deletePresetsWithHistory([ids.B]);
     expect(canRedo()).toBe(false);
+  });
+
+  it('keeps the list as updated and reports the error when writing to storage fails, then reloads from storage', async () => {
+    const onError = vi.fn();
+    failNextWrite = true;
+    await deletePresetsWithHistory([ids.A], onError);
+    expect(getPresetLibrarySnapshot().library.presets.map(preset => preset.name)).not.toContain('A');
+
+    await settle();
+    await settle();
+    expect(onError).toHaveBeenCalledTimes(1);
+    expect(getPresetLibrarySnapshot().library.presets.map(preset => preset.name)).toContain('A');
+  });
+
+  it('does not let a reload overwrite a change that is still being written', async () => {
+    await deletePresetsWithHistory([ids.A]);
+    await refreshPresetLibrary();
+
+    expect(getPresetLibrarySnapshot().library.presets.map(preset => preset.name)).not.toContain('A');
   });
 });

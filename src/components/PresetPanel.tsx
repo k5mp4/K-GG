@@ -513,7 +513,7 @@ export function PresetPanel({ canvasW, canvasH, setCanvasW, setCanvasH, aspectRa
 
   async function moveSelectionOrPreset(ids: string[], folderId: string | null) {
     try {
-      await movePresetsWithHistory(ids, folderId);
+      await movePresetsWithHistory(ids, folderId, () => setError(t('preset.moveFailed')));
       setSelectedIds(new Set());
       setError(null);
     } catch (moveError) { setError(moveError instanceof Error ? moveError.message : t('preset.moveFailed')); }
@@ -523,7 +523,7 @@ export function PresetPanel({ canvasW, canvasH, setCanvasW, setCanvasH, aspectRa
     const ids = [...selection];
     if (ids.length === 0) return;
     try {
-      await deletePresetsWithHistory(ids);
+      await deletePresetsWithHistory(ids, () => setError(t('preset.deleteFailed')));
       setSelectedIds(new Set());
       setError(null);
     } catch (deleteError) { setError(deleteError instanceof Error ? deleteError.message : t('preset.deleteFailed')); }
