@@ -1,7 +1,7 @@
 import { useRef, useCallback, useEffect, useState } from 'react';
 import { InputCubicBezierPicker, type CubicBezierValue } from 'tweeq';
 import { BEAT_SYNC_BEATS_PER_LOOP, getBeatSyncDurationSeconds, useGradientStore } from '../store/gradientStore';
-import { BEAT_SYNC_RATES, normalizeBeatSyncRate } from '../lib/animationConfig';
+import { BEAT_SYNC_RATES, normalizeBeatSyncBpm, normalizeBeatSyncRate } from '../lib/animationConfig';
 import { applicationCommands } from '../application/commands';
 import { EASING_PRESETS, type EasingPreset } from '../lib/easingBezier';
 import { applyCubicBezierLink } from '../lib/linkedCubicBezier';
@@ -69,7 +69,7 @@ export function BezierEasingEditor({ compact = false }: { compact?: boolean }) {
 
     const intervals = times.slice(1).map((time, index) => time - times[index]);
     const avgInterval = intervals.reduce((sum, interval) => sum + interval, 0) / intervals.length;
-    const bpm = Math.max(1, Math.min(999, Math.round(60000 / avgInterval)));
+    const bpm = normalizeBeatSyncBpm(60000 / avgInterval);
     updateBeatSync({ bpm });
     setBpmDraft(String(bpm));
   }, [updateBeatSync]);
@@ -79,7 +79,7 @@ export function BezierEasingEditor({ compact = false }: { compact?: boolean }) {
       cancelBpmRef.current = false;
       return;
     }
-    const bpm = Math.max(1, Math.min(999, Number(bpmDraft) || beatSync.bpm || 120));
+    const bpm = normalizeBeatSyncBpm(Number(bpmDraft) || beatSync.bpm || 120);
     updateBeatSync({ bpm });
     setBpmDraft(String(bpm));
   }, [beatSync.bpm, bpmDraft, updateBeatSync]);
@@ -89,8 +89,9 @@ export function BezierEasingEditor({ compact = false }: { compact?: boolean }) {
     if (!input) return;
     const onWheel = (e: WheelEvent) => {
       e.preventDefault();
-      const step = e.shiftKey ? 10 : 1;
-      const bpm = Math.max(1, Math.min(999, beatSync.bpm + (e.deltaY < 0 ? step : -step)));
+      // 既定は1、Shiftで10、Altで0.1（小数の微調整）。
+      const step = e.shiftKey ? 10 : e.altKey ? 0.1 : 1;
+      const bpm = normalizeBeatSyncBpm(beatSync.bpm + (e.deltaY < 0 ? step : -step));
       updateBeatSync({ bpm });
       setBpmDraft(String(bpm));
     };
@@ -261,7 +262,7 @@ export function BezierEasingEditor({ compact = false }: { compact?: boolean }) {
                 type="number"
                 min={1}
                 max={999}
-                step={1}
+                step="any"
                 value={bpmDraft}
                 onChange={(e) => setBpmDraft(e.target.value)}
                 onBlur={commitBpm}

@@ -303,6 +303,22 @@ mod tests {
     }
 
     #[test]
+    fn parses_touchdesigner_bpm_messages() {
+        // TouchDesignerのOSC Out DAT（型タグあり）がKGG_VJSystemのbpmHubから送るBPM。
+        let dat = b"/bpm\0\0\0\0,f\0\0C\x16\0\0";
+        assert_eq!(
+            parse_osc_packet(dat),
+            vec![OscMessage { address: "/bpm".into(), args: vec![150.0] }]
+        );
+        // OSC Out CHOPは/_samplerateとともにbundleで送り、フレーム内のサンプル数だけ引数が増える。
+        let chop = b"#bundle\0\xeel\xb4\xea[\xd7<\x93\0\0\0\x18/_samplerate\0\0\0\0,f\0\0Bp\0\0\0\0\0\x14/bpm\0\0\0\0,ff\0C\x17\0\0C\x17\0\0";
+        let parsed = parse_osc_packet(chop);
+        assert_eq!(parsed.len(), 2);
+        assert_eq!(parsed[0], OscMessage { address: "/_samplerate".into(), args: vec![60.0] });
+        assert_eq!(parsed[1], OscMessage { address: "/bpm".into(), args: vec![151.0, 151.0] });
+    }
+
+    #[test]
     fn rejects_malformed_input() {
         assert!(parse_osc_packet(b"").is_empty());
         assert!(parse_osc_packet(b"not osc").is_empty());

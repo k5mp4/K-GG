@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { CONTROLLER_APPLY_INTERVAL_MS, ControllerApplyScheduler, normalizeOscBpm } from './useControllerActions';
+import { CONTROLLER_APPLY_INTERVAL_MS, ControllerApplyScheduler } from './useControllerActions';
 
 function setup() {
   let time = 1000;
@@ -64,12 +64,12 @@ describe('ControllerApplyScheduler', () => {
     expect(scrubs).toHaveLength(1);
   });
 
-  it('applies only the latest BPM, rounded to 0.1', () => {
+  it('applies only the latest BPM, rounded to 0.01', () => {
     const { scheduler, bpms, frame } = setup();
     scheduler.setBpm(120);
-    scheduler.setBpm(127.46);
+    scheduler.setBpm(127.456);
     frame(100);
-    expect(bpms).toEqual([127.5]);
+    expect(bpms).toEqual([127.46]);
   });
 
   it('drops pending input on dispose', () => {
@@ -78,13 +78,5 @@ describe('ControllerApplyScheduler', () => {
     scheduler.dispose();
     frame(100);
     expect(parameters).toEqual([]);
-  });
-});
-
-describe('normalizeOscBpm', () => {
-  it('clamps to the Beat Sync range and rounds to 0.1', () => {
-    expect(normalizeOscBpm(0.2)).toBe(1);
-    expect(normalizeOscBpm(5000)).toBe(999);
-    expect(normalizeOscBpm(128.04)).toBe(128);
   });
 });

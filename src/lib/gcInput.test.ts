@@ -143,6 +143,23 @@ describe('GcInputController BPM', () => {
     expect(controller.handleMessages([{ address: '/bpm', args: [] }], 0)).toEqual([]);
   });
 
+  it('emits a beat reset for the reset address with or without an argument', () => {
+    const controller = create(enabled);
+    expect(controller.handleMessages([msg('/beat/reset', 1)], 0)).toEqual([{ type: 'beatReset' }]);
+    expect(controller.handleMessages([{ address: '/beat/reset', args: [] }], 0)).toEqual([{ type: 'beatReset' }]);
+  });
+
+  it('ignores a zero beat reset, and resets only while following is enabled', () => {
+    expect(create(enabled).handleMessages([msg('/beat/reset', 0)], 0)).toEqual([]);
+    expect(create().handleMessages([msg('/beat/reset', 1)], 0)).toEqual([]);
+  });
+
+  it('collapses repeated resets and orders the reset before the BPM', () => {
+    const controller = create(enabled);
+    expect(controller.handleMessages([msg('/bpm', 128), msg('/beat/reset', 1), msg('/beat/reset', 1)], 0))
+      .toEqual([{ type: 'beatReset' }, { type: 'bpm', bpm: 128 }]);
+  });
+
   it('follows a custom address and leaves other addresses alone', () => {
     const controller = create(normalizeControllerSettings({ bpm: { enabled: true, address: '/clock/tempo' } }));
     expect(controller.handleMessages([msg('/bpm', 90), msg('/clock/tempo', 140)], 0)).toEqual([{ type: 'bpm', bpm: 140 }]);
@@ -177,9 +194,12 @@ describe('normalizeControllerSettings', () => {
   });
 
   it('keeps a valid BPM address and rejects unsafe ones', () => {
-    expect(normalizeControllerSettings({ bpm: { enabled: true, address: '/tempo/main' } }).bpm).toEqual({ enabled: true, address: '/tempo/main' });
+    expect(normalizeControllerSettings({ bpm: { enabled: true, address: '/tempo/main', resetAddress: '/tempo/down' } }).bpm)
+      .toEqual({ enabled: true, address: '/tempo/main', resetAddress: '/tempo/down' });
     for (const address of ['bpm', '/', '/a b', '/a*', '/a#b', '/'.padEnd(80, 'x'), 3]) {
-      expect(normalizeControllerSettings({ bpm: { enabled: true, address } }).bpm.address).toBe('/bpm');
+      const { bpm } = normalizeControllerSettings({ bpm: { enabled: true, address, resetAddress: address } });
+      expect(bpm.address).toBe('/bpm');
+      expect(bpm.resetAddress).toBe('/beat/reset');
     }
   });
 });

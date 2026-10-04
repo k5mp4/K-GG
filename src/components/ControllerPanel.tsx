@@ -107,19 +107,24 @@ function PortField({ port }: { port: number }) {
   );
 }
 
-function BpmAddressField({ address, disabled }: { address: string; disabled: boolean }) {
+function BpmAddressField({ label, field, address, disabled }: {
+  label: string;
+  field: 'address' | 'resetAddress';
+  address: string;
+  disabled: boolean;
+}) {
   const [text, setText] = useState(address);
   useEffect(() => { setText(address); }, [address]);
 
   const commit = () => {
     const next = text.trim();
-    if (isValidBpmAddress(next)) updateControllerSettings({ bpm: { ...getControllerSettings().bpm, address: next } });
+    if (isValidBpmAddress(next)) updateControllerSettings({ bpm: { ...getControllerSettings().bpm, [field]: next } });
     else setText(address);
   };
 
   return (
     <label className="flex items-center justify-between gap-3 text-[11px] text-k-text">
-      <span>OSC address</span>
+      <span>{label}</span>
       <input
         type="text"
         value={text}
@@ -261,7 +266,7 @@ export function ControllerPanel() {
         )}
       </Group>
 
-      <Group title="BPM sync" hint="OSCで届くテンポを、Loop TimingのBeat SyncのBPMへ反映します。Beat Syncをオンにするとループの長さへ反映されます。Beatの倍率はBeat Syncの設定で変えられます。">
+      <Group title="BPM sync" hint="OSCで届くテンポを、Loop TimingのBeat SyncのBPMへ反映します（小数第2位まで）。Beat Syncをオンにするとループの長さへ反映されます。Beatの倍率はBeat Syncの設定で変えられます。拍の先頭リセットが届くと、再生位置を先頭へ戻します。">
         <label className="flex items-center justify-between gap-3 text-[11px] text-k-text">
           <span>Follow OSC BPM</span>
           <Toggle
@@ -272,7 +277,8 @@ export function ControllerPanel() {
             onChange={enabled => updateControllerSettings({ bpm: { ...settings.bpm, enabled } })}
           />
         </label>
-        <BpmAddressField address={settings.bpm.address} disabled={!settings.bpm.enabled} />
+        <BpmAddressField label="BPM address" field="address" address={settings.bpm.address} disabled={!settings.bpm.enabled} />
+        <BpmAddressField label="Beat reset address" field="resetAddress" address={settings.bpm.resetAddress} disabled={!settings.bpm.enabled} />
       </Group>
 
       <Group title="Time scrub" hint="倒した量に応じて再生位置を動かします。小さく倒すと細かく動きます。">

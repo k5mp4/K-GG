@@ -23,6 +23,15 @@ export function stepBeatSyncRate(rate: unknown, direction: -1 | 1): BeatSyncRate
   return BEAT_SYNC_RATES[Math.min(BEAT_SYNC_RATES.length - 1, Math.max(0, index + direction))];
 }
 
+export const BEAT_SYNC_BPM_MIN = 1;
+export const BEAT_SYNC_BPM_MAX = 999;
+
+/** Beat SyncのBPMを許容範囲（1〜999）へ収め、小数第2位（0.01刻み）へ丸める。 */
+export function normalizeBeatSyncBpm(bpm: number, fallback = 120): number {
+  const value = Number.isFinite(bpm) ? bpm : fallback;
+  return Math.min(BEAT_SYNC_BPM_MAX, Math.max(BEAT_SYNC_BPM_MIN, Math.round(value * 100) / 100));
+}
+
 export function getBeatSyncDurationSeconds(bpm: number, rate: unknown = 1): number {
   const safeBpm = Math.max(1, Math.min(999, Number.isFinite(bpm) ? bpm : 120));
   return BEAT_SYNC_BEATS_PER_LOOP * 60 / (safeBpm * normalizeBeatSyncRate(rate));
