@@ -258,6 +258,15 @@ export function placePresets(library: PresetLibrary, placements: PresetPlacement
   });
 }
 
+/** Ids from `anchorId` to `targetId` inclusive, following the order of `presets` as displayed. Falls back to the target alone. */
+export function getPresetRangeIds(presets: Preset[], anchorId: string | null, targetId: string): string[] {
+  const from = anchorId === null ? -1 : presets.findIndex(preset => preset.id === anchorId);
+  const to = presets.findIndex(preset => preset.id === targetId);
+  if (to < 0) return [];
+  if (from < 0) return [targetId];
+  return presets.slice(Math.min(from, to), Math.max(from, to) + 1).map(preset => preset.id);
+}
+
 export function deletePresets(library: PresetLibrary, ids: Iterable<string>): PresetLibrary {
   const wanted = new Set(ids);
   return validatePresetLibrary({ ...library, presets: library.presets.filter(preset => !wanted.has(preset.id)) });

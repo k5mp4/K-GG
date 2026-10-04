@@ -12,6 +12,7 @@ import {
   getFolderPath,
   getFolderPreviewPresets,
   getPresetPlacements,
+  getPresetRangeIds,
   mergePresetLibrary,
   movePreset,
   movePresets,
@@ -176,5 +177,21 @@ describe('presetLibrary batch operations', () => {
     expect(rest.presets.map(item => item.name)).toEqual(['B']);
     expect(restorePresets(rest, removed).presets.map(item => item.name).sort()).toEqual(['A', 'B', 'C']);
     expect(restorePresets(library, removed).presets).toHaveLength(3);
+  });
+
+  it('returns the ids between the anchor and the target in display order, in either direction', () => {
+    const { library, ids } = sample();
+
+    expect(getPresetRangeIds(library.presets, ids[0], ids[2])).toEqual(ids);
+    expect(getPresetRangeIds(library.presets, ids[2], ids[1])).toEqual([ids[1], ids[2]]);
+    expect(getPresetRangeIds(library.presets, ids[1], ids[1])).toEqual([ids[1]]);
+  });
+
+  it('falls back to the target alone when there is no usable anchor, and to nothing for an unknown target', () => {
+    const { library, ids } = sample();
+
+    expect(getPresetRangeIds(library.presets, null, ids[1])).toEqual([ids[1]]);
+    expect(getPresetRangeIds(library.presets, 'gone', ids[1])).toEqual([ids[1]]);
+    expect(getPresetRangeIds(library.presets, ids[0], 'gone')).toEqual([]);
   });
 });

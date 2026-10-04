@@ -26,7 +26,7 @@ import {
   type PresetLibrary,
 } from '../lib/presets';
 import { loadUserColorPalettes, mergeUserColorPalettes } from '../lib/colorPalettes';
-import { getChildFolders, getFolderPath, getFolderPreviewPresets, getPresetsInFolder } from '../lib/presetLibrary';
+import { getChildFolders, getFolderPath, getFolderPreviewPresets, getPresetRangeIds, getPresetsInFolder } from '../lib/presetLibrary';
 import { builtinPresetLibrary, ensurePresetLibraryLoaded, getPresetLibrarySnapshot, isBuiltinPresetId, refreshPresetLibrary, subscribePresetLibrary } from '../lib/presetLibraryCache';
 import { deletePresetsWithHistory, movePresetsWithHistory } from '../lib/presetLibraryActions';
 import { PresetPreview } from './PresetPreview';
@@ -342,6 +342,8 @@ export function PresetPanel({ canvasW, canvasH, setCanvasW, setCanvasH, aspectRa
   const [selectedIds, setSelectedIds] = useState<ReadonlySet<string>>(new Set());
   const [menu, setMenu] = useState<{ x: number; y: number } | null>(null);
   const closeMenu = useCallback(() => setMenu(null), []);
+  // Shiftクリックの範囲選択の起点。最後にクリック（または右クリック）したPreset。
+  const anchorIdRef = useRef<string | null>(null);
 
   // 保存先の読み込みは起動時に済んでいる。ここでは変更後の更新だけを行う。
   async function refresh() {
@@ -351,7 +353,7 @@ export function PresetPanel({ canvasW, canvasH, setCanvasW, setCanvasH, aspectRa
 
   useEffect(() => { void ensurePresetLibraryLoaded(); }, []);
   // フォルダーを移ったら選択とメニューを閉じる。見えないPresetを誤って削除しないため。
-  useEffect(() => { setSelectedIds(new Set()); setMenu(null); }, [selectedFolderId]);
+  useEffect(() => { setSelectedIds(new Set()); setMenu(null); anchorIdRef.current = null; }, [selectedFolderId]);
 
   const currentFolder = library.folders.find(folder => folder.id === selectedFolderId) ?? null;
   const childFolders = useMemo(() => getChildFolders(library, selectedFolderId), [library, selectedFolderId]);
@@ -527,16 +529,24 @@ export function PresetPanel({ canvasW, canvasH, setCanvasW, setCanvasH, aspectRa
     } catch (deleteError) { setError(deleteError instanceof Error ? deleteError.message : t('preset.deleteFailed')); }
   }
 
-  /** Shift（またはCtrl/Cmd）+クリックは選択の追加・解除、通常のクリックは選択を解いてPresetを適用する。 */
+  /** Shift+クリックは起点から押したカードまでの範囲選択、Ctrl/Cmd+クリックは1枚ずつの追加・解除、通常のクリックは選択を解いてPresetを適用する。 */
   function handleCardClick(preset: Preset, event: ReactMouseEvent<HTMLElement>) {
     if (event.shiftKey || event.ctrlKey || event.metaKey) {
       if (isBuiltinPresetId(preset.id)) return;
+      if (event.shiftKey) {
+        setSelectedIds(new Set(getPresetRangeIds(userPresets, anchorIdRef.current, preset.id)));
+        // 起点は動かさず、Shiftクリックのたびに起点からの範囲を取り直す。起点が未設定なら押したカードを起点にする。
+        if (anchorIdRef.current === null || !userPresets.some(item => item.id === anchorIdRef.current)) anchorIdRef.current = preset.id;
+        return;
+      }
       const next = new Set(selectionRef.current);
       if (next.has(preset.id)) next.delete(preset.id); else next.add(preset.id);
       setSelectedIds(next);
+      anchorIdRef.current = preset.id;
       return;
     }
     if (selectionRef.current.size > 0) setSelectedIds(new Set());
+    anchorIdRef.current = preset.id;
     handleLoad(preset);
   }
 
@@ -544,7 +554,7 @@ export function PresetPanel({ canvasW, canvasH, setCanvasW, setCanvasH, aspectRa
   function handleCardContextMenu(preset: Preset, event: ReactMouseEvent<HTMLElement>) {
     event.preventDefault();
     if (isBuiltinPresetId(preset.id)) return;
-    if (!selectionRef.current.has(preset.id)) setSelectedIds(new Set([preset.id]));
+    if (!selectionRef.current.has(preset.id)) { setSelectedIds(new Set([preset.id])); anchorIdRef.current = preset.id; }
     setMenu({ x: event.clientX, y: event.clientY });
   }
 
