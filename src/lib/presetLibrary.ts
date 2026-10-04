@@ -219,6 +219,60 @@ export function movePreset(library: PresetLibrary, presetId: string, folderId: s
   return validatePresetLibrary({ ...library, presets: library.presets.map(preset => preset.id === presetId ? { ...preset, folderId, order } : preset) });
 }
 
+/** A preset's position in the library, kept so a move or delete can be undone exactly. */
+export type PresetPlacement = { id: string; folderId: string | null; order: number };
+
+export function getPresetPlacements(library: PresetLibrary, ids: Iterable<string>): PresetPlacement[] {
+  const wanted = new Set(ids);
+  return library.presets
+    .filter(preset => wanted.has(preset.id))
+    .map(preset => ({ id: preset.id, folderId: preset.folderId ?? null, order: preset.order ?? 0 }));
+}
+
+/** Moves several presets at once to the end of `folderId`, keeping their relative order. Presets already there stay put. */
+export function movePresets(library: PresetLibrary, ids: Iterable<string>, folderId: string | null): PresetLibrary {
+  assertFolder(library, folderId);
+  const wanted = new Set(ids);
+  const moving = sortByOrder(library.presets.filter(preset => wanted.has(preset.id) && (preset.folderId ?? null) !== folderId));
+  if (moving.length === 0) return library;
+  const movingIds = new Set(moving.map(preset => preset.id));
+  const base = Math.max(-1, ...library.presets.filter(preset => !movingIds.has(preset.id) && (preset.folderId ?? null) === folderId).map(preset => preset.order ?? 0)) + 1;
+  const orders = new Map(moving.map((preset, index) => [preset.id, base + index]));
+  return validatePresetLibrary({
+    ...library,
+    presets: library.presets.map(preset => orders.has(preset.id) ? { ...preset, folderId, order: orders.get(preset.id)! } : preset),
+  });
+}
+
+/** Puts presets back at recorded positions. A folder that no longer exists falls back to the root. */
+export function placePresets(library: PresetLibrary, placements: PresetPlacement[]): PresetLibrary {
+  const byId = new Map(placements.map(placement => [placement.id, placement]));
+  const folderIds = new Set(library.folders.map(folder => folder.id));
+  return validatePresetLibrary({
+    ...library,
+    presets: library.presets.map(preset => {
+      const placement = byId.get(preset.id);
+      if (!placement) return preset;
+      return { ...preset, folderId: placement.folderId !== null && folderIds.has(placement.folderId) ? placement.folderId : null, order: placement.order };
+    }),
+  });
+}
+
+export function deletePresets(library: PresetLibrary, ids: Iterable<string>): PresetLibrary {
+  const wanted = new Set(ids);
+  return validatePresetLibrary({ ...library, presets: library.presets.filter(preset => !wanted.has(preset.id)) });
+}
+
+/** Re-adds deleted presets as they were. Presets already present are skipped; a missing folder falls back to the root. */
+export function restorePresets(library: PresetLibrary, presets: Preset[]): PresetLibrary {
+  const existing = new Set(library.presets.map(preset => preset.id));
+  const folderIds = new Set(library.folders.map(folder => folder.id));
+  const restored = presets
+    .filter(preset => !existing.has(preset.id))
+    .map(preset => ({ ...preset, folderId: preset.folderId != null && folderIds.has(preset.folderId) ? preset.folderId : null }));
+  return validatePresetLibrary({ ...library, presets: [...library.presets, ...restored] });
+}
+
 export function moveFolder(library: PresetLibrary, folderId: string, parentId: string | null): PresetLibrary {
   const folder = library.folders.find(candidate => candidate.id === folderId);
   if (!folder) throw new Error('Folder not found');

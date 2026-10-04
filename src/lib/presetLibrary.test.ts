@@ -7,12 +7,17 @@ import {
   createFolder,
   decodePresetPackage,
   deleteFolder,
+  deletePresets,
   encodePresetExport,
   getFolderPath,
   getFolderPreviewPresets,
+  getPresetPlacements,
   mergePresetLibrary,
   movePreset,
+  movePresets,
+  placePresets,
   normalizePresetLibrary,
+  restorePresets,
   type PresetLibrary,
 } from './presetLibrary';
 import type { StoreSnapshot } from './presetModel';
@@ -135,5 +140,41 @@ describe('untrusted preset ZIP limits', () => {
       else view.setUint32(central + 24, kind === 'oversized' ? 17 * 1024 * 1024 : 1, true);
       expect(() => decodePresetPackage(broken, 'presets.zip')).toThrow();
     }
+  });
+});
+
+describe('presetLibrary batch operations', () => {
+  function sample() {
+    const { library, folder } = createFolder(createEmptyPresetLibrary(), 'Motion', null);
+    const presets = [preset('A', 0), preset('B', 1), preset('C', 2)];
+    return { folder, library: { ...library, presets }, ids: presets.map(item => item.id) };
+  }
+
+  it('moves presets to the end of the folder in their current order and skips ones already there', () => {
+    const { library, folder, ids } = sample();
+    const moved = movePresets(library, [ids[2], ids[0]], folder.id);
+
+    expect(moved.presets.filter(item => item.folderId === folder.id).sort((a, b) => (a.order ?? 0) - (b.order ?? 0)).map(item => item.name)).toEqual(['A', 'C']);
+    expect(movePresets(moved, [ids[0]], folder.id)).toBe(moved);
+    expect(() => movePresets(library, [ids[0]], 'missing')).toThrow('Folder not found');
+  });
+
+  it('places presets back at recorded positions and falls back to the root for a missing folder', () => {
+    const { library, folder, ids } = sample();
+    const before = getPresetPlacements(library, [ids[0]]);
+    const moved = movePresets(library, [ids[0]], folder.id);
+
+    expect(placePresets(moved, before).presets.find(item => item.id === ids[0])?.folderId).toBe(null);
+    expect(placePresets(library, [{ id: ids[0], folderId: 'gone', order: 7 }]).presets.find(item => item.id === ids[0])).toMatchObject({ folderId: null, order: 7 });
+  });
+
+  it('deletes and restores presets, ignoring ones that are already present', () => {
+    const { library, ids } = sample();
+    const removed = library.presets.filter(item => item.id !== ids[1]);
+    const rest = deletePresets(library, [ids[0], ids[2]]);
+
+    expect(rest.presets.map(item => item.name)).toEqual(['B']);
+    expect(restorePresets(rest, removed).presets.map(item => item.name).sort()).toEqual(['A', 'B', 'C']);
+    expect(restorePresets(library, removed).presets).toHaveLength(3);
   });
 });

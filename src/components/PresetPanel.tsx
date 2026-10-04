@@ -1,4 +1,4 @@
-import { memo, useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore, type ChangeEvent, type DragEvent, type MutableRefObject } from 'react';
+import { memo, useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore, type ChangeEvent, type DragEvent, type MouseEvent as ReactMouseEvent, type MutableRefObject } from 'react';
 import { createEmptyManualDistortMap, createEmptyManualSmoothMask, normalizeNoiseDistortionConfig, normalizePostprocessConfig, STORE_DEFAULTS, useGradientStore } from '../store/gradientStore';
 import { createDefaultEffectPipeline, normalizeEffectPipelineConfig } from '../lib/effectPipeline';
 import { normalizeClothGradientConfig } from '../types/clothGradient';
@@ -16,10 +16,8 @@ import { keepLoopTimingOnPresetLoad } from '../lib/animationConfig';
 import {
   createFolder,
   deleteFolder,
-  deletePreset,
   exportPresetPackage,
   importPresetPackage,
-  movePreset,
   renameFolder,
   savePreset,
   type Preset,
@@ -30,7 +28,9 @@ import {
 import { loadUserColorPalettes, mergeUserColorPalettes } from '../lib/colorPalettes';
 import { getChildFolders, getFolderPath, getFolderPreviewPresets, getPresetsInFolder } from '../lib/presetLibrary';
 import { builtinPresetLibrary, ensurePresetLibraryLoaded, getPresetLibrarySnapshot, isBuiltinPresetId, refreshPresetLibrary, subscribePresetLibrary } from '../lib/presetLibraryCache';
+import { deletePresetsWithHistory, movePresetsWithHistory } from '../lib/presetLibraryActions';
 import { PresetPreview } from './PresetPreview';
+import { PresetContextMenu } from './PresetContextMenu';
 import { capturePresetThumbnail } from '../lib/presetThumbnail';
 import { useLanguage } from '../i18n/LanguageProvider';
 import { IconButton } from './IconButton';
@@ -167,20 +167,25 @@ const FOLDER_GRID_STYLE = responsiveColumns(120);
 
 type PresetCardProps = {
   preset: Preset;
-  folderOptions: FolderOption[];
   isBuiltin: boolean;
   isActive: boolean;
+  /** Shift/Ctrl+クリックで選んだ複数選択の対象。 */
+  isSelected: boolean;
   /** GCコントローラー操作で選択中の候補。 */
   isCursor: boolean;
   viewMode: ViewMode;
-  onLoad: (preset: Preset) => void;
-  onDelete: (id: string) => void;
-  onMove: (id: string, folderId: string | null) => void;
+  onClick: (preset: Preset, event: ReactMouseEvent<HTMLElement>) => void;
+  onContextMenu: (preset: Preset, event: ReactMouseEvent<HTMLElement>) => void;
 };
 
-const PresetCard = memo(function PresetCard({ preset, folderOptions, isBuiltin, isActive, isCursor, viewMode, onLoad, onDelete, onMove }: PresetCardProps) {
+const SELECTED_BADGE = (
+  <span aria-hidden="true" className="pointer-events-none absolute left-1 top-1 flex h-4 w-4 items-center justify-center bg-sky-400 text-[10px] font-bold leading-none text-deep">✓</span>
+);
+
+const PresetCard = memo(function PresetCard({ preset, isBuiltin, isActive, isSelected, isCursor, viewMode, onClick, onContextMenu }: PresetCardProps) {
   const { t } = useLanguage();
   const title = isBuiltin ? `${preset.name} · ${t('preset.builtIn')}` : preset.name;
+  const selectionRing = isSelected ? 'ring-2 ring-sky-400' : '';
   const dragProps = {
     draggable: !isBuiltin,
     onDragStart: (event: DragEvent<HTMLElement>) => {
@@ -188,34 +193,24 @@ const PresetCard = memo(function PresetCard({ preset, folderOptions, isBuiltin, 
       event.dataTransfer.setData(PRESET_DRAG_TYPE, preset.id);
       event.dataTransfer.effectAllowed = 'move';
     },
+    onContextMenu: (event: ReactMouseEvent<HTMLElement>) => onContextMenu(preset, event),
   };
-  const moveSelect = !isBuiltin && (
-    <select
-      aria-label={t('preset.destination', { name: preset.name })}
-      value={preset.folderId ?? ''}
-      onChange={event => onMove(preset.id, event.target.value || null)}
-      className="max-w-[78px] bg-k-bg/90 px-1 py-0.5 text-[9px] text-tab-inactive outline-none"
-    >
-      <option value="">{t('preset.root')}</option>
-      {folderOptions.map(option => <option key={option.id} value={option.id}>{option.label}</option>)}
-    </select>
-  );
 
   if (viewMode === 'list') {
     return (
       <article
         {...dragProps}
         data-preset-id={preset.id}
-        className={`flex min-w-0 items-center gap-1 border bg-k-surface/65 p-1.5 transition-colors ${isCursor ? 'ring-2 ring-cream' : ''} ${isActive ? 'border-fire/70 bg-fire/10' : 'border-cream/10 hover:border-cream/25'} ${!isBuiltin ? 'cursor-grab active:cursor-grabbing' : ''}`}
+        data-selected={isSelected || undefined}
+        className={`flex min-w-0 select-none items-center gap-1 border bg-k-surface/65 p-1.5 transition-colors ${isCursor ? 'ring-2 ring-cream' : selectionRing} ${isActive ? 'border-fire/70 bg-fire/10' : 'border-cream/10 hover:border-cream/25'} ${!isBuiltin ? 'cursor-grab active:cursor-grabbing' : ''}`}
       >
-        <button type="button" onClick={() => onLoad(preset)} title={title} aria-current={isActive || undefined} className="flex min-w-0 flex-1 items-center gap-2 text-left">
-          <span className="block h-11 w-16 shrink-0 overflow-hidden border border-cream/15 bg-deep/40">
+        <button type="button" onClick={event => onClick(preset, event)} title={title} aria-current={isActive || undefined} className="flex min-w-0 flex-1 items-center gap-2 text-left">
+          <span className="relative block h-11 w-16 shrink-0 overflow-hidden border border-cream/15 bg-deep/40">
             <PresetPreview preset={preset} />
+            {isSelected && SELECTED_BADGE}
           </span>
           <span className="min-w-0 flex-1 truncate text-[11px] font-semibold text-k-text">{preset.name}</span>
         </button>
-        {moveSelect}
-        {!isBuiltin && <IconButton icon="delete" onClick={() => onDelete(preset.id)} className="shrink-0 px-1 text-red-400 hover:text-red-300" label={t('preset.deleteNamed', { name: preset.name })} />}
       </article>
     );
   }
@@ -224,20 +219,16 @@ const PresetCard = memo(function PresetCard({ preset, folderOptions, isBuiltin, 
     <article
       {...dragProps}
       data-preset-id={preset.id}
-      className={`group relative min-w-0 overflow-hidden border bg-k-surface/70 transition-all ${isCursor ? 'ring-2 ring-cream' : ''} ${isActive ? 'border-fire/80 shadow-[0_0_0_1px_rgba(213,73,43,0.25)]' : 'border-cream/10 hover:-translate-y-0.5 hover:border-cream/30'} ${!isBuiltin ? 'cursor-grab active:cursor-grabbing' : ''}`}
+      data-selected={isSelected || undefined}
+      className={`relative min-w-0 select-none overflow-hidden border bg-k-surface/70 transition-all ${isCursor ? 'ring-2 ring-cream' : selectionRing} ${isActive ? 'border-fire/80 shadow-[0_0_0_1px_rgba(213,73,43,0.25)]' : 'border-cream/10 hover:-translate-y-0.5 hover:border-cream/30'} ${!isBuiltin ? 'cursor-grab active:cursor-grabbing' : ''}`}
     >
-      <button type="button" onClick={() => onLoad(preset)} title={title} aria-current={isActive || undefined} className="relative block aspect-[16/10] w-full overflow-hidden bg-deep/40 text-left">
+      <button type="button" onClick={event => onClick(preset, event)} title={title} aria-current={isActive || undefined} className="relative block aspect-[16/10] w-full overflow-hidden bg-deep/40 text-left">
         <PresetPreview preset={preset} />
         <span className="pointer-events-none absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/80 via-black/45 to-transparent px-1.5 pb-1 pt-4">
           <span className={`block truncate text-[10px] font-semibold leading-tight drop-shadow ${isActive ? 'text-cream' : 'text-white'}`}>{preset.name}</span>
         </span>
+        {isSelected && SELECTED_BADGE}
       </button>
-      {!isBuiltin && (
-        <div className="absolute right-1 top-1 flex items-center gap-0.5 opacity-0 transition-opacity focus-within:opacity-100 group-hover:opacity-100 [@media(hover:none)]:opacity-100">
-          {moveSelect}
-          <IconButton icon="delete" onClick={() => onDelete(preset.id)} className="shrink-0 bg-k-bg/90 px-1 text-red-400 hover:text-red-300" label={t('preset.deleteNamed', { name: preset.name })} />
-        </div>
-      )}
     </article>
   );
 });
@@ -348,6 +339,9 @@ export function PresetPanel({ canvasW, canvasH, setCanvasW, setCanvasH, aspectRa
   const [cursorId, setCursorId] = useState<string | null>(null);
   const [cursorToast, setCursorToast] = useState<string | null>(null);
   const cursorToastTimer = useRef<number | undefined>(undefined);
+  const [selectedIds, setSelectedIds] = useState<ReadonlySet<string>>(new Set());
+  const [menu, setMenu] = useState<{ x: number; y: number } | null>(null);
+  const closeMenu = useCallback(() => setMenu(null), []);
 
   // 保存先の読み込みは起動時に済んでいる。ここでは変更後の更新だけを行う。
   async function refresh() {
@@ -356,6 +350,8 @@ export function PresetPanel({ canvasW, canvasH, setCanvasW, setCanvasH, aspectRa
   }
 
   useEffect(() => { void ensurePresetLibraryLoaded(); }, []);
+  // フォルダーを移ったら選択とメニューを閉じる。見えないPresetを誤って削除しないため。
+  useEffect(() => { setSelectedIds(new Set()); setMenu(null); }, [selectedFolderId]);
 
   const currentFolder = library.folders.find(folder => folder.id === selectedFolderId) ?? null;
   const childFolders = useMemo(() => getChildFolders(library, selectedFolderId), [library, selectedFolderId]);
@@ -367,6 +363,10 @@ export function PresetPanel({ canvasW, canvasH, setCanvasW, setCanvasH, aspectRa
   );
   const folderOptions = useMemo(() => flattenFolderOptions(library.folders), [library.folders]);
   const allUserPresets = library.presets;
+  // 表示中のフォルダーにあるPresetだけを選択扱いにする。削除・移動で消えたIDは自然に外れる。
+  const selection = useMemo(() => new Set(userPresets.filter(preset => selectedIds.has(preset.id)).map(preset => preset.id)), [userPresets, selectedIds]);
+  const selectionRef = useRef(selection);
+  selectionRef.current = selection;
   const displayedError = error ?? (status === 'error' ? t('preset.loadFailed') : null);
 
   function setDisplayMode(nextMode: ViewMode) {
@@ -504,22 +504,72 @@ export function PresetPanel({ canvasW, canvasH, setCanvasW, setCanvasH, aspectRa
     } catch (folderError) { setError(folderError instanceof Error ? folderError.message : t('preset.deleteFolderFailed')); }
   }
 
-  async function handleMovePreset(id: string, folderId: string | null) {
-    try { await movePreset(id, folderId); await refresh(); }
-    catch (moveError) { setError(moveError instanceof Error ? moveError.message : t('preset.moveFailed')); }
+  /** ドラッグしたPresetが複数選択に含まれていれば、選択中のPresetをまとめて移動する。 */
+  function handleMovePreset(id: string, folderId: string | null) {
+    return moveSelectionOrPreset(selection.has(id) ? [...selection] : [id], folderId);
   }
 
-  async function handleDeletePreset(id: string) {
-    try { await deletePreset(id); await refresh(); }
-    catch (deleteError) { setError(deleteError instanceof Error ? deleteError.message : t('preset.deleteFailed')); }
+  async function moveSelectionOrPreset(ids: string[], folderId: string | null) {
+    try {
+      await movePresetsWithHistory(ids, folderId);
+      setSelectedIds(new Set());
+      setError(null);
+    } catch (moveError) { setError(moveError instanceof Error ? moveError.message : t('preset.moveFailed')); }
+  }
+
+  async function handleDeleteSelected() {
+    const ids = [...selection];
+    if (ids.length === 0) return;
+    try {
+      await deletePresetsWithHistory(ids);
+      setSelectedIds(new Set());
+      setError(null);
+    } catch (deleteError) { setError(deleteError instanceof Error ? deleteError.message : t('preset.deleteFailed')); }
+  }
+
+  /** Shift（またはCtrl/Cmd）+クリックは選択の追加・解除、通常のクリックは選択を解いてPresetを適用する。 */
+  function handleCardClick(preset: Preset, event: ReactMouseEvent<HTMLElement>) {
+    if (event.shiftKey || event.ctrlKey || event.metaKey) {
+      if (isBuiltinPresetId(preset.id)) return;
+      const next = new Set(selectionRef.current);
+      if (next.has(preset.id)) next.delete(preset.id); else next.add(preset.id);
+      setSelectedIds(next);
+      return;
+    }
+    if (selectionRef.current.size > 0) setSelectedIds(new Set());
+    handleLoad(preset);
+  }
+
+  /** 右クリックしたPresetが選択外なら、そのPresetだけを選択してメニューを開く。 */
+  function handleCardContextMenu(preset: Preset, event: ReactMouseEvent<HTMLElement>) {
+    event.preventDefault();
+    if (isBuiltinPresetId(preset.id)) return;
+    if (!selectionRef.current.has(preset.id)) setSelectedIds(new Set([preset.id]));
+    setMenu({ x: event.clientX, y: event.clientY });
   }
 
   // PresetCardをmemo化するため、最新のハンドラーをrefで参照する安定した関数を渡す。
-  const handlersRef = useRef({ load: handleLoad, remove: handleDeletePreset, move: handleMovePreset });
-  handlersRef.current = { load: handleLoad, remove: handleDeletePreset, move: handleMovePreset };
-  const loadPresetStable = useCallback((preset: Preset) => handlersRef.current.load(preset), []);
-  const deletePresetStable = useCallback((id: string) => { void handlersRef.current.remove(id); }, []);
-  const movePresetStable = useCallback((id: string, folderId: string | null) => { void handlersRef.current.move(id, folderId); }, []);
+  const handlersRef = useRef({ click: handleCardClick, contextMenu: handleCardContextMenu, removeSelected: handleDeleteSelected });
+  handlersRef.current = { click: handleCardClick, contextMenu: handleCardContextMenu, removeSelected: handleDeleteSelected };
+  const clickCardStable = useCallback((preset: Preset, event: ReactMouseEvent<HTMLElement>) => handlersRef.current.click(preset, event), []);
+  const contextMenuCardStable = useCallback((preset: Preset, event: ReactMouseEvent<HTMLElement>) => handlersRef.current.contextMenu(preset, event), []);
+
+  // 選択中は Delete で削除、Escape で選択解除。入力欄の編集中や、パネルが見えていないときは何もしない。
+  const hasSelection = selection.size > 0;
+  useEffect(() => {
+    if (!hasSelection) return;
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') { setSelectedIds(new Set()); return; }
+      if (event.key !== 'Delete' && event.key !== 'Backspace') return;
+      const target = event.target as HTMLElement | null;
+      if (target && (target.isContentEditable || ['INPUT', 'TEXTAREA', 'SELECT'].includes(target.tagName))) return;
+      if (!listRef.current || listRef.current.getClientRects().length === 0) return;
+      event.preventDefault();
+      void handlersRef.current.removeSelected();
+    };
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, [hasSelection]);
 
   // GCコントローラー: スティックで候補を動かし、決定ボタンで読み込む。フォルダーはボタンで切り替える。
   // 関数は毎回作り直されるため、useGcInput側は最新の参照を呼ぶ。
@@ -602,14 +652,14 @@ export function PresetPanel({ canvasW, canvasH, setCanvasW, setCanvasH, aspectRa
           <FolderBreadcrumb path={folderPath} onSelect={setSelectedFolderId} onDropPreset={handleMovePreset} />
         </div>
 
-        <main ref={listRef} className="min-h-0 flex-1 space-y-2 overflow-y-auto pr-0.5 scrollbar-thin">
+        <main ref={listRef} onClick={event => { if (event.target === event.currentTarget) setSelectedIds(new Set()); }} className="min-h-0 flex-1 space-y-2 overflow-y-auto pr-0.5 scrollbar-thin">
           {childFolders.length > 0 && <div className="grid gap-1.5" style={FOLDER_GRID_STYLE}>{childFolders.map(folder => <FolderCard key={folder.id} folder={folder} library={library} onOpen={() => setSelectedFolderId(folder.id)} onDropPreset={handleMovePreset} />)}</div>}
 
           {visiblePresets.length === 0 ? (
             <div className="border border-dashed border-cream/15 px-3 py-6 text-center text-[10px] italic text-tab-inactive">{t('preset.empty')}</div>
           ) : (
             <div className={viewMode === 'grid' ? 'grid gap-1.5' : 'space-y-1'} style={viewMode === 'grid' ? PRESET_GRID_STYLE : undefined}>
-              {visiblePresets.map(preset => <PresetCard key={preset.id} preset={preset} folderOptions={folderOptions} isBuiltin={isBuiltinPresetId(preset.id)} isActive={presetName === preset.name} isCursor={cursorId === preset.id} viewMode={viewMode} onLoad={loadPresetStable} onDelete={deletePresetStable} onMove={movePresetStable} />)}
+              {visiblePresets.map(preset => <PresetCard key={preset.id} preset={preset} isBuiltin={isBuiltinPresetId(preset.id)} isActive={presetName === preset.name} isSelected={selection.has(preset.id)} isCursor={cursorId === preset.id} viewMode={viewMode} onClick={clickCardStable} onContextMenu={contextMenuCardStable} />)}
             </div>
           )}
         </main>
@@ -656,6 +706,19 @@ export function PresetPanel({ canvasW, canvasH, setCanvasW, setCanvasH, aspectRa
           </div>
         </SidebarSection>
       </div>
+      {menu && hasSelection && (
+        <PresetContextMenu
+          x={menu.x}
+          y={menu.y}
+          count={selection.size}
+          name={userPresets.find(preset => selection.has(preset.id))?.name ?? ''}
+          folders={folderOptions}
+          currentFolderId={selectedFolderId}
+          onMove={folderId => { closeMenu(); void moveSelectionOrPreset([...selection], folderId); }}
+          onDelete={() => { closeMenu(); void handleDeleteSelected(); }}
+          onClose={closeMenu}
+        />
+      )}
       {cursorToast && <div role="status" className="pointer-events-none fixed bottom-6 left-1/2 z-50 max-w-[60vw] -translate-x-1/2 truncate border border-cream/40 bg-deep/90 px-3 py-1.5 text-[12px] font-semibold text-cream shadow-lg">{cursorToast}</div>}
     </div>
   );
