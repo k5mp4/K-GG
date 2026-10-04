@@ -17,6 +17,7 @@ export type ControllerAxis = typeof CONTROLLER_AXES[number];
 /** ボタンで実行する操作。 */
 export const CONTROLLER_BUTTON_ACTIONS = [
   'presetConfirm', 'togglePlayback', 'resetTime', 'folderPrev', 'folderNext', 'folderRoot', 'toggleSpout',
+  'beatRateDown', 'beatRateUp',
 ] as const;
 export type ControllerButtonAction = typeof CONTROLLER_BUTTON_ACTIONS[number];
 
@@ -40,6 +41,8 @@ export type ControllerSettings = {
   buttons: Record<ControllerButtonAction, ControllerButton | null>;
   parameters: ControllerParameterBinding[];
   scrub: { source: ControllerAxis | null; /** 最大に倒した時の1秒あたりのループ割合 */ speed: number };
+  /** OSCで届くBPMをLoop TimingのBeat Syncへ反映する。 */
+  bpm: { enabled: boolean; address: string };
 };
 
 export const CONTROLLER_PORT_MIN = 1024;
@@ -60,13 +63,23 @@ export const DEFAULT_CONTROLLER_SETTINGS: ControllerSettings = {
     folderNext: 'dpad/right',
     folderRoot: 'b',
     toggleSpout: 'start',
+    beatRateDown: 'dpad/down',
+    beatRateUp: 'dpad/up',
   },
   parameters: [
     { source: 'trigger/l', target: 'noise.amount' },
     { source: 'trigger/r', target: 'postprocess.glassRefraction' },
   ],
   scrub: { source: 'cstick/x', speed: 0.25 },
+  bpm: { enabled: false, address: '/bpm' },
 };
+
+/** BPMを受け取るOSCアドレス。`/`で始まる印字可能なASCIIで、OSCの特殊文字を含まない。 */
+const BPM_ADDRESS = /^\/[!-~]{1,63}$/;
+
+export function isValidBpmAddress(address: string): boolean {
+  return BPM_ADDRESS.test(address) && !/[#*,?[\]{}]/.test(address);
+}
 
 function oneOf<T extends string>(values: readonly T[], value: unknown): T | undefined {
   return values.find(candidate => candidate === value);
@@ -95,6 +108,7 @@ export function normalizeControllerSettings(input: unknown): ControllerSettings 
       return source && target ? [{ source, target }] : [];
     }).slice(0, MAX_PARAMETER_BINDINGS)
     : defaults.parameters.map(binding => ({ ...binding }));
+  const rawBpm = (raw.bpm && typeof raw.bpm === 'object' ? raw.bpm : {}) as Record<string, unknown>;
   const rawScrub = (raw.scrub && typeof raw.scrub === 'object' ? raw.scrub : {}) as Record<string, unknown>;
   return {
     enabled: raw.enabled === true,
@@ -107,6 +121,10 @@ export function normalizeControllerSettings(input: unknown): ControllerSettings 
         ? rawScrub.source === null ? null : oneOf(CONTROLLER_AXES, rawScrub.source) ?? defaults.scrub.source
         : defaults.scrub.source,
       speed: clampNumber(rawScrub.speed, CONTROLLER_SCRUB_SPEED_MIN, CONTROLLER_SCRUB_SPEED_MAX, defaults.scrub.speed),
+    },
+    bpm: {
+      enabled: rawBpm.enabled === true,
+      address: typeof rawBpm.address === 'string' && isValidBpmAddress(rawBpm.address) ? rawBpm.address : defaults.bpm.address,
     },
   };
 }

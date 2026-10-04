@@ -9,9 +9,23 @@ export const ANIMATION_DURATION_MAX = getParameterLimit('animation.duration').ma
 export const ANIMATION_SPEED_MIN = getParameterLimit('animation.speed').min;
 export const ANIMATION_SPEED_MAX = getParameterLimit('animation.speed').max;
 
-export function getBeatSyncDurationSeconds(bpm: number): number {
+/** Tempo multipliers selectable for Beat Sync. 2 plays the beat twice as fast, 1/2 and 1/4 slow it down. */
+export const BEAT_SYNC_RATES = [0.25, 0.5, 1, 2] as const;
+export type BeatSyncRate = typeof BEAT_SYNC_RATES[number];
+
+export function normalizeBeatSyncRate(rate: unknown): BeatSyncRate {
+  return BEAT_SYNC_RATES.find(candidate => candidate === rate) ?? 1;
+}
+
+/** The next slower (-1) or faster (+1) rate, stopping at both ends. */
+export function stepBeatSyncRate(rate: unknown, direction: -1 | 1): BeatSyncRate {
+  const index = BEAT_SYNC_RATES.indexOf(normalizeBeatSyncRate(rate));
+  return BEAT_SYNC_RATES[Math.min(BEAT_SYNC_RATES.length - 1, Math.max(0, index + direction))];
+}
+
+export function getBeatSyncDurationSeconds(bpm: number, rate: unknown = 1): number {
   const safeBpm = Math.max(1, Math.min(999, Number.isFinite(bpm) ? bpm : 120));
-  return BEAT_SYNC_BEATS_PER_LOOP * 60 / safeBpm;
+  return BEAT_SYNC_BEATS_PER_LOOP * 60 / (safeBpm * normalizeBeatSyncRate(rate));
 }
 
 /**

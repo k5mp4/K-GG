@@ -27,6 +27,17 @@ describe('animation store constraints', () => {
     expect(useGradientStore.getState().animation.speed).toBe(ANIMATION_SPEED_MIN);
   });
 
+  it('derives the loop duration from BPM and the Beat Sync rate', () => {
+    const { easing } = useGradientStore.getState().animation;
+    const beatSync = { enabled: true, bpm: 120, beatsPerBar: 4, subdivision: 4 as const };
+    useGradientStore.getState().setAnimation({ easing: { ...easing, beatSync } });
+    expect(useGradientStore.getState().animation.duration).toBe(2);
+    useGradientStore.getState().setAnimation({ easing: { ...easing, beatSync: { ...beatSync, rate: 2 } } });
+    expect(useGradientStore.getState().animation.duration).toBe(1);
+    useGradientStore.getState().setAnimation({ easing: { ...easing, beatSync: { ...beatSync, rate: 0.25 } } });
+    expect(useGradientStore.getState().animation.duration).toBe(8);
+  });
+
   it('clamps newly added loop keyframes to the editable half', () => {
     useGradientStore.setState({
       animation: { ...initialAnimation, previewLoop: true },

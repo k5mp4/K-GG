@@ -12,6 +12,7 @@ import {
   CONTROLLER_SCRUB_SPEED_MIN,
   DEFAULT_CONTROLLER_SETTINGS,
   MAX_PARAMETER_BINDINGS,
+  isValidBpmAddress,
   getControllerSettings,
   subscribeControllerSettings,
   updateControllerSettings,
@@ -24,6 +25,7 @@ import {
 } from '../lib/controllerSettings';
 import { CustomSelect } from './CustomSelect';
 import { SliderField } from './SliderField';
+import { Toggle } from './Toggle';
 
 const BUTTON_LABELS: Record<ControllerButton, string> = {
   a: 'A', b: 'B', x: 'X', y: 'Y', start: 'Start', z: 'Z', l: 'L (click)', r: 'R (click)',
@@ -46,6 +48,8 @@ const BUTTON_ACTION_ROWS: { action: ControllerButtonAction; label: string }[] = 
   { action: 'folderNext', label: 'Next folder' },
   { action: 'folderRoot', label: 'Library root' },
   { action: 'toggleSpout', label: 'Spout output on / off' },
+  { action: 'beatRateDown', label: 'Beat slower (×1/4 · ×1/2 · ×1)' },
+  { action: 'beatRateUp', label: 'Beat faster (×1 · ×2)' },
 ];
 
 const buttonOptions = [
@@ -98,6 +102,33 @@ function PortField({ port }: { port: number }) {
         onBlur={commit}
         onKeyDown={event => { if (event.key === 'Enter') event.currentTarget.blur(); }}
         className="w-24 bg-k-surface px-2 py-1 text-right text-[11px] text-k-text outline-none ring-1 ring-cream/15 focus:ring-fire/70"
+      />
+    </label>
+  );
+}
+
+function BpmAddressField({ address, disabled }: { address: string; disabled: boolean }) {
+  const [text, setText] = useState(address);
+  useEffect(() => { setText(address); }, [address]);
+
+  const commit = () => {
+    const next = text.trim();
+    if (isValidBpmAddress(next)) updateControllerSettings({ bpm: { ...getControllerSettings().bpm, address: next } });
+    else setText(address);
+  };
+
+  return (
+    <label className="flex items-center justify-between gap-3 text-[11px] text-k-text">
+      <span>OSC address</span>
+      <input
+        type="text"
+        value={text}
+        disabled={disabled}
+        spellCheck={false}
+        onChange={event => setText(event.target.value)}
+        onBlur={commit}
+        onKeyDown={event => { if (event.key === 'Enter') event.currentTarget.blur(); }}
+        className="w-32 bg-k-surface px-2 py-1 text-right text-[11px] text-k-text outline-none ring-1 ring-cream/15 focus:ring-fire/70 disabled:opacity-50"
       />
     </label>
   );
@@ -228,6 +259,20 @@ export function ControllerPanel() {
             + Add mapping
           </button>
         )}
+      </Group>
+
+      <Group title="BPM sync" hint="OSCで届くテンポを、Loop TimingのBeat SyncのBPMへ反映します。Beat Syncをオンにするとループの長さへ反映されます。Beatの倍率はBeat Syncの設定で変えられます。">
+        <label className="flex items-center justify-between gap-3 text-[11px] text-k-text">
+          <span>Follow OSC BPM</span>
+          <Toggle
+            variant="switch"
+            size="xs"
+            checked={settings.bpm.enabled}
+            ariaLabel="Follow OSC BPM"
+            onChange={enabled => updateControllerSettings({ bpm: { ...settings.bpm, enabled } })}
+          />
+        </label>
+        <BpmAddressField address={settings.bpm.address} disabled={!settings.bpm.enabled} />
       </Group>
 
       <Group title="Time scrub" hint="倒した量に応じて再生位置を動かします。小さく倒すと細かく動きます。">

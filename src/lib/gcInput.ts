@@ -24,7 +24,9 @@ export type GcCommand =
   /** `value`は0..1に正規化した軸の値。 */
   | { type: 'parameter'; target: ControllerParameterTarget; value: number }
   /** 再生位置（ループ割合）を動かす量。 */
-  | { type: 'scrub'; delta: number };
+  | { type: 'scrub'; delta: number }
+  /** OSCで届いたテンポ。 */
+  | { type: 'bpm'; bpm: number };
 
 /** スティックをこの値以上倒すと入力、この値未満へ戻すと解除する（ヒステリシス）。 */
 export const GC_STICK_PRESS_THRESHOLD = 0.6;
@@ -76,9 +78,14 @@ export class GcInputController {
     const commands: GcCommand[] = [];
     const parameterValues = new Map<ControllerParameterTarget, number>();
     const stickTouched = new Set<number>();
+    let bpm: number | null = null;
     for (const message of messages) {
-      const match = GC_ADDRESS.exec(message.address);
       const value = message.args[0];
+      if (settings.bpm.enabled && message.address === settings.bpm.address) {
+        if (typeof value === 'number' && Number.isFinite(value) && value > 0) bpm = value;
+        continue;
+      }
+      const match = GC_ADDRESS.exec(message.address);
       if (!match || typeof value !== 'number' || !Number.isFinite(value)) continue;
       const port = Number(match[1]);
       const name = match[2];
@@ -109,6 +116,7 @@ export class GcInputController {
         if (binding.source === name) parameterValues.set(binding.target, normalizeAxisValue(binding.source, value));
       }
     }
+    if (bpm !== null) commands.push({ type: 'bpm', bpm });
     for (const [target, value] of parameterValues) commands.push({ type: 'parameter', target, value });
     for (const port of stickTouched) {
       const state = this.ports.get(port);

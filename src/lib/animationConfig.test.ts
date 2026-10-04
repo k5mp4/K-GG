@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { STORE_DEFAULTS } from '../store/gradientStore';
-import { keepLoopTimingOnPresetLoad } from './animationConfig';
+import { getBeatSyncDurationSeconds, keepLoopTimingOnPresetLoad, normalizeBeatSyncRate, stepBeatSyncRate } from './animationConfig';
 
 describe('keepLoopTimingOnPresetLoad', () => {
   const current = {
@@ -25,5 +25,28 @@ describe('keepLoopTimingOnPresetLoad', () => {
     expect(result.previewLoop).toBe(false);
     expect(result.easing).toBe(current.easing);
     expect(result.duration).toBe(8);
+  });
+});
+
+describe('Beat Sync rate', () => {
+  it('scales the 4 beat loop by the tempo multiplier', () => {
+    expect(getBeatSyncDurationSeconds(120)).toBe(2);
+    expect(getBeatSyncDurationSeconds(120, 2)).toBe(1);
+    expect(getBeatSyncDurationSeconds(120, 0.5)).toBe(4);
+    expect(getBeatSyncDurationSeconds(120, 0.25)).toBe(8);
+  });
+
+  it('treats a missing or unknown rate as 1', () => {
+    expect(getBeatSyncDurationSeconds(120, undefined)).toBe(2);
+    expect(normalizeBeatSyncRate(3)).toBe(1);
+    expect(normalizeBeatSyncRate('2')).toBe(1);
+  });
+
+  it('steps through the rates and stops at both ends', () => {
+    expect(stepBeatSyncRate(1, 1)).toBe(2);
+    expect(stepBeatSyncRate(2, 1)).toBe(2);
+    expect(stepBeatSyncRate(1, -1)).toBe(0.5);
+    expect(stepBeatSyncRate(0.25, -1)).toBe(0.25);
+    expect(stepBeatSyncRate(undefined, -1)).toBe(0.5);
   });
 });

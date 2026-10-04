@@ -1,6 +1,7 @@
 import { useRef, useCallback, useEffect, useState } from 'react';
 import { InputCubicBezier, type CubicBezierValue } from 'tweeq';
 import { BEAT_SYNC_BEATS_PER_LOOP, getBeatSyncDurationSeconds, useGradientStore } from '../store/gradientStore';
+import { BEAT_SYNC_RATES, normalizeBeatSyncRate } from '../lib/animationConfig';
 import { applicationCommands } from '../application/commands';
 import { EASING_PRESETS, type EasingPreset } from '../lib/easingBezier';
 import { applyCubicBezierLink } from '../lib/linkedCubicBezier';
@@ -9,6 +10,8 @@ import { useLanguage } from '../i18n/LanguageProvider';
 import { localizeUiLabel } from '../i18n/uiLabels';
 
 const MAX_BPM_TAPS = 16;
+
+const BEAT_RATE_LABELS: Record<(typeof BEAT_SYNC_RATES)[number], string> = { 0.25: '×1/4', 0.5: '×1/2', 1: '×1', 2: '×2' };
 
 const PRESET_LABELS: { key: EasingPreset; label: string }[] = [
   { key: 'linear', label: 'Linear' },
@@ -22,7 +25,8 @@ export function BezierEasingEditor({ compact = false }: { compact?: boolean }) {
   const { animation } = useGradientStore();
   const { setAnimation } = applicationCommands;
   const { easing } = animation;
-  const beatSync = easing.beatSync ?? { enabled: false, bpm: 120, beatsPerBar: 4, subdivision: 4 as 3 | 4 };
+  const beatSync = easing.beatSync ?? { enabled: false, bpm: 120, beatsPerBar: 4, subdivision: 4 as 3 | 4, rate: 1 as const };
+  const beatRate = normalizeBeatSyncRate(beatSync.rate);
   const timeRemapActive = easing.enabled || beatSync.enabled;
   const bpmInputRef = useRef<HTMLInputElement>(null);
   const [bpmDraft, setBpmDraft] = useState(String(beatSync.bpm));
@@ -42,7 +46,7 @@ export function BezierEasingEditor({ compact = false }: { compact?: boolean }) {
   const updateBeatSync = useCallback((next: Partial<typeof beatSync>) => {
     const nextBeatSync = { ...beatSync, ...next };
     setAnimation({
-      ...(nextBeatSync.enabled ? { duration: getBeatSyncDurationSeconds(nextBeatSync.bpm) } : {}),
+      ...(nextBeatSync.enabled ? { duration: getBeatSyncDurationSeconds(nextBeatSync.bpm, nextBeatSync.rate) } : {}),
       easing: { ...easing, enabled: nextBeatSync.enabled ? true : easing.enabled, beatSync: nextBeatSync },
     });
   }, [beatSync, easing, setAnimation]);
@@ -222,6 +226,27 @@ export function BezierEasingEditor({ compact = false }: { compact?: boolean }) {
             >
               {tapCount > 1 ? `${tapCount} Tap` : 'Tap'}
             </button>
+          </div>
+
+          <div>
+            <div className="mb-1 text-[10px] text-tab-inactive">Beat</div>
+            <div className="grid grid-cols-4 gap-1">
+              {BEAT_SYNC_RATES.map((rate) => (
+                <button
+                  key={rate}
+                  type="button"
+                  aria-pressed={beatRate === rate}
+                  onClick={() => updateBeatSync({ rate })}
+                  className={`py-1 rounded-none text-[10px] ${
+                    beatRate === rate
+                      ? 'bg-fire text-k-text'
+                      : 'bg-k-surface hover:bg-k-muted text-k-text/80'
+                  }`}
+                >
+                  {BEAT_RATE_LABELS[rate]}
+                </button>
+              ))}
+            </div>
           </div>
 
           <div className="grid grid-cols-2 gap-2">

@@ -1,5 +1,7 @@
 import { useEffect, useRef } from 'react';
 import { applicationCommands } from '../../application/commands';
+import { stepBeatSyncRate } from '../../lib/animationConfig';
+import type { AnimationConfig } from '../../types/animation';
 import type { ControllerParameterTarget } from '../../lib/controllerSettings';
 import type { GcCommand } from '../../lib/gcInput';
 import { getParameterLimit, type ParameterLimitKey } from '../../lib/parameterLimits';
@@ -27,6 +29,20 @@ export function controllerParameterValue(target: ControllerParameterTarget, unit
   return min + (max - min) * Math.min(1, Math.max(0, unit));
 }
 
+type BeatSyncPatch = Partial<NonNullable<AnimationConfig['easing']['beatSync']>>;
+
+/** Loop TimingのBeat Syncを部分的に更新する。Beat Syncがオンなら、ループ長はstoreが再計算する。 */
+function updateBeatSync(patch: (current: NonNullable<AnimationConfig['easing']['beatSync']>) => BeatSyncPatch) {
+  const { easing } = useGradientStore.getState().animation;
+  const current = easing.beatSync ?? { enabled: false, bpm: 120, beatsPerBar: 4, subdivision: 4 as const };
+  applicationCommands.setAnimation({ easing: { ...easing, beatSync: { ...current, ...patch(current) } } });
+}
+
+/** OSCで届くBPMを、Beat Syncの許容範囲（1〜999）へ収め、0.1刻みへ丸める。 */
+export function normalizeOscBpm(bpm: number): number {
+  return Math.min(999, Math.max(1, Math.round(bpm * 10) / 10));
+}
+
 function scrubTime(delta: number) {
   const loop = useGradientStore.getState().animation.previewLoop ?? true;
   const next = renderBridge.getCurrentNormalizedTime() + delta;
@@ -49,6 +65,7 @@ type SchedulerDeps = {
   cancel: (handle: number) => void;
   applyParameter: (target: ControllerParameterTarget, value: number) => void;
   applyScrub: (delta: number) => void;
+  applyBpm: (bpm: number) => void;
 };
 
 /**
@@ -59,6 +76,7 @@ export class ControllerApplyScheduler {
   private readonly parameters = new Map<ControllerParameterTarget, number>();
   private readonly applied = new Map<ControllerParameterTarget, number>();
   private scrubDelta = 0;
+  private bpm: number | null = null;
   private lastFlushAt = Number.NEGATIVE_INFINITY;
   private frame: number | null = null;
 
@@ -71,12 +89,21 @@ export class ControllerApplyScheduler {
       cancel: handle => cancelAnimationFrame(handle),
       applyParameter: (target, value) => CONTROLLER_PARAMETER_INFO[target].apply(value),
       applyScrub: scrubTime,
+      // 手動で入力したBPMと同じ値が届いても、不要なstore更新をしない。
+      applyBpm: bpm => {
+        if (useGradientStore.getState().animation.easing.beatSync?.bpm !== bpm) updateBeatSync(() => ({ bpm }));
+      },
       ...deps,
     };
   }
 
   setParameter(target: ControllerParameterTarget, unit: number): void {
     this.parameters.set(target, quantizeParameter(target, controllerParameterValue(target, unit)));
+    this.request();
+  }
+
+  setBpm(bpm: number): void {
+    this.bpm = normalizeOscBpm(bpm);
     this.request();
   }
 
@@ -90,6 +117,7 @@ export class ControllerApplyScheduler {
     this.frame = null;
     this.parameters.clear();
     this.scrubDelta = 0;
+    this.bpm = null;
   }
 
   private request(): void {
@@ -110,6 +138,8 @@ export class ControllerApplyScheduler {
       this.deps.applyParameter(target, value);
     }
     this.parameters.clear();
+    if (this.bpm !== null) this.deps.applyBpm(this.bpm);
+    this.bpm = null;
     if (this.scrubDelta !== 0) {
       const delta = this.scrubDelta;
       this.scrubDelta = 0;
@@ -140,6 +170,9 @@ export function useControllerActions(): void {
         else if (command.action === 'toggleSpout') {
           const output = getSpoutOutputController();
           void output.setEnabled(!output.getState().enabled);
+        } else if (command.action === 'beatRateDown' || command.action === 'beatRateUp') {
+          const direction = command.action === 'beatRateUp' ? 1 : -1;
+          updateBeatSync(current => ({ rate: stepBeatSyncRate(current.rate, direction) }));
         }
         break;
       case 'parameter':
@@ -147,6 +180,9 @@ export function useControllerActions(): void {
         break;
       case 'scrub':
         schedulerRef.current?.scrub(command.delta);
+        break;
+      case 'bpm':
+        schedulerRef.current?.setBpm(command.bpm);
         break;
       case 'move':
         break;

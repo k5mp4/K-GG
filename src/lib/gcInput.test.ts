@@ -125,6 +125,37 @@ describe('GcInputController analog parameters and scrub', () => {
   });
 });
 
+describe('GcInputController BPM', () => {
+  const enabled = normalizeControllerSettings({ bpm: { enabled: true, address: '/bpm' } });
+
+  it('ignores BPM messages unless following is enabled', () => {
+    expect(create().handleMessages([msg('/bpm', 128)], 0)).toEqual([]);
+  });
+
+  it('emits the latest valid BPM from a batch', () => {
+    const controller = create(enabled);
+    expect(controller.handleMessages([msg('/bpm', 120), msg('/bpm', 127.5)], 0)).toEqual([{ type: 'bpm', bpm: 127.5 }]);
+  });
+
+  it('ignores non-positive and non-finite BPM values', () => {
+    const controller = create(enabled);
+    expect(controller.handleMessages([msg('/bpm', 0), msg('/bpm', -3), msg('/bpm', Number.NaN)], 0)).toEqual([]);
+    expect(controller.handleMessages([{ address: '/bpm', args: [] }], 0)).toEqual([]);
+  });
+
+  it('follows a custom address and leaves other addresses alone', () => {
+    const controller = create(normalizeControllerSettings({ bpm: { enabled: true, address: '/clock/tempo' } }));
+    expect(controller.handleMessages([msg('/bpm', 90), msg('/clock/tempo', 140)], 0)).toEqual([{ type: 'bpm', bpm: 140 }]);
+  });
+
+  it('maps the beat rate buttons by default', () => {
+    const controller = create();
+    controller.handleMessages([msg('/gc/1/dpad/up', 0), msg('/gc/1/dpad/down', 0)], 0);
+    expect(controller.handleMessages([msg('/gc/1/dpad/up', 1)], 10)).toEqual([{ type: 'action', action: 'beatRateUp' }]);
+    expect(controller.handleMessages([msg('/gc/1/dpad/down', 1)], 20)).toEqual([{ type: 'action', action: 'beatRateDown' }]);
+  });
+});
+
 describe('normalizeControllerSettings', () => {
   it('falls back to defaults for missing or invalid values', () => {
     expect(normalizeControllerSettings(undefined)).toEqual(DEFAULT_CONTROLLER_SETTINGS);
@@ -143,6 +174,13 @@ describe('normalizeControllerSettings', () => {
     expect(settings.buttons.resetTime).toBeNull();
     expect(settings.parameters).toEqual([{ source: 'trigger/r', target: 'noise.speed' }]);
     expect(settings.scrub).toEqual({ source: 'cstick/x', speed: 2 });
+  });
+
+  it('keeps a valid BPM address and rejects unsafe ones', () => {
+    expect(normalizeControllerSettings({ bpm: { enabled: true, address: '/tempo/main' } }).bpm).toEqual({ enabled: true, address: '/tempo/main' });
+    for (const address of ['bpm', '/', '/a b', '/a*', '/a#b', '/'.padEnd(80, 'x'), 3]) {
+      expect(normalizeControllerSettings({ bpm: { enabled: true, address } }).bpm.address).toBe('/bpm');
+    }
   });
 });
 
