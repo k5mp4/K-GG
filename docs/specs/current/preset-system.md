@@ -5,7 +5,7 @@ title: Preset System
 status: current
 owners: [maintainer]
 created: 2026-07-27
-updated: 2026-10-03
+updated: 2026-10-04
 requirement_ids: [PRESET-001, PRESET-002, PRESET-003, PRESET-004, PRESET-005, PRESET-006, PRESET-007, PRESET-008, PRESET-009, PRESET-011, PRESET-012, PRESET-013, PRESET-014, PRESET-016, PRESET-017, PRESET-018, PRESET-019, PRESET-020, PRESET-021, PRESET-022]
 related_adrs: [ADR-0007, ADR-0008, ADR-20260927-datamosh-feedback-layer, ADR-20260929-sandbox-texture-material-stage, ADR-20260930-sandbox-shapes-final-stage]
 related_changes: [CHANGE-001, CHANGE-012, CHANGE-013, CHANGE-018, CHANGE-024, CHANGE-025, CHANGE-026, CHANGE-027, CHANGE-030, CHANGE-031, CHANGE-032, CHANGE-034, CHANGE-037, CHANGE-039, CHANGE-046, CHANGE-048, CHANGE-051]
@@ -35,7 +35,7 @@ Image Gradient Sourceの元画像、Image Overlay/Mask、Texture画像、SANDBOX
 
 単一Presetは `id`、`name`、`createdAt`、`state` を必須とし、仮想フォルダの `folderId`、同階層の `order`、任意の画像データURL `thumbnail` を持ちます。旧Presetでは任意フィールドが欠落していても読み込める範囲で既定値を補完します。
 
-フォルダを含むライブラリは `format: kgg-preset-library`、`version: 2`、`folders`、`presets` を持ちます。旧来の単純なPreset配列もライブラリのルートへ正規化できます。既存の識別値と保存済み状態を壊す自動変換は行いません。
+フォルダを含むライブラリは `format: kgg-preset-library`、`version: 2`、`folders`、`presets` を持ちます。旧来の単純なPreset配列もライブラリのルートへ正規化できます。配列にはフォルダ定義がないため、各Presetの`folderId`は読込時に無視してルートへ置き、単一Presetの書出しも`folderId`を`null`にして書き出します（フォルダを含めて書き出すにはフォルダ／ライブラリZIPを使います）。既存の識別値と保存済み状態を壊す自動変換は行いません。
 
 ### PRESET-004 仮想フォルダ
 
