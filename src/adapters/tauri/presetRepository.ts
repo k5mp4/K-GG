@@ -58,6 +58,10 @@ async function movePreset(id: string, folderId: string | null): Promise<void> {
   await writeLibrary(moveLibraryPreset(await loadPresetLibrary(), id, folderId));
 }
 
+async function updatePresetLibrary(update: (library: PresetLibrary) => PresetLibrary): Promise<void> {
+  await writeLibrary(update(await loadPresetLibrary()));
+}
+
 async function createFolder(name: string, parentId: string | null): Promise<PresetFolder> {
   const result = createLibraryFolder(await loadPresetLibrary(), name, parentId);
   await writeLibrary(result.library);
@@ -99,6 +103,7 @@ export const tauriPresetRepository: PresetRepository = {
   savePreset,
   deletePreset,
   movePreset,
+  updatePresetLibrary,
   createFolder,
   renameFolder,
   moveFolder,

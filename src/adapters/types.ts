@@ -87,6 +87,8 @@ export interface PresetRepository {
   savePreset(name: string, state: StoreSnapshot, folderId: string | null, thumbnail?: string): MaybePromise<Preset>;
   deletePreset(id: string): MaybePromise<void>;
   movePreset(id: string, folderId: string | null): MaybePromise<void>;
+  /** 読み直したライブラリへ変換を適用して保存する。複数Presetの一括移動・削除と、その取り消しに使う。 */
+  updatePresetLibrary(update: (library: PresetLibrary) => PresetLibrary): MaybePromise<void>;
   createFolder(name: string, parentId: string | null): MaybePromise<PresetFolder>;
   renameFolder(id: string, name: string): MaybePromise<void>;
   moveFolder(id: string, parentId: string | null): MaybePromise<void>;

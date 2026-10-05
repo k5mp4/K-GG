@@ -8,12 +8,14 @@ vi.mock('./presets', () => ({ loadPresetLibrary: () => loadPresetLibrary() }));
 
 import {
   builtinPresetLibrary,
+  enqueuePresetLibraryWrite,
   ensurePresetLibraryLoaded,
   getPresetLibrarySnapshot,
   isBuiltinPresetId,
   refreshPresetLibrary,
   resetPresetLibraryCacheForTest,
   subscribePresetLibrary,
+  updatePresetLibraryCache,
 } from './presetLibraryCache';
 
 function libraryWith(...names: string[]): PresetLibrary {
@@ -67,5 +69,48 @@ describe('presetLibraryCache', () => {
     expect(isBuiltinPresetId(builtinPresetLibrary.presets[0].id)).toBe(true);
     expect(isBuiltinPresetId('missing')).toBe(false);
     expect(loadPresetLibrary).not.toHaveBeenCalled();
+  });
+
+  it('keeps the previous preset objects on reload when nothing about them changed', async () => {
+    const first = libraryWith('A', 'B');
+    loadPresetLibrary.mockResolvedValueOnce(first);
+    await ensurePresetLibraryLoaded();
+    const before = getPresetLibrarySnapshot().library.presets;
+
+    const reloaded = JSON.parse(JSON.stringify(first)) as PresetLibrary;
+    reloaded.presets[1] = { ...reloaded.presets[1], name: 'B renamed' };
+    loadPresetLibrary.mockResolvedValueOnce(reloaded);
+    await refreshPresetLibrary();
+    const after = getPresetLibrarySnapshot().library.presets;
+
+    expect(after[0]).toBe(before[0]);
+    expect(after[1]).not.toBe(before[1]);
+    expect(after[1].name).toBe('B renamed');
+  });
+
+  it('publishes a cache update to subscribers without reading storage', async () => {
+    loadPresetLibrary.mockResolvedValueOnce(libraryWith('A', 'B'));
+    await ensurePresetLibraryLoaded();
+    const listener = vi.fn();
+    subscribePresetLibrary(listener);
+
+    updatePresetLibraryCache(library => ({ ...library, presets: library.presets.slice(1) }));
+
+    expect(listener).toHaveBeenCalledTimes(1);
+    expect(getPresetLibrarySnapshot().library.presets.map(preset => preset.name)).toEqual(['B']);
+    expect(loadPresetLibrary).toHaveBeenCalledTimes(1);
+  });
+
+  it('waits for queued writes before re-reading storage, and runs writes in order', async () => {
+    const order: string[] = [];
+    loadPresetLibrary.mockImplementation(async () => { order.push('load'); return libraryWith('A'); });
+    await ensurePresetLibraryLoaded();
+    order.length = 0;
+
+    void enqueuePresetLibraryWrite(async () => { order.push('write 1'); });
+    void enqueuePresetLibraryWrite(async () => { order.push('write 2'); });
+    await refreshPresetLibrary();
+
+    expect(order).toEqual(['write 1', 'write 2', 'load']);
   });
 });

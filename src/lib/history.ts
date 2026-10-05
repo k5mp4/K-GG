@@ -34,9 +34,21 @@ function extractSnapshot(s: StoreState): HistorySnapshot {
   };
 }
 
+/** 状態スナップショットでは戻せない操作（Presetライブラリの削除・移動など）を、同じ履歴に積むための取り消し単位。 */
+export type HistoryCommand = {
+  undo: () => void | Promise<void>;
+  redo: () => void | Promise<void>;
+};
+
+type HistoryEntry =
+  | { kind: 'state'; snapshot: HistorySnapshot }
+  | { kind: 'command'; command: HistoryCommand };
+
 class HistoryManager {
-  private historyStack: HistorySnapshot[] = [];
-  private futureStack: HistorySnapshot[] = [];
+  private historyStack: HistoryEntry[] = [];
+  private futureStack: HistoryEntry[] = [];
+  /** 非同期のコマンドが入れ替わって実行されないよう、順番に実行する。 */
+  private commandQueue: Promise<void> = Promise.resolve();
   private applyingSnapshot = false;
   private pendingPrev: HistorySnapshot | null = null;
   private schedulePush: ReturnType<typeof debounce>;
@@ -44,8 +56,7 @@ class HistoryManager {
   constructor() {
     this.schedulePush = debounce(() => {
       if (this.pendingPrev) {
-        this.historyStack.push(this.pendingPrev);
-        if (this.historyStack.length > MAX_HISTORY) this.historyStack.shift();
+        this.pushHistory({ kind: 'state', snapshot: this.pendingPrev });
         this.futureStack.length = 0;
         this.pendingPrev = null;
       }
@@ -81,6 +92,37 @@ class HistoryManager {
     });
   }
 
+  private pushHistory(entry: HistoryEntry): void {
+    this.historyStack.push(entry);
+    if (this.historyStack.length > MAX_HISTORY) this.historyStack.shift();
+  }
+
+  private runCommand(task: () => void | Promise<void>): void {
+    this.commandQueue = this.commandQueue.then(task).catch(error => {
+      console.error('Failed to apply an undo/redo command:', error);
+    });
+  }
+
+  /** 実行済みの操作を履歴へ積む。デバウンス待ちの状態変更は、この操作より前の履歴として先に確定する。 */
+  record(command: HistoryCommand): void {
+    if (this.pendingPrev) {
+      this.schedulePush.cancel();
+      this.pushHistory({ kind: 'state', snapshot: this.pendingPrev });
+      this.pendingPrev = null;
+    }
+    this.pushHistory({ kind: 'command', command });
+    this.futureStack.length = 0;
+  }
+
+  /** テスト用。履歴を空にする。 */
+  reset(): void {
+    this.schedulePush.cancel();
+    this.pendingPrev = null;
+    this.historyStack.length = 0;
+    this.futureStack.length = 0;
+    this.commandQueue = Promise.resolve();
+  }
+
   private applySnapshot(snap: HistorySnapshot): void {
     this.applyingSnapshot = true;
     useGradientStore.setState({
@@ -108,25 +150,35 @@ class HistoryManager {
     if (this.pendingPrev) {
       this.schedulePush.cancel();
       const current = extractSnapshot(useGradientStore.getState());
-      this.futureStack.push(current);
+      this.futureStack.push({ kind: 'state', snapshot: current });
       const prev = this.pendingPrev;
       this.pendingPrev = null;
       this.applySnapshot(prev);
       return;
     }
-    if (this.historyStack.length === 0) return;
+    const entry = this.historyStack.pop();
+    if (!entry) return;
+    if (entry.kind === 'command') {
+      this.futureStack.push(entry);
+      this.runCommand(entry.command.undo);
+      return;
+    }
     const current = extractSnapshot(useGradientStore.getState());
-    this.futureStack.push(current);
-    this.applySnapshot(this.historyStack.pop()!);
+    this.futureStack.push({ kind: 'state', snapshot: current });
+    this.applySnapshot(entry.snapshot);
   }
 
   redo(): void {
-    if (this.futureStack.length === 0) return;
+    const entry = this.futureStack.pop();
+    if (!entry) return;
+    if (entry.kind === 'command') {
+      this.pushHistory(entry);
+      this.runCommand(entry.command.redo);
+      return;
+    }
     const current = extractSnapshot(useGradientStore.getState());
-    const next = this.futureStack.pop()!;
-    this.historyStack.push(current);
-    if (this.historyStack.length > MAX_HISTORY) this.historyStack.shift();
-    this.applySnapshot(next);
+    this.pushHistory({ kind: 'state', snapshot: current });
+    this.applySnapshot(entry.snapshot);
   }
 
   canUndo(): boolean {
@@ -145,3 +197,5 @@ export const undo = () => historyManager.undo();
 export const redo = () => historyManager.redo();
 export const canUndo = () => historyManager.canUndo();
 export const canRedo = () => historyManager.canRedo();
+export const recordHistoryCommand = (command: HistoryCommand) => historyManager.record(command);
+export const resetHistoryForTest = () => historyManager.reset();

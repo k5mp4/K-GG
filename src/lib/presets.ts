@@ -20,6 +20,10 @@ export async function movePreset(id: string, folderId: string | null): Promise<v
   await adapters.presetRepository.movePreset(id, folderId);
 }
 
+export async function updatePresetLibrary(update: (library: PresetLibrary) => PresetLibrary): Promise<void> {
+  await adapters.presetRepository.updatePresetLibrary(update);
+}
+
 export async function createFolder(name: string, parentId: string | null): Promise<PresetFolder> {
   return await adapters.presetRepository.createFolder(name, parentId);
 }

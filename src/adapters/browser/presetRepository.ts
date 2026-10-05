@@ -62,6 +62,10 @@ function movePreset(id: string, folderId: string | null): void {
   savePresetLibrary(moveLibraryPreset(loadPresetLibrary(), id, folderId));
 }
 
+function updatePresetLibrary(update: (library: PresetLibrary) => PresetLibrary): void {
+  savePresetLibrary(update(loadPresetLibrary()));
+}
+
 function createFolder(name: string, parentId: string | null): PresetFolder {
   const result = createLibraryFolder(loadPresetLibrary(), name, parentId);
   savePresetLibrary(result.library);
@@ -95,6 +99,7 @@ export const browserPresetRepository: PresetRepository = {
   savePreset,
   deletePreset,
   movePreset,
+  updatePresetLibrary,
   createFolder,
   renameFolder,
   moveFolder,
