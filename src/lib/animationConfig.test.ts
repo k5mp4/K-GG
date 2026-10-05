@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { STORE_DEFAULTS } from '../store/gradientStore';
-import { getBeatSyncDurationSeconds, keepLoopTimingOnPresetLoad, normalizeBeatSyncRate, stepBeatSyncRate } from './animationConfig';
+import { getBeatSyncDurationSeconds, keepLoopTimingOnPresetLoad, normalizeBeatSyncBpm, normalizeBeatSyncRate, stepBeatSyncRate } from './animationConfig';
 
 describe('keepLoopTimingOnPresetLoad', () => {
   const current = {
@@ -48,5 +48,21 @@ describe('Beat Sync rate', () => {
     expect(stepBeatSyncRate(1, -1)).toBe(0.5);
     expect(stepBeatSyncRate(0.25, -1)).toBe(0.25);
     expect(stepBeatSyncRate(undefined, -1)).toBe(0.5);
+  });
+});
+
+describe('normalizeBeatSyncBpm', () => {
+  it('keeps two decimal places', () => {
+    expect(normalizeBeatSyncBpm(128.37)).toBe(128.37);
+    expect(normalizeBeatSyncBpm(128.5)).toBe(128.5);
+    expect(normalizeBeatSyncBpm(127.456)).toBe(127.46);
+    // float32で届く値（例: 128.37 → 128.3699951...）も元の値へ戻る。
+    expect(normalizeBeatSyncBpm(Math.fround(128.37))).toBe(128.37);
+  });
+
+  it('clamps to the Beat Sync range and falls back for non-finite values', () => {
+    expect(normalizeBeatSyncBpm(0.2)).toBe(1);
+    expect(normalizeBeatSyncBpm(5000)).toBe(999);
+    expect(normalizeBeatSyncBpm(Number.NaN)).toBe(120);
   });
 });

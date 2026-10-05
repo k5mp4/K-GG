@@ -1,6 +1,6 @@
 import { useEffect, useRef } from 'react';
 import { applicationCommands } from '../../application/commands';
-import { stepBeatSyncRate } from '../../lib/animationConfig';
+import { normalizeBeatSyncBpm, stepBeatSyncRate } from '../../lib/animationConfig';
 import type { AnimationConfig } from '../../types/animation';
 import type { ControllerParameterTarget } from '../../lib/controllerSettings';
 import type { GcCommand } from '../../lib/gcInput';
@@ -36,11 +36,6 @@ function updateBeatSync(patch: (current: NonNullable<AnimationConfig['easing']['
   const { easing } = useGradientStore.getState().animation;
   const current = easing.beatSync ?? { enabled: false, bpm: 120, beatsPerBar: 4, subdivision: 4 as const };
   applicationCommands.setAnimation({ easing: { ...easing, beatSync: { ...current, ...patch(current) } } });
-}
-
-/** OSCで届くBPMを、Beat Syncの許容範囲（1〜999）へ収め、0.1刻みへ丸める。 */
-export function normalizeOscBpm(bpm: number): number {
-  return Math.min(999, Math.max(1, Math.round(bpm * 10) / 10));
 }
 
 function scrubTime(delta: number) {
@@ -103,7 +98,7 @@ export class ControllerApplyScheduler {
   }
 
   setBpm(bpm: number): void {
-    this.bpm = normalizeOscBpm(bpm);
+    this.bpm = normalizeBeatSyncBpm(bpm);
     this.request();
   }
 
@@ -183,6 +178,9 @@ export function useControllerActions(): void {
         break;
       case 'bpm':
         schedulerRef.current?.setBpm(command.bpm);
+        break;
+      case 'beatReset':
+        renderBridge.seekTo(0);
         break;
       case 'move':
         break;

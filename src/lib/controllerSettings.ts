@@ -41,8 +41,8 @@ export type ControllerSettings = {
   buttons: Record<ControllerButtonAction, ControllerButton | null>;
   parameters: ControllerParameterBinding[];
   scrub: { source: ControllerAxis | null; /** 最大に倒した時の1秒あたりのループ割合 */ speed: number };
-  /** OSCで届くBPMをLoop TimingのBeat Syncへ反映する。 */
-  bpm: { enabled: boolean; address: string };
+  /** OSCで届くBPMをLoop TimingのBeat Syncへ反映し、拍の先頭リセットで再生位置を先頭へ戻す。 */
+  bpm: { enabled: boolean; address: string; resetAddress: string };
 };
 
 export const CONTROLLER_PORT_MIN = 1024;
@@ -71,10 +71,10 @@ export const DEFAULT_CONTROLLER_SETTINGS: ControllerSettings = {
     { source: 'trigger/r', target: 'postprocess.glassRefraction' },
   ],
   scrub: { source: 'cstick/x', speed: 0.25 },
-  bpm: { enabled: false, address: '/bpm' },
+  bpm: { enabled: false, address: '/bpm', resetAddress: '/beat/reset' },
 };
 
-/** BPMを受け取るOSCアドレス。`/`で始まる印字可能なASCIIで、OSCの特殊文字を含まない。 */
+/** BPMと拍リセットを受け取るOSCアドレス。`/`で始まる印字可能なASCIIで、OSCの特殊文字を含まない。 */
 const BPM_ADDRESS = /^\/[!-~]{1,63}$/;
 
 export function isValidBpmAddress(address: string): boolean {
@@ -125,6 +125,9 @@ export function normalizeControllerSettings(input: unknown): ControllerSettings 
     bpm: {
       enabled: rawBpm.enabled === true,
       address: typeof rawBpm.address === 'string' && isValidBpmAddress(rawBpm.address) ? rawBpm.address : defaults.bpm.address,
+      resetAddress: typeof rawBpm.resetAddress === 'string' && isValidBpmAddress(rawBpm.resetAddress)
+        ? rawBpm.resetAddress
+        : defaults.bpm.resetAddress,
     },
   };
 }
