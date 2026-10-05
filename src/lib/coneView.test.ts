@@ -14,7 +14,9 @@ import {
   getThreeDRenderParams,
   getTorusMajorRadius,
   getTorusTwistTurns,
+  getCameraLoop,
   getCameraWiggle,
+  getCameraWiggleCycles,
   getRibbonLaps,
   getDiscsFrameDistance,
   getAbstractUniforms,
@@ -126,6 +128,10 @@ describe('3D render parameters', () => {
     // Only the wiggle rolls the free Cone camera; Rotation stays the texture offset.
     const swaying = { ...DEFAULT_CONE_VIEW, rotation: 90, wigglePreset: 'sway' as const };
     expect(getThreeDRenderParams({ ...swaying, coneCameraMode: 'free' }, 0.25, 1).camera.rollRadians).toBeCloseTo(14 * Math.PI / 180, 10);
+    // The Roll Loop rolls the free Cone camera too, but never the classic one.
+    const rolling = { ...DEFAULT_CONE_VIEW, rotation: 90, cameraRollLoop: 1 };
+    expect(getThreeDRenderParams({ ...rolling, coneCameraMode: 'free' }, 0.25, 1).camera.rollRadians).toBeCloseTo(Math.PI / 2, 10);
+    expect(getThreeDRenderParams(rolling, 0.25, 1).camera.rollRadians).toBe(0);
 
     const torus = getThreeDRenderParams({
       ...DEFAULT_CONE_VIEW,
@@ -864,6 +870,49 @@ describe('torus tunnel', () => {
     expect(getCameraWiggle({ ...config, wiggleAmount: 0 }, 0.5).yaw).toBeCloseTo(180, 9);
     expect(getCameraWiggle({ ...config, wiggleAmount: 0 }, 0.5).pitch).toBe(0);
     expect(getCameraWiggle({ ...config, wiggleSpeed: 2 }, 0.25).yaw).toBeCloseTo(180, 9);
+  });
+
+  it('eases the pace inside each wiggle cycle without moving the cycle ends', () => {
+    const easeIn = { ...torus, wigglePreset: 'drift' as const, wiggleEasing: [0.42, 0, 1, 1] as [number, number, number, number] };
+    // Linear easing keeps the original sinusoids exactly.
+    expect(getCameraWiggleCycles({ ...torus, wiggleSpeed: 2 }, 0.3)).toBeCloseTo(0.6, 12);
+    expect(getCameraWiggle({ ...easeIn, wiggleEasing: [0, 0, 1, 1] }, 0.3))
+      .toEqual(getCameraWiggle({ ...easeIn, wiggleEasing: [0.25, 0.25, 0.75, 0.75] }, 0.3));
+    // Ease In lags behind the linear pace mid-cycle, and each cycle still ends on a whole count.
+    expect(getCameraWiggleCycles(easeIn, 0.5)).toBeLessThan(0.45);
+    expect(getCameraWiggleCycles({ ...easeIn, wiggleSpeed: 3 }, 1 / 3)).toBeCloseTo(1, 9);
+    expect(getCameraWiggleCycles({ ...easeIn, wiggleSpeed: 3 }, 0.5)).toBeGreaterThan(1);
+    expect(getCameraWiggleCycles({ ...easeIn, wiggleSpeed: 3 }, 0.5)).toBeLessThan(1.5);
+    for (const wiggleSpeed of [1, 3]) {
+      const config = { ...easeIn, wiggleSpeed };
+      const start = getCameraWiggle(config, 0);
+      const end = getCameraWiggle(config, 1);
+      for (const key of Object.keys(start) as (keyof typeof start)[]) {
+        expect(end[key]).toBeCloseTo(start[key], 9);
+      }
+    }
+    // Look Around turns at the eased pace too and still closes the loop.
+    const look = { ...easeIn, wigglePreset: 'lookAround' as const, wiggleAmount: 0 };
+    expect(getCameraWiggle(look, 0.5).yaw).toBeLessThan(180);
+    expect(getCameraWiggle(look, 1).yaw).toBeCloseTo(0, 9);
+  });
+
+  it('loops Roll, Yaw and Pitch independently in whole turns per loop', () => {
+    const looping = { ...torus, cameraRollLoop: 1, cameraYawLoop: -2, cameraPitchLoop: 3 };
+    expect(getCameraLoop(torus, 0.4)).toEqual({ yaw: 0, pitch: 0, roll: 0 });
+    const quarter = getCameraLoop(looping, 0.25);
+    expect(quarter.roll).toBeCloseTo(90, 9);
+    expect(quarter.yaw).toBeCloseTo(180, 9);
+    expect(quarter.pitch).toBeCloseTo(270, 9);
+    // Only the Yaw turns when only its loop is set.
+    expect(getCameraLoop({ ...torus, cameraYawLoop: 1 }, 0.25)).toEqual({ yaw: 90, pitch: 0, roll: 0 });
+    expect(getCameraLoop(looping, 1)).toEqual({ yaw: 0, pitch: 0, roll: 0 });
+    // The loops add to the base angles and the wiggle.
+    const camera = getThreeDCamera({ ...looping, rotation: 10, cameraYaw: 20, cameraPitch: 30, wigglePreset: 'lookAround', wiggleAmount: 0 }, 0.125);
+    const degrees = Math.PI / 180;
+    expect(camera.rollRadians).toBeCloseTo((10 + 45) * degrees, 9);
+    expect(camera.yawRadians).toBeCloseTo((20 + 270 + 45) * degrees, 9);
+    expect(camera.pitchRadians).toBeCloseTo((30 + 135) * degrees, 9);
   });
 
   it('scales the wiggle linearly with Amount and keeps the camera inside the tube', () => {

@@ -278,6 +278,24 @@ export const CAMERA_WIGGLE_PRESET_OPTIONS: { value: CameraWigglePreset; label: s
   { value: 'vertigo', label: 'Vertigo · Dolly zoom' },
 ];
 
+/**
+ * CSS-style cubic Bezier [p1x, p1y, p2x, p2y] that remaps the time inside each
+ * wiggle cycle. Every component stays in [0, 1] like the Tweeq editor, and the
+ * fixed ends (0, 0) and (1, 1) keep the cycle closed.
+ */
+export type CameraWiggleEasing = [number, number, number, number];
+/** Linear timing, with handles inside the editor so they are easy to grab. */
+export const LINEAR_CAMERA_WIGGLE_EASING: CameraWiggleEasing = [0.25, 0.25, 0.75, 0.75];
+
+export function normalizeCameraWiggleEasing(value: unknown): CameraWiggleEasing {
+  if (!Array.isArray(value) || value.length !== 4) return [...LINEAR_CAMERA_WIGGLE_EASING];
+  return value.map((entry, index) => (
+    typeof entry === 'number' && Number.isFinite(entry)
+      ? Math.max(0, Math.min(1, entry))
+      : LINEAR_CAMERA_WIGGLE_EASING[index]
+  )) as CameraWiggleEasing;
+}
+
 export type ConeViewConfig = {
   shape: ConeShape;
   depth: number;
@@ -319,6 +337,13 @@ export type ConeViewConfig = {
   /** Look-direction adjustment in degrees, relative to each shape's base camera direction. */
   cameraYaw: number;
   cameraPitch: number;
+  /**
+   * Whole turns per loop of each camera angle, independent of each other and
+   * of the wiggle. The sign sets the direction; whole turns close the loop.
+   */
+  cameraRollLoop: number;
+  cameraYawLoop: number;
+  cameraPitchLoop: number;
   /** Vertical field of view in degrees for the Perspective projection. */
   cameraFov: number;
   /** Full angle in degrees covered by the Fisheye circle; 180 is a dome master. */
@@ -334,6 +359,8 @@ export type ConeViewConfig = {
   wiggleAmount: number;
   /** Integer multiplier of every wiggle frequency, so the motion still closes on the loop. */
   wiggleSpeed: number;
+  /** Timing inside each wiggle cycle; linear keeps the original sinusoids. */
+  wiggleEasing: CameraWiggleEasing;
   /** Lattice only: surface family. */
   latticeType: LatticeType;
   /** Lattice only: world length of one lattice period. */
@@ -545,6 +572,9 @@ export const DEFAULT_CONE_VIEW: ConeViewConfig = {
   cameraY: getParameterDefault('cone.cameraY'),
   cameraYaw: getParameterDefault('cone.cameraYaw'),
   cameraPitch: getParameterDefault('cone.cameraPitch'),
+  cameraRollLoop: getParameterDefault('cone.cameraRollLoop'),
+  cameraYawLoop: getParameterDefault('cone.cameraYawLoop'),
+  cameraPitchLoop: getParameterDefault('cone.cameraPitchLoop'),
   cameraFov: getParameterDefault('cone.cameraFov'),
   fisheyeAngle: getParameterDefault('cone.fisheyeAngle'),
   lensDistortion: getParameterDefault('cone.lensDistortion'),
@@ -553,6 +583,7 @@ export const DEFAULT_CONE_VIEW: ConeViewConfig = {
   wigglePreset: 'off',
   wiggleAmount: getParameterDefault('cone.wiggleAmount'),
   wiggleSpeed: getParameterDefault('cone.wiggleSpeed'),
+  wiggleEasing: [...LINEAR_CAMERA_WIGGLE_EASING],
   latticeType: 'gyroid',
   latticeScale: getParameterDefault('cone.latticeScale'),
   latticeThickness: getParameterDefault('cone.latticeThickness'),
@@ -681,6 +712,9 @@ export function normalizeConeViewConfig(value: unknown): ConeViewConfig {
     cameraY: clampParameter(raw.cameraY, DEFAULT_CONE_VIEW.cameraY, getParameterLimit('cone.cameraY')),
     cameraYaw: clampParameter(raw.cameraYaw, DEFAULT_CONE_VIEW.cameraYaw, getParameterLimit('cone.cameraYaw')),
     cameraPitch: clampParameter(raw.cameraPitch, DEFAULT_CONE_VIEW.cameraPitch, getParameterLimit('cone.cameraPitch')),
+    cameraRollLoop: clampParameter(raw.cameraRollLoop, DEFAULT_CONE_VIEW.cameraRollLoop, getParameterLimit('cone.cameraRollLoop')),
+    cameraYawLoop: clampParameter(raw.cameraYawLoop, DEFAULT_CONE_VIEW.cameraYawLoop, getParameterLimit('cone.cameraYawLoop')),
+    cameraPitchLoop: clampParameter(raw.cameraPitchLoop, DEFAULT_CONE_VIEW.cameraPitchLoop, getParameterLimit('cone.cameraPitchLoop')),
     cameraFov: clampParameter(raw.cameraFov, DEFAULT_CONE_VIEW.cameraFov, getParameterLimit('cone.cameraFov')),
     fisheyeAngle: clampParameter(raw.fisheyeAngle, DEFAULT_CONE_VIEW.fisheyeAngle, getParameterLimit('cone.fisheyeAngle')),
     lensDistortion: clampParameter(raw.lensDistortion, DEFAULT_CONE_VIEW.lensDistortion, getParameterLimit('cone.lensDistortion')),
@@ -689,6 +723,7 @@ export function normalizeConeViewConfig(value: unknown): ConeViewConfig {
     wigglePreset: normalizeOption(raw.wigglePreset, CAMERA_WIGGLE_PRESETS, DEFAULT_CONE_VIEW.wigglePreset),
     wiggleAmount: clampParameter(raw.wiggleAmount, DEFAULT_CONE_VIEW.wiggleAmount, getParameterLimit('cone.wiggleAmount')),
     wiggleSpeed: clampParameter(raw.wiggleSpeed, DEFAULT_CONE_VIEW.wiggleSpeed, getParameterLimit('cone.wiggleSpeed')),
+    wiggleEasing: normalizeCameraWiggleEasing(raw.wiggleEasing),
     latticeType: normalizeOption(raw.latticeType, LATTICE_TYPES, DEFAULT_CONE_VIEW.latticeType),
     latticeScale: clampParameter(raw.latticeScale, DEFAULT_CONE_VIEW.latticeScale, getParameterLimit('cone.latticeScale')),
     latticeThickness: clampParameter(raw.latticeThickness, DEFAULT_CONE_VIEW.latticeThickness, getParameterLimit('cone.latticeThickness')),

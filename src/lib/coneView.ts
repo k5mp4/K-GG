@@ -19,7 +19,9 @@ import {
   type CrystalForm,
   type ConeSeamMode,
   type CameraWigglePreset,
+  normalizeCameraWiggleEasing,
 } from '../types/coneView';
+import { evaluateCubicBezier } from './easingBezier';
 
 export const CONE_CAMERA_DISTANCE = 1.25;
 export const CONE_CAMERA_FOV = 60;
@@ -157,7 +159,7 @@ export type ThreeDCamera = {
   offsetY: number;
   yawRadians: number;
   pitchRadians: number;
-  /** Base roll (Rotation) plus the wiggle roll. */
+  /** Base roll (Rotation) plus the Roll Loop and the wiggle roll. */
   rollRadians: number;
   /** Perspective vertical field of view including the wiggle. */
   fovDegrees: number;
@@ -259,33 +261,68 @@ const CAMERA_WIGGLE_SPINS: Partial<Record<CameraWigglePreset, readonly WiggleSpi
 export type CameraWiggle = Record<WiggleChannel, number>;
 
 /**
+ * Wiggle cycles elapsed at a loop-normalized time, with Wiggle Easing applied
+ * inside each cycle. The cycle count is the integer Speed, and the easing maps
+ * 0 to 0 and 1 to 1, so every cycle still starts and ends where the linear one
+ * does and only the pace in between changes.
+ */
+export function getCameraWiggleCycles(config: ConeViewConfig, normalizedTime: number): number {
+  const speed = Math.max(1, Math.round(safeFinite(config.wiggleSpeed, 1)));
+  const cycles = speed * safeFinite(normalizedTime, 0);
+  const whole = Math.floor(cycles);
+  const [p1x, p1y, p2x, p2y] = normalizeCameraWiggleEasing(config.wiggleEasing);
+  return whole + evaluateCubicBezier(cycles - whole, p1x, p1y, p2x, p2y);
+}
+
+/**
  * Evaluates the wiggle preset at a loop-normalized time. Amplitudes are
  * scaled by Amount and harmonics and spins by the integer Speed, so time 0 and
  * 1 give identical values (angles modulo a full turn) and the camera motion
- * loops seamlessly.
+ * loops seamlessly. Wiggle Easing changes the pace inside each Speed cycle.
  */
 export function getCameraWiggle(config: ConeViewConfig, normalizedTime: number): CameraWiggle {
   const wiggle: CameraWiggle = { yaw: 0, pitch: 0, roll: 0, x: 0, y: 0, fov: 0, dolly: 0 };
   const terms = CAMERA_WIGGLE_TERMS[config.wigglePreset] ?? CAMERA_WIGGLE_TERMS.off;
   const spins = CAMERA_WIGGLE_SPINS[config.wigglePreset] ?? [];
   const amount = Math.max(0, safeFinite(config.wiggleAmount, 1));
-  const speed = Math.max(1, Math.round(safeFinite(config.wiggleSpeed, 1)));
-  const time = safeFinite(normalizedTime, 0);
+  if (terms.length === 0 && spins.length === 0) return wiggle;
+  const cycles = getCameraWiggleCycles(config, normalizedTime);
   for (const spin of spins) {
     // Keep the angle in [0, 360) so the end of the loop equals its start.
-    const turns = spin.turns * speed * time;
+    const turns = spin.turns * cycles;
     wiggle[spin.channel] += (turns - Math.floor(turns)) * 360;
   }
   if (amount === 0) return wiggle;
   for (const term of terms) {
     wiggle[term.channel] += amount * term.amplitude
-      * Math.sin(2 * Math.PI * term.harmonic * speed * time + term.phase);
+      * Math.sin(2 * Math.PI * term.harmonic * cycles + term.phase);
   }
   return wiggle;
 }
 
+export type CameraLoop = Record<'yaw' | 'pitch' | 'roll', number>;
+
+/**
+ * Camera Roll, Yaw and Pitch Loop at a loop-normalized time, in degrees within
+ * [0, 360). Each angle turns its own whole number of times per loop, so the
+ * end of the loop equals its start.
+ */
+export function getCameraLoop(config: ConeViewConfig, normalizedTime: number): CameraLoop {
+  const time = safeFinite(normalizedTime, 0);
+  const angle = (loop: number) => {
+    const turns = Math.round(safeFinite(loop, 0)) * time;
+    return (turns - Math.floor(turns)) * 360;
+  };
+  return {
+    yaw: angle(config.cameraYawLoop),
+    pitch: angle(config.cameraPitchLoop),
+    roll: angle(config.cameraRollLoop),
+  };
+}
+
 export function getThreeDCamera(config: ConeViewConfig, normalizedTime = 0): ThreeDCamera {
   const wiggle = getCameraWiggle(config, normalizedTime);
+  const loop = getCameraLoop(config, normalizedTime);
   let offsetX = safeFinite(config.cameraX, 0) + wiggle.x;
   let offsetY = safeFinite(config.cameraY, 0) + wiggle.y;
   const length = Math.hypot(offsetX, offsetY);
@@ -304,9 +341,9 @@ export function getThreeDCamera(config: ConeViewConfig, normalizedTime = 0): Thr
   return {
     offsetX,
     offsetY,
-    yawRadians: (safeFinite(config.cameraYaw, 0) + wiggle.yaw) * degrees,
-    pitchRadians: (safeFinite(config.cameraPitch, 0) + wiggle.pitch) * degrees,
-    rollRadians: (safeFinite(config.rotation, 0) + wiggle.roll) * degrees,
+    yawRadians: (safeFinite(config.cameraYaw, 0) + loop.yaw + wiggle.yaw) * degrees,
+    pitchRadians: (safeFinite(config.cameraPitch, 0) + loop.pitch + wiggle.pitch) * degrees,
+    rollRadians: (safeFinite(config.rotation, 0) + loop.roll + wiggle.roll) * degrees,
     fovDegrees,
     // Positive dolly moves forward; pulling back is the vertigo compensation.
     dolly: safeFinite(config.cameraDolly, 0) + wiggle.dolly - vertigoDolly,
@@ -1294,12 +1331,13 @@ export function getThreeDRenderParams(
         : [transform.offsetU, transform.offsetV],
     seamBlend: transform.seamBlend,
     seamMode: CONE_SEAM_MODE_INDEX[transform.seamMode],
-    // The Cone keeps Rotation as a texture offset, so only the wiggle rolls
-    // the free Cone camera; the classic Cone camera does not move at all.
+    // The Cone keeps Rotation as a texture offset, so only the Roll Loop and
+    // the wiggle roll the free Cone camera; the classic Cone camera does not
+    // move at all.
     camera: classicCone
       ? { offsetX: 0, offsetY: 0, yawRadians: 0, pitchRadians: 0, rollRadians: 0, fovDegrees: CONE_CAMERA_FOV, dolly: 0 }
       : isCone
-        ? { ...camera, rollRadians: getCameraWiggle(config, normalizedTime).roll * Math.PI / 180 }
+        ? { ...camera, rollRadians: camera.rollRadians - safeFinite(config.rotation, 0) * Math.PI / 180 }
         : camera,
     cone: {
       cameraDistance: CONE_CAMERA_DISTANCE,

@@ -81,10 +81,11 @@ describe('ConeViewPanel shape controls', () => {
 
   it('adds the camera to the free Cone', () => {
     const markup = renderShape('cone', { coneCameraMode: 'free' });
-    for (const label of ['Depth', 'Rotation', 'Twist', 'FOV', 'Dolly', 'Camera Yaw', 'Camera Pitch', 'Camera Wiggle', 'Wiggle Amount']) {
+    for (const label of ['Depth', 'Rotation', 'Twist', 'FOV', 'Dolly', 'Camera Yaw', 'Camera Pitch', 'Roll Loop', 'Yaw Loop', 'Pitch Loop', 'Camera Wiggle', 'Wiggle Amount']) {
       expect(hasLabel(markup, label), label).toBe(true);
     }
     expect(markup).toContain('data-three-d-camera-position');
+    expect(markup).toContain('data-camera-wiggle-easing');
     // Rotation is the Cone's texture rotation, so there is no separate camera roll.
     expect(hasLabel(markup, 'Camera Roll')).toBe(false);
     // The Cone stays unlit.

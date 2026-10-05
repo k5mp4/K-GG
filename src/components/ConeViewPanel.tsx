@@ -4,7 +4,7 @@ import { getFieldModel, setFieldModel, subscribeFieldModel } from '../lib/fieldM
 import type { MessageKey } from '../i18n/messages';
 import { useGradientStore } from '../store/gradientStore';
 import { applicationCommands } from '../application/commands';
-import { InputPosition } from 'tweeq';
+import { InputCubicBezier, InputPosition, type CubicBezierValue } from 'tweeq';
 import { getParameterLimit } from '../lib/parameterLimits';
 import {
   ABSTRACT_FORM_OPTIONS,
@@ -20,6 +20,7 @@ import {
   DISCS_FORM_OPTIONS,
   DISCS_SPIN_PATTERN_OPTIONS,
   FIELD_GEOMETRY_OPTIONS,
+  LINEAR_CAMERA_WIGGLE_EASING,
   FIELD_RENDER_OPTIONS,
   LATTICE_TYPE_OPTIONS,
   RINGS_MAPPING_OPTIONS,
@@ -30,6 +31,7 @@ import {
   type AbstractForm,
   type AbstractMaterial,
   type AbstractView,
+  type CameraWiggleEasing,
   type CameraWigglePreset,
   type ConeCameraMode,
   type ConeSeamMode,
@@ -83,6 +85,15 @@ function toCameraPositionInput(x: number, y: number): [number, number] {
 
 function formatDegrees(value: number): string {
   return `${Math.round(value)}°`;
+}
+
+function formatTurnsPerLoop(value: number): string {
+  const turns = Math.round(value);
+  return turns === 0 ? 'Off' : `${turns > 0 ? '+' : ''}${turns}`;
+}
+
+function isLinearEasing([p1x, p1y, p2x, p2y]: readonly number[]): boolean {
+  return p1x === p1y && p2x === p2y;
 }
 
 function Section({ title, hint, children }: { title: string; hint?: string; children: ReactNode }) {
@@ -967,7 +978,9 @@ function SurfaceControls({ coneView, setConeView }: { coneView: ConeViewConfig; 
   );
 }
 
-function CameraControls({ coneView, setConeView, resetLabel }: { coneView: ConeViewConfig; setConeView: SetConeView; resetLabel: string }) {
+function CameraControls({ coneView, setConeView }: { coneView: ConeViewConfig; setConeView: SetConeView }) {
+  const { t } = useLanguage();
+  const wiggleOff = coneView.wigglePreset === 'off';
   return (
     <>
       <CustomSelect
@@ -1048,6 +1061,30 @@ function CameraControls({ coneView, setConeView, resetLabel }: { coneView: ConeV
         format={formatDegrees}
         onChange={(cameraPitch) => setConeView({ cameraPitch })}
       />
+      <div className="space-y-3" data-three-d-camera-loop>
+        <span className="hint-label block w-fit font-display text-[9px] font-semibold uppercase tracking-[0.12em] text-cream/60" title={t('cone.cameraLoopHint')}>Angle Loop</span>
+        <SliderField
+          label="Roll Loop"
+          value={coneView.cameraRollLoop}
+          limitKey="cone.cameraRollLoop"
+          format={formatTurnsPerLoop}
+          onChange={(cameraRollLoop) => setConeView({ cameraRollLoop })}
+        />
+        <SliderField
+          label="Yaw Loop"
+          value={coneView.cameraYawLoop}
+          limitKey="cone.cameraYawLoop"
+          format={formatTurnsPerLoop}
+          onChange={(cameraYawLoop) => setConeView({ cameraYawLoop })}
+        />
+        <SliderField
+          label="Pitch Loop"
+          value={coneView.cameraPitchLoop}
+          limitKey="cone.cameraPitchLoop"
+          format={formatTurnsPerLoop}
+          onChange={(cameraPitchLoop) => setConeView({ cameraPitchLoop })}
+        />
+      </div>
       <div className="space-y-1" data-three-d-camera-position>
         <div className="flex items-center justify-between gap-2">
           <span className="text-xs text-deep">Camera Position</span>
@@ -1057,7 +1094,7 @@ function CameraControls({ coneView, setConeView, resetLabel }: { coneView: ConeV
             disabled={coneView.cameraX === DEFAULT_CONE_VIEW.cameraX && coneView.cameraY === DEFAULT_CONE_VIEW.cameraY}
             onClick={() => setConeView({ cameraX: DEFAULT_CONE_VIEW.cameraX, cameraY: DEFAULT_CONE_VIEW.cameraY })}
           >
-            {resetLabel}
+            {t('cone.resetPosition')}
           </button>
         </div>
         <InputPosition
@@ -1083,7 +1120,7 @@ function CameraControls({ coneView, setConeView, resetLabel }: { coneView: ConeV
         label="Wiggle Amount"
         value={coneView.wiggleAmount}
         limitKey="cone.wiggleAmount"
-        disabled={coneView.wigglePreset === 'off'}
+        disabled={wiggleOff}
         format={(value) => `${Math.round(value * 100)}%`}
         onChange={(wiggleAmount) => setConeView({ wiggleAmount })}
       />
@@ -1091,10 +1128,30 @@ function CameraControls({ coneView, setConeView, resetLabel }: { coneView: ConeV
         label="Wiggle Speed"
         value={coneView.wiggleSpeed}
         limitKey="cone.wiggleSpeed"
-        disabled={coneView.wigglePreset === 'off'}
+        disabled={wiggleOff}
         format={(value) => `×${Math.round(value)}`}
         onChange={(wiggleSpeed) => setConeView({ wiggleSpeed })}
       />
+      <div className={`flex items-center justify-between gap-2${wiggleOff ? ' opacity-40' : ''}`} data-camera-wiggle-easing>
+        <span className="hint-label text-xs text-deep" title={t('cone.wiggleEasingHint')}>Wiggle Easing</span>
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            className="text-[9px] text-cream/55 transition-colors hover:text-fire disabled:opacity-0"
+            disabled={wiggleOff || isLinearEasing(coneView.wiggleEasing)}
+            onClick={() => setConeView({ wiggleEasing: [...LINEAR_CAMERA_WIGGLE_EASING] })}
+          >
+            {t('common.reset')}
+          </button>
+          <InputCubicBezier
+            value={coneView.wiggleEasing as CubicBezierValue}
+            onChange={(next) => setConeView({ wiggleEasing: [...next] as CameraWiggleEasing })}
+            disabled={wiggleOff}
+            aria-label="Wiggle Easing"
+            title="Wiggle Easing"
+          />
+        </div>
+      </div>
     </>
   );
 }
@@ -1144,7 +1201,7 @@ export function ConeViewPanel() {
 
       {showCamera && (
         <Section title="Camera">
-          <CameraControls coneView={coneView} setConeView={setConeView} resetLabel={t('cone.resetPosition')} />
+          <CameraControls coneView={coneView} setConeView={setConeView} />
         </Section>
       )}
 
