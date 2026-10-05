@@ -62,6 +62,9 @@ describe('cone view configuration', () => {
       cameraY: 0,
       cameraYaw: 0,
       cameraPitch: 0,
+      cameraRollLoop: 0,
+      cameraYawLoop: 0,
+      cameraPitchLoop: 0,
       cameraFov: 60,
       fisheyeAngle: 180,
       lensDistortion: 0,
@@ -70,6 +73,7 @@ describe('cone view configuration', () => {
       wigglePreset: 'off',
       wiggleAmount: 1,
       wiggleSpeed: 1,
+      wiggleEasing: [0.25, 0.25, 0.75, 0.75],
       latticeType: 'gyroid',
       latticeScale: 2,
       latticeThickness: 0.25,
@@ -471,6 +475,19 @@ describe('cone view configuration', () => {
       cameraDolly: -1,
       torusAim: 1,
     });
+  });
+
+  it('normalizes the camera angle loops and the wiggle easing', () => {
+    expect(DEFAULT_CONE_VIEW).toMatchObject({ cameraRollLoop: 0, cameraYawLoop: 0, cameraPitchLoop: 0, wiggleEasing: [0.25, 0.25, 0.75, 0.75] });
+    expect(normalizeConeViewConfig({ cameraRollLoop: 2.6, cameraYawLoop: -20, cameraPitchLoop: 'x' })).toMatchObject({
+      cameraRollLoop: 3,
+      cameraYawLoop: -8,
+      cameraPitchLoop: 0,
+    });
+    expect(normalizeConeViewConfig({ wiggleEasing: [0.42, -1, 2, 1] }).wiggleEasing).toEqual([0.42, 0, 1, 1]);
+    expect(normalizeConeViewConfig({ wiggleEasing: [0.42, Number.NaN, 0.58, 1] }).wiggleEasing).toEqual([0.42, 0.25, 0.58, 1]);
+    expect(normalizeConeViewConfig({ wiggleEasing: [0.1, 0.2] }).wiggleEasing).toEqual([0.25, 0.25, 0.75, 0.75]);
+    expect(normalizeConeViewConfig({ wiggleEasing: 'ease' }).wiggleEasing).toEqual([0.25, 0.25, 0.75, 0.75]);
   });
 
   it('normalizes the torus wiggle settings', () => {
