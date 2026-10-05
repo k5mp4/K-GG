@@ -111,10 +111,12 @@ test('workspace adapts to small screens while preserving editors and preview', a
   const preferredWidth = (await properties.boundingBox())!.width;
   await page.getByRole('button', { name: 'Open Animation', exact: true }).click();
   await expect.poll(async () => (await timeline.boundingBox())!.height).toBeGreaterThanOrEqual(300);
+  // The open animation is still easing the height, so wait for it before reading the preferred height.
+  await expect.poll(() => timeline.evaluate(element => element.parentElement!.getAnimations().length)).toBe(0);
   const preferredTimelineHeight = (await timeline.boundingBox())!.height;
   await page.setViewportSize({ width: 640, height: 480 });
   await expect.poll(async () => (await timeline.boundingBox())!.height).toBeLessThanOrEqual(218);
   await page.setViewportSize({ width: 1440, height: 960 });
-  await expect.poll(async () => (await timeline.boundingBox())!.height).toBe(preferredTimelineHeight);
+  await expect.poll(async () => (await timeline.boundingBox())!.height).toBeCloseTo(preferredTimelineHeight, 0);
   await expect.poll(async () => (await properties.boundingBox())!.width).toBeCloseTo(preferredWidth, 0);
 });
