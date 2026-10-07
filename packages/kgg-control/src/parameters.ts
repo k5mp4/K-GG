@@ -125,6 +125,11 @@ const RAW_CONTROL_PARAMETER_DEFINITIONS: readonly ParameterDefinition[] = [
   numberParameter('slit.slitWidth', 'slitScan', 'slitWidth', 'Slit width'),
   numberParameter('slit.offset', 'slitScan', 'offset', 'Slit displacement'),
   numberParameter('slit.variance', 'slitScan', 'variance', 'Slit width variance'),
+  enumParameter('slit.edgeSide', 'slitScan', 'edgeSide', getEnumParameterLimit('slit.edgeSide').values, 'Linear slit bar end that is rounded or beveled (none, start, end, both, or random per band)', { defaultValue: getEnumParameterDefault('slit.edgeSide') }),
+  enumParameter('slit.edgeShape', 'slitScan', 'edgeShape', getEnumParameterLimit('slit.edgeShape').values, 'Slit bar end shape (rounded or beveled)', { defaultValue: getEnumParameterDefault('slit.edgeShape') }),
+  numberParameter('slit.edgeSize', 'slitScan', 'edgeSize', 'Slit bar corner radius in pixels'),
+  numberParameter('slit.edgeLength', 'slitScan', 'edgeLength', 'Slit bar length relative to the canvas'),
+  numberParameter('slit.edgeLengthVariance', 'slitScan', 'edgeLengthVariance', 'Slit bar length variance'),
 
   booleanParameter('stretch.enabled', 'stretch', 'enabled', 'Enable stretch distortion'),
   numberParameter('stretch.bandHeight', 'stretch', 'bandHeight', 'Stretch band height'),

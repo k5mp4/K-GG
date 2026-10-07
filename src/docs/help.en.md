@@ -60,6 +60,8 @@ If the screen or GPU rendering becomes corrupted, open Settings in the top bar a
 
 Stretches pixels along an axis. Enable Animate for motion. PingPong provides a seamless loop.
 
+In Linear mode, Rounded Ends splits each band into several bars with Round or Bevel ends. Every bar shifts on its own, so none of the original image is left between them. Start, End, Both, or Random picks which ends are rounded; Radius sets the corner size, and Bar Length and Length Variance set how long the bars are. When the Slit animation is on, the bars flow along the band and the loop is seamless.
+
 ### SANDBOX
 
 The top bar is ordered `Diffuse → Noise → Slit → Postprocess → SANDBOX → Export → Preset`; Stretch has no standalone tab and is not shown in the Postprocess property module. Select an Edit Layer in Postprocess to operate that layer's detailed properties. SANDBOX uses the same text color as Postprocess. The `SANDBOX` top-bar tab groups drawing modules outside the reorderable gradient stack. Use its `Edit Layer` selector to edit Cloth, Normal, Prism, Particles, Flow Gradient, Seamless, or Shapes; changing the selection does not change the render order. Cone is managed as a normal Effect Stack layer.

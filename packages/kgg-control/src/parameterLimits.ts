@@ -126,6 +126,9 @@ export const PARAMETER_LIMITS = {
   'slit.slitWidth': { min: 1, max: 500, step: 1, defaultValue: 80, integer: true },
   'slit.offsetSpeed': { min: -2, max: 2, step: 0.01, defaultValue: 0.3 },
   'slit.variance': { min: 0, max: 1, step: 0.01, defaultValue: 0.5 },
+  'slit.edgeSize': { min: 0, max: 250, step: 1, defaultValue: 40 },
+  'slit.edgeLength': { min: 0.05, max: 1, step: 0.01, defaultValue: 0.25 },
+  'slit.edgeLengthVariance': { min: 0, max: 1, step: 0.01, defaultValue: 0.5 },
   'slit.seed': { min: 0, max: 99, step: 1, defaultValue: 0, integer: true },
 
   'stretch.bandHeight': { min: 1, max: 600, step: 1, defaultValue: 18, integer: true },
@@ -455,6 +458,14 @@ export const ENUM_PARAMETER_LIMITS = {
   'shapes.reveal': {
     values: ['none', 'fadeGlow', 'wipe', 'flicker'],
     defaultValue: 'fadeGlow',
+  },
+  'slit.edgeSide': {
+    values: ['none', 'start', 'end', 'both', 'random'],
+    defaultValue: 'none',
+  },
+  'slit.edgeShape': {
+    values: ['round', 'bevel'],
+    defaultValue: 'round',
   },
   'postprocess.voronoiDistMetric': VORONOI_DISTANCE_METRIC_LIMIT,
   'postprocess.voronoiFeature': VORONOI_FEATURE_LIMIT,

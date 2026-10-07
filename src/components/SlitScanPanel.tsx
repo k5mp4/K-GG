@@ -21,7 +21,11 @@ const WAVE_TYPE_OPTIONS = [
 ];
 const SLIT_MODES = ['linear', 'circular', 'polygon', 'wave'] as const;
 const SLIT_MODE_LABELS = ['Linear', 'Circular', 'Polygon', 'Wave'] as const;
-const SLIT_MOTION_MODES = ['unidirectional', 'pingpong'] as const;
+const SLIT_EDGE_SIDES = ['none', 'start', 'end', 'both', 'random'] as const;
+const SLIT_EDGE_SIDE_LABELS = ['None', 'Start', 'End', 'Both', 'Random'] as const;
+const SLIT_EDGE_SHAPES = ['round', 'bevel'] as const;
+const SLIT_EDGE_SHAPE_LABELS = ['Round', 'Bevel'] as const;
+const SLIT_MOTION_MODES =['unidirectional', 'pingpong'] as const;
 const SLIT_MOTION_LABELS = ['→ Loop', '↔ PingPong'] as const;
 
 const isSlitDirty = (value: SlitScanConfig) =>
@@ -216,6 +220,56 @@ export function SlitScanPanel({ sourceImageName, hasSourceImage, onSourceImageLo
             trackId="slitScan.slitWidth"
             limitKey="slit.slitWidth"
           />
+
+          {slitScan.mode === 'linear' && (
+            <div className="space-y-3 border-t border-panel-border/30 pt-3">
+              <p className="text-[9px] font-display font-semibold uppercase tracking-widest text-tab-inactive">Rounded Ends</p>
+              <InputDrum
+                value={slitScan.edgeSide ?? D.edgeSide}
+                options={SLIT_EDGE_SIDES}
+                labels={SLIT_EDGE_SIDE_LABELS}
+                onChange={(edgeSide) => setSlitScan({ edgeSide })}
+                aria-label="Slit edge side"
+                className="w-full"
+              />
+              {(slitScan.edgeSide ?? D.edgeSide) !== 'none' && (
+                <>
+                  <InputRadio
+                    value={slitScan.edgeShape ?? D.edgeShape}
+                    options={SLIT_EDGE_SHAPES}
+                    labels={SLIT_EDGE_SHAPE_LABELS}
+                    onChange={(edgeShape) => edgeShape !== undefined && setSlitScan({ edgeShape })}
+                    aria-label="Slit edge shape"
+                    className="w-full"
+                  />
+                  <SliderField
+                    label="Radius"
+                    value={slitScan.edgeSize ?? D.edgeSize}
+                    onChange={(v) => setSlitScan({ edgeSize: v })}
+                    format={(v) => `${Math.round(v)}px`}
+                    trackId="slitScan.edgeSize"
+                    limitKey="slit.edgeSize"
+                  />
+                  <SliderField
+                    label="Bar Length"
+                    value={slitScan.edgeLength ?? D.edgeLength}
+                    onChange={(v) => setSlitScan({ edgeLength: v })}
+                    format={(v) => v.toFixed(2)}
+                    trackId="slitScan.edgeLength"
+                    limitKey="slit.edgeLength"
+                  />
+                  <SliderField
+                    label="Length Variance"
+                    value={slitScan.edgeLengthVariance ?? D.edgeLengthVariance}
+                    onChange={(v) => setSlitScan({ edgeLengthVariance: v })}
+                    format={(v) => v.toFixed(2)}
+                    trackId="slitScan.edgeLengthVariance"
+                    limitKey="slit.edgeLengthVariance"
+                  />
+                </>
+              )}
+            </div>
+          )}
 
           {/* Slit motion settings. The speed values are also used by export. */}
           <div className="space-y-3 border-t border-panel-border/30 pt-3">
