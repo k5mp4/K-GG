@@ -94,7 +94,7 @@
   uniform bool u_slitNoiseAfter; // false=Slit -> Noise, true=Noise -> Slit
   uniform bool u_slitPixelPerfect; // true=スリット位置・サンプル移動をキャンバス1px単位に丸める
   uniform vec3 u_slitEdge; // .x = コーナー半径(px), .y = 角丸にする端(0=none,1=start,2=end,3=both,4=random), .z = 形状(0=round,1=bevel)
-  uniform vec3 u_slitEdgeBar; // .x = バー長（帯方向のキャンバス長に対する比）, .y = 長さのばらつき, .z = 模様が繰り返すバーの本数
+  uniform vec4 u_slitEdgeBar; // .x = バー長（帯方向のキャンバス長に対する比）, .y = 長さのばらつき, .z = 模様が繰り返すバーの本数, .w = 流れる速度のばらつき
 
   // Manual Distort
   uniform bool u_manualDistortEnabled;
@@ -400,7 +400,9 @@
     float len = max(u_slitEdgeBar.x * span, 4.0);
     float amp = u_slitEdgeBar.y * 0.8;
     float cells = max(u_slitEdgeBar.z, 1.0);
-    float travel = u_slitAnimEnabled ? (u_slitAnimMode == 1 ? sin(u_slitAnimTime * 6.28318530718) * len : u_slitAnimTime * cells * len) : 0.0;
+    // 帯ごとの速度の倍率。Loop は模様の周期の整数倍でないとループが閉じないので整数に丸める。
+    float speed = 1.0 + slitHash(band.x * 5.77 + u_slitParams.y * 3.3 + 2.9) * 3.0 * u_slitEdgeBar.w;
+    float travel = u_slitAnimEnabled ? (u_slitAnimMode == 1 ? sin(u_slitAnimTime * 6.28318530718) * len * speed : u_slitAnimTime * cells * len * floor(speed)) : 0.0;
     float tt = t - travel;
     float idx = band.x;
     float phase = slitHash(idx * 2.11 + u_slitParams.y * 17.3 + 9.5);

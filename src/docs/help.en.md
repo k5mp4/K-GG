@@ -60,7 +60,7 @@ If the screen or GPU rendering becomes corrupted, open Settings in the top bar a
 
 Stretches pixels along an axis. Enable Animate for motion. PingPong provides a seamless loop.
 
-In Linear mode, Rounded Ends splits each band into several bars with Round or Bevel ends. Every bar shifts on its own, so none of the original image is left between them. Start, End, Both, or Random picks which ends are rounded; Radius sets the corner size, and Bar Length and Length Variance set how long the bars are. When the Slit animation is on, the bars flow along the band and the loop is seamless.
+In Linear mode, Rounded Ends splits each band into several bars with Round or Bevel ends. Every bar shifts on its own, so none of the original image is left between them. Start, End, Both, or Random picks which ends are rounded; Radius sets the corner size, and Bar Length and Length Variance set how long the bars are. When the Slit animation is on, the bars flow along the band and the loop is seamless. Speed Variance makes each band flow at a different speed.
 
 ### SANDBOX
 

@@ -134,5 +134,5 @@ uniform float u_stackSlitAnimTime;
 uniform int u_stackSlitAnimMode;
 uniform bool u_stackSlitPixelPerfect;
 uniform vec3 u_stackSlitEdge;
-uniform vec3 u_stackSlitEdgeBar;
+uniform vec4 u_stackSlitEdgeBar;
 const float PI = 3.141592653589793;

@@ -173,6 +173,7 @@ export type SlitScanConfig = {
   edgeSize?: number;              // 0–250 px, 角の半径／面取り幅（帯幅の半分で頭打ち）
   edgeLength?: number;            // 0.05–1, バー長（キャンバスの帯方向の長さに対する比）
   edgeLengthVariance?: number;    // 0–1, 帯ごとのバー長のばらつき
+  edgeSpeedVariance?: number;     // 0–1, 帯ごとにバーが流れる速度のばらつき（0=全帯が同じ速度）
 };
 
 export type SlitEdgeSide = 'none' | 'start' | 'end' | 'both' | 'random';

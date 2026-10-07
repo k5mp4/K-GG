@@ -266,6 +266,14 @@ export function SlitScanPanel({ sourceImageName, hasSourceImage, onSourceImageLo
                     trackId="slitScan.edgeLengthVariance"
                     limitKey="slit.edgeLengthVariance"
                   />
+                  <SliderField
+                    label="Speed Variance"
+                    value={slitScan.edgeSpeedVariance ?? D.edgeSpeedVariance}
+                    onChange={(v) => setSlitScan({ edgeSpeedVariance: v })}
+                    format={(v) => v.toFixed(2)}
+                    trackId="slitScan.edgeSpeedVariance"
+                    limitKey="slit.edgeSpeedVariance"
+                  />
                 </>
               )}
             </div>

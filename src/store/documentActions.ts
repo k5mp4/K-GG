@@ -313,6 +313,7 @@ export function createDocumentActions(set: DocumentStoreSet, defaults: DocumentD
     slitScan.edgeSize = clampParameter(slitScan.edgeSize, s.slitScan.edgeSize ?? getParameterDefault('slit.edgeSize'), getParameterLimit('slit.edgeSize'));
     slitScan.edgeLength = clampParameter(slitScan.edgeLength, s.slitScan.edgeLength ?? getParameterDefault('slit.edgeLength'), getParameterLimit('slit.edgeLength'));
     slitScan.edgeLengthVariance = clampParameter(slitScan.edgeLengthVariance, s.slitScan.edgeLengthVariance ?? getParameterDefault('slit.edgeLengthVariance'), getParameterLimit('slit.edgeLengthVariance'));
+    slitScan.edgeSpeedVariance = clampParameter(slitScan.edgeSpeedVariance, s.slitScan.edgeSpeedVariance ?? getParameterDefault('slit.edgeSpeedVariance'), getParameterLimit('slit.edgeSpeedVariance'));
     let keyframeTracks = s.keyframeTracks;
     if (s.animation.enabled && slitScan.enabled && s.animation.affectSlit) {
       keyframeTracks = ensureAutoTrack(keyframeTracks, 'slitScan.offset');

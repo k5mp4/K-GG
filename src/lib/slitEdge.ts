@@ -31,12 +31,14 @@ export type SlitEdgeSettings = {
   lengthVariance: number;
   /** Number of bars after which the pattern repeats. */
   cells: number;
+  /** How far the flow speed differs between bands (0 = all bands flow at the same speed). */
+  speedVariance: number;
   seed: number;
 };
 
 type SlitEdgeInput = Pick<
   SlitScanConfig,
-  'mode' | 'edgeSide' | 'edgeShape' | 'edgeSize' | 'edgeLength' | 'edgeLengthVariance' | 'pixelPerfect' | 'seed'
+  'mode' | 'edgeSide' | 'edgeShape' | 'edgeSize' | 'edgeLength' | 'edgeLengthVariance' | 'edgeSpeedVariance' | 'pixelPerfect' | 'seed'
 >;
 
 export function resolveSlitEdge(slitScan: SlitEdgeInput): SlitEdgeSettings {
@@ -52,15 +54,20 @@ export function resolveSlitEdge(slitScan: SlitEdgeInput): SlitEdgeSettings {
   );
   // Only Linear bands run along a straight axis; the other modes keep their hard cuts.
   const active = slitScan.mode === 'linear' && side !== 'none' && size > 0;
+  const speedVariance = clampParameter(
+    slitScan.edgeSpeedVariance,
+    getParameterDefault('slit.edgeSpeedVariance'),
+    getParameterLimit('slit.edgeSpeedVariance'),
+  );
   // Cast away float noise so 1 / 0.25 and friends give the same count on every platform.
   const cells = Math.max(1, Math.ceil(1 / length - 1e-6));
-  return { side: active ? side : 'none', shape, size: active ? size : 0, length, lengthVariance, cells, seed: slitScan.seed };
+  return { side: active ? side : 'none', shape, size: active ? size : 0, length, lengthVariance, cells, speedVariance, seed: slitScan.seed };
 }
 
-/** Packs the settings for the `u_slitEdge` (size, side, shape) and `u_slitEdgeBar` (length, variance, cells) uniforms. */
-export function getSlitEdgeUniform(slitScan: SlitEdgeInput): [number, number, number, number, number, number] {
-  const { side, shape, size, length, lengthVariance, cells } = resolveSlitEdge(slitScan);
-  return [size, SIDE_UNIFORM[side], shape === 'bevel' ? 1 : 0, length, lengthVariance, cells];
+/** Packs the settings for the `u_slitEdge` (size, side, shape) and `u_slitEdgeBar` (length, variance, cells, speed variance) uniforms. */
+export function getSlitEdgeUniform(slitScan: SlitEdgeInput): [number, number, number, number, number, number, number] {
+  const { side, shape, size, length, lengthVariance, cells, speedVariance } = resolveSlitEdge(slitScan);
+  return [size, SIDE_UNIFORM[side], shape === 'bevel' ? 1 : 0, length, lengthVariance, cells, speedVariance];
 }
 
 /**
@@ -99,6 +106,16 @@ function capDistance(a: number, b: number, r: number, shape: SlitEdgeShape): num
   const qx = r - a;
   const qy = r - b;
   return shape === 'bevel' ? (qx + qy - r) * Math.SQRT1_2 : Math.hypot(qx, qy) - r;
+}
+
+/**
+ * Flow speed of a band relative to the base speed (1 to 4). A looping flow must
+ * cover a whole number of pattern periods per cycle to close without a seam, so
+ * Loop uses whole multiples; PingPong swings back and forth and can use any value.
+ */
+export function slitBarSpeed(index: number, seed: number, speedVariance: number, pingpong: boolean): number {
+  const speed = 1 + hash(index * 5.77 + seed * 3.3 + 2.9) * 3 * speedVariance;
+  return pingpong ? speed : Math.floor(speed);
 }
 
 function mod(value: number, divisor: number): number {
@@ -143,7 +160,8 @@ export function slitBarShift(input: SlitBarInput): number {
   const amp = edge.lengthVariance * 0.8;
   const cells = edge.cells;
   const animTime = input.animTime ?? 0;
-  const travel = animTime === 0 ? 0 : input.pingpong ? Math.sin(animTime * Math.PI * 2) * len : animTime * cells * len;
+  const speed = slitBarSpeed(index, seed, edge.speedVariance, input.pingpong ?? false);
+  const travel = animTime === 0 ? 0 : input.pingpong ? Math.sin(animTime * Math.PI * 2) * len * speed : animTime * cells * len * speed;
   const barTangent = tangent - travel;
   const phase = hash(index * 2.11 + seed * 17.3 + 9.5);
   const xl = unwarpCoord(input.left, slitWidth, slitVariance, seed);

@@ -130,6 +130,7 @@ const RAW_CONTROL_PARAMETER_DEFINITIONS: readonly ParameterDefinition[] = [
   numberParameter('slit.edgeSize', 'slitScan', 'edgeSize', 'Slit bar corner radius in pixels'),
   numberParameter('slit.edgeLength', 'slitScan', 'edgeLength', 'Slit bar length relative to the canvas'),
   numberParameter('slit.edgeLengthVariance', 'slitScan', 'edgeLengthVariance', 'Slit bar length variance'),
+  numberParameter('slit.edgeSpeedVariance', 'slitScan', 'edgeSpeedVariance', 'Slit bar flow speed variance between bands'),
 
   booleanParameter('stretch.enabled', 'stretch', 'enabled', 'Enable stretch distortion'),
   numberParameter('stretch.bandHeight', 'stretch', 'bandHeight', 'Stretch band height'),

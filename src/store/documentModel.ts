@@ -222,6 +222,7 @@ export const STORE_DEFAULTS = {
     edgeSize: getParameterDefault('slit.edgeSize'),
     edgeLength: getParameterDefault('slit.edgeLength'),
     edgeLengthVariance: getParameterDefault('slit.edgeLengthVariance'),
+    edgeSpeedVariance: getParameterDefault('slit.edgeSpeedVariance'),
   },
   stretch: {
     enabled: false,

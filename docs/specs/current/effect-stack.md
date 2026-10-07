@@ -263,11 +263,11 @@ Block／SmoothのDiffuseは適用方式`diffuse.applyMode`を持ち、値は`noi
 
 ### EFFECT-032 Slitの角丸・面取りバー（Round／Bevel）
 
-`slitScan`は`edgeSide`（`none`既定／`start`／`end`／`both`／`random`）、`edgeShape`（`round`既定／`bevel`）、`edgeSize`（0〜250px、既定40）、`edgeLength`（0.05〜1、既定0.25）、`edgeLengthVariance`（0〜1、既定0.5）を持ちます。`edgeSide`が`none`以外で`edgeSize`が0より大きいとき、Linearの各帯を帯方向に複数のバーへ分けます。各バーは帯のずらしを独立に持ち、バーの間に元の画像は現れません。Circular・Polygon・Waveには適用せず、値を保持したまま描画では`none`として扱います。
+`slitScan`は`edgeSide`（`none`既定／`start`／`end`／`both`／`random`）、`edgeShape`（`round`既定／`bevel`）、`edgeSize`（0〜250px、既定40）、`edgeLength`（0.05〜1、既定0.25）、`edgeLengthVariance`（0〜1、既定0.5）、`edgeSpeedVariance`（0〜1、既定0.5）を持ちます。`edgeSide`が`none`以外で`edgeSize`が0より大きいとき、Linearの各帯を帯方向に複数のバーへ分けます。各バーは帯のずらしを独立に持ち、バーの間に元の画像は現れません。Circular・Polygon・Waveには適用せず、値を保持したまま描画では`none`として扱います。
 
 バーの長さは、キャンバスの帯方向の長さに`edgeLength`を掛けた値を基準に、`edgeLengthVariance`の割合で境界をずらして決めます。境界の位置は帯のindexと`seed`から決まり、帯ごとに位相が異なります。バーのずらし係数は、帯のindex・バー番号・`seed`から決まる乱数で、アニメーション中は`sin(2π·(乱数 + 位相))`で滑らかに変化します。従来の帯のLoopは鋸歯状に切り替わりますが、バーでは複数のバーが並んで色が急に跳びちらつくため、LoopでもPingPongでも同じ滑らかな式を使います。バーの模様は、バーの長さから決めた本数（`ceil(1 / edgeLength)`本、キャンバス1枚分ほど）ごとに繰り返します。
 
-Slitのアニメーションが有効なとき、バーは帯に沿って流れます。Loopでは、Slitの位相（`animMode`と`offsetSpeed`から決まる、duration周期で閉じた位相）1サイクルにつき、模様の1周期ぶん（バーの本数×バーの長さ）だけ`offsetSpeed`の符号の向きへ進みます。PingPongでは、位相に`sin(2π·位相)`をかけてバー1本ぶんの幅で往復します。位相はduration周期で整数サイクル進むため、ループの継ぎ目で模様が元に戻り、シームレスに繰り返します。アニメーションが無効、またはOffset Speedが0のときはバーは動きません。
+Slitのアニメーションが有効なとき、バーは帯に沿って流れます。Loopでは、Slitの位相（`animMode`と`offsetSpeed`から決まる、duration周期で閉じた位相）1サイクルにつき、模様の1周期ぶん（バーの本数×バーの長さ）だけ`offsetSpeed`の符号の向きへ進みます。PingPongでは、位相に`sin(2π·位相)`をかけてバー1本ぶんの幅で往復します。位相はduration周期で整数サイクル進むため、ループの継ぎ目で模様が元に戻り、シームレスに繰り返します。`edgeSpeedVariance`は帯ごとの流れる速度のばらつきで、0では全帯が同じ速度です。帯の速度は帯のindexと`seed`から決まる乱数で、基準速度の1〜`1 + 3·edgeSpeedVariance`倍になります。Loopでは、位相1サイクルで模様の周期の整数倍だけ進まないとループの継ぎ目が出るため、倍率を整数（1〜4倍）に切り捨てます。PingPongは往復の幅を倍率に応じて広げ、倍率は連続値です。アニメーションが無効、またはOffset Speedが0のときはバーは動きません。
 
 `start`は各バーの帯方向の小さい側の端、`end`は大きい側の端だけを角丸にし、`both`は両端、`random`はバーごとに片方を角丸にします。角丸の端は隣のバーの上へ半径の分だけ重なり、角の隙間から隣のバーが見えます。重なり順は、`start`ではバー番号が大きい方、`end`では小さい方が上で、`both`と`random`ではバーごとの乱数です。
 

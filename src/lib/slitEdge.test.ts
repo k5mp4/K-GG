@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { STORE_DEFAULTS } from '../store/gradientStore';
 import type { SlitScanConfig } from '../types/distortion';
-import { getSlitEdgeUniform, resolveSlitEdge, slitBarFactor, slitBarShift, type SlitEdgeSettings } from './slitEdge';
+import { getSlitEdgeUniform, resolveSlitEdge, slitBarFactor, slitBarShift, slitBarSpeed, type SlitEdgeSettings } from './slitEdge';
 
 const slit = (overrides: Partial<SlitScanConfig> = {}): SlitScanConfig => ({
   ...STORE_DEFAULTS.slitScan,
@@ -15,6 +15,7 @@ const edge = (overrides: Partial<SlitEdgeSettings> = {}): SlitEdgeSettings => ({
   length: 0.25,
   lengthVariance: 0,
   cells: 4,
+  speedVariance: 0,
   seed: 0,
   ...overrides,
 });
@@ -22,10 +23,10 @@ const edge = (overrides: Partial<SlitEdgeSettings> = {}): SlitEdgeSettings => ({
 const SPAN = 2000;
 const SW = 80;
 // Band 0 spans slit coordinates [0, 80]; its centre line is 40.
-const shiftAt = (tangent: number, slitCoord: number, settings: SlitEdgeSettings, variance = 0, animTime = 0, pingpong = false) =>
+const shiftAt = (tangent: number, slitCoord: number, settings: SlitEdgeSettings, variance = 0, animTime = 0, pingpong = false, index = 0) =>
   slitBarShift({
     slitCoord,
-    index: 0,
+    index,
     left: 0,
     right: SW,
     tangent,
@@ -75,10 +76,10 @@ describe('Slit bar edge settings', () => {
 
   it('packs size, side, shape, length, variance and cell count for the shader uniforms', () => {
     expect(getSlitEdgeUniform(slit({ edgeSide: 'start', edgeShape: 'round', edgeSize: 30, edgeLength: 0.4, edgeLengthVariance: 0.2 })))
-      .toEqual([30, 1, 0, 0.4, 0.2, 3]);
+      .toEqual([30, 1, 0, 0.4, 0.2, 3, 0.5]);
     expect(getSlitEdgeUniform(slit({ edgeSide: 'end', edgeShape: 'bevel', edgeSize: 12 }))[1]).toBe(2);
     expect(getSlitEdgeUniform(slit({ edgeSide: 'both', edgeShape: 'bevel', edgeSize: 12 }))[1]).toBe(3);
-    expect(getSlitEdgeUniform(slit({ edgeSide: 'random', edgeShape: 'bevel', edgeSize: 12 }))).toEqual([12, 4, 1, 0.25, 0.5, 4]);
+    expect(getSlitEdgeUniform(slit({ edgeSide: 'random', edgeShape: 'bevel', edgeSize: 12 }))).toEqual([12, 4, 1, 0.25, 0.5, 4, 0.5]);
   });
 
   it('only applies to Linear mode and falls back for invalid values', () => {
@@ -120,6 +121,56 @@ describe('Slit bar colour changes', () => {
     for (const random of [0, 0.31, 0.77]) {
       expect(slitBarFactor(random, 2, true)).toBeCloseTo(slitBarFactor(random, 0, true), 9);
       expect(slitBarFactor(random, -1, true)).toBeCloseTo(slitBarFactor(random, 0, true), 9);
+    }
+  });
+});
+
+describe('Slit bar flow speed', () => {
+  it('keeps every band at the base speed without variance', () => {
+    for (let index = -8; index < 24; index++) {
+      expect(slitBarSpeed(index, 0, 0, false)).toBe(1);
+      expect(slitBarSpeed(index, 0, 0, true)).toBe(1);
+    }
+  });
+
+  it('spreads the speeds between bands, as whole multiples for Loop', () => {
+    const loop = Array.from({ length: 32 }, (_, index) => slitBarSpeed(index, 0, 1, false));
+    expect(Math.min(...loop)).toBeGreaterThanOrEqual(1);
+    expect(Math.max(...loop)).toBeLessThanOrEqual(4);
+    expect(loop.every(Number.isInteger)).toBe(true);
+    expect(new Set(loop).size).toBeGreaterThanOrEqual(3);
+    const pingpong = Array.from({ length: 32 }, (_, index) => slitBarSpeed(index, 0, 1, true));
+    expect(new Set(pingpong).size).toBeGreaterThan(8);
+  });
+
+  it('moves each band at its own speed and still closes the loop after whole cycles', () => {
+    const settings = edge({ side: 'both', lengthVariance: 0.5, speedVariance: 1 });
+    const period = settings.cells * settings.length * SPAN;
+    const seen = new Set<number>();
+    for (let index = 0; index < 12; index++) {
+      const speed = slitBarSpeed(index, settings.seed, 1, false);
+      seen.add(speed);
+      for (let t = -900; t <= 900; t += 61.7) {
+        const rest = shiftAt(t, 40, settings, 0, 0, false, index);
+        expect(shiftAt(t, 40, settings, 0, 1, false, index)).toBeCloseTo(rest, 9);
+        expect(shiftAt(t, 40, settings, 0, 3, false, index)).toBeCloseTo(rest, 9);
+        // A quarter cycle carries this band's pattern speed/4 periods along.
+        expect(shiftAt(t + (period * speed) / 4, 40, settings, 0, 0.25, false, index)).toBeCloseTo(rest, 9);
+      }
+    }
+    expect(seen.size).toBeGreaterThan(1);
+  });
+
+  it('swings PingPong bands by a speed-scaled amount and returns after each cycle', () => {
+    const settings = edge({ side: 'both', speedVariance: 1 });
+    const len = settings.length * SPAN;
+    for (let index = 0; index < 8; index++) {
+      const speed = slitBarSpeed(index, settings.seed, 1, true);
+      for (let t = -900; t <= 900; t += 71.3) {
+        const rest = shiftAt(t, 40, settings, 0, 0, true, index);
+        expect(shiftAt(t, 40, settings, 0, 1, true, index)).toBeCloseTo(rest, 9);
+        expect(shiftAt(t + len * speed, 40, settings, 0, 0.25, true, index)).toBeCloseTo(rest, 9);
+      }
     }
   });
 });

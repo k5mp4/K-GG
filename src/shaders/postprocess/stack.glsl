@@ -268,7 +268,8 @@ float stackSlitBarShift(float slitCoord, vec3 band, float t, float span, float s
   float len = max(u_stackSlitEdgeBar.x * span, 4.0);
   float amp = u_stackSlitEdgeBar.y * 0.8;
   float cells = max(u_stackSlitEdgeBar.z, 1.0);
-  float travel = u_stackSlitAnimEnabled ? (u_stackSlitAnimMode == 1 ? sin(u_stackSlitAnimTime * 2.0 * PI) * len : u_stackSlitAnimTime * cells * len) : 0.0;
+  float speed = 1.0 + stackSlitHash(band.x * 5.77 + u_stackSlitParams.y * 3.3 + 2.9) * 3.0 * u_stackSlitEdgeBar.w;
+  float travel = u_stackSlitAnimEnabled ? (u_stackSlitAnimMode == 1 ? sin(u_stackSlitAnimTime * 2.0 * PI) * len * speed : u_stackSlitAnimTime * cells * len * floor(speed)) : 0.0;
   float tt = t - travel;
   float idx = band.x;
   float phase = stackSlitHash(idx * 2.11 + u_stackSlitParams.y * 17.3 + 9.5);

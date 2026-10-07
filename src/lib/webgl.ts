@@ -2867,7 +2867,7 @@ function drawPostprocessPass(
     setUniform1i(gl, ctx.postprocessUniforms.u_stackSlitPixelPerfect, stackSlitPixelPerfect ? 1 : 0);
     const stackSlitEdge = getSlitEdgeUniform(stackSlit);
     gl.uniform3f(ctx.postprocessUniforms.u_stackSlitEdge, stackSlitEdge[0], stackSlitEdge[1], stackSlitEdge[2]);
-    gl.uniform3f(ctx.postprocessUniforms.u_stackSlitEdgeBar, stackSlitEdge[3], stackSlitEdge[4], stackSlitEdge[5]);
+    gl.uniform4f(ctx.postprocessUniforms.u_stackSlitEdgeBar, stackSlitEdge[3], stackSlitEdge[4], stackSlitEdge[5], stackSlitEdge[6]);
   }
   if ((effectMode === 'glass' || effectMode === 'glassV2' || effectMode === 'glassTile') && exportDiagnosticsEnabled()) {
     const destinationTexture = targetFramebuffer === ctx.postprocessFboA
@@ -4228,7 +4228,7 @@ export function render(
   setUniform1i(gl, uniforms.u_slitPixelPerfect, _pp ? 1 : 0);
   const slitEdge = getSlitEdgeUniform(slitScan);
   gl.uniform3f(uniforms.u_slitEdge, slitEdge[0], slitEdge[1], slitEdge[2]);
-  gl.uniform3f(uniforms.u_slitEdgeBar, slitEdge[3], slitEdge[4], slitEdge[5]);
+  gl.uniform4f(uniforms.u_slitEdgeBar, slitEdge[3], slitEdge[4], slitEdge[5], slitEdge[6]);
   // Stretch is applied later as a post-process that samples the rendered texture.
   uploadManualDistortMap(ctx, manualDistort);
   gl.activeTexture(gl.TEXTURE5);
