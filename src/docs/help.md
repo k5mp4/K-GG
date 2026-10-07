@@ -78,6 +78,7 @@ Web 版は `index.html` で Google Fonts から Noto Sans JP、Open Sans を読�
 - 特定の軸方向にピクセルを引き伸ばすエフェクトを適用します。
 - Animateを有効にすることでアニメーション可能です
 - **PingPongは仕組み上動きの破綻がないです**
+- LinearのRounded Endsで、各帯を帯方向に複数のバーへ分け、端を Round（角丸）または Bevel（面取り）にできます。各バーは別々にずれるので、元の画像は残りません。Start／End／Both／Randomで角丸にする端を選び、Radiusが角の大きさ、Bar LengthとLength Varianceがバーの長さです。Slitのアニメーションを有効にすると、バーは帯に沿って流れ、ループの継ぎ目なくつながります。Speed Varianceで帯ごとに流れる速さをばらけさせられます
 
 ### SANDBOX
 - トップバーは `Diffuse → Noise → Slit → Postprocess → SANDBOX → Export → Preset` の順で、Stretchは独立項目およびPostprocessのプロパティモジュールに表示しません。PostprocessではEdit Layerを選択し、その詳細プロパティを操作できます。SANDBOXの文字色はPostprocessと同じです。

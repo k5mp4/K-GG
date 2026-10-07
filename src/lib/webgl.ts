@@ -67,6 +67,7 @@ import { getChladniUniformValues } from './chladniNoise';
 import { clampParameter, getParameterLimit } from './parameterLimits';
 import { getAnimationDirectionVector } from './animationDirection';
 import { getSlitAnimationPhase } from './slitAnimation';
+import { getSlitEdgeUniform } from './slitEdge';
 import { shouldRenderNormalMap } from './normalMap';
 import { VORONOI_DISTANCE_MAP, VORONOI_FEATURE_MAP } from './voronoi';
 import type { LatestState } from '../types/latestState';
@@ -2864,6 +2865,9 @@ function drawPostprocessPass(
     gl.uniform1f(ctx.postprocessUniforms.u_stackSlitAnimTime, stackSlitAnimationTime);
     setUniform1i(gl, ctx.postprocessUniforms.u_stackSlitAnimMode, stackSlit.animMode === 'pingpong' ? 1 : 0);
     setUniform1i(gl, ctx.postprocessUniforms.u_stackSlitPixelPerfect, stackSlitPixelPerfect ? 1 : 0);
+    const stackSlitEdge = getSlitEdgeUniform(stackSlit);
+    gl.uniform3f(ctx.postprocessUniforms.u_stackSlitEdge, stackSlitEdge[0], stackSlitEdge[1], stackSlitEdge[2]);
+    gl.uniform4f(ctx.postprocessUniforms.u_stackSlitEdgeBar, stackSlitEdge[3], stackSlitEdge[4], stackSlitEdge[5], stackSlitEdge[6]);
   }
   if ((effectMode === 'glass' || effectMode === 'glassV2' || effectMode === 'glassTile') && exportDiagnosticsEnabled()) {
     const destinationTexture = targetFramebuffer === ctx.postprocessFboA
@@ -4222,6 +4226,9 @@ export function render(
   // Legacy rendering keeps one fixed order. V2 uses the explicit stack order.
   setUniform1i(gl, uniforms.u_slitNoiseAfter, 0);
   setUniform1i(gl, uniforms.u_slitPixelPerfect, _pp ? 1 : 0);
+  const slitEdge = getSlitEdgeUniform(slitScan);
+  gl.uniform3f(uniforms.u_slitEdge, slitEdge[0], slitEdge[1], slitEdge[2]);
+  gl.uniform4f(uniforms.u_slitEdgeBar, slitEdge[3], slitEdge[4], slitEdge[5], slitEdge[6]);
   // Stretch is applied later as a post-process that samples the rendered texture.
   uploadManualDistortMap(ctx, manualDistort);
   gl.activeTexture(gl.TEXTURE5);

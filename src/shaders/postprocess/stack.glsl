@@ -184,7 +184,8 @@ vec2 snapStackSlitOffset(vec2 offsetUv) {
   return floor(offsetUv * u_fullResolution + 0.5) / u_fullResolution;
 }
 
-float computeStackSlitIndex(float warpedCoord, float slitWidth) {
+// Returns (slit index, left bound, right bound) in slit-coordinate space.
+vec3 computeStackSlitBand(float warpedCoord, float slitWidth) {
   // Index a local copy of the delta table. Selecting each entry through a
   // 32-way branch inside this 32-step loop made the ANGLE/Direct3D compile
   // several times slower for every program that includes the Slit layer.
@@ -212,12 +213,87 @@ float computeStackSlitIndex(float warpedCoord, float slitWidth) {
     if (entry.x <= -9000.0) continue;
     float left = entry.x * slitWidth + cumulativeDelta;
     float right = left + slitWidth + entry.y;
-    if (warpedCoord < left) return floor((warpedCoord - cumulativeDelta) / slitWidth);
-    if (warpedCoord < right) return entry.x;
+    if (warpedCoord < left) break;
+    if (warpedCoord < right) return vec3(entry.x, left, right);
     cumulativeDelta += entry.y;
   }
-  return floor((warpedCoord - cumulativeDelta) / slitWidth);
+  float bandIndex = floor((warpedCoord - cumulativeDelta) / slitWidth);
+  float bandLeft = bandIndex * slitWidth + cumulativeDelta;
+  return vec3(bandIndex, bandLeft, bandLeft + slitWidth);
 }
+
+// Linear bars with Round/Bevel ends. Mirrors the slitBar* functions in gradient.frag.glsl.
+float stackSlitUnwarpCoord(float target, float sw) {
+  if (u_stackSlitVariance <= 0.0) return target;
+  float x = target;
+  for (int i = 0; i < 6; i++) {
+    float phase = x / (sw * 4.0) * 6.2832 + u_stackSlitParams.y * 37.4;
+    float fx = x + sin(phase) * u_stackSlitVariance * sw - target;
+    float dfx = max(1.0 + cos(phase) * u_stackSlitVariance * 1.5708, 0.2);
+    x -= fx / dfx;
+  }
+  return x;
+}
+
+float stackSlitBarCapDist(float a, float b, float r) {
+  if (a >= r || b >= r) return -b;
+  vec2 q = vec2(r - a, r - b);
+  return u_stackSlitEdge.z > 0.5 ? (q.x + q.y - r) * 0.70710678 : length(q) - r;
+}
+
+float stackSlitBarCut(float k, float idx, float len, float amp, float phase, float cells) {
+  return (k + phase + (stackSlitHash(idx * 1.37 + mod(k, cells) * 5.31 + u_stackSlitParams.y * 53.1 + 4.2) - 0.5) * amp) * len;
+}
+
+float stackSlitBarFactor(float h) {
+  return u_stackSlitAnimEnabled ? sin((h + u_stackSlitAnimTime) * 2.0 * PI) : (h * 2.0 - 1.0);
+}
+
+vec3 stackSlitBarLayer(float k, float idx, float len, float amp, float phase, float cells, float a, float r, float t) {
+  float side = u_stackSlitEdge.y;
+  float key = mod(k, cells);
+  float pick = stackSlitHash(idx * 2.7 + key * 3.3 + u_stackSlitParams.y * 11.1 + 1.7);
+  bool capLow = side > 3.5 ? pick < 0.5 : mod(side, 2.0) > 0.5;
+  bool capHigh = side > 3.5 ? pick >= 0.5 : side > 1.5;
+  float z = side < 1.5 ? k : (side < 2.5 ? -k : stackSlitHash(idx * 4.1 + key * 1.9 + u_stackSlitParams.y * 7.7 + 5.3));
+  float lo = stackSlitBarCut(k, idx, len, amp, phase, cells);
+  float hi = stackSlitBarCut(k + 1.0, idx, len, amp, phase, cells);
+  float dLow = capLow ? stackSlitBarCapDist(a, t - (lo - r), r) : lo - t;
+  float dHigh = capHigh ? stackSlitBarCapDist(a, (hi + r) - t, r) : t - hi;
+  float h = stackSlitHash(idx + u_stackSlitParams.y * 91.7 + key * 7.13);
+  return vec3(step(max(dLow, dHigh), 0.0), stackSlitBarFactor(h), z);
+}
+
+float stackSlitBarShift(float slitCoord, vec3 band, float t, float span, float sw) {
+  float len = max(u_stackSlitEdgeBar.x * span, 4.0);
+  float amp = u_stackSlitEdgeBar.y * 0.8;
+  float cells = max(u_stackSlitEdgeBar.z, 1.0);
+  float speed = 1.0 + stackSlitHash(band.x * 5.77 + u_stackSlitParams.y * 3.3 + 2.9) * 3.0 * u_stackSlitEdgeBar.w;
+  float travel = u_stackSlitAnimEnabled ? (u_stackSlitAnimMode == 1 ? sin(u_stackSlitAnimTime * 2.0 * PI) * len * speed : u_stackSlitAnimTime * cells * len * floor(speed)) : 0.0;
+  float tt = t - travel;
+  float idx = band.x;
+  float phase = stackSlitHash(idx * 2.11 + u_stackSlitParams.y * 17.3 + 9.5);
+  float xl = stackSlitUnwarpCoord(band.y, sw);
+  float xr = stackSlitUnwarpCoord(band.z, sw);
+  float a = max(min(slitCoord - xl, xr - slitCoord), 0.0);
+  float r = min(u_stackSlitEdge.x, min((xr - xl) * 0.5, 0.5 * len * (1.0 - amp)));
+  float k0 = floor(tt / len - phase + 0.5);
+  if (tt < stackSlitBarCut(k0, idx, len, amp, phase, cells)) k0 -= 1.0;
+  else if (tt >= stackSlitBarCut(k0 + 1.0, idx, len, amp, phase, cells)) k0 += 1.0;
+  vec3 la = stackSlitBarLayer(k0 - 1.0, idx, len, amp, phase, cells, a, r, tt);
+  vec3 lb = stackSlitBarLayer(k0, idx, len, amp, phase, cells, a, r, tt);
+  vec3 lc = stackSlitBarLayer(k0 + 1.0, idx, len, amp, phase, cells, a, r, tt);
+  float shift = lb.y;
+  vec3 tmp;
+  if (la.z > lb.z) { tmp = la; la = lb; lb = tmp; }
+  if (lb.z > lc.z) { tmp = lb; lb = lc; lc = tmp; }
+  if (la.z > lb.z) { tmp = la; la = lb; lb = tmp; }
+  shift = mix(shift, la.y, la.x);
+  shift = mix(shift, lb.y, lb.x);
+  shift = mix(shift, lc.y, lc.x);
+  return shift;
+}
+
 
 float regularStackPolygonCoord(vec2 p) {
   float sides = max(float(u_stackSlitPolygonSides), 3.0);
@@ -258,7 +334,7 @@ vec2 stackSlitUv(vec2 globalUv, vec2 globalCoord) {
     float radialPixels = u_stackSlitMode == 2
       ? regularStackPolygonCoord(fragmentCentered)
       : length(fragmentCentered);
-    float slitIndex = computeStackSlitIndex(radialPixels + u_stackSlitParams.x, slitWidth);
+    float slitIndex = computeStackSlitBand(radialPixels + u_stackSlitParams.x, slitWidth).x;
     float randomValue = stackSlitHash(slitIndex + u_stackSlitParams.y * 91.7);
     float shiftFactor = u_stackSlitAnimEnabled
       ? (u_stackSlitAnimMode == 1
@@ -282,15 +358,25 @@ vec2 stackSlitUv(vec2 globalUv, vec2 globalCoord) {
   float warpedCoord = slitCoord
     + sin(slitCoord / (slitWidth * 4.0) * 6.2832 + u_stackSlitParams.y * 37.4)
       * u_stackSlitVariance * slitWidth;
-  float slitIndex = computeStackSlitIndex(warpedCoord, slitWidth);
+  vec3 slitBand = computeStackSlitBand(warpedCoord, slitWidth);
+  float slitIndex = slitBand.x;
   float randomValue = stackSlitHash(slitIndex + u_stackSlitParams.y * 91.7);
   float shiftFactor = u_stackSlitAnimEnabled
     ? (u_stackSlitAnimMode == 1
       ? sin((randomValue + u_stackSlitAnimTime) * 2.0 * PI)
       : fract(randomValue + u_stackSlitAnimTime) * 2.0 - 1.0)
     : randomValue * 2.0 - 1.0;
+  if (u_stackSlitEdge.x > 0.0 && u_stackSlitEdge.y > 0.5) {
+    shiftFactor = stackSlitBarShift(
+      slitCoord,
+      slitBand,
+      dot(globalCoord - u_fullResolution * 0.5, vec2(-sinAngle, cosAngle)),
+      abs(sinAngle) * u_fullResolution.x + abs(cosAngle) * u_fullResolution.y,
+      slitWidth
+    );
+  }
   float offsetAngle = u_stackSlitAngle + u_stackSlitOffsetAngle + PI * 0.5;
   vec2 sourceDirection = vec2(cos(offsetAngle), sin(offsetAngle));
-return globalUv + snapStackSlitOffset(shiftFactor * u_stackSlitOffset * sourceDirection);
+  return globalUv + snapStackSlitOffset(shiftFactor * u_stackSlitOffset * sourceDirection);
 }
 #endif

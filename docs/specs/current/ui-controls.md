@@ -37,7 +37,7 @@ Noise、Slit、StretchのSeed行では、InputShuffleは対応するSeedスラ�
 
 ### UI-003 Slitの選択コントロール
 
-SlitのModeはLinear、Circular、Polygon、WaveをInputDrumで選択できます。MotionはUnidirectional（Loop）とPingPongをInputRadioで選択し、Offset Speedだけで速度を調整できます。Phase SpeedおよびTimeline Loop切替は表示しません。Source ImageはSlitプロパティモジュール内の全設定とSeedの下端に置き、既存の読込・削除・エラー表示を維持します。
+SlitのModeはLinear、Circular、Polygon、WaveをInputDrumで選択できます。MotionはUnidirectional（Loop）とPingPongをInputRadioで選択し、Offset Speedだけで速度を調整できます。Phase SpeedおよびTimeline Loop切替は表示しません。LinearのModeでは、Widthの下にRounded Endsセクションを表示します。角丸にする端をNone／Start／End／Both／RandomのInputDrumで選び、None以外のときだけRound／BevelのInputRadioと、Radius・Bar Length・Length Variance・Speed Varianceのスライダー（キーフレーム対応）を表示します。Source ImageはSlitプロパティモジュール内の全設定とSeedの下端に置き、既存の読込・削除・エラー表示を維持します。
 
 ### UI-004 Animationの名称
 

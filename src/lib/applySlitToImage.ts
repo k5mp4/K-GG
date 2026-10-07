@@ -1,15 +1,19 @@
 import type { SlitScanConfig } from '../types/distortion';
+import { resolveSlitEdge, slitBarFactor, slitBarShift } from './slitEdge';
 
-function computeSlitIdx(warpedCoord: number, sw: number, sortedDeltas: Array<[number, number]>): number {
+/** Same search as the shader's computeSlitBand: returns the slit index and its [left, right] bounds. */
+function computeSlitBand(warpedCoord: number, sw: number, sortedDeltas: Array<[number, number]>): { idx: number; left: number; right: number } {
   let cumDelta = 0;
   for (const [sIdx, delta] of sortedDeltas) {
     const leftBound = sIdx * sw + cumDelta;
-    if (warpedCoord < leftBound) return Math.floor((warpedCoord - cumDelta) / sw);
+    if (warpedCoord < leftBound) break;
     const rightBound = leftBound + sw + delta;
-    if (warpedCoord < rightBound) return sIdx;
+    if (warpedCoord < rightBound) return { idx: sIdx, left: leftBound, right: rightBound };
     cumDelta += delta;
   }
-  return Math.floor((warpedCoord - cumDelta) / sw);
+  const idx = Math.floor((warpedCoord - cumDelta) / sw);
+  const left = idx * sw + cumDelta;
+  return { idx, left, right: left + sw };
 }
 
 function slitHash(n: number): number {
@@ -140,8 +144,12 @@ export async function applySlitToCanvas(srcCanvas: HTMLCanvasElement, slitScan: 
   const offsetX = Math.cos(offsetAngle);
   const offsetY = Math.sin(offsetAngle);
   const seed = slitScan.seed;
+  const edge = resolveSlitEdge(slitScan);
   const animEnabled = slitScan.animEnabled && slitScan.animMode !== 'off' && slitScan.offsetSpeed !== 0;
   const animTime = 0;
+  const bandFactor = (h: number) => animEnabled
+    ? (slitScan.animMode === 'pingpong' ? Math.sin((h + animTime) * Math.PI * 2) : fract(h + animTime) * 2 - 1)
+    : h * 2 - 1;
   const snapUVToCanvasPixel = (uvX: number, uvY: number) => {
     if (!pixelPerfect) return [uvX, uvY] as const;
     return [(Math.floor(uvX * width) + 0.5) / width, (Math.floor(uvY * height) + 0.5) / height] as const;
@@ -179,7 +187,7 @@ export async function applySlitToCanvas(srcCanvas: HTMLCanvasElement, slitScan: 
           ? regularPolygonCoord(dx, dy, slitScan.polygonSides ?? 6, angle)
           : Math.sqrt(dx * dx + dy * dy);
         const circCoord = radialCoord + slitPhase;
-        const slitIdx = computeSlitIdx(circCoord, sw, sortedDeltas);
+        const slitIdx = computeSlitBand(circCoord, sw, sortedDeltas).idx;
         const h = slitHash(slitIdx + seed * 91.7);
         const sf = animEnabled
           ? (slitScan.animMode === 'pingpong' ? Math.sin((h + animTime) * Math.PI * 2) : fract(h + animTime) * 2 - 1)
@@ -195,11 +203,22 @@ export async function applySlitToCanvas(srcCanvas: HTMLCanvasElement, slitScan: 
       } else {
         const slitCoord = globalX * cosA + globalY * sinA - centerProj + slitPhase;
         const warpedCoord = slitCoord + Math.sin((slitCoord / (sw * 4)) * Math.PI * 2 + seed * 37.4) * slitScan.variance * sw;
-        const slitIdx = computeSlitIdx(warpedCoord, sw, sortedDeltas);
-        const h = slitHash(slitIdx + seed * 91.7);
-        const sf = animEnabled
-          ? (slitScan.animMode === 'pingpong' ? Math.sin((h + animTime) * Math.PI * 2) : fract(h + animTime) * 2 - 1)
-          : h * 2 - 1;
+        const band = computeSlitBand(warpedCoord, sw, sortedDeltas);
+        const slitIdx = band.idx;
+        const sf = edge.size > 0
+          ? slitBarShift({
+            slitCoord,
+            index: slitIdx,
+            left: band.left,
+            right: band.right,
+            tangent: (globalX - width * 0.5) * -sinA + (globalY - height * 0.5) * cosA,
+            span: Math.abs(sinA) * width + Math.abs(cosA) * height,
+            slitWidth: sw,
+            slitVariance: slitScan.variance,
+            edge,
+            shiftFactor: (random) => slitBarFactor(random, animTime, animEnabled),
+          })
+          : bandFactor(slitHash(slitIdx + seed * 91.7));
         const [offsetUvX, offsetUvY] = snapOffsetToCanvasPixel(sf * slitScan.offset * offsetX, sf * slitScan.offset * offsetY);
         uvX += offsetUvX;
         uvY += offsetUvY;

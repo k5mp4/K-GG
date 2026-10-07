@@ -163,7 +163,21 @@ export type SlitScanConfig = {
   slitDeltas: Record<number, number>; // スリットごとの幅オフセット（px）。slit index → delta
   pixelPerfect: boolean;   // true=スリット位置・幅・移動量をキャンバス1px単位に丸める
   offsetAngle: number;     // 0–360 deg, スリットオフセット方向（スリット角度からの相対角度）
+  /**
+   * Linear の各帯を、帯方向に有限長のバーとして扱い、その端を角丸／面取りにする。
+   * start=帯方向の小さい側のみ角丸（反対側はキャンバス端まで）、end=大きい側のみ、both=両端が角丸の浮いたバー、
+   * random=帯ごとに start/end を無作為に選ぶ。Linear 以外では無効。旧Presetでは省略され none 扱い。
+   */
+  edgeSide?: SlitEdgeSide;
+  edgeShape?: SlitEdgeShape;      // round=円弧, bevel=45度の面取り
+  edgeSize?: number;              // 0–250 px, 角の半径／面取り幅（帯幅の半分で頭打ち）
+  edgeLength?: number;            // 0.05–1, バー長（キャンバスの帯方向の長さに対する比）
+  edgeLengthVariance?: number;    // 0–1, 帯ごとのバー長のばらつき
+  edgeSpeedVariance?: number;     // 0–1, 帯ごとにバーが流れる速度のばらつき（0=全帯が同じ速度）
 };
+
+export type SlitEdgeSide = 'none' | 'start' | 'end' | 'both' | 'random';
+export type SlitEdgeShape = 'round' | 'bevel';
 
 type LegacySlitPhaseMotionFields = {
   phaseAnimEnabled?: unknown;

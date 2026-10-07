@@ -168,4 +168,33 @@ describe('V2 effect shader parity', () => {
       .replaceAll('u_stackSlitPixelPerfect', 'u_pixelPerfect');
     expect(compact(stackSnapOffset)).toBe(compact(legacySnapOffset));
   });
+
+  it('keeps the Slit bars (Round/Bevel ends) equivalent to Legacy', () => {
+    const canonicalBar = (source: string) => compact(source
+      .replaceAll('stackSlit', 'slit')
+      .replaceAll('u_stackSlit', 'u_slit')
+      .replaceAll('6.28318530718', '2.0*PI')
+      .replaceAll('2.0 * PI', '2.0*PI'));
+    for (const name of ['slitUnwarpCoord', 'slitBarCapDist', 'slitBarCut', 'slitBarFactor', 'slitBarLayer', 'slitBarShift']) {
+      const stackName = 'stackSlit' + name.slice('slit'.length);
+      expect(canonicalBar(extractFunction(postprocessShader, stackName)), name)
+        .toBe(canonicalBar(extractFunction(normalizedGradientShader, name)));
+    }
+  });
+
+  it('keeps the Slit band search returning (index, left, right) in both shaders', () => {
+    const canonicalBand = (source: string) => compact(source
+      .replaceAll('computeStackSlitBand', 'computeSlitBand')
+      .replaceAll('u_stackSlitDelta', 'u_slitDelta')
+      .replaceAll('warpedCoord', 'coord')
+      .replaceAll('slitWidth', 'sw')
+      .replaceAll('cumulativeDelta', 'cumDelta')
+      .replace(/\bleft\b/g, 'lb')
+      .replace(/\bright\b/g, 'rb')
+      .replace(/\bbandIndex\b/g, 'idx')
+      .replace(/\bbandLeft\b/g, 'lb'));
+    const stack = canonicalBand(extractFunction(postprocessShader, 'computeStackSlitBand'));
+    const legacy = canonicalBand(extractFunction(normalizedGradientShader, 'computeSlitBand'));
+    expect(stack).toBe(legacy);
+  });
 });

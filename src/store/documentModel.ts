@@ -217,6 +217,12 @@ export const STORE_DEFAULTS = {
     slitDeltas: {} as Record<number, number>,
     pixelPerfect: false,
     offsetAngle: getParameterDefault('slit.offsetAngle'),
+    edgeSide: getEnumParameterDefault('slit.edgeSide'),
+    edgeShape: getEnumParameterDefault('slit.edgeShape'),
+    edgeSize: getParameterDefault('slit.edgeSize'),
+    edgeLength: getParameterDefault('slit.edgeLength'),
+    edgeLengthVariance: getParameterDefault('slit.edgeLengthVariance'),
+    edgeSpeedVariance: getParameterDefault('slit.edgeSpeedVariance'),
   },
   stretch: {
     enabled: false,

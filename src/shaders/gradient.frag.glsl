@@ -93,6 +93,8 @@
   uniform int u_slitAnimMode;  // 0=unidirectional(fract), 1=pingpong(sin)
   uniform bool u_slitNoiseAfter; // false=Slit -> Noise, true=Noise -> Slit
   uniform bool u_slitPixelPerfect; // true=スリット位置・サンプル移動をキャンバス1px単位に丸める
+  uniform vec3 u_slitEdge; // .x = コーナー半径(px), .y = 角丸にする端(0=none,1=start,2=end,3=both,4=random), .z = 形状(0=round,1=bevel)
+  uniform vec4 u_slitEdgeBar; // .x = バー長（帯方向のキャンバス長に対する比）, .y = 長さのばらつき, .z = 模様が繰り返すバーの本数, .w = 流れる速度のばらつき
 
   // Manual Distort
   uniform bool u_manualDistortEnabled;
@@ -339,6 +341,90 @@
     float sector = 6.28318530718 / sides;
     float localAngle = abs(mod(atan(p.y, p.x) + u_slitAngle + sector * 0.5, sector) - sector * 0.5);
     return length(p) * cos(localAngle) / max(cos(3.14159265359 / sides), 0.001);
+  }
+
+  // 実座標へ戻す: Variance で歪めたスリット座標 warped から、元のスリット座標を求める（ニュートン法）。
+  // バーの形を歪み補正前の実ピクセルで測るために使う。
+  float slitUnwarpCoord(float target, float sw) {
+    if (u_slitVariance <= 0.0) return target;
+    float x = target;
+    for (int i = 0; i < 6; i++) {
+      float phase = x / (sw * 4.0) * 6.2832 + u_slitParams.y * 37.4;
+      float fx = x + sin(phase) * u_slitVariance * sw - target;
+      float dfx = max(1.0 + cos(phase) * u_slitVariance * 1.5708, 0.2);
+      x -= fx / dfx;
+    }
+    return x;
+  }
+
+  // バー端のコーナー（Round=円弧 / Bevel=45度の面取り）までの符号付き距離（px、正=バーの外側）。
+  // a=帯の側縁までの距離、b=バー端までの距離、r=コーナー半径。
+  float slitBarCapDist(float a, float b, float r) {
+    if (a >= r || b >= r) return -b;
+    vec2 q = vec2(r - a, r - b);
+    return u_slitEdge.z > 0.5 ? (q.x + q.y - r) * 0.70710678 : length(q) - r;
+  }
+
+  // 帯 idx 上で k 番目のバーが始まる帯方向の位置。長さ len の格子を amp の割合でずらす。
+  // 模様は cells 本のバーごとに繰り返す（アニメーションで1周期ぶん流すとループが継ぎ目なくつながる）。
+  float slitBarCut(float k, float idx, float len, float amp, float phase, float cells) {
+    return (k + phase + (slitHash(idx * 1.37 + mod(k, cells) * 5.31 + u_slitParams.y * 53.1 + 4.2) - 0.5) * amp) * len;
+  }
+
+  // バーのずらし係数。Loop でも PingPong でも滑らかな周期関数にする。
+  // 鋸歯（fract）だとバーごとに色が急に跳び、複数のバーが並ぶとちらつくため。
+  float slitBarFactor(float h) {
+    return u_slitAnimEnabled ? sin((h + u_slitAnimTime) * 6.28318530718) : (h * 2.0 - 1.0);
+  }
+
+  // k 番目のバーの (カバレッジ, ずらし係数, 重なり順)。端は隣のバーの上へ半径 r だけはみ出す。
+  // カバレッジは 0/1 の二値。ずらし係数を境界で混ぜると、離れた位置の色を拾った線がちらつくため。
+  vec3 slitBarLayer(float k, float idx, float len, float amp, float phase, float cells, float a, float r, float t) {
+    float side = u_slitEdge.y;
+    float key = mod(k, cells);
+    float pick = slitHash(idx * 2.7 + key * 3.3 + u_slitParams.y * 11.1 + 1.7);
+    bool capLow = side > 3.5 ? pick < 0.5 : mod(side, 2.0) > 0.5;
+    bool capHigh = side > 3.5 ? pick >= 0.5 : side > 1.5;
+    float z = side < 1.5 ? k : (side < 2.5 ? -k : slitHash(idx * 4.1 + key * 1.9 + u_slitParams.y * 7.7 + 5.3));
+    float lo = slitBarCut(k, idx, len, amp, phase, cells);
+    float hi = slitBarCut(k + 1.0, idx, len, amp, phase, cells);
+    float dLow = capLow ? slitBarCapDist(a, t - (lo - r), r) : lo - t;
+    float dHigh = capHigh ? slitBarCapDist(a, (hi + r) - t, r) : t - hi;
+    float h = slitHash(idx + u_slitParams.y * 91.7 + key * 7.13);
+    return vec3(step(max(dLow, dHigh), 0.0), slitBarFactor(h), z);
+  }
+
+  // Linear の帯を帯方向に複数の角丸／面取りバーへ分け、その位置の画素に重なるバーのずらし係数を返す。
+  // slitCoord=歪み補正前のスリット座標、band=(index, 左端, 右端)、t=キャンバス中心からの帯方向の位置、span=キャンバスの帯方向の長さ。
+  float slitBarShift(float slitCoord, vec3 band, float t, float span, float sw) {
+    float len = max(u_slitEdgeBar.x * span, 4.0);
+    float amp = u_slitEdgeBar.y * 0.8;
+    float cells = max(u_slitEdgeBar.z, 1.0);
+    // 帯ごとの速度の倍率。Loop は模様の周期の整数倍でないとループが閉じないので整数に丸める。
+    float speed = 1.0 + slitHash(band.x * 5.77 + u_slitParams.y * 3.3 + 2.9) * 3.0 * u_slitEdgeBar.w;
+    float travel = u_slitAnimEnabled ? (u_slitAnimMode == 1 ? sin(u_slitAnimTime * 6.28318530718) * len * speed : u_slitAnimTime * cells * len * floor(speed)) : 0.0;
+    float tt = t - travel;
+    float idx = band.x;
+    float phase = slitHash(idx * 2.11 + u_slitParams.y * 17.3 + 9.5);
+    float xl = slitUnwarpCoord(band.y, sw);
+    float xr = slitUnwarpCoord(band.z, sw);
+    float a = max(min(slitCoord - xl, xr - slitCoord), 0.0);
+    float r = min(u_slitEdge.x, min((xr - xl) * 0.5, 0.5 * len * (1.0 - amp)));
+    float k0 = floor(tt / len - phase + 0.5);
+    if (tt < slitBarCut(k0, idx, len, amp, phase, cells)) k0 -= 1.0;
+    else if (tt >= slitBarCut(k0 + 1.0, idx, len, amp, phase, cells)) k0 += 1.0;
+    vec3 la = slitBarLayer(k0 - 1.0, idx, len, amp, phase, cells, a, r, tt);
+    vec3 lb = slitBarLayer(k0, idx, len, amp, phase, cells, a, r, tt);
+    vec3 lc = slitBarLayer(k0 + 1.0, idx, len, amp, phase, cells, a, r, tt);
+    float shift = lb.y;
+    vec3 tmp;
+    if (la.z > lb.z) { tmp = la; la = lb; lb = tmp; }
+    if (lb.z > lc.z) { tmp = lb; lb = lc; lc = tmp; }
+    if (la.z > lb.z) { tmp = la; la = lb; lb = tmp; }
+    shift = mix(shift, la.y, la.x);
+    shift = mix(shift, lb.y, lb.x);
+    shift = mix(shift, lc.y, lc.x);
+    return shift;
   }
 
   float slitWaveShape(float t) {
@@ -634,7 +720,8 @@
   // u_slitDelta** の各 vec4 は (.xy, .zw) の2エントリを保持。slitIdx=-1 は空エントリ。
   // uniform 配列ではなくローカル配列へ写してから引く。32エントリの静的展開は
   // ANGLE/Direct3D での Generator コンパイル時間の大きな割合を占めていた。
-  float computeSlitIdx(float warpedCoord, float sw) {
+  // 戻り値は (スリット index, 左端, 右端)。左端・右端はスリット座標上の帯の境界。
+  vec3 computeSlitBand(float warpedCoord, float sw) {
     vec4 deltas[16];
     deltas[0] = u_slitDelta01;
     deltas[1] = u_slitDelta23;
@@ -659,11 +746,13 @@
       if (entry.x <= -9000.0) continue;
       float lb = entry.x * sw + cumDelta;
       float rb = lb + sw + entry.y;
-      if (warpedCoord < lb) return floor((warpedCoord - cumDelta) / sw);
-      if (warpedCoord < rb) return entry.x;
+      if (warpedCoord < lb) break;
+      if (warpedCoord < rb) return vec3(entry.x, lb, rb);
       cumDelta += entry.y;
     }
-    return floor((warpedCoord - cumDelta) / sw);
+    float idx = floor((warpedCoord - cumDelta) / sw);
+    float left = idx * sw + cumDelta;
+    return vec3(idx, left, left + sw);
   }
 
   void main() {
@@ -710,7 +799,7 @@
         vec2 fragC = globalCoord - u_resolution * 0.5;
         float r_px = u_slitMode == 2 ? regularPolygonCoord(fragC) : length(fragC);
         float circCoord = r_px + u_slitParams.x;
-        float slitIdx = computeSlitIdx(circCoord, sw);
+        float slitIdx = computeSlitBand(circCoord, sw).x;
         float h = slitHash(slitIdx + u_slitParams.y * 91.7);
         float sf = u_slitAnimEnabled ? (u_slitAnimMode == 1 ? sin((h + u_slitAnimTime) * 6.28318530718) : fract(h + u_slitAnimTime) * 2.0 - 1.0) : (h * 2.0 - 1.0);
         float delta = sf * u_slitOffset * 3.14159265 + slitIdx * u_slitAngle;
@@ -724,9 +813,13 @@
         float centerProj = dot(u_resolution * 0.5, vec2(cosA, sinA));
         float slitCoord = dot(globalCoord, vec2(cosA, sinA)) - centerProj + u_slitParams.x;
         float warpedCoord = slitCoord + sin(slitCoord / (sw * 4.0) * 6.2832 + u_slitParams.y * 37.4) * u_slitVariance * sw;
-        float slitIdx = computeSlitIdx(warpedCoord, sw);
+        vec3 slitBand = computeSlitBand(warpedCoord, sw);
+        float slitIdx = slitBand.x;
         float h = slitHash(slitIdx + u_slitParams.y * 91.7);
         float sf = u_slitAnimEnabled ? (u_slitAnimMode == 1 ? sin((h + u_slitAnimTime) * 6.28318530718) : fract(h + u_slitAnimTime) * 2.0 - 1.0) : (h * 2.0 - 1.0);
+        if (u_slitEdge.x > 0.0 && u_slitEdge.y > 0.5) {
+          sf = slitBarShift(slitCoord, slitBand, dot(globalCoord - u_resolution * 0.5, vec2(-sinA, cosA)), abs(sinA) * u_resolution.x + abs(cosA) * u_resolution.y, sw);
+        }
         float offA = u_slitAngle + u_slitOffsetAngle + 1.5707963;
         sourceStretchDir = vec2(cos(offA), sin(offA));
         sourceStretchAmount = abs(sf * u_slitOffset);
@@ -778,7 +871,7 @@
         vec2 fragC = globalCoord - u_resolution * 0.5;
         float r_px = u_slitMode == 2 ? regularPolygonCoord(fragC) : length(fragC);
         float circCoord = r_px + u_slitParams.x;
-        float slitIdx = computeSlitIdx(circCoord, sw);
+        float slitIdx = computeSlitBand(circCoord, sw).x;
         float h = slitHash(slitIdx + u_slitParams.y * 91.7);
         float sf = u_slitAnimEnabled ? (u_slitAnimMode == 1 ? sin((h + u_slitAnimTime) * 6.28318530718) : fract(h + u_slitAnimTime) * 2.0 - 1.0) : (h * 2.0 - 1.0);
         float delta = sf * u_slitOffset * 3.14159265 + slitIdx * u_slitAngle;
@@ -792,9 +885,13 @@
         float centerProj = dot(u_resolution * 0.5, vec2(cosA, sinA));
         float slitCoord = dot(globalCoord, vec2(cosA, sinA)) - centerProj + u_slitParams.x;
         float warpedCoord = slitCoord + sin(slitCoord / (sw * 4.0) * 6.2832 + u_slitParams.y * 37.4) * u_slitVariance * sw;
-        float slitIdx = computeSlitIdx(warpedCoord, sw);
+        vec3 slitBand = computeSlitBand(warpedCoord, sw);
+        float slitIdx = slitBand.x;
         float h = slitHash(slitIdx + u_slitParams.y * 91.7);
         float sf = u_slitAnimEnabled ? (u_slitAnimMode == 1 ? sin((h + u_slitAnimTime) * 6.28318530718) : fract(h + u_slitAnimTime) * 2.0 - 1.0) : (h * 2.0 - 1.0);
+        if (u_slitEdge.x > 0.0 && u_slitEdge.y > 0.5) {
+          sf = slitBarShift(slitCoord, slitBand, dot(globalCoord - u_resolution * 0.5, vec2(-sinA, cosA)), abs(sinA) * u_resolution.x + abs(cosA) * u_resolution.y, sw);
+        }
         float offA = u_slitAngle + u_slitOffsetAngle + 1.5707963;
         sourceStretchDir = vec2(cos(offA), sin(offA));
         sourceStretchAmount = abs(sf * u_slitOffset);
