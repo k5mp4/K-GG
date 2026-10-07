@@ -12,6 +12,7 @@ use tauri_plugin_opener::OpenerExt;
 
 mod after_effects;
 mod design_app_bridge;
+mod font_names;
 mod osc_input;
 mod tool_windows;
 mod spout_output;
@@ -956,7 +957,8 @@ fn get_native_ffmpeg_status(app: tauri::AppHandle) -> NativeFfmpegStatus {
     native_ffmpeg_status(&app)
 }
 
-#[tauri::command]
+// 数百のフォントファイルを読むため、UIスレッドを止めないよう非同期スレッドで実行する。
+#[tauri::command(async)]
 fn list_system_fonts() -> Vec<String> {
     let mut fonts: Vec<String> = Vec::new();
     let mut seen = std::collections::HashSet::new();
@@ -1046,9 +1048,18 @@ fn parse_registry_font_output(output: &str) -> Vec<String> {
             // "(TrueType)" / "(OpenType)" suffix stripped.
             let type_start = line.find("REG_SZ")?;
             let raw = line[..type_start].trim();
-            let family = raw.split(" (").next().unwrap_or(raw).trim().to_string();
-            (!family.is_empty()).then_some(family)
+            let family = raw.split(" (").next().unwrap_or(raw).trim();
+            // A TrueType collection is registered as "A & B & C (TrueType)".
+            Some(
+                family
+                    .split(" & ")
+                    .map(str::trim)
+                    .filter(|name| !name.is_empty())
+                    .map(str::to_string)
+                    .collect::<Vec<_>>(),
+            )
         })
+        .flatten()
         .collect()
 }
 
@@ -1102,14 +1113,19 @@ fn scan_font_directory(
         if !matches!(extension.as_str(), "ttf" | "otf" | "ttc") {
             continue;
         }
-        let Some(file_name) = path.file_stem().and_then(OsStr::to_str) else {
-            continue;
-        };
-        let name = font_name_from_file_name(file_name);
-        if name.is_empty() || !seen.insert(name.clone()) {
-            continue;
+        // Prefer the names stored in the font itself. They are what a WebView
+        // can resolve, unlike names guessed from the file name.
+        let mut names = font_names::read_font_names(&path);
+        if names.is_empty() {
+            if let Some(file_name) = path.file_stem().and_then(OsStr::to_str) {
+                names.push(font_name_from_file_name(file_name));
+            }
         }
-        fonts.push(name);
+        for name in names {
+            if !name.is_empty() && seen.insert(name.clone()) {
+                fonts.push(name);
+            }
+        }
     }
 }
 

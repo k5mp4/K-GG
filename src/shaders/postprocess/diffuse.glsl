@@ -33,6 +33,13 @@ vec2 diffuseCellFraction(vec2 coord, float cellSize) {
   return clamp((coord - baseCellCenter) / max(baseSize, 0.01) + 0.5, 0.0, 1.0);
 }
 
+// Center of the base grid cell that contains coord. ASCII samples its source
+// color here so every pixel of a cell picks the same glyph.
+vec2 diffuseBaseCellCenter(vec2 coord) {
+  float baseSize = max(u_diffuseGrain, 0.01);
+  return (floor(coord / baseSize) + 0.5) * baseSize;
+}
+
 float diffuseCellSizeAtCoord(vec2 coord, vec3 fallbackColor) {
   float baseSize = max(u_diffuseGrain, 0.01);
   if (!u_diffuseGrainAdaptiveEnabled) return baseSize;
@@ -77,23 +84,26 @@ vec3 applyDiffuseAscii(vec3 cellColor, vec2 coord, float cellSize) {
   float glyphIndex = floor(clamp(luminance, 0.0, 1.0) * max(u_diffuseAsciiCount - 1.0, 0.0) + 0.5);
   float column = mod(glyphIndex, max(u_diffuseAsciiColumns, 1.0));
   float row = floor(glyphIndex / max(u_diffuseAsciiColumns, 1.0));
-  // The cell fraction is already clamped to [0, 1]. Keeping it unscaled means
-  // the glyph fills its own cell even when the adaptive grain or font size
-  // changes, so it never bleeds into the neighboring atlas glyph. A nonzero
-  // rotation spins the glyph around the cell center before sampling. UV space
-  // has a downward Y axis, so the sign of sin is flipped to keep the visual
-  // rotation counter-clockwise (readable text at 0°).
+  // The cell fraction is already clamped to [0, 1], and cellColor is sampled at
+  // the base cell center by the caller, so one cell always shows one whole
+  // glyph. A nonzero rotation spins the glyph around the cell center before
+  // sampling; the fraction is shrunk by |cos|+|sin| so the rotated glyph square
+  // still fits inside the cell instead of being cut at the cell edge.
   vec2 local = diffuseCellFraction(coord, cellSize) - 0.5;
   if (abs(u_diffuseAsciiRotation) > 0.0001) {
     float cosR = cos(u_diffuseAsciiRotation);
     float sinR = sin(u_diffuseAsciiRotation);
+    local *= abs(cosR) + abs(sinR);
     local = vec2(local.x * cosR + local.y * sinR, -local.x * sinR + local.y * cosR);
   }
   local += 0.5;
-  vec2 atlasUv = vec2((column + local.x) / max(u_diffuseAsciiColumns, 1.0), (row + local.y) / max(u_diffuseAsciiRows, 1.0));
+  float insideGlyphCell = step(0.0, local.x) * step(local.x, 1.0) * step(0.0, local.y) * step(local.y, 1.0);
+  // gl_FragCoord has an upward Y axis, whereas the atlas keeps the canvas row
+  // order (row 0 at the top), so the vertical coordinate is mirrored here.
+  vec2 atlasUv = vec2((column + local.x) / max(u_diffuseAsciiColumns, 1.0), (row + 1.0 - local.y) / max(u_diffuseAsciiRows, 1.0));
   // Canvas text is white in RGB; sampling red keeps the mask visible even on
   // browsers that premultiply the transparent atlas alpha during upload.
-  float glyph = texture2D(u_diffuseAsciiAtlas, atlasUv).r;
+  float glyph = texture2D(u_diffuseAsciiAtlas, atlasUv).r * insideGlyphCell;
   vec3 patternColor = mix(diffusePatternBackground(cellColor), cellColor, glyph);
   float amount = u_diffuseAdaptiveEnabled
     ? diffuseCurveValue(diffuseAdaptiveInput(cellColor), false)

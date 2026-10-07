@@ -11,12 +11,14 @@ void main() {
   vec2 globalUv = globalCoord / safeFullResolution;
 #if !defined(KGG_GLASS_ONLY) && !defined(KGG_PRISM_ONLY)
   if (u_effectEnabled && u_effectMode == 6) {
-    // Only ordered Dither needs a cell-center source sample. Halftone and
-    // ASCII must retain the fragment color so their shape/glyph mask remains
-    // visible instead of degenerating into solid blocks.
+    // Ordered Dither and ASCII take a cell-center source sample. ASCII needs it
+    // so every pixel of a cell picks the same glyph instead of mixing glyph
+    // fragments along the source edges; the glyph mask itself comes from the
+    // fragment position, so it stays visible. Halftone retains the fragment
+    // color.
     vec2 diffuseSampleCoord = u_diffuseMode == 2
       ? ditherCellCenter(globalCoord)
-      : globalCoord;
+      : (u_diffuseEnabled && u_diffuseMode == 4 ? diffuseBaseCellCenter(globalCoord) : globalCoord);
     vec2 diffuseUv = diffuseGlobalUv(diffuseSampleCoord / u_fullResolution, globalCoord);
     gl_FragColor = applyDiffuseDither(
       texture2D(u_sourceTex, diffuseTexelCenterUv(sourceUvFromGlobal(diffuseUv))),
@@ -32,7 +34,11 @@ void main() {
   }
 #endif
   if (u_effectEnabled && u_effectMode == 8) {
-    vec2 slitUv = stackSlitUv(globalUv, globalCoord);
+    // ASCII after Slit evaluates the whole slit at the cell center so a cell
+    // shows one glyph even where a slit band edge crosses it.
+    bool asciiAfterSlit = u_stackSlitDiffuseAfter && u_diffuseEnabled && u_diffuseMode == 4;
+    vec2 slitCoord = asciiAfterSlit ? diffuseBaseCellCenter(globalCoord) : globalCoord;
+    vec2 slitUv = stackSlitUv(slitCoord / safeFullResolution, slitCoord);
     vec2 sampleUv = u_stackSlitDiffuseAfter
       ? diffuseGlobalUv(slitUv, globalCoord)
       : slitUv;

@@ -2172,9 +2172,67 @@ function normalizeAsciiCharset(value: string | undefined): string[] {
 
 const ASCII_GENERIC_FONTS = new Set(['monospace', 'serif', 'sans-serif', 'cursive', 'fantasy']);
 
-function cssFontShorthand(size: number, font: string): string {
-  const family = ASCII_GENERIC_FONTS.has(font) ? font : `"${font}"`;
+function cssQuote(name: string): string {
+  return `"${name.replace(/["\\]/g, '\\$&')}"`;
+}
+
+function cssFontShorthand(size: number, family: string): string {
   return `bold ${size}px ${family}`;
+}
+
+// The font list is built from installed font files and the Windows font
+// registry, so an entry can be a full face name such as "AP OTF A1MinchoStdN
+// Medium" that is not a CSS family. Canvas silently draws such a name with the
+// default font. Resolve each name once: use it as a family when the browser
+// knows it, otherwise register a `local()` FontFace, which matches full and
+// PostScript names, under a private alias.
+const asciiFontFamilies = new Map<string, string>();
+const asciiFontPending = new Set<string>();
+let asciiFontAliasSeed = 0;
+
+function isCssFontFamilyAvailable(name: string): boolean {
+  const context = document.createElement('canvas').getContext('2d');
+  if (!context) return true;
+  // An unknown family is drawn with the fallback that follows it, so the two
+  // fallbacks produce different widths only when the family is missing.
+  const probe = 'mmmmmmmmmmlliWM0あ漢';
+  const measure = (fallback: string): number => {
+    context.font = `40px ${cssQuote(name)}, ${fallback}`;
+    return context.measureText(probe).width;
+  };
+  return measure('monospace') === measure('serif');
+}
+
+function resolveAsciiFontFamily(ctx: WebGLContext, font: string): string {
+  if (ASCII_GENERIC_FONTS.has(font)) return font;
+  const cached = asciiFontFamilies.get(font);
+  if (cached) return cached;
+  const quoted = cssQuote(font);
+  if (typeof document === 'undefined' || asciiFontPending.has(font)) return quoted;
+  if (isCssFontFamilyAvailable(font)) {
+    asciiFontFamilies.set(font, quoted);
+    return quoted;
+  }
+  if (typeof FontFace === 'undefined' || !document.fonts) {
+    asciiFontFamilies.set(font, quoted);
+    return quoted;
+  }
+  if (!asciiFontPending.has(font)) {
+    asciiFontPending.add(font);
+    const alias = `kgg-ascii-font-${asciiFontAliasSeed += 1}`;
+    void new FontFace(alias, `local(${cssQuote(font)})`).load().then((face) => {
+      document.fonts.add(face);
+      asciiFontFamilies.set(font, cssQuote(alias));
+    }).catch(() => {
+      // Not installed under any name; keep the plain family and its fallback.
+      asciiFontFamilies.set(font, quoted);
+    }).finally(() => {
+      asciiFontPending.delete(font);
+      // Redraw the atlas with the resolved face on the next frame.
+      ctx.diffuseAsciiSignature = '';
+    });
+  }
+  return quoted;
 }
 
 function uploadDiffuseAsciiTexture(
@@ -2192,7 +2250,8 @@ function uploadDiffuseAsciiTexture(
   const glyphSize = Math.max(Math.ceil(resolvedSize * 1.15), ASCII_GLYPH_WIDTH);
   const atlasWidth = ASCII_ATLAS_COLUMNS * glyphSize;
   const atlasHeight = ASCII_ATLAS_MAX_ROWS * glyphSize;
-  const signature = `${chars.join('')}::${resolvedFont}::${resolvedSize}`;
+  const fontFamily = resolveAsciiFontFamily(ctx, resolvedFont);
+  const signature = `${chars.join('')}::${fontFamily}::${resolvedSize}`;
   if (ctx.diffuseAsciiSignature === signature) return;
   const { gl } = ctx;
   const canvas = typeof document !== 'undefined' ? document.createElement('canvas') : null;
@@ -2201,7 +2260,7 @@ function uploadDiffuseAsciiTexture(
   canvas.height = atlasHeight;
   const context = canvas.getContext('2d');
   if (!context) return;
-  const fontShorthand = cssFontShorthand(resolvedSize, resolvedFont);
+  const fontShorthand = cssFontShorthand(resolvedSize, fontFamily);
   const draw = (): void => {
     context.clearRect(0, 0, canvas.width, canvas.height);
     context.fillStyle = '#ffffff';
@@ -2211,7 +2270,27 @@ function uploadDiffuseAsciiTexture(
     chars.forEach((char, index) => {
       const column = index % ASCII_ATLAS_COLUMNS;
       const row = Math.floor(index / ASCII_ATLAS_COLUMNS);
-      context.fillText(char, column * glyphSize + glyphSize / 2, row * glyphSize + glyphSize / 2 + 1);
+      const centerX = column * glyphSize + glyphSize / 2;
+      const centerY = row * glyphSize + glyphSize / 2 + 1;
+      // Shrink a glyph whose ink is larger than its atlas cell (wide or tall
+      // glyphs, fallback fonts) and clip it to the cell, so no glyph is cut at
+      // the cell edge or bleeds into the neighboring glyph when sampled.
+      const metrics = context.measureText(char);
+      const halfWidth = Math.max(metrics.actualBoundingBoxLeft, metrics.actualBoundingBoxRight);
+      const halfHeight = Math.max(metrics.actualBoundingBoxAscent, metrics.actualBoundingBoxDescent);
+      const fitScale = Math.min(
+        1,
+        halfWidth > 0 ? (glyphSize / 2 - 1) / halfWidth : 1,
+        halfHeight > 0 ? (glyphSize / 2 - 1) / halfHeight : 1,
+      );
+      context.save();
+      context.beginPath();
+      context.rect(column * glyphSize, row * glyphSize, glyphSize, glyphSize);
+      context.clip();
+      context.translate(centerX, centerY);
+      context.scale(fitScale, fitScale);
+      context.fillText(char, 0, 0);
+      context.restore();
     });
     gl.activeTexture(gl.TEXTURE9);
     gl.bindTexture(gl.TEXTURE_2D, ctx.diffuseAsciiTexture);
@@ -2221,19 +2300,10 @@ function uploadDiffuseAsciiTexture(
     ctx.diffuseAsciiCount = chars.length;
     ctx.diffuseAsciiRows = ASCII_ATLAS_MAX_ROWS;
   };
-  // Draw synchronously with the currently available font first, so a font
-  // change is visible immediately. `document.fonts.load` resolves for system
-  // fonts too; when it settles, invalidate the signature so the next frame
-  // re-draws with the fully loaded family instead of a fallback.
+  // Draw synchronously with the currently available font, so a font change is
+  // visible immediately. A name that needs a `local()` FontFace resolves
+  // asynchronously and invalidates the signature when it is ready.
   draw();
-  const fonts = typeof document !== 'undefined' ? document.fonts : null;
-  if (fonts && !fonts.check(fontShorthand)) {
-    void fonts.load(fontShorthand).then(() => {
-      ctx.diffuseAsciiSignature = '';
-    }).catch(() => {
-      // Font unavailable on this system; keep the fallback-drawn atlas.
-    });
-  }
 }
 
 function publishDiffuseInputHistogram(ctx: WebGLContext, gradient: GradientConfig, sourceCanvas: HTMLCanvasElement | null | undefined): void {
