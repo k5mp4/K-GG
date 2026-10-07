@@ -246,7 +246,7 @@ float stackSlitBarCut(float k, float idx, float len, float amp, float phase, flo
 }
 
 float stackSlitBarFactor(float h) {
-  return u_stackSlitAnimEnabled ? (u_stackSlitAnimMode == 1 ? sin((h + u_stackSlitAnimTime) * 2.0 * PI) : fract(h + u_stackSlitAnimTime) * 2.0 - 1.0) : (h * 2.0 - 1.0);
+  return u_stackSlitAnimEnabled ? sin((h + u_stackSlitAnimTime) * 2.0 * PI) : (h * 2.0 - 1.0);
 }
 
 vec3 stackSlitBarLayer(float k, float idx, float len, float amp, float phase, float cells, float a, float r, float t) {

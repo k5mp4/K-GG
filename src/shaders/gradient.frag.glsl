@@ -371,8 +371,10 @@
     return (k + phase + (slitHash(idx * 1.37 + mod(k, cells) * 5.31 + u_slitParams.y * 53.1 + 4.2) - 0.5) * amp) * len;
   }
 
+  // バーのずらし係数。Loop でも PingPong でも滑らかな周期関数にする。
+  // 鋸歯（fract）だとバーごとに色が急に跳び、複数のバーが並ぶとちらつくため。
   float slitBarFactor(float h) {
-    return u_slitAnimEnabled ? (u_slitAnimMode == 1 ? sin((h + u_slitAnimTime) * 6.28318530718) : fract(h + u_slitAnimTime) * 2.0 - 1.0) : (h * 2.0 - 1.0);
+    return u_slitAnimEnabled ? sin((h + u_slitAnimTime) * 6.28318530718) : (h * 2.0 - 1.0);
   }
 
   // k 番目のバーの (カバレッジ, ずらし係数, 重なり順)。端は隣のバーの上へ半径 r だけはみ出す。

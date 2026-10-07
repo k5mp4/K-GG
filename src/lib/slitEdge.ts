@@ -63,6 +63,15 @@ export function getSlitEdgeUniform(slitScan: SlitEdgeInput): [number, number, nu
   return [size, SIDE_UNIFORM[side], shape === 'bevel' ? 1 : 0, length, lengthVariance, cells];
 }
 
+/**
+ * Shift factor of one bar. Always a smooth periodic function while animating: a
+ * sawtooth makes every bar jump to a new colour at its own moment, which flickers
+ * once several bars sit side by side. Mirrors `slitBarFactor` in the shaders.
+ */
+export function slitBarFactor(random: number, animTime: number, animating: boolean): number {
+  return animating ? Math.sin((random + animTime) * Math.PI * 2) : random * 2 - 1;
+}
+
 function fract(value: number): number {
   return value - Math.floor(value);
 }

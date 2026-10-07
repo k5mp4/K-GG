@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { STORE_DEFAULTS } from '../store/gradientStore';
 import type { SlitScanConfig } from '../types/distortion';
-import { getSlitEdgeUniform, resolveSlitEdge, slitBarShift, type SlitEdgeSettings } from './slitEdge';
+import { getSlitEdgeUniform, resolveSlitEdge, slitBarFactor, slitBarShift, type SlitEdgeSettings } from './slitEdge';
 
 const slit = (overrides: Partial<SlitScanConfig> = {}): SlitScanConfig => ({
   ...STORE_DEFAULTS.slitScan,
@@ -93,6 +93,34 @@ describe('Slit bar edge settings', () => {
 
   it('rounds the radius in Pixel Perfect mode', () => {
     expect(resolveSlitEdge(slit({ edgeSide: 'end', edgeSize: 12.6, pixelPerfect: true })).size).toBe(13);
+  });
+});
+
+describe('Slit bar colour changes', () => {
+  it('uses the stored random value when not animating', () => {
+    expect(slitBarFactor(0, 5, false)).toBe(-1);
+    expect(slitBarFactor(0.75, 0, false)).toBe(0.5);
+  });
+
+  it('changes smoothly with no sudden jumps while animating', () => {
+    // A sawtooth jumps by 2 once per cycle for each bar; the bar factor must move in small steps.
+    for (const random of [0, 0.13, 0.5, 0.87, 0.999]) {
+      let previous = slitBarFactor(random, 0, true);
+      let largest = 0;
+      for (let time = 0.001; time <= 3; time += 0.001) {
+        const current = slitBarFactor(random, time, true);
+        largest = Math.max(largest, Math.abs(current - previous));
+        previous = current;
+      }
+      expect(largest).toBeLessThan(0.01);
+    }
+  });
+
+  it('closes after a whole cycle so the loop has no seam', () => {
+    for (const random of [0, 0.31, 0.77]) {
+      expect(slitBarFactor(random, 2, true)).toBeCloseTo(slitBarFactor(random, 0, true), 9);
+      expect(slitBarFactor(random, -1, true)).toBeCloseTo(slitBarFactor(random, 0, true), 9);
+    }
   });
 });
 

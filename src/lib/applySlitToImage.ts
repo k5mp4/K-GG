@@ -1,5 +1,5 @@
 import type { SlitScanConfig } from '../types/distortion';
-import { resolveSlitEdge, slitBarShift } from './slitEdge';
+import { resolveSlitEdge, slitBarFactor, slitBarShift } from './slitEdge';
 
 /** Same search as the shader's computeSlitBand: returns the slit index and its [left, right] bounds. */
 function computeSlitBand(warpedCoord: number, sw: number, sortedDeltas: Array<[number, number]>): { idx: number; left: number; right: number } {
@@ -147,6 +147,9 @@ export async function applySlitToCanvas(srcCanvas: HTMLCanvasElement, slitScan: 
   const edge = resolveSlitEdge(slitScan);
   const animEnabled = slitScan.animEnabled && slitScan.animMode !== 'off' && slitScan.offsetSpeed !== 0;
   const animTime = 0;
+  const bandFactor = (h: number) => animEnabled
+    ? (slitScan.animMode === 'pingpong' ? Math.sin((h + animTime) * Math.PI * 2) : fract(h + animTime) * 2 - 1)
+    : h * 2 - 1;
   const snapUVToCanvasPixel = (uvX: number, uvY: number) => {
     if (!pixelPerfect) return [uvX, uvY] as const;
     return [(Math.floor(uvX * width) + 0.5) / width, (Math.floor(uvY * height) + 0.5) / height] as const;
@@ -202,9 +205,6 @@ export async function applySlitToCanvas(srcCanvas: HTMLCanvasElement, slitScan: 
         const warpedCoord = slitCoord + Math.sin((slitCoord / (sw * 4)) * Math.PI * 2 + seed * 37.4) * slitScan.variance * sw;
         const band = computeSlitBand(warpedCoord, sw, sortedDeltas);
         const slitIdx = band.idx;
-        const shiftFactor = (h: number) => animEnabled
-          ? (slitScan.animMode === 'pingpong' ? Math.sin((h + animTime) * Math.PI * 2) : fract(h + animTime) * 2 - 1)
-          : h * 2 - 1;
         const sf = edge.size > 0
           ? slitBarShift({
             slitCoord,
@@ -216,9 +216,9 @@ export async function applySlitToCanvas(srcCanvas: HTMLCanvasElement, slitScan: 
             slitWidth: sw,
             slitVariance: slitScan.variance,
             edge,
-            shiftFactor,
+            shiftFactor: (random) => slitBarFactor(random, animTime, animEnabled),
           })
-          : shiftFactor(slitHash(slitIdx + seed * 91.7));
+          : bandFactor(slitHash(slitIdx + seed * 91.7));
         const [offsetUvX, offsetUvY] = snapOffsetToCanvasPixel(sf * slitScan.offset * offsetX, sf * slitScan.offset * offsetY);
         uvX += offsetUvX;
         uvY += offsetUvY;

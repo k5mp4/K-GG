@@ -265,7 +265,7 @@ Block／SmoothのDiffuseは適用方式`diffuse.applyMode`を持ち、値は`noi
 
 `slitScan`は`edgeSide`（`none`既定／`start`／`end`／`both`／`random`）、`edgeShape`（`round`既定／`bevel`）、`edgeSize`（0〜250px、既定40）、`edgeLength`（0.05〜1、既定0.25）、`edgeLengthVariance`（0〜1、既定0.5）を持ちます。`edgeSide`が`none`以外で`edgeSize`が0より大きいとき、Linearの各帯を帯方向に複数のバーへ分けます。各バーは帯のずらしを独立に持ち、バーの間に元の画像は現れません。Circular・Polygon・Waveには適用せず、値を保持したまま描画では`none`として扱います。
 
-バーの長さは、キャンバスの帯方向の長さに`edgeLength`を掛けた値を基準に、`edgeLengthVariance`の割合で境界をずらして決めます。境界の位置は帯のindexと`seed`から決まり、帯ごとに位相が異なります。バーのずらし係数は、帯のindex・バー番号・`seed`から決まる乱数で、Slitの`animMode`と`offsetSpeed`によるアニメーションを従来の帯と同じ式で受けます。バーの模様は、バーの長さから決めた本数（`ceil(1 / edgeLength)`本、キャンバス1枚分ほど）ごとに繰り返します。
+バーの長さは、キャンバスの帯方向の長さに`edgeLength`を掛けた値を基準に、`edgeLengthVariance`の割合で境界をずらして決めます。境界の位置は帯のindexと`seed`から決まり、帯ごとに位相が異なります。バーのずらし係数は、帯のindex・バー番号・`seed`から決まる乱数で、アニメーション中は`sin(2π·(乱数 + 位相))`で滑らかに変化します。従来の帯のLoopは鋸歯状に切り替わりますが、バーでは複数のバーが並んで色が急に跳びちらつくため、LoopでもPingPongでも同じ滑らかな式を使います。バーの模様は、バーの長さから決めた本数（`ceil(1 / edgeLength)`本、キャンバス1枚分ほど）ごとに繰り返します。
 
 Slitのアニメーションが有効なとき、バーは帯に沿って流れます。Loopでは、Slitの位相（`animMode`と`offsetSpeed`から決まる、duration周期で閉じた位相）1サイクルにつき、模様の1周期ぶん（バーの本数×バーの長さ）だけ`offsetSpeed`の符号の向きへ進みます。PingPongでは、位相に`sin(2π·位相)`をかけてバー1本ぶんの幅で往復します。位相はduration周期で整数サイクル進むため、ループの継ぎ目で模様が元に戻り、シームレスに繰り返します。アニメーションが無効、またはOffset Speedが0のときはバーは動きません。
 
