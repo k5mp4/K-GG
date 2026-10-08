@@ -393,8 +393,12 @@ export function evaluateSceneAtTime(state: LatestState, normalizedTime: number):
     animation.previewLoop ?? true,
   );
 
+  // Wrap the seed on a whole number of frames per loop so the last frame is followed by
+  // seed 0 with the same cadence as every other step (time=1 also maps back to seed 0),
+  // instead of overshooting to an extra seed or ending on a fractional-length step.
+  const seedLoopFrames = Math.max(1, Math.round(animation.duration * animation.fps));
   const seedFrame = animation.enabled && diffuseMode === 'auto'
-    ? Math.floor(autoTime * animation.duration * animation.fps)
+    ? Math.floor(autoTime * seedLoopFrames + 1e-9) % seedLoopFrames
     : 0;
   const diffuse = withAnimatedDiffuseSeed(
     { ...state.diffuse, seedAnimEnabled: diffuseMode === 'auto' },
