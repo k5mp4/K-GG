@@ -34,6 +34,7 @@ const LABELS: Record<EffectStackKind, string> = {
   datamosh: 'Datamosh',
   cone: '3D',
   texture: 'Texture',
+  distortChroma: 'Distort Chroma',
 };
 
 type DragState = Omit<EffectStackDragState, 'kind' | 'phase'> & {

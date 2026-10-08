@@ -30,6 +30,7 @@ import datamoshPixelStretchGLSL from '../shaders/datamosh/pixel-stretch.glsl?raw
 import datamoshMainGLSL from '../shaders/datamosh/main.glsl?raw';
 import threeDGLSL from '../shaders/three-d.frag.glsl?raw';
 import textureGLSL from '../shaders/texture.frag.glsl?raw';
+import distortChromaGLSL from '../shaders/distortChroma.frag.glsl?raw';
 import shapesGLSL from '../shaders/shapes.frag.glsl?raw';
 import { CONE_GRADIENT_REAPPLY_SHADER } from './coneSeam';
 import { CONE_SHAPE_INDEX, type ConeShape } from '../types/coneView';
@@ -77,6 +78,7 @@ export type LazyProgramKey =
   | 'datamosh'
   | ThreeDProgramKey
   | 'texture'
+  | 'distortChroma'
   | 'shapes';
 
 const THREE_D_SHAPES = ['cone', 'torus', 'lattice', 'terrain', 'ribbon', 'rings', 'field', 'discs', 'crystal', 'abstract'] as const satisfies readonly ConeShape[];
@@ -212,6 +214,7 @@ export const SHADER_VERSION = (
   + datamoshGLSL.length * 47
   + threeDGLSL.length * 43
   + textureGLSL.length * 41
+  + distortChromaGLSL.length * 37
   + shapesGLSL.length * 37
 ) | 0;
 
@@ -426,6 +429,7 @@ function getBaseProgramSource(key: LazyProgramKey): ProgramSource {
   if (key === 'datamosh') return { vertex: vertexGLSL, fragment: datamoshGLSL };
   if (isThreeDProgramKey(key)) return { vertex: THREE_D_VERTEX_SOURCE, fragment: createThreeDSource(getThreeDShape(key)) };
   if (key === 'texture') return { vertex: vertexGLSL, fragment: textureGLSL };
+  if (key === 'distortChroma') return { vertex: vertexGLSL, fragment: distortChromaGLSL };
   // GLSL ES 3.00 for explicit-LOD sampling of the mask mipmaps.
   if (key === 'shapes') return { vertex: SHAPES_VERTEX_SOURCE, fragment: shapesGLSL };
   return { vertex: particlesVertexGLSL, fragment: particlesFragmentGLSL };

@@ -91,6 +91,7 @@ import {
   CORE_RENDER_TARGETS,
   FULL_RENDER_TARGETS,
   isEffectStackLayerEnabled,
+  DISTORT_CHROMA_MIN_LENS_BLUR,
   type RenderPlanFallbackProgram,
   type RenderTargetKey,
   type V2RenderPlan,
@@ -102,6 +103,7 @@ import { getFieldModel } from './fieldModelRuntime';
 import { VIDEO_MOTION_FIELD_HEIGHT, VIDEO_MOTION_FIELD_WIDTH } from './videoMotionSource';
 import { getThreeDRenderParams } from './coneView';
 import { bindFieldModelTexture, uploadThreeDUniforms } from './threeDUniforms';
+import { DEFAULT_DISTORT_CHROMA, normalizeDistortChromaConfig, resolveDistortChromaColors, type DistortChromaConfig } from '../types/distortChroma';
 import { DEFAULT_TEXTURE, normalizeTextureConfig, resolveTextureLightAngle, type TextureConfig } from '../types/texture';
 import {
   evaluateShapesReveal,
@@ -330,6 +332,11 @@ export type WebGLContext = {
   /** Height map of the SANDBOX Texture stage (unit 4 during its pass). */
   textureImageTexture: WebGLTexture;
   textureImageSource: HTMLCanvasElement | null;
+  distortChromaProgram: WebGLProgram | null;
+  distortChromaUniforms: Record<string, WebGLUniformLocation | null>;
+  /** Session-only Lens image of the Distort Chroma layer (unit 4 during its pass). */
+  distortChromaImageTexture: WebGLTexture;
+  distortChromaImageSource: HTMLCanvasElement | null;
   /** SANDBOX Shapes: final-stage program, mipmapped alpha mask, and captured frame. */
   shapesProgram: WebGLProgram | null;
   shapesUniforms: Record<string, WebGLUniformLocation | null>;
@@ -717,6 +724,13 @@ export async function initWebGL(canvas: HTMLCanvasElement): Promise<WebGLContext
   // The tile fit repeats the image, so the wrap mode must repeat too.
   gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.REPEAT);
   gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.REPEAT);
+  const distortChromaImageTexture = createOwnedTexture();
+  gl.bindTexture(gl.TEXTURE_2D, distortChromaImageTexture);
+  gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, 1, 1, 0, gl.RGBA, gl.UNSIGNED_BYTE, new Uint8Array([128, 128, 128, 255]));
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
   const shapesMaskTexture = createOwnedTexture();
   gl.bindTexture(gl.TEXTURE_2D, shapesMaskTexture);
   gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, 1, 1, 0, gl.RGBA, gl.UNSIGNED_BYTE, new Uint8Array([0, 0, 0, 0]));
@@ -768,7 +782,7 @@ export async function initWebGL(canvas: HTMLCanvasElement): Promise<WebGLContext
   ownedFlowGradient = flowGradient;
   const transitionTextureFrom = ownTexture(createTexture(gl));
   const transitionTextureTo = ownTexture(createTexture(gl));
-  const ctx: WebGLContext = { gl, performanceProfiler, gpuDiagnostics, renderOptimization, program, uniforms, geometryBuffer, transitionGeometryBuffer, generatorProgram: program, generatorUniforms: uniforms, bootstrapProgram: program, bootstrapUniforms: uniforms, activeNoiseVariants: createInitialNoiseVariants(), noiseVariantPrograms: new Map([[noiseVariantId('generator', GENERATOR_WITHOUT_NOISE_VARIANT), { program, uniforms }]]), noiseVariantStates: new Map(), gradientRampTexture, meshGradientTexture, meshGradientTextureSignature: '', diffuseCurveTexture, diffuseCurveSignature: '', diffuseAsciiTexture, diffuseAsciiSignature: '', diffuseAsciiCount: 1, diffuseAsciiRows: ASCII_ATLAS_MAX_ROWS, diffuseHistogramAt: 0, manualDistortTexture, manualDistortDisplacement: null, manualDistortSmoothMask: null, manualDistortMapResolution: 0, sourceImageTexture, sourceImageCanvas: null, imageGradientTexture, imageGradientSource: null, imageMaskTexture, imageMaskSource: null, normalMapProgram: null, normalMapUniforms: {}, datamoshProgram: null, datamoshUniforms: {}, threeDPrograms: {}, textureProgram: null, textureUniforms: {}, textureImageTexture, textureImageSource: null, shapesProgram: null, shapesUniforms: {}, shapesMaskTexture, shapesMaskKey: null, shapesFrameTexture, shapesFrameSize: [1, 1], fieldModelTexture, fieldModelVersion: 0, videoMotionFieldTexture, datamoshHistoryFbos: [datamoshHistoryFboA, datamoshHistoryFboB], datamoshHistoryTextures: [datamoshHistoryTextureA, datamoshHistoryTextureB], datamoshInputFbos: [datamoshInputFboA, datamoshInputFboB], datamoshInputTextures: [datamoshInputTextureA, datamoshInputTextureB], datamoshHistory: createDatamoshHistoryState(), gradFbo, gradTexture, blurProgram: null, blurUniforms: {}, stretchProgram: null, stretchUniforms: {}, seamlessProgram: null, seamlessUniforms: {}, postprocessProgram: null, postprocessUniforms: {}, stackCoreProgram: null, stackCoreUniforms: {}, noiseStackProgram: null, noiseStackUniforms: {}, noiseDiffuseStackProgram: null, noiseDiffuseStackUniforms: {}, glassProgram: null, glassUniforms: {}, glassFallbackActive: false, glassV2Program: null, glassV2Uniforms: {}, glassV2FallbackActive: false, glassTileProgram: null, glassTileUniforms: {}, glassTileFallbackActive: false, prismProgram: null, prismUniforms: {}, prismCompositeProgram: null, prismCompositeUniforms: {}, particleProgram: null, particleUniforms: {}, particleVao: null, particleQuadBuffer: null, particleInstanceBuffer: null, particleInstanceCount: 0, particleInstanceSeed: Number.NaN, flowGradient, normalFbo, normalTexture, hBlurFbo, hBlurTexture, postprocessFboA, postprocessTextureA, postprocessFboB, postprocessTextureB, prismScratchFbo, prismScratchTexture, prismBlurFbo, prismBlurTexture, prismGlowFbo, prismGlowTexture, shaderCompileExt, lazyProgramState: createLazyProgramState(), lazyProgramCompileQueue: createSerialAsyncQueue(), resourceLedger, hasPresentedFrame: false, disposed: false };
+  const ctx: WebGLContext = { gl, performanceProfiler, gpuDiagnostics, renderOptimization, program, uniforms, geometryBuffer, transitionGeometryBuffer, generatorProgram: program, generatorUniforms: uniforms, bootstrapProgram: program, bootstrapUniforms: uniforms, activeNoiseVariants: createInitialNoiseVariants(), noiseVariantPrograms: new Map([[noiseVariantId('generator', GENERATOR_WITHOUT_NOISE_VARIANT), { program, uniforms }]]), noiseVariantStates: new Map(), gradientRampTexture, meshGradientTexture, meshGradientTextureSignature: '', diffuseCurveTexture, diffuseCurveSignature: '', diffuseAsciiTexture, diffuseAsciiSignature: '', diffuseAsciiCount: 1, diffuseAsciiRows: ASCII_ATLAS_MAX_ROWS, diffuseHistogramAt: 0, manualDistortTexture, manualDistortDisplacement: null, manualDistortSmoothMask: null, manualDistortMapResolution: 0, sourceImageTexture, sourceImageCanvas: null, imageGradientTexture, imageGradientSource: null, imageMaskTexture, imageMaskSource: null, normalMapProgram: null, normalMapUniforms: {}, datamoshProgram: null, datamoshUniforms: {}, threeDPrograms: {}, textureProgram: null, textureUniforms: {}, textureImageTexture, textureImageSource: null, distortChromaProgram: null, distortChromaUniforms: {}, distortChromaImageTexture, distortChromaImageSource: null, shapesProgram: null, shapesUniforms: {}, shapesMaskTexture, shapesMaskKey: null, shapesFrameTexture, shapesFrameSize: [1, 1], fieldModelTexture, fieldModelVersion: 0, videoMotionFieldTexture, datamoshHistoryFbos: [datamoshHistoryFboA, datamoshHistoryFboB], datamoshHistoryTextures: [datamoshHistoryTextureA, datamoshHistoryTextureB], datamoshInputFbos: [datamoshInputFboA, datamoshInputFboB], datamoshInputTextures: [datamoshInputTextureA, datamoshInputTextureB], datamoshHistory: createDatamoshHistoryState(), gradFbo, gradTexture, blurProgram: null, blurUniforms: {}, stretchProgram: null, stretchUniforms: {}, seamlessProgram: null, seamlessUniforms: {}, postprocessProgram: null, postprocessUniforms: {}, stackCoreProgram: null, stackCoreUniforms: {}, noiseStackProgram: null, noiseStackUniforms: {}, noiseDiffuseStackProgram: null, noiseDiffuseStackUniforms: {}, glassProgram: null, glassUniforms: {}, glassFallbackActive: false, glassV2Program: null, glassV2Uniforms: {}, glassV2FallbackActive: false, glassTileProgram: null, glassTileUniforms: {}, glassTileFallbackActive: false, prismProgram: null, prismUniforms: {}, prismCompositeProgram: null, prismCompositeUniforms: {}, particleProgram: null, particleUniforms: {}, particleVao: null, particleQuadBuffer: null, particleInstanceBuffer: null, particleInstanceCount: 0, particleInstanceSeed: Number.NaN, flowGradient, normalFbo, normalTexture, hBlurFbo, hBlurTexture, postprocessFboA, postprocessTextureA, postprocessFboB, postprocessTextureB, prismScratchFbo, prismScratchTexture, prismBlurFbo, prismBlurTexture, prismGlowFbo, prismGlowTexture, shaderCompileExt, lazyProgramState: createLazyProgramState(), lazyProgramCompileQueue: createSerialAsyncQueue(), resourceLedger, hasPresentedFrame: false, disposed: false };
   initializedContext = ctx;
   for (const key of NOISE_VARIANT_PROGRAM_KEYS) {
     ctx.lazyProgramState[key] = getNoiseVariantState(ctx, key, ctx.activeNoiseVariants[key]);
@@ -844,6 +858,7 @@ export function disposeWebGL(ctx: WebGLContext): void {
     ctx.datamoshProgram,
     ...Object.values(ctx.threeDPrograms).map(entry => entry.program),
     ctx.textureProgram,
+    ctx.distortChromaProgram,
     ctx.shapesProgram,
   ];
   const uniquePrograms = new Set(programs.filter((program): program is WebGLProgram => Boolean(program)));
@@ -859,6 +874,7 @@ export function disposeWebGL(ctx: WebGLContext): void {
     ctx.imageGradientTexture,
     ctx.imageMaskTexture,
     ctx.textureImageTexture,
+    ctx.distortChromaImageTexture,
     ctx.shapesMaskTexture,
     ctx.shapesFrameTexture,
     ctx.fieldModelTexture,
@@ -1050,6 +1066,7 @@ function createLazyProgramState(): Record<LazyProgramKey, LazyProgramState> {
     threeDCrystal: { promise: null, failed: false, timedOut: false, fallback: false },
     threeDAbstract: { promise: null, failed: false, timedOut: false, fallback: false },
     texture: { promise: null, failed: false, timedOut: false, fallback: false },
+    distortChroma: { promise: null, failed: false, timedOut: false, fallback: false },
     shapes: { promise: null, failed: false, timedOut: false, fallback: false },
   };
 }
@@ -1222,6 +1239,16 @@ function getFlowCompositeUniforms(gl: WebGL2RenderingContext, program: WebGLProg
     u_contrast: gl.getUniformLocation(program, 'u_contrast'),
     u_flowOpacity: gl.getUniformLocation(program, 'u_flowOpacity'),
   };
+}
+
+const DISTORT_CHROMA_UNIFORM_NAMES = [
+  'u_sourceTex', 'u_lensTex', 'u_resolution', 'u_fullResolution', 'u_tileOffset', 'u_amount',
+  'u_warpRed', 'u_warpBlue', 'u_steps', 'u_bump', 'u_rotate', 'u_tap',
+  'u_color1', 'u_color2', 'u_color3', 'u_wrap',
+] as const;
+
+function getDistortChromaUniforms(gl: WebGL2RenderingContext, program: WebGLProgram): Record<string, WebGLUniformLocation | null> {
+  return Object.fromEntries(DISTORT_CHROMA_UNIFORM_NAMES.map(name => [name, gl.getUniformLocation(program, name)]));
 }
 
 const TEXTURE_UNIFORM_NAMES = [
@@ -1414,6 +1441,9 @@ function installLazyProgram(
   } else if (key === 'texture') {
     ctx.textureProgram = program;
     ctx.textureUniforms = getTextureUniforms(gl, program);
+  } else if (key === 'distortChroma') {
+    ctx.distortChromaProgram = program;
+    ctx.distortChromaUniforms = getDistortChromaUniforms(gl, program);
   } else if (key === 'shapes') {
     ctx.shapesProgram = program;
     ctx.shapesUniforms = getShapesUniforms(gl, program);
@@ -1633,6 +1663,7 @@ function lazyProgramReady(ctx: WebGLContext, key: LazyProgramKey, noiseVariant?:
     normalMap: [ctx.normalMapProgram, ctx.normalMapUniforms],
     datamosh: [ctx.datamoshProgram, ctx.datamoshUniforms],
     texture: [ctx.textureProgram, ctx.textureUniforms],
+    distortChroma: [ctx.distortChromaProgram, ctx.distortChromaUniforms],
     shapes: [ctx.shapesProgram, ctx.shapesUniforms],
     stretch: [ctx.stretchProgram, ctx.stretchUniforms],
     seamless: [ctx.seamlessProgram, ctx.seamlessUniforms],
@@ -3293,6 +3324,105 @@ function drawTexturePass(
   return true;
 }
 
+const DISTORT_CHROMA_WRAP_MAP = { clamp: 0, repeat: 1, mirror: 2 } as const;
+
+/**
+ * Distort Chroma: refracts the stack result along the luminance slope of a
+ * Lens and disperses colour over `steps` spectrum samples.
+ *
+ * The Lens is the layer's own input or a session-only image. A Lens Blur at or
+ * above the minimum is applied with the shared separable blur program: the
+ * horizontal pass goes to the horizontal-blur target and the vertical pass to
+ * a second scratch target that is never the layer input, so the blur never
+ * reads and writes the same texture. The image Lens is stretched over the
+ * canvas, so it is blurred in canvas pixels like the stack input.
+ */
+function drawDistortChromaPass(
+  ctx: WebGLContext,
+  sourceTexture: WebGLTexture,
+  config: DistortChromaConfig,
+  imageSource: HTMLCanvasElement | null,
+  width: number,
+  height: number,
+  fullWidth: number,
+  fullHeight: number,
+  offsetX: number,
+  offsetY: number,
+  targetFramebuffer: WebGLFramebuffer | null,
+): boolean {
+  const { gl } = ctx;
+  if (!ctx.distortChromaProgram) return false;
+  const useImage = config.lensSource === 'image' && imageSource != null && imageSource.width > 0 && imageSource.height > 0;
+  let lensTexture: WebGLTexture = sourceTexture;
+  if (useImage) {
+    gl.activeTexture(gl.TEXTURE4);
+    gl.bindTexture(gl.TEXTURE_2D, ctx.distortChromaImageTexture);
+    if (ctx.distortChromaImageSource !== imageSource) {
+      // Canvas rows run top to bottom while the stack textures run bottom to top.
+      gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, true);
+      gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, imageSource);
+      gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, false);
+      ctx.distortChromaImageSource = imageSource;
+    }
+    lensTexture = ctx.distortChromaImageTexture;
+  } else {
+    ctx.distortChromaImageSource = null;
+  }
+
+  gl.viewport(0, 0, width, height);
+  gl.disable(gl.BLEND);
+  gl.disable(gl.SCISSOR_TEST);
+  gl.colorMask(true, true, true, true);
+
+  if (config.lensBlur >= DISTORT_CHROMA_MIN_LENS_BLUR && ctx.blurProgram) {
+    const blurTarget = sourceTexture === ctx.normalTexture
+      ? { fbo: ctx.gradFbo, texture: ctx.gradTexture }
+      : { fbo: ctx.normalFbo, texture: ctx.normalTexture };
+    gl.useProgram(ctx.blurProgram);
+    gl.uniform2f(ctx.blurUniforms.u_resolution, width, height);
+    gl.uniform1f(ctx.blurUniforms.u_blurSigma, config.lensBlur);
+    setUniform1i(gl, ctx.blurUniforms.u_blurRadius, Math.min(Math.ceil(config.lensBlur * 3), 32));
+    setUniform1i(gl, ctx.blurUniforms.u_tex, 2);
+    gl.activeTexture(gl.TEXTURE2);
+    gl.bindTexture(gl.TEXTURE_2D, lensTexture);
+    gl.uniform2f(ctx.blurUniforms.u_blurDir, 1, 0);
+    gl.bindFramebuffer(gl.FRAMEBUFFER, ctx.hBlurFbo);
+    drawArrays(ctx, 'Distort Chroma Lens Blur', gl.TRIANGLES, 0, 6);
+    gl.bindTexture(gl.TEXTURE_2D, ctx.hBlurTexture);
+    gl.uniform2f(ctx.blurUniforms.u_blurDir, 0, 1);
+    gl.bindFramebuffer(gl.FRAMEBUFFER, blurTarget.fbo);
+    drawArrays(ctx, 'Distort Chroma Lens Blur', gl.TRIANGLES, 0, 6);
+    lensTexture = blurTarget.texture;
+  }
+
+  const uniforms = ctx.distortChromaUniforms;
+  const [color1, color2, color3] = resolveDistortChromaColors(config);
+  gl.useProgram(ctx.distortChromaProgram);
+  gl.bindFramebuffer(gl.FRAMEBUFFER, targetFramebuffer);
+  gl.activeTexture(gl.TEXTURE3);
+  gl.bindTexture(gl.TEXTURE_2D, sourceTexture);
+  setUniform1i(gl, uniforms.u_sourceTex, 3);
+  gl.activeTexture(gl.TEXTURE4);
+  gl.bindTexture(gl.TEXTURE_2D, lensTexture);
+  setUniform1i(gl, uniforms.u_lensTex, 4);
+  gl.uniform2f(uniforms.u_resolution, width, height);
+  gl.uniform2f(uniforms.u_fullResolution, fullWidth, fullHeight);
+  gl.uniform2f(uniforms.u_tileOffset, offsetX, offsetY);
+  gl.uniform2f(uniforms.u_amount, config.amountX, config.amountY);
+  gl.uniform1f(uniforms.u_warpRed, config.warpRed);
+  gl.uniform1f(uniforms.u_warpBlue, config.warpBlue);
+  setUniform1i(gl, uniforms.u_steps, config.steps);
+  gl.uniform1f(uniforms.u_bump, config.bump);
+  gl.uniform1f(uniforms.u_rotate, config.rotate * Math.PI / 180);
+  gl.uniform1f(uniforms.u_tap, Math.max(1, config.lensBlur));
+  gl.uniform3f(uniforms.u_color1, color1[0], color1[1], color1[2]);
+  gl.uniform3f(uniforms.u_color2, color2[0], color2[1], color2[2]);
+  gl.uniform3f(uniforms.u_color3, color3[0], color3[1], color3[2]);
+  setUniform1i(gl, uniforms.u_wrap, DISTORT_CHROMA_WRAP_MAP[config.wrap]);
+  drawArrays(ctx, 'Distort Chroma', gl.TRIANGLES, 0, 6);
+  return true;
+}
+
 function drawPostprocessStackOutput(
   ctx: WebGLContext,
   sourceTexture: WebGLTexture,
@@ -3863,9 +3993,12 @@ export function render(
   texture: TextureConfig = DEFAULT_TEXTURE,
   textureImageSource: HTMLCanvasElement | null = null,
   textureNormalizedTime = 0,
+  distortChroma: DistortChromaConfig = DEFAULT_DISTORT_CHROMA,
+  distortChromaImageSource: HTMLCanvasElement | null = null,
 ): void {
   seamless = normalizeSeamlessConfig(seamless);
   texture = normalizeTextureConfig(texture);
+  distortChroma = normalizeDistortChromaConfig(distortChroma);
   coneView = normalizeConeViewConfig(coneView);
   if (ctx.disposed || ctx.gl.isContextLost()) return;
   const isV2Pipeline = effectPipeline?.version === 'stack-v2';
@@ -3964,6 +4097,11 @@ export function render(
   const textureRequested = isV2Pipeline && effectPipeline
     ? isEffectStackLayerEnabled(effectPipeline, 'texture')
     : false;
+  // Distort Chroma is an Effect Stack layer, so only V2 has it. It resamples the
+  // image, so a protected Image Gradient bypasses it like the other geometry layers.
+  const distortChromaRequested = isV2Pipeline && effectPipeline && !imageGradientProtected
+    ? isEffectStackLayerEnabled(effectPipeline, 'distortChroma')
+    : false;
   const planScene = {
     gradient,
     noiseDistortion,
@@ -3977,6 +4115,7 @@ export function render(
     flowGradient,
     sourceImageCanvas,
     imageGradientSource,
+    distortChroma,
   };
   const planOverrides = {
     imageGradientEnabled: imageGradientProtected,
@@ -4395,6 +4534,10 @@ export function render(
     const stretchReady = imageGradientProtected || !renderPlan.programs.stretch || requestLazyProgram(ctx, 'stretch');
     const seamlessReady = !seamlessRequested || requestLazyProgram(ctx, 'seamless');
     const textureReady = !textureRequested || requestLazyProgram(ctx, 'texture');
+    const distortChromaReady = !distortChromaRequested || (
+      requestLazyProgram(ctx, 'distortChroma') &&
+      (!renderPlan.distortChromaNeedsBlur || requestLazyProgram(ctx, 'blur'))
+    );
     const prismReady = !prismRequested || (
       requestLazyProgram(ctx, 'prism') &&
       requestLazyProgram(ctx, 'prismComposite') &&
@@ -4404,7 +4547,7 @@ export function render(
 
     // Lazy programs compile asynchronously. Keep a usable base frame until every
     // requested V2 stage is available instead of presenting a partial stack.
-    if (!generatorReady || !stackCoreReady || !noiseDiffuseCompositionReady || !normalReady || !stretchReady || !prismReady || !particlesReady || !seamlessReady || !textureReady || !flowProgramsReady || (datamoshRequested && !datamoshActive) || threeDPending) {
+    if (!generatorReady || !stackCoreReady || !noiseDiffuseCompositionReady || !normalReady || !stretchReady || !prismReady || !particlesReady || !seamlessReady || !textureReady || !distortChromaReady || !flowProgramsReady || (datamoshRequested && !datamoshActive) || threeDPending) {
       // Cloth is a Base generator and does not depend on the stack programs:
       // present the cloth frame even while they compile.
       const clothReady = clothGradient?.enabled
@@ -4590,6 +4733,17 @@ export function render(
         if (!datamoshActive) continue;
         const moshedTexture = drawDatamoshPass(ctx, currentTexture, datamosh, datamoshFrame, vpW, vpH);
         if (moshedTexture) currentTexture = moshedTexture;
+        continue;
+      }
+      if (layer.kind === 'distortChroma') {
+        // Distort Chroma has its own program; if it is unavailable the layer is skipped.
+        const target = choosePostprocessTarget(ctx, currentTexture);
+        if (drawDistortChromaPass(
+          ctx, currentTexture, distortChroma, distortChromaImageSource,
+          vpW, vpH, width, height, tileOx, tileOy, target.fbo,
+        )) {
+          currentTexture = target.texture;
+        }
         continue;
       }
       if (layer.kind === 'texture') {

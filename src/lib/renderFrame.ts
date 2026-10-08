@@ -45,6 +45,8 @@ export function renderFrame(ctx: WebGLContext, request: RenderFrameRequest): voi
     request.texture,
     request.textureImageSource,
     request.textureNormalizedTime ?? 0,
+    request.distortChroma,
+    request.distortChromaImageSource,
   );
   // Shapes consumes the finished frame, so it runs after every other stage.
   if (request.shapes?.enabled) {

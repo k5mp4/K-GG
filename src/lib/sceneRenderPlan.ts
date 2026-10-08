@@ -38,6 +38,7 @@ export type SceneRenderPlanState = Pick<LatestState,
   | 'sourceImageCanvas'
   | 'imageGradientSource'
   | 'datamosh'
+  | 'distortChroma'
 >;
 
 /**
@@ -67,6 +68,7 @@ export function getSceneRenderPlanInput(
     diffuseMode: state.diffuse?.mode,
     diffuseApplyMode: state.diffuse?.applyMode,
     analyticNoisePending: overrides.analyticNoisePending,
+    distortChromaLensBlur: state.distortChroma?.lensBlur,
   };
 }
 
@@ -114,6 +116,7 @@ export function getRequiredSceneProgramKeys(
     add('datamosh', plan.programs.datamosh);
     if (plan.programs.threeD) add(getThreeDProgramKey(state.coneView.shape), true);
     add('texture', plan.programs.texture);
+    add('distortChroma', !imageGradientProtected && plan.programs.distortChroma);
   } else {
     const layers = getActivePostprocessStackLayers(state.postprocess).filter(layer => (
       (layer.kind !== 'glass' && layer.kind !== 'glassV2' && layer.kind !== 'glassTile')

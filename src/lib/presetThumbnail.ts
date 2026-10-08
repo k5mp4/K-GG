@@ -10,6 +10,7 @@ import { getRequiredSceneProgramKeys } from './sceneRenderPlan';
 import { resolveDiffuseBezier } from './diffuseCurve';
 import { normalizeSeamlessConfig } from '../types/seamless';
 import { normalizeTextureConfig } from '../types/texture';
+import { normalizeDistortChromaConfig } from '../types/distortChroma';
 import { normalizeShapesConfig } from '../types/shapes';
 import { normalizeFlowGradientConfig } from '../types/flowGradient';
 import { normalizeConeViewConfig } from '../types/coneView';
@@ -84,6 +85,7 @@ export function createPresetThumbnailState(snapshot: StoreSnapshot): LatestState
     datamosh: resolvePersistedDatamosh(snapshot),
     seamless: normalizeSeamlessConfig(snapshot.seamless),
     texture: normalizeTextureConfig(snapshot.texture),
+    distortChroma: normalizeDistortChromaConfig(snapshot.distortChroma),
     shapes: normalizeShapesConfig(snapshot.shapes),
     flowGradient: normalizeFlowGradientConfig(snapshot.flowGradient),
     manualDistort,
@@ -100,6 +102,8 @@ export function createPresetThumbnailState(snapshot: StoreSnapshot): LatestState
     imageMaskEnabled: false,
     // The height map is a session-only external image and not part of a portable Preset.
     textureImageSource: null,
+    // The Lens image is a session-only external image and not part of a portable Preset.
+    distortChromaImageSource: null,
     // A custom SVG is session-only; the thumbnail draws its Star fallback.
     shapesCustomMask: null,
   };

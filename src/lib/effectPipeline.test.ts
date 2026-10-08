@@ -97,10 +97,51 @@ describe('effectPipeline', () => {
       expect(plan.framebufferAllocationMode).toBe('direct');
     });
 
+    it('requests the Distort Chroma program only while the layer is on, without scratch targets for an unblurred Lens', () => {
+      const pipeline = createDefaultEffectPipeline();
+      const base = { normalMapEnabled: false, normalMapBlur: 0, prismGlowRadius: 0 };
+      const withLayer = {
+        ...pipeline,
+        effectStack: updateEffectStackLayer(pipeline.effectStack, 'distortChroma', { enabled: true }),
+      };
+
+      const off = getV2RenderPlan(pipeline, { ...base, distortChromaLensBlur: 4 });
+      expect(off.programs.distortChroma).toBe(false);
+      expect(off.programs.blur).toBe(false);
+      expect(off.distortChromaNeedsBlur).toBe(false);
+
+      const unblurred = getV2RenderPlan(withLayer, { ...base, distortChromaLensBlur: 0.2 });
+      expect(unblurred.programs.distortChroma).toBe(true);
+      expect(unblurred.programs.stackCore).toBe(true);
+      expect(unblurred.programs.blur).toBe(false);
+      expect(unblurred.framebufferTargets).not.toContain('normal');
+      expect(unblurred.framebufferTargets).not.toContain('horizontalBlur');
+    });
+
+    it('requests the shared blur program and the two scratch targets for a blurred Distort Chroma Lens', () => {
+      const pipeline = createDefaultEffectPipeline();
+      const withLayer = {
+        ...pipeline,
+        effectStack: updateEffectStackLayer(pipeline.effectStack, 'distortChroma', { enabled: true }),
+      };
+      const plan = getV2RenderPlan(withLayer, {
+        normalMapEnabled: false,
+        normalMapBlur: 0,
+        prismGlowRadius: 0,
+        distortChromaLensBlur: 2,
+      });
+
+      expect(plan.distortChromaNeedsBlur).toBe(true);
+      expect(plan.programs.blur).toBe(true);
+      expect(plan.framebufferTargets).toEqual(expect.arrayContaining(['postprocessA', 'postprocessB', 'normal', 'horizontalBlur']));
+      expect(new Set(plan.framebufferTargets).size).toBe(plan.framebufferTargets.length);
+    });
+
     it('places Texture last by default and lets it move like any other layer', () => {
       const stack = createDefaultEffectStack();
 
-      expect(stack.map(layer => layer.kind).at(-1)).toBe('texture');
+      expect(stack.map(layer => layer.kind).at(-2)).toBe('texture');
+      expect(stack.map(layer => layer.kind).at(-1)).toBe('distortChroma');
       expect(stack.find(layer => layer.kind === 'texture')?.enabled).toBe(false);
       expect(normalizeEffectStack([{ kind: 'texture', enabled: true }, { kind: 'noise', enabled: true }])
         .map(layer => layer.kind).slice(0, 2)).toEqual(['texture', 'noise']);
@@ -602,6 +643,7 @@ describe('effectPipeline', () => {
         datamosh: false,
         threeD: false,
         texture: false,
+        distortChroma: false,
       });
       expect(plan.capabilities).toEqual({
         required: ['webgl2', 'rgba8-framebuffer'],
@@ -633,6 +675,7 @@ describe('effectPipeline', () => {
         { kind: 'datamosh', enabled: false },
         { kind: 'cone', enabled: false },
         { kind: 'texture', enabled: false },
+        { kind: 'distortChroma', enabled: false },
       ],
       selectedKind: 'diffuse',
       prismEnabled: false,
@@ -661,6 +704,7 @@ describe('effectPipeline', () => {
       { kind: 'datamosh', enabled: false },
       { kind: 'cone', enabled: false },
       { kind: 'texture', enabled: false },
+      { kind: 'distortChroma', enabled: false },
     ]);
   });
 
@@ -718,6 +762,7 @@ describe('effectPipeline', () => {
       'datamosh',
       'cone',
       'texture',
+      'distortChroma',
     ]);
     expect(Object.fromEntries(normalized.map(layer => [layer.kind, layer.enabled]))).toEqual({
       diffuse: false,
@@ -733,6 +778,7 @@ describe('effectPipeline', () => {
       datamosh: false,
       cone: false,
       texture: false,
+      distortChroma: false,
     });
   });
 
@@ -765,6 +811,7 @@ describe('effectPipeline', () => {
       'datamosh',
       'cone',
       'texture',
+      'distortChroma',
     ]);
 
     expect(moveEffectStackLayer(toggled, 'diffuse', 0).at(0)).toEqual({ kind: 'diffuse', enabled: true });
@@ -803,12 +850,14 @@ describe('effectPipeline', () => {
       'datamosh',
       'cone',
       'texture',
+      'distortChroma',
       'noise',
     ]);
-    expect(movedPastDiffuse.at(-5)).toEqual({ kind: 'diffuse', enabled: true });
-    expect(movedPastDiffuse.at(-4)).toEqual({ kind: 'datamosh', enabled: false });
-    expect(movedPastDiffuse.at(-3)).toEqual({ kind: 'cone', enabled: false });
-    expect(movedPastDiffuse.at(-2)).toEqual({ kind: 'texture', enabled: false });
+    expect(movedPastDiffuse.at(-6)).toEqual({ kind: 'diffuse', enabled: true });
+    expect(movedPastDiffuse.at(-5)).toEqual({ kind: 'datamosh', enabled: false });
+    expect(movedPastDiffuse.at(-4)).toEqual({ kind: 'cone', enabled: false });
+    expect(movedPastDiffuse.at(-3)).toEqual({ kind: 'texture', enabled: false });
+    expect(movedPastDiffuse.at(-2)).toEqual({ kind: 'distortChroma', enabled: false });
     expect(movedPastDiffuse.at(-1)).toEqual({ kind: 'noise', enabled: true });
   });
 
@@ -822,7 +871,7 @@ describe('effectPipeline', () => {
     let seed = 0;
     const randomized = randomizeEffectStackOrder(stack, () => (seed += 0.17) % 1);
 
-    expect(randomized).toHaveLength(13);
+    expect(randomized).toHaveLength(14);
     expect(new Set(randomized.map(layer => layer.kind))).toEqual(new Set(stack.map(layer => layer.kind)));
     expect(Object.fromEntries(randomized.map(layer => [layer.kind, layer.enabled]))).toEqual(enabledByKind);
     expect(randomized).not.toBe(stack);

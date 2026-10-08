@@ -44,6 +44,8 @@ describe('renderFrame compatibility adapter', () => {
       texture: { enabled: true },
       textureImageSource: { id: 'texture-image' },
       textureNormalizedTime: 0.7,
+      distortChroma: { enabled: true },
+      distortChromaImageSource: { id: 'lens-image' },
     } as unknown as RenderFrameRequest;
 
     renderFrame({} as WebGLContext, request);
@@ -86,6 +88,8 @@ describe('renderFrame compatibility adapter', () => {
       request.texture,
       request.textureImageSource,
       request.textureNormalizedTime,
+      request.distortChroma,
+      request.distortChromaImageSource,
     );
     expect(vi.mocked(renderShapesPass)).not.toHaveBeenCalled();
   });

@@ -15,6 +15,7 @@ import { hasEnabledPostprocessEffectStack } from '../lib/effectPipeline';
 import { ConeViewPanel } from './ConeViewPanel';
 import { DatamoshPanel } from './DatamoshPanel';
 import { TexturePanel } from './TexturePanel';
+import { DistortChromaPanel } from './DistortChromaPanel';
 import { getDiffuseGrainParameterLimitKey } from '../lib/parameterLimits';
 import { VORONOI_FEATURES, VORONOI_METRICS } from '../lib/voronoi';
 import { StretchPanel } from './StretchPanel';
@@ -358,6 +359,11 @@ type PostprocessPanelProps = {
   textureImageName?: string;
   onTextureImageLoad?: (canvas: HTMLCanvasElement, name: string) => void;
   onTextureImageClear?: () => void;
+  /** Session-only Lens image of the Distort Chroma layer, owned by the workspace. */
+  distortChromaImageSource?: HTMLCanvasElement | null;
+  distortChromaImageName?: string;
+  onDistortChromaImageLoad?: (canvas: HTMLCanvasElement, name: string) => void;
+  onDistortChromaImageClear?: () => void;
 };
 
 const noop = () => undefined;
@@ -369,6 +375,10 @@ export function PostprocessPanel({
   textureImageName = '',
   onTextureImageLoad = noop,
   onTextureImageClear = noop,
+  distortChromaImageSource = null,
+  distortChromaImageName = '',
+  onDistortChromaImageLoad = noop,
+  onDistortChromaImageClear = noop,
 }: PostprocessPanelProps = {}) {
   const { t } = useLanguage();
   const { gradient, postprocess, effectPipeline } = useGradientStore();
@@ -383,8 +393,13 @@ export function PostprocessPanel({
   const selectedTexture = !sandboxMode
     && effectPipeline.version === 'stack-v2'
     && effectPipeline.selectedKind === 'texture';
+  const selectedDistortChroma = !sandboxMode
+    && effectPipeline.version === 'stack-v2'
+    && effectPipeline.selectedKind === 'distortChroma';
   const activeEffectMode = sandboxMode ?? (
-    selectedDatamosh
+    selectedDistortChroma
+      ? 'distortChroma'
+      : selectedDatamosh
       ? 'datamosh'
       : selectedTexture
       ? 'texture'
@@ -450,15 +465,16 @@ export function PostprocessPanel({
             { value: 'glassTile', label: 'GlassTile' },
             { value: 'datamosh', label: 'Datamosh' },
             { value: 'texture', label: 'Texture' },
+            { value: 'distortChroma', label: 'Distort Chroma' },
           ]}
           onChange={(value) => {
-            if (value === 'datamosh' || value === 'stretch' || value === 'texture') {
+            if (value === 'datamosh' || value === 'stretch' || value === 'texture' || value === 'distortChroma') {
               setEffectPipeline({ selectedKind: value });
             } else {
               const effectMode = value as Exclude<PostprocessStackKind, 'prism'>;
               setEffectMode(effectMode);
               // Keep the stack selection in step so a previously selected
-              // Datamosh / Stretch / Texture layer no longer pins the module.
+              // Datamosh / Stretch / Texture / Distort Chroma layer no longer pins the module.
               setEffectPipeline({ selectedKind: effectMode === 'glassV2' ? 'glass' : effectMode });
             }
           }}
@@ -479,6 +495,14 @@ export function PostprocessPanel({
               onImageClear={onTextureImageClear}
             />
           )}
+          {activeEffectMode === 'distortChroma' && !selectedCone && (
+            <DistortChromaPanel
+              imageSource={distortChromaImageSource}
+              imageName={distortChromaImageName}
+              onImageLoad={onDistortChromaImageLoad}
+              onImageClear={onDistortChromaImageClear}
+            />
+          )}
           <div data-cone-settings={selectedCone ? 'shown' : 'hidden'} hidden={!selectedCone}>
             <ConeViewPanel />
           </div>
@@ -487,7 +511,7 @@ export function PostprocessPanel({
               <StretchPanel showEnabledToggle={false} />
             </div>
           )}
-          {activeEffectMode !== 'datamosh' && activeEffectMode !== 'stretch' && activeEffectMode !== 'texture' && !selectedCone && (
+          {activeEffectMode !== 'datamosh' && activeEffectMode !== 'stretch' && activeEffectMode !== 'texture' && activeEffectMode !== 'distortChroma' && !selectedCone && (
           <>
           {isDistort ? (
             <ManualDistortControls

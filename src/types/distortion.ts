@@ -262,7 +262,8 @@ export type EffectStackKind =
   | 'glassTile'
   | 'datamosh'
   | 'cone'
-  | 'texture';
+  | 'texture'
+  | 'distortChroma';
 
 export type EffectStackLayer = {
   kind: EffectStackKind;

@@ -46,6 +46,8 @@ export type RenderFrameRequest = {
   texture?: LatestState['texture'];
   textureImageSource?: LatestState['textureImageSource'];
   textureNormalizedTime?: number;
+  distortChroma?: LatestState['distortChroma'];
+  distortChromaImageSource?: LatestState['distortChromaImageSource'];
   flowGradient?: LatestState['flowGradient'];
   flowNormalizedTime?: number;
   flowLoopEnabled?: boolean;

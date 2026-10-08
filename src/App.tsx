@@ -116,6 +116,8 @@ export default function App() {
     imageGradientSourceName,
     textureImageSource,
     textureImageSourceName,
+    distortChromaImageSource,
+    distortChromaImageSourceName,
     ffmpegStatus,
     ffmpegChecking,
     ffmpegDialogOpen,
@@ -146,6 +148,8 @@ export default function App() {
     handleImageGradientSourceClear,
     handleTextureImageLoad,
     handleTextureImageClear,
+    handleDistortChromaImageLoad,
+    handleDistortChromaImageClear,
     handleSeek,
     handleTimelineToggle,
     handleTimeRemapToggle,
@@ -222,6 +226,10 @@ export default function App() {
                         textureImageName={textureImageSourceName}
                         onTextureImageLoad={handleTextureImageLoad}
                         onTextureImageClear={handleTextureImageClear}
+                        distortChromaImageSource={distortChromaImageSource}
+                        distortChromaImageName={distortChromaImageSourceName}
+                        onDistortChromaImageLoad={handleDistortChromaImageLoad}
+                        onDistortChromaImageClear={handleDistortChromaImageClear}
                       />
                     )}
                     {value === 'export' && (
