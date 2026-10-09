@@ -16,6 +16,7 @@ import { normalizeClothGradientConfig } from '../types/clothGradient';
 import { normalizeConeViewConfig } from '../types/coneView';
 import { normalizeSeamlessConfig } from '../types/seamless';
 import { normalizeTextureConfig } from '../types/texture';
+import { normalizeDistortChromaConfig } from '../types/distortChroma';
 import { normalizeShapesConfig } from '../types/shapes';
 import { normalizeImageGradientConfig } from '../types/imageGradient';
 import { normalizePropertyTrack, type AnimationMode, type Keyframe } from '../types/keyframe';
@@ -393,6 +394,16 @@ export function createDocumentActions(set: DocumentStoreSet, defaults: DocumentD
       : s.effectPipeline;
     return { texture, effectPipeline };
   }),
+  setDistortChroma: (v) => set((s) => {
+    const distortChroma = normalizeDistortChromaConfig({ ...s.distortChroma, ...v });
+    const effectPipeline = v.enabled !== undefined && s.effectPipeline.version === 'stack-v2'
+      ? {
+        ...s.effectPipeline,
+        effectStack: updateEffectStackLayer(s.effectPipeline.effectStack, 'distortChroma', { enabled: v.enabled }),
+      }
+      : s.effectPipeline;
+    return { distortChroma, effectPipeline };
+  }),
   setFlowGradient: (v) => set((s) => ({
     flowGradient: normalizeFlowGradientConfig({ ...s.flowGradient, ...v }),
   })),
@@ -520,6 +531,7 @@ export function createDocumentActions(set: DocumentStoreSet, defaults: DocumentD
       stretch: { ...s.stretch, enabled: enabled('stretch') },
       datamosh: { ...s.datamosh, enabled: enabled('datamosh') },
       texture: { ...s.texture, enabled: enabled('texture') },
+      distortChroma: { ...s.distortChroma, enabled: enabled('distortChroma') },
       ...(postprocessEnabledSignatureChanged
         ? { postprocess: { ...s.postprocess, enabled: hasEnabledPostprocessEffectStack(effectPipeline) } }
         : {}),

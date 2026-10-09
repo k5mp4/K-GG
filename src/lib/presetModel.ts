@@ -25,6 +25,8 @@ import type { SeamlessConfig } from '../types/seamless';
 import { normalizeSeamlessConfig } from '../types/seamless';
 import type { TextureConfig } from '../types/texture';
 import { normalizeTextureConfig } from '../types/texture';
+import type { DistortChromaConfig } from '../types/distortChroma';
+import { normalizeDistortChromaConfig } from '../types/distortChroma';
 import type { ShapesConfig } from '../types/shapes';
 import { normalizeShapesConfig } from '../types/shapes';
 import type { FlowGradientConfig } from '../types/flowGradient';
@@ -46,6 +48,7 @@ export type StoreSnapshot = {
   coneView?: ConeViewConfig;
   seamless?: SeamlessConfig;
   texture?: TextureConfig;
+  distortChroma?: DistortChromaConfig;
   shapes?: ShapesConfig;
   flowGradient?: FlowGradientConfig;
   datamosh?: DatamoshConfig;
@@ -253,6 +256,7 @@ export function makePreset(
       coneView: normalizeConeViewConfig(state.coneView),
       seamless: normalizeSeamlessConfig(state.seamless),
       texture: normalizeTextureConfig(state.texture),
+      distortChroma: normalizeDistortChromaConfig(state.distortChroma),
       shapes: normalizeShapesConfig(state.shapes),
       flowGradient: normalizeFlowGradientConfig(state.flowGradient),
       datamosh: resolvePersistedDatamosh(sourceState),

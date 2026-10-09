@@ -288,6 +288,16 @@ export const PARAMETER_LIMITS = {
   'texture.diffraction': { min: 0, max: 1, step: 0.01, defaultValue: 0 },
   'texture.diffractionSpread': { min: 0.25, max: 4, step: 0.05, defaultValue: 1 },
 
+  // Distort Chroma. Amount is in output pixels; Bump scales the Lens luminance slope.
+  'distortChroma.amountX': { min: -300, max: 300, step: 0.5, defaultValue: 24 },
+  'distortChroma.amountY': { min: -300, max: 300, step: 0.5, defaultValue: 24 },
+  'distortChroma.warpRed': { min: -3, max: 3, step: 0.01, defaultValue: 0.5 },
+  'distortChroma.warpBlue': { min: -3, max: 3, step: 0.01, defaultValue: 1 },
+  'distortChroma.steps': { min: 3, max: 32, step: 1, defaultValue: 12, integer: true },
+  'distortChroma.bump': { min: 0, max: 200, step: 0.1, defaultValue: 20 },
+  'distortChroma.rotate': { min: 0, max: 360, step: 1, defaultValue: 0, angleUnit: 'degrees', wrapAngle: true },
+  'distortChroma.lensBlur': { min: 0, max: 32, step: 0.5, defaultValue: 2 },
+
   // SANDBOX Shapes. Lengths are fractions of the shape's shorter content side,
   // so the look stays the same when the SVG or the canvas size changes.
   'shapes.scale': { min: 0.1, max: 1.5, step: 0.01, defaultValue: 0.7 },
@@ -447,6 +457,14 @@ export const ENUM_PARAMETER_LIMITS = {
   'texture.imageFit': {
     values: ['cover', 'tile'],
     defaultValue: 'cover',
+  },
+  'distortChroma.lensSource': {
+    values: ['source', 'image'],
+    defaultValue: 'source',
+  },
+  'distortChroma.wrap': {
+    values: ['clamp', 'repeat', 'mirror'],
+    defaultValue: 'clamp',
   },
   'shapes.source': {
     values: ['circle', 'star', 'text', 'custom'],

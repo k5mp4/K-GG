@@ -54,6 +54,14 @@ terms. The recommended Windows builds from gyan.dev are GPLv3. See:
 - https://www.gyan.dev/ffmpeg/builds/
 - https://www.gnu.org/licenses/gpl-3.0.html
 
+I_DistortChroma
+---------------
+
+The Distort Chroma effect (src/shaders/distortChroma.frag.glsl) is a GLSL re-implementation of
+the algorithm in I_DistortChroma by panko200 (https://github.com/panko200/I_DistortChroma),
+which is licensed under the MIT License. Copyright (c) 2026 panko200. The full license text is
+in vendor/i-distortchroma/LICENSE and in the application Help > Third-party licenses screen.
+
 Fonts
 -----
 

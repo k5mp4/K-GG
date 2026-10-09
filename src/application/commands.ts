@@ -28,6 +28,7 @@ export type ApplicationCommands = Pick<GradientStore,
   | 'setConeView'
   | 'setSeamless'
   | 'setTexture'
+  | 'setDistortChroma'
   | 'setShapes'
   | 'setFlowGradient'
   | 'setDatamosh'
@@ -72,6 +73,7 @@ const APPLICATION_COMMAND_KEYS = [
   'setConeView',
   'setSeamless',
   'setTexture',
+  'setDistortChroma',
   'setShapes',
   'setFlowGradient',
   'setDatamosh',
@@ -127,6 +129,7 @@ export function createApplicationCommands(
     setConeView: value => getState().setConeView(value),
     setSeamless: value => getState().setSeamless(value),
     setTexture: value => getState().setTexture(value),
+    setDistortChroma: value => getState().setDistortChroma(value),
     setShapes: value => getState().setShapes(value),
     setFlowGradient: value => getState().setFlowGradient(value),
     setDatamosh: value => getState().setDatamosh(value),

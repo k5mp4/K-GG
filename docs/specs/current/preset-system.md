@@ -29,7 +29,7 @@ Presetの `state` には、Gradient、Noise Distortion、Diffuse、Image Gradien
 
 ### PRESET-002 保存しない外部入力
 
-Image Gradient Sourceの元画像、Image Overlay/Mask、Texture画像、SANDBOX Shapesで読み込んだSVGなどの外部画像オブジェクトやファイルパスはPortableなPresetへ保存しません。読込後に外部入力が存在しない場合は、該当設定を保ったまま安全なフォールバックを表示します。
+Image Gradient Sourceの元画像、Image Overlay/Mask、Texture画像、Distort ChromaのLens画像、SANDBOX Shapesで読み込んだSVGなどの外部画像オブジェクトやファイルパスはPortableなPresetへ保存しません。読込後に外部入力が存在しない場合は、該当設定を保ったまま安全なフォールバックを表示します。
 
 ### PRESET-003 Preset文書と互換性
 
@@ -123,6 +123,10 @@ Legacy SPECは保存形式が変化した経緯を追うために残します。
 ### PRESET-019 Texture設定の保存互換
 
 `texture`と、`effectPipeline.effectStack`内の`texture`レイヤー（有効状態と順序）はPresetの永続化対象です。SANDBOX時代の保存（レイヤーがなく`texture.enabled`だけが有効）は、読み込み時にレイヤーを有効にして引き継ぎます。保存時と読み込み時に`normalizeTextureConfig`で範囲と列挙を正規化し、旧Presetにない場合は無効の既定値を使います。Texture用に読み込んだ画像はPortableなPresetへ保存せず、読込後に画像がない場合は選択中の手続き型プリセットで描画します。Thumbnailも同じ規則で、画像を使いません。
+
+### PRESET-022 Distort Chroma設定の保存互換
+
+`distortChroma`と、`effectPipeline.effectStack`内の`distortChroma`レイヤー（有効状態と順序）はPresetの永続化対象です。保存時と読み込み時に`normalizeDistortChromaConfig`で範囲、列挙、色を正規化し、旧Presetにない場合は無効の既定値を使います。Lens用に読み込んだ画像はPortableなPresetへ保存せず、読込後に画像がない場合は前段textureをLensにして描画します。Thumbnailも同じ規則で、画像を使いません。
 
 ### PRESET-021 Shapes設定の保存互換
 

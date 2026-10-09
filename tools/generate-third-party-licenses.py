@@ -111,6 +111,15 @@ entries.append({'ecosystem': 'vendor', 'name': 'Spout2 (SpoutDX)', 'version': '2
                 'notices': [{'file': 'LICENSE', 'text': Path('vendor/spout2/LICENSE').read_text(encoding='utf-8').strip()},
                             {'file': 'SPOUTSDK/licence.txt', 'text': Path('vendor/spout2/SPOUTSDK/licence.txt').read_text(encoding='utf-8').strip()}]})
 
+# Distort Chroma is a GLSL re-implementation of I_DistortChroma's HLSL algorithm (MIT).
+DISTORT_CHROMA_COMMIT = '3e34c6839fd3f017d8fbd21f4538eafbbafc31a4'
+distort_chroma_readme = Path('vendor/i-distortchroma/README.md').read_text(encoding='utf-8')
+if DISTORT_CHROMA_COMMIT not in distort_chroma_readme:
+    raise RuntimeError('vendor/i-distortchroma/README.md does not record the referenced I_DistortChroma commit')
+entries.append({'ecosystem': 'vendor', 'name': 'I_DistortChroma (algorithm reference)', 'version': DISTORT_CHROMA_COMMIT, 'license': 'MIT',
+                'source': 'https://github.com/panko200/I_DistortChroma/tree/' + DISTORT_CHROMA_COMMIT,
+                'notices': [{'file': 'LICENSE', 'text': Path('vendor/i-distortchroma/LICENSE').read_text(encoding='utf-8').strip()}]})
+
 metadata = json.loads(subprocess.check_output(['cargo', 'metadata', '--locked', '--offline', '--format-version', '1',
                                                '--filter-platform', 'x86_64-pc-windows-msvc', '--manifest-path', 'src-tauri/Cargo.toml']))
 resolved = {node['id'] for node in metadata['resolve']['nodes']}
@@ -128,7 +137,7 @@ entries.sort(key=lambda entry: (entry['ecosystem'], entry['name'], entry['versio
 inputs = ['package-lock.json', 'src-tauri/Cargo.lock', 'vendor/tweeq/package.json',
           'vendor/tweeq/index.es.js', 'vendor/tweeq/index.cjs', 'vendor/tweeq/style.css',
           'vendor/tweeq/THIRD_PARTY_LICENSES.json', 'vendor/spout2/README.md', 'vendor/spout2/LICENSE',
-          'vendor/spout2/SPOUTSDK/licence.txt', 'LICENSE', 'NOTICE']
+          'vendor/spout2/SPOUTSDK/licence.txt', 'vendor/i-distortchroma/README.md', 'vendor/i-distortchroma/LICENSE', 'LICENSE', 'NOTICE']
 result = {'schemaVersion': 1, 'inputs': {name: hashlib.sha256(Path(name).read_bytes().replace(b'\r\n', b'\n')).hexdigest() for name in inputs},
           'applicationLicense': Path('LICENSE').read_text(encoding='utf-8'),
           'applicationNotice': Path('NOTICE').read_text(encoding='utf-8'), 'entries': entries}

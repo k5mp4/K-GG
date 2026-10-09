@@ -14,7 +14,7 @@ import type { EffectPipelineConfig, EffectStackKind } from '../../types/distorti
  * receives it as-is and renders the same panel from it.
  */
 
-export type LazyProgramKey = 'stackCore' | 'noiseStack' | 'glassV2' | 'glassTile' | 'datamosh' | 'texture' | 'threeD' | 'stretch' | 'prism' | 'prismComposite' | 'normalMap' | 'blur' | 'particles';
+export type LazyProgramKey = 'stackCore' | 'noiseStack' | 'glassV2' | 'glassTile' | 'datamosh' | 'texture' | 'distortChroma' | 'threeD' | 'stretch' | 'prism' | 'prismComposite' | 'normalMap' | 'blur' | 'particles';
 export type LazyProgramStatus = 'loading' | 'ready' | 'failed' | 'fallback';
 
 export type EffectStackLayerStatus = { labelKey: MessageKey; className: string };
@@ -61,7 +61,7 @@ const CORE_EFFECTS = new Set<EffectStackKind>([
   'diffuse', 'noise', 'slit', 'distort', 'mirror', 'kaleidoscope', 'voronoi', 'cone',
 ]);
 const IMAGE_GRADIENT_PROTECTED_EFFECTS = new Set<EffectStackKind>([
-  'stretch', 'distort', 'mirror', 'kaleidoscope', 'voronoi', 'glass', 'glassTile', 'cone',
+  'stretch', 'distort', 'mirror', 'kaleidoscope', 'voronoi', 'glass', 'glassTile', 'cone', 'distortChroma',
 ]);
 
 export function isEffectStackKind(value: unknown): value is EffectStackKind {
@@ -75,6 +75,7 @@ function programKeyForEffect(kind: EffectStackKind): LazyProgramKey {
   if (kind === 'glassTile') return 'glassTile';
   if (kind === 'datamosh') return 'datamosh';
   if (kind === 'texture') return 'texture';
+  if (kind === 'distortChroma') return 'distortChroma';
   return 'stretch';
 }
 

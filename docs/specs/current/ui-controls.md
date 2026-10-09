@@ -163,6 +163,10 @@ Mode、Motion、Seed、Animationの保存キーを維持し、旧PresetのautoLo
 
 SANDBOXの`Edit Layer`で`Shapes`（Betaバッジ付き）を選ぶと、モジュールのON／OFFと設定を表示します。設定は`Shape`（Source：円・星・文字のアウトライン・読み込んだSVG、SVGの読み込み・削除、Scale、Offset X／Y、Rotation）、`Edge`（Softness、Inner Shadow、Shadow Size、Shadow Offset、Light Angle）、`Fill`（Fill Source：フロー／リップル／ストライプ／K-GGの描画、Fill Amount、Fill Scale、Warp、Fill Cycles、Direction）、`Gradient`（Glow Radius、Glow Intensity、Contrast、Grain、背景を透明にする）、`Show / Hide Loop`（Mode：フェード＋発光／ワイプ／ネオン点滅／常に表示、Cycles、Transition、Hidden、Phase）に分けます。Fill SourceがK-GGの描画のときはFill Scale・Warp・Fill Cyclesを表示しません。着色は右サイドバーのGradient Rampで編集します。SVGを読み込むとSourceを読み込んだSVGへ切り替え、ファイル名を表示します。Sourceが読み込んだSVGで未読込のときは、星で描画中であることを警告色で示し、読み込みに失敗したときはエラーを表示します。モジュールがOFFのときはスライダーを無効にし、Source・Fill Source・Mode・SVGの読み込みは操作できます。Modeが常に表示のときはループ用のスライダーを無効にします。Resetは有効状態とSourceを保ったまま他の値を既定値へ戻します。
 
+### UI-031 Effect Stack Distort Chroma
+
+Effect Stackの`Distort Chroma`レイヤーを選択すると、Postprocessのプロパティモジュールに設定を表示し、`Edit Layer`にも`Distort Chroma`を表示します。ON／OFFはEffect Stackで操作します。設定は`Lens`（Lens Source、画像の読み込み・削除、Lens Blur、Bump、Rotate）、`Distortion`（Amount X／Y、Edge）、`Spectrum`（Warp Red、Warp Blue、Steps、Color 1／2／3、White Balance）に分けます。Lens Sourceが`Image`で画像が未読込のときは、前段textureをLensにして描画中であることを警告色で示します。レイヤーがOFFのときはスライダーを無効にし、Lens Sourceと画像の選択は操作できます。Stepsの説明には、1画素あたりStepsの数だけテクスチャを読むことを含めます。
+
 ### UI-030 Effect Stack Texture
 
 Effect Stackの`Texture`レイヤーを選択すると、Postprocessのプロパティモジュールに設定を表示し、`Edit Layer`にも`Texture`を表示します。ON／OFFはEffect Stackで操作します。設定は`Material`（Source、Preset、画像の読み込み・削除、Fit）、`Surface`（Amount、Scale／Repeat、Grain Angle、Center X／Y、Relief）、`Reflection`（Roughness、Anisotropy、Metallic、Specular）、`Light`（Light Angle、Light Height、Light Sweep）、`Diffraction`（Diffraction、Spread）に分けます。Presetを選ぶと見た目の値を初期値へ置き換え、`spunMetal`と`cdGroove`ではGrain Angleの代わりにCenter X／Yを表示します。Sourceが`image`で画像が未読込のときは、選択中のプリセットで描画中であることを警告色で示します。レイヤーがOFFのときはスライダーを無効にし、Source・Preset・画像の選択は操作できます。SANDBOXのEdit Layerにはありません。

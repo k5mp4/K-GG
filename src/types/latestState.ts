@@ -16,6 +16,7 @@ import type { ClothGradientConfig } from './clothGradient';
 import type { ConeViewConfig } from './coneView';
 import type { SeamlessConfig } from './seamless';
 import type { TextureConfig } from './texture';
+import type { DistortChromaConfig } from './distortChroma';
 import type { FlowGradientConfig } from './flowGradient';
 import type { DatamoshConfig } from './datamosh';
 import type { ShapesConfig } from './shapes';
@@ -33,6 +34,7 @@ export type LatestState = {
   coneView: ConeViewConfig;
   seamless?: SeamlessConfig;
   texture?: TextureConfig;
+  distortChroma?: DistortChromaConfig;
   flowGradient?: FlowGradientConfig;
   datamosh?: DatamoshConfig;
   shapes?: ShapesConfig;
@@ -50,6 +52,8 @@ export type LatestState = {
   imageMaskEnabled?: boolean;
   /** Session-only height map for the SANDBOX Texture stage; never saved in a Preset. */
   textureImageSource?: HTMLCanvasElement | null;
+  /** Session-only Lens image for the Distort Chroma layer; never saved in a Preset. */
+  distortChromaImageSource?: HTMLCanvasElement | null;
   /** Session-only rasterized custom SVG for SANDBOX Shapes; never saved in a Preset. */
   shapesCustomMask?: ShapesMask | null;
 };

@@ -67,6 +67,8 @@ function renderSceneFrame(
     texture: state.texture,
     textureImageSource: state.textureImageSource ?? null,
     textureNormalizedTime: scene.autoTime,
+    distortChroma: state.distortChroma,
+    distortChromaImageSource: state.distortChromaImageSource ?? null,
     shapes: state.shapes,
     shapesMask: state.shapes?.enabled ? resolveShapesMask(state.shapes.source, state.shapesCustomMask) : null,
     shapesNormalizedTime: scene.autoTime,

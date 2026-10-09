@@ -33,13 +33,14 @@ type Props = {
   imageMaskSource?: TexImageSource | null;
   imageMaskEnabled?: boolean;
   textureImageSource?: HTMLCanvasElement | null;
+  distortChromaImageSource?: HTMLCanvasElement | null;
   controlUi?: KggControlUiAdapter;
   controlProject?: KggControlProjectAdapter;
   /** 3D preview consumes this canvas as a texture, so the base cloth pass must stay out of it. */
   disableClothBase?: boolean;
 };
 
-export function GradientCanvas({ width = 800, height = 800, animLoopRef, seekVersion = 0, canvasRef, sourceImageCanvas = null, imageGradientSource = null, imageMaskSource = null, imageMaskEnabled = false, textureImageSource = null, disableClothBase = false, controlUi, controlProject }: Props) {
+export function GradientCanvas({ width = 800, height = 800, animLoopRef, seekVersion = 0, canvasRef, sourceImageCanvas = null, imageGradientSource = null, imageMaskSource = null, imageMaskEnabled = false, textureImageSource = null, distortChromaImageSource = null, disableClothBase = false, controlUi, controlProject }: Props) {
   const { t } = useLanguage();
   const fallbackCanvasRef = useRef<HTMLCanvasElement | null>(null);
   const staticRenderSchedulerRef = useRef<LatestFrameScheduler | null>(null);
@@ -48,7 +49,7 @@ export function GradientCanvas({ width = 800, height = 800, animLoopRef, seekVer
     staticRenderSchedulerRef.current = new LatestFrameScheduler();
   }
 
-  const { gradient, noiseDistortion, diffuse, imageGradient, slitScan, stretch, animation, normalMap, manualDistort, postprocess, effectPipeline, keyframeTracks, currentTime, clothGradient, coneView, seamless, texture, shapes, flowGradient, datamosh } = useGradientStore(useShallow(selectRenderState));
+  const { gradient, noiseDistortion, diffuse, imageGradient, slitScan, stretch, animation, normalMap, manualDistort, postprocess, effectPipeline, keyframeTracks, currentTime, clothGradient, coneView, seamless, texture, distortChroma, shapes, flowGradient, datamosh } = useGradientStore(useShallow(selectRenderState));
   const shapesCustomMask = useShapesMaskStore(state => state.customMask);
   const clothGradientForCanvas = disableClothBase
     ? { ...clothGradient, enabled: false }
@@ -126,7 +127,7 @@ export function GradientCanvas({ width = 800, height = 800, animLoopRef, seekVer
 
   // latestRef を毎レンダー更新（ブラウザ描画前に同期更新し、RAFループが即座に最新値を参照できるようにする）
   useLayoutEffect(() => {
-    latestRef.current = { gradient, noiseDistortion, diffuse, imageGradient, slitScan, stretch, normalMap, manualDistort, postprocess, effectPipeline, animation, keyframeTracks, width, height, animDirection: animation.direction, sourceImageCanvas, imageGradientSource, imageMaskSource, imageMaskEnabled, textureImageSource, clothGradient: clothGradientForCanvas, coneView, seamless, texture, shapes, shapesCustomMask, flowGradient, datamosh };
+    latestRef.current = { gradient, noiseDistortion, diffuse, imageGradient, slitScan, stretch, normalMap, manualDistort, postprocess, effectPipeline, animation, keyframeTracks, width, height, animDirection: animation.direction, sourceImageCanvas, imageGradientSource, imageMaskSource, imageMaskEnabled, textureImageSource, distortChromaImageSource, clothGradient: clothGradientForCanvas, coneView, seamless, texture, distortChroma, shapes, shapesCustomMask, flowGradient, datamosh };
   });
 
   // 静止レンダリング（アニメーション停止中の状態変化に反応）
@@ -150,7 +151,7 @@ export function GradientCanvas({ width = 800, height = 800, animLoopRef, seekVer
         publishProcessedCanvasFrame(normalizedTime);
       });
     });
-  }, [gradient, noiseDistortion, diffuse, imageGradient, slitScan, stretch, normalMap, manualDistort, postprocess, effectPipeline, clothGradient, coneView, seamless, texture, shapes, shapesCustomMask, flowGradient, datamosh, disableClothBase, width, height, animation.enabled, animation.speed, animation.rampOffsetSpeed, animation.direction, animation.easing, animation.affectNoise, animation.affectSlit, animation.affectRamp, animation.affectStretch, keyframeTracks, currentTime, lazyProgramReadyCount, seekVersion, isWebGLReady, sourceImageCanvas, imageGradientSource, imageMaskSource, imageMaskEnabled, textureImageSource]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [gradient, noiseDistortion, diffuse, imageGradient, slitScan, stretch, normalMap, manualDistort, postprocess, effectPipeline, clothGradient, coneView, seamless, texture, distortChroma, shapes, shapesCustomMask, flowGradient, datamosh, disableClothBase, width, height, animation.enabled, animation.speed, animation.rampOffsetSpeed, animation.direction, animation.easing, animation.affectNoise, animation.affectSlit, animation.affectRamp, animation.affectStretch, keyframeTracks, currentTime, lazyProgramReadyCount, seekVersion, isWebGLReady, sourceImageCanvas, imageGradientSource, imageMaskSource, imageMaskEnabled, textureImageSource, distortChromaImageSource]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // アニメーションループの管理
   useEffect(() => {
@@ -228,7 +229,7 @@ export function GradientCanvas({ width = 800, height = 800, animLoopRef, seekVer
         loop.stop();
       }
     };
-  }, [animation.enabled, animation.duration, animation.previewLoop, animation.speed, animation.rampOffsetSpeed, animation.fps, keyframeTracks, noiseDistortion.enabled, slitScan.enabled, stretch.enabled, diffuse.enabled, diffuse.seedAnimEnabled, postprocess.enabled, postprocess.effectMode, postprocess.effectStack, postprocess.glassMotion, effectPipeline, clothGradient, coneView, seamless, texture, shapes, flowGradient, disableClothBase, isWebGLReady]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [animation.enabled, animation.duration, animation.previewLoop, animation.speed, animation.rampOffsetSpeed, animation.fps, keyframeTracks, noiseDistortion.enabled, slitScan.enabled, stretch.enabled, diffuse.enabled, diffuse.seedAnimEnabled, postprocess.enabled, postprocess.effectMode, postprocess.effectStack, postprocess.glassMotion, effectPipeline, clothGradient, coneView, seamless, texture, distortChroma, shapes, flowGradient, disableClothBase, isWebGLReady]); // eslint-disable-line react-hooks/exhaustive-deps
 
   return (
     <div style={{ position: 'relative', width: '100%', height: '100%', isolation: 'isolate' }}>

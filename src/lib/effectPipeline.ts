@@ -26,7 +26,11 @@ export const EFFECT_STACK_KINDS = [
   'datamosh',
   'cone',
   'texture',
+  'distortChroma',
 ] as const satisfies readonly EffectStackKind[];
+
+/** Below this sigma (px) the Distort Chroma Lens is used unblurred. */
+export const DISTORT_CHROMA_MIN_LENS_BLUR = 0.5;
 
 /** Postprocessの全体ON/OFFへ反映する、主スタック内のレイヤー。 */
 export const POSTPROCESS_EFFECT_STACK_KINDS = [
@@ -40,6 +44,7 @@ export const POSTPROCESS_EFFECT_STACK_KINDS = [
   'datamosh',
   'cone',
   'texture',
+  'distortChroma',
 ] as const satisfies readonly EffectStackKind[];
 
 const EFFECT_STACK_KIND_SET = new Set<string>(EFFECT_STACK_KINDS);
@@ -339,6 +344,8 @@ export type V2RenderPlanOptions = {
   diffuseMode?: DiffuseMode;
   /** Missing values mean `noiseLinked`, matching presets saved before the option existed. */
   diffuseApplyMode?: DiffuseApplyMode;
+  /** Distort Chroma Lens Blur sigma in pixels. The blurred Lens needs two scratch targets. */
+  distortChromaLensBlur?: number;
   /**
    * The Generator variant for the current Noise type is still compiling.
    * Noise then runs as its stack pass, like a non-analytic Noise type.
@@ -436,6 +443,8 @@ export type V2RenderPlan = {
   diffuseEnabled: boolean;
   normalRequested: boolean;
   normalNeedsBlur: boolean;
+  /** Distort Chroma blurs its Lens through the shared blur program. */
+  distortChromaNeedsBlur: boolean;
   prismRequested: boolean;
   prismNeedsBlur: boolean;
   particlesRequested: boolean;
@@ -460,6 +469,7 @@ export type V2RenderPlan = {
     datamosh: boolean;
     threeD: boolean;
     texture: boolean;
+    distortChroma: boolean;
   };
 };
 
@@ -664,6 +674,10 @@ export function getV2RenderPlan(
   const glassTileRequested = enabledLayers.some(layer => layer.kind === 'glassTile');
   const noiseRequested = enabledLayers.some(layer => layer.kind === 'noise');
   const stretchRequested = enabledLayers.some(layer => layer.kind === 'stretch');
+  const distortChromaRequested = enabledLayers.some(layer => layer.kind === 'distortChroma');
+  const distortChromaNeedsBlur = distortChromaRequested
+    && Number.isFinite(options.distortChromaLensBlur)
+    && (options.distortChromaLensBlur ?? 0) >= DISTORT_CHROMA_MIN_LENS_BLUR;
   const flowGradientEnabled = Boolean(options.flowGradientEnabled);
   const analyticPrefix = getAnalyticGradientPrefixPlan(pipeline, enabledLayers, options);
   const noiseDiffuseComposition = pipeline.version === 'stack-v2'
@@ -682,8 +696,8 @@ export function getV2RenderPlan(
     );
 
   const framebufferTargets: RenderTargetKey[] = framebufferAllocationMode === 'direct' ? [] : [...CORE_RENDER_TARGETS];
-  if (normalRequested) framebufferTargets.push('normal');
-  if (normalNeedsBlur) framebufferTargets.push('horizontalBlur');
+  if (normalRequested || distortChromaNeedsBlur) framebufferTargets.push('normal');
+  if (normalNeedsBlur || distortChromaNeedsBlur) framebufferTargets.push('horizontalBlur');
   if (prismRequested) framebufferTargets.push('prismScratch');
   if (prismNeedsBlur) framebufferTargets.push('prismBlur', 'prismGlow');
 
@@ -700,6 +714,7 @@ export function getV2RenderPlan(
     diffuseEnabled,
     normalRequested,
     normalNeedsBlur,
+    distortChromaNeedsBlur,
     prismRequested,
     prismNeedsBlur,
     particlesRequested,
@@ -724,7 +739,7 @@ export function getV2RenderPlan(
       glassV2: glassV2Requested,
       glassTile: glassTileRequested,
       normalMap: normalRequested,
-      blur: normalNeedsBlur || prismNeedsBlur,
+      blur: normalNeedsBlur || prismNeedsBlur || distortChromaNeedsBlur,
       stretch: stretchRequested,
       prism: prismRequested,
       prismComposite: prismRequested,
@@ -732,6 +747,7 @@ export function getV2RenderPlan(
       datamosh: enabledLayers.some(layer => layer.kind === 'datamosh'),
       threeD: enabledLayers.some(layer => layer.kind === 'cone'),
       texture: enabledLayers.some(layer => layer.kind === 'texture'),
+      distortChroma: distortChromaRequested,
     },
   };
 }

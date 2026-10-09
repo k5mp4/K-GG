@@ -64,6 +64,7 @@ const EFFECT_STACK_TAB_MAP: Partial<Record<EffectStackKind, LeftTab>> = {
   datamosh: 'postprocess',
   cone: 'postprocess',
   texture: 'postprocess',
+  distortChroma: 'postprocess',
 };
 
 function formatGpuBytes(bytes: number | null | undefined): string | null {
@@ -145,6 +146,8 @@ export function useWorkspaceController({ translate }: WorkspaceControllerOptions
   const [imageGradientSourceName, setImageGradientSourceName] = useState('');
   const [textureImageSource, setTextureImageSource] = useState<HTMLCanvasElement | null>(null);
   const [textureImageSourceName, setTextureImageSourceName] = useState('');
+  const [distortChromaImageSource, setDistortChromaImageSource] = useState<HTMLCanvasElement | null>(null);
+  const [distortChromaImageSourceName, setDistortChromaImageSourceName] = useState('');
 
   const {
     canvasW, setCanvasW,
@@ -643,6 +646,7 @@ export function useWorkspaceController({ translate }: WorkspaceControllerOptions
       slitSourceImageCanvas,
       imageGradientSource,
       textureImageSource,
+      distortChromaImageSource,
     },
     resources: {
       animLoopRef,
@@ -755,6 +759,8 @@ export function useWorkspaceController({ translate }: WorkspaceControllerOptions
     imageGradientSourceName,
     textureImageSource,
     textureImageSourceName,
+    distortChromaImageSource,
+    distortChromaImageSourceName,
     ffmpegStatus,
     ffmpegChecking,
     ffmpegDialogOpen,
@@ -806,6 +812,14 @@ export function useWorkspaceController({ translate }: WorkspaceControllerOptions
     handleTextureImageLoad: (canvas: HTMLCanvasElement, name: string) => {
       setTextureImageSource(canvas);
       setTextureImageSourceName(name);
+    },
+    handleDistortChromaImageLoad: (canvas: HTMLCanvasElement, name: string) => {
+      setDistortChromaImageSource(canvas);
+      setDistortChromaImageSourceName(name);
+    },
+    handleDistortChromaImageClear: () => {
+      setDistortChromaImageSource(null);
+      setDistortChromaImageSourceName('');
     },
     handleTextureImageClear: () => {
       setTextureImageSource(null);

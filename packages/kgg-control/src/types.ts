@@ -35,7 +35,8 @@ export type EffectKind =
   | 'diffuse'
   | 'datamosh'
   | 'cone'
-  | 'texture';
+  | 'texture'
+  | 'distortChroma';
 
 export type EffectState = {
   kind: EffectKind;

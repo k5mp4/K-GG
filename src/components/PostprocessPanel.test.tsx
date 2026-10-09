@@ -5,7 +5,7 @@ import { updateEffectStackLayer } from '../lib/effectPipeline';
 import { useGradientStore } from '../store/gradientStore';
 import { PostprocessPanel } from './PostprocessPanel';
 
-function renderPostprocessPanelWithLayerSelected(kind: 'cone' | 'stretch' | 'texture') {
+function renderPostprocessPanelWithLayerSelected(kind: 'cone' | 'stretch' | 'texture' | 'distortChroma') {
   const initialState = useGradientStore.getInitialState();
   const previousEffectPipeline = initialState.effectPipeline;
   initialState.effectPipeline = {
@@ -35,6 +35,17 @@ describe('PostprocessPanel layer surface', () => {
     expect(markup).toContain('data-texture-panel');
     expect(markup).toContain('Anisotropy');
     expect(markup).not.toContain('data-stretch-settings');
+  });
+
+  it('shows the Distort Chroma settings when the layer is selected', () => {
+    const markup = renderPostprocessPanelWithLayerSelected('distortChroma');
+
+    expect(markup).toContain('data-distort-chroma-panel');
+    for (const label of ['Amount X', 'Amount Y', 'Warp Red', 'Warp Blue', 'Steps', 'Bump', 'Rotate', 'Lens Blur', 'White Balance']) {
+      expect(markup).toContain(label);
+    }
+    expect(markup).not.toContain('data-texture-panel');
+    expect(markup).not.toContain('type="file"');
   });
 
   it('keeps the Datamosh layer mounted in the Postprocess property surface', () => {

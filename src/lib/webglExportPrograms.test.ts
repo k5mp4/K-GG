@@ -6,6 +6,7 @@ import { GENERATOR_WITHOUT_NOISE_VARIANT, getProgramSource, NOISE_TYPE_MAP } fro
 import { getSceneNoiseProgramVariants } from './sceneRenderPlan';
 import { DATAMOSH_DEFAULTS } from '../types/datamosh';
 import { DEFAULT_SHAPES } from '../types/shapes';
+import { DEFAULT_DISTORT_CHROMA } from '../types/distortChroma';
 
 function stateWithGlass(enabled: boolean): LatestState {
   const pipeline = createDefaultEffectPipeline();
@@ -122,6 +123,42 @@ describe('export WebGL program plan', () => {
     state.effectPipeline.effectStack = updateEffectStackLayer(state.effectPipeline.effectStack, 'texture', { enabled: true });
 
     expect(getRequiredExportProgramKeys(state)).toEqual(['stackCore', 'texture']);
+  });
+
+  it('requests Stack Core and the Distort Chroma program from the enabled layer, plus blur for a blurred Lens', () => {
+    const state = stateWithGlass(false);
+    state.effectPipeline.effectStack = updateEffectStackLayer(state.effectPipeline.effectStack, 'distortChroma', { enabled: true });
+
+    state.distortChroma = { ...DEFAULT_DISTORT_CHROMA, enabled: true, lensBlur: 0 };
+    expect(getRequiredExportProgramKeys(state)).toEqual(['stackCore', 'distortChroma']);
+
+    state.distortChroma = { ...DEFAULT_DISTORT_CHROMA, enabled: true, lensBlur: 3 };
+    expect(getRequiredExportProgramKeys(state)).toEqual(['stackCore', 'blur', 'distortChroma']);
+  });
+
+  it('does not request the Distort Chroma program while the layer is off or the Image Gradient is protected', () => {
+    const state = stateWithGlass(false);
+    expect(getRequiredExportProgramKeys(state)).not.toContain('distortChroma');
+
+    state.effectPipeline.effectStack = updateEffectStackLayer(state.effectPipeline.effectStack, 'distortChroma', { enabled: true });
+    state.imageGradient = { enabled: true } as LatestState['imageGradient'];
+    state.imageGradientSource = {} as HTMLCanvasElement;
+    expect(getRequiredExportProgramKeys(state)).not.toContain('distortChroma');
+  });
+
+  it('exposes the Distort Chroma uniforms, a bounded loop, and global-pixel wrapping', () => {
+    const source = getProgramSource('distortChroma');
+
+    expect(source.fragment.indexOf('precision highp float;')).toBe(0);
+    for (const name of [
+      'u_sourceTex', 'u_lensTex', 'u_amount', 'u_warpRed', 'u_warpBlue', 'u_steps', 'u_bump',
+      'u_rotate', 'u_tap', 'u_color1', 'u_color2', 'u_color3', 'u_wrap', 'u_fullResolution', 'u_tileOffset',
+    ]) {
+      expect(source.fragment).toContain(name);
+    }
+    // GLSL ES 1.00 loops need constant bounds, so Steps is a break condition.
+    expect(source.fragment).toContain('const int MAX_STEPS = 32;');
+    expect(source.fragment).toContain('gl_FragCoord.xy + u_tileOffset');
   });
 
   it('requests the Shapes program only while SANDBOX Shapes is on', () => {
