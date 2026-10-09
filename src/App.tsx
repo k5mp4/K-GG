@@ -525,7 +525,7 @@ export default function App() {
           </DockPanel>
           </div>
           </Activity>
-          <VjWorkspace canvasW={canvasW} canvasH={canvasH} windowFailed={vjWindowFailed} />
+          <VjWorkspace canvasW={canvasW} canvasH={canvasH} windowFailed={vjWindowFailed} canvasRef={canvasRef} />
         </div>
         {/* TimelineWorkspace sits below the sidebars so sidebar resizing does not change its footprint. */}
         <Activity mode={vjEnabled ? 'hidden' : 'visible'}>

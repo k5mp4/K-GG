@@ -8,6 +8,7 @@ import { getFolderPath } from '../../lib/presetLibrary';
 import { createLocalEffectStackActions } from '../effectStack/effectStackController';
 import { getVjParameters, getVjParameterValue, type VjParameter, type VjParameterRule } from './vjParameters';
 import type { VjSession } from './useVjSession';
+import { VjSpoutToggle } from './VjSpoutToggle';
 import type { EffectStackKind, EffectStackLayer } from '../../types/distortion';
 import './vj.css';
 
@@ -118,7 +119,9 @@ function EffectCard({ layer, session }: { layer: EffectStackLayer; session: VjSe
   </section>;
 }
 
-export function VjDeck({ session, canvasW, canvasH, windowFailed }: { session: VjSession; canvasW: number; canvasH: number; windowFailed: boolean }) {
+export function VjDeck({ session, canvasW, canvasH, windowFailed, canvasRef }: {
+  session: VjSession; canvasW: number; canvasH: number; windowFailed: boolean; canvasRef: React.RefObject<HTMLCanvasElement | null>;
+}) {
   const { t } = useLanguage();
   const [target, setTarget] = useState<'all' | 'selected'>('all');
   const [addId, setAddId] = useState('');
@@ -148,6 +151,7 @@ export function VjDeck({ session, canvasW, canvasH, windowFailed }: { session: V
         onChange={event => session.updateSettings({ shuffle: event.target.value === 'shuffle' })}>
         <option value="sequential">{t('vj.sequential')}</option><option value="shuffle">{t('vj.shuffle')}</option>
       </select>
+      <VjSpoutToggle canvasRef={canvasRef} />
       <button type="button" className="vj-exit" onClick={() => session.updateSettings({ layoutMode: 'editor' })}>{t('vj.editor')}</button>
     </header>
     <div className="vj-deck-body">

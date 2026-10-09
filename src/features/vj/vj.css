@@ -44,7 +44,11 @@
 .vj-beats .is-current { color: var(--color-k-bg, #151817); background: var(--color-fire, #ee6633); border-color: var(--color-fire, #ee6633); }
 .vj-toolbar .vj-auto.is-running { border-color: var(--color-fire, #ee6633); color: var(--color-fire, #ee6633); }
 .vj-auto-mode { font-size: 9px; color: var(--color-tab-inactive, #8f9485); white-space: nowrap; }
+.vj-spout { display: flex; align-items: center; gap: 5px; margin-left: auto; font-size: 10px; white-space: nowrap; }
+.vj-spout-status { font-size: 9px; color: var(--color-tab-inactive, #8f9485); }
+.vj-spout.is-error .vj-spout-status { color: #e8736a; }
 .vj-toolbar .vj-exit { margin-left: auto; white-space: nowrap; }
+.vj-toolbar .vj-spout + .vj-exit { margin-left: 0; }
 .vj-deck-body { display: grid; grid-template-columns: 280px 150px 300px minmax(360px, 1fr); flex: 1; min-height: 0; }
 .vj-main, .vj-cues, .vj-presets, .vj-effects { min-width: 0; min-height: 0; border-right: 1px solid var(--color-k-border, #44483b); }
 .vj-main { padding: 4px 10px; }

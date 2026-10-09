@@ -13,6 +13,7 @@ import {
 } from '../../lib/spoutOutput';
 import { getRegisteredWebGLContext } from '../../lib/webgl';
 import { createCanvasFrameSource } from '../../lib/webglFrameReadback';
+import { createSpoutOwnership } from './spoutOwnership';
 
 const SENDER_NAME_STORAGE_KEY = 'kgg_spout_sender_name';
 const FRAME_RATE_STORAGE_KEY = 'kgg_spout_frame_rate';
@@ -56,15 +57,29 @@ export function getSpoutOutputController(): SpoutOutputController {
   return controller;
 }
 
+let ownership: ReturnType<typeof createSpoutOwnership> | null = null;
+
+function getOwnership() {
+  ownership ??= createSpoutOwnership(() => {
+    const output = getSpoutOutputController();
+    output.setFrameSource(null);
+    void output.setEnabled(false);
+  });
+  return ownership;
+}
+
 /**
- * Connects the Spout controller to the processed preview canvas while the
- * owning component is mounted, and releases the sender on unmount or unload.
+ * Connects the Spout controller to the processed preview canvas while an
+ * owning component (the Export panel or the VJ deck) is mounted. The sender is
+ * released when the last owner unmounts or the page unloads, so switching
+ * between the editor and the VJ layout keeps it running.
  */
 export function useSpoutOutput(canvasRef: React.RefObject<HTMLCanvasElement | null>) {
   const output = getSpoutOutputController();
   const state = useSyncExternalStore(output.subscribe, output.getState, output.getState);
 
   useEffect(() => {
+    const release = getOwnership().acquire();
     void output.initialize();
     output.setFrameSource(createCanvasFrameSource(() => canvasRef.current, getRegisteredWebGLContext));
     const unsubscribeFrames = subscribeProcessedCanvasFrame(output.markFrameDirty);
@@ -73,8 +88,7 @@ export function useSpoutOutput(canvasRef: React.RefObject<HTMLCanvasElement | nu
     return () => {
       unsubscribeFrames();
       window.removeEventListener('pagehide', stopOnUnload);
-      output.setFrameSource(null);
-      void output.setEnabled(false);
+      release();
     };
   }, [canvasRef, output]);
 

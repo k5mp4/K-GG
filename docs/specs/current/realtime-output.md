@@ -9,8 +9,8 @@ updated: 2026-09-25
 requirement_ids: [RTOUT-001, RTOUT-002, RTOUT-003, RTOUT-004, RTOUT-005, RTOUT-006, RTOUT-007, RTOUT-008]
 related_adrs: [ADR-0023]
 related_changes: [CHANGE-056]
-related_code: [src/lib/spoutOutput.ts, src/lib/webglFrameReadback.ts, src/features/native/useSpoutOutput.ts, src/adapters/tauri/spoutOutputService.ts, src/components/SpoutOutputPanel.tsx, src-tauri/src/spout_output.rs, src-tauri/src/spout_shared_frames.rs, src-tauri/native/spout, src-tauri/build.rs, vendor/spout2]
-related_tests: [src/lib/spoutOutput.test.ts, src/lib/webglFrameReadback.test.ts, src/adapters/tauri/spoutOutputService.test.ts, src-tauri/src/spout_output.rs, src-tauri/src/spout_shared_frames.rs]
+related_code: [src/lib/spoutOutput.ts, src/lib/webglFrameReadback.ts, src/features/native/useSpoutOutput.ts, src/adapters/tauri/spoutOutputService.ts, src/components/SpoutOutputPanel.tsx, src/features/vj/VjSpoutToggle.tsx, src/features/native/spoutOwnership.ts, src-tauri/src/spout_output.rs, src-tauri/src/spout_shared_frames.rs, src-tauri/native/spout, src-tauri/build.rs, vendor/spout2]
+related_tests: [src/lib/spoutOutput.test.ts, src/lib/webglFrameReadback.test.ts, src/features/native/spoutOwnership.test.ts, src/adapters/tauri/spoutOutputService.test.ts, src-tauri/src/spout_output.rs, src-tauri/src/spout_shared_frames.rs]
 ---
 
 # リアルタイム映像出力（Spout）
@@ -33,7 +33,7 @@ Spout出力はWindowsのTauri Desktop版だけで利用できる。Web版とWind
 
 ### RTOUT-003 操作
 
-Exportパネルの「Spout Output」で次を操作できる。
+Exportパネルの「Spout Output」で次を操作できる。VJレイアウトでは、上部ツールバーのSpoutスイッチでEnableだけを操作でき、状態（Off／Starting／Ready／Sending／Error）を表示する。Sender NameとFrame RateはExportパネルで設定する。
 
 - **Enable**: 有効にすると、直ちに現在のcanvasを1フレーム送る。以降は描画ごとに送信する。アプリ起動時は常に無効。
 - **Sender Name**: 既定は`KAGARIBI Grad`。印字可能なASCII 1〜200文字で、Enterまたはフォーカス移動で確定する。有効中に変更すると、旧Senderを解放してから新しい名前で作り直す。同じ名前のSenderが既にある場合、Spoutは`名前_1`、`名前_2`…として登録し、パネルに登録名を表示する。
@@ -61,7 +61,7 @@ Canvas Sizeの変更は同じSenderのまま解像度を更新する。WebGL con
 
 ### RTOUT-008 解放と失敗時の動作
 
-次の場合にSenderを解放し、Receiverの一覧から消す: Enableを無効にしたとき、Sender Nameを変更したとき、Exportパネルがunmountされたとき、ページがunloadされたとき、ページの再読み込み後に前回のSenderが残っていたとき、ネイティブ側の送信が失敗したとき、アプリ終了時。
+次の場合にSenderを解放し、Receiverの一覧から消す: Enableを無効にしたとき、Sender Nameを変更したとき、Exportパネルとの両方（VJデッキを含む）がunmountされたとき（通常レイアウトとVJの切替ではSenderを維持する）、ページがunloadされたとき、ページの再読み込み後に前回のSenderが残っていたとき、ネイティブ側の送信が失敗したとき、アプリ終了時。
 
 DirectX 11を利用できない場合を含め、Senderの作成・送信の失敗はSpout出力だけをError状態にする。Preview描画、書き出し、その他の機能は継続する。
 
