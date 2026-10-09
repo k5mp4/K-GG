@@ -2,12 +2,15 @@ import { Toggle } from './Toggle';
 import { Icon } from './Icon';
 import { IconButton } from './IconButton';
 import { useLanguage } from '../i18n/LanguageProvider';
+import type { VjSettings } from '../features/vj/vjSettings';
 
 type PropertyModulesSettingsPanelProps = {
   hoverSwitchEnabled: boolean;
   onHoverSwitchChange: (enabled: boolean) => void;
   onRefreshApp: () => void;
   onClose: () => void;
+  layoutMode?: VjSettings['layoutMode'];
+  onLayoutModeChange?: (mode: VjSettings['layoutMode']) => void;
 };
 
 export function PropertyModulesSettingsPanel({
@@ -15,6 +18,8 @@ export function PropertyModulesSettingsPanel({
   onHoverSwitchChange,
   onRefreshApp,
   onClose,
+  layoutMode = 'editor',
+  onLayoutModeChange,
 }: PropertyModulesSettingsPanelProps) {
   const { language, setLanguage, t } = useLanguage();
   return (
@@ -40,6 +45,17 @@ export function PropertyModulesSettingsPanel({
         </div>
 
         <div className="space-y-5 overflow-y-auto p-6 scrollbar-thin">
+          {onLayoutModeChange && <div className="border border-cream/20 bg-k-bg/55 p-4">
+            <p className="text-sm font-display font-semibold text-k-text">{t('settings.layout')}</p>
+            <p className="mt-1 text-xs leading-relaxed text-tab-inactive">{t('settings.vjDescription')}</p>
+            <div className="mt-3 grid grid-cols-2 gap-2" role="radiogroup" aria-label={t('settings.layout')}>
+              {(['editor', 'vj'] as const).map(mode => <button key={mode} type="button" role="radio" aria-checked={layoutMode === mode}
+                onClick={() => onLayoutModeChange(mode)}
+                className={`border px-3 py-2 text-xs font-display font-bold focus-visible:ring-2 focus-visible:ring-fire ${layoutMode === mode ? 'border-fire bg-fire/15 text-cream' : 'border-cream/20 bg-k-surface text-tab-inactive'}`}>
+                {t(mode === 'editor' ? 'settings.editorLayout' : 'settings.vjLayout')}
+              </button>)}
+            </div>
+          </div>}
           <div className="border border-cream/20 bg-k-bg/55 p-4">
             <div className="flex items-start justify-between gap-4">
               <div className="min-w-0 flex-1">

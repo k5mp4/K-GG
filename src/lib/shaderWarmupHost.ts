@@ -8,9 +8,11 @@ import {
   canWarmLazyProgramsInBackground,
   requestLazyProgramCompile,
   settleLazyProgram,
+  lazyProgramReady, retainNoiseProgramVariants,
   type WebGLContext,
 } from './webgl';
 import { isNoiseVariantProgramKey, type LazyProgramKey } from './webglShaderSources';
+import { collectSceneWarmupTargets } from './presetShaderWarmup';
 
 /** Binds warmup to the preview WebGL context and its latest scene snapshot. */
 export function createPreviewShaderWarmupHost(
@@ -26,6 +28,12 @@ export function createPreviewShaderWarmupHost(
     return latest ? getSceneNoiseProgramVariants(latest)[key] : undefined;
   };
   return {
+    getTargetsForDocument: state => collectSceneWarmupTargets({
+      width: 1, height: 1, animDirection: 0, ...getLatestState(), ...state,
+    }, true),
+    isReady: (key, noiseVariant) => !ctx.disposed && !ctx.gl.isContextLost()
+      && lazyProgramReady(ctx, key, noiseVariant ?? noiseVariantFor(key)),
+    retain: targets => retainNoiseProgramVariants(ctx, targets),
     settle: (key, priority, noiseVariant) => settleLazyProgram(ctx, key, priority, noiseVariant ?? noiseVariantFor(key)),
     request: (key, priority) => {
       requestLazyProgramCompile(ctx, key, priority, noiseVariantFor(key));

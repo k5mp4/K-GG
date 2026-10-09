@@ -2,10 +2,12 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
   getShaderWarmupSnapshot,
   prefetchEffectStackLayer,
+  prepareShaderWarmupTargets,
   resetShaderWarmupForTests,
   setPresetWarmupTargets,
   startShaderWarmup,
   subscribeShaderWarmup,
+  areShaderWarmupTargetsReady, createShaderWarmupRetention, getShaderWarmupContext, markShaderWarmupUnavailable,
   type IdleScheduler,
   type ShaderWarmupHost,
 } from './shaderWarmup';
@@ -56,6 +58,69 @@ function createManualIdle() {
 }
 
 describe('shader warmup', () => {
+  it('pauses unrelated background compilation during performance and resumes on exit', async () => {
+    const idle = createManualIdle();
+    const { host, settled } = createHost({ getRequiredKeys: () => [] });
+    const retention = createShaderWarmupRetention();
+    retention.update([{ key: 'stretch' }]);
+    setPresetWarmupTargets([{ key: 'seamless' }]);
+    const stop = startShaderWarmup(host, { plan: ['blur'], scheduleIdle: idle.schedule });
+
+    await idle.flush();
+    expect(settled).toEqual([]);
+    expect(await prepareShaderWarmupTargets([{ key: 'stretch' }])).toBe(true);
+    expect(settled).toEqual([{ key: 'stretch', priority: 'prefetch' }]);
+
+    retention.dispose();
+    await idle.flush();
+    expect(settled.slice(1)).toEqual([
+      { key: 'blur', priority: 'warmup' },
+      { key: 'seamless', priority: 'warmup' },
+    ]);
+
+    retention.update([{ key: 'stretch' }]);
+    setPresetWarmupTargets([{ key: 'texture' }]);
+    await idle.flush();
+    expect(settled).not.toContainEqual({ key: 'texture', priority: 'warmup' });
+    retention.dispose();
+    await idle.flush();
+    expect(settled).toContainEqual({ key: 'texture', priority: 'warmup' });
+    stop();
+  });
+
+  it('retains independent performance sets and invalidates prepared resources on context loss', async () => {
+    const retain = vi.fn();
+    const { host } = createHost({ retain, getRequiredKeys: () => [] });
+    const first = createShaderWarmupRetention();
+    const second = createShaderWarmupRetention();
+    first.update([{ key: 'noiseStack', noiseVariant: 0 }]);
+    startShaderWarmup(host, { plan: [] });
+    second.update([{ key: 'noiseStack', noiseVariant: 1 }]);
+    expect(retain).toHaveBeenLastCalledWith([{ key: 'noiseStack', noiseVariant: 0 }, { key: 'noiseStack', noiseVariant: 1 }]);
+    const targets = [{ key: 'noiseStack' as const, noiseVariant: 0 }];
+    expect(areShaderWarmupTargetsReady(targets, host)).toBe(false);
+    await prepareShaderWarmupTargets(targets);
+    expect(areShaderWarmupTargetsReady(targets, host)).toBe(true);
+    first.dispose();
+    expect(retain).toHaveBeenLastCalledWith([{ key: 'noiseStack', noiseVariant: 1 }]);
+    markShaderWarmupUnavailable();
+    expect(getShaderWarmupContext()).toBeNull();
+    expect(areShaderWarmupTargetsReady(targets, host)).toBe(false);
+    second.dispose();
+  });
+  it('prepares the next performance cue on the live host and rejects failed shaders', async () => {
+    const { host, settled } = createHost({ getRequiredKeys: () => [] });
+    const idle = createManualIdle();
+    const stop = startShaderWarmup(host, { plan: [], scheduleIdle: idle.schedule });
+    expect(await prepareShaderWarmupTargets([{ key: 'stackCore' }])).toBe(true);
+    expect(settled).toContainEqual({ key: 'stackCore', priority: 'prefetch' });
+    expect(await prepareShaderWarmupTargets([{ key: 'stackCore' }])).toBe(true);
+    expect(settled.filter(call => call.key === 'stackCore')).toHaveLength(1);
+    host.settle = async () => 'failed';
+    expect(await prepareShaderWarmupTargets([{ key: 'glassV2' }])).toBe(false);
+    stop();
+    expect(await prepareShaderWarmupTargets([{ key: 'stackCore' }])).toBe(false);
+  });
   afterEach(() => {
     resetShaderWarmupForTests();
   });

@@ -5,7 +5,7 @@ title: ワークスペースと小画面レイアウト
 status: current
 owners: [maintainer]
 created: 2026-10-03
-updated: 2026-10-03
+updated: 2026-10-09
 requirement_ids: [LAYOUT-001, LAYOUT-002, LAYOUT-003, LAYOUT-004, LAYOUT-005]
 related_adrs: [ADR-20261003-responsive-workspace-layout]
 related_changes: []
@@ -23,7 +23,7 @@ related_tests: [src/features/workspace/workspaceLayout.test.ts, tests/e2e/worksp
 
 ### LAYOUT-001 サイズの範囲
 
-Tauriメインウインドウの最小サイズ設定は640×480論理pxとする。ブラウザーでは幅320pxからページ全体の横スクロールを発生させず、モジュール一覧やTimeline内部で必要なスクロールを提供する。
+通常エディターのTauriメインウインドウの最小サイズ設定は640×480論理pxとする。ブラウザーでは幅320pxからページ全体の横スクロールを発生させず、モジュール一覧やTimeline内部で必要なスクロールを提供する。設定で選ぶ[VJレイアウト](./vj-performance)は別の操作領域と最小高さを使う。
 
 ### LAYOUT-002 パネルの表示
 

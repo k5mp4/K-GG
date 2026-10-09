@@ -250,6 +250,7 @@ export function GradientCanvas({ width = 800, height = 800, animLoopRef, seekVer
       )}
       <div
         aria-live="polite"
+        data-viewport-ui
         style={{
           position: 'absolute',
           top: 10,
@@ -302,7 +303,7 @@ export function GradientCanvas({ width = 800, height = 800, animLoopRef, seekVer
           backgroundSize: '24px 24px',
         }}
       />
-      <WebGLPerformancePanel
+      <div data-viewport-ui><WebGLPerformancePanel
         profiler={webglRef.current?.performanceProfiler ?? null}
         canvas={canvasRef.current}
         onBenchmarkFrame={() => {
@@ -315,7 +316,7 @@ export function GradientCanvas({ width = 800, height = 800, animLoopRef, seekVer
           syncVideoMotionFrame(frameState, normalizedTime, Boolean(frameState.animation.enabled && !(animLoopRef.current?.isPaused ?? true)));
           renderSceneAtTime(ctx, frameState, normalizedTime, { allowEffectStackTransition: false });
         }}
-      />
+      /></div>
     </div>
   );
 }

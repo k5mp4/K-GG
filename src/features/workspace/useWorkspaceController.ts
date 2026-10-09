@@ -96,9 +96,10 @@ export function gpuSummary(diag: GpuDiagnostics | null): { label: string; title:
 
 type WorkspaceControllerOptions = {
   translate: (key: MessageKey, replacements?: Replacements) => string;
+  compact?: boolean;
 };
 
-export function useWorkspaceController({ translate }: WorkspaceControllerOptions) {
+export function useWorkspaceController({ translate, compact = false }: WorkspaceControllerOptions) {
   const store = useGradientStore(useShallow(state => ({
     animation: state.animation,
     clothGradient: state.clothGradient,
@@ -433,8 +434,9 @@ export function useWorkspaceController({ translate }: WorkspaceControllerOptions
     return () => resizeObserver.disconnect();
   }, [viewportRef]);
 
-  const availableW = viewportSize.w > 0 ? Math.max(1, viewportSize.w - 48) : MAX_DISPLAY_W;
-  const availableH = viewportSize.h > 0 ? Math.max(1, viewportSize.h - 48) : 9999;
+  const previewPadding = compact ? 0 : 48;
+  const availableW = viewportSize.w > 0 ? Math.max(1, viewportSize.w - previewPadding) : MAX_DISPLAY_W;
+  const availableH = viewportSize.h > 0 ? Math.max(1, viewportSize.h - previewPadding) : 9999;
   const fitByW = Math.min(canvasW, MAX_DISPLAY_W, availableW);
   const fitHByW = Math.round(fitByW * (canvasH / canvasW));
   const displayW = fitHByW <= availableH ? fitByW : Math.round(availableH * (canvasW / canvasH));

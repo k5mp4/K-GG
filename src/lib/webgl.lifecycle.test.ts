@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { disposeWebGL, type WebGLContext } from './webgl';
+import { disposeWebGL, settleLazyProgram, type WebGLContext } from './webgl';
 import type { FlowGradientResources } from './flowGradientRenderer';
 
 function makeFlowResources(): FlowGradientResources {
@@ -41,6 +41,7 @@ function makeContext() {
   const transitionGeometryBuffer = {} as WebGLBuffer;
   const gl = {
     canvas,
+    isContextLost: vi.fn(() => false),
     deleteBuffer: vi.fn(),
     deleteFramebuffer: vi.fn(),
     deleteProgram: vi.fn(),
@@ -72,6 +73,29 @@ function makeContext() {
 }
 
 describe('WebGL context resource lifecycle', () => {
+  it('does not treat a cached program in a lost context as ready', async () => {
+    const { context, gl } = makeContext();
+    context.stackCoreProgram = {} as WebGLProgram;
+    vi.mocked(gl.isContextLost).mockReturnValue(true);
+
+    expect(await settleLazyProgram(context, 'stackCore', 'prefetch')).toBe('disposed');
+  });
+
+  it('invalidates a pending preparation when its context is lost', async () => {
+    const { context, gl } = makeContext();
+    let finish!: () => void;
+    const promise = new Promise<void>(resolve => { finish = resolve; });
+    context.lazyProgramState = { stackCore: { promise, failed: false, timedOut: false } } as WebGLContext['lazyProgramState'];
+    context.lazyProgramCompileQueue = { promote: vi.fn() } as unknown as WebGLContext['lazyProgramCompileQueue'];
+
+    const preparation = settleLazyProgram(context, 'stackCore', 'prefetch');
+    vi.mocked(gl.isContextLost).mockReturnValue(true);
+    finish();
+
+    expect(await preparation).toBe('disposed');
+    expect(context.lazyProgramState.stackCore.failed).toBe(false);
+  });
+
   it('releases both geometry buffers and is idempotent', () => {
     const { context, gl, geometryBuffer, transitionGeometryBuffer } = makeContext();
 

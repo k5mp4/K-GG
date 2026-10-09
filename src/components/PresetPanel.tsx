@@ -1,19 +1,7 @@
 import { memo, useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore, type ChangeEvent, type DragEvent, type MouseEvent as ReactMouseEvent, type MutableRefObject } from 'react';
-import { createEmptyManualDistortMap, createEmptyManualSmoothMask, normalizeNoiseDistortionConfig, normalizePostprocessConfig, STORE_DEFAULTS, useGradientStore } from '../store/gradientStore';
-import { createDefaultEffectPipeline, normalizeEffectPipelineConfig } from '../lib/effectPipeline';
-import { normalizeClothGradientConfig } from '../types/clothGradient';
-import { normalizeConeViewConfig } from '../types/coneView';
-import { normalizeSeamlessConfig } from '../types/seamless';
-import { normalizeTextureConfig } from '../types/texture';
-import { normalizeDistortChromaConfig } from '../types/distortChroma';
-import { normalizeShapesConfig } from '../types/shapes';
-import { normalizeFlowGradientConfig } from '../types/flowGradient';
-import { resolvePersistedDatamosh } from '../types/datamosh';
-import { normalizeImageGradientConfig } from '../types/imageGradient';
-import { stripSlitPhaseMotionFields } from '../types/distortion';
-import { resolveDiffuseBezier } from '../lib/diffuseCurve';
+import { useGradientStore } from '../store/gradientStore';
 import { createPresetSaveState } from '../lib/presetModel';
-import { keepLoopTimingOnPresetLoad } from '../lib/animationConfig';
+import { applyPresetToDocument } from '../lib/applyPreset';
 import {
   createFolder,
   deleteFolder,
@@ -26,7 +14,7 @@ import {
   type PresetFolder,
   type PresetLibrary,
 } from '../lib/presets';
-import { loadUserColorPalettes, mergeUserColorPalettes } from '../lib/colorPalettes';
+import { loadUserColorPalettes } from '../lib/colorPalettes';
 import { getChildFolders, getFolderPath, getFolderPreviewPresets, getPresetRangeIds, getPresetsInFolder } from '../lib/presetLibrary';
 import { builtinPresetLibrary, ensurePresetLibraryLoaded, getPresetLibrarySnapshot, isBuiltinPresetId, refreshPresetLibrary, subscribePresetLibrary } from '../lib/presetLibraryCache';
 import { deletePresetsWithHistory, movePresetsWithHistory } from '../lib/presetLibraryActions';
@@ -71,18 +59,6 @@ const PRESET_DRAG_TYPE = 'application/x-kgg-preset';
 
 function getDraggedPresetId(event: DragEvent<HTMLElement>): string | null {
   return event.dataTransfer.getData(PRESET_DRAG_TYPE) || null;
-}
-
-function normalizeManualDistortResolution(value: unknown): number {
-  return typeof value === 'number' && Number.isFinite(value)
-    ? Math.max(1, Math.min(512, Math.round(value)))
-    : STORE_DEFAULTS.manualDistort.mapResolution;
-}
-
-function validFiniteArray(value: unknown, expectedLength: number): value is number[] {
-  return Array.isArray(value)
-    && value.length === expectedLength
-    && value.every(item => typeof item === 'number' && Number.isFinite(item));
 }
 
 function getViewMode(): ViewMode {
@@ -378,78 +354,12 @@ export function PresetPanel({ canvasW, canvasH, setCanvasW, setCanvasH, aspectRa
   }
 
   function handleLoad(preset: Preset) {
-    const s = preset.state;
-    if (s.gradient) applicationCommands.setGradient(s.gradient);
-    if (s.noiseDistortion) applicationCommands.setNoiseDistortion(normalizeNoiseDistortionConfig(s.noiseDistortion));
-    // Always pass Diffuse through STORE_DEFAULTS so legacy presets receive
-    // adaptiveEnabled=false and the identity luminance curve.
-    const loadedDiffuse = {
-      ...STORE_DEFAULTS.diffuse,
-      ...(s.diffuse ?? {}),
-      luminanceBezier: resolveDiffuseBezier(s.diffuse?.luminanceBezier, s.diffuse?.luminanceCurve),
-    };
-    delete loadedDiffuse.luminanceCurve;
-    applicationCommands.setDiffuse(loadedDiffuse);
-    applicationCommands.setImageGradient(normalizeImageGradientConfig(s.imageGradient, s.imageGradient ? 0 : STORE_DEFAULTS.imageGradient.anchorInfluence));
-    if (s.slitScan) {
-      const loadedSlit = {
-        ...STORE_DEFAULTS.slitScan,
-        ...stripSlitPhaseMotionFields(s.slitScan),
-      };
-      delete (loadedSlit as Record<string, unknown>).autoLoop;
-      applicationCommands.setSlitScan(loadedSlit);
+    const { resolution } = applyPresetToDocument(preset);
+    if (resolution) {
+      setCanvasW(resolution.width);
+      setCanvasH(resolution.height);
+      aspectRatioRef.current = resolution.width / resolution.height;
     }
-    if (s.stretch) applicationCommands.setStretch(s.stretch);
-    if (s.normalMap) applicationCommands.setNormalMap(s.normalMap);
-    const loadedPostprocess = normalizePostprocessConfig(
-      s.postprocess ?? s.postprocessDistort,
-      s.manualDistort,
-    );
-    const legacyDistort = s.manualDistort ?? loadedPostprocess;
-    const resolution = normalizeManualDistortResolution(legacyDistort.mapResolution);
-    const displacementLength = resolution * resolution * 2;
-    const smoothMaskLength = resolution * resolution;
-    applicationCommands.setManualDistort({
-      ...STORE_DEFAULTS.manualDistort,
-      ...legacyDistort,
-      enabled: false,
-      mapResolution: resolution,
-      displacement: validFiniteArray(legacyDistort.displacement, displacementLength) ? legacyDistort.displacement : createEmptyManualDistortMap(resolution),
-      smoothMask: validFiniteArray(legacyDistort.smoothMask, smoothMaskLength) ? legacyDistort.smoothMask : createEmptyManualSmoothMask(resolution),
-    });
-    applicationCommands.setPostprocess(loadedPostprocess);
-    // clothGradient が無い旧プリセットでも安全にデフォルトで初期化し、
-    // SANDBOX の Cloth 設定を反映する。
-    applicationCommands.setClothGradient(normalizeClothGradientConfig(s.clothGradient));
-    applicationCommands.setConeView(normalizeConeViewConfig(s.coneView));
-    applicationCommands.setSeamless(normalizeSeamlessConfig(s.seamless));
-    applicationCommands.setTexture(normalizeTextureConfig(s.texture));
-    applicationCommands.setDistortChroma(normalizeDistortChromaConfig(s.distortChroma));
-    applicationCommands.setShapes(normalizeShapesConfig(s.shapes));
-    applicationCommands.setFlowGradient(normalizeFlowGradientConfig(s.flowGradient));
-    // Presets saved before Datamosh migrate their Effect Stack Video Motion here.
-    applicationCommands.setDatamosh(resolvePersistedDatamosh(s));
-    // effectPipeline を持たない旧プリセット/内蔵プリセットは Legacy v1 に
-    // ならないよう、既定の V2 パイプラインへ昇格する。V2 でなければ
-    // SANDBOX Cloth は描画パイプラインへ一切統合されないため。
-    applicationCommands.setEffectPipeline(s.effectPipeline
-      ? normalizeEffectPipelineConfig(s.effectPipeline)
-      : createDefaultEffectPipeline());
-    applicationCommands.setKeyframeTracks(s.keyframeTracks ?? {});
-    if (s.animation) applicationCommands.setAnimation({
-      ...keepLoopTimingOnPresetLoad(s.animation, useGradientStore.getState().animation),
-      rampOffsetSpeed: s.animation.rampOffsetSpeed ?? 0,
-    });
-    if (s.colorPalettes) mergeUserColorPalettes(s.colorPalettes);
-    if (s.resolution) {
-      const normalizeResolution = (value: number) => Number.isFinite(value) ? Math.max(1, Math.min(4096, Math.round(value))) : 1024;
-      const presetWidth = normalizeResolution(s.resolution.width);
-      const presetHeight = normalizeResolution(s.resolution.height);
-      setCanvasW(presetWidth);
-      setCanvasH(presetHeight);
-      aspectRatioRef.current = presetWidth / presetHeight;
-    }
-    applicationCommands.setPresetName(preset.name);
     setSelectedPresetId(preset.id);
     onPresetLoad();
   }

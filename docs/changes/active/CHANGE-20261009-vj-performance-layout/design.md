@@ -1,0 +1,35 @@
+# Design
+
+## 実装方針と状態
+
+VJセッションを`src/features/vj/`へ分離する。`vjSettings`は正規化したアプリ設定をlocalStorageへ保存する。`vjPlayback`は独立した拍時計と巡回キューを提供する。`useVjSession`がライブラリ、Shader準備、共通Preset適用、キュー進行、復帰snapshotを接続する。
+
+UIの既存canvasを同じReact位置で維持し、通常パネルをinertかつ非表示にする。VJでは2D出力の縮小表示を行い、通常表示のpan／zoom状態を変更しない。Tauriサイズ操作はlogical pxで直列化し、切替前サイズ・最大化状態を保存して復帰する。権限はメインウインドウのサイズ・最大化だけを追加する。
+
+## パラメータとPreset境界
+
+`vjParameters`は正規のparameter limits、enum定義、既存defaultからモード依存のscalarカタログを作る。`vjDocument`だけがグループ単位の正規化されたapplicationCommandsを呼ぶ。操作項目のkeyframe trackをstatic化し、値・trackのsnapshotを復帰操作に使う。ON/OFFと順序は復帰snapshotで上書きしない。
+
+`applyPresetToDocument`は既存PresetPanelの適用手順を抽出し、共有ライブラリ配列をcloneする。既存document actionsを一時stateへ実行して正規化し、成功後に一度だけlive storeへ反映する。壊れた入れ子データで映像を部分変更しない。通常Panelは返されたresolutionを適用し、VJは現在のresolutionを保つ。Browser／Tauri保存処理とPreset形式には変更を加えない。
+
+Shaderの事前準備は既存live hostへ要求する。別canvas・別GPUコンテキストを作らない。準備失敗ではPresetを適用せず、状態欄から確認できる。同期反映の再入と、失効したcontextの準備結果を抑止する。
+
+## 事前ロードとフォルダ巡回
+
+追加要求では`VjPresetCache`が演奏対象全件のPreparedPresetとGPU contextの準備状態を管理する。CPU clone・マップ検証とGPUコンパイルをアイドル区間へ移し、適用時は準備済みpatchと現在の省略値を同期的に反映する。全件のNoise variantをretention ownerで保持し、集合変更・退出で解除する。コンテキスト失効後の準備結果は使わない。通常編集パネルはReact Activityで状態を保持しながら非表示中の購読を止める。
+
+retention ownerが存在する間は、通常のバックグラウンドShader準備とライブラリ全体のPreset準備を停止し、演奏対象のprefetchだけを進める。退出時は通常準備を再開する。context loss中のコンパイルは失効として終了し、Shader失敗や準備完了の通知を出さない。
+
+`vjPresetSource`は既存PresetLibraryの保存順・フォルダ階層を再利用し、K-GGのルートまたは指定フォルダから対象IDを解決する。子孫包含は設定で選び、ライブラリ更新時に対象を再計算する。カスタムリストIDは別に維持し、保存処理やOS境界は追加しない。
+
+追加の自動ランダム要求では、元の全件キャッシュとは別の`VjPresetCache`が次の1件だけを保持する。元のPreparedPresetを共有し、範囲内ランダムと既存document actionsの正規化を一時stateへ実行する。変更したgroupの入力とstatic trackをPreparedPresetへ反映してからGPUを準備し、拍境界ではその結果だけを同期反映する。ルール・候補・contextの変更は世代管理で取消し、巡回の各出現で新しく準備する。数値・enumの正規範囲、外部素材の制約とロックは既存カタログを共用する。
+
+エフェクト欄は有効なlayerのみを表示する。残った領域の1/8を列幅とし、136pxの操作幅を下回る場合は横スクロールする。数値ラベル・入力とrangeを2段に置き、270pxの高さを維持する。
+
+## 移行と復帰
+
+既存ユーザーは通常表示で開始する。新しいアプリ設定キーだけを追加するためPreset移行は不要。VJで「エディターに戻る」を使うと既存編集UIへ戻る。機能を削除しても既存Presetを読むことができ、新しい設定キーは無視できる。
+
+## 検証
+
+時計・キュー・カタログ・復帰・設定保存・共通loader・nativeサイズ復帰のunitを追加する。ブラウザーでは1920×270／640×270、プリセット切替、範囲内ランダムとundo、4拍切替、canvas同一性と出力寸法、通常UI復帰を確認する。既存workspace E2Eも実行する。Tauri実機・Spout・GPU負荷はRelease GateとObservationへ分ける。
