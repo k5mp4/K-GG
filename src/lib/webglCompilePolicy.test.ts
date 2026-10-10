@@ -3,9 +3,28 @@ import {
   createSerialAsyncQueue,
   selectShaderCompileExtension,
   selectShaderCompileExtensionForSnapshot,
+  selectNoiseProgramVariants, retainNoiseProgramVariants, type WebGLContext,
 } from './webgl';
+import { vi } from 'vitest';
 
 describe('WebGL lazy compile policy', () => {
+  it('keeps all performance variants through repeated cycles and returns to the normal LRU on release', () => {
+    vi.stubGlobal('window', { dispatchEvent: () => {} });
+    const deleteProgram = vi.fn();
+    const programs = new Map(Array.from({ length: 6 }, (_, variant) => [`noiseStack:${variant}`, { program: {}, uniforms: {} }]));
+    const ctx = { gl: { deleteProgram }, noiseVariantPrograms: programs, noiseVariantStates: new Map(),
+      lazyProgramState: {}, activeNoiseVariants: { generator: -1, noiseStack: 0, noiseDiffuseStack: 0 } } as unknown as WebGLContext;
+    try {
+      retainNoiseProgramVariants(ctx, Array.from({ length: 6 }, (_, noiseVariant) => ({ key: 'noiseStack' as const, noiseVariant })));
+      for (let variant = 0; variant < 18; variant++) selectNoiseProgramVariants(ctx, { generator: -1, noiseStack: variant % 6, noiseDiffuseStack: 0 });
+      expect(programs.size).toBe(6);
+      expect(deleteProgram).not.toHaveBeenCalled();
+      retainNoiseProgramVariants(ctx, []);
+      expect(programs.size).toBe(3);
+      expect(programs.has('noiseStack:5')).toBe(true);
+      expect(deleteProgram).toHaveBeenCalledTimes(3);
+    } finally { vi.unstubAllGlobals(); }
+  });
   it('disables parallel linking only while validation is enabled', () => {
     const extension = { COMPLETION_STATUS_KHR: 0x91b1 };
 

@@ -1,6 +1,7 @@
 import type { EffectStackKind } from '../types/distortion';
 import type { LazyCompilePriority, LazyProgramSettleResult } from './webgl';
 import type { LazyProgramKey } from './webglShaderSources';
+import type { DocumentState } from '../store/documentSlice';
 
 /**
  * Idle warmup order after the current scene is ready. Cheap, commonly used
@@ -49,6 +50,9 @@ export type ShaderWarmupSnapshot = {
 
 /** The WebGL-facing operations warmup needs. Implemented by `shaderWarmupHost.ts`. */
 export type ShaderWarmupHost = {
+  getTargetsForDocument?(state: DocumentState): ShaderWarmupTarget[];
+  isReady?(key: LazyProgramKey, noiseVariant?: number): boolean;
+  retain?(targets: readonly ShaderWarmupTarget[]): void;
   /** `noiseVariant` overrides the variant of the current scene, for programs a Preset needs. */
   settle(key: LazyProgramKey, priority: LazyCompilePriority, noiseVariant?: number): Promise<LazyProgramSettleResult>;
   request(key: LazyProgramKey, priority: LazyCompilePriority): void;
@@ -75,6 +79,24 @@ export const INITIAL_SHADER_WARMUP_SNAPSHOT: ShaderWarmupSnapshot = {
 let snapshot: ShaderWarmupSnapshot = INITIAL_SHADER_WARMUP_SNAPSHOT;
 const listeners = new Set<() => void>();
 let activeHost: ShaderWarmupHost | null = null;
+const retainedTargets = new Map<symbol, readonly ShaderWarmupTarget[]>();
+const preparedTargets = new Set<string>();
+
+export function getShaderWarmupContext(): ShaderWarmupHost | null { return activeHost; }
+
+export function areShaderWarmupTargetsReady(targets: readonly ShaderWarmupTarget[], context: ShaderWarmupHost | null): boolean {
+  return context !== null && context === activeHost && !context.isBusy()
+    && targets.every(target => context.isReady?.(target.key, target.noiseVariant) ?? preparedTargets.has(targetId(target)));
+}
+
+export function createShaderWarmupRetention() {
+  const owner = Symbol('performance');
+  const publishRetained = () => activeHost?.retain?.([...retainedTargets.values()].flat());
+  return {
+    update(targets: readonly ShaderWarmupTarget[]) { retainedTargets.set(owner, targets); publishRetained(); },
+    dispose() { retainedTargets.delete(owner); publishRetained(); },
+  };
+}
 
 /** A program (and the Noise variant) that a Preset needs, compiled ahead of its first use. */
 export type ShaderWarmupTarget = { key: LazyProgramKey; noiseVariant?: number };
@@ -108,6 +130,8 @@ export function subscribeShaderWarmup(listener: () => void): () => void {
 
 /** Marks the preview as running without WebGL so startup UI does not wait for shaders. */
 export function markShaderWarmupUnavailable(): void {
+  activeHost = null;
+  preparedTargets.clear();
   publish({ status: 'unavailable' });
 }
 
@@ -116,6 +140,8 @@ export function resetShaderWarmupForTests(): void {
   snapshot = INITIAL_SHADER_WARMUP_SNAPSHOT;
   listeners.clear();
   activeHost = null;
+  retainedTargets.clear();
+  preparedTargets.clear();
   presetTargets = [];
   presetWarmed.clear();
   presetContext = null;
@@ -166,6 +192,9 @@ export function startShaderWarmup(
   const controller = new AbortController();
   const { signal } = controller;
   activeHost = host;
+  preparedTargets.clear();
+  host.retain?.([...retainedTargets.values()].flat());
+  publish({ status: 'waiting' });
   presetContext = null;
   presetWarmed.clear();
 
@@ -202,10 +231,12 @@ export function startShaderWarmup(
     publish({ status: 'background', backgroundTotal: backgroundKeys.length, backgroundSettled: 0 });
     let backgroundSettled = 0;
     for (const key of backgroundKeys) {
+      // A performance owner prepares its finite set explicitly; unrelated
+      // background compiles must not introduce stalls during playback.
       do {
         await waitForIdle(scheduleIdle, signal);
         if (signal.aborted) return;
-      } while (host.isBusy());
+      } while (host.isBusy() || retainedTargets.size > 0);
       const result = await host.settle(key, 'warmup');
       if (signal.aborted || result === 'disposed') return;
       backgroundSettled += 1;
@@ -225,7 +256,7 @@ export function startShaderWarmup(
 
   return () => {
     controller.abort();
-    if (activeHost === host) activeHost = null;
+    if (activeHost === host) { activeHost = null; preparedTargets.clear(); publish({ status: 'waiting' }); }
     if (presetContext?.host === host) presetContext = null;
   };
 }
@@ -246,7 +277,7 @@ async function runPresetWarmup(context: PresetWarmupContext): Promise<void> {
       do {
         await waitForIdle(context.scheduleIdle, context.signal);
         if (context.signal.aborted) return;
-      } while (context.host.isBusy());
+      } while (context.host.isBusy() || retainedTargets.size > 0);
       presetWarmed.add(targetId(next));
       const result = await context.host.settle(next.key, 'warmup', next.noiseVariant);
       if (context.signal.aborted || result === 'disposed') return;
@@ -280,4 +311,18 @@ export function prefetchEffectStackLayer(kind: EffectStackKind): void {
   } catch (error) {
     console.warn('[WebGL shader] prefetch skipped', error);
   }
+}
+
+/** Prepare a performance cue on the existing preview context before replacing the live document. */
+export async function prepareShaderWarmupTargets(targets: readonly ShaderWarmupTarget[]): Promise<boolean> {
+  const host = activeHost;
+  if (!host || host.isBusy()) return false;
+  for (const target of targets) {
+    if (host !== activeHost || host.isBusy()) return false;
+    if (areShaderWarmupTargetsReady([target], host)) continue;
+    if (await host.settle(target.key, 'prefetch', target.noiseVariant) !== 'ready') return false;
+    if (host !== activeHost) return false;
+    preparedTargets.add(targetId(target));
+  }
+  return host === activeHost;
 }

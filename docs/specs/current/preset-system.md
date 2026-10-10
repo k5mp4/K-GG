@@ -5,12 +5,12 @@ title: Preset System
 status: current
 owners: [maintainer]
 created: 2026-07-27
-updated: 2026-10-04
+updated: 2026-10-09
 requirement_ids: [PRESET-001, PRESET-002, PRESET-003, PRESET-004, PRESET-005, PRESET-006, PRESET-007, PRESET-008, PRESET-009, PRESET-011, PRESET-012, PRESET-013, PRESET-014, PRESET-016, PRESET-017, PRESET-018, PRESET-019, PRESET-020, PRESET-021, PRESET-022, PRESET-023]
 related_adrs: [ADR-0007, ADR-0008, ADR-20260927-datamosh-feedback-layer, ADR-20260929-sandbox-texture-material-stage, ADR-20260930-sandbox-shapes-final-stage]
 related_changes: [CHANGE-001, CHANGE-012, CHANGE-013, CHANGE-018, CHANGE-024, CHANGE-025, CHANGE-026, CHANGE-027, CHANGE-030, CHANGE-031, CHANGE-032, CHANGE-034, CHANGE-037, CHANGE-039, CHANGE-046, CHANGE-048, CHANGE-051]
-related_code: [src/lib/presetModel.ts, src/lib/presetLibrary.ts, src/lib/presetLibraryActions.ts, src/lib/history.ts, src/lib/presets.ts, src/lib/presetPreview.ts, src/lib/presetThumbnail.ts, src/lib/presetLibraryCache.ts, src/lib/panelLayout.ts, src/lib/flowGradientRenderer.ts, src/types/flowGradient.ts, src/types/datamosh.ts, src/lib/effectPipeline.ts, src/lib/glass.ts, src/lib/postprocessStack.ts, src/store/gradientStore.ts, src/components/PresetPanel.tsx, src/components/PresetContextMenu.tsx, src/components/FlowGradientPanel.tsx, src/components/DatamoshPanel.tsx, src/components/PresetPreview.tsx, src/components/ClothCanvas.tsx, src/types/coneView.ts, src/adapters/types.ts, src/adapters/browser/presetRepository.ts, src/adapters/tauri/presetRepository.ts, src/lib/kggControlRuntime.ts, src-tauri/src/lib.rs, src/types/texture.ts, src/types/shapes.ts]
-related_tests: [src/lib/presetLibrary.test.ts, src/lib/presetLibraryActions.test.ts, src/lib/history.test.ts, src/lib/presetModel.diffuse.test.ts, src/lib/presetModel.slit.test.ts, src/lib/presetModel.removedEffects.test.ts, src/lib/presetModel.compact.test.ts, src/lib/flowGradientPreset.test.ts, src/lib/presetPreview.test.ts, src/lib/presetThumbnail.test.ts, src/lib/presetThumbnail.lifecycle.test.ts, src/lib/presetLibraryCache.test.ts, src/lib/glass.test.ts, src/lib/postprocessStack.test.ts, src/store/gradientStore.glass.test.ts, src/store/gradientStore.postprocessStack.test.ts, src/store/gradientStore.animation.test.ts, src/types/coneView.test.ts, src/lib/effectPipeline.test.ts, src/lib/presetModel.texture.test.ts, src/lib/presetModel.shapes.test.ts]
+related_code: [src/lib/applyPreset.ts, src/lib/presetModel.ts, src/lib/presetLibrary.ts, src/lib/presetLibraryActions.ts, src/lib/history.ts, src/lib/presets.ts, src/lib/presetPreview.ts, src/lib/presetThumbnail.ts, src/lib/presetLibraryCache.ts, src/lib/panelLayout.ts, src/lib/flowGradientRenderer.ts, src/types/flowGradient.ts, src/types/datamosh.ts, src/lib/effectPipeline.ts, src/lib/glass.ts, src/lib/postprocessStack.ts, src/store/gradientStore.ts, src/components/PresetPanel.tsx, src/components/PresetContextMenu.tsx, src/components/FlowGradientPanel.tsx, src/components/DatamoshPanel.tsx, src/components/PresetPreview.tsx, src/components/ClothCanvas.tsx, src/types/coneView.ts, src/adapters/types.ts, src/adapters/browser/presetRepository.ts, src/adapters/tauri/presetRepository.ts, src/lib/kggControlRuntime.ts, src-tauri/src/lib.rs, src/types/texture.ts, src/types/shapes.ts]
+related_tests: [src/lib/applyPreset.test.ts, src/lib/presetLibrary.test.ts, src/lib/presetLibraryActions.test.ts, src/lib/history.test.ts, src/lib/presetModel.diffuse.test.ts, src/lib/presetModel.slit.test.ts, src/lib/presetModel.removedEffects.test.ts, src/lib/presetModel.compact.test.ts, src/lib/flowGradientPreset.test.ts, src/lib/presetPreview.test.ts, src/lib/presetThumbnail.test.ts, src/lib/presetThumbnail.lifecycle.test.ts, src/lib/presetLibraryCache.test.ts, src/lib/glass.test.ts, src/lib/postprocessStack.test.ts, src/store/gradientStore.glass.test.ts, src/store/gradientStore.postprocessStack.test.ts, src/store/gradientStore.animation.test.ts, src/types/coneView.test.ts, src/lib/effectPipeline.test.ts, src/lib/presetModel.texture.test.ts, src/lib/presetModel.shapes.test.ts]
 ---
 
 # Preset System
@@ -64,6 +64,10 @@ Web版はブラウザの `localStorage` を保存先とし、単一PresetはJSON
 ### PRESET-008 破損データと安全性
 
 Presetやライブラリは読込時に構造、ID、親子関係、循環、名前、サイズ上限を検証します。破損データを現在のライブラリへ部分適用せず、エラーとして扱います。Web版で読込に失敗した場合は空ライブラリへフォールバックし、Tauri版でも保存済みデータを壊さずにエラーを通知します。
+
+通常エディターと[VJ](./vj-performance)の映像への適用は`src/lib/applyPreset.ts`を共有します。既存document actionsで一時stateを正規化し、全処理が成功した時点で一度だけ現在の映像へ反映します。壊れたキーフレームなどで正規化が失敗した場合、映像を部分変更しません。保存済みPresetの入れ子データは複製して使い、読み込み後の編集でライブラリ内のデータを変更しません。
+
+準備と反映は分離できます。VJは演奏対象をあらかじめclone・正規化し、切替時は準備済みの値を同期的に反映します。旧Presetの省略項目とPreview Loop・BPM・easingの引継ぎは、準備時ではなく反映時の現在値から求めます。準備キャッシュは保存形式へ追加しません。
 
 交換ファイルは読込前に32 MiB以下へ制限し、Worker内で検証・展開する。ZIPは`preset-library.json`だけを含むZIP32を受け付け、展開サイズ16 MiB以下、実サイズ、CRCを検証する。追加エントリ、ZIP64、暗号化、不正サイズは拒否する。10秒以内に完了しないimportはWorkerを終了し、保存済みライブラリを変更しない。
 

@@ -1,5 +1,5 @@
 import './App.css';
-import { useEffect } from 'react';
+import { Activity, useEffect, useSyncExternalStore } from 'react';
 import { NoiseDistortionPanel } from './components/NoiseDistortionPanel';
 import { DiffusePanel } from './components/BlockNoisePanel';
 import { ExportPanel } from './components/ExportPanel';
@@ -28,6 +28,9 @@ import { useWorkspaceController } from './features/workspace/useWorkspaceControl
 import { disposePresetThumbnailRenderer } from './lib/presetThumbnail';
 import { ensurePresetLibraryLoaded } from './lib/presetLibraryCache';
 import { startPresetShaderWarmupSync } from './lib/presetShaderWarmup';
+import { getVjLayoutMode, subscribeVjSettings, updateVjSettings } from './features/vj/vjSettings';
+import { useVjWindow } from './features/vj/useVjWindow';
+import { VjWorkspace } from './features/vj/VjWorkspace';
 
 export default function App() {
   useEffect(() => () => {
@@ -41,6 +44,9 @@ export default function App() {
   useEffect(() => startPresetShaderWarmupSync(), []);
 
   const { t } = useLanguage();
+  const layoutMode = useSyncExternalStore(subscribeVjSettings, getVjLayoutMode, getVjLayoutMode);
+  const vjEnabled = layoutMode === 'vj';
+  const vjWindowFailed = useVjWindow(vjEnabled);
   const {
     updater,
     animation,
@@ -154,11 +160,13 @@ export default function App() {
     handleTimelineToggle,
     handleTimeRemapToggle,
     handleShowHelp,
-  } = useWorkspaceController({ translate: t });
+  } = useWorkspaceController({ translate: t, compact: vjEnabled });
 
   return (
     <InteractionSettingsProvider value={{ hoverInteractionsEnabled: tabHoverSwitchEnabled }}>
-      <div ref={workspaceRef} data-workspace-layout={layout.panels} className="h-[100dvh] min-w-0 text-k-text flex flex-col overflow-hidden relative">
+      <div ref={workspaceRef} data-workspace-layout={layout.panels} data-layout-mode={layoutMode} className={`h-[100dvh] min-w-0 text-k-text flex flex-col overflow-hidden relative${vjEnabled ? ' kgg-vj-workspace' : ''}`}>
+        <Activity mode={vjEnabled ? 'hidden' : 'visible'}>
+        <div className="workspace-topbar" inert={vjEnabled}>
         <WorkspaceTopBar
           leftTab={leftTab}
           panelsPresentation={layout.panels}
@@ -175,14 +183,18 @@ export default function App() {
           onOpenSettings={() => setShowPropertyModulesSettings(true)}
           onToggleRightSidebar={handleToggleRightSidebar}
         />
+        </div>
 
-        <div className="min-h-0 flex-1 flex flex-row overflow-hidden relative">
+        </Activity>
+        <div className="workspace-body min-h-0 flex-1 flex flex-row overflow-hidden relative">
           {/* モバイル用左サイドバー開閉オーバーレイ */}
-          {layout.panels === 'overlay' && (showLeftSidebar || showRightSidebar) && (
+          {!vjEnabled && layout.panels === 'overlay' && (showLeftSidebar || showRightSidebar) && (
             <button type="button" tabIndex={-1} className="absolute inset-0 bg-k-bg/50 z-30 !border-0" aria-label={t('common.close')} onClick={() => { setShowLeftSidebar(false); setShowRightSidebar(false); }} />
           )}
 
           {/* 詳細プロパティ表示用の左サイドバー */}
+          <Activity mode={vjEnabled ? 'hidden' : 'visible'}>
+          <div className="editor-only flex min-h-0" inert={vjEnabled}>
           <DockPanel
             id="property-modules-panel"
             side="left"
@@ -268,11 +280,15 @@ export default function App() {
               </div>
             </div>
           </DockPanel>
+          </div>
 
+          </Activity>
           {/* プレビューエリア */}
-          <CanvasWorkspace {...canvasWorkspaceProps} />
+          <CanvasWorkspace {...canvasWorkspaceProps} compact={vjEnabled} />
 
           {/* 右サイドバー: グラデーション設定 */}
+          <Activity mode={vjEnabled ? 'hidden' : 'visible'}>
+          <div className="editor-only flex min-h-0" inert={vjEnabled}>
           <DockPanel
             id="gradient-settings-panel"
             side="right"
@@ -507,8 +523,13 @@ export default function App() {
               </SidebarSection>
             </div>
           </DockPanel>
+          </div>
+          </Activity>
+          <VjWorkspace canvasW={canvasW} canvasH={canvasH} windowFailed={vjWindowFailed} canvasRef={canvasRef} />
         </div>
         {/* TimelineWorkspace sits below the sidebars so sidebar resizing does not change its footprint. */}
+        <Activity mode={vjEnabled ? 'hidden' : 'visible'}>
+        <div className="workspace-timeline" inert={vjEnabled}>
         <TimelineWorkspace
           isOpen={showTimeline}
           height={timelineHeight}
@@ -524,6 +545,8 @@ export default function App() {
           onToggle={handleTimelineToggle}
           onResizeStart={handleTimelineResizeStart}
         />
+        </div>
+        </Activity>
         {showHelp && (
           <HelpPanel
             onClose={() => setShowHelp(false)}
@@ -543,6 +566,11 @@ export default function App() {
             onHoverSwitchChange={setTabHoverSwitchMode}
             onRefreshApp={() => window.location.reload()}
             onClose={() => setShowPropertyModulesSettings(false)}
+            layoutMode={layoutMode}
+            onLayoutModeChange={layoutMode => {
+              updateVjSettings({ layoutMode });
+              setShowPropertyModulesSettings(false);
+            }}
           />
         )}
         <UpdateDialog

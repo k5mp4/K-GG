@@ -25,6 +25,10 @@ export default defineConfig({
       testMatch: '**/workspace-layout.spec.ts',
     },
     {
+      name: 'vj-performance',
+      testMatch: '**/vj-performance.spec.ts',
+    },
+    {
       name: 'export-png',
       testMatch: '**/export.spec.ts',
       grep: /Save PNG downloads a structurally valid image/,

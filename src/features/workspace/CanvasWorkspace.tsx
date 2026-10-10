@@ -94,6 +94,7 @@ type CanvasWorkspaceControlsProps = {
 };
 
 export type CanvasWorkspaceProps = {
+  compact?: boolean;
   viewport: CanvasWorkspaceViewportProps;
   chrome: CanvasWorkspaceChromeProps;
   view: CanvasWorkspaceViewProps;
@@ -104,6 +105,7 @@ export type CanvasWorkspaceProps = {
 };
 
 export function CanvasWorkspace({
+  compact = false,
   viewport,
   chrome,
   view,
@@ -142,7 +144,7 @@ export function CanvasWorkspace({
     onCloseTimeRemap,
   } = chrome;
   const {
-    renderViewMode,
+    renderViewMode: normalRenderViewMode,
     clothReady,
     clothUnavailable,
     clothGradient,
@@ -150,6 +152,7 @@ export function CanvasWorkspace({
     effectPipeline,
     leftTab,
   } = view;
+  const renderViewMode = compact ? 'canvas' : normalRenderViewMode;
   const {
     overlayImageSrc,
     overlayImageElement,
@@ -290,10 +293,10 @@ export function CanvasWorkspace({
         </button>
       </div>
 
-      <div className="relative min-h-0 flex-1 flex items-center justify-center p-2 md:p-6 overflow-visible">
+      <div className="canvas-frame relative min-h-0 flex-1 flex items-center justify-center p-2 md:p-6 overflow-visible">
         <EffectStackWorkspace
           sourceCanvasRef={canvasRef}
-          hidden={panelsPresentation === 'overlay' && (showLeftSidebar || showRightSidebar)}
+          hidden={compact || (panelsPresentation === 'overlay' && (showLeftSidebar || showRightSidebar))}
           presentation={toolsPresentation}
           onSelectEffectStack={onSelectEffectStack}
         />
@@ -302,7 +305,7 @@ export function CanvasWorkspace({
           width: displayW,
           height: displayH,
           overflow: 'visible',
-          transform: `translate(${pan.x}px, ${pan.y}px) scale(${zoom})`,
+          transform: compact ? 'none' : `translate(${pan.x}px, ${pan.y}px) scale(${zoom})`,
           transformOrigin: 'center center',
         }}>
           <div
@@ -347,10 +350,10 @@ export function CanvasWorkspace({
             && effectPipeline.version === 'stack-v2'
             && effectPipeline.selectedKind === 'cone'
             && isEffectStackLayerEnabled(effectPipeline, 'cone') && (
-              <ConeApexEditor width={displayW} height={displayH} visible={showGradientAnchors} />
+              <ConeApexEditor width={displayW} height={displayH} visible={!compact && showGradientAnchors} />
           )}
           <DistortOverlay
-            active={renderViewMode === 'canvas' && leftTab === 'postprocess' && postprocess.effectMode === 'distort' && (
+            active={!compact && renderViewMode === 'canvas' && leftTab === 'postprocess' && postprocess.effectMode === 'distort' && (
               effectPipeline.version === 'stack-v2'
                 ? isEffectStackLayerEnabled(effectPipeline, 'distort')
                 : isPostprocessLayerEnabled(postprocess, 'distort')
@@ -363,7 +366,7 @@ export function CanvasWorkspace({
             setManualDistort={setManualDistort}
           />
           <PostprocessOverlay
-            active={renderViewMode === 'canvas' && leftTab === 'postprocess'}
+            active={!compact && renderViewMode === 'canvas' && leftTab === 'postprocess'}
             width={displayW}
             height={displayH}
             postprocess={postprocess}
@@ -383,8 +386,8 @@ export function CanvasWorkspace({
               alt=""
             />
           )}
-          <GradientAnchorEditor width={displayW} height={displayH} visible={showGradientAnchors} />
-          {renderViewMode === 'canvas' && <SlitOverlay width={displayW} height={displayH} canvasW={canvasW} canvasH={canvasH} />}
+          <GradientAnchorEditor width={displayW} height={displayH} visible={!compact && showGradientAnchors} />
+          {!compact && renderViewMode === 'canvas' && <SlitOverlay width={displayW} height={displayH} canvasW={canvasW} canvasH={canvasH} />}
         </div>
         {clothUnavailable && (
           <div

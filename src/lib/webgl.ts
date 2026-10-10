@@ -263,6 +263,8 @@ export type WebGLContext = {
   /** Compiled Noise variants by `noiseVariantId`, including inactive ones. */
   noiseVariantPrograms: Map<string, { program: WebGLProgram; uniforms: Record<string, WebGLUniformLocation | null> }>;
   noiseVariantStates: Map<string, LazyProgramState>;
+  /** Variants required by the active performance set are retained until that set changes. */
+  retainedNoiseVariantIds?: ReadonlySet<string>;
   gradientRampTexture: WebGLTexture; // TEXTURE1: グラデーションランプ
   meshGradientTexture: WebGLTexture; // TEXTURE2: 前方向テッセレーション済みMeshフィールド
   meshGradientTextureSignature: string;
@@ -1351,7 +1353,7 @@ async function compileLazyProgram(
     // the render path and make the whole effect stack unusable.
     installLazyProgram(ctx, key, program, noiseVariant);
   } catch (error) {
-    if (ctx.disposed) {
+    if (ctx.disposed || gl.isContextLost()) {
       if (program) gl.deleteProgram(program);
       return;
     }
@@ -1482,7 +1484,8 @@ function requestLazyProgram(
   requestedNoiseVariant?: number,
 ): boolean {
   const noiseVariant = resolveNoiseVariant(ctx, key, requestedNoiseVariant);
-  if (ctx.disposed || lazyProgramReady(ctx, key, noiseVariant)) return !ctx.disposed;
+  if (ctx.disposed || ctx.gl.isContextLost()) return false;
+  if (lazyProgramReady(ctx, key, noiseVariant)) return true;
 
   const state = lazyProgramStateFor(ctx, key, noiseVariant);
   const queueId = lazyProgramQueueId(key, noiseVariant);
@@ -1499,14 +1502,14 @@ function requestLazyProgram(
       () => compileLazyProgram(ctx, key, noiseVariant),
       { priority, id: queueId },
     ).catch((error) => {
-      if (ctx.disposed) return;
+      if (ctx.disposed || ctx.gl.isContextLost()) return;
       state.failed = true;
       state.timedOut = error instanceof Error && error.message.includes('timed out');
       console.error(`[WebGL] Lazy shader compile failed (${queueId}):`, error);
       if (isActiveVariant()) dispatchLazyProgramState(key, 'failed');
     }).finally(() => {
       state.promise = null;
-      if (ctx.disposed || state.failed) return;
+      if (ctx.disposed || ctx.gl.isContextLost() || state.failed) return;
       if (isActiveVariant()) dispatchLazyProgramState(key, 'ready');
       // An inactive variant can still change the next frame: the Generator
       // variant prepared while Noise is drawn by its stack pass takes over
@@ -1559,10 +1562,14 @@ function touchNoiseVariantProgram(ctx: WebGLContext, key: NoiseVariantProgramKey
   if (!entry) return;
   ctx.noiseVariantPrograms.delete(id);
   ctx.noiseVariantPrograms.set(id, entry);
+  trimNoiseVariantPrograms(ctx, key);
+}
+
+function trimNoiseVariantPrograms(ctx: WebGLContext, key: NoiseVariantProgramKey): void {
   const activeId = noiseVariantId(key, ctx.activeNoiseVariants[key]);
   const bootstrapId = noiseVariantId('generator', GENERATOR_WITHOUT_NOISE_VARIANT);
   const evictable = [...ctx.noiseVariantPrograms.keys()]
-    .filter(candidate => candidate.startsWith(`${key}:`) && candidate !== bootstrapId);
+    .filter(candidate => candidate.startsWith(`${key}:`) && candidate !== bootstrapId && !ctx.retainedNoiseVariantIds?.has(candidate));
   let excess = evictable.length - MAX_CACHED_NOISE_VARIANTS;
   for (const candidate of evictable) {
     if (excess <= 0) break;
@@ -1571,6 +1578,16 @@ function touchNoiseVariantProgram(ctx: WebGLContext, key: NoiseVariantProgramKey
     ctx.noiseVariantPrograms.delete(candidate);
     ctx.noiseVariantStates.delete(candidate);
     excess -= 1;
+  }
+}
+
+/** Retain only the finite Noise variants used by a prepared performance set. */
+export function retainNoiseProgramVariants(ctx: WebGLContext, targets: readonly { key: LazyProgramKey; noiseVariant?: number }[]): void {
+  ctx.retainedNoiseVariantIds = new Set(targets.flatMap(target =>
+    isNoiseVariantProgramKey(target.key) && target.noiseVariant !== undefined
+      ? [noiseVariantId(target.key, target.noiseVariant)] : []));
+  for (const key of NOISE_VARIANT_PROGRAM_KEYS) {
+    trimNoiseVariantPrograms(ctx, key);
   }
 }
 
@@ -1652,7 +1669,7 @@ function markNoiseDiffuseStackFallback(ctx: WebGLContext): void {
   }));
 }
 
-function lazyProgramReady(ctx: WebGLContext, key: LazyProgramKey, noiseVariant?: number): boolean {
+export function lazyProgramReady(ctx: WebGLContext, key: LazyProgramKey, noiseVariant?: number): boolean {
   if (isThreeDProgramKey(key)) return Boolean(ctx.threeDPrograms[key]);
   if (noiseVariant !== undefined && isNoiseVariantProgramKey(key)) {
     return ctx.noiseVariantPrograms.has(noiseVariantId(key, noiseVariant));
@@ -1746,12 +1763,12 @@ export async function settleLazyProgram(
   priority: LazyCompilePriority,
   requestedNoiseVariant?: number,
 ): Promise<LazyProgramSettleResult> {
-  if (ctx.disposed) return 'disposed';
+  if (ctx.disposed || ctx.gl.isContextLost()) return 'disposed';
   const noiseVariant = resolveNoiseVariant(ctx, key, requestedNoiseVariant);
   if (requestLazyProgram(ctx, key, priority, noiseVariant)) return 'ready';
   const pending = lazyProgramStateFor(ctx, key, noiseVariant).promise;
   if (pending) await pending.catch(() => undefined);
-  if (ctx.disposed) return 'disposed';
+  if (ctx.disposed || ctx.gl.isContextLost()) return 'disposed';
   return lazyProgramReady(ctx, key, noiseVariant) ? 'ready' : 'failed';
 }
 
