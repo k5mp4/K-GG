@@ -29,7 +29,7 @@
 | Fast validation | `npm run check:merge` | pass（unit 1171 pass / 1 skip、lint、build、docs） |
 | Shader compile (WebGL2) | `npm run check:render` | pass（場付きGenerator variantとIceを含む全74 program） |
 | Field / Ice fixture (WebGL2) | `npx playwright test --project=ice` | pass（7 tests） |
-| Render / export e2e | `npm run check:e2e` | PENDING |
+| Render / export e2e | `npm run check:e2e` | 11 pass / 4 fail。失敗はworkspace-layout 1件とvj-performance 3件。うち3件はmain（734c63d）でも同じく失敗。残る`vj-performance.spec.ts:28`は単独再実行でpass（全体実行時の負荷によるtimeoutと判断）。Ice・Material Field関連のe2eはすべてpass |
 
 ## Release Gate
 
