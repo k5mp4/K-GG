@@ -248,8 +248,7 @@ function cellVertexColor(
     // between two grid rows (especially obvious in the default 2x2 mesh).
     // Sample the same ramp texture at each tessellated parametric position so
     // the canvas uses the same color progression that the ramp displays.
-    const globalV = mesh.rows <= 1 ? 0 : (cellRow + clamp01(v)) / (mesh.rows - 1);
-    return sampleRamp(rampData, rampWidth, globalV);
+    return sampleRamp(rampData, rampWidth, meshLogicalV(mesh, cellRow, v));
   }
 
   const colors = cellCornerColors(mesh, rampData, rampWidth, cellRow, cellCol);
@@ -281,16 +280,18 @@ function writeColor(output: Uint8Array, offset: number, color: Rgba): void {
   output[offset + 3] = Math.max(0, Math.min(255, Math.round(finiteOr(color[3], 255))));
 }
 
-function rasterizeTriangle(
-  output: Uint8Array,
+/**
+ * Visits the covered pixels of one triangle with its barycentric weights.
+ * Shared by the color field and the logical-coordinate lookup so both cover
+ * exactly the same pixels in the same order.
+ */
+function forEachTrianglePixel(
   width: number,
   height: number,
   a: Vec2Tuple,
   b: Vec2Tuple,
   c: Vec2Tuple,
-  ca: Rgba,
-  cb: Rgba,
-  cc: Rgba,
+  write: (pixel: number, weightA: number, weightB: number, weightC: number) => void,
 ): void {
   const minX = Math.max(0, Math.floor(Math.min(a[0], b[0], c[0]) * width - 0.5));
   const maxX = Math.min(width - 1, Math.ceil(Math.max(a[0], b[0], c[0]) * width - 0.5));
@@ -309,13 +310,70 @@ function rasterizeTriangle(
       const weightB = ((c[1] - a[1]) * (sampleX - c[0]) + (a[0] - c[0]) * (sampleY - c[1])) / determinant;
       const weightC = 1 - weightA - weightB;
       if (weightA < -1e-6 || weightB < -1e-6 || weightC < -1e-6) continue;
-      const offset = (y * width + x) * 4;
-      writeColor(output, offset, [
-        weightA * ca[0] + weightB * cb[0] + weightC * cc[0],
-        weightA * ca[1] + weightB * cb[1] + weightC * cc[1],
-        weightA * ca[2] + weightB * cb[2] + weightC * cc[2],
-        weightA * ca[3] + weightB * cb[3] + weightC * cc[3],
-      ]);
+      write(y * width + x, weightA, weightB, weightC);
+    }
+  }
+}
+
+function rasterizeTriangle(
+  output: Uint8Array,
+  width: number,
+  height: number,
+  a: Vec2Tuple,
+  b: Vec2Tuple,
+  c: Vec2Tuple,
+  ca: Rgba,
+  cb: Rgba,
+  cc: Rgba,
+): void {
+  forEachTrianglePixel(width, height, a, b, c, (pixel, weightA, weightB, weightC) => {
+    writeColor(output, pixel * 4, [
+      weightA * ca[0] + weightB * cb[0] + weightC * cc[0],
+      weightA * ca[1] + weightB * cb[1] + weightC * cc[1],
+      weightA * ca[2] + weightB * cb[2] + weightC * cc[2],
+      weightA * ca[3] + weightB * cb[3] + weightC * cc[3],
+    ]);
+  });
+}
+
+/**
+ * Forward-tessellates every Coons cell and visits its triangles in the fixed
+ * draw order. Later triangles overwrite earlier ones, which defines how
+ * folded patches overlap; both mesh fields must share this order.
+ */
+function forEachMeshTriangle<T>(
+  mesh: MeshGradientConfig,
+  perCell: number,
+  sample: (cellRow: number, cellCol: number, u: number, v: number) => T,
+  visit: (a: Vec2Tuple, b: Vec2Tuple, c: Vec2Tuple, ta: T, tb: T, tc: T) => void,
+): void {
+  for (let cellRow = 0; cellRow < mesh.rows - 1; cellRow += 1) {
+    for (let cellCol = 0; cellCol < mesh.columns - 1; cellCol += 1) {
+      const points: Vec2Tuple[][] = [];
+      const values: T[][] = [];
+      for (let y = 0; y <= perCell; y += 1) {
+        const v = y / perCell;
+        const pointRow: Vec2Tuple[] = [];
+        const valueRow: T[] = [];
+        for (let x = 0; x <= perCell; x += 1) {
+          const u = x / perCell;
+          pointRow.push(evaluateMeshCell(mesh, cellRow, cellCol, u, v));
+          valueRow.push(sample(cellRow, cellCol, u, v));
+        }
+        points.push(pointRow);
+        values.push(valueRow);
+      }
+
+      for (let y = 0; y < perCell; y += 1) {
+        for (let x = 0; x < perCell; x += 1) {
+          const p00 = points[y][x];
+          const p10 = points[y][x + 1];
+          const p01 = points[y + 1][x];
+          const p11 = points[y + 1][x + 1];
+          visit(p00, p10, p11, values[y][x], values[y][x + 1], values[y + 1][x + 1]);
+          visit(p00, p11, p01, values[y][x], values[y + 1][x + 1], values[y + 1][x]);
+        }
+      }
     }
   }
 }
@@ -363,35 +421,55 @@ export function buildMeshGradientField(
     }
   }
 
-  for (let cellRow = 0; cellRow < mesh.rows - 1; cellRow += 1) {
-    for (let cellCol = 0; cellCol < mesh.columns - 1; cellCol += 1) {
-      const points: Vec2Tuple[][] = [];
-      const colors: Rgba[][] = [];
-      for (let y = 0; y <= perCell; y += 1) {
-        const v = y / perCell;
-        const pointRow: Vec2Tuple[] = [];
-        const colorRow: Rgba[] = [];
-        for (let x = 0; x <= perCell; x += 1) {
-          const u = x / perCell;
-          pointRow.push(evaluateMeshCell(mesh, cellRow, cellCol, u, v));
-          colorRow.push(cellVertexColor(mesh, rampData, rampWidth, cellRow, cellCol, u, v));
-        }
-        points.push(pointRow);
-        colors.push(colorRow);
-      }
-
-      for (let y = 0; y < perCell; y += 1) {
-        for (let x = 0; x < perCell; x += 1) {
-          const p00 = points[y][x];
-          const p10 = points[y][x + 1];
-          const p01 = points[y + 1][x];
-          const p11 = points[y + 1][x + 1];
-          rasterizeTriangle(output, width, height, p00, p10, p11, colors[y][x], colors[y][x + 1], colors[y + 1][x + 1]);
-          rasterizeTriangle(output, width, height, p00, p11, p01, colors[y][x], colors[y + 1][x + 1], colors[y + 1][x]);
-        }
-      }
-    }
-  }
+  forEachMeshTriangle(
+    mesh,
+    perCell,
+    (cellRow, cellCol, u, v) => cellVertexColor(mesh, rampData, rampWidth, cellRow, cellCol, u, v),
+    (a, b, c, ca, cb, cc) => rasterizeTriangle(output, width, height, a, b, c, ca, cb, cc),
+  );
 
   return output;
+}
+
+/** Global logical v of a tessellation sample, matching Ramp mode colors. */
+function meshLogicalV(mesh: MeshGradientConfig, cellRow: number, v: number): number {
+  return mesh.rows <= 1 ? 0 : (cellRow + clamp01(v)) / (mesh.rows - 1);
+}
+
+/**
+ * Rasterizes the mesh's logical v (0 bottom row, 1 top row) into a
+ * bottom-left-origin single-channel field. Ramp mode reads the ramp at this
+ * v, so a field-driven ramp can be mixed in the same coordinate. Holes and
+ * pixels outside a folded patch use screen v, which is the coordinate the
+ * color field's bilinear fallback corresponds to. Colors never enter this
+ * field, so it only depends on the geometry and its size.
+ */
+export function buildMeshCoordinateField(
+  inputMesh: MeshGradientConfig,
+  options: MeshGradientFieldOptions = {},
+): Float32Array {
+  const mesh = normalizeMeshGradientConfig(inputMesh);
+  const width = Math.max(1, Math.floor(options.width ?? MESH_FIELD_SIZE));
+  const height = Math.max(1, Math.floor(options.height ?? width));
+  const perCell = perCellSubdivisions(mesh, options.subdivisions);
+  const output = new Float32Array(width * height);
+  for (let y = 0; y < height; y += 1) {
+    output.fill(height === 1 ? 0 : y / (height - 1), y * width, (y + 1) * width);
+  }
+  forEachMeshTriangle(
+    mesh,
+    perCell,
+    (cellRow, _cellCol, _u, v) => meshLogicalV(mesh, cellRow, v),
+    (a, b, c, va, vb, vc) => forEachTrianglePixel(width, height, a, b, c, (pixel, weightA, weightB, weightC) => {
+      output[pixel] = clamp01(finiteOr(weightA * va + weightB * vb + weightC * vc, 0));
+    }),
+  );
+  return output;
+}
+
+/** Cache key of the coordinate field: geometry and size, never colors. */
+export function meshCoordinateFieldSignature(inputMesh: MeshGradientConfig, size: number, subdivisions: number): string {
+  const mesh = normalizeMeshGradientConfig(inputMesh);
+  const { colorMode: _colorMode, pointColors: _pointColors, ...geometry } = mesh;
+  return `${JSON.stringify(geometry)}:${size}:${subdivisions}`;
 }

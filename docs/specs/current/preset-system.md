@@ -5,9 +5,9 @@ title: Preset System
 status: current
 owners: [maintainer]
 created: 2026-07-27
-updated: 2026-10-09
-requirement_ids: [PRESET-001, PRESET-002, PRESET-003, PRESET-004, PRESET-005, PRESET-006, PRESET-007, PRESET-008, PRESET-009, PRESET-011, PRESET-012, PRESET-013, PRESET-014, PRESET-016, PRESET-017, PRESET-018, PRESET-019, PRESET-020, PRESET-021, PRESET-022, PRESET-023]
-related_adrs: [ADR-0007, ADR-0008, ADR-20260927-datamosh-feedback-layer, ADR-20260929-sandbox-texture-material-stage, ADR-20260930-sandbox-shapes-final-stage]
+updated: 2026-10-19
+requirement_ids: [PRESET-001, PRESET-002, PRESET-003, PRESET-004, PRESET-005, PRESET-006, PRESET-007, PRESET-008, PRESET-009, PRESET-011, PRESET-012, PRESET-013, PRESET-014, PRESET-016, PRESET-017, PRESET-018, PRESET-019, PRESET-020, PRESET-021, PRESET-022, PRESET-023, PRESET-024, PRESET-025]
+related_adrs: [ADR-0007, ADR-0008, ADR-20260927-datamosh-feedback-layer, ADR-20260929-sandbox-texture-material-stage, ADR-20260930-sandbox-shapes-final-stage, ADR-20261019-ice-material-field]
 related_changes: [CHANGE-001, CHANGE-012, CHANGE-013, CHANGE-018, CHANGE-024, CHANGE-025, CHANGE-026, CHANGE-027, CHANGE-030, CHANGE-031, CHANGE-032, CHANGE-034, CHANGE-037, CHANGE-039, CHANGE-046, CHANGE-048, CHANGE-051]
 related_code: [src/lib/applyPreset.ts, src/lib/presetModel.ts, src/lib/presetLibrary.ts, src/lib/presetLibraryActions.ts, src/lib/history.ts, src/lib/presets.ts, src/lib/presetPreview.ts, src/lib/presetThumbnail.ts, src/lib/presetLibraryCache.ts, src/lib/panelLayout.ts, src/lib/flowGradientRenderer.ts, src/types/flowGradient.ts, src/types/datamosh.ts, src/lib/effectPipeline.ts, src/lib/glass.ts, src/lib/postprocessStack.ts, src/store/gradientStore.ts, src/components/PresetPanel.tsx, src/components/PresetContextMenu.tsx, src/components/FlowGradientPanel.tsx, src/components/DatamoshPanel.tsx, src/components/PresetPreview.tsx, src/components/ClothCanvas.tsx, src/types/coneView.ts, src/adapters/types.ts, src/adapters/browser/presetRepository.ts, src/adapters/tauri/presetRepository.ts, src/lib/kggControlRuntime.ts, src-tauri/src/lib.rs, src/types/texture.ts, src/types/shapes.ts]
 related_tests: [src/lib/applyPreset.test.ts, src/lib/presetLibrary.test.ts, src/lib/presetLibraryActions.test.ts, src/lib/history.test.ts, src/lib/presetModel.diffuse.test.ts, src/lib/presetModel.slit.test.ts, src/lib/presetModel.removedEffects.test.ts, src/lib/presetModel.compact.test.ts, src/lib/flowGradientPreset.test.ts, src/lib/presetPreview.test.ts, src/lib/presetThumbnail.test.ts, src/lib/presetThumbnail.lifecycle.test.ts, src/lib/presetLibraryCache.test.ts, src/lib/glass.test.ts, src/lib/postprocessStack.test.ts, src/store/gradientStore.glass.test.ts, src/store/gradientStore.postprocessStack.test.ts, src/store/gradientStore.animation.test.ts, src/types/coneView.test.ts, src/lib/effectPipeline.test.ts, src/lib/presetModel.texture.test.ts, src/lib/presetModel.shapes.test.ts]
@@ -135,6 +135,14 @@ Legacy SPECは保存形式が変化した経緯を追うために残します。
 ### PRESET-021 Shapes設定の保存互換
 
 `shapes`（有効状態、形状ソース、配置、輪郭と陰影、Fill、オーラと階調、背景、表示・非表示ループ）はPreset、履歴（undo／redo）、storeの永続化対象です。保存時と読み込み時に`normalizeShapesConfig`で範囲と列挙を正規化し、旧Presetにない場合は無効の既定値を使います。`source: custom`で読み込んだSVGは保存せず、読込後にSVGがない場合とThumbnailでは内蔵の`star`で描画します。
+
+### PRESET-024 Material Fieldと構造入力の保存互換
+
+root の`materialField`と`gradient.fieldInput`はPreset、Undo/Redo、Thumbnail、Export snapshot、共有パラメータ（UI・kgg-control/MCP）の対象です。保存時と読み込み時に`normalizeMaterialFieldConfig`と`normalizeGradientFieldInput`で範囲、整数化（SeedとLoop Cycles）、列挙を正規化し、未知値・非有限値・範囲外の値は既定値または範囲内へ戻します。どちらも持たない旧Presetは、開いている文書の値を引き継がず、既定の構造と`source: none`で読み込むため、描画は変わりません。`fieldInput.source`を選んでも他の効果は有効になりません。`gradient.fieldInput`の部分更新は他のGradient設定を変えません。描画済みtextureやMeshの`v` lookupは保存しません。
+
+### PRESET-025 Ice設定の保存互換
+
+rootの`ice`と、`effectPipeline.effectStack`内の`ice`レイヤー（有効状態と順序）はPresetの永続化対象です。保存時と読み込み時に`normalizeIceConfig`で範囲、整数化（Light Cycles）、色を正規化し、旧Presetにない場合は無効の既定値を使います。Iceの構造は`materialField`（PRESET-024）に保存し、`ice`には光学設定だけを持ちます。Thumbnailも同じ値で描画し、場付きvariantやIce programの準備を待ってから描画します。
 
 ### PRESET-020 保存データの最小化
 

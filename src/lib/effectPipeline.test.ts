@@ -140,8 +140,9 @@ describe('effectPipeline', () => {
     it('places Texture last by default and lets it move like any other layer', () => {
       const stack = createDefaultEffectStack();
 
-      expect(stack.map(layer => layer.kind).at(-2)).toBe('texture');
-      expect(stack.map(layer => layer.kind).at(-1)).toBe('distortChroma');
+      expect(stack.map(layer => layer.kind).at(-3)).toBe('texture');
+      expect(stack.map(layer => layer.kind).at(-2)).toBe('distortChroma');
+      expect(stack.map(layer => layer.kind).at(-1)).toBe('ice');
       expect(stack.find(layer => layer.kind === 'texture')?.enabled).toBe(false);
       expect(normalizeEffectStack([{ kind: 'texture', enabled: true }, { kind: 'noise', enabled: true }])
         .map(layer => layer.kind).slice(0, 2)).toEqual(['texture', 'noise']);
@@ -644,6 +645,7 @@ describe('effectPipeline', () => {
         threeD: false,
         texture: false,
         distortChroma: false,
+        ice: false,
       });
       expect(plan.capabilities).toEqual({
         required: ['webgl2', 'rgba8-framebuffer'],
@@ -676,6 +678,7 @@ describe('effectPipeline', () => {
         { kind: 'cone', enabled: false },
         { kind: 'texture', enabled: false },
         { kind: 'distortChroma', enabled: false },
+        { kind: 'ice', enabled: false },
       ],
       selectedKind: 'diffuse',
       prismEnabled: false,
@@ -705,6 +708,7 @@ describe('effectPipeline', () => {
       { kind: 'cone', enabled: false },
       { kind: 'texture', enabled: false },
       { kind: 'distortChroma', enabled: false },
+      { kind: 'ice', enabled: false },
     ]);
   });
 
@@ -763,6 +767,7 @@ describe('effectPipeline', () => {
       'cone',
       'texture',
       'distortChroma',
+      'ice',
     ]);
     expect(Object.fromEntries(normalized.map(layer => [layer.kind, layer.enabled]))).toEqual({
       diffuse: false,
@@ -779,6 +784,7 @@ describe('effectPipeline', () => {
       cone: false,
       texture: false,
       distortChroma: false,
+      ice: false,
     });
   });
 
@@ -812,6 +818,7 @@ describe('effectPipeline', () => {
       'cone',
       'texture',
       'distortChroma',
+      'ice',
     ]);
 
     expect(moveEffectStackLayer(toggled, 'diffuse', 0).at(0)).toEqual({ kind: 'diffuse', enabled: true });
@@ -851,13 +858,15 @@ describe('effectPipeline', () => {
       'cone',
       'texture',
       'distortChroma',
+      'ice',
       'noise',
     ]);
-    expect(movedPastDiffuse.at(-6)).toEqual({ kind: 'diffuse', enabled: true });
-    expect(movedPastDiffuse.at(-5)).toEqual({ kind: 'datamosh', enabled: false });
-    expect(movedPastDiffuse.at(-4)).toEqual({ kind: 'cone', enabled: false });
-    expect(movedPastDiffuse.at(-3)).toEqual({ kind: 'texture', enabled: false });
-    expect(movedPastDiffuse.at(-2)).toEqual({ kind: 'distortChroma', enabled: false });
+    expect(movedPastDiffuse.at(-7)).toEqual({ kind: 'diffuse', enabled: true });
+    expect(movedPastDiffuse.at(-6)).toEqual({ kind: 'datamosh', enabled: false });
+    expect(movedPastDiffuse.at(-5)).toEqual({ kind: 'cone', enabled: false });
+    expect(movedPastDiffuse.at(-4)).toEqual({ kind: 'texture', enabled: false });
+    expect(movedPastDiffuse.at(-3)).toEqual({ kind: 'distortChroma', enabled: false });
+    expect(movedPastDiffuse.at(-2)).toEqual({ kind: 'ice', enabled: false });
     expect(movedPastDiffuse.at(-1)).toEqual({ kind: 'noise', enabled: true });
   });
 
@@ -871,7 +880,7 @@ describe('effectPipeline', () => {
     let seed = 0;
     const randomized = randomizeEffectStackOrder(stack, () => (seed += 0.17) % 1);
 
-    expect(randomized).toHaveLength(14);
+    expect(randomized).toHaveLength(15);
     expect(new Set(randomized.map(layer => layer.kind))).toEqual(new Set(stack.map(layer => layer.kind)));
     expect(Object.fromEntries(randomized.map(layer => [layer.kind, layer.enabled]))).toEqual(enabledByKind);
     expect(randomized).not.toBe(stack);

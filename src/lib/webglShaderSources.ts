@@ -1,6 +1,7 @@
 import noiseGLSL from '../shaders/noise.glsl?raw';
 import vertexGLSL from '../shaders/vertex.vert.glsl?raw';
 import gradientGLSL from '../shaders/gradient.frag.glsl?raw';
+import materialFieldGLSL from '../shaders/material-field.glsl?raw';
 import blurGLSL from '../shaders/blur.frag.glsl?raw';
 import normalMapGLSL from '../shaders/normalmap.frag.glsl?raw';
 import stretchGLSL from '../shaders/stretch.frag.glsl?raw';
@@ -31,6 +32,7 @@ import datamoshMainGLSL from '../shaders/datamosh/main.glsl?raw';
 import threeDGLSL from '../shaders/three-d.frag.glsl?raw';
 import textureGLSL from '../shaders/texture.frag.glsl?raw';
 import distortChromaGLSL from '../shaders/distortChroma.frag.glsl?raw';
+import iceGLSL from '../shaders/ice.frag.glsl?raw';
 import shapesGLSL from '../shaders/shapes.frag.glsl?raw';
 import { CONE_GRADIENT_REAPPLY_SHADER } from './coneSeam';
 import { CONE_SHAPE_INDEX, type ConeShape } from '../types/coneView';
@@ -79,6 +81,7 @@ export type LazyProgramKey =
   | ThreeDProgramKey
   | 'texture'
   | 'distortChroma'
+  | 'ice'
   | 'shapes';
 
 const THREE_D_SHAPES = ['cone', 'torus', 'lattice', 'terrain', 'ribbon', 'rings', 'field', 'discs', 'crystal', 'abstract'] as const satisfies readonly ConeShape[];
@@ -216,6 +219,8 @@ export const SHADER_VERSION = (
   + textureGLSL.length * 41
   + distortChromaGLSL.length * 37
   + shapesGLSL.length * 37
+  + materialFieldGLSL.length * 31
+  + iceGLSL.length * 29
 ) | 0;
 
 // Keep these symbols in the dedicated Glass sources explicitly instead of
@@ -387,6 +392,14 @@ export function isNoiseVariantProgramKey(key: LazyProgramKey): key is NoiseVaria
  */
 export const GENERATOR_WITHOUT_NOISE_VARIANT = -1;
 
+/**
+ * The bootstrap Generator plus the shared Material Field. V2 frames use it
+ * while the Gradient reads thickness or cracks; the analytic prefix is off
+ * then, so the variant never needs Noise. Other frames keep the unchanged
+ * bootstrap program and never compile the field.
+ */
+export const GENERATOR_MATERIAL_FIELD_VARIANT = -2;
+
 export type ProgramSourceOptions = {
   /** NOISE_TYPE_MAP index for a program in NOISE_VARIANT_PROGRAM_KEYS. Omitted keeps every Noise type. */
   noiseVariant?: number;
@@ -403,6 +416,7 @@ function withNoiseVariant(fragment: string, noiseVariant: number | undefined): s
  * WebGL context.
  */
 export function getProgramSource(key: LazyProgramKey, options: ProgramSourceOptions = {}): ProgramSource {
+  if (key === 'generator' && options.noiseVariant === GENERATOR_MATERIAL_FIELD_VARIANT) return getMaterialFieldGeneratorSource();
   const source = getBaseProgramSource(key);
   if (!isNoiseVariantProgramKey(key)) return source;
   return { vertex: source.vertex, fragment: withNoiseVariant(source.fragment, options.noiseVariant) };
@@ -430,9 +444,33 @@ function getBaseProgramSource(key: LazyProgramKey): ProgramSource {
   if (isThreeDProgramKey(key)) return { vertex: THREE_D_VERTEX_SOURCE, fragment: createThreeDSource(getThreeDShape(key)) };
   if (key === 'texture') return { vertex: vertexGLSL, fragment: textureGLSL };
   if (key === 'distortChroma') return { vertex: vertexGLSL, fragment: distortChromaGLSL };
+  // Ice evaluates the same Material Field functions as the field Generator.
+  if (key === 'ice') return { vertex: vertexGLSL, fragment: `${materialFieldGLSL}
+precision highp float;
+${iceGLSL}` };
   // GLSL ES 3.00 for explicit-LOD sampling of the mask mipmaps.
   if (key === 'shapes') return { vertex: SHAPES_VERTEX_SOURCE, fragment: shapesGLSL };
   return { vertex: particlesVertexGLSL, fragment: particlesFragmentGLSL };
+}
+
+function getBootstrapNoiseSource(): string {
+  const begin = noiseGLSL.indexOf('// KGG_BOOTSTRAP_NOISE_BEGIN');
+  const end = noiseGLSL.indexOf('// KGG_BOOTSTRAP_NOISE_END');
+  return begin >= 0 && end >= begin
+    ? noiseGLSL.slice(0, begin) + noiseGLSL.slice(end + '// KGG_BOOTSTRAP_NOISE_END'.length)
+    : noiseGLSL;
+}
+
+/** Source of the GENERATOR_MATERIAL_FIELD_VARIANT program. */
+export function getMaterialFieldGeneratorSource(): ProgramSource {
+  return {
+    vertex: normalizeShaderLineEndings(vertexGLSL),
+    fragment: normalizeShaderLineEndings(`${getBootstrapNoiseSource()}
+#define KGG_BOOTSTRAP
+#define KGG_MATERIAL_FIELD
+${materialFieldGLSL}
+${gradientGLSL}`),
+  };
 }
 
 export function getInitialProgramSource(): ProgramSource {
@@ -440,11 +478,7 @@ export function getInitialProgramSource(): ProgramSource {
   // the full generator remains lazy, and it is the V2 Generator whenever
   // Noise is not folded into it. Noise and Manual Distort are omitted, but
   // base gradients, source images, Slit, and Diffuse stay live.
-  const begin = noiseGLSL.indexOf('// KGG_BOOTSTRAP_NOISE_BEGIN');
-  const end = noiseGLSL.indexOf('// KGG_BOOTSTRAP_NOISE_END');
-  const bootstrapNoise = begin >= 0 && end >= begin
-    ? noiseGLSL.slice(0, begin) + noiseGLSL.slice(end + '// KGG_BOOTSTRAP_NOISE_END'.length)
-    : noiseGLSL;
+  const bootstrapNoise = getBootstrapNoiseSource();
   return {
     vertex: normalizeShaderLineEndings(vertexGLSL),
     fragment: normalizeShaderLineEndings(`${bootstrapNoise}\n#define KGG_BOOTSTRAP\n${gradientGLSL}`),

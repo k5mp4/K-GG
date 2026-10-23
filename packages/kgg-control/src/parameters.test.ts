@@ -20,6 +20,13 @@ describe('K-GG control parameter registry', () => {
     });
   });
 
+  it('shares material field limits and discrete seed/cycle metadata', () => {
+    expect(getParameterDefinition('materialField.seed')).toMatchObject({ min: 0, max: 65535, integer: true });
+    expect(getParameterDefinition('materialField.cycles')).toMatchObject({ min: 0, max: 8, integer: true });
+    expect(getParameterDefinition('gradient.fieldInput.source')).toMatchObject({ enumValues: ['none', 'thickness', 'cracks'], defaultValue: 'none' });
+    expect(getParameterDefinition('gradient.fieldInput.influence')).toMatchObject({ min: 0, max: 1, defaultValue: 1 });
+  });
+
   it('filters paths by prefix', () => {
     const parameters = listParameterDefinitions('noise');
     expect(parameters.length).toBeGreaterThan(5);

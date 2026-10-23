@@ -5,7 +5,7 @@ import { resolvePreparedPresetPatch, type PreparedPreset } from '../../lib/apply
 import { createVjRandomValues, getVjParameters, type VjParameter, type VjParameterRule } from './vjParameters';
 import type { EffectStackKind } from '../../types/distortion';
 
-const GROUPS = ['noiseDistortion', 'diffuse', 'slitScan', 'stretch', 'postprocess', 'coneView', 'datamosh', 'texture', 'distortChroma'] as const;
+const GROUPS = ['noiseDistortion', 'diffuse', 'slitScan', 'stretch', 'postprocess', 'coneView', 'datamosh', 'texture', 'distortChroma', 'ice', 'materialField'] as const;
 type Group = typeof GROUPS[number];
 export type VjDocumentSnapshot = Pick<GradientStore, Group | 'keyframeTracks'>;
 export type VjValues = Record<string, number | string | boolean>;
@@ -17,7 +17,7 @@ export function captureVjDocument(): VjDocumentSnapshot {
 }
 
 type ValueCommands = Pick<GradientStore, 'setNoiseDistortion' | 'setDiffuse' | 'setSlitScan' | 'setStretch'
-  | 'setPostprocess' | 'setConeView' | 'setDatamosh' | 'setTexture' | 'setDistortChroma' | 'setKeyframeTracks'>;
+  | 'setPostprocess' | 'setConeView' | 'setDatamosh' | 'setTexture' | 'setDistortChroma' | 'setIce' | 'setMaterialField' | 'setKeyframeTracks'>;
 
 function applyGroup(group: Group, patch: Record<string, unknown>, commands: ValueCommands = applicationCommands,
   state: GradientStore = useGradientStore.getState()): void {
@@ -34,6 +34,8 @@ function applyGroup(group: Group, patch: Record<string, unknown>, commands: Valu
     case 'datamosh': commands.setDatamosh(patch); break;
     case 'texture': commands.setTexture(patch); break;
     case 'distortChroma': commands.setDistortChroma(patch); break;
+    case 'ice': commands.setIce(patch); break;
+    case 'materialField': commands.setMaterialField(patch); break;
   }
 }
 

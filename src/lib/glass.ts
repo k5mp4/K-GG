@@ -2,6 +2,7 @@ import type { EffectPipelineConfig, GlassSurfaceType, PostprocessConfig } from '
 import { isPostprocessLayerEnabled } from './postprocessStack';
 import { isEffectStackLayerEnabled } from './effectPipeline';
 import { getGlassTileSamplePadding } from './glassTile';
+import type { IceTileRequirement } from './ice';
 import {
   clampParameter,
   getEnumParameterDefault,
@@ -202,6 +203,7 @@ export function isGlassOpticallyIdentity(
 export function getPostprocessStackSamplePadding(
   postprocess: PostprocessConfig | null | undefined,
   effectPipeline?: EffectPipelineConfig | null,
+  iceRequirement?: Pick<IceTileRequirement, 'padding'> | null,
 ): number {
   const activeGlassLayerCount = effectPipeline?.version === 'stack-v2'
     ? Number(isEffectStackLayerEnabled(effectPipeline, 'glass'))
@@ -222,7 +224,7 @@ export function getPostprocessStackSamplePadding(
         // its dependency radius is reserved exactly once.
         return perLayerPadding * activeGlassLayerCount;
       })();
-  return glassPadding + getGlassTileSamplePadding(postprocess, effectPipeline);
+  return glassPadding + getGlassTileSamplePadding(postprocess, effectPipeline) + (iceRequirement?.padding ?? 0);
 }
 
 export const getGlassSamplePadding = getPostprocessStackSamplePadding;

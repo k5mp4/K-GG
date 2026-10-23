@@ -1,8 +1,11 @@
 import { DEFAULT_CLOTH_GRADIENT } from '../types/clothGradient';
 import { DEFAULT_CONE_VIEW } from '../types/coneView';
 import { DEFAULT_SEAMLESS } from '../types/seamless';
+import { DEFAULT_MATERIAL_FIELD } from '../types/materialField';
+import { DEFAULT_GRADIENT_FIELD_INPUT } from '../types/gradient';
 import { DEFAULT_TEXTURE } from '../types/texture';
 import { DEFAULT_DISTORT_CHROMA } from '../types/distortChroma';
+import { DEFAULT_ICE } from '../types/ice';
 import { DEFAULT_SHAPES } from '../types/shapes';
 import { DEFAULT_DIFFUSE_ASCII_CHARSET, DEFAULT_DIFFUSE_BACKGROUND_COLOR } from '../types/distortion';
 import type { DiffuseAdaptiveChannel, DiffuseApplyMode, DiffuseConfig, DiffuseHalftoneShape, ManualDistortConfig, NoiseDistortionConfig, PostprocessConfig } from '../types/distortion';
@@ -82,6 +85,7 @@ export const createEmptyManualSmoothMask = (resolution = MANUAL_DISTORT_MAP_RESO
 
 export const STORE_DEFAULTS = {
   gradient: {
+    fieldInput: { ...DEFAULT_GRADIENT_FIELD_INPUT },
     angle: getParameterDefault('gradient.angle'),
     stops: [...gradientRampPresets.Kagaribi_15_BG],
     opacityStops: [
@@ -275,8 +279,10 @@ export const STORE_DEFAULTS = {
   clothGradient: { ...DEFAULT_CLOTH_GRADIENT },
   coneView: { ...DEFAULT_CONE_VIEW },
   seamless: { ...DEFAULT_SEAMLESS },
+  materialField: { ...DEFAULT_MATERIAL_FIELD },
   texture: { ...DEFAULT_TEXTURE },
   distortChroma: { ...DEFAULT_DISTORT_CHROMA },
+  ice: { ...DEFAULT_ICE },
   shapes: { ...DEFAULT_SHAPES },
   flowGradient: { ...FLOW_GRADIENT_DEFAULTS },
   datamosh: { ...DATAMOSH_DEFAULTS },

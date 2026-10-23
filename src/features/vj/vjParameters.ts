@@ -40,7 +40,7 @@ const GROUPS: Record<EffectStackKind, string> = {
   noise: 'noiseDistortion', diffuse: 'diffuse', slit: 'slitScan', stretch: 'stretch',
   distort: 'postprocess', mirror: 'postprocess', kaleidoscope: 'postprocess',
   voronoi: 'postprocess', glass: 'postprocess', glassTile: 'postprocess',
-  datamosh: 'datamosh', cone: 'coneView', texture: 'texture', distortChroma: 'distortChroma',
+  datamosh: 'datamosh', cone: 'coneView', texture: 'texture', distortChroma: 'distortChroma', ice: 'ice',
 };
 
 const ENUMS: Record<string, readonly string[]> = {
@@ -228,6 +228,7 @@ function fieldActive(kind: EffectStackKind, field: string, state: GradientStore)
       return true;
     }
     case 'distortChroma': return true;
+    case 'ice': return true;
   }
 }
 

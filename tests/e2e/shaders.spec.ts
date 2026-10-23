@@ -24,6 +24,7 @@ test('every WebGL program compiles and links in a real WebGL2 context', async ({
       getInitialProgramSource,
       NOISE_TYPE_MAP,
       NOISE_VARIANT_PROGRAM_KEYS,
+      GENERATOR_MATERIAL_FIELD_VARIANT,
     } = await import(sourcesPath);
     type Source = { vertex: string; fragment: string };
     const programs: Array<[string, Source]> = [
@@ -32,7 +33,7 @@ test('every WebGL program compiles and links in a real WebGL2 context', async ({
         'generator', 'blur', 'normalMap', 'stretch', 'stackCore', 'noiseStack',
         'noiseDiffuseStack', 'glass', 'glassV2', 'glassTile', 'prism', 'postprocess',
         'prismComposite', 'particles', 'seamless', 'flowSplat', 'flowTrail',
-        'flowComposite', 'datamosh', 'texture', 'distortChroma', 'shapes',
+        'flowComposite', 'datamosh', 'texture', 'distortChroma', 'ice', 'shapes',
         // One program per 3D shape.
         'threeDCone', 'threeDTorus', 'threeDLattice', 'threeDTerrain',
         'threeDRibbon', 'threeDRings', 'threeDField', 'threeDDiscs',
@@ -44,6 +45,8 @@ test('every WebGL program compiles and links in a real WebGL2 context', async ({
           [`${key}:${noiseVariant}`, getProgramSource(key, { noiseVariant })] as [string, Source]
         ))
       )),
+      // The Gradient reading the shared Material Field uses its own Generator variant.
+      ['generator:materialField', getProgramSource('generator', { noiseVariant: GENERATOR_MATERIAL_FIELD_VARIANT })],
     ];
 
     const gl = document.createElement('canvas').getContext('webgl2');
@@ -82,6 +85,7 @@ test('every WebGL program compiles and links in a real WebGL2 context', async ({
   for (const result of results) console.log(`[shader] ${result.program}: ${result.ok ? 'ok' : 'FAILED'} (${result.ms}ms)`);
   const failures = results.filter(result => !result.ok);
   expect(failures, JSON.stringify(failures, null, 2)).toEqual([]);
-  // 32 base programs (3D has one per shape) plus 13 Noise types for each of the 3 Noise-dependent programs.
-  expect(results).toHaveLength(33 + 13 * 3);
+  // 33 base programs (3D has one per shape), 13 Noise types for each of the 3
+  // Noise-dependent programs, and the Material Field Generator variant.
+  expect(results).toHaveLength(34 + 13 * 3 + 1);
 });

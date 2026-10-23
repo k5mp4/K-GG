@@ -36,7 +36,8 @@ export type EffectKind =
   | 'datamosh'
   | 'cone'
   | 'texture'
-  | 'distortChroma';
+  | 'distortChroma'
+  | 'ice';
 
 export type EffectState = {
   kind: EffectKind;

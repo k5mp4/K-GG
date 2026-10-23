@@ -20,6 +20,10 @@ import { isRemovedAnimationProperty } from './animationRegistry';
 
 import type { ClothGradientConfig } from '../types/clothGradient';
 import { normalizeClothGradientConfig } from '../types/clothGradient';
+import { normalizeMaterialFieldConfig, type MaterialFieldConfig } from '../types/materialField';
+import { isMaterialFieldAnimated, isMaterialFieldInputActive, resolveMaterialPhase } from './materialField';
+import { normalizeIceConfig, type IceConfig } from '../types/ice';
+import { isIceLayerActive } from './ice';
 
 export type EvaluatedScene = {
   gradient: GradientConfig;
@@ -30,6 +34,16 @@ export type EvaluatedScene = {
   normalMap: NormalMapConfig;
   clothGradient: ClothGradientConfig;
   postprocess: PostprocessConfig;
+  /** Shared field after keyframes; Seed and cycles are never interpolated. */
+  materialField: MaterialFieldConfig;
+  /** Loop Timing-remapped clock for the shared field, 0 while animation is off. */
+  materialTime: number;
+  /** Field loop phase in turns, derived once from `materialTime`. */
+  materialPhase: number;
+  /** Ice optics after keyframes; light cycles are never interpolated. */
+  ice: IceConfig;
+  /** Ice light phase in turns, from the same clock as the field. */
+  iceLightPhase: number;
   renderTime: number;
   /** Cloth Gradient 専用の時間。アニメーション有効時のみ進む秒単位の値。 */
   clothTime: number;
@@ -274,6 +288,12 @@ function propertyOwnerEnabled(state: LatestState, propertyId: string): boolean {
     return isPostprocessTimeAnimationActive(state.postprocess, state.effectPipeline);
   }
   if (propertyId.startsWith('postprocess.')) return state.postprocess.enabled;
+  if (propertyId.startsWith('ice.') || propertyId.startsWith('materialField.')) {
+    const imageGradientProtected = state.imageGradient.enabled && Boolean(state.imageGradientSource);
+    const iceActive = isIceLayerActive({ ice: state.ice, effectPipeline: state.effectPipeline, imageGradientProtected });
+    if (propertyId.startsWith('ice.')) return iceActive;
+    return iceActive || isMaterialFieldInputActive(state.gradient, imageGradientProtected);
+  }
   return true;
 }
 
@@ -305,8 +325,19 @@ export function hasActiveAnimation(state: LatestState): boolean {
     Math.round(state.animation.rampOffsetSpeed ?? 0) !== 0 ||
     (state.diffuse.enabled && Boolean(state.diffuse.seedAnimEnabled)) ||
     isPostprocessTimeAnimationActive(state.postprocess, state.effectPipeline) ||
-    (state.shapes?.enabled === true && (state.shapes.reveal !== 'none' || state.shapes.fillCycles !== 0))
+    (state.shapes?.enabled === true && (state.shapes.reveal !== 'none' || state.shapes.fillCycles !== 0)) ||
+    isMaterialFieldMotionActive(state)
   );
+}
+
+function isMaterialFieldMotionActive(state: LatestState): boolean {
+  const imageGradientProtected = state.imageGradient.enabled && Boolean(state.imageGradientSource);
+  const iceActive = isIceLayerActive({ ice: state.ice, effectPipeline: state.effectPipeline, imageGradientProtected });
+  // Ice moves its light even when the structure is fixed.
+  if (iceActive && normalizeIceConfig(state.ice).lightCycles > 0) return true;
+  if (!state.materialField) return false;
+  const fieldRead = iceActive || isMaterialFieldInputActive(state.gradient, imageGradientProtected);
+  return fieldRead && isMaterialFieldAnimated(normalizeMaterialFieldConfig(state.materialField));
 }
 
 export function evaluateSceneAtTime(state: LatestState, normalizedTime: number): EvaluatedScene {
@@ -415,6 +446,22 @@ export function evaluateSceneAtTime(state: LatestState, normalizedTime: number):
     ),
   );
 
+  // Seed and loop count stay discrete: a stray key on either must not blend
+  // two structures or break the integer-cycle loop.
+  const baseMaterialField = normalizeMaterialFieldConfig(state.materialField);
+  const materialField = normalizeMaterialFieldConfig({
+    ...applyObjectTracks('materialField', { ...baseMaterialField }, tracks, time, animation.previewLoop ?? true),
+    seed: baseMaterialField.seed,
+    cycles: baseMaterialField.cycles,
+  });
+  const materialTime = animation.enabled ? autoTime : 0;
+  const baseIce = normalizeIceConfig(state.ice);
+  const ice = normalizeIceConfig({
+    ...applyObjectTracks('ice', { ...baseIce }, tracks, time, animation.previewLoop ?? true),
+    enabled: baseIce.enabled,
+    lightCycles: baseIce.lightCycles,
+  });
+
   let gradient = applyGradientTracks(state.gradient, tracks, time, animation.previewLoop ?? true);
   const rampOffsetSpeed = Math.round(animation.rampOffsetSpeed ?? 0);
   if (animation.enabled && rampOffsetSpeed !== 0) {
@@ -431,6 +478,11 @@ export function evaluateSceneAtTime(state: LatestState, normalizedTime: number):
     normalMap: state.normalMap,
     clothGradient,
     postprocess,
+    materialField,
+    materialTime,
+    materialPhase: resolveMaterialPhase(materialTime, materialField.cycles, materialField.phase),
+    ice,
+    iceLightPhase: resolveMaterialPhase(materialTime, ice.lightCycles, ice.lightPhase),
     renderTime,
     clothTime: animation.enabled
       ? autoTime * animation.speed * animation.duration

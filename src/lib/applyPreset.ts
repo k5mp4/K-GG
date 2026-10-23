@@ -8,11 +8,14 @@ import { normalizeClothGradientConfig } from '../types/clothGradient';
 import { normalizeConeViewConfig } from '../types/coneView';
 import { resolvePersistedDatamosh } from '../types/datamosh';
 import { normalizeDistortChromaConfig } from '../types/distortChroma';
+import { normalizeIceConfig } from '../types/ice';
 import { stripSlitPhaseMotionFields } from '../types/distortion';
 import { normalizeFlowGradientConfig } from '../types/flowGradient';
 import { normalizeImageGradientConfig } from '../types/imageGradient';
 import { normalizeSeamlessConfig } from '../types/seamless';
 import { normalizeShapesConfig } from '../types/shapes';
+import { normalizeMaterialFieldConfig } from '../types/materialField';
+import { normalizeGradientFieldInput } from '../types/gradient';
 import { normalizeTextureConfig } from '../types/texture';
 import { keepLoopTimingOnPresetLoad } from './animationConfig';
 import { mergeUserColorPalettes } from './colorPalettes';
@@ -57,7 +60,7 @@ export function preparePresetToDocument(preset: Preset): PreparedPreset {
     ...createDocumentActions(stage, STORE_DEFAULTS),
     setPresetName: (presetName: string) => stage({ presetName }),
   };
-  if (s.gradient) commands.setGradient(s.gradient);
+  if (s.gradient) commands.setGradient({ ...s.gradient, fieldInput: normalizeGradientFieldInput(s.gradient.fieldInput) });
   if (s.noiseDistortion) commands.setNoiseDistortion(normalizeNoiseDistortionConfig(s.noiseDistortion));
   const loadedDiffuse = {
     ...STORE_DEFAULTS.diffuse,
@@ -91,8 +94,10 @@ export function preparePresetToDocument(preset: Preset): PreparedPreset {
   commands.setClothGradient(normalizeClothGradientConfig(s.clothGradient));
   commands.setConeView(normalizeConeViewConfig(s.coneView));
   commands.setSeamless(normalizeSeamlessConfig(s.seamless));
+  commands.setMaterialField(normalizeMaterialFieldConfig(s.materialField));
   commands.setTexture(normalizeTextureConfig(s.texture));
   commands.setDistortChroma(normalizeDistortChromaConfig(s.distortChroma));
+  commands.setIce(normalizeIceConfig(s.ice));
   commands.setShapes(normalizeShapesConfig(s.shapes));
   commands.setFlowGradient(normalizeFlowGradientConfig(s.flowGradient));
   commands.setDatamosh(resolvePersistedDatamosh(s));

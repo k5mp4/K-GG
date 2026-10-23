@@ -8,7 +8,7 @@
  * 結果を別の 2D canvas に貼り合わせて最終高解像度画像を得る。
  */
 
-import { renderBridge, type ExportSessionToken } from './renderBridge';
+import { renderBridge, type ExportSessionToken, type TileRequirement } from './renderBridge';
 import { applySeamlessToCanvas } from './seamless';
 import type { SeamlessConfig } from '../types/seamless';
 import { getRegisteredWebGLContext } from './webgl';
@@ -119,6 +119,21 @@ export function getPaddedTileRegion(
 }
 
 /**
+ * Ice reads up to a fixed radius around each pixel. A tile that cannot hold
+ * that margin, or a stack whose other layers read outside any margin, fails
+ * before the first tile instead of producing a result with visible seams or
+ * without Ice.
+ */
+export function assertTileRequirement(requirement: TileRequirement, padding: number, tileSize: number): void {
+  if (requirement.unsupportedReason) throw new Error(requirement.unsupportedReason);
+  if (padding < requirement.padding) {
+    throw new Error(
+      `Tiled output needs ${requirement.padding}px of padding for Ice, but a ${tileSize}px tile allows only ${padding}px. Use a smaller output or a larger tile.`,
+    );
+  }
+}
+
+/**
  * タイル分割で描画した結果を 2D canvas に合成して返す。
  * 呼び出し側は `out.toBlob('image/png')` 等で書き出す。
  */
@@ -131,6 +146,10 @@ export async function renderTiledToCanvas2D(
     ? renderBridge.getExportTilePadding(exportSession)
     : renderBridge.getTilePadding();
   const padding = Math.min(requestedPadding, Math.max(0, Math.floor((tileSize - 1) / 2)));
+  const requirement = exportSession
+    ? renderBridge.getExportTileRequirement(exportSession)
+    : renderBridge.getTileRequirement();
+  assertTileRequirement(requirement, padding, tileSize);
   const coreTileSize = Math.max(1, tileSize - padding * 2);
   const syncFrames = opts.syncFrames ?? 1;
 

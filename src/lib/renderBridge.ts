@@ -17,6 +17,8 @@ type VoidFn = () => void;
 type BoolFn = () => boolean;
 type NumberFn = () => number;
 type TilePaddingFn = () => number;
+export type TileRequirement = { padding: number; unsupportedReason: string | null };
+type TileRequirementFn = () => TileRequirement;
 type PauseAnimationFn = () => boolean;
 type ResumeAnimationFn = () => void;
 
@@ -27,6 +29,8 @@ export type PreparedExportRenderer = {
   finishGpu: VoidFn;
   restorePreview: VoidFn;
   tilePadding: number;
+  /** Padding tiled output must honour exactly, and why tiling is impossible (Ice). */
+  tileRequirement?: TileRequirement;
   diagnostics?: ExportPlanDiagnostics;
 };
 
@@ -47,6 +51,7 @@ let _getCurrentTime: NumberFn | null = null;
 let _getCurrentNormalizedTime: NumberFn | null = null;
 let _seekTo: ((normalizedTime: number) => void) | null = null;
 let _getTilePadding: TilePaddingFn | null = null;
+let _getTileRequirement: TileRequirementFn | null = null;
 let _pauseAnimation: PauseAnimationFn | null = null;
 let _resumeAnimation: ResumeAnimationFn | null = null;
 let _prepareExportRenderer: PrepareExportRendererFn | null = null;
@@ -92,11 +97,13 @@ export const renderBridge = {
     stopAnim: VoidFn,
     startAnim: VoidFn,
     getTilePadding?: TilePaddingFn,
+    getTileRequirement?: TileRequirementFn,
   ): void {
     _renderAtTime = renderAtTime;
     _stopAnim = stopAnim;
     _startAnim = startAnim;
     _getTilePadding = getTilePadding ?? null;
+    _getTileRequirement = getTileRequirement ?? null;
   },
   registerExportRenderer(prepareExportRenderer: PrepareExportRendererFn): void {
     _prepareExportRenderer = prepareExportRenderer;
@@ -191,6 +198,10 @@ export const renderBridge = {
     const active = assertActiveExportSession(token);
     return Math.max(0, Math.floor(active.renderer.tilePadding));
   },
+  getExportTileRequirement(token: ExportSessionToken): TileRequirement {
+    const active = assertActiveExportSession(token);
+    return active.renderer.tileRequirement ?? { padding: 0, unsupportedReason: null };
+  },
   endExportSession(token: ExportSessionToken): void {
     const active = assertActiveExportSession(token);
     _activeExportSession = null;
@@ -280,6 +291,9 @@ export const renderBridge = {
   },
   getTilePadding(): number {
     return Math.max(0, Math.floor(_getTilePadding?.() ?? 0));
+  },
+  getTileRequirement(): TileRequirement {
+    return _getTileRequirement?.() ?? { padding: 0, unsupportedReason: null };
   },
   seekTo(normalizedTime: number): void {
     if (_preparingExportSession || _activeExportSession) {

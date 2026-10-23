@@ -35,6 +35,7 @@ const LABELS: Record<EffectStackKind, string> = {
   cone: '3D',
   texture: 'Texture',
   distortChroma: 'Distort Chroma',
+  ice: 'Ice',
 };
 
 type DragState = Omit<EffectStackDragState, 'kind' | 'phase'> & {

@@ -65,6 +65,7 @@ const EFFECT_STACK_TAB_MAP: Partial<Record<EffectStackKind, LeftTab>> = {
   cone: 'postprocess',
   texture: 'postprocess',
   distortChroma: 'postprocess',
+  ice: 'postprocess',
 };
 
 function formatGpuBytes(bytes: number | null | undefined): string | null {

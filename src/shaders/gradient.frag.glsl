@@ -252,6 +252,37 @@
     return texture2D(u_meshGradient, clamp(sampleUV, 0.0, 1.0));
   }
 
+#if defined(KGG_MATERIAL_FIELD)
+  uniform int u_mfInputSource; // 1=thickness, 2=cracks
+  uniform float u_mfInfluence;
+  uniform sampler2D u_meshCoordinate;
+  uniform vec2 u_meshCoordinateSize;
+
+  // Mesh logical v from an R32F lookup. Float textures are not filterable
+  // without an extension, so the four nearest texels are interpolated here.
+  float sampleMeshCoordinate(vec2 sampleUV) {
+    vec2 size = max(u_meshCoordinateSize, vec2(1.0));
+    vec2 st = clamp(sampleUV, 0.0, 1.0) * size - 0.5;
+    vec2 base = floor(st);
+    vec2 f = st - base;
+    vec2 i0 = (clamp(base, vec2(0.0), size - 1.0) + 0.5) / size;
+    vec2 i1 = (clamp(base + 1.0, vec2(0.0), size - 1.0) + 0.5) / size;
+    float a = texture2D(u_meshCoordinate, i0).r;
+    float b = texture2D(u_meshCoordinate, vec2(i1.x, i0.y)).r;
+    float c = texture2D(u_meshCoordinate, vec2(i0.x, i1.y)).r;
+    float d = texture2D(u_meshCoordinate, i1).r;
+    return clamp(mix(mix(a, b, f.x), mix(c, d, f.x), f.y), 0.0, 1.0);
+  }
+
+  // Fixed-range scalar from the shared field. Full-output pixels keep the
+  // structure identical across tiles and resolutions of the same aspect.
+  float materialFieldInput(vec2 globalPx) {
+    vec2 q = mfDomain(globalPx / max(u_resolution.y, 1.0));
+    if (u_mfInputSource == 2) return mfCrackDensity(q, u_mfScale / max(u_resolution.y, 1.0));
+    return mfThicknessDistance(q) / MF_MAX_THICKNESS;
+  }
+#endif
+
   float applyRampRepeatT(float t);
 
   vec4 sampleStandardGradient(vec2 sampleUV) {
@@ -956,10 +987,21 @@
       }
     }
 #endif
+#if defined(KGG_MATERIAL_FIELD)
+    // Normal ramps mix the field into the scalar before the existing repeat.
+    float materialInput = materialFieldInput(uv * u_resolution);
+    if (!meshGradient) t = mix(t, materialInput, u_mfInfluence);
+#endif
     float rampT = applyRampRepeatT(t);
     vec4 rampColor;
     if (meshGradient) {
       vec4 meshColor = sampleMeshGradient(uv);
+#if defined(KGG_MATERIAL_FIELD)
+      // Mesh ramp mode crossfades from its baked colors so influence 0 stays
+      // the legacy image: mix(mesh, Ramp(mix(v, f, s)), s).
+      float meshFieldT = mix(sampleMeshCoordinate(uv), materialInput, u_mfInfluence);
+      meshColor = mix(meshColor, texture2D(u_gradientRamp, vec2(clamp(meshFieldT, 0.0, 1.0), 0.5)), u_mfInfluence);
+#endif
 #if !defined(KGG_BOOTSTRAP)
       if (u_manualDistortEnabled && !u_imageGradientEnabled) {
         float smoothPasses = manualSmoothMask * 8.0;

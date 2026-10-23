@@ -5,9 +5,9 @@ title: VJレイアウトとプリセット演奏
 status: current
 owners: [maintainer]
 created: 2026-10-09
-updated: 2026-10-09
+updated: 2026-10-20
 requirement_ids: [VJ-001, VJ-002, VJ-003, VJ-004, VJ-005, VJ-006, VJ-007]
-related_adrs: [ADR-20261009-vj-performance-session, ADR-0009]
+related_adrs: [ADR-20261009-vj-performance-session, ADR-0009, ADR-20261019-ice-material-field]
 related_changes: []
 related_code: [src/features/vj/VjDeck.tsx, src/features/vj/useVjSession.ts, src/features/vj/vjPlayback.ts, src/features/vj/vjPresetCache.ts, src/features/vj/vjPresetSource.ts, src/features/vj/vjSettings.ts, src/features/vj/vjParameters.ts, src/features/vj/vjDocument.ts, src/features/vj/vj.css, src/adapters/tauri/vjWindow.ts, src/lib/applyPreset.ts, src/lib/shaderWarmup.ts]
 related_tests: [src/features/vj/vjPlayback.test.ts, src/features/vj/vjPresetCache.test.ts, src/features/vj/vjPresetSource.test.ts, src/features/vj/vjSettings.test.ts, src/features/vj/vjParameters.test.ts, src/features/vj/vjDocument.test.ts, src/adapters/tauri/vjWindow.test.ts, src/lib/applyPreset.test.ts, src/lib/shaderWarmup.test.ts, tests/e2e/vj-performance.spec.ts]
@@ -76,6 +76,8 @@ VJ演奏中は演奏対象以外の通常バックグラウンドShader準備を
 VJで手動編集またはランダム化したパラメータだけをstatic trackへ切り替え、既存キーフレームによる上書きを止める。触れていないパラメータのアニメーションは維持する。「プリセットのアニメーションを戻す」で演奏開始／読み込み時のtrackへ復帰する。
 
 自動読み込みの範囲内ランダムも変更したパラメータだけをstatic化する。アニメーションの復帰には元のPresetのtrackを用いる。「読み込み時の値に戻す」は読み込んだランダム化済みの値を基準とする。
+
+Iceの値を戻すときは、共有Material Fieldの構造（`materialField`）も一緒に戻し、GradientのRamp入力が使う構造を取り残さない。
 
 「ランダム化を戻す」は直前のランダム化前の値とtrackを戻す。「読み込み時の値に戻す」は演奏開始／直近読み込み時の値とtrackを戻し、現在のEffect StackのON/OFF・順序を保つ。VJ退出だけでは演奏中に変更した値を巻き戻さない。
 

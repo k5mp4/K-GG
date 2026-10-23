@@ -14,6 +14,36 @@ describe('KggControlRuntime', () => {
     getWebGLContext: () => null,
   });
 
+  it('edits shared field and nested color input through the same commands', () => {
+    const captured = runtime.captureSnapshot();
+    if (!captured.ok) throw new Error('Expected snapshot');
+    try {
+      expect(runtime.setParameter('materialField.seed', 17)).toMatchObject({ ok: true, value: { value: 17 } });
+      expect(runtime.setParameter('gradient.fieldInput.source', 'cracks')).toMatchObject({ ok: true, value: { value: 'cracks' } });
+      expect(runtime.setParameter('gradient.fieldInput.influence', 0.4)).toMatchObject({ ok: true, value: { value: 0.4 } });
+      expect(useGradientStore.getState().gradient.fieldInput).toEqual({ source: 'cracks', influence: 0.4 });
+      expect(runtime.listParameters('materialField')).toMatchObject({ ok: true });
+    } finally {
+      runtime.restoreSnapshot(captured.value.snapshotId);
+    }
+  });
+
+  it('edits Ice optics and its layer through the shared parameter registry', () => {
+    const captured = runtime.captureSnapshot();
+    if (!captured.ok) throw new Error('Expected snapshot');
+    try {
+      expect(runtime.setParameter('ice.ior', 9)).toMatchObject({ ok: false });
+      expect(runtime.setParameter('ice.ior', 1.5)).toMatchObject({ ok: true, value: { value: 1.5 } });
+      expect(runtime.setParameter('ice.lightCycles', 2)).toMatchObject({ ok: true });
+      expect(runtime.setParameter('ice.enabled', true)).toMatchObject({ ok: true });
+      const state = useGradientStore.getState();
+      expect(state.ice).toMatchObject({ ior: 1.5, lightCycles: 2, enabled: true });
+      expect(state.effectPipeline.effectStack.find(layer => layer.kind === 'ice')?.enabled).toBe(true);
+    } finally {
+      runtime.restoreSnapshot(captured.value.snapshotId);
+    }
+  });
+
   it('sets registered parameters through Zustand normalization', () => {
     const before = runtime.getParameter('gradient.angle');
     expect(before.ok).toBe(true);

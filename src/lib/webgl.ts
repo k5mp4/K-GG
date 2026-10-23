@@ -52,6 +52,7 @@ import {
 import { isGlassTileOpticallyIdentity, normalizeGlassTileRenderParameters } from './glassTile';
 import { getActivePostprocessStackLayers } from './postprocessStack';
 import {
+  generatorNeedsMaterialFieldVariant,
   generatorNeedsNoiseVariant,
   getNoiseProgramVariants,
   getRequiredSceneProgramKeys,
@@ -61,7 +62,11 @@ import {
   type NoiseProgramVariants,
 } from './sceneRenderPlan';
 import { buildDiffuseBezierLut, normalizeDiffuseBezier } from './diffuseCurve';
-import { buildMeshGradientField, MESH_FIELD_SIZE, MESH_FIELD_SUBDIVISIONS } from './meshGradientField';
+import { buildMeshCoordinateField, buildMeshGradientField, meshCoordinateFieldSignature, MESH_FIELD_SIZE, MESH_FIELD_SUBDIVISIONS } from './meshGradientField';
+import { DEFAULT_MATERIAL_FIELD, normalizeMaterialFieldConfig, type MaterialFieldConfig } from '../types/materialField';
+import { getMaterialFieldUniforms, isMaterialFieldInputActive, MATERIAL_FIELD_INPUT_SOURCE_INDEX, type MaterialFieldUniforms } from './materialField';
+import { DEFAULT_ICE, isIceOpticallyIdentity, normalizeIceConfig, type IceConfig } from '../types/ice';
+import { getIceSampleRadii } from './ice';
 import { noiseAngleDegreesForShader, noiseAngleRadiansForShader } from './noiseAngle';
 import { getChladniUniformValues } from './chladniNoise';
 import { clampParameter, getParameterLimit } from './parameterLimits';
@@ -268,6 +273,11 @@ export type WebGLContext = {
   gradientRampTexture: WebGLTexture; // TEXTURE1: グラデーションランプ
   meshGradientTexture: WebGLTexture; // TEXTURE2: 前方向テッセレーション済みMeshフィールド
   meshGradientTextureSignature: string;
+  /** TEXTURE10: R32F logical-v lookup for field-driven Mesh ramps; full size on first use. */
+  meshCoordinateTexture: WebGLTexture;
+  meshCoordinateTextureSignature: string;
+  /** Number of lookup uploads, observable so color/Seed/time edits can be shown not to rebuild it. */
+  meshCoordinateUploadCount: number;
   diffuseCurveTexture: WebGLTexture; // TEXTURE8: Diffuse輝度カーブLUT
   diffuseCurveSignature: string;
   diffuseAsciiTexture: WebGLTexture; // TEXTURE9: Diffuse ASCIIグリフアトラス
@@ -330,6 +340,8 @@ export type WebGLContext = {
   /** One program per 3D shape, compiled on demand (see ThreeDProgramKey). */
   threeDPrograms: Partial<Record<ThreeDProgramKey, { program: WebGLProgram; uniforms: Record<string, WebGLUniformLocation | null> }>>;
   textureProgram: WebGLProgram | null;
+  iceProgram: WebGLProgram | null;
+  iceUniforms: Record<string, WebGLUniformLocation | null>;
   textureUniforms: Record<string, WebGLUniformLocation | null>;
   /** Height map of the SANDBOX Texture stage (unit 4 during its pass). */
   textureImageTexture: WebGLTexture;
@@ -676,6 +688,14 @@ export async function initWebGL(canvas: HTMLCanvasElement): Promise<WebGLContext
   gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
   gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
   gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+  // Placeholder until a field-driven Mesh ramp needs the full lookup.
+  const meshCoordinateTexture = createOwnedTexture();
+  gl.bindTexture(gl.TEXTURE_2D, meshCoordinateTexture);
+  gl.texImage2D(gl.TEXTURE_2D, 0, gl.R32F, 1, 1, 0, gl.RED, gl.FLOAT, new Float32Array([0]));
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
   const diffuseCurveTexture = createOwnedTexture();
   gl.bindTexture(gl.TEXTURE_2D, diffuseCurveTexture);
   const identityCurve = new Uint8Array(256 * 4);
@@ -784,7 +804,7 @@ export async function initWebGL(canvas: HTMLCanvasElement): Promise<WebGLContext
   ownedFlowGradient = flowGradient;
   const transitionTextureFrom = ownTexture(createTexture(gl));
   const transitionTextureTo = ownTexture(createTexture(gl));
-  const ctx: WebGLContext = { gl, performanceProfiler, gpuDiagnostics, renderOptimization, program, uniforms, geometryBuffer, transitionGeometryBuffer, generatorProgram: program, generatorUniforms: uniforms, bootstrapProgram: program, bootstrapUniforms: uniforms, activeNoiseVariants: createInitialNoiseVariants(), noiseVariantPrograms: new Map([[noiseVariantId('generator', GENERATOR_WITHOUT_NOISE_VARIANT), { program, uniforms }]]), noiseVariantStates: new Map(), gradientRampTexture, meshGradientTexture, meshGradientTextureSignature: '', diffuseCurveTexture, diffuseCurveSignature: '', diffuseAsciiTexture, diffuseAsciiSignature: '', diffuseAsciiCount: 1, diffuseAsciiRows: ASCII_ATLAS_MAX_ROWS, diffuseHistogramAt: 0, manualDistortTexture, manualDistortDisplacement: null, manualDistortSmoothMask: null, manualDistortMapResolution: 0, sourceImageTexture, sourceImageCanvas: null, imageGradientTexture, imageGradientSource: null, imageMaskTexture, imageMaskSource: null, normalMapProgram: null, normalMapUniforms: {}, datamoshProgram: null, datamoshUniforms: {}, threeDPrograms: {}, textureProgram: null, textureUniforms: {}, textureImageTexture, textureImageSource: null, distortChromaProgram: null, distortChromaUniforms: {}, distortChromaImageTexture, distortChromaImageSource: null, shapesProgram: null, shapesUniforms: {}, shapesMaskTexture, shapesMaskKey: null, shapesFrameTexture, shapesFrameSize: [1, 1], fieldModelTexture, fieldModelVersion: 0, videoMotionFieldTexture, datamoshHistoryFbos: [datamoshHistoryFboA, datamoshHistoryFboB], datamoshHistoryTextures: [datamoshHistoryTextureA, datamoshHistoryTextureB], datamoshInputFbos: [datamoshInputFboA, datamoshInputFboB], datamoshInputTextures: [datamoshInputTextureA, datamoshInputTextureB], datamoshHistory: createDatamoshHistoryState(), gradFbo, gradTexture, blurProgram: null, blurUniforms: {}, stretchProgram: null, stretchUniforms: {}, seamlessProgram: null, seamlessUniforms: {}, postprocessProgram: null, postprocessUniforms: {}, stackCoreProgram: null, stackCoreUniforms: {}, noiseStackProgram: null, noiseStackUniforms: {}, noiseDiffuseStackProgram: null, noiseDiffuseStackUniforms: {}, glassProgram: null, glassUniforms: {}, glassFallbackActive: false, glassV2Program: null, glassV2Uniforms: {}, glassV2FallbackActive: false, glassTileProgram: null, glassTileUniforms: {}, glassTileFallbackActive: false, prismProgram: null, prismUniforms: {}, prismCompositeProgram: null, prismCompositeUniforms: {}, particleProgram: null, particleUniforms: {}, particleVao: null, particleQuadBuffer: null, particleInstanceBuffer: null, particleInstanceCount: 0, particleInstanceSeed: Number.NaN, flowGradient, normalFbo, normalTexture, hBlurFbo, hBlurTexture, postprocessFboA, postprocessTextureA, postprocessFboB, postprocessTextureB, prismScratchFbo, prismScratchTexture, prismBlurFbo, prismBlurTexture, prismGlowFbo, prismGlowTexture, shaderCompileExt, lazyProgramState: createLazyProgramState(), lazyProgramCompileQueue: createSerialAsyncQueue(), resourceLedger, hasPresentedFrame: false, disposed: false };
+  const ctx: WebGLContext = { gl, performanceProfiler, gpuDiagnostics, renderOptimization, program, uniforms, geometryBuffer, transitionGeometryBuffer, generatorProgram: program, generatorUniforms: uniforms, bootstrapProgram: program, bootstrapUniforms: uniforms, activeNoiseVariants: createInitialNoiseVariants(), noiseVariantPrograms: new Map([[noiseVariantId('generator', GENERATOR_WITHOUT_NOISE_VARIANT), { program, uniforms }]]), noiseVariantStates: new Map(), gradientRampTexture, meshGradientTexture, meshGradientTextureSignature: '', meshCoordinateTexture, meshCoordinateTextureSignature: '', meshCoordinateUploadCount: 0, diffuseCurveTexture, diffuseCurveSignature: '', diffuseAsciiTexture, diffuseAsciiSignature: '', diffuseAsciiCount: 1, diffuseAsciiRows: ASCII_ATLAS_MAX_ROWS, diffuseHistogramAt: 0, manualDistortTexture, manualDistortDisplacement: null, manualDistortSmoothMask: null, manualDistortMapResolution: 0, sourceImageTexture, sourceImageCanvas: null, imageGradientTexture, imageGradientSource: null, imageMaskTexture, imageMaskSource: null, normalMapProgram: null, normalMapUniforms: {}, datamoshProgram: null, datamoshUniforms: {}, threeDPrograms: {}, textureProgram: null, textureUniforms: {}, iceProgram: null, iceUniforms: {}, textureImageTexture, textureImageSource: null, distortChromaProgram: null, distortChromaUniforms: {}, distortChromaImageTexture, distortChromaImageSource: null, shapesProgram: null, shapesUniforms: {}, shapesMaskTexture, shapesMaskKey: null, shapesFrameTexture, shapesFrameSize: [1, 1], fieldModelTexture, fieldModelVersion: 0, videoMotionFieldTexture, datamoshHistoryFbos: [datamoshHistoryFboA, datamoshHistoryFboB], datamoshHistoryTextures: [datamoshHistoryTextureA, datamoshHistoryTextureB], datamoshInputFbos: [datamoshInputFboA, datamoshInputFboB], datamoshInputTextures: [datamoshInputTextureA, datamoshInputTextureB], datamoshHistory: createDatamoshHistoryState(), gradFbo, gradTexture, blurProgram: null, blurUniforms: {}, stretchProgram: null, stretchUniforms: {}, seamlessProgram: null, seamlessUniforms: {}, postprocessProgram: null, postprocessUniforms: {}, stackCoreProgram: null, stackCoreUniforms: {}, noiseStackProgram: null, noiseStackUniforms: {}, noiseDiffuseStackProgram: null, noiseDiffuseStackUniforms: {}, glassProgram: null, glassUniforms: {}, glassFallbackActive: false, glassV2Program: null, glassV2Uniforms: {}, glassV2FallbackActive: false, glassTileProgram: null, glassTileUniforms: {}, glassTileFallbackActive: false, prismProgram: null, prismUniforms: {}, prismCompositeProgram: null, prismCompositeUniforms: {}, particleProgram: null, particleUniforms: {}, particleVao: null, particleQuadBuffer: null, particleInstanceBuffer: null, particleInstanceCount: 0, particleInstanceSeed: Number.NaN, flowGradient, normalFbo, normalTexture, hBlurFbo, hBlurTexture, postprocessFboA, postprocessTextureA, postprocessFboB, postprocessTextureB, prismScratchFbo, prismScratchTexture, prismBlurFbo, prismBlurTexture, prismGlowFbo, prismGlowTexture, shaderCompileExt, lazyProgramState: createLazyProgramState(), lazyProgramCompileQueue: createSerialAsyncQueue(), resourceLedger, hasPresentedFrame: false, disposed: false };
   initializedContext = ctx;
   for (const key of NOISE_VARIANT_PROGRAM_KEYS) {
     ctx.lazyProgramState[key] = getNoiseVariantState(ctx, key, ctx.activeNoiseVariants[key]);
@@ -860,6 +880,7 @@ export function disposeWebGL(ctx: WebGLContext): void {
     ctx.datamoshProgram,
     ...Object.values(ctx.threeDPrograms).map(entry => entry.program),
     ctx.textureProgram,
+    ctx.iceProgram,
     ctx.distortChromaProgram,
     ctx.shapesProgram,
   ];
@@ -869,6 +890,7 @@ export function disposeWebGL(ctx: WebGLContext): void {
   const textures = [
     ctx.gradientRampTexture,
     ctx.meshGradientTexture,
+    ctx.meshCoordinateTexture,
     ctx.diffuseCurveTexture,
     ctx.diffuseAsciiTexture,
     ctx.manualDistortTexture,
@@ -1069,6 +1091,7 @@ function createLazyProgramState(): Record<LazyProgramKey, LazyProgramState> {
     threeDAbstract: { promise: null, failed: false, timedOut: false, fallback: false },
     texture: { promise: null, failed: false, timedOut: false, fallback: false },
     distortChroma: { promise: null, failed: false, timedOut: false, fallback: false },
+    ice: { promise: null, failed: false, timedOut: false, fallback: false },
     shapes: { promise: null, failed: false, timedOut: false, fallback: false },
   };
 }
@@ -1260,6 +1283,51 @@ const TEXTURE_UNIFORM_NAMES = [
   'u_diffraction', 'u_diffractionSpread',
 ] as const;
 
+const MATERIAL_FIELD_STRUCTURE_UNIFORM_NAMES = [
+  'u_mfSeedZ', 'u_mfSeedOffset', 'u_mfScale', 'u_mfThickness', 'u_mfThicknessVariation', 'u_mfCracks',
+  'u_mfSurface', 'u_mfFrost', 'u_mfBubbles', 'u_mfWarp', 'u_mfMorph', 'u_mfAngle',
+] as const;
+
+const ICE_UNIFORM_NAMES = [
+  'u_sourceTex', 'u_resolution', 'u_fullResolution', 'u_tileOffset', 'u_mix', 'u_refractionPx',
+  'u_dispersionPx', 'u_roughnessPx', 'u_roughness', 'u_reflection', 'u_ior', 'u_absorption',
+  'u_scattering', 'u_absorptionColor', 'u_scatterColor', 'u_lightAngle',
+  ...MATERIAL_FIELD_STRUCTURE_UNIFORM_NAMES,
+] as const;
+
+function getIceUniforms(gl: WebGL2RenderingContext, program: WebGLProgram): Record<string, WebGLUniformLocation | null> {
+  return Object.fromEntries(ICE_UNIFORM_NAMES.map(name => [name, gl.getUniformLocation(program, name)]));
+}
+
+/** Shared structure constants used by both the field Generator and Ice. */
+function setMaterialFieldStructureUniforms(
+  gl: WebGL2RenderingContext,
+  uniforms: Record<string, WebGLUniformLocation | null>,
+  field: MaterialFieldUniforms,
+): void {
+  gl.uniform1f(uniforms.u_mfSeedZ, field.seedZ);
+  gl.uniform2f(uniforms.u_mfSeedOffset, field.seedOffset[0], field.seedOffset[1]);
+  gl.uniform1f(uniforms.u_mfScale, field.scale);
+  gl.uniform1f(uniforms.u_mfThickness, field.thickness);
+  gl.uniform1f(uniforms.u_mfThicknessVariation, field.thicknessVariation);
+  gl.uniform1f(uniforms.u_mfCracks, field.cracks);
+  gl.uniform1f(uniforms.u_mfSurface, field.surface);
+  gl.uniform1f(uniforms.u_mfFrost, field.frost);
+  gl.uniform1f(uniforms.u_mfBubbles, field.bubbles);
+  gl.uniform1f(uniforms.u_mfWarp, field.warp);
+  gl.uniform1f(uniforms.u_mfMorph, field.morph);
+  gl.uniform1f(uniforms.u_mfAngle, field.angle);
+}
+
+function hexToLinearRgb(hex: string): [number, number, number] {
+  const value = Number.parseInt(hex.slice(1), 16);
+  const decode = (channel: number) => {
+    const c = channel / 255;
+    return c <= 0.04045 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4;
+  };
+  return [decode((value >> 16) & 0xff), decode((value >> 8) & 0xff), decode(value & 0xff)];
+}
+
 function getTextureUniforms(gl: WebGL2RenderingContext, program: WebGLProgram): Record<string, WebGLUniformLocation | null> {
   return Object.fromEntries(TEXTURE_UNIFORM_NAMES.map(name => [name, gl.getUniformLocation(program, name)]));
 }
@@ -1443,6 +1511,9 @@ function installLazyProgram(
   } else if (key === 'texture') {
     ctx.textureProgram = program;
     ctx.textureUniforms = getTextureUniforms(gl, program);
+  } else if (key === 'ice') {
+    ctx.iceProgram = program;
+    ctx.iceUniforms = getIceUniforms(gl, program);
   } else if (key === 'distortChroma') {
     ctx.distortChromaProgram = program;
     ctx.distortChromaUniforms = getDistortChromaUniforms(gl, program);
@@ -1681,6 +1752,7 @@ export function lazyProgramReady(ctx: WebGLContext, key: LazyProgramKey, noiseVa
     datamosh: [ctx.datamoshProgram, ctx.datamoshUniforms],
     texture: [ctx.textureProgram, ctx.textureUniforms],
     distortChroma: [ctx.distortChromaProgram, ctx.distortChromaUniforms],
+    ice: [ctx.iceProgram, ctx.iceUniforms],
     shapes: [ctx.shapesProgram, ctx.shapesUniforms],
     stretch: [ctx.stretchProgram, ctx.stretchUniforms],
     seamless: [ctx.seamlessProgram, ctx.seamlessUniforms],
@@ -2190,6 +2262,48 @@ function uploadMeshGradientTexture(ctx: WebGLContext, gradient: GradientConfig, 
   gl.bindTexture(gl.TEXTURE_2D, ctx.meshGradientTexture);
   gl.texSubImage2D(gl.TEXTURE_2D, 0, 0, 0, MESH_FIELD_SIZE, MESH_FIELD_SIZE, gl.RGBA, gl.UNSIGNED_BYTE, field);
   ctx.meshGradientTextureSignature = signature;
+}
+
+function uploadMeshCoordinateTexture(ctx: WebGLContext, gradient: GradientConfig): void {
+  const mesh = normalizeMeshGradientConfig(gradient.mesh);
+  const signature = meshCoordinateFieldSignature(mesh, MESH_FIELD_SIZE, MESH_FIELD_SUBDIVISIONS);
+  if (ctx.meshCoordinateTextureSignature === signature) return;
+  const field = buildMeshCoordinateField(mesh, {
+    width: MESH_FIELD_SIZE,
+    height: MESH_FIELD_SIZE,
+    subdivisions: MESH_FIELD_SUBDIVISIONS,
+  });
+  const { gl } = ctx;
+  gl.activeTexture(gl.TEXTURE10);
+  gl.bindTexture(gl.TEXTURE_2D, ctx.meshCoordinateTexture);
+  gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, false);
+  gl.texImage2D(gl.TEXTURE_2D, 0, gl.R32F, MESH_FIELD_SIZE, MESH_FIELD_SIZE, 0, gl.RED, gl.FLOAT, field);
+  ctx.meshCoordinateTextureSignature = signature;
+  ctx.meshCoordinateUploadCount += 1;
+}
+
+/** Uploads the per-frame field constants; exported for the lookup cache test. */
+export function applyMaterialFieldUniforms(
+  ctx: WebGLContext,
+  uniforms: Record<string, WebGLUniformLocation | null>,
+  gradient: GradientConfig,
+  materialField: MaterialFieldConfig,
+  materialPhase: number,
+  active: boolean,
+): void {
+  const { gl } = ctx;
+  const input = gradient.fieldInput;
+  setUniform1i(gl, uniforms.u_mfInputSource, active && input ? MATERIAL_FIELD_INPUT_SOURCE_INDEX[input.source] : 0);
+  gl.uniform1f(uniforms.u_mfInfluence, active && input ? input.influence : 0);
+  if (!active) return;
+  setMaterialFieldStructureUniforms(gl, uniforms, getMaterialFieldUniforms(materialField, materialPhase));
+  const meshRamp = (gradient.gradientType ?? 'linear') === 'mesh';
+  if (meshRamp) uploadMeshCoordinateTexture(ctx, gradient);
+  gl.activeTexture(gl.TEXTURE10);
+  gl.bindTexture(gl.TEXTURE_2D, ctx.meshCoordinateTexture);
+  setUniform1i(gl, uniforms.u_meshCoordinate, 10);
+  const lookupSize = meshRamp ? MESH_FIELD_SIZE : 1;
+  gl.uniform2f(uniforms.u_meshCoordinateSize, lookupSize, lookupSize);
 }
 
 function uploadDiffuseCurveTexture(ctx: WebGLContext, diffuse: Pick<DiffuseConfig, 'luminanceBezier' | 'grainBezier'>): void {
@@ -3341,6 +3455,61 @@ function drawTexturePass(
   return true;
 }
 
+/**
+ * Ice: refracts, absorbs, scatters, and reflects the previous texture through
+ * the shared Material Field. Every source reference stays inside
+ * getIceSampleRadii(), which the tile padding reserves.
+ */
+function drawIcePass(
+  ctx: WebGLContext,
+  sourceTexture: WebGLTexture,
+  ice: IceConfig,
+  materialField: MaterialFieldConfig,
+  materialPhase: number,
+  iceLightPhase: number,
+  width: number,
+  height: number,
+  fullWidth: number,
+  fullHeight: number,
+  offsetX: number,
+  offsetY: number,
+  targetFramebuffer: WebGLFramebuffer | null,
+): boolean {
+  const { gl } = ctx;
+  if (!ctx.iceProgram) return false;
+  const uniforms = ctx.iceUniforms;
+  const radii = getIceSampleRadii(fullHeight);
+  gl.useProgram(ctx.iceProgram);
+  gl.viewport(0, 0, width, height);
+  gl.disable(gl.BLEND);
+  gl.disable(gl.SCISSOR_TEST);
+  gl.colorMask(true, true, true, true);
+  gl.bindFramebuffer(gl.FRAMEBUFFER, targetFramebuffer);
+  gl.activeTexture(gl.TEXTURE3);
+  gl.bindTexture(gl.TEXTURE_2D, sourceTexture);
+  setUniform1i(gl, uniforms.u_sourceTex, 3);
+  gl.uniform2f(uniforms.u_resolution, width, height);
+  gl.uniform2f(uniforms.u_fullResolution, fullWidth, fullHeight);
+  gl.uniform2f(uniforms.u_tileOffset, offsetX, offsetY);
+  gl.uniform1f(uniforms.u_mix, ice.mix);
+  gl.uniform1f(uniforms.u_refractionPx, radii.refraction * ice.refraction);
+  gl.uniform1f(uniforms.u_dispersionPx, radii.dispersion * ice.refraction);
+  gl.uniform1f(uniforms.u_roughnessPx, radii.roughness);
+  gl.uniform1f(uniforms.u_roughness, ice.roughness);
+  gl.uniform1f(uniforms.u_reflection, ice.reflection);
+  gl.uniform1f(uniforms.u_ior, ice.ior);
+  gl.uniform1f(uniforms.u_absorption, ice.absorption);
+  gl.uniform1f(uniforms.u_scattering, ice.scattering);
+  const absorptionColor = hexToLinearRgb(ice.absorptionColor);
+  const scatterColor = hexToLinearRgb(ice.scatterColor);
+  gl.uniform3f(uniforms.u_absorptionColor, absorptionColor[0], absorptionColor[1], absorptionColor[2]);
+  gl.uniform3f(uniforms.u_scatterColor, scatterColor[0], scatterColor[1], scatterColor[2]);
+  gl.uniform1f(uniforms.u_lightAngle, iceLightPhase * Math.PI * 2);
+  setMaterialFieldStructureUniforms(gl, uniforms, getMaterialFieldUniforms(materialField, materialPhase));
+  drawArrays(ctx, 'Ice', gl.TRIANGLES, 0, 6);
+  return true;
+}
+
 const DISTORT_CHROMA_WRAP_MAP = { clamp: 0, repeat: 1, mirror: 2 } as const;
 
 /**
@@ -4012,14 +4181,22 @@ export function render(
   textureNormalizedTime = 0,
   distortChroma: DistortChromaConfig = DEFAULT_DISTORT_CHROMA,
   distortChromaImageSource: HTMLCanvasElement | null = null,
+  materialField: MaterialFieldConfig = DEFAULT_MATERIAL_FIELD,
+  materialPhase = 0,
+  ice: IceConfig = DEFAULT_ICE,
+  iceLightPhase = 0,
 ): void {
   seamless = normalizeSeamlessConfig(seamless);
+  materialField = normalizeMaterialFieldConfig(materialField);
+  ice = normalizeIceConfig(ice);
   texture = normalizeTextureConfig(texture);
   distortChroma = normalizeDistortChromaConfig(distortChroma);
   coneView = normalizeConeViewConfig(coneView);
   if (ctx.disposed || ctx.gl.isContextLost()) return;
   const isV2Pipeline = effectPipeline?.version === 'stack-v2';
   const imageGradientProtected = imageGradient.enabled && !!imageGradientSource;
+  // The field input is a V2 Base feature; Legacy pipelines keep their path.
+  const materialFieldActive = isV2Pipeline && isMaterialFieldInputActive(gradient, imageGradientProtected);
   const flowRequested = effectPipeline?.flowGradientEnabled === true && flowGradient != null;
   if (!flowRequested && ctx.flowGradient.hasTrail) resetFlowGradientResources(ctx.gl, ctx.flowGradient);
   const normalizedFlowGradient = flowRequested ? normalizeFlowGradientConfig(flowGradient) : null;
@@ -4119,6 +4296,11 @@ export function render(
   const distortChromaRequested = isV2Pipeline && effectPipeline && !imageGradientProtected
     ? isEffectStackLayerEnabled(effectPipeline, 'distortChroma')
     : false;
+  // Ice refracts the image, so a protected Image Gradient bypasses it. Mix 0
+  // is an identity pass and never needs the program.
+  const iceRequested = isV2Pipeline && effectPipeline && !imageGradientProtected && !isIceOpticallyIdentity(ice)
+    ? isEffectStackLayerEnabled(effectPipeline, 'ice')
+    : false;
   const planScene = {
     gradient,
     noiseDistortion,
@@ -4146,6 +4328,12 @@ export function render(
       renderPlan: plan,
       noiseEnabled: noiseDistortion.enabled,
       manualDistortEnabled: manualDistort.enabled,
+    }),
+    generatorNeedsMaterialFieldVariant({
+      isV2Pipeline,
+      imageGradientProtected,
+      renderPlan: plan,
+      materialFieldInputActive: materialFieldActive,
     }),
   );
   let renderPlan = isV2Pipeline && effectPipeline
@@ -4336,6 +4524,7 @@ export function render(
   gl.bindTexture(gl.TEXTURE_2D, meshGradientTexture);
   setUniform1i(gl, uniforms.u_meshGradient, 2);
   gl.uniform1f(uniforms.u_rampRepeat, Math.max(1, Math.min(20, Math.round(gradient.rampRepeat ?? 1))));
+  applyMaterialFieldUniforms(ctx, uniforms, gradient, materialField, materialPhase, materialFieldActive);
   gl.activeTexture(gl.TEXTURE4);
   gl.bindTexture(gl.TEXTURE_2D, sourceImageTexture);
   if (sourceImageCanvas && ctx.sourceImageCanvas !== sourceImageCanvas) {
@@ -4503,7 +4692,9 @@ export function render(
       && !protectedCone
       && !protectedTexture
       && !datamoshActive;
-    const generatorReady = !analyticPrefixEnabled || requestLazyProgram(ctx, 'generator');
+    // The field Generator variant must be compiled before the field-driven
+    // Base is presented; until then the bootstrap Base keeps the frame live.
+    const generatorReady = !(analyticPrefixEnabled || materialFieldActive) || requestLazyProgram(ctx, 'generator');
     if ((renderPlan.framebufferAllocationMode === 'direct' || protectedDirect) && !flowActive && !datamoshActive && generatorReady) {
       if (imageGradientProtected) {
         setUniform1i(gl, uniforms.u_noiseEnabled, protectedLayerEnabled('noise') && noiseDistortion.enabled ? 1 : 0);
@@ -4551,6 +4742,7 @@ export function render(
     const stretchReady = imageGradientProtected || !renderPlan.programs.stretch || requestLazyProgram(ctx, 'stretch');
     const seamlessReady = !seamlessRequested || requestLazyProgram(ctx, 'seamless');
     const textureReady = !textureRequested || requestLazyProgram(ctx, 'texture');
+    const iceReady = !iceRequested || requestLazyProgram(ctx, 'ice');
     const distortChromaReady = !distortChromaRequested || (
       requestLazyProgram(ctx, 'distortChroma') &&
       (!renderPlan.distortChromaNeedsBlur || requestLazyProgram(ctx, 'blur'))
@@ -4564,7 +4756,7 @@ export function render(
 
     // Lazy programs compile asynchronously. Keep a usable base frame until every
     // requested V2 stage is available instead of presenting a partial stack.
-    if (!generatorReady || !stackCoreReady || !noiseDiffuseCompositionReady || !normalReady || !stretchReady || !prismReady || !particlesReady || !seamlessReady || !textureReady || !distortChromaReady || !flowProgramsReady || (datamoshRequested && !datamoshActive) || threeDPending) {
+    if (!generatorReady || !stackCoreReady || !noiseDiffuseCompositionReady || !normalReady || !stretchReady || !prismReady || !particlesReady || !seamlessReady || !textureReady || !iceReady || !distortChromaReady || !flowProgramsReady || (datamoshRequested && !datamoshActive) || threeDPending) {
       // Cloth is a Base generator and does not depend on the stack programs:
       // present the cloth frame even while they compile.
       const clothReady = clothGradient?.enabled
@@ -4757,6 +4949,17 @@ export function render(
         const target = choosePostprocessTarget(ctx, currentTexture);
         if (drawDistortChromaPass(
           ctx, currentTexture, distortChroma, distortChromaImageSource,
+          vpW, vpH, width, height, tileOx, tileOy, target.fbo,
+        )) {
+          currentTexture = target.texture;
+        }
+        continue;
+      }
+      if (layer.kind === 'ice') {
+        if (!iceRequested) continue;
+        const target = choosePostprocessTarget(ctx, currentTexture);
+        if (drawIcePass(
+          ctx, currentTexture, ice, materialField, materialPhase, iceLightPhase,
           vpW, vpH, width, height, tileOx, tileOy, target.fbo,
         )) {
           currentTexture = target.texture;

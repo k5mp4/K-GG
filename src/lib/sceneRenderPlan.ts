@@ -3,6 +3,7 @@ import { isGlassOpticallyIdentity } from './glass';
 import { isGlassTileOpticallyIdentity } from './glassTile';
 import { getActivePostprocessStackLayers } from './postprocessStack';
 import {
+  GENERATOR_MATERIAL_FIELD_VARIANT,
   GENERATOR_WITHOUT_NOISE_VARIANT,
   getThreeDProgramKey,
   NOISE_TYPE_MAP,
@@ -11,6 +12,8 @@ import {
 } from './webglShaderSources';
 import type { LatestState } from '../types/latestState';
 import { getV2RenderPlan, type V2RenderPlan, type V2RenderPlanOptions } from './effectPipeline';
+import { isMaterialFieldInputActive } from './materialField';
+import { isIceOpticallyIdentity } from '../types/ice';
 
 /**
  * Inputs used to decide which render resources and passes a scene needs.
@@ -22,6 +25,7 @@ export type SceneRenderPlanInput = V2RenderPlanOptions & {
 
 export type SceneRenderPlanOverrides = Partial<Pick<SceneRenderPlanInput,
   'imageGradientEnabled' | 'forceTextureDiffusePass' | 'flowGradientEnabled' | 'analyticNoisePending'
+  | 'materialFieldInputActive'
 >>;
 
 export type SceneRenderPlanState = Pick<LatestState,
@@ -39,6 +43,7 @@ export type SceneRenderPlanState = Pick<LatestState,
   | 'imageGradientSource'
   | 'datamosh'
   | 'distortChroma'
+  | 'ice'
 >;
 
 /**
@@ -50,6 +55,8 @@ export function getSceneRenderPlanInput(
   state: SceneRenderPlanState,
   overrides: SceneRenderPlanOverrides = {},
 ): SceneRenderPlanInput {
+  const imageGradientEnabled = overrides.imageGradientEnabled
+    ?? (state.imageGradient.enabled && Boolean(state.imageGradientSource));
   return {
     effectPipeline: state.effectPipeline,
     normalMapEnabled: state.normalMap.enabled,
@@ -61,14 +68,15 @@ export function getSceneRenderPlanInput(
     flowGradientEnabled: overrides.flowGradientEnabled ?? state.effectPipeline.flowGradientEnabled === true,
     gradientType: state.gradient?.gradientType,
     sourceImageEnabled: Boolean(state.sourceImageCanvas),
-    imageGradientEnabled: overrides.imageGradientEnabled
-      ?? (state.imageGradient.enabled && Boolean(state.imageGradientSource)),
+    imageGradientEnabled,
     noiseType: state.noiseDistortion?.type,
     noiseLoopMode: state.noiseDistortion?.noiseLoopMode,
     diffuseMode: state.diffuse?.mode,
     diffuseApplyMode: state.diffuse?.applyMode,
     analyticNoisePending: overrides.analyticNoisePending,
     distortChromaLensBlur: state.distortChroma?.lensBlur,
+    materialFieldInputActive: overrides.materialFieldInputActive
+      ?? (state.effectPipeline.version === 'stack-v2' && isMaterialFieldInputActive(state.gradient, imageGradientEnabled)),
   };
 }
 
@@ -117,6 +125,7 @@ export function getRequiredSceneProgramKeys(
     if (plan.programs.threeD) add(getThreeDProgramKey(state.coneView.shape), true);
     add('texture', plan.programs.texture);
     add('distortChroma', !imageGradientProtected && plan.programs.distortChroma);
+    add('ice', !imageGradientProtected && plan.programs.ice && !isIceOpticallyIdentity(state.ice));
   } else {
     const layers = getActivePostprocessStackLayers(state.postprocess).filter(layer => (
       (layer.kind !== 'glass' && layer.kind !== 'glassV2' && layer.kind !== 'glassTile')
@@ -160,6 +169,16 @@ export type GeneratorVariantInput = {
 };
 
 /**
+ * The field Generator variant replaces the bootstrap only for V2 frames whose
+ * plan reads the Material Field; protected Image Gradient never does.
+ */
+export function generatorNeedsMaterialFieldVariant(input: Pick<GeneratorVariantInput, 'isV2Pipeline' | 'imageGradientProtected' | 'renderPlan'> & {
+  materialFieldInputActive: boolean;
+}): boolean {
+  return input.isV2Pipeline && !input.imageGradientProtected && input.renderPlan !== null && input.materialFieldInputActive;
+}
+
+/**
  * Whether the Generator needs a full variant instead of the bootstrap
  * program, which omits Noise and Manual Distort. V2 evaluates Noise in the
  * Generator only when the analytic prefix consumes the Noise layer, and never
@@ -181,10 +200,13 @@ export function generatorNeedsNoiseVariant(input: GeneratorVariantInput): boolea
 export function getNoiseProgramVariants(
   noiseType: keyof typeof NOISE_TYPE_MAP | undefined,
   generatorNeedsVariant: boolean,
+  materialFieldVariant = false,
 ): NoiseProgramVariants {
   const noiseVariant = NOISE_TYPE_MAP[noiseType ?? 'simplex'] ?? NOISE_TYPE_MAP.simplex;
   return {
-    generator: generatorNeedsVariant ? noiseVariant : GENERATOR_WITHOUT_NOISE_VARIANT,
+    generator: generatorNeedsVariant
+      ? noiseVariant
+      : materialFieldVariant ? GENERATOR_MATERIAL_FIELD_VARIANT : GENERATOR_WITHOUT_NOISE_VARIANT,
     noiseStack: noiseVariant,
     noiseDiffuseStack: noiseVariant,
   };
@@ -196,15 +218,22 @@ export function getSceneNoiseProgramVariants(
   options: Pick<SceneRenderPlanOverrides, 'analyticNoisePending'> = {},
 ): NoiseProgramVariants {
   const imageGradientProtected = state.imageGradient.enabled && Boolean(state.imageGradientSource);
-  const renderPlan = getSceneRenderPlan(getSceneRenderPlanInput(state, {
+  const input = getSceneRenderPlanInput(state, {
     imageGradientEnabled: imageGradientProtected,
     analyticNoisePending: options.analyticNoisePending,
-  }));
+  });
+  const renderPlan = getSceneRenderPlan(input);
+  const isV2Pipeline = state.effectPipeline.version === 'stack-v2';
   return getNoiseProgramVariants(state.noiseDistortion?.type, generatorNeedsNoiseVariant({
-    isV2Pipeline: state.effectPipeline.version === 'stack-v2',
+    isV2Pipeline,
     imageGradientProtected,
     renderPlan,
     noiseEnabled: state.noiseDistortion?.enabled === true,
     manualDistortEnabled: state.manualDistort?.enabled === true,
+  }), generatorNeedsMaterialFieldVariant({
+    isV2Pipeline,
+    imageGradientProtected,
+    renderPlan,
+    materialFieldInputActive: input.materialFieldInputActive === true,
   }));
 }

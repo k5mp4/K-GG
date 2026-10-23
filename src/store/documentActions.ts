@@ -6,6 +6,7 @@ import {
   defaultEdgeHandles,
   legacyProjection,
   normalizeMeshGradientConfig,
+  normalizeGradientFieldInput,
   type Vec2Tuple,
 } from '../types/gradient';
 import { evaluateMeshPatch } from '../lib/meshGradientField';
@@ -15,8 +16,10 @@ import { DEFAULT_DIFFUSE_ASCII_CHARSET, DEFAULT_DIFFUSE_BACKGROUND_COLOR, normal
 import { normalizeClothGradientConfig } from '../types/clothGradient';
 import { normalizeConeViewConfig } from '../types/coneView';
 import { normalizeSeamlessConfig } from '../types/seamless';
+import { normalizeMaterialFieldConfig } from '../types/materialField';
 import { normalizeTextureConfig } from '../types/texture';
 import { normalizeDistortChromaConfig } from '../types/distortChroma';
+import { normalizeIceConfig } from '../types/ice';
 import { normalizeShapesConfig } from '../types/shapes';
 import { normalizeImageGradientConfig } from '../types/imageGradient';
 import { normalizePropertyTrack, type AnimationMode, type Keyframe } from '../types/keyframe';
@@ -84,6 +87,7 @@ export function createDocumentActions(set: DocumentStoreSet, defaults: DocumentD
       gradient: {
         ...s.gradient,
         ...next,
+        fieldInput: normalizeGradientFieldInput({ ...s.gradient.fieldInput, ...v.fieldInput }),
         ...(next.gradientType && next.gradientType !== s.gradient.gradientType ? { anchors } : {}),
         ...(nextType === 'bezier' && next.gradientType !== s.gradient.gradientType
           ? { bezierControls: defaultBezierControlsForAnchors(anchors ?? GRADIENT_ANCHOR_DEFAULTS.bezier) }
@@ -384,6 +388,7 @@ export function createDocumentActions(set: DocumentStoreSet, defaults: DocumentD
   setConeView: (v) => set((s) => ({ coneView: normalizeConeViewConfig({ ...s.coneView, ...v }) })),
   setSeamless: (v) => set((s) => ({ seamless: normalizeSeamlessConfig({ ...s.seamless, ...v }) })),
   setShapes: (v) => set((s) => ({ shapes: normalizeShapesConfig({ ...s.shapes, ...v }) })),
+  setMaterialField: (v) => set((s) => ({ materialField: normalizeMaterialFieldConfig({ ...s.materialField, ...v }) })),
   setTexture: (v) => set((s) => {
     const texture = normalizeTextureConfig({ ...s.texture, ...v });
     const effectPipeline = v.enabled !== undefined && s.effectPipeline.version === 'stack-v2'
@@ -403,6 +408,16 @@ export function createDocumentActions(set: DocumentStoreSet, defaults: DocumentD
       }
       : s.effectPipeline;
     return { distortChroma, effectPipeline };
+  }),
+  setIce: (v) => set((s) => {
+    const ice = normalizeIceConfig({ ...s.ice, ...v });
+    const effectPipeline = v.enabled !== undefined && s.effectPipeline.version === 'stack-v2'
+      ? {
+        ...s.effectPipeline,
+        effectStack: updateEffectStackLayer(s.effectPipeline.effectStack, 'ice', { enabled: v.enabled }),
+      }
+      : s.effectPipeline;
+    return { ice, effectPipeline };
   }),
   setFlowGradient: (v) => set((s) => ({
     flowGradient: normalizeFlowGradientConfig({ ...s.flowGradient, ...v }),
@@ -532,6 +547,7 @@ export function createDocumentActions(set: DocumentStoreSet, defaults: DocumentD
       datamosh: { ...s.datamosh, enabled: enabled('datamosh') },
       texture: { ...s.texture, enabled: enabled('texture') },
       distortChroma: { ...s.distortChroma, enabled: enabled('distortChroma') },
+      ice: { ...s.ice, enabled: enabled('ice') },
       ...(postprocessEnabledSignatureChanged
         ? { postprocess: { ...s.postprocess, enabled: hasEnabledPostprocessEffectStack(effectPipeline) } }
         : {}),

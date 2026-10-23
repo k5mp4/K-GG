@@ -21,7 +21,7 @@ export function useVjSession() {
   const document = useGradientStore(useShallow(state => ({
     noiseDistortion: state.noiseDistortion, diffuse: state.diffuse, slitScan: state.slitScan,
     stretch: state.stretch, postprocess: state.postprocess, coneView: state.coneView,
-    datamosh: state.datamosh, texture: state.texture, distortChroma: state.distortChroma,
+    datamosh: state.datamosh, materialField: state.materialField, texture: state.texture, distortChroma: state.distortChroma, ice: state.ice,
     effectPipeline: state.effectPipeline, presetName: state.presetName,
   })));
   const enabled = settings.layoutMode === 'vj';
