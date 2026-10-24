@@ -5,12 +5,12 @@ title: Gradient System
 status: current
 owners: [maintainer]
 created: 2026-07-27
-updated: 2026-09-30
-requirement_ids: [GRAD-001, GRAD-002, GRAD-003, GRAD-004, GRAD-005, GRAD-006, GRAD-007, GRAD-008, GRAD-009, GRAD-010, GRAD-011, GRAD-012, GRAD-013, GRAD-014, GRAD-015, GRAD-016, GRAD-017, GRAD-018, GRAD-019, GRAD-020, GRAD-021, GRAD-022, GRAD-023, GRAD-024, GRAD-025, GRAD-026, GRAD-027]
-related_adrs: [ADR-0001, ADR-0003, ADR-0010, ADR-0013]
+updated: 2026-10-19
+requirement_ids: [GRAD-001, GRAD-002, GRAD-003, GRAD-004, GRAD-005, GRAD-006, GRAD-007, GRAD-008, GRAD-009, GRAD-010, GRAD-011, GRAD-012, GRAD-013, GRAD-014, GRAD-015, GRAD-016, GRAD-017, GRAD-018, GRAD-019, GRAD-020, GRAD-021, GRAD-022, GRAD-023, GRAD-024, GRAD-025, GRAD-026, GRAD-027, GRAD-028]
+related_adrs: [ADR-0001, ADR-0003, ADR-0010, ADR-0013, ADR-20261019-ice-material-field]
 related_changes: [CHANGE-001, CHANGE-010, CHANGE-024, CHANGE-025, CHANGE-030, CHANGE-031, CHANGE-032, CHANGE-037, CHANGE-039, CHANGE-040, CHANGE-045, CHANGE-048, CHANGE-049]
-related_code: [src/types/gradient.ts, src/types/flowGradient.ts, src/types/imageGradient.ts, src/types/renderView.ts, src/types/coneView.ts, src/store/gradientStore.ts, src/lib/gradientRampUtils.ts, src/lib/flowGradientRenderer.ts, src/lib/flowSimulation.ts, src/lib/gradientPreview.ts, src/lib/meshGradientField.ts, src/lib/sceneEvaluation.ts, src/lib/webgl.ts, src/lib/webglCapability.ts, src/lib/webglShaderSources.ts, src/lib/clothGradientRenderer.ts, src/lib/coneView.ts, src/lib/coneSeam.ts, src/lib/processedCanvasClock.ts, src/lib/presetModel.ts, src/components/GradientRamp.tsx, src/components/CustomSelect.tsx, src/components/ColorPicker.tsx, src/components/ColorPaletteGenerator.tsx, src/components/GradientCanvas.tsx, src/components/SandboxPanel.tsx, src/components/FlowGradientPanel.tsx, src/components/ClothGradientPanel.tsx, src/components/ClothCanvas.tsx, src/components/ConeApexEditor.tsx, src/components/ConeViewPanel.tsx, src/components/ExportPanel.tsx, src/lib/videoExportFrames.ts, src/adapters/types.ts, src/lib/colorSpace.ts, src/lib/cubehelix.ts, src/lib/perceptualGradient.ts, src/lib/gradientGenerator.ts, src/i18n/uiLabels.ts, src/i18n/messages.ts]
-related_tests: [src/types/gradient.test.ts, src/types/coneView.test.ts, src/lib/flowSimulation.test.ts, src/lib/flowGradientPreset.test.ts, src/lib/meshGradient.test.ts, src/lib/proportionalRampEdit.test.ts, src/lib/sceneEvaluation.glass.test.ts, src/lib/gradientPreview.test.ts, src/lib/gradientRampOffset.test.ts, src/lib/webglTextureUpdates.test.ts, src/lib/videoExportFrames.test.ts, src/lib/coneView.test.ts, src/lib/coneSeam.test.ts, src/lib/webglCapability.test.ts, src/lib/processedCanvasClock.test.ts, src/components/ConeApexEditor.test.tsx, src/components/CustomSelect.test.tsx, src/lib/cubehelix.test.ts, src/lib/perceptualGradient.test.ts, src/lib/gradientGenerator.test.ts, src/lib/effectPipeline.test.ts, src/components/PostprocessStackPanel.test.tsx]
+related_code: [src/types/gradient.ts, src/types/materialField.ts, src/lib/materialField.ts, src/shaders/material-field.glsl, src/components/MaterialFieldControls.tsx, src/types/flowGradient.ts, src/types/imageGradient.ts, src/types/renderView.ts, src/types/coneView.ts, src/store/gradientStore.ts, src/lib/gradientRampUtils.ts, src/lib/flowGradientRenderer.ts, src/lib/flowSimulation.ts, src/lib/gradientPreview.ts, src/lib/meshGradientField.ts, src/lib/sceneEvaluation.ts, src/lib/webgl.ts, src/lib/webglCapability.ts, src/lib/webglShaderSources.ts, src/lib/clothGradientRenderer.ts, src/lib/coneView.ts, src/lib/coneSeam.ts, src/lib/processedCanvasClock.ts, src/lib/presetModel.ts, src/components/GradientRamp.tsx, src/components/CustomSelect.tsx, src/components/ColorPicker.tsx, src/components/ColorPaletteGenerator.tsx, src/components/GradientCanvas.tsx, src/components/SandboxPanel.tsx, src/components/FlowGradientPanel.tsx, src/components/ClothGradientPanel.tsx, src/components/ClothCanvas.tsx, src/components/ConeApexEditor.tsx, src/components/ConeViewPanel.tsx, src/components/ExportPanel.tsx, src/lib/videoExportFrames.ts, src/adapters/types.ts, src/lib/colorSpace.ts, src/lib/cubehelix.ts, src/lib/perceptualGradient.ts, src/lib/gradientGenerator.ts, src/i18n/uiLabels.ts, src/i18n/messages.ts]
+related_tests: [src/types/gradient.test.ts, src/types/materialField.test.ts, src/lib/materialField.test.ts, src/lib/meshCoordinateField.test.ts, src/lib/sceneRenderPlan.materialField.test.ts, src/lib/webglMaterialField.test.ts, src/components/MaterialFieldControls.test.tsx, tests/e2e/ice.spec.ts, src/types/coneView.test.ts, src/lib/flowSimulation.test.ts, src/lib/flowGradientPreset.test.ts, src/lib/meshGradient.test.ts, src/lib/proportionalRampEdit.test.ts, src/lib/sceneEvaluation.glass.test.ts, src/lib/gradientPreview.test.ts, src/lib/gradientRampOffset.test.ts, src/lib/webglTextureUpdates.test.ts, src/lib/videoExportFrames.test.ts, src/lib/coneView.test.ts, src/lib/coneSeam.test.ts, src/lib/webglCapability.test.ts, src/lib/processedCanvasClock.test.ts, src/components/ConeApexEditor.test.tsx, src/components/CustomSelect.test.tsx, src/lib/cubehelix.test.ts, src/lib/perceptualGradient.test.ts, src/lib/gradientGenerator.test.ts, src/lib/effectPipeline.test.ts, src/components/PostprocessStackPanel.test.tsx]
 ---
 
 # Gradient System
@@ -166,6 +166,25 @@ kgg-control/MCPには、Bezier制御点の移動（`set_bezier_control`）、Mes
 
 画面下部のAnimationパネルのRamp Offset（`animation.rampOffsetSpeed`、-8〜8の整数、既定0＝停止）で動かします。AnimationのOn/Offに従い、Offのときや0のときは動きません。1ループで`rampOffsetSpeed`周だけランプを進め、負の値で逆方向へ進みます。周回数は整数に丸め、Speedやイージングの値に関わらずループ終端がちょうど整数周になるため、常に継ぎ目なくループします（ランプ自体の両端色が違う場合は、色の継ぎ目が動いて見えるので、Mirrorか周期的なストップ配置を使います）。Color Offset専用のスライダーとキーフレームトラックはありません。`gradient.rampOffset`は動きの起点となる位相で、UIからは編集せず、既定は0です。Ramp編集UI（ストップバー、Meshのランプ位置表示）は編集対象のストップ配置を示すため、オフセットを反映しません。
 
+### GRAD-028 共有Material Fieldによる配色入力
+
+Gradient Rampの入力値に、手続き型の共有構造（Material Field）の厚みまたは亀裂密度を混ぜられます。外部画像や3Dモデルは使いません。設定は二つに分かれます。
+
+- `gradient.fieldInput`: `source`（`none`、`thickness`、`cracks`。既定`none`）と`influence`（0〜1、既定1）。
+- root の `materialField`: Seed（整数0〜65535）、Scale（画面の高さあたりの基本セル数0.5〜32）、Thickness（0〜2）、Thickness Variation（0〜1）、Cracks（0〜1）、Warp（0〜1）、Morph（0〜1）、Loop Cycles（整数0〜8）、Phase（0〜1周）。Ice（[ICE-001](./effect-stack)）は厚みと座標（Seed、Scale、Warp、Morph、Loop Cycles、Phase）だけを使い、亀裂は描きません。
+
+`materialField`は一つだけ保存し、Gradient側に別のSeedやScaleを持ちません。`materialField`自体に有効フラグはなく、描画するかどうかは`fieldInput`の実効状態で決まります。
+
+場は出力全体の画素位置を画面の高さで割った座標で評価し、Seedと設定と周期位相だけから決まります。Rampの色、描画順序、前フレームの値には依存しないため、Ramp色を変えても亀裂の位置や厚みの構造は変わりません。厚みは相対光学距離 `thickness × (1 + variation × n)` を0〜4に収めて4で割った値、亀裂は二つのスケールのセル境界から作った芯と周辺の密度（0〜1）です。値域は固定で、フレームごとのmin/max正規化はしません。細い亀裂は出力全体の画素幅で帯域制限します。
+
+通常の6方式（linear、radial、fourcolor、diamond、angle、bezier）は、従来のRamp入力を`g`、場の値を`f`、影響量を`s`として`mix(g, f, s)`を既存のRepeat処理とRamp textureへ渡します。Offset、Mirror、色補間は既存のRamp規則のままです。Meshのランプ対応モードは、論理座標`v`（下の行0、上の行1）を`mix(Mesh従来色, Ramp(mix(v, f, s)), s)`で混ぜます。`s=0`は従来のMesh描画、`s=1`は場だけの配色です。途中の影響量では通常6方式と同じ曲線になりません。Meshの`v`はMeshのジオメトリだけから作るlookup（単チャンネルfloat、shader内で4 texel補間）で読み、色、Seed、時刻の変更では作り直しません。MeshのRampは既存Meshと同じくshader側のRepeatを重ねません。
+
+次の場合は設定を保持したまま実効無効にし、従来の描画と同じになります。`source: none`、影響量0、Image Gradient Sourceが画像を保護している間、Meshの直接色モード、Legacy V1のEffect Pipeline。条件を外すと保存値で復帰します。
+
+時間はLoop Timing適用後の時刻（Texture／Flowと同じ`autoTime`）から一度だけ位相を作ります。位相は`fract(fract(cycles × autoTime) + phase)`で、Animationが無効のときは時刻0として扱います。Morphは位相の整数調波による小さな座標変形なので、線形のLoop Timingでは時刻0と1が完全に一致し、境界前後の速度もそろいます。Morphが0またはLoop Cyclesが0なら場は動きません。任意のキー、イージング、ループしない上流効果を含む作品全体のループは保証しません。`materialField.<項目>`のキートラックは評価しますが、SeedとLoop Cyclesは補間しません（UIからのキー記録は未対応です）。
+
+Preview、Thumbnail、静止画、連番、動画、Tileは同じ評価規則を使います。Tile描画では全画面の位置へ戻して評価するため、分割境界で構造が切れません。描画はbootstrap Generatorに場を加えた専用variantで行い、場の入力を使わない場面ではこのvariantをコンパイルしません。詳細は[WebGL Performance](./webgl-performance)と[Effect Stack](./effect-stack)を参照してください。
+
 ## 他領域との関係
 
 - Preset Systemは、Gradientの設定、キーフレーム、関連するエフェクト設定を状態スナップショットとして保存します。
@@ -174,6 +193,8 @@ kgg-control/MCPには、Bezier制御点の移動（`set_bezier_control`）、Mes
 
 ## 変更履歴
 
+- 2026-10-19: 共有Material Fieldの厚み・亀裂をRamp入力に使うGRAD-028を現行仕様化。
+- 2026-10-20: 同じ場を使うIceレイヤーをEffect StackのICE-001〜003として現行仕様化。
 - 2026-09-30: 全GradientTypeで使えるRamp Color Offset（Animationパネルのオフセット速度）をGRAD-027として現行仕様化。
 - 2026-09-21: Color Palette GeneratorをGradient Generatorだけに整理し、基準色の色相を起点にする多色生成、Algorithm直前のプレビュー、個別ストップ編集を現行仕様化。
 

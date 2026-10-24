@@ -6,11 +6,15 @@ import { normalizeImageGradientConfig } from '../types/imageGradient';
 import { normalizeMeshGradientConfig } from '../types/gradient';
 import type { LatestState } from '../types/latestState';
 import { disposeWebGL, initWebGL, settleLazyProgram, type WebGLContext } from './webgl';
-import { getRequiredSceneProgramKeys } from './sceneRenderPlan';
+import { getRequiredSceneProgramKeys, getSceneNoiseProgramVariants } from './sceneRenderPlan';
+import { GENERATOR_MATERIAL_FIELD_VARIANT } from './webglShaderSources';
 import { resolveDiffuseBezier } from './diffuseCurve';
 import { normalizeSeamlessConfig } from '../types/seamless';
+import { normalizeMaterialFieldConfig } from '../types/materialField';
+import { normalizeGradientFieldInput } from '../types/gradient';
 import { normalizeTextureConfig } from '../types/texture';
 import { normalizeDistortChromaConfig } from '../types/distortChroma';
+import { normalizeIceConfig } from '../types/ice';
 import { normalizeShapesConfig } from '../types/shapes';
 import { normalizeFlowGradientConfig } from '../types/flowGradient';
 import { normalizeConeViewConfig } from '../types/coneView';
@@ -69,7 +73,7 @@ export function createPresetThumbnailState(snapshot: StoreSnapshot): LatestState
     : snapshot.gradient;
 
   return {
-    gradient,
+    gradient: { ...gradient, fieldInput: normalizeGradientFieldInput(gradient.fieldInput) },
     noiseDistortion: normalizeNoiseDistortionConfig(snapshot.noiseDistortion),
     diffuse,
     imageGradient: normalizeImageGradientConfig(snapshot.imageGradient, snapshot.imageGradient ? 0 : STORE_DEFAULTS.imageGradient.anchorInfluence),
@@ -84,8 +88,10 @@ export function createPresetThumbnailState(snapshot: StoreSnapshot): LatestState
     coneView: normalizeConeViewConfig(snapshot.coneView),
     datamosh: resolvePersistedDatamosh(snapshot),
     seamless: normalizeSeamlessConfig(snapshot.seamless),
+    materialField: normalizeMaterialFieldConfig(snapshot.materialField),
     texture: normalizeTextureConfig(snapshot.texture),
     distortChroma: normalizeDistortChromaConfig(snapshot.distortChroma),
+    ice: normalizeIceConfig(snapshot.ice),
     shapes: normalizeShapesConfig(snapshot.shapes),
     flowGradient: normalizeFlowGradientConfig(snapshot.flowGradient),
     manualDistort,
@@ -170,9 +176,18 @@ async function captureNow(snapshot: StoreSnapshot): Promise<string> {
   // poll on animation frames, which stop while the window is hidden, so the
   // wait is capped to keep preset saving from stalling.
   const requiredPrograms = getRequiredSceneProgramKeys(state);
+  // The Material Field Generator has no stand-in pass, so a field-driven
+  // thumbnail waits for that exact variant. Analytic Noise variants keep their
+  // Stack pass fallback and are not awaited here.
+  const generatorVariant = getSceneNoiseProgramVariants(state).generator;
   let timeoutId: ReturnType<typeof setTimeout> | undefined;
   await Promise.race([
-    Promise.all(requiredPrograms.map(key => settleLazyProgram(context, key, 'demand'))),
+    Promise.all(requiredPrograms.map(key => settleLazyProgram(
+      context,
+      key,
+      'demand',
+      key === 'generator' && generatorVariant === GENERATOR_MATERIAL_FIELD_VARIANT ? generatorVariant : undefined,
+    ))),
     new Promise<void>(resolve => { timeoutId = setTimeout(resolve, PRESET_THUMBNAIL_PROGRAM_WAIT_MS); }),
   ]);
   clearTimeout(timeoutId);

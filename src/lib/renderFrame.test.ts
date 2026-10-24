@@ -46,6 +46,11 @@ describe('renderFrame compatibility adapter', () => {
       textureNormalizedTime: 0.7,
       distortChroma: { enabled: true },
       distortChromaImageSource: { id: 'lens-image' },
+      materialField: { seed: 7 },
+      materialPhase: 0.4,
+      ice: { enabled: true, mix: 0.5 },
+      iceLightPhase: 0.6,
+      iceSurfacePhase: 0.3,
     } as unknown as RenderFrameRequest;
 
     renderFrame({} as WebGLContext, request);
@@ -90,6 +95,11 @@ describe('renderFrame compatibility adapter', () => {
       request.textureNormalizedTime,
       request.distortChroma,
       request.distortChromaImageSource,
+      request.materialField,
+      request.materialPhase,
+      request.ice,
+      request.iceLightPhase,
+      request.iceSurfacePhase,
     );
     expect(vi.mocked(renderShapesPass)).not.toHaveBeenCalled();
   });

@@ -15,6 +15,7 @@ import { hasEnabledPostprocessEffectStack } from '../lib/effectPipeline';
 import { ConeViewPanel } from './ConeViewPanel';
 import { DatamoshPanel } from './DatamoshPanel';
 import { TexturePanel } from './TexturePanel';
+import { IcePanel } from './IcePanel';
 import { DistortChromaPanel } from './DistortChromaPanel';
 import { getDiffuseGrainParameterLimitKey } from '../lib/parameterLimits';
 import { VORONOI_FEATURES, VORONOI_METRICS } from '../lib/voronoi';
@@ -396,8 +397,13 @@ export function PostprocessPanel({
   const selectedDistortChroma = !sandboxMode
     && effectPipeline.version === 'stack-v2'
     && effectPipeline.selectedKind === 'distortChroma';
+  const selectedIce = !sandboxMode
+    && effectPipeline.version === 'stack-v2'
+    && effectPipeline.selectedKind === 'ice';
   const activeEffectMode = sandboxMode ?? (
-    selectedDistortChroma
+    selectedIce
+      ? 'ice'
+      : selectedDistortChroma
       ? 'distortChroma'
       : selectedDatamosh
       ? 'datamosh'
@@ -466,9 +472,10 @@ export function PostprocessPanel({
             { value: 'datamosh', label: 'Datamosh' },
             { value: 'texture', label: 'Texture' },
             { value: 'distortChroma', label: 'Distort Chroma' },
+            { value: 'ice', label: 'Ice' },
           ]}
           onChange={(value) => {
-            if (value === 'datamosh' || value === 'stretch' || value === 'texture' || value === 'distortChroma') {
+            if (value === 'datamosh' || value === 'stretch' || value === 'texture' || value === 'distortChroma' || value === 'ice') {
               setEffectPipeline({ selectedKind: value });
             } else {
               const effectMode = value as Exclude<PostprocessStackKind, 'prism'>;
@@ -495,6 +502,7 @@ export function PostprocessPanel({
               onImageClear={onTextureImageClear}
             />
           )}
+          {activeEffectMode === 'ice' && !selectedCone && <IcePanel />}
           {activeEffectMode === 'distortChroma' && !selectedCone && (
             <DistortChromaPanel
               imageSource={distortChromaImageSource}
@@ -511,7 +519,7 @@ export function PostprocessPanel({
               <StretchPanel showEnabledToggle={false} />
             </div>
           )}
-          {activeEffectMode !== 'datamosh' && activeEffectMode !== 'stretch' && activeEffectMode !== 'texture' && activeEffectMode !== 'distortChroma' && !selectedCone && (
+          {activeEffectMode !== 'datamosh' && activeEffectMode !== 'stretch' && activeEffectMode !== 'texture' && activeEffectMode !== 'distortChroma' && activeEffectMode !== 'ice' && !selectedCone && (
           <>
           {isDistort ? (
             <ManualDistortControls

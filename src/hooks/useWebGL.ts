@@ -13,6 +13,17 @@ import { AnimationLoop } from '../lib/animation';
 import { renderSceneAtTime } from '../lib/renderSceneAtTime';
 import { publishProcessedCanvasFrame } from '../lib/processedCanvasClock';
 import { getPostprocessStackSamplePadding } from '../lib/glass';
+import { getIceTileRequirement } from '../lib/ice';
+
+/** Ice's strict tile margin for a scene, from the final output height. */
+function iceTileRequirementFor(state: LatestState) {
+  return getIceTileRequirement({
+    ice: state.ice,
+    effectPipeline: state.effectPipeline,
+    imageGradientProtected: state.imageGradient.enabled && Boolean(state.imageGradientSource),
+    outputHeight: state.height,
+  });
+}
 import { useGradientStore } from '../store/gradientStore';
 import { applicationCommands } from '../application/commands';
 import type { WebGLContext } from '../lib/webgl';
@@ -175,7 +186,11 @@ export function useWebGL(
       () => getPostprocessStackSamplePadding(
         latestRef.current?.postprocess,
         latestRef.current?.effectPipeline,
+        latestRef.current ? iceTileRequirementFor(latestRef.current) : null,
       ),
+      () => (latestRef.current
+        ? iceTileRequirementFor(latestRef.current)
+        : { padding: 0, unsupportedReason: null }),
     );
     renderBridge.registerExportRenderer(async (signal?: AbortSignal) => {
       const ctx = webglRef.current;
@@ -183,9 +198,13 @@ export function useWebGL(
       if (!ctx || !latest) throw new Error('WebGL export renderer is not ready');
 
       const snapshot = createExportStateSnapshot(latest);
+      // The export snapshot fixes Ice's margin from the radius limits, so a
+      // key that raises refraction later in the clip still fits.
+      const tileRequirement = iceTileRequirementFor(snapshot);
       const tilePadding = getPostprocessStackSamplePadding(
         snapshot.postprocess,
         snapshot.effectPipeline,
+        tileRequirement,
       );
       await prepareExportPrograms(ctx, snapshot, signal);
       const requiredPrograms = getRequiredExportProgramKeys(snapshot);
@@ -200,6 +219,7 @@ export function useWebGL(
         },
         finishGpu: () => ctx.gl.finish(),
         tilePadding,
+        tileRequirement,
         diagnostics: {
           effectStack: snapshot.effectPipeline.effectStack
             .filter(layer => layer.enabled)

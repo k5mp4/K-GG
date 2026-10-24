@@ -5,9 +5,9 @@ title: Effect Stack
 status: current
 owners: [maintainer]
 created: 2026-07-27
-updated: 2026-10-08
-requirement_ids: [EFFECT-001, EFFECT-002, EFFECT-003, EFFECT-004, EFFECT-005, EFFECT-006, EFFECT-007, EFFECT-008, EFFECT-009, EFFECT-010, EFFECT-011, EFFECT-012, EFFECT-013, EFFECT-014, EFFECT-015, EFFECT-016, EFFECT-017, EFFECT-018, EFFECT-019, EFFECT-020, EFFECT-021, EFFECT-022, EFFECT-023, EFFECT-025, EFFECT-026, EFFECT-027, EFFECT-028, EFFECT-029, EFFECT-030, EFFECT-031, EFFECT-032, DISTORT-001, DISTORT-002, CLOTH-001, CLOTH-002, CLOTH-003, SANDBOX-001, FLOW-001, FLOW-002, FLOW-003, FLOW-004, FLOW-005, FLOW-006, FLOW-007, FLOW-008, FLOW-009, FLOW-010, FLOW-011, FLOW-012, VIDEO-MOTION-001, VIDEO-MOTION-002, VIDEO-MOTION-003, VIDEO-MOTION-004, DATAMOSH-001, DATAMOSH-002, DATAMOSH-003, DATAMOSH-004, DATAMOSH-005, DATAMOSH-006, TEXTURE-001, TEXTURE-002, TEXTURE-003, DISTORT-CHROMA-001, DISTORT-CHROMA-002, DISTORT-CHROMA-003, SHAPES-001, SHAPES-002, SHAPES-003, SHAPES-004]
-related_adrs: [ADR-0004, ADR-0005, ADR-0009, ADR-0010, ADR-0017, ADR-20260927-datamosh-feedback-layer, ADR-20260929-sandbox-texture-material-stage, ADR-20260930-sandbox-shapes-final-stage]
+updated: 2026-10-20
+requirement_ids: [EFFECT-001, EFFECT-002, EFFECT-003, EFFECT-004, EFFECT-005, EFFECT-006, EFFECT-007, EFFECT-008, EFFECT-009, EFFECT-010, EFFECT-011, EFFECT-012, EFFECT-013, EFFECT-014, EFFECT-015, EFFECT-016, EFFECT-017, EFFECT-018, EFFECT-019, EFFECT-020, EFFECT-021, EFFECT-022, EFFECT-023, EFFECT-025, EFFECT-026, EFFECT-027, EFFECT-028, EFFECT-029, EFFECT-030, EFFECT-031, EFFECT-032, DISTORT-001, DISTORT-002, CLOTH-001, CLOTH-002, CLOTH-003, SANDBOX-001, FLOW-001, FLOW-002, FLOW-003, FLOW-004, FLOW-005, FLOW-006, FLOW-007, FLOW-008, FLOW-009, FLOW-010, FLOW-011, FLOW-012, VIDEO-MOTION-001, VIDEO-MOTION-002, VIDEO-MOTION-003, VIDEO-MOTION-004, DATAMOSH-001, DATAMOSH-002, DATAMOSH-003, DATAMOSH-004, DATAMOSH-005, DATAMOSH-006, TEXTURE-001, TEXTURE-002, TEXTURE-003, DISTORT-CHROMA-001, DISTORT-CHROMA-002, DISTORT-CHROMA-003, ICE-001, ICE-002, ICE-003, SHAPES-001, SHAPES-002, SHAPES-003, SHAPES-004]
+related_adrs: [ADR-0004, ADR-0005, ADR-0009, ADR-0010, ADR-0017, ADR-20260927-datamosh-feedback-layer, ADR-20260929-sandbox-texture-material-stage, ADR-20260930-sandbox-shapes-final-stage, ADR-20261019-ice-material-field]
 related_changes: [CHANGE-001, CHANGE-011, CHANGE-012, CHANGE-013, CHANGE-014, CHANGE-015, CHANGE-018, CHANGE-019, CHANGE-020, CHANGE-021, CHANGE-022, CHANGE-023, CHANGE-024, CHANGE-025, CHANGE-026, CHANGE-027, CHANGE-030, CHANGE-031, CHANGE-032, CHANGE-033, CHANGE-034, CHANGE-035, CHANGE-036, CHANGE-037, CHANGE-044, CHANGE-046, CHANGE-047, CHANGE-048, CHANGE-053]
 related_code: [src/types/distortion.ts, src/types/coneView.ts, src/lib/effectPipeline.ts, src/lib/normalMap.ts, src/lib/effectStackTransition.ts, src/lib/postprocessStack.ts, src/lib/postprocessAnimation.ts, src/lib/sceneEvaluation.ts, src/lib/animationRegistry.ts, src/lib/glass.ts, src/lib/glassTile.ts, src/lib/webgl.ts, src/lib/voronoi.ts, src/shaders/postprocess/stack.glsl, src/shaders/postprocess/uniforms.glsl, src/store/documentModel.ts, packages/kgg-control/src/parameterLimits.ts, packages/kgg-control/src/types.ts, packages/kgg-control/src/scenarios.ts, src/lib/slitAnimation.ts, src/lib/webglShaderSources.ts, src/lib/flowGradientRenderer.ts, src/lib/flowSimulation.ts, src/lib/presetModel.ts, src/lib/presetThumbnail.ts, src/lib/coneView.ts, src/lib/coneSeam.ts, src/store/gradientStore.ts, src/lib/kggControlRuntime.ts, src/components/PostprocessStackPanel.tsx, src/components/EffectStackWorkspace.tsx, src/components/PostprocessPanel.tsx, src/components/PostprocessOverlay.tsx, src/components/DistortOverlay.tsx, src/components/SandboxPanel.tsx, src/components/FlowGradientPanel.tsx, src/components/BlockNoisePanel.tsx, src/components/DiffuseCurveEditor.tsx, src/components/SlitScanPanel.tsx, src/components/StretchPanel.tsx, src/components/PresetPanel.tsx, src/components/ClothGradientPanel.tsx, src/components/ClothCanvas.tsx, src/components/ConeApexEditor.tsx, src/components/ConeViewPanel.tsx, src/lib/clothGradientRenderer.ts, src/types/clothGradient.ts, src/types/flowGradient.ts, src/shaders/normalmap.frag.glsl, src/shaders/postprocess/glass-optics.glsl, src/shaders/postprocess/glass-field.glsl, src/shaders/postprocess/glass-compact.glsl, src/shaders/postprocess/uniforms.glsl, src/shaders/postprocess/glass-tile.glsl, src/shaders/postprocess/diffuse.glsl, src/shaders/postprocess/noise-diffuse-main.glsl, src/shaders/flow-splat.vert.glsl, src/shaders/flow-splat.frag.glsl, src/shaders/flow-trail.frag.glsl, src/components/DatamoshPanel.tsx, src/types/datamosh.ts, src/lib/videoMotionSource.ts, src/lib/videoMotionRuntime.ts, src/shaders/datamosh/uniforms.glsl, src/shaders/datamosh/motion-field.glsl, src/shaders/datamosh/pixel-stretch.glsl, src/shaders/datamosh/main.glsl, src/types/texture.ts, src/shaders/texture.frag.glsl, src/components/TexturePanel.tsx, src/types/shapes.ts, src/lib/shapesLibrary.ts, src/shaders/shapes.frag.glsl, src/features/shapes/shapesMaskStore.ts, src/components/ShapesPanel.tsx, src/lib/renderFrame.ts, src/types/distortChroma.ts, src/shaders/distortChroma.frag.glsl, src/components/DistortChromaPanel.tsx]
 related_tests: [tests/e2e/shaders.spec.ts, src/lib/effectPipeline.test.ts, src/lib/webglNormalMapParity.test.ts, src/lib/effectStackTransition.test.ts, src/lib/postprocessStack.test.ts, src/lib/postprocessAnimation.test.ts, src/lib/effectStackDrag.test.ts, src/lib/effectShaderParity.test.ts, src/lib/webglExportPrograms.test.ts, src/lib/webglShaderSources.test.ts, src/lib/glassTile.test.ts, src/lib/glassTileShader.test.ts, src/lib/flowSimulation.test.ts, src/lib/flowGradientPreset.test.ts, src/lib/glass.test.ts, src/store/gradientStore.effectPipeline.test.ts, src/store/gradientStore.postprocessStack.test.ts, src/store/gradientStore.glass.test.ts, src/store/gradientStore.animation.test.ts, src/lib/sceneEvaluation.glass.test.ts, src/lib/slitAnimation.test.ts, src/lib/presetModel.slit.test.ts, src/lib/presetThumbnail.test.ts, src/lib/coneView.test.ts, src/lib/coneSeam.test.ts, src/lib/presetModel.diffuse.test.ts, src/lib/processedCanvasClock.test.ts, src/types/coneView.test.ts, tests/clothGradient.test.ts, src/types/datamosh.test.ts, src/lib/videoMotionSource.test.ts, src/lib/videoMotionRuntime.test.ts, src/lib/kggControlRuntime.test.ts, packages/kgg-control/src/scenarios.test.ts, src/components/PostprocessPanel.test.tsx, src/components/PostprocessStackPanel.test.tsx, src/components/SandboxPanel.test.tsx, src/types/texture.test.ts, src/store/gradientStore.texture.test.ts, src/types/shapes.test.ts, src/lib/shapesLibrary.test.ts, src/lib/presetModel.shapes.test.ts, src/lib/renderFrame.test.ts, src/types/distortChroma.test.ts, src/store/gradientStore.distortChroma.test.ts, src/lib/presetModel.distortChroma.test.ts]
@@ -23,15 +23,15 @@ Effect Stackは、Gradientから得た画像・色場へ複数の効果を適用
 
 ### EFFECT-001 主スタックの効果
 
-Unified Effect Stack V2の主スタックは、`Noise`、`Slit`、`Stretch`、`Distort`、`Mirror`、`Kaleidoscope`、`Voronoi`、`Glass`、`GlassTile`、`Diffuse`、`Datamosh`、`Cone`、`Texture`、`Distort Chroma`の14種類です。`Datamosh`は前フレームの履歴を使う時間フィードバック経路、`Glass`はGLASS V2、`GlassTile`はKG_Glassのタイル表面モデルを移植した専用描画経路、`Cone`は前段textureを円錐面へ投影する専用描画経路、`Texture`は前段の結果へ高さ場でライティングする専用描画経路（TEXTURE-001）を使用します。各種類はスタック内に一度だけ存在し、同じ種類の複数インスタンスは現在サポートしません。
+Unified Effect Stack V2の主スタックは、`Noise`、`Slit`、`Stretch`、`Distort`、`Mirror`、`Kaleidoscope`、`Voronoi`、`Glass`、`GlassTile`、`Diffuse`、`Datamosh`、`Cone`、`Texture`、`Distort Chroma`、`Ice`の15種類です。`Datamosh`は前フレームの履歴を使う時間フィードバック経路、`Glass`はGLASS V2、`GlassTile`はKG_Glassのタイル表面モデルを移植した専用描画経路、`Cone`は前段textureを円錐面へ投影する専用描画経路、`Texture`は前段の結果へ高さ場でライティングする専用描画経路（TEXTURE-001）、`Ice`は前段の結果を薄い氷越しに見せる専用描画経路（ICE-001）を使用します。各種類はスタック内に一度だけ存在し、同じ種類の複数インスタンスは現在サポートしません。
 
 主スタックは既知の種類を正規化して保持します。未知の種類や重複は保存・読込時に除外され、欠落した既知の種類は無効状態で補完されます。旧Presetの`videoMotion`レイヤーはDATAMOSH-005に従って同じ位置の`datamosh`レイヤーへ写像されます。旧Presetの`glassV2`は`glass`へ写像され、旧`glass`と同時に存在する場合も一つへ統合されます。
 
 ### EFFECT-002 有効化と順序
 
-利用者は主スタックの各効果を有効/無効に切り替え、順序を手動またはランダムに並べ替え、選択中の効果を変更できます。現在の実装は任意の新しい種類を追加・削除するモデルではなく、既知の14種類を無効化することで「使わない」状態を表現します。
+利用者は主スタックの各効果を有効/無効に切り替え、順序を手動またはランダムに並べ替え、選択中の効果を変更できます。現在の実装は任意の新しい種類を追加・削除するモデルではなく、既知の15種類を無効化することで「使わない」状態を表現します。
 
-新規V2状態の既定順は `Noise → Slit → Stretch → Distort → Mirror → Kaleidoscope → Voronoi → Glass → GlassTile → Diffuse → Datamosh → Cone → Texture → Distort Chroma` で、Diffuseが既定で有効です。ユーザーが保存した順序と有効状態はPresetへ保存されます。ランダム化操作では14種類を一度ずつ含む順列を作り、有効状態・選択状態・固定段を維持します。現在の描画結果から目標順序の結果へ400msの`easeInOut`表示ブレンドを行い、完了後に目標順序を確定します。
+新規V2状態の既定順は `Noise → Slit → Stretch → Distort → Mirror → Kaleidoscope → Voronoi → Glass → GlassTile → Diffuse → Datamosh → Cone → Texture → Distort Chroma → Ice` で、Diffuseが既定で有効です。Iceを持たない旧Presetの順序は保ち、Iceを無効の末尾レイヤーとして補います。ユーザーが保存した順序と有効状態はPresetへ保存されます。ランダム化操作では15種類を一度ずつ含む順列を作り、有効状態・選択状態・固定段を維持します。現在の描画結果から目標順序の結果へ400msの`easeInOut`表示ブレンドを行い、完了後に目標順序を確定します。
 
 ### EFFECT-014 Postprocessの全体有効状態
 
@@ -255,6 +255,8 @@ Effect Stack V2でDiffuseレイヤーがStippleの場合、レイヤー位置で
 
 Effect Stack V2で有効なDiffuseの直後に有効なSlitがある場合、DiffuseはSlitが生成する出力座標側で一度だけ評価します。これによりSlitの延長領域にもDiffuseのセル表現が反映され、Diffuse済みの画像をSlitが再サンプリングしてセルを縞状に引き延ばすことを避けます。Block／SmoothがAnalytic Prefixの条件を満たす場合でも、この隣接順ではTexture Stack経路を使います。SlitがDiffuseの直後にない場合は、既存のAnalytic Prefix境界と消費範囲を維持します。
 
+GradientがMaterial Fieldを入力にしている間（[GRAD-028](./gradient-system)）は、Analytic PrefixでNoise／Diffuseを取り込まず、BaseのtextureをGeneratorで作ってからStackを実行します。共有場は全画面座標に固定されているため、場より前に画像を歪める効果を置いても場には伝わりません。場の入力が無効な場合のAnalytic Prefixの最適化は従来どおりです。
+
 ### EFFECT-026 Noise→Diffuseの旧Generator UV合成
 
 Effect Stack V2で有効な`Noise`より後ろに有効な`Diffuse`があり、DiffuseがBlockまたはSmoothで適用方式（`diffuse.applyMode`）が`noiseLinked`の場合、NoiseとDiffuseの間に他の有効レイヤーがあるかどうかにかかわらず、Noiseの位置で同じ入力textureからNoiseのUV変換を一度行った後にDiffuseのグローバル座標変位を加え、`I(N(x) + D(x))`として一度だけサンプリングします。これによりDiffuseの変位がNoiseの歪みで増幅・引き伸ばされず、間にレイヤーがない場合と同じかかり方になります。間にあるレイヤーはこの合成結果を入力として処理し、Diffuseの本来の位置では再適用しません。NoiseとDiffuseのglobalCoord、seed、time、subpixel Grain、Scatter、Tile offset、full resolutionは既存の各レイヤー契約に従います。先頭の解析可能なNoiseは、後続のDiffuseを含めて既存Generatorで一度だけ評価します。`Diffuse → Noise`、直後に`Slit`がある`Diffuse`、Dither／Halftone／ASCII／Stippleおよびその他の非対象モードはこの合成を使わず、既存のTexture StackまたはSlit出力座標評価を使います。Preview、Thumbnail、静止画、連番、動画、Tileは同じRender Planを使います。
@@ -350,6 +352,45 @@ LensはRec.709係数（0.2126、0.7152、0.0722）の輝度を高さ場として
 各画素で`Steps`（3〜32、既定12）個のスペクトル位置`t = i / (Steps − 1)`をサンプルします。位置ごとの変位は`dispField × Amount × mix(Warp Red, Warp Blue, t)`画素で、`Amount X／Y`（−300〜300画素、既定24）をX／Y別に掛けます。変位は出力画素単位で、解像度に応じて画素数を換算します。サンプル位置は`Edge`（`clamp`既定／`repeat`／`mirror`）に従い、キャンバス全体の座標でラップします。色は`Color 1／2／3`（既定は赤・緑・青）の三角形重み`max(1−2t, 0)`、`1−|2t−1|`、`max(2t−1, 0)`で補間し、各色の重みを全ステップでの合計が1になるよう正規化するため、変位が0の画素は`Color 1 + Color 2 + Color 3`になります。`White Balance`（既定ON）はチャンネルごとに3色の合計が白になるよう割って、変位が0の画素の色を保ちます。OFFのときは色をそのまま使い、合計が白でない設定では色味や明るさが変わります。`Warp Red`の既定は0.5、`Warp Blue`は1.0（−3〜3）、`Bump`は0〜200（既定20）です。
 
 1画素あたりのテクスチャ読み出しは、Lensの12回とSourceの`Steps`回です。`Steps`を2倍にするとSourceの読み出しも2倍になります。設定は`distortChroma`としてPreset、履歴（undo／redo）、storeへ保存し、すべての数値と列挙を正規化時に範囲へ収め、未知の列挙値と不正な色は既定値へ戻します。読み込んだLens画像は外部入力としてセッション内だけで保持し、Preset、Thumbnail、書き出し用の設定JSONへ含めません。参考実装は[I_DistortChroma](https://github.com/panko200/I_DistortChroma)（MIT、Copyright (c) 2026 panko200）で、HLSLのアルゴリズムをGLSLへ書き直しています。構造が近いため、MITの著作権表示と許諾文を`vendor/i-distortchroma/LICENSE`、`NOTICE`、アプリ内のThird-party licensesに含めます。
+
+### ICE-001 Ice Effect Stackレイヤー
+
+Iceは主スタックの通常レイヤー（`EffectStackKind`の`ice`）で、配置された位置の前段textureを、画面全体を覆う薄い氷越しに見た像へ変えます。drag、randomize、solo、選択、永続化、render planの対象で、有効状態と順序は`effectPipeline.effectStack`、光学設定はrootの`ice`へ保存します。`ice.enabled`とレイヤーの有効状態はTextureと同じcommand境界で同期します。既定順では最後（`Distort Chroma`の後）に置き、既定は無効です。設定はPostprocessの`Edit Layer`で編集します。
+
+氷の表面は、Ice自身のノイズテクスチャー（ICE-002）から作るバンプマップと粗さマップで決まります。共有Material Field（[GRAD-028](./gradient-system)）からは厚みだけを使い、亀裂などの模様は描きません。表面のノイズも共有のSeed・歪み・周期変形を使い、Ice専用のSeedは持ちません。Iceの有効状態は場の構造やGradientの構造入力を変えず、構造入力を使わない場合もIceは同じ場を評価します。
+
+専用program（`ice`）はレイヤーが有効でMixが0より大きい場合だけ遅延コンパイルし、準備できるまではBase描画を維持します。Mix 0は恒等処理としてpassもprogramも要求しません。Effect Stack V2だけで動作し、Legacy V1では適用しません。画像を再サンプルするため、Image Gradient Sourceの保護中は適用せず、保存値は保持します。
+
+### ICE-002 Iceの光学
+
+Iceは2.5Dの近似で、1 passで次を合成します。入力のRGBはsRGB相当としてdecodeし、線形光で合成してencodeします。
+
+表面は手続き型のノイズテクスチャーで作ります。ノイズは3Dグラデーションノイズの2D断面で、画面の高さあたり`Noise Scale`（0.5〜16、既定3）セル、共有場のSeed・歪み・周期変形をそのスケールへ写した座標で評価し、外部画像は使いません。断面の位置はICE-003の動きで変わります。このノイズから2つのマップを作ります。
+
+- バンプマップ（2段階の凹凸）: 大まかな凹凸は、低周波ノイズを`Raised Area`（隆起の面積、0〜1）で閾値処理した部分的な隆起です。隆起の縁は`Bevel`（角の丸み）の幅でなめらかに立ち上がり、0では段差になります。隆起の内側にわずかな起伏、隆起の外側に浅い溶けたくぼみを加えます。高さは`Bump`で決まります。細かな凹凸は`Micro Grain`による全体の微細なざらつきで、1セルが出力の数画素より小さくなる解像度では帯域制限で弱めます。法線は1画素幅の中心差分で求めます。
+- 粗さマップ（曇りのムラ）: 別の低周波ノイズで、ツヤのある部分と白く曇った部分を作ります。`Roughness`が平均、`Roughness Variation`（0〜1）が両者の混在の強さで、0では一様です。隆起した部分は少しツヤが出ます。粗さは屈折像のぼかし、表面の白い曇り（`Scattering`に比例）、環境反射のぼけ、ハイライトの広がりを決めます。
+
+この表面に対して次を合成します。
+
+- 屈折と透過: 法線とIOR（1〜1.6、既定1.31）で屈折させた方向と厚みに応じて前段textureを読みます。変位は出力の高さ`H`に対し最大0.020H×Refractionへ連続的に飽和させ、色ごとの分散は最大0.002H、粗さのぼかしは最大0.004Hです。画面の外はキャンバス全体の座標でMirrorします。
+- 吸収と曇り: 相対光学距離`d`（厚み0〜4に隆起の分を加えた値）に対し、透過`T = exp(-Absorption × (1 − 母材の色) × d)`を使います。母材の色の既定はごく淡い青で、ほぼ白に近い青みになります。吸収0または厚み0では透過1です。粗い部分の白い曇りは`Scattering`と粗さで決まり、吸収とは独立に残ります。
+- 逆光: `Backlight`で、背後の光が斜面と面取りした縁から漏れて光ります。光の方向を向いた斜面ほど強く、粗い部分では弱くなります。
+- 反射とハイライト: IORから求めたFresnel項をReflectionで強め（上限0.85）、外部HDRを使わない手続き型の環境光（広い明暗と光の帯）を映します。反射の割合は透過と散乱から差し引きます。`Highlight`は光の向きにある前方の光源による鋭い白いハイライト（GGX分布）で、ツヤのある部分では小さく鋭く、粗い部分では広く弱くなります。隆起の縁は傾きが大きいため、光が引っかかって屈折・反射・ハイライトが強まります。
+
+近傍の読み出しはalphaで重み付けし、alphaが0の画素の隠れたRGBを混ぜません。有効な近傍がなければその画素の元の色を使います。出力alphaはその画素の入力alphaのままで、反射・散乱・逆光・ハイライトで被覆を増やしません。Mixは結果と入力の混合率です。微細なざらつきは出力全体の画素幅で帯域制限します。平らで粗さ0、光源と吸収のない設定では入力をそのまま返します。
+
+### ICE-003 Iceの時間・保存・タイル
+
+Iceの動きは、表面ノイズの動きと光の回転に分かれます。どちらもLoop Timing適用後の時刻`t`から位相を一度だけ作り、整数周期では時刻0と1で値と速度が一致します。Animationが無効のときは時刻0で評価します。
+
+- 表面ノイズの動き: `ice.surfaceCycles`（整数0〜8、既定1）の位相`fract(surfaceCycles × t)`で、次の3つを動かします。`Evolution`（展開、既定0.5）はノイズの断面を画像面の外へ出る円に沿って動かし、隆起と粗さの斑が別の形へ移り変わります。`Flow`（流れ、既定0）は断面を`Flow Angle`の向きへ往復させます。`Growth`（隆起の成長、既定0.25）は隆起の面積を斑ごとにずれた拍で増減させ、隆起が盛り上がっては溶けます。3つとも0なら表面は止まります。
+- 光の回転: `ice.lightCycles`（整数0〜8、既定0）と`ice.lightPhase`の位相`fract(fract(lightCycles × t) + lightPhase)`で、環境光の帯、逆光とハイライトの向きを回します。0では光は`lightPhase`の向きで止まります。
+
+Ice光学・表面・動きの連続値はキー（`ice.<項目>`）を受け付けますが、Surface CyclesとLight Cyclesは補間しません。Iceが描画されない間、そのキーはアニメーション判定に含めません。
+
+`ice`はPreset、Undo/Redo、Thumbnail、Export snapshot、kgg-control/MCPの共有パラメータ、VJの値の取得・復元の対象です。保存時と読み込み時に`normalizeIceConfig`で範囲・整数化・色を正規化し、Iceを持たない旧Presetは無効の既定値で読み込みます。描画は変わりません。
+
+タイル出力では、出力の高さから求めた`ceil(0.020H + 0.002H + 0.004H) + 2`画素の余白をIceのために確保します。余白は現在の値ではなく上限から求めるため、後のフレームで屈折が強くなるキーでも足ります。タイルの寸法でこの余白を確保できない場合と、Mirror／Kaleidoscopeのようにタイルの外を参照するレイヤーをIceと同時に使う場合は、描画を始める前に理由を返して失敗し、Iceを省いた結果や継ぎ目のある結果を出しません。
 
 ### EFFECT-020 Cloth表示アダプター
 

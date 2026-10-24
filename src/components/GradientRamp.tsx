@@ -23,6 +23,7 @@ import { ColorPicker } from './ColorPicker';
 import { ColorPaletteGenerator } from './ColorPaletteGenerator';
 import { SidebarSection } from './SidebarSection';
 import { SliderField } from './SliderField';
+import { MaterialFieldControls } from './MaterialFieldControls';
 import { GradientTypeSelector } from './GradientTypeSelector';
 import { IconButton } from './IconButton';
 import { useLanguage } from '../i18n/LanguageProvider';
@@ -1796,6 +1797,10 @@ export function GradientRamp({ showHeader = true, variant = 'panel', onUndo = un
         />
       </div>
 
+      <div className="max-w-md">
+        <MaterialFieldControls />
+      </div>
+
       {/* カラーピッカー＋ストップ操作（横並び） */}
       <div className="flex gap-4 items-start flex-wrap">
         {selectedIdxs.size > 0 && (
@@ -2217,6 +2222,8 @@ export function GradientRamp({ showHeader = true, variant = 'panel', onUndo = un
               {t('gradient.mirror')}
             </button>
           </div>
+
+          <MaterialFieldControls />
 
           <SidebarSection
             id="gradient-palette-generator"

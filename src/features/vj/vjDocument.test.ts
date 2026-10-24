@@ -11,6 +11,21 @@ import type { Preset } from '../../lib/presetModel';
 describe('VJ live parameter control', () => {
   beforeEach(() => useGradientStore.setState(useGradientStore.getInitialState(), true));
 
+  it('restores the shared structure together with Ice values', () => {
+    applicationCommands.setIce({ enabled: true, refraction: 0.3 });
+    applicationCommands.setMaterialField({ cracks: 0.2 });
+    const snapshot = captureVjDocument();
+    applicationCommands.setIce({ refraction: 0.9 });
+    applicationCommands.setMaterialField({ cracks: 0.95 });
+    restoreVjDocument(snapshot);
+    const state = useGradientStore.getState();
+    expect(state.ice.refraction).toBe(0.3);
+    expect(state.materialField.cracks).toBe(0.2);
+    // A value reset keeps the layer's live ON/OFF.
+    expect(state.ice.enabled).toBe(true);
+    expect(getVjParameters('ice', state).map(parameter => parameter.id)).toContain('ice.refraction');
+  });
+
   it('prepares bounded values without publishing the original preset or changing disabled effects and locks', () => {
     const cue: Preset = { id: 'auto', name: 'Auto', createdAt: 1, state: {
       ...structuredClone(createDocumentState(STORE_DEFAULTS)),

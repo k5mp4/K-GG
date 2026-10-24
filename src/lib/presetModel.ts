@@ -23,10 +23,14 @@ import type { ConeViewConfig } from '../types/coneView';
 import { normalizeConeViewConfig } from '../types/coneView';
 import type { SeamlessConfig } from '../types/seamless';
 import { normalizeSeamlessConfig } from '../types/seamless';
+import type { MaterialFieldConfig } from '../types/materialField';
 import type { TextureConfig } from '../types/texture';
+import { normalizeMaterialFieldConfig } from '../types/materialField';
+import { normalizeGradientFieldInput } from '../types/gradient';
 import { normalizeTextureConfig } from '../types/texture';
 import type { DistortChromaConfig } from '../types/distortChroma';
 import { normalizeDistortChromaConfig } from '../types/distortChroma';
+import { normalizeIceConfig, type IceConfig } from '../types/ice';
 import type { ShapesConfig } from '../types/shapes';
 import { normalizeShapesConfig } from '../types/shapes';
 import type { FlowGradientConfig } from '../types/flowGradient';
@@ -47,8 +51,10 @@ export type StoreSnapshot = {
   clothGradient?: ClothGradientConfig;
   coneView?: ConeViewConfig;
   seamless?: SeamlessConfig;
+  materialField?: MaterialFieldConfig;
   texture?: TextureConfig;
   distortChroma?: DistortChromaConfig;
+  ice?: IceConfig;
   shapes?: ShapesConfig;
   flowGradient?: FlowGradientConfig;
   datamosh?: DatamoshConfig;
@@ -248,15 +254,17 @@ export function makePreset(
     ...(metadata.thumbnail ? { thumbnail: metadata.thumbnail } : {}),
     state: compactPresetState({
       ...state,
-      gradient,
+      gradient: gradient ? { ...gradient, fieldInput: normalizeGradientFieldInput(gradient.fieldInput) } : gradient,
       diffuse,
       slitScan,
       keyframeTracks,
       clothGradient: normalizeClothGradientConfig(state.clothGradient),
       coneView: normalizeConeViewConfig(state.coneView),
       seamless: normalizeSeamlessConfig(state.seamless),
+      materialField: normalizeMaterialFieldConfig(state.materialField),
       texture: normalizeTextureConfig(state.texture),
       distortChroma: normalizeDistortChromaConfig(state.distortChroma),
+      ice: normalizeIceConfig(state.ice),
       shapes: normalizeShapesConfig(state.shapes),
       flowGradient: normalizeFlowGradientConfig(state.flowGradient),
       datamosh: resolvePersistedDatamosh(sourceState),

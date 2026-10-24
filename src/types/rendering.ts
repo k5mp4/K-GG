@@ -54,6 +54,13 @@ export type RenderFrameRequest = {
   flowSessionId?: string;
   datamosh?: LatestState['datamosh'];
   coneView?: LatestState['coneView'];
+  /** Shared Material Field after keyframes, and its loop phase in turns. */
+  materialField?: LatestState['materialField'];
+  materialPhase?: number;
+  /** Ice optics after keyframes, and its light phase in turns. */
+  ice?: LatestState['ice'];
+  iceLightPhase?: number;
+  iceSurfacePhase?: number;
   /** SANDBOX Shapes, applied after the whole frame by renderShapesPass. */
   shapes?: LatestState['shapes'];
   shapesMask?: ShapesMask | null;

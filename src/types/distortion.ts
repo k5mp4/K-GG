@@ -263,7 +263,8 @@ export type EffectStackKind =
   | 'datamosh'
   | 'cone'
   | 'texture'
-  | 'distortChroma';
+  | 'distortChroma'
+  | 'ice';
 
 export type EffectStackLayer = {
   kind: EffectStackKind;

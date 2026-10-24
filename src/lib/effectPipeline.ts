@@ -27,6 +27,7 @@ export const EFFECT_STACK_KINDS = [
   'cone',
   'texture',
   'distortChroma',
+  'ice',
 ] as const satisfies readonly EffectStackKind[];
 
 /** Below this sigma (px) the Distort Chroma Lens is used unblurred. */
@@ -45,6 +46,7 @@ export const POSTPROCESS_EFFECT_STACK_KINDS = [
   'cone',
   'texture',
   'distortChroma',
+  'ice',
 ] as const satisfies readonly EffectStackKind[];
 
 const EFFECT_STACK_KIND_SET = new Set<string>(EFFECT_STACK_KINDS);
@@ -351,6 +353,12 @@ export type V2RenderPlanOptions = {
    * Noise then runs as its stack pass, like a non-analytic Noise type.
    */
   analyticNoisePending?: boolean;
+  /**
+   * The Gradient reads the shared Material Field. Its full-screen coordinates
+   * must not mix with a fused Noise/Diffuse UV transform, so the analytic
+   * prefix stays off and the field Generator variant draws the Base.
+   */
+  materialFieldInputActive?: boolean;
 };
 
 export type AnalyticPrefixReason =
@@ -360,6 +368,7 @@ export type AnalyticPrefixReason =
   | 'non-analytic-gradient'
   | 'source-image'
   | 'image-gradient'
+  | 'material-field'
   | 'cloth'
   | 'flow-gradient'
   | 'seamless'
@@ -470,6 +479,7 @@ export type V2RenderPlan = {
     threeD: boolean;
     texture: boolean;
     distortChroma: boolean;
+    ice: boolean;
   };
 };
 
@@ -563,6 +573,7 @@ export function getAnalyticGradientPrefixPlan(
   if (!ANALYTIC_GRADIENT_TYPES.has(options.gradientType)) return disabledAnalyticPrefix('non-analytic-gradient');
   if (options.sourceImageEnabled) return disabledAnalyticPrefix('source-image');
   if (options.imageGradientEnabled) return disabledAnalyticPrefix('image-gradient');
+  if (options.materialFieldInputActive) return disabledAnalyticPrefix('material-field');
   if (options.clothGradientEnabled) return disabledAnalyticPrefix('cloth');
   if (options.flowGradientEnabled || pipeline.flowGradientEnabled) return disabledAnalyticPrefix('flow-gradient');
   if (options.seamlessEnabled) return disabledAnalyticPrefix('seamless');
@@ -723,7 +734,8 @@ export function getV2RenderPlan(
     capabilities,
     fallbacks: V2_RENDER_PLAN_FALLBACKS,
     programs: {
-      generator: Boolean(options.imageGradientEnabled) || analyticPrefix.enabled,
+      generator: Boolean(options.imageGradientEnabled) || analyticPrefix.enabled
+        || Boolean(options.materialFieldInputActive),
       stackCore: framebufferAllocationMode !== 'direct' && requiresV2StackCore(
         pipeline,
         normalRequested,
@@ -748,6 +760,7 @@ export function getV2RenderPlan(
       threeD: enabledLayers.some(layer => layer.kind === 'cone'),
       texture: enabledLayers.some(layer => layer.kind === 'texture'),
       distortChroma: distortChromaRequested,
+      ice: enabledLayers.some(layer => layer.kind === 'ice'),
     },
   };
 }

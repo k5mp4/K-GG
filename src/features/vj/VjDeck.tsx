@@ -15,7 +15,7 @@ import './vj.css';
 const EFFECT_NAMES: Record<EffectStackKind, string> = {
   noise: 'Noise', slit: 'Slit', stretch: 'Stretch', distort: 'Distort', mirror: 'Mirror',
   kaleidoscope: 'Kaleidoscope', voronoi: 'Voronoi', glass: 'Glass', glassTile: 'Glass Tile',
-  diffuse: 'Diffuse', datamosh: 'Datamosh', cone: '3D', texture: 'Texture', distortChroma: 'Distort Chroma',
+  diffuse: 'Diffuse', datamosh: 'Datamosh', cone: '3D', texture: 'Texture', distortChroma: 'Distort Chroma', ice: 'Ice',
 };
 
 function ParameterRow({ parameter, session, detailed }: { parameter: VjParameter; session: VjSession; detailed: boolean }) {

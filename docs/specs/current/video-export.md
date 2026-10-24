@@ -5,9 +5,9 @@ title: 動画・連番フレーム出力
 status: current
 owners: [maintainer]
 created: 2026-07-31
-updated: 2026-10-03
+updated: 2026-10-20
 requirement_ids: [EXPORT-001, EXPORT-002, EXPORT-003, EXPORT-004, EXPORT-005, EXPORT-006, EXPORT-007, EXPORT-008, EXPORT-009, EXPORT-010, EXPORT-011, EXPORT-012, EXPORT-013, EXPORT-021, EXPORT-022]
-related_adrs: [ADR-0004, ADR-0005, ADR-0018, ADR-0021]
+related_adrs: [ADR-0004, ADR-0005, ADR-0018, ADR-0021, ADR-20261019-ice-material-field]
 related_changes: [CHANGE-011, CHANGE-024, CHANGE-025, CHANGE-027, CHANGE-030, CHANGE-031, CHANGE-032, CHANGE-037, CHANGE-038, CHANGE-048, CHANGE-051, CHANGE-052, CHANGE-054]
 related_code: [src/adapters/browser/videoExportService.ts, src/adapters/tauri/videoExportService.ts, src/adapters/browser/exportService.ts, src/adapters/tauri/exportService.ts, src/adapters/tauri/afterEffectsService.ts, src/adapters/types.ts, src/lib/export.ts, src/lib/exportSlits.ts, src/lib/exportVideo.ts, src/lib/videoExportFormats.ts, src/lib/aftereffectsExport.ts, src/lib/aeStatusController.ts, src/lib/videoExportLifecycle.ts, src/lib/renderBridge.ts, src/lib/renderSceneAtTime.ts, src/lib/flowGradientRenderer.ts, src/lib/flowSimulation.ts, src/lib/videoExportFrames.ts, src/lib/tileRender.ts, src/lib/webgl.ts, src/lib/clothGradientRenderer.ts, src/lib/coneSeam.ts, src/components/GradientCanvas.tsx, src/components/ClothCanvas.tsx, src/components/ConeApexEditor.tsx, src/components/ExportPanel.tsx, src-tauri/src/lib.rs, tools/ffmpeg-native-smoke.mjs, tools/verify-macos-signing.sh, tools/tauri-build-macos-verified.sh]
 related_tests: [src/components/ExportPanel.mov.test.tsx, src/lib/videoExportFormats.test.ts, tests/e2e/export.spec.ts, src/lib/renderBridge.test.ts, src/lib/effectPipeline.test.ts, src/lib/renderFrame.test.ts, src/lib/flowSimulation.test.ts, src/lib/flowGradientPreset.test.ts, src/lib/webglExportPrograms.test.ts, src/lib/webglShaderSources.test.ts, src/lib/glass.test.ts, src/lib/videoExportFrames.test.ts, src/lib/coneView.test.ts, src/lib/coneSeam.test.ts, src/lib/webglPerformance.test.ts, src/lib/aftereffectsExport.test.ts, src/lib/aeStatusController.test.ts, src/lib/videoExportLifecycle.test.ts, src/adapters/tauri/exportService.test.ts, src/adapters/tauri/videoExportService.native-artifact.test.ts, src/adapters/tauri/exportService.native-artifact.test.ts, src/adapters/tauri/afterEffectsService.native-artifact.test.ts]
@@ -40,6 +40,8 @@ PNG ZIP、MOV、MP4、WebM、GIFは、同じEffect Pipeline、scene evaluation�
 ### EXPORT-005 GLASS系とタイル出力
 
 Glass（GLASS V2）を含む出力では、sourceとdestinationのFBO／textureを衝突させず、隣接サンプルに必要なtile paddingを確保する。full-frame pathとtiled pathは、同じ時刻と設定で同じ出力規則を使用する。
+
+Iceを含む出力は、Iceの最大参照距離から求めた余白をexport開始時のsnapshotで固定し、Glass／GlassTileの余白へ加える。余白を確保できないタイル寸法や、Mirror／KaleidoscopeとIceを同時に使う構成では、最初のタイルの前に理由を返して失敗し、余白を黙って縮めない（[ICE-003](./effect-stack)）。
 
 ### EXPORT-006 cancellationと失敗
 

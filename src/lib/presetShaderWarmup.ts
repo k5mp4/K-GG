@@ -41,7 +41,7 @@ export function collectSceneWarmupTargets(state: LatestState, includeAnalyticNoi
     // Reserve these programs before performance rather than compiling on that later frame.
     for (const [key, needed] of [
       ['blur', state.normalMap.enabled || state.effectPipeline.prismEnabled || enabled('distortChroma')],
-      ['glassV2', enabled('glass')], ['glassTile', enabled('glassTile')],
+      ['glassV2', enabled('glass')], ['glassTile', enabled('glassTile')], ['ice', enabled('ice')],
     ] as const) {
       if (needed) targets.set(`${key}:`, { key });
     }

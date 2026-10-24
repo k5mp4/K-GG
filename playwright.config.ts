@@ -50,6 +50,10 @@ export default defineConfig({
       name: 'shaders',
       testMatch: '**/shaders.spec.ts',
     },
+    {
+      name: 'ice',
+      testMatch: '**/ice.spec.ts',
+    },
   ],
   use: {
     baseURL,

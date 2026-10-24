@@ -255,8 +255,10 @@ function serializeStore(state: StoreState): SerializableStore {
     clothGradient: state.clothGradient,
     coneView: state.coneView,
     seamless: state.seamless,
+    materialField: state.materialField,
     texture: state.texture,
     distortChroma: state.distortChroma,
+    ice: state.ice,
     datamosh: state.datamosh,
     manualDistort: state.manualDistort,
     postprocess: state.postprocess,
@@ -281,7 +283,11 @@ function makeSnapshot(state: StoreState): ControlSnapshot {
 
 function getStoreValue(store: SerializableStore, definition: ParameterDefinition): ParameterValue | undefined {
   const target = store[definition.target];
-  return isRecord(target) ? target[definition.property] as ParameterValue : undefined;
+  if (!isRecord(target)) return undefined;
+  if (definition.target === 'gradient' && definition.property.startsWith('fieldInput.')) {
+    return isRecord(target.fieldInput) ? target.fieldInput[definition.property.slice('fieldInput.'.length)] as ParameterValue : undefined;
+  }
+  return target[definition.property] as ParameterValue;
 }
 
 function effectStates(state: StoreState): EffectState[] {
@@ -510,9 +516,13 @@ export class KggControlRuntime {
     const validated = validateParameterValue(definition, rawValue);
     if (!validated.ok) return error('invalid_parameter', validated.message);
 
-    const patch = { [definition.property]: validated.value } as never;
+    const patch = (definition.target === 'gradient' && definition.property.startsWith('fieldInput.')
+      ? { fieldInput: { [definition.property.slice('fieldInput.'.length)]: validated.value } }
+      : { [definition.property]: validated.value }) as never;
     const setter = {
       gradient: applicationCommands.setGradient,
+      materialField: applicationCommands.setMaterialField,
+      ice: applicationCommands.setIce,
       noiseDistortion: applicationCommands.setNoiseDistortion,
       diffuse: applicationCommands.setDiffuse,
       flowGradient: applicationCommands.setFlowGradient,
@@ -578,6 +588,8 @@ export class KggControlRuntime {
     if (!validatedPatch.ok) return validatedPatch;
     const setters: Partial<Record<Exclude<ControlGroup, 'ui' | 'keyframeTracks'>, (value: never) => void>> = {
       gradient: applicationCommands.setGradient,
+      materialField: applicationCommands.setMaterialField,
+      ice: applicationCommands.setIce,
       noiseDistortion: applicationCommands.setNoiseDistortion,
       diffuse: applicationCommands.setDiffuse,
       imageGradient: applicationCommands.setImageGradient,

@@ -3,7 +3,7 @@ import type { ClothGradientConfig } from '../types/clothGradient';
 import type { ConeViewConfig } from '../types/coneView';
 import type { FlowGradientConfig } from '../types/flowGradient';
 import type { ImageGradientConfig } from '../types/imageGradient';
-import type { GradientConfig, MeshEdge, Vec2Tuple } from '../types/gradient';
+import type { GradientConfig, GradientFieldInput, MeshEdge, Vec2Tuple } from '../types/gradient';
 import type {
   DiffuseConfig,
   EffectPipelineConfig,
@@ -15,8 +15,10 @@ import type {
   StretchConfig,
 } from '../types/distortion';
 import type { SeamlessConfig } from '../types/seamless';
+import type { MaterialFieldConfig } from '../types/materialField';
 import type { TextureConfig } from '../types/texture';
 import type { DistortChromaConfig } from '../types/distortChroma';
+import type { IceConfig } from '../types/ice';
 import type { ShapesConfig } from '../types/shapes';
 import type { DatamoshConfig } from '../types/datamosh';
 import type { WorkspaceSlice } from './workspaceSlice';
@@ -38,8 +40,10 @@ export type DocumentState = {
   clothGradient: ClothGradientConfig;
   coneView: ConeViewConfig;
   seamless: SeamlessConfig;
+  materialField: MaterialFieldConfig;
   texture: TextureConfig;
   distortChroma: DistortChromaConfig;
+  ice: IceConfig;
   shapes: ShapesConfig;
   flowGradient: FlowGradientConfig;
   datamosh: DatamoshConfig;
@@ -50,7 +54,7 @@ export type DocumentState = {
 };
 
 export type DocumentActions = {
-  setGradient: (value: Partial<GradientConfig>) => void;
+  setGradient: (value: Omit<Partial<GradientConfig>, 'fieldInput'> & { fieldInput?: Partial<GradientFieldInput> }) => void;
   setMeshCorner: (index: number, position: Vec2Tuple) => void;
   setMeshHandle: (edge: MeshEdge, index: 0 | 1, position: Vec2Tuple) => void;
   resetMeshGradient: () => void;
@@ -77,8 +81,10 @@ export type DocumentActions = {
   setClothGradient: (value: Partial<ClothGradientConfig>) => void;
   setConeView: (value: Partial<ConeViewConfig>) => void;
   setSeamless: (value: Partial<SeamlessConfig>) => void;
+  setMaterialField: (value: Partial<MaterialFieldConfig>) => void;
   setTexture: (value: Partial<TextureConfig>) => void;
   setDistortChroma: (value: Partial<DistortChromaConfig>) => void;
+  setIce: (value: Partial<IceConfig>) => void;
   setShapes: (value: Partial<ShapesConfig>) => void;
   setFlowGradient: (value: Partial<FlowGradientConfig>) => void;
   setDatamosh: (value: Partial<DatamoshConfig>) => void;
@@ -105,7 +111,7 @@ export type DocumentStoreSet = (
 /** Creates an isolated document state without sharing mutable default arrays. */
 export function createDocumentState(defaults: DocumentDefaults): DocumentState {
   return {
-    gradient: { ...defaults.gradient },
+    gradient: { ...defaults.gradient, fieldInput: { ...defaults.gradient.fieldInput! } },
     noiseDistortion: { ...defaults.noiseDistortion },
     diffuse: { ...defaults.diffuse },
     imageGradient: { ...defaults.imageGradient },
@@ -116,8 +122,10 @@ export function createDocumentState(defaults: DocumentDefaults): DocumentState {
     clothGradient: { ...defaults.clothGradient },
     coneView: { ...defaults.coneView },
     seamless: { ...defaults.seamless },
+    materialField: { ...defaults.materialField },
     texture: { ...defaults.texture },
     distortChroma: { ...defaults.distortChroma },
+    ice: { ...defaults.ice },
     shapes: { ...defaults.shapes },
     flowGradient: { ...defaults.flowGradient },
     datamosh: { ...defaults.datamosh },

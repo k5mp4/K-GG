@@ -77,6 +77,8 @@ export function getAnimationGroup(propertyId: string, fallback = 'Properties'): 
     stretch: 'Stretch',
     diffuse: 'Diffuse',
     postprocess: 'Postprocess',
+    materialField: 'Material Field',
+    ice: 'Ice',
   };
   return labels[category] ?? fallback;
 }

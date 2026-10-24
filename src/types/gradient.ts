@@ -1,3 +1,16 @@
+import { clampParameter, getParameterDefault, getParameterLimit, normalizeEnumParameter } from '../lib/parameterLimits';
+
+export type GradientFieldInput = { source: 'none' | 'thickness' | 'cracks'; influence: number };
+export const DEFAULT_GRADIENT_FIELD_INPUT: GradientFieldInput = { source: 'none', influence: getParameterDefault('gradient.fieldInput.influence') };
+
+export function normalizeGradientFieldInput(value: unknown): GradientFieldInput {
+  const raw = typeof value === 'object' && value !== null ? value as Partial<Record<keyof GradientFieldInput, unknown>> : {};
+  return {
+    source: normalizeEnumParameter('gradient.fieldInput.source', raw.source),
+    influence: clampParameter(raw.influence, DEFAULT_GRADIENT_FIELD_INPUT.influence, getParameterLimit('gradient.fieldInput.influence')),
+  };
+}
+
 export type RampColorMode =
   | 'rgb'
   | 'linearrgb'
@@ -486,7 +499,9 @@ export function normalizeMeshGradientConfig(value: unknown): MeshGradientConfig 
   });
 }
 
+/** Optional in portable legacy documents; live state always normalizes it. */
 export type GradientConfig = {
+  fieldInput?: GradientFieldInput;
   angle: number;     // degrees 0–360
   stops: ColorStop[];
   opacityStops?: OpacityStop[];

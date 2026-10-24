@@ -367,10 +367,10 @@ export function PresetPanel({ canvasW, canvasH, setCanvasW, setCanvasH, aspectRa
   async function handleSave() {
     const trimmed = name.trim();
     if (!trimmed) return;
-    const { gradient, noiseDistortion, diffuse, imageGradient, slitScan, stretch, animation, normalMap, clothGradient, coneView, seamless, texture, distortChroma, shapes, flowGradient, datamosh, manualDistort, postprocess, effectPipeline, keyframeTracks } = useGradientStore.getState();
+    const { gradient, noiseDistortion, diffuse, imageGradient, slitScan, stretch, animation, normalMap, clothGradient, coneView, seamless, materialField, texture, distortChroma, ice, shapes, flowGradient, datamosh, manualDistort, postprocess, effectPipeline, keyframeTracks } = useGradientStore.getState();
     const state = createPresetSaveState({
       gradient, noiseDistortion, diffuse, imageGradient, slitScan, stretch,
-      animation, normalMap, clothGradient, coneView, seamless, texture, distortChroma, shapes, flowGradient, datamosh,
+      animation, normalMap, clothGradient, coneView, seamless, materialField, texture, distortChroma, ice, shapes, flowGradient, datamosh,
       manualDistort, postprocess, effectPipeline,
       keyframeTracks,
     }, loadUserColorPalettes(), { width: canvasW, height: canvasH });
