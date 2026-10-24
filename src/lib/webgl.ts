@@ -66,7 +66,7 @@ import { buildMeshCoordinateField, buildMeshGradientField, meshCoordinateFieldSi
 import { DEFAULT_MATERIAL_FIELD, normalizeMaterialFieldConfig, type MaterialFieldConfig } from '../types/materialField';
 import { getMaterialFieldUniforms, isMaterialFieldInputActive, MATERIAL_FIELD_INPUT_SOURCE_INDEX, type MaterialFieldUniforms } from './materialField';
 import { DEFAULT_ICE, isIceOpticallyIdentity, normalizeIceConfig, type IceConfig } from '../types/ice';
-import { getIceSampleRadii } from './ice';
+import { getIceUniformValues } from './ice';
 import { noiseAngleDegreesForShader, noiseAngleRadiansForShader } from './noiseAngle';
 import { getChladniUniformValues } from './chladniNoise';
 import { clampParameter, getParameterLimit } from './parameterLimits';
@@ -1285,12 +1285,13 @@ const TEXTURE_UNIFORM_NAMES = [
 
 const MATERIAL_FIELD_STRUCTURE_UNIFORM_NAMES = [
   'u_mfSeedZ', 'u_mfSeedOffset', 'u_mfScale', 'u_mfThickness', 'u_mfThicknessVariation', 'u_mfCracks',
-  'u_mfSurface', 'u_mfFrost', 'u_mfBubbles', 'u_mfWarp', 'u_mfMorph', 'u_mfAngle',
+  'u_mfFrost', 'u_mfBubbles', 'u_mfWarp', 'u_mfMorph', 'u_mfAngle',
 ] as const;
 
 const ICE_UNIFORM_NAMES = [
   'u_sourceTex', 'u_resolution', 'u_fullResolution', 'u_tileOffset', 'u_mix', 'u_refractionPx',
-  'u_dispersionPx', 'u_roughnessPx', 'u_roughness', 'u_reflection', 'u_ior', 'u_absorption',
+  'u_dispersionPx', 'u_roughnessPx', 'u_roughness', 'u_roughnessVariation', 'u_noiseScale', 'u_bump',
+  'u_bumpCoverage', 'u_bevel', 'u_microBump', 'u_highlight', 'u_backlight', 'u_reflection', 'u_ior', 'u_absorption',
   'u_scattering', 'u_absorptionColor', 'u_scatterColor', 'u_lightAngle',
   ...MATERIAL_FIELD_STRUCTURE_UNIFORM_NAMES,
 ] as const;
@@ -1311,21 +1312,11 @@ function setMaterialFieldStructureUniforms(
   gl.uniform1f(uniforms.u_mfThickness, field.thickness);
   gl.uniform1f(uniforms.u_mfThicknessVariation, field.thicknessVariation);
   gl.uniform1f(uniforms.u_mfCracks, field.cracks);
-  gl.uniform1f(uniforms.u_mfSurface, field.surface);
   gl.uniform1f(uniforms.u_mfFrost, field.frost);
   gl.uniform1f(uniforms.u_mfBubbles, field.bubbles);
   gl.uniform1f(uniforms.u_mfWarp, field.warp);
   gl.uniform1f(uniforms.u_mfMorph, field.morph);
   gl.uniform1f(uniforms.u_mfAngle, field.angle);
-}
-
-function hexToLinearRgb(hex: string): [number, number, number] {
-  const value = Number.parseInt(hex.slice(1), 16);
-  const decode = (channel: number) => {
-    const c = channel / 255;
-    return c <= 0.04045 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4;
-  };
-  return [decode((value >> 16) & 0xff), decode((value >> 8) & 0xff), decode(value & 0xff)];
 }
 
 function getTextureUniforms(gl: WebGL2RenderingContext, program: WebGLProgram): Record<string, WebGLUniformLocation | null> {
@@ -3478,7 +3469,6 @@ function drawIcePass(
   const { gl } = ctx;
   if (!ctx.iceProgram) return false;
   const uniforms = ctx.iceUniforms;
-  const radii = getIceSampleRadii(fullHeight);
   gl.useProgram(ctx.iceProgram);
   gl.viewport(0, 0, width, height);
   gl.disable(gl.BLEND);
@@ -3491,21 +3481,10 @@ function drawIcePass(
   gl.uniform2f(uniforms.u_resolution, width, height);
   gl.uniform2f(uniforms.u_fullResolution, fullWidth, fullHeight);
   gl.uniform2f(uniforms.u_tileOffset, offsetX, offsetY);
-  gl.uniform1f(uniforms.u_mix, ice.mix);
-  gl.uniform1f(uniforms.u_refractionPx, radii.refraction * ice.refraction);
-  gl.uniform1f(uniforms.u_dispersionPx, radii.dispersion * ice.refraction);
-  gl.uniform1f(uniforms.u_roughnessPx, radii.roughness);
-  gl.uniform1f(uniforms.u_roughness, ice.roughness);
-  gl.uniform1f(uniforms.u_reflection, ice.reflection);
-  gl.uniform1f(uniforms.u_ior, ice.ior);
-  gl.uniform1f(uniforms.u_absorption, ice.absorption);
-  gl.uniform1f(uniforms.u_scattering, ice.scattering);
-  const absorptionColor = hexToLinearRgb(ice.absorptionColor);
-  const scatterColor = hexToLinearRgb(ice.scatterColor);
-  gl.uniform3f(uniforms.u_absorptionColor, absorptionColor[0], absorptionColor[1], absorptionColor[2]);
-  gl.uniform3f(uniforms.u_scatterColor, scatterColor[0], scatterColor[1], scatterColor[2]);
-  gl.uniform1f(uniforms.u_lightAngle, iceLightPhase * Math.PI * 2);
-  setMaterialFieldStructureUniforms(gl, uniforms, getMaterialFieldUniforms(materialField, materialPhase));
+  const values = getIceUniformValues(ice, getMaterialFieldUniforms(materialField, materialPhase), iceLightPhase, fullHeight);
+  for (const [name, value] of Object.entries(values.floats)) gl.uniform1f(uniforms[name], value);
+  for (const [name, value] of Object.entries(values.vec2s)) gl.uniform2f(uniforms[name], value[0], value[1]);
+  for (const [name, value] of Object.entries(values.vec3s)) gl.uniform3f(uniforms[name], value[0], value[1], value[2]);
   drawArrays(ctx, 'Ice', gl.TRIANGLES, 0, 6);
   return true;
 }

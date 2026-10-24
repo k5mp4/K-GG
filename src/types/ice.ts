@@ -13,8 +13,24 @@ export type IceConfig = {
   mix: number;
   /** Strength of the refracted displacement, bounded by the KTD5 radius. */
   refraction: number;
-  /** Radius of the fixed blur kernel, bounded by the KTD5 radius. */
+  /** Mean surface roughness: blur, haze, and highlight spread. */
   roughness: number;
+  /** Contrast of the roughness map: 0 is uniform, 1 mixes glossy and frosted patches. */
+  roughnessVariation: number;
+  /** Cells per screen height of the surface noise texture. */
+  noiseScale: number;
+  /** Height of the raised (partly melted) areas of the bump map. */
+  bump: number;
+  /** Share of the surface that is raised. */
+  bumpCoverage: number;
+  /** Roundness of the raised edges; 0 is a sharp step. */
+  bevel: number;
+  /** Fine grain over the whole surface. */
+  microBump: number;
+  /** Sharp specular highlight from the front light. */
+  highlight: number;
+  /** Light passing through the sheet from behind, glowing at slopes and cracks. */
+  backlight: number;
   /** Strength of the procedural environment reflection. */
   reflection: number;
   /** Index of refraction. Independent from Glass. */
@@ -41,6 +57,14 @@ export const ICE_LIMIT_KEYS = {
   mix: 'ice.mix',
   refraction: 'ice.refraction',
   roughness: 'ice.roughness',
+  roughnessVariation: 'ice.roughnessVariation',
+  noiseScale: 'ice.noiseScale',
+  bump: 'ice.bump',
+  bumpCoverage: 'ice.bumpCoverage',
+  bevel: 'ice.bevel',
+  microBump: 'ice.microBump',
+  highlight: 'ice.highlight',
+  backlight: 'ice.backlight',
   reflection: 'ice.reflection',
   ior: 'ice.ior',
   absorption: 'ice.absorption',
@@ -56,7 +80,7 @@ export const ICE_COLOR_KEYS = ['absorptionColor', 'scatterColor'] as const;
 export const DEFAULT_ICE: IceConfig = {
   enabled: false,
   ...Object.fromEntries(ICE_NUMERIC_KEYS.map(key => [key, getParameterDefault(ICE_LIMIT_KEYS[key])])) as Pick<IceConfig, IceNumericKey>,
-  absorptionColor: '#7FC4E6',
+  absorptionColor: '#BFE0F5',
   scatterColor: '#F2F8FF',
 };
 

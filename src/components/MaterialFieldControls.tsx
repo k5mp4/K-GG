@@ -43,7 +43,6 @@ const STRUCTURE_ROWS: StructureRow[] = [
 
 /** Structure that only Ice reads; the Gradient input uses thickness and cracks. */
 const ICE_STRUCTURE_ROWS: StructureRow[] = [
-  { key: 'surface', labelKey: 'materialField.surface', format: percent, keyframed: true },
   { key: 'frost', labelKey: 'materialField.frost', format: percent, keyframed: true },
   { key: 'bubbles', labelKey: 'materialField.bubbles', format: percent, keyframed: true },
 ];

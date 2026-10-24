@@ -24,11 +24,11 @@ describe('IcePanel', () => {
     useGradientStore.setState(useGradientStore.getInitialState(), true);
   });
 
-  it('groups the shared structure, optics, and motion', () => {
+  it('groups the noise-driven surface, optics, shared structure, and motion', () => {
     const markup = render({ ...DEFAULT_ICE, enabled: true });
     expect(markup).toContain('data-ice-panel');
     expect(markup).toContain('data-material-field-structure');
-    for (const label of ['Structure (shared)', 'Optics', 'Motion', 'Refraction', 'IOR', 'Absorption', 'Scattering', 'Body Color', 'Light Cycles', 'Shared by Gradient and Ice']) {
+    for (const label of ['Surface', 'Noise Scale', 'Bump', 'Raised Area', 'Bevel', 'Micro Grain', 'Roughness Variation', 'Inner Structure (shared)', 'Optics', 'Highlight', 'Backlight', 'Motion', 'Refraction', 'IOR', 'Absorption', 'Scattering', 'Body Color', 'Light Cycles', 'Shared by Gradient and Ice']) {
       expect(markup, label).toContain(label);
     }
     expect(markup).not.toContain('data-ice-inactive');

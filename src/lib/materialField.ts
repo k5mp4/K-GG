@@ -73,7 +73,6 @@ export type MaterialFieldUniforms = {
   thickness: number;
   thicknessVariation: number;
   cracks: number;
-  surface: number;
   frost: number;
   bubbles: number;
   warp: number;
@@ -107,7 +106,6 @@ export function getMaterialFieldUniforms(field: MaterialFieldConfig, phaseTurns:
     thickness: field.thickness,
     thicknessVariation: field.thicknessVariation,
     cracks: field.cracks,
-    surface: field.surface,
     frost: field.frost,
     bubbles: field.bubbles,
     warp: field.warp,

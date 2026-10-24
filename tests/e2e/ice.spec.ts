@@ -238,7 +238,7 @@ async function renderIceCases(page: import('@playwright/test').Page, cases: IceC
     const { getMaterialFieldUniforms } = field as typeof import('../../src/lib/materialField');
     const { normalizeMaterialFieldConfig } = fieldTypes as typeof import('../../src/types/materialField');
     const { normalizeIceConfig } = iceTypes as typeof import('../../src/types/ice');
-    const { getIceSampleRadii } = iceLib as typeof import('../../src/lib/ice');
+    const { getIceUniformValues } = iceLib as typeof import('../../src/lib/ice');
     const canvas = document.createElement('canvas');
     const gl = canvas.getContext('webgl2', { antialias: false, preserveDrawingBuffer: true, premultipliedAlpha: false });
     if (!gl) throw new Error('WebGL2 is unavailable');
@@ -268,13 +268,6 @@ async function renderIceCases(page: import('@playwright/test').Page, cases: IceC
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
     gl.uniform1i(u('u_sourceTex'), 3);
-    const linear = (hex: string) => {
-      const value = Number.parseInt(hex.slice(1), 16);
-      return [16, 8, 0].map(shift => {
-        const c = ((value >> shift) & 255) / 255;
-        return c <= 0.04045 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4;
-      });
-    };
     const sourcePixel = (kind: string, x: number, y: number, width: number): number[] => {
       if (kind === 'gray') return [128, 128, 128, 255];
       if (kind === 'transparentHalf') return x < width / 2 ? [128, 128, 128, 255] : [255, 0, 255, 0];
@@ -294,31 +287,16 @@ async function renderIceCases(page: import('@playwright/test').Page, cases: IceC
       canvas.width = region.width;
       canvas.height = region.height;
       gl.viewport(0, 0, region.width, region.height);
-      const mf = normalizeMaterialFieldConfig({ seed: 5, scale: 4, cracks: 0.8, frost: 0.2, bubbles: 0.3, surface: 0.6, ...iceCase.field });
+      const mf = normalizeMaterialFieldConfig({ seed: 5, scale: 4, cracks: 0.8, frost: 0.2, bubbles: 0.3, ...iceCase.field });
       const ice = normalizeIceConfig({ enabled: true, ...iceCase.ice });
       const f = getMaterialFieldUniforms(mf, 0.2);
-      const radii = getIceSampleRadii(iceCase.height);
       gl.uniform2f(u('u_resolution'), region.width, region.height);
       gl.uniform2f(u('u_fullResolution'), iceCase.width, iceCase.height);
       gl.uniform2f(u('u_tileOffset'), region.x, region.y);
-      gl.uniform1f(u('u_mix'), ice.mix);
-      gl.uniform1f(u('u_refractionPx'), radii.refraction * ice.refraction);
-      gl.uniform1f(u('u_dispersionPx'), radii.dispersion * ice.refraction);
-      gl.uniform1f(u('u_roughnessPx'), radii.roughness);
-      gl.uniform1f(u('u_roughness'), ice.roughness);
-      gl.uniform1f(u('u_reflection'), ice.reflection);
-      gl.uniform1f(u('u_ior'), ice.ior);
-      gl.uniform1f(u('u_absorption'), ice.absorption);
-      gl.uniform1f(u('u_scattering'), ice.scattering);
-      gl.uniform3fv(u('u_absorptionColor'), linear(ice.absorptionColor));
-      gl.uniform3fv(u('u_scatterColor'), linear(ice.scatterColor));
-      gl.uniform1f(u('u_lightAngle'), 0.7);
-      for (const [name, value] of Object.entries({
-        u_mfSeedZ: f.seedZ, u_mfScale: f.scale, u_mfThickness: f.thickness, u_mfThicknessVariation: f.thicknessVariation,
-        u_mfCracks: f.cracks, u_mfSurface: f.surface, u_mfFrost: f.frost, u_mfBubbles: f.bubbles, u_mfWarp: f.warp,
-        u_mfMorph: f.morph, u_mfAngle: f.angle,
-      })) gl.uniform1f(u(name), value);
-      gl.uniform2f(u('u_mfSeedOffset'), f.seedOffset[0], f.seedOffset[1]);
+      const values = getIceUniformValues(ice, f, 0.11, iceCase.height);
+      for (const [name, value] of Object.entries(values.floats)) gl.uniform1f(u(name), value);
+      for (const [name, value] of Object.entries(values.vec2s)) gl.uniform2f(u(name), value[0], value[1]);
+      for (const [name, value] of Object.entries(values.vec3s)) gl.uniform3f(u(name), value[0], value[1], value[2]);
       gl.drawArrays(gl.TRIANGLES, 0, 6);
       const output = new Uint8Array(region.width * region.height * 4);
       gl.readPixels(0, 0, region.width, region.height, gl.RGBA, gl.UNSIGNED_BYTE, output);
@@ -333,7 +311,7 @@ test('Ice keeps the input alpha and never lets hidden transparent colour bleed i
   const [result] = await renderIceCases(page, [{
     width: 96, height: 64, source: 'transparentHalf',
     field: { cracks: 0, frost: 0, bubbles: 0 },
-    ice: { refraction: 1, roughness: 1, absorption: 0, scattering: 0, reflection: 0 },
+    ice: { refraction: 1, roughness: 1, absorption: 0, scattering: 0, reflection: 0, backlight: 0 },
   }]);
   for (let index = 0; index < result.output.length; index += 4) {
     expect(result.output[index + 3]).toBe(result.input[index + 3]);
@@ -347,10 +325,13 @@ test('Ice keeps the input alpha and never lets hidden transparent colour bleed i
 
 test('scattering stays white without absorption and vanishes with the inner structure', async ({ page }) => {
   const size = { width: 128, height: 80, source: 'gray' as const };
+  // Isolate the inner structure: a flat, glossy surface without lights.
+  const flat = { bump: 0, microBump: 0, roughness: 0, roughnessVariation: 0, highlight: 0, backlight: 0, reflection: 0, refraction: 0 };
   const [cracked, empty, identity, zeroMix] = await renderIceCases(page, [
-    { ...size, field: { cracks: 0.9, frost: 0, bubbles: 0 }, ice: { absorption: 0, scattering: 3, reflection: 0, refraction: 0 } },
-    { ...size, field: { cracks: 0, frost: 0, bubbles: 0 }, ice: { absorption: 0, scattering: 3, reflection: 0, refraction: 0 } },
-    { ...size, field: { thickness: 0 }, ice: { absorption: 4, scattering: 4, reflection: 0, refraction: 0, roughness: 0 } },
+    { ...size, field: { cracks: 0.9, frost: 0, bubbles: 0 }, ice: { ...flat, absorption: 0, scattering: 4 } },
+    { ...size, field: { cracks: 0, frost: 0, bubbles: 0 }, ice: { ...flat, absorption: 0, scattering: 3 } },
+    // Frost roughens the surface itself, so it is held at zero here.
+    { ...size, field: { thickness: 0, frost: 0 }, ice: { ...flat, absorption: 4, scattering: 4 } },
     { ...size, ice: { mix: 0 } },
   ]);
   const maxLuminance = (pixels: number[]) => {
@@ -359,7 +340,7 @@ test('scattering stays white without absorption and vanishes with the inner stru
     return max;
   };
   // Cracks scatter white light over a neutral input even with zero absorption.
-  expect(maxLuminance(cracked.output)).toBeGreaterThan(128 + 40);
+  expect(maxLuminance(cracked.output)).toBeGreaterThan(128 + 30);
   // Without cracks, frost, or bubbles there is nothing to scatter.
   expect(maxLuminance(empty.output)).toBeLessThanOrEqual(130);
   // Zero thickness removes absorption and inner scattering; Mix 0 is the input.
@@ -378,7 +359,7 @@ test('padded tiles reproduce the full Ice frame at the screen edges and seams', 
     const { getIceTilePadding } = await import(path) as typeof import('../../src/lib/ice');
     return getIceTilePadding(outputHeight);
   }, height);
-  const ice = { refraction: 1, roughness: 1, reflection: 0.6 };
+  const ice = { refraction: 1, roughness: 1, reflection: 0.6, bump: 1, bevel: 0, microBump: 1, highlight: 1, backlight: 1 };
   const cores = [
     { x: 0, y: 0, width: 80, height: 48 },
     { x: 80, y: 0, width: 80, height: 48 },
@@ -408,4 +389,43 @@ test('padded tiles reproduce the full Ice frame at the screen edges and seams', 
     }
   });
   expect(maxDifference).toBeLessThanOrEqual(1);
+});
+
+test('the surface noise drives refraction, glossy and frosted patches, and highlights', async ({ page }) => {
+  const flat = { bump: 0, microBump: 0, roughness: 0, roughnessVariation: 0, highlight: 0, backlight: 0, reflection: 0, absorption: 0, scattering: 0 };
+  const structure = { cracks: 0, frost: 0, bubbles: 0 };
+  const stripes = { width: 192, height: 108, source: 'stripes' as const, field: structure };
+  const gray = { width: 192, height: 108, source: 'gray' as const, field: structure };
+  const [flatStripes, bumpedStripes, uniformHaze, patchyHaze, noHighlight, highlight] = await renderIceCases(page, [
+    { ...stripes, ice: { ...flat, refraction: 1 } },
+    { ...stripes, ice: { ...flat, refraction: 1, bump: 1, bevel: 0.2 } },
+    { ...gray, ice: { ...flat, roughness: 0.4, roughnessVariation: 0, scattering: 1.5 } },
+    { ...gray, ice: { ...flat, roughness: 0.4, roughnessVariation: 1, scattering: 1.5 } },
+    { ...gray, ice: { ...flat, bump: 1, bevel: 0.1, microBump: 1 } },
+    { ...gray, ice: { ...flat, bump: 1, bevel: 0.1, microBump: 1, highlight: 1 } },
+  ]);
+  const luminanceRange = (pixels: number[]) => {
+    let min = 255;
+    let max = 0;
+    for (let index = 0; index < pixels.length; index += 4) {
+      const value = luminance(pixels, index);
+      min = Math.min(min, value);
+      max = Math.max(max, value);
+    }
+    return { min, max, span: max - min };
+  };
+  const maxDifference = (a: number[], b: number[]) => {
+    let max = 0;
+    for (let index = 0; index < a.length; index += 1) max = Math.max(max, Math.abs(a[index] - b[index]));
+    return max;
+  };
+
+  // A flat sheet without lights or structure shows the input; raised areas bend it.
+  expect(maxDifference(flatStripes.output, flatStripes.input)).toBeLessThanOrEqual(1);
+  expect(maxDifference(bumpedStripes.output, flatStripes.output)).toBeGreaterThan(40);
+  // Roughness Variation turns a uniform haze into glossy and frosted patches.
+  expect(luminanceRange(patchyHaze.output).span).toBeGreaterThan(luminanceRange(uniformHaze.output).span + 15);
+  // The highlight lands on slopes facing the light and only when enabled.
+  expect(luminanceRange(noHighlight.output).max).toBeLessThan(170);
+  expect(luminanceRange(highlight.output).max).toBeGreaterThan(220);
 });

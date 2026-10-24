@@ -12,7 +12,6 @@ uniform float u_mfScale;        // Base cells per screen height.
 uniform float u_mfThickness;
 uniform float u_mfThicknessVariation;
 uniform float u_mfCracks;
-uniform float u_mfSurface;
 uniform float u_mfFrost;
 uniform float u_mfBubbles;
 uniform float u_mfWarp;
@@ -144,14 +143,6 @@ float mfCrackDensity(vec2 q, float pixelCells) {
 
   float density = (trunk + halo) * mix(0.35, 1.0, trunkMask) + 0.6 * branch * branchMask;
   return clamp(u_mfCracks * density, 0.0, 1.0);
-}
-
-// Surface relief for optical normals, independent of the thickness so a flat
-// surface can still hold thick, cloudy ice. Roughly [-surface, surface].
-float mfSurfaceHeight(vec2 q) {
-  // Broad undulation with a little fine detail: ice bends the image gently
-  // instead of rippling it like water.
-  return u_mfSurface * (mfFbm(q * 0.55 + vec2(31.0, 7.0), 107.0) + 0.15 * mfGradientNoise(q * 2.2 + vec2(5.0, 19.0), 109.0));
 }
 
 // Low-frequency frost density in [0, 1].

@@ -18,7 +18,7 @@ Gradient Rampに構造入力・影響量・無効理由と、「GradientとIce�
 
 ### ICE-001〜003 Ice Effect Stackレイヤー
 
-主スタックに`ice`レイヤーを追加（既定は無効、既定順の最後）。前段textureを共有Material Fieldの構造で屈折・吸収・散乱・反射させる1 pass。線形光で合成し、出力alphaは元座標のalpha。Mix 0は恒等でprogramも要求しない。Image Gradient Source保護中は適用しない。光は整数周期で巡り、構造は動かさない。タイル出力は上限から求めた余白を固定し、確保できない場合とMirror／Kaleidoscopeとの併用は描画前に失敗する。
+主スタックに`ice`レイヤーを追加（既定は無効、既定順の最後）。Ice自身のノイズテクスチャーから作るバンプマップ（部分的な隆起・面取り・微細なざらつき）と粗さマップ（ツヤと曇りの混在）を表面とし、共有Material Fieldの内部構造と合わせて、前段textureを屈折・吸収・散乱・逆光・反射・ハイライトで処理する1 pass。線形光で合成し、出力alphaは元座標のalpha。Mix 0は恒等でprogramも要求しない。Image Gradient Source保護中は適用しない。光は整数周期で巡り、構造は動かさない。タイル出力は上限から求めた余白を固定し、確保できない場合とMirror／Kaleidoscopeとの併用は描画前に失敗する。
 
 ### PRESET-025 Ice設定の保存互換
 
@@ -26,7 +26,7 @@ rootの`ice`と`ice`レイヤーを保存。旧Presetは無効の既定値で読
 
 ### UI-033 Effect Stack Ice
 
-Edit LayerにIceを追加。「構造（共有）」はGradientと同じ編集UIを共用し、Surface・Frost・Bubblesを含む。光学と動きを分けて表示する。
+Edit LayerにIceを追加。「表面」（バンプマップと粗さマップ）、「光学」、「内部の構造（共有）」（Gradientと同じ編集UI、Frost・Bubblesを含む）、「動き」に分けて表示する。
 
 ## MODIFIED Requirements
 

@@ -17,11 +17,23 @@ type IceNumericKey = keyof typeof ICE_LIMIT_KEYS;
 
 type OpticRow = { key: IceNumericKey; labelKey: MessageKey; format: (value: number) => string; keyframed: boolean };
 
+/** The surface noise texture: bump map (uplifts, bevel, grain) and roughness map. */
+const SURFACE_ROWS: OpticRow[] = [
+  { key: 'noiseScale', labelKey: 'ice.noiseScale', format: value => value.toFixed(1), keyframed: true },
+  { key: 'bump', labelKey: 'ice.bump', format: percent, keyframed: true },
+  { key: 'bumpCoverage', labelKey: 'ice.bumpCoverage', format: percent, keyframed: true },
+  { key: 'bevel', labelKey: 'ice.bevel', format: percent, keyframed: true },
+  { key: 'microBump', labelKey: 'ice.microBump', format: percent, keyframed: true },
+  { key: 'roughness', labelKey: 'ice.roughness', format: percent, keyframed: true },
+  { key: 'roughnessVariation', labelKey: 'ice.roughnessVariation', format: percent, keyframed: true },
+];
+
 const OPTIC_ROWS: OpticRow[] = [
   { key: 'mix', labelKey: 'ice.mix', format: percent, keyframed: true },
   { key: 'refraction', labelKey: 'ice.refraction', format: percent, keyframed: true },
   { key: 'ior', labelKey: 'ice.ior', format: twoDecimals, keyframed: true },
-  { key: 'roughness', labelKey: 'ice.roughness', format: percent, keyframed: true },
+  { key: 'highlight', labelKey: 'ice.highlight', format: percent, keyframed: true },
+  { key: 'backlight', labelKey: 'ice.backlight', format: percent, keyframed: true },
   { key: 'reflection', labelKey: 'ice.reflection', format: percent, keyframed: true },
   { key: 'absorption', labelKey: 'ice.absorption', format: twoDecimals, keyframed: true },
   { key: 'scattering', labelKey: 'ice.scattering', format: twoDecimals, keyframed: true },
@@ -47,8 +59,9 @@ function Section({ title, children }: { title: string; children: ReactNode }) {
 }
 
 /**
- * Ice settings grouped as Structure (the shared Material Field), Optics, and
- * Motion. ON/OFF lives in the Effect Stack like the other layers.
+ * Ice settings grouped as Surface (the noise-driven bump and roughness maps),
+ * Optics, inner Structure (the shared Material Field), and Motion. ON/OFF
+ * lives in the Effect Stack like the other layers.
  */
 export function IcePanel() {
   const { t } = useLanguage();
@@ -83,8 +96,9 @@ export function IcePanel() {
       {disabled && (
         <p className="text-[10px] text-tab-inactive" role="note" data-ice-inactive="off">{t('ice.offHint')}</p>
       )}
-      <Section title={t('ice.structure')}>
-        <MaterialFieldStructureEditor />
+      <Section title={t('ice.surface')}>
+        <p className="text-[10px] text-tab-inactive">{t('ice.surfaceHint')}</p>
+        {SURFACE_ROWS.map(renderRow)}
       </Section>
       <Section title={t('ice.optics')}>
         {OPTIC_ROWS.map(renderRow)}
@@ -101,6 +115,9 @@ export function IcePanel() {
             </div>
           </div>
         ))}
+      </Section>
+      <Section title={t('ice.structure')}>
+        <MaterialFieldStructureEditor />
       </Section>
       <Section title={t('ice.motion')}>
         {MOTION_ROWS.map(renderRow)}
