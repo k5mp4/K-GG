@@ -171,7 +171,7 @@ kgg-control/MCPには、Bezier制御点の移動（`set_bezier_control`）、Mes
 Gradient Rampの入力値に、手続き型の共有構造（Material Field）の厚みまたは亀裂密度を混ぜられます。外部画像や3Dモデルは使いません。設定は二つに分かれます。
 
 - `gradient.fieldInput`: `source`（`none`、`thickness`、`cracks`。既定`none`）と`influence`（0〜1、既定1）。
-- root の `materialField`: Seed（整数0〜65535）、Scale（画面の高さあたりの基本セル数0.5〜32）、Thickness（0〜2）、Thickness Variation（0〜1）、Cracks（0〜1）、Warp（0〜1）、Morph（0〜1）、Loop Cycles（整数0〜8）、Phase（0〜1周）。Frost、Bubbles（各0〜1）はIce（[ICE-001](./effect-stack)）だけが使い、Gradientの構造入力には影響しません。
+- root の `materialField`: Seed（整数0〜65535）、Scale（画面の高さあたりの基本セル数0.5〜32）、Thickness（0〜2）、Thickness Variation（0〜1）、Cracks（0〜1）、Warp（0〜1）、Morph（0〜1）、Loop Cycles（整数0〜8）、Phase（0〜1周）。Ice（[ICE-001](./effect-stack)）は厚みと座標（Seed、Scale、Warp、Morph、Loop Cycles、Phase）だけを使い、亀裂は描きません。
 
 `materialField`は一つだけ保存し、Gradient側に別のSeedやScaleを持ちません。`materialField`自体に有効フラグはなく、描画するかどうかは`fieldInput`の実効状態で決まります。
 

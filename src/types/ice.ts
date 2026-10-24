@@ -2,10 +2,10 @@ import { clampParameter, getParameterDefault, getParameterLimit, type ParameterL
 
 /**
  * Ice: an Effect Stack layer that treats the previous texture as the scene
- * seen through a thin full-screen ice sheet. Its structure (thickness, cracks,
- * frost, bubbles, surface) comes from the shared `materialField`; this config
- * only holds the optical response, so Ice and the Gradient never keep
- * separate copies of the structure.
+ * seen through a thin full-screen ice sheet. Its surface (bump and roughness
+ * maps from a noise texture), optics, and motion live here; the thickness and
+ * the noise domain (Seed, warp, morph) come from the shared `materialField`,
+ * so Ice and the Gradient never keep separate copies of the structure.
  */
 export type IceConfig = {
   enabled: boolean;
@@ -29,7 +29,7 @@ export type IceConfig = {
   microBump: number;
   /** Sharp specular highlight from the front light. */
   highlight: number;
-  /** Light passing through the sheet from behind, glowing at slopes and cracks. */
+  /** Light passing through the sheet from behind, glowing at slopes and bevelled rims. */
   backlight: number;
   /** Strength of the procedural environment reflection. */
   reflection: number;
@@ -37,16 +37,26 @@ export type IceConfig = {
   ior: number;
   /** Absorption coefficient per relative optical distance. */
   absorption: number;
-  /** Scattering coefficient per relative optical distance of the inner structure. */
+  /** How white the frosted (rough) patches turn. */
   scattering: number;
   /** Colour light keeps after one unit of absorption; white absorbs nothing. */
   absorptionColor: string;
-  /** Colour of light scattered by cracks, frost, and bubbles. */
+  /** Colour of the white haze on frosted patches. */
   scatterColor: string;
   /** Whole turns of the procedural light per loop. */
   lightCycles: number;
   /** Light phase offset in turns. */
   lightPhase: number;
+  /** Whole cycles per loop of the surface-noise motion (evolution, flow, growth). */
+  surfaceCycles: number;
+  /** How far the noise texture evolves (changes shape) per cycle. */
+  evolution: number;
+  /** Back-and-forth flow of the noise texture along the flow angle. */
+  flow: number;
+  /** Flow direction in degrees. */
+  flowAngle: number;
+  /** How much the raised areas rise and melt back per cycle. */
+  growth: number;
 };
 
 type IceNumericKey = {
@@ -71,6 +81,11 @@ export const ICE_LIMIT_KEYS = {
   scattering: 'ice.scattering',
   lightCycles: 'ice.lightCycles',
   lightPhase: 'ice.lightPhase',
+  surfaceCycles: 'ice.surfaceCycles',
+  evolution: 'ice.evolution',
+  flow: 'ice.flow',
+  flowAngle: 'ice.flowAngle',
+  growth: 'ice.growth',
 } as const satisfies Record<IceNumericKey, ParameterLimitKey>;
 
 const ICE_NUMERIC_KEYS = Object.keys(ICE_LIMIT_KEYS) as IceNumericKey[];

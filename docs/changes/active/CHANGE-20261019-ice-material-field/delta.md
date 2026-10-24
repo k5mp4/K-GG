@@ -26,7 +26,7 @@ rootの`ice`と`ice`レイヤーを保存。旧Presetは無効の既定値で読
 
 ### UI-033 Effect Stack Ice
 
-Edit LayerにIceを追加。「表面」（バンプマップと粗さマップ）、「光学」、「内部の構造（共有）」（Gradientと同じ編集UI、Frost・Bubblesを含む）、「動き」に分けて表示する。
+Edit LayerにIceを追加。「表面」（バンプマップと粗さマップ）、「光学」、「内部の構造（共有）」（Gradientと同じ編集UI、亀裂は表示しない）、「動き」（表面ノイズの展開・流れ・隆起の成長と光の回転）に分けて表示する。
 
 ## MODIFIED Requirements
 

@@ -51,6 +51,7 @@ export function renderFrame(ctx: WebGLContext, request: RenderFrameRequest): voi
     request.materialPhase ?? 0,
     request.ice,
     request.iceLightPhase ?? 0,
+    request.iceSurfacePhase ?? 0,
   );
   // Shapes consumes the finished frame, so it runs after every other stage.
   if (request.shapes?.enabled) {

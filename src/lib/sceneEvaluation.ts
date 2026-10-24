@@ -44,6 +44,8 @@ export type EvaluatedScene = {
   ice: IceConfig;
   /** Ice light phase in turns, from the same clock as the field. */
   iceLightPhase: number;
+  /** Ice surface-noise motion phase in turns. */
+  iceSurfacePhase: number;
   renderTime: number;
   /** Cloth Gradient 専用の時間。アニメーション有効時のみ進む秒単位の値。 */
   clothTime: number;
@@ -334,7 +336,12 @@ function isMaterialFieldMotionActive(state: LatestState): boolean {
   const imageGradientProtected = state.imageGradient.enabled && Boolean(state.imageGradientSource);
   const iceActive = isIceLayerActive({ ice: state.ice, effectPipeline: state.effectPipeline, imageGradientProtected });
   // Ice moves its light even when the structure is fixed.
-  if (iceActive && normalizeIceConfig(state.ice).lightCycles > 0) return true;
+  if (iceActive) {
+    const ice = normalizeIceConfig(state.ice);
+    // Ice moves its light, or its surface noise, even when the field is fixed.
+    if (ice.lightCycles > 0) return true;
+    if (ice.surfaceCycles > 0 && (ice.evolution > 0 || ice.flow > 0 || ice.growth > 0)) return true;
+  }
   if (!state.materialField) return false;
   const fieldRead = iceActive || isMaterialFieldInputActive(state.gradient, imageGradientProtected);
   return fieldRead && isMaterialFieldAnimated(normalizeMaterialFieldConfig(state.materialField));
@@ -460,6 +467,7 @@ export function evaluateSceneAtTime(state: LatestState, normalizedTime: number):
     ...applyObjectTracks('ice', { ...baseIce }, tracks, time, animation.previewLoop ?? true),
     enabled: baseIce.enabled,
     lightCycles: baseIce.lightCycles,
+    surfaceCycles: baseIce.surfaceCycles,
   });
 
   let gradient = applyGradientTracks(state.gradient, tracks, time, animation.previewLoop ?? true);
@@ -483,6 +491,7 @@ export function evaluateSceneAtTime(state: LatestState, normalizedTime: number):
     materialPhase: resolveMaterialPhase(materialTime, materialField.cycles, materialField.phase),
     ice,
     iceLightPhase: resolveMaterialPhase(materialTime, ice.lightCycles, ice.lightPhase),
+    iceSurfacePhase: resolveMaterialPhase(materialTime, ice.surfaceCycles, 0),
     renderTime,
     clothTime: animation.enabled
       ? autoTime * animation.speed * animation.duration

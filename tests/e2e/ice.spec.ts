@@ -225,6 +225,8 @@ type IceCase = {
   source: 'gray' | 'stripes' | 'transparentHalf';
   field?: Record<string, number>;
   ice?: Record<string, number | string>;
+  /** Surface-noise motion phase in turns. */
+  surfacePhase?: number;
 };
 
 // Renders the Ice program over a synthetic source in a bare WebGL2 context.
@@ -287,13 +289,13 @@ async function renderIceCases(page: import('@playwright/test').Page, cases: IceC
       canvas.width = region.width;
       canvas.height = region.height;
       gl.viewport(0, 0, region.width, region.height);
-      const mf = normalizeMaterialFieldConfig({ seed: 5, scale: 4, cracks: 0.8, frost: 0.2, bubbles: 0.3, ...iceCase.field });
+      const mf = normalizeMaterialFieldConfig({ seed: 5, scale: 4, cracks: 0.8, ...iceCase.field });
       const ice = normalizeIceConfig({ enabled: true, ...iceCase.ice });
       const f = getMaterialFieldUniforms(mf, 0.2);
       gl.uniform2f(u('u_resolution'), region.width, region.height);
       gl.uniform2f(u('u_fullResolution'), iceCase.width, iceCase.height);
       gl.uniform2f(u('u_tileOffset'), region.x, region.y);
-      const values = getIceUniformValues(ice, f, 0.11, iceCase.height);
+      const values = getIceUniformValues(ice, f, 0.11, iceCase.surfacePhase ?? 0, iceCase.height);
       for (const [name, value] of Object.entries(values.floats)) gl.uniform1f(u(name), value);
       for (const [name, value] of Object.entries(values.vec2s)) gl.uniform2f(u(name), value[0], value[1]);
       for (const [name, value] of Object.entries(values.vec3s)) gl.uniform3f(u(name), value[0], value[1], value[2]);
@@ -310,7 +312,6 @@ const luminance = (pixels: number[], index: number) => (pixels[index] + pixels[i
 test('Ice keeps the input alpha and never lets hidden transparent colour bleed in', async ({ page }) => {
   const [result] = await renderIceCases(page, [{
     width: 96, height: 64, source: 'transparentHalf',
-    field: { cracks: 0, frost: 0, bubbles: 0 },
     ice: { refraction: 1, roughness: 1, absorption: 0, scattering: 0, reflection: 0, backlight: 0 },
   }]);
   for (let index = 0; index < result.output.length; index += 4) {
@@ -323,15 +324,15 @@ test('Ice keeps the input alpha and never lets hidden transparent colour bleed i
   }
 });
 
-test('scattering stays white without absorption and vanishes with the inner structure', async ({ page }) => {
+test('frosted haze stays white without absorption and the old crack pattern is gone', async ({ page }) => {
   const size = { width: 128, height: 80, source: 'gray' as const };
-  // Isolate the inner structure: a flat, glossy surface without lights.
+  // A flat surface without lights isolates the haze and the absorption.
   const flat = { bump: 0, microBump: 0, roughness: 0, roughnessVariation: 0, highlight: 0, backlight: 0, reflection: 0, refraction: 0 };
-  const [cracked, empty, identity, zeroMix] = await renderIceCases(page, [
-    { ...size, field: { cracks: 0.9, frost: 0, bubbles: 0 }, ice: { ...flat, absorption: 0, scattering: 4 } },
-    { ...size, field: { cracks: 0, frost: 0, bubbles: 0 }, ice: { ...flat, absorption: 0, scattering: 3 } },
-    // Frost roughens the surface itself, so it is held at zero here.
-    { ...size, field: { thickness: 0, frost: 0 }, ice: { ...flat, absorption: 4, scattering: 4 } },
+  const [cracked, uncracked, frosted, identity, zeroMix] = await renderIceCases(page, [
+    { ...size, field: { cracks: 1 }, ice: { ...flat, absorption: 0, scattering: 4 } },
+    { ...size, field: { cracks: 0 }, ice: { ...flat, absorption: 0, scattering: 4 } },
+    { ...size, ice: { ...flat, roughness: 0.8, absorption: 0, scattering: 4 } },
+    { ...size, field: { thickness: 0 }, ice: { ...flat, absorption: 4, scattering: 4 } },
     { ...size, ice: { mix: 0 } },
   ]);
   const maxLuminance = (pixels: number[]) => {
@@ -339,16 +340,45 @@ test('scattering stays white without absorption and vanishes with the inner stru
     for (let index = 0; index < pixels.length; index += 4) max = Math.max(max, luminance(pixels, index));
     return max;
   };
-  // Cracks scatter white light over a neutral input even with zero absorption.
-  expect(maxLuminance(cracked.output)).toBeGreaterThan(128 + 30);
-  // Without cracks, frost, or bubbles there is nothing to scatter.
-  expect(maxLuminance(empty.output)).toBeLessThanOrEqual(130);
-  // Zero thickness removes absorption and inner scattering; Mix 0 is the input.
+  const maxDifference = (a: number[], b: number[]) => {
+    let max = 0;
+    for (let index = 0; index < a.length; index += 1) max = Math.max(max, Math.abs(a[index] - b[index]));
+    return max;
+  };
+  // Cracks belong to the Gradient input only; they leave no pattern in Ice.
+  expect(maxDifference(cracked.output, uncracked.output)).toBe(0);
+  expect(maxLuminance(uncracked.output)).toBeLessThanOrEqual(130);
+  // Rough patches turn white with zero absorption.
+  expect(maxLuminance(frosted.output)).toBeGreaterThan(128 + 20);
+  // Zero thickness removes absorption; Mix 0 is the input.
   for (const result of [identity, zeroMix]) {
-    let maxDifference = 0;
-    for (let index = 0; index < result.output.length; index += 1) maxDifference = Math.max(maxDifference, Math.abs(result.output[index] - result.input[index]));
-    expect(maxDifference).toBeLessThanOrEqual(1);
+    expect(maxDifference(result.output, result.input)).toBeLessThanOrEqual(1);
   }
+});
+
+test('the surface noise evolves, flows, and grows in closed loops', async ({ page }) => {
+  const size = { width: 160, height: 90, source: 'stripes' as const };
+  const motion = { surfaceCycles: 1, evolution: 1, flow: 0.6, flowAngle: 30, growth: 0.6, lightCycles: 0 };
+  const [start, end, quarter, still] = await renderIceCases(page, [
+    { ...size, ice: motion, surfacePhase: 0 },
+    // resolveMaterialPhase maps time 1 back to phase 0 for whole cycles.
+    { ...size, ice: motion, surfacePhase: 1 },
+    { ...size, ice: motion, surfacePhase: 0.25 },
+    { ...size, ice: { ...motion, evolution: 0, flow: 0, growth: 0 }, surfacePhase: 0.25 },
+  ]);
+  const [stillStart] = await renderIceCases(page, [{ ...size, ice: { ...motion, evolution: 0, flow: 0, growth: 0 }, surfacePhase: 0 }]);
+  let loopDifference = 0;
+  let motionDifference = 0;
+  let stillDifference = 0;
+  for (let index = 0; index < start.output.length; index += 1) {
+    loopDifference = Math.max(loopDifference, Math.abs(start.output[index] - end.output[index]));
+    motionDifference = Math.max(motionDifference, Math.abs(start.output[index] - quarter.output[index]));
+    stillDifference = Math.max(stillDifference, Math.abs(still.output[index] - stillStart.output[index]));
+  }
+  expect(loopDifference).toBeLessThanOrEqual(1);
+  expect(motionDifference).toBeGreaterThan(20);
+  // Without evolution, flow, or growth the surface holds still.
+  expect(stillDifference).toBe(0);
 });
 
 test('padded tiles reproduce the full Ice frame at the screen edges and seams', async ({ page }) => {
@@ -393,7 +423,7 @@ test('padded tiles reproduce the full Ice frame at the screen edges and seams', 
 
 test('the surface noise drives refraction, glossy and frosted patches, and highlights', async ({ page }) => {
   const flat = { bump: 0, microBump: 0, roughness: 0, roughnessVariation: 0, highlight: 0, backlight: 0, reflection: 0, absorption: 0, scattering: 0 };
-  const structure = { cracks: 0, frost: 0, bubbles: 0 };
+  const structure = { cracks: 0 };
   const stripes = { width: 192, height: 108, source: 'stripes' as const, field: structure };
   const gray = { width: 192, height: 108, source: 'gray' as const, field: structure };
   const [flatStripes, bumpedStripes, uniformHaze, patchyHaze, noHighlight, highlight] = await renderIceCases(page, [

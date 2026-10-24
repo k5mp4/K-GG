@@ -60,6 +60,7 @@ export type RenderFrameRequest = {
   /** Ice optics after keyframes, and its light phase in turns. */
   ice?: LatestState['ice'];
   iceLightPhase?: number;
+  iceSurfacePhase?: number;
   /** SANDBOX Shapes, applied after the whole frame by renderShapesPass. */
   shapes?: LatestState['shapes'];
   shapesMask?: ShapesMask | null;

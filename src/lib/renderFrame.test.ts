@@ -50,6 +50,7 @@ describe('renderFrame compatibility adapter', () => {
       materialPhase: 0.4,
       ice: { enabled: true, mix: 0.5 },
       iceLightPhase: 0.6,
+      iceSurfacePhase: 0.3,
     } as unknown as RenderFrameRequest;
 
     renderFrame({} as WebGLContext, request);
@@ -98,6 +99,7 @@ describe('renderFrame compatibility adapter', () => {
       request.materialPhase,
       request.ice,
       request.iceLightPhase,
+      request.iceSurfacePhase,
     );
     expect(vi.mocked(renderShapesPass)).not.toHaveBeenCalled();
   });

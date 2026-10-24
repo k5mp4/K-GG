@@ -41,17 +41,11 @@ const STRUCTURE_ROWS: StructureRow[] = [
   { key: 'phase', labelKey: 'materialField.phase', format: fixed2, keyframed: true },
 ];
 
-/** Structure that only Ice reads; the Gradient input uses thickness and cracks. */
-const ICE_STRUCTURE_ROWS: StructureRow[] = [
-  { key: 'frost', labelKey: 'materialField.frost', format: percent, keyframed: true },
-  { key: 'bubbles', labelKey: 'materialField.bubbles', format: percent, keyframed: true },
-];
-
 /**
  * Editor of the single saved `materialField`. Gradient and Ice both mount it,
  * so the same Seed and Scale are never shown as separate values.
  */
-export function MaterialFieldStructureEditor() {
+export function MaterialFieldStructureEditor({ showCracks = true }: { showCracks?: boolean } = {}) {
   const { t } = useLanguage();
   const materialField = normalizeMaterialFieldConfig(useGradientStore(state => state.materialField));
   const { setMaterialField } = applicationCommands;
@@ -69,9 +63,7 @@ export function MaterialFieldStructureEditor() {
   return (
     <div className="space-y-2" data-material-field-structure>
       <p className="text-[10px] uppercase tracking-widest text-tab-inactive">{t('materialField.sharedBadge')}</p>
-      {STRUCTURE_ROWS.map(renderRow)}
-      <p className="text-[10px] text-tab-inactive">{t('materialField.iceOnly')}</p>
-      {ICE_STRUCTURE_ROWS.map(renderRow)}
+      {STRUCTURE_ROWS.filter(row => showCracks || row.key !== 'cracks').map(renderRow)}
       <p className="text-[10px] text-tab-inactive">{t('materialField.loopHint')}</p>
     </div>
   );

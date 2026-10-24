@@ -68,6 +68,7 @@ function renderSceneFrame(
     materialPhase: scene.materialPhase,
     ice: scene.ice,
     iceLightPhase: scene.iceLightPhase,
+    iceSurfacePhase: scene.iceSurfacePhase,
     texture: state.texture,
     textureImageSource: state.textureImageSource ?? null,
     textureNormalizedTime: scene.autoTime,

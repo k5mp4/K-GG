@@ -173,7 +173,7 @@ Gradient Rampの繰り返し・ミラーの後に「構造入力」（なし／�
 
 ### UI-033 Effect Stack Ice
 
-Effect Stackの`Ice`レイヤーを選択すると、Postprocessのプロパティモジュールに設定を表示し、`Edit Layer`にも`Ice`を表示します。ON／OFFはEffect Stackで操作します。設定は「表面」「光学」「内部の構造（共有）」「動き」に分けます。表面はノイズテクスチャーから作るバンプマップと粗さマップの設定で、Noise Scale、Bump、Raised Area、Bevel、Micro Grain、Roughness、Roughness Variationです。光学はMix、Refraction、IOR、Highlight、Backlight、Reflection、Absorption、Scattering、母材の色、散乱の色です。内部の構造はGradient Rampの「共通の構造」と同じ編集UIを共用し、同じ値を編集することを明示します。内部の構造にはIceだけが使うFrost、Bubblesを含みます。動きはLight CyclesとLight Phaseです。レイヤーがOFFのときは表面・光学・動きのスライダーを無効にし、OFFである旨を表示します。Image Gradient Sourceが有効なときは適用されない理由を表示します。連続値は既存のキーフレーム操作（`materialField.*`、`ice.*`）を持ち、SeedとLoop Cycles、Light Cyclesは持ちません。
+Effect Stackの`Ice`レイヤーを選択すると、Postprocessのプロパティモジュールに設定を表示し、`Edit Layer`にも`Ice`を表示します。ON／OFFはEffect Stackで操作します。設定は「表面」「光学」「内部の構造（共有）」「動き」に分けます。表面はノイズテクスチャーから作るバンプマップと粗さマップの設定で、Noise Scale、Bump、Raised Area、Bevel、Micro Grain、Roughness、Roughness Variationです。光学はMix、Refraction、IOR、Highlight、Backlight、Reflection、Absorption、Scattering、母材の色、散乱の色です。内部の構造はGradient Rampの「共通の構造」と同じ編集UIを共用し、同じ値を編集することを明示します。Iceが使わない亀裂はIce側には表示しません。動きはSurface Cycles、Evolution、Flow、Flow Angle、Growth、Light Cycles、Light Phaseで、表面ノイズの動きと光の回転を分けて説明します。レイヤーがOFFのときは表面・光学・動きのスライダーを無効にし、OFFである旨を表示します。Image Gradient Sourceが有効なときは適用されない理由を表示します。連続値は既存のキーフレーム操作（`materialField.*`、`ice.*`）を持ち、SeedとLoop Cycles、Surface Cycles、Light Cyclesは持ちません。
 
 ### UI-030 Effect Stack Texture
 

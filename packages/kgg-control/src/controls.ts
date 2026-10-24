@@ -75,7 +75,7 @@ const vectorSchema: ControlSchema = { type: 'array', items: numberSchema(), minI
 
 export const CONTROL_GROUP_DEFINITIONS: readonly ControlGroupDefinition[] = [
   ['gradient', 'Gradient', 'Gradient type, ramp, stops, anchors, Bezier controls, and mesh data.'],
-  ['materialField', 'Shared Material Field', 'Shared thickness, cracks, frost, and loop structure for Gradient and Ice.'],
+  ['materialField', 'Shared Material Field', 'Shared thickness, cracks, and loop structure for Gradient and Ice.'],
   ['ice', 'Ice', 'Ice layer optics: refraction, absorption, scattering, reflection, and light motion.'],
   ['noiseDistortion', 'Noise', 'Noise algorithm, distortion, evolution, and noise-specific controls.'],
   ['diffuse', 'Diffuse', 'Diffuse, dither, halftone, ASCII, and adaptive grain controls.'],

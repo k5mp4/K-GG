@@ -1285,14 +1285,15 @@ const TEXTURE_UNIFORM_NAMES = [
 
 const MATERIAL_FIELD_STRUCTURE_UNIFORM_NAMES = [
   'u_mfSeedZ', 'u_mfSeedOffset', 'u_mfScale', 'u_mfThickness', 'u_mfThicknessVariation', 'u_mfCracks',
-  'u_mfFrost', 'u_mfBubbles', 'u_mfWarp', 'u_mfMorph', 'u_mfAngle',
+  'u_mfWarp', 'u_mfMorph', 'u_mfAngle',
 ] as const;
 
 const ICE_UNIFORM_NAMES = [
   'u_sourceTex', 'u_resolution', 'u_fullResolution', 'u_tileOffset', 'u_mix', 'u_refractionPx',
   'u_dispersionPx', 'u_roughnessPx', 'u_roughness', 'u_roughnessVariation', 'u_noiseScale', 'u_bump',
   'u_bumpCoverage', 'u_bevel', 'u_microBump', 'u_highlight', 'u_backlight', 'u_reflection', 'u_ior', 'u_absorption',
-  'u_scattering', 'u_absorptionColor', 'u_scatterColor', 'u_lightAngle',
+  'u_scattering', 'u_absorptionColor', 'u_scatterColor', 'u_lightAngle', 'u_surfaceAngle',
+  'u_evolution', 'u_flow', 'u_flowDirection', 'u_growth',
   ...MATERIAL_FIELD_STRUCTURE_UNIFORM_NAMES,
 ] as const;
 
@@ -1312,8 +1313,6 @@ function setMaterialFieldStructureUniforms(
   gl.uniform1f(uniforms.u_mfThickness, field.thickness);
   gl.uniform1f(uniforms.u_mfThicknessVariation, field.thicknessVariation);
   gl.uniform1f(uniforms.u_mfCracks, field.cracks);
-  gl.uniform1f(uniforms.u_mfFrost, field.frost);
-  gl.uniform1f(uniforms.u_mfBubbles, field.bubbles);
   gl.uniform1f(uniforms.u_mfWarp, field.warp);
   gl.uniform1f(uniforms.u_mfMorph, field.morph);
   gl.uniform1f(uniforms.u_mfAngle, field.angle);
@@ -3458,6 +3457,7 @@ function drawIcePass(
   materialField: MaterialFieldConfig,
   materialPhase: number,
   iceLightPhase: number,
+  iceSurfacePhase: number,
   width: number,
   height: number,
   fullWidth: number,
@@ -3481,7 +3481,7 @@ function drawIcePass(
   gl.uniform2f(uniforms.u_resolution, width, height);
   gl.uniform2f(uniforms.u_fullResolution, fullWidth, fullHeight);
   gl.uniform2f(uniforms.u_tileOffset, offsetX, offsetY);
-  const values = getIceUniformValues(ice, getMaterialFieldUniforms(materialField, materialPhase), iceLightPhase, fullHeight);
+  const values = getIceUniformValues(ice, getMaterialFieldUniforms(materialField, materialPhase), iceLightPhase, iceSurfacePhase, fullHeight);
   for (const [name, value] of Object.entries(values.floats)) gl.uniform1f(uniforms[name], value);
   for (const [name, value] of Object.entries(values.vec2s)) gl.uniform2f(uniforms[name], value[0], value[1]);
   for (const [name, value] of Object.entries(values.vec3s)) gl.uniform3f(uniforms[name], value[0], value[1], value[2]);
@@ -4164,6 +4164,7 @@ export function render(
   materialPhase = 0,
   ice: IceConfig = DEFAULT_ICE,
   iceLightPhase = 0,
+  iceSurfacePhase = 0,
 ): void {
   seamless = normalizeSeamlessConfig(seamless);
   materialField = normalizeMaterialFieldConfig(materialField);
@@ -4938,7 +4939,7 @@ export function render(
         if (!iceRequested) continue;
         const target = choosePostprocessTarget(ctx, currentTexture);
         if (drawIcePass(
-          ctx, currentTexture, ice, materialField, materialPhase, iceLightPhase,
+          ctx, currentTexture, ice, materialField, materialPhase, iceLightPhase, iceSurfacePhase,
           vpW, vpH, width, height, tileOx, tileOy, target.fbo,
         )) {
           currentTexture = target.texture;

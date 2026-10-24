@@ -97,8 +97,10 @@ export function getIceUniformValues(
   ice: IceConfig,
   field: MaterialFieldUniforms,
   iceLightPhase: number,
+  iceSurfacePhase: number,
   outputHeight: number,
 ): IceUniformValues {
+  const flowAngle = ice.flowAngle * Math.PI / 180;
   const radii = getIceSampleRadii(outputHeight);
   return {
     floats: {
@@ -120,18 +122,20 @@ export function getIceUniformValues(
       u_absorption: ice.absorption,
       u_scattering: ice.scattering,
       u_lightAngle: iceLightPhase * Math.PI * 2,
+      u_surfaceAngle: iceSurfacePhase * Math.PI * 2,
+      u_evolution: ice.evolution,
+      u_flow: ice.flow,
+      u_growth: ice.growth,
       u_mfSeedZ: field.seedZ,
       u_mfScale: field.scale,
       u_mfThickness: field.thickness,
       u_mfThicknessVariation: field.thicknessVariation,
       u_mfCracks: field.cracks,
-      u_mfFrost: field.frost,
-      u_mfBubbles: field.bubbles,
       u_mfWarp: field.warp,
       u_mfMorph: field.morph,
       u_mfAngle: field.angle,
     },
-    vec2s: { u_mfSeedOffset: field.seedOffset },
+    vec2s: { u_mfSeedOffset: field.seedOffset, u_flowDirection: [Math.cos(flowAngle), Math.sin(flowAngle)] },
     vec3s: {
       u_absorptionColor: hexToLinearRgb(ice.absorptionColor),
       u_scatterColor: hexToLinearRgb(ice.scatterColor),

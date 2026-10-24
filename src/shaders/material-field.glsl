@@ -12,8 +12,6 @@ uniform float u_mfScale;        // Base cells per screen height.
 uniform float u_mfThickness;
 uniform float u_mfThicknessVariation;
 uniform float u_mfCracks;
-uniform float u_mfFrost;
-uniform float u_mfBubbles;
 uniform float u_mfWarp;
 uniform float u_mfMorph;
 uniform float u_mfAngle;        // 2*pi*(cycles*time + phase), evaluated once on the CPU.
@@ -143,40 +141,6 @@ float mfCrackDensity(vec2 q, float pixelCells) {
 
   float density = (trunk + halo) * mix(0.35, 1.0, trunkMask) + 0.6 * branch * branchMask;
   return clamp(u_mfCracks * density, 0.0, 1.0);
-}
-
-// Low-frequency frost density in [0, 1].
-float mfFrostDensity(vec2 q) {
-  if (u_mfFrost <= 0.0) return 0.0;
-  float body = mfFbm(q * 0.7 + vec2(13.0, 57.0), 113.0);
-  float grain = 0.5 + 0.5 * mfGradientNoise(q * 6.0, 127.0);
-  return clamp(u_mfFrost * smoothstep(-0.25, 0.55, body) * mix(0.7, 1.0, grain), 0.0, 1.0);
-}
-
-// One layer of hashed small bubbles: a faint disk with a brighter rim,
-// band-limited by the full-output pixel footprint. Density in [0, 1].
-float mfBubbleDensity(vec2 q, float pixelCells) {
-  if (u_mfBubbles <= 0.0) return 0.0;
-  const float bubbleScale = 3.5;
-  vec2 x = q * bubbleScale + vec2(7.7, 1.9);
-  vec2 cell = floor(x);
-  vec2 f = x - cell;
-  float footprint = max(pixelCells * bubbleScale * 1.5, 1.0e-4);
-  float density = 0.0;
-  for (int j = -1; j <= 1; j++) {
-    for (int i = -1; i <= 1; i++) {
-      vec2 g = vec2(float(i), float(j));
-      vec2 presence = mfHash23(vec3(cell + g, u_mfSeedZ + 137.0));
-      if (presence.x > u_mfBubbles * 0.7) continue;
-      vec2 center = mfHash23(vec3(cell + g, u_mfSeedZ + 131.0));
-      float radius = mix(0.06, 0.22, presence.y);
-      float dist = length(g + center - f);
-      float disk = 1.0 - smoothstep(radius - 0.5 * footprint, radius + 0.5 * footprint, dist);
-      float rim = disk * smoothstep(0.4 * radius, radius, dist);
-      density = max(density, 0.35 * disk + 0.65 * rim);
-    }
-  }
-  return clamp(density, 0.0, 1.0);
 }
 
 precision mediump float;

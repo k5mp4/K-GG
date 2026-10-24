@@ -38,6 +38,20 @@ describe('Ice time evaluation and program demand', () => {
     expect(scene.ice.refraction).toBeCloseTo(0.5);
   });
 
+  it('closes the surface-noise loop and keeps its cycles discrete', () => {
+    const state = iceState({ ice: { ...DEFAULT_ICE, enabled: true, surfaceCycles: 3 } });
+    expect(evaluateSceneAtTime(state, 0).iceSurfacePhase).toBe(evaluateSceneAtTime(state, 1).iceSurfacePhase);
+    expect(evaluateSceneAtTime(state, 0.25).iceSurfacePhase).toBeCloseTo(0.75);
+    const key = (id: string, time: number, value: number) => ({ id, time, value, interpolation: 'linear' as const });
+    state.keyframeTracks = {
+      'ice.surfaceCycles': { propertyId: 'ice.surfaceCycles', label: 'Surface Cycles', mode: 'keys', enabled: true, keyframes: [key('a', 0, 0), key('b', 1, 8)] },
+      'ice.evolution': { propertyId: 'ice.evolution', label: 'Evolution', mode: 'keys', enabled: true, keyframes: [key('c', 0, 0), key('d', 1, 1)] },
+    };
+    const scene = evaluateSceneAtTime(state, 0.5);
+    expect(scene.ice.surfaceCycles).toBe(3);
+    expect(scene.ice.evolution).toBeCloseTo(0.5);
+  });
+
   it('holds the light still while animation is off', () => {
     const state = iceState({ animation: { ...STORE_DEFAULTS.animation, enabled: false } });
     expect(evaluateSceneAtTime(state, 0.6).iceLightPhase).toBeCloseTo(0.25);
@@ -45,9 +59,14 @@ describe('Ice time evaluation and program demand', () => {
 
   it('animates only while the Ice layer actually draws', () => {
     expect(hasActiveAnimation(iceState())).toBe(true);
-    expect(hasActiveAnimation(iceState({ ice: { ...DEFAULT_ICE, enabled: true, lightCycles: 0 } }))).toBe(false);
+    const still = { ...DEFAULT_ICE, enabled: true, lightCycles: 0, evolution: 0, flow: 0, growth: 0 };
+    expect(hasActiveAnimation(iceState({ ice: still }))).toBe(false);
+    // The default surface noise evolves even with the light held still.
+    expect(hasActiveAnimation(iceState({ ice: { ...DEFAULT_ICE, enabled: true } }))).toBe(true);
+    expect(hasActiveAnimation(iceState({ ice: { ...still, growth: 0.5, surfaceCycles: 0 } }))).toBe(false);
+    expect(hasActiveAnimation(iceState({ ice: { ...still, flow: 0.5 } }))).toBe(true);
     expect(hasActiveAnimation(iceState({ ice: { ...DEFAULT_ICE, enabled: true, mix: 0 } }))).toBe(false);
-    const morphing = iceState({ ice: { ...DEFAULT_ICE, enabled: true, lightCycles: 0 } });
+    const morphing = iceState({ ice: still });
     morphing.materialField = { ...STORE_DEFAULTS.materialField, morph: 0.5, cycles: 1 };
     expect(hasActiveAnimation(morphing)).toBe(true);
   });

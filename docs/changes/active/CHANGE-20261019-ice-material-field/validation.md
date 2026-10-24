@@ -4,8 +4,9 @@
 
 | AC | 検証方法 | テスト・確認場所 | 結果 |
 | --- | --- | --- | --- |
-| AE1 吸収0でも亀裂の白さが残り、内部構造がなければ白濁しない | e2e (WebGL2) | `tests/e2e/ice.spec.ts`「scattering stays white…」 | pass |
-| AE1 厚み0で吸収と内部散乱が消える／Mix 0は入力のまま | e2e (WebGL2) | 同上 | pass |
+| AE1 吸収0でも粗い部分の白い曇りが残り、亀裂の模様はIceに出ない | e2e (WebGL2) | `tests/e2e/ice.spec.ts`「frosted haze stays white…」 | pass |
+| AE1 厚み0で吸収が消える／Mix 0は入力のまま | e2e (WebGL2) | 同上 | pass |
+| 表面ノイズの展開・流れ・成長が整数周期で閉じ、3つとも0なら止まる | e2e (WebGL2) / unit | `tests/e2e/ice.spec.ts`「the surface noise evolves…」、`src/lib/sceneEvaluation.ice.test.ts` | pass |
 | AE2 厚み・亀裂をRamp入力に選び、色を変えても構造が変わらない | e2e (WebGL2) | `tests/e2e/ice.spec.ts` ramp invariance | pass |
 | AE2 Iceの有無に依存せず配色が保持される | unit | `src/lib/sceneRenderPlan.materialField.test.ts`、`src/lib/sceneEvaluation.ice.test.ts` | pass |
 | AE3 固定入力・線形時間で順序を変えても同じ。整数周期で時刻0と1が一致 | e2e (WebGL2) / unit | `tests/e2e/ice.spec.ts`、`src/lib/materialField.test.ts`、`src/lib/sceneEvaluation.ice.test.ts` | pass |
@@ -29,7 +30,7 @@
 | Change structure | `npm run change:check` | pass |
 | Fast validation | `npm run check:merge` | pass（unit 1171 pass / 1 skip、lint、build、docs） |
 | Shader compile (WebGL2) | `npm run check:render` | pass（場付きGenerator variantとIceを含む全74 program） |
-| Field / Ice fixture (WebGL2) | `npx playwright test --project=ice` | pass（8 tests、ノイズ表面への変更後） |
+| Field / Ice fixture (WebGL2) | `npx playwright test --project=ice` | pass（10 tests、模様の削除と表面ノイズの動きの追加後） |
 | Render / export e2e | `npm run check:e2e` | ノイズ表面への変更前の結果。11 pass / 4 fail。失敗はworkspace-layout 1件とvj-performance 3件。うち3件はmain（734c63d）でも同じく失敗。残る`vj-performance.spec.ts:28`は単独再実行でpass（全体実行時の負荷によるtimeoutと判断）。Ice・Material Field関連のe2eはすべてpass |
 
 ## Release Gate
@@ -45,6 +46,7 @@
 - 2026-10-20、同じ環境で960×540の合成入力に対しClear／Cracked／Frostedの3設定を描画して目視。初版は環境光の帯が凹凸の等高線として見えたため、帯を位置主体の広い明暗へ変え、表面の凹凸を低周波にした。調整後は亀裂の網目・気泡・ゆるい屈折・青みのある母材を確認。
 - Previewで亀裂入力のRamp配色とMeshの影響量50%、Effect StackからのIceのON／Edit Layer表示を目視で確認。
 - 2026-10-24、利用者の依頼でIceの表面を「模様の重ね合わせ」からノイズテクスチャー駆動へ変更（ADRの決定9）。1280×720のK-GG風グラデーションと縦線・文字の入力で、既定・ツヤ多め・曇り混在の3設定を描画して目視。調整の経緯：隆起の傾きが小さすぎて見えなかったため高さと屈折の利得を上げ、縁の逆光が太い白帯になったため細く弱くし、迷路状の隆起を丸い斑へ変え、亀裂と気泡の散乱の比重を下げた。調整後は角の丸い部分的な隆起、縁に乗る鋭いハイライト、ツヤと曇りの混在、隆起で曲がる背景を確認。Ice programのコンパイルはANGLEで約9秒（以前は約3秒）。
+- 2026-10-24、Iceから亀裂・霜・気泡の模様を外し（霜・気泡の設定は削除、亀裂はGradientの構造入力用に残す）、表面ノイズの動き（展開・流れ・隆起の成長）を追加。光の回転は既定0。1280×720で表面位相0／0.25／0.5を描画し、光を止めたまま隆起と粗さの斑が別の形へ移り変わることを目視で確認。
 
 ## Commands
 

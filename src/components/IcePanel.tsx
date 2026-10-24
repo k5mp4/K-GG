@@ -40,6 +40,11 @@ const OPTIC_ROWS: OpticRow[] = [
 ];
 
 const MOTION_ROWS: OpticRow[] = [
+  { key: 'surfaceCycles', labelKey: 'ice.surfaceCycles', format: value => String(Math.round(value)) + 'x', keyframed: false },
+  { key: 'evolution', labelKey: 'ice.evolution', format: percent, keyframed: true },
+  { key: 'flow', labelKey: 'ice.flow', format: percent, keyframed: true },
+  { key: 'flowAngle', labelKey: 'ice.flowAngle', format: value => Math.round(value) + '°', keyframed: true },
+  { key: 'growth', labelKey: 'ice.growth', format: percent, keyframed: true },
   { key: 'lightCycles', labelKey: 'ice.lightCycles', format: value => `${Math.round(value)}x`, keyframed: false },
   { key: 'lightPhase', labelKey: 'ice.lightPhase', format: twoDecimals, keyframed: true },
 ];
@@ -117,9 +122,10 @@ export function IcePanel() {
         ))}
       </Section>
       <Section title={t('ice.structure')}>
-        <MaterialFieldStructureEditor />
+        <MaterialFieldStructureEditor showCracks={false} />
       </Section>
       <Section title={t('ice.motion')}>
+        <p className="text-[10px] text-tab-inactive">{t('ice.motionHint')}</p>
         {MOTION_ROWS.map(renderRow)}
         <p className="text-[10px] text-tab-inactive">{t('ice.loopHint')}</p>
       </Section>

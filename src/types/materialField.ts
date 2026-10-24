@@ -7,8 +7,6 @@ export type MaterialFieldConfig = {
   thickness: number;
   thicknessVariation: number;
   cracks: number;
-  frost: number;
-  bubbles: number;
   warp: number;
   morph: number;
   cycles: number;
@@ -21,8 +19,6 @@ export const MATERIAL_FIELD_LIMIT_KEYS = {
   thickness: 'materialField.thickness',
   thicknessVariation: 'materialField.thicknessVariation',
   cracks: 'materialField.cracks',
-  frost: 'materialField.frost',
-  bubbles: 'materialField.bubbles',
   warp: 'materialField.warp',
   morph: 'materialField.morph',
   cycles: 'materialField.cycles',
