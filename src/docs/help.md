@@ -62,6 +62,7 @@ Web 版は `index.html` で Google Fonts から Noto Sans JP、Open Sans を読�
 
 ### Postprocess Effect Stack
 - キャンバス左上の `Effect Stack` パネルで、Noise / Slit / Stretch / Distort / Mirror / Kaleidoscope / Voronoi / Glass / GlassTile / Diffuse の順序を変更できます。Diffuseは初期状態では最後尾です。
+- Kaleidoscopeの`Mirroring Type`は、中心から扇形に分ける Unfold / Fold / Wheel / Flower / Starlish / Flipper / Tunnel と、画面全体を鏡のセルで敷き詰める Flip / Flip Flop / Dia Cross / Triangle から選べます。格子の形式では`Slices`がセルの細かさ、`Zoom`が元画像の拡大率になります。Tunnelは`Zoom`を動かすとトンネルを進むように見えます。
 - GlassはGLASS V2による滑らかな勾配ノイズとRGB別屈折率を使う画面空間の光学近似です。PostprocessのプロパティにはGlassを一つだけ表示し、色収差は最大80px、Transmission TintとHighlight Tintはカラー入力から調整できます。
 - GlassTileはGlassとは別のエフェクトで、KG_Glassのタイル表面モデルを使います。Pattern、タイルサイズ、表面形状、屈折・分散、粗さ、Mix、Edge Mode、Seedを調整できます。
 - 行のグリップをドラッグすると、行が目的位置へ収束してから描画順序が確定します。各行のスイッチでレイヤーをON/OFFできます。

@@ -11,27 +11,101 @@ vec2 mirroredUv(vec2 uv) {
   return uv;
 }
 
+// Triangle wave with period 2: mirrors x back and forth inside [0, 1].
+float kaleidoscopeFold(float x) {
+  return abs(mod(x + 1.0, 2.0) - 1.0);
+}
+
+// Lattice types (Flip, Flip Flop, Dia Cross, Triangle) tile the frame with
+// mirrored cells. Slices sets the cell density (Slices / 2 cells per frame
+// height) and Zoom scales the sampled source cell like the polar types.
+vec2 kaleidoscopeLatticeOffset(vec2 centered, float slices) {
+  float c = cos(u_kaleidoscopeRotation);
+  float s = sin(u_kaleidoscopeRotation);
+  vec2 rotated = vec2(c * centered.x - s * centered.y, s * centered.x + c * centered.y);
+  float cell = 2.0 / slices;
+  vec2 q = rotated / cell;
+  vec2 local;
+
+  if (u_kaleidoscopeType == 5) {
+    // Flip: rectangular mirror cells (p2mm).
+    local = vec2(kaleidoscopeFold(q.x), kaleidoscopeFold(q.y));
+  } else if (u_kaleidoscopeType == 6) {
+    // Flip Flop: the four cells of each 2x2 block are quarter turns of one
+    // another, so the source tumbles around the block center (p4).
+    vec2 b = mod(q + 1.0, 2.0) - 1.0;
+    if (b.x < 0.0 && b.y >= 0.0) {
+      b = vec2(b.y, -b.x);
+    } else if (b.x < 0.0) {
+      b = -b;
+    } else if (b.y < 0.0) {
+      b = vec2(-b.y, b.x);
+    }
+    local = b;
+  } else if (u_kaleidoscopeType == 7) {
+    // Dia Cross: square mirrors crossed by both diagonals (p4m).
+    local = vec2(kaleidoscopeFold(q.x), kaleidoscopeFold(q.y));
+    if (local.y > local.x) local = local.yx;
+  } else {
+    // Triangle: hexagonal cells folded into twelve mirrored 30-60-90
+    // triangles, the classic three-mirror kaleidoscope (p6m). Hex edges are
+    // mirror lines, so neighbouring cells meet without seams.
+    vec2 h = q + vec2(0.5, 0.8660254);
+    vec2 stride = vec2(1.0, 1.7320508);
+    vec4 hexCell = floor(vec4(h, h - vec2(0.5, 0.8660254)) / stride.xyxy) + 0.5;
+    vec4 hexDelta = vec4(h - hexCell.xy * stride, h - (hexCell.zw + 0.5) * stride);
+    vec2 hex = dot(hexDelta.xy, hexDelta.xy) < dot(hexDelta.zw, hexDelta.zw) ? hexDelta.xy : hexDelta.zw;
+    float wedge = PI / 3.0;
+    float hexAngle = abs(mod(atan(hex.y, hex.x), wedge) - wedge * 0.5);
+    local = vec2(cos(hexAngle), sin(hexAngle)) * length(hex) * 2.0;
+  }
+
+  return local * cell / max(u_kaleidoscopeZoom, 0.001);
+}
+
 vec2 kaleidoscopeUv(vec2 uv) {
   float aspect = u_fullResolution.x / max(u_fullResolution.y, 1.0);
   vec2 centered = uv - vec2(0.5);
   centered.x *= aspect;
 
   float slices = clamp(floor(u_kaleidoscopeSlices + 0.5), 2.0, 64.0);
+  if (u_kaleidoscopeType == 5 || u_kaleidoscopeType == 6 || u_kaleidoscopeType == 7 || u_kaleidoscopeType == 9) {
+    vec2 latticeSampled = kaleidoscopeLatticeOffset(centered, slices);
+    latticeSampled.x /= aspect;
+    return latticeSampled + vec2(0.5);
+  }
+
   float sector = (2.0 * PI) / slices;
   float angle = atan(centered.y, centered.x) + u_kaleidoscopeRotation;
   float radius = length(centered) / max(u_kaleidoscopeZoom, 0.001);
 
-  if (u_kaleidoscopeType == 0) {
-    angle = mod(angle, sector);
-    angle = abs(angle - sector * 0.5);
-  } else if (u_kaleidoscopeType == 1) {
+  if (u_kaleidoscopeType == 1) {
     float petal = sin(angle * slices);
     radius *= 0.72 + 0.28 * abs(petal);
     angle = abs(mod(angle, sector) - sector * 0.5);
-  } else {
+  } else if (u_kaleidoscopeType == 2) {
     float spoke = pow(abs(cos(angle * slices * 0.5)), 2.5);
     radius *= 0.62 + 0.38 * spoke;
     angle = abs(mod(angle + sector * 0.25, sector) - sector * 0.5);
+  } else if (u_kaleidoscopeType == 3) {
+    // Fold: Unfold's mirrored wedges, also folded back toward the center at
+    // every half frame height so the source repeats as concentric bands.
+    angle = abs(mod(angle, sector) - sector * 0.5);
+    radius = 0.5 * kaleidoscopeFold(radius * 2.0);
+  } else if (u_kaleidoscopeType == 4) {
+    // Wheel: rotational copies without reflection.
+    angle = mod(angle, sector);
+  } else if (u_kaleidoscopeType == 8) {
+    // Flipper: wedges bent by distance from the center into curved fins.
+    angle = abs(mod(angle + radius * 3.0, sector) - sector * 0.5);
+  } else if (u_kaleidoscopeType == 10) {
+    // Tunnel: mirrored wedges with log-radius mirroring, so each octave of
+    // distance repeats the same ring and Zoom travels through the tunnel.
+    angle = abs(mod(angle, sector) - sector * 0.5);
+    radius = 0.25 * exp2(kaleidoscopeFold(log2(max(radius, 0.00001))));
+  } else {
+    angle = mod(angle, sector);
+    angle = abs(angle - sector * 0.5);
   }
 
   vec2 sampled = vec2(cos(angle), sin(angle)) * radius;

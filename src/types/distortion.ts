@@ -233,7 +233,21 @@ export type GlassTileEdgeMode = 'clamp' | 'tile' | 'mirror' | 'transparent';
 export type GlassSurfaceType = 'organic' | 'ripple';
 export type PostprocessEffectMode = 'distort' | 'mirror' | 'kaleidoscope' | 'prism' | 'voronoi' | 'glass' | 'glassV2' | 'glassTile' | 'particles';
 export type PostprocessMirrorMode = 'horizontal' | 'vertical' | 'quad';
-export type PostprocessKaleidoscopeType = 'unfold' | 'flower' | 'starlish';
+/** UI order of the Kaleidoscope mirroring types. */
+export const POSTPROCESS_KALEIDOSCOPE_TYPES = [
+  'unfold', 'fold', 'wheel', 'flower', 'starlish', 'flipper', 'tunnel', 'flip', 'flipFlop', 'diaCross', 'triangle',
+] as const;
+export type PostprocessKaleidoscopeType = typeof POSTPROCESS_KALEIDOSCOPE_TYPES[number];
+/** `u_kaleidoscopeType` values. Existing ids stay fixed so saved presets render unchanged. */
+export const POSTPROCESS_KALEIDOSCOPE_SHADER_IDS: Record<PostprocessKaleidoscopeType, number> = {
+  unfold: 0, flower: 1, starlish: 2, fold: 3, wheel: 4, flip: 5, flipFlop: 6, diaCross: 7, flipper: 8, triangle: 9, tunnel: 10,
+};
+/** Types that tile the frame with mirror cells instead of polar wedges. */
+export const POSTPROCESS_KALEIDOSCOPE_LATTICE_TYPES = ['flip', 'flipFlop', 'diaCross', 'triangle'] as const satisfies readonly PostprocessKaleidoscopeType[];
+
+export function isKaleidoscopeLatticeType(type: PostprocessKaleidoscopeType): boolean {
+  return (POSTPROCESS_KALEIDOSCOPE_LATTICE_TYPES as readonly PostprocessKaleidoscopeType[]).includes(type);
+}
 export type PostprocessParticleBlendMode = 'alpha' | 'add';
 export type PostprocessParticleColorOverLifeMode = 'hue' | 'ramp';
 export type PostprocessParticleEmitterType = 'field' | 'line' | 'burst' | 'point';

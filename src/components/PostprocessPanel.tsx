@@ -3,7 +3,8 @@ import { createEmptyManualDistortMap, createEmptyManualSmoothMask, STORE_DEFAULT
 import { applicationCommands } from '../application/commands';
 import { applyMirrorT, applyRampRepeatT, getColorAtPosition } from '../lib/gradientRampUtils';
 import type { ColorStop, RampColorMode, RampInterpolation } from '../types/gradient';
-import type { GlassSurfaceType, ManualDistortConfig, PostprocessParticleEmitterType, PostprocessStackKind } from '../types/distortion';
+import type { GlassSurfaceType, ManualDistortConfig, PostprocessKaleidoscopeType, PostprocessParticleEmitterType, PostprocessStackKind } from '../types/distortion';
+import { POSTPROCESS_KALEIDOSCOPE_TYPES } from '../types/distortion';
 import { Collapsible } from './Collapsible';
 import { CustomSelect } from './CustomSelect';
 import { SliderField } from './SliderField';
@@ -38,11 +39,20 @@ const MIRROR_AXIS_OPTIONS = [
   { value: 'vertical', label: 'Top / Bottom' },
   { value: 'quad', label: 'Both' },
 ];
-const KALEIDOSCOPE_TYPE_OPTIONS = [
-  { value: 'unfold', label: 'Unfold' },
-  { value: 'flower', label: 'Flower' },
-  { value: 'starlish', label: 'Starlish' },
-];
+const KALEIDOSCOPE_TYPE_LABELS: Record<PostprocessKaleidoscopeType, string> = {
+  unfold: 'Unfold',
+  fold: 'Fold',
+  wheel: 'Wheel',
+  flower: 'Flower',
+  starlish: 'Starlish',
+  flipper: 'Flipper',
+  tunnel: 'Tunnel',
+  flip: 'Flip',
+  flipFlop: 'Flip Flop',
+  diaCross: 'Dia Cross',
+  triangle: 'Triangle',
+};
+const KALEIDOSCOPE_TYPE_OPTIONS = POSTPROCESS_KALEIDOSCOPE_TYPES.map((value) => ({ value, label: KALEIDOSCOPE_TYPE_LABELS[value] }));
 const GLASS_TILE_PATTERN_OPTIONS = [
   { value: 'square', label: 'Square' },
   { value: 'diamond', label: 'Diamond' },
