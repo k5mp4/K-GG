@@ -1,6 +1,7 @@
 import type { GradientStore } from '../../store/gradientStore';
 import { STORE_DEFAULTS } from '../../store/gradientStore';
 import type { EffectStackKind } from '../../types/distortion';
+import { POSTPROCESS_KALEIDOSCOPE_TYPES } from '../../types/distortion';
 import {
   ENUM_PARAMETER_LIMITS, PARAMETER_LIMITS, getDiffuseGrainParameterLimitKey,
   type ParameterLimitKey,
@@ -59,7 +60,7 @@ const ENUMS: Record<string, readonly string[]> = {
   'slitScan.animMode': ['off', 'unidirectional', 'pingpong'],
   'postprocess.mode': ['warp', 'swirl', 'spiky'],
   'postprocess.mirrorMode': ['horizontal', 'vertical', 'quad'],
-  'postprocess.kaleidoscopeType': ['unfold', 'flower', 'starlish'],
+  'postprocess.kaleidoscopeType': POSTPROCESS_KALEIDOSCOPE_TYPES,
   'postprocess.glassTilePattern': ['square', 'diamond', 'hexagon', 'triangle', 'brick', 'faceted'],
   'datamosh.motionSource': DATAMOSH_MOTION_SOURCES,
   'datamosh.mixMode': DATAMOSH_MIX_MODES,

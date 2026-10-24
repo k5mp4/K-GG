@@ -16,7 +16,7 @@ import {
   type ConeViewConfig,
 } from '../types/coneView';
 import type { NoiseDistortionConfig, DiffuseConfig, SlitScanConfig, StretchConfig, NormalMapConfig, ManualDistortConfig, PostprocessConfig, PostprocessStackKind, EffectPipelineConfig } from '../types/distortion';
-import { DEFAULT_DIFFUSE_ASCII_CHARSET, DEFAULT_DIFFUSE_BACKGROUND_COLOR } from '../types/distortion';
+import { DEFAULT_DIFFUSE_ASCII_CHARSET, DEFAULT_DIFFUSE_BACKGROUND_COLOR, POSTPROCESS_KALEIDOSCOPE_SHADER_IDS } from '../types/distortion';
 import { IMAGE_GRADIENT_DEFAULTS, type ImageGradientConfig } from '../types/imageGradient';
 import { GRADIENT_ANCHOR_DEFAULTS, defaultBezierControlsForAnchors } from '../store/documentModel';
 import { normalizeMeshGradientConfig, type MeshGradientConfig } from '../types/gradient';
@@ -2898,8 +2898,7 @@ function drawPostprocessPass(
     gl.uniform1f(ctx.postprocessUniforms.u_prismSpeed, Math.max(Math.abs(animationSpeed), 0.0));
     const mirrorModeMap = { horizontal: 0, vertical: 1, quad: 2 } as const;
     setUniform1i(gl, ctx.postprocessUniforms.u_mirrorMode, mirrorModeMap[postprocess.mirrorMode ?? 'horizontal']);
-    const kaleidoscopeTypeMap = { unfold: 0, flower: 1, starlish: 2 } as const;
-    setUniform1i(gl, ctx.postprocessUniforms.u_kaleidoscopeType, kaleidoscopeTypeMap[postprocess.kaleidoscopeType ?? 'unfold']);
+    setUniform1i(gl, ctx.postprocessUniforms.u_kaleidoscopeType, POSTPROCESS_KALEIDOSCOPE_SHADER_IDS[postprocess.kaleidoscopeType ?? 'unfold'] ?? 0);
     gl.uniform1f(ctx.postprocessUniforms.u_kaleidoscopeSlices, postprocess.kaleidoscopeSlices ?? 8);
     gl.uniform1f(ctx.postprocessUniforms.u_kaleidoscopeRotation, ((postprocess.kaleidoscopeRotation ?? 0) * Math.PI) / 180);
     gl.uniform1f(ctx.postprocessUniforms.u_kaleidoscopeZoom, postprocess.kaleidoscopeZoom ?? 1);
