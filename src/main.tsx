@@ -6,6 +6,9 @@ import { LanguageProvider } from './i18n/LanguageProvider'
 import { SplashScreen } from './features/splash/SplashScreen'
 import { currentToolWindow } from './adapters/tauri/toolWindows'
 import { WindowRoot } from './WindowRoot'
+import { installDevUserTimingCleanup } from './lib/devUserTimingCleanup'
+
+if (import.meta.env.DEV) installDevUserTimingCleanup()
 
 const toolWindow = currentToolWindow()
 if (toolWindow) document.documentElement.dataset.toolWindow = toolWindow

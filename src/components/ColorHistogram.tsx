@@ -3,6 +3,14 @@ import { useGradientStore } from '../store/gradientStore';
 import { applicationCommands } from '../application/commands';
 import { buildRampTextureData } from '../lib/gradientRampUtils';
 import { useLanguage } from '../i18n/LanguageProvider';
+import { startThrottledFrameLoop } from '../lib/throttledFrameLoop';
+import { getRegisteredWebGLContext } from '../lib/webgl';
+import { createCanvasFrameSource } from '../lib/webglFrameReadback';
+
+// Previewを同期で読み戻す（drawImage→getImageData）と、CPUがGPUの描画完了を待つ同期点になり、
+// 重いEffectでfpsが半減する。GPU上で縮小した画素だけをfenceの完了後に受け取り、表示に足りる頻度へ間引く。
+const HISTOGRAM_SAMPLE_INTERVAL_MS = 200;
+const HISTOGRAM_SAMPLE_SIZE = 64;
 
 interface Props {
   sourceCanvasRef: React.RefObject<HTMLCanvasElement | null>;
@@ -67,37 +75,15 @@ export function ColorHistogram({ sourceCanvasRef, active = true }: Props) {
     if (!active || !histogram.enabled) return;
 
     const offscreen = document.createElement('canvas');
-    offscreen.width = 64;
-    offscreen.height = 64;
+    offscreen.width = HISTOGRAM_SAMPLE_SIZE;
+    offscreen.height = HISTOGRAM_SAMPLE_SIZE;
+    const frameSource = createCanvasFrameSource(() => sourceCanvasRef.current, getRegisteredWebGLContext);
+    const sample = new Uint8Array(HISTOGRAM_SAMPLE_SIZE * HISTOGRAM_SAMPLE_SIZE * 4);
+    let pending = false;
+    let stopped = false;
 
-    let rafId: number;
-    let lastStatsAt = 0;
-    const update = () => {
-      const source = sourceCanvasRef.current;
-      const target = histogramCanvasRef.current;
-      if (!source || !target) {
-        rafId = requestAnimationFrame(update);
-        return;
-      }
-
-      const offCtx = offscreen.getContext('2d', { willReadFrequently: true });
-      if (!offCtx) return;
-
-      try {
-        if (source.width > 0 && source.height > 0) {
-          offCtx.drawImage(source, 0, 0, source.width, source.height, 0, 0, 64, 64);
-        } else {
-          rafId = requestAnimationFrame(update);
-          return;
-        }
-      } catch (e) {
-        rafId = requestAnimationFrame(update);
-        return;
-      }
-      
-      const imageData = offCtx.getImageData(0, 0, 64, 64);
-      const data = imageData.data;
-      const totalPixels = 64 * 64;
+    const analyze = (data: Uint8Array | Uint8ClampedArray, target: HTMLCanvasElement) => {
+      const totalPixels = HISTOGRAM_SAMPLE_SIZE * HISTOGRAM_SAMPLE_SIZE;
 
       const rH = new Uint32Array(256);
       const gH = new Uint32Array(256);
@@ -141,15 +127,11 @@ export function ColorHistogram({ sourceCanvasRef, active = true }: Props) {
         }
       }
 
-      const now = performance.now();
-      if (now - lastStatsAt > 250) {
-        lastStatsAt = now;
-        const stats = stopRgbList.map(s => ({
-          color: s.hex,
-          percent: (colorCounts.get(s.hex) || 0) / totalPixels * 100
-        })).sort((a, b) => b.percent - a.percent);
-        setColorStats(stats);
-      }
+      const stats = stopRgbList.map(s => ({
+        color: s.hex,
+        percent: (colorCounts.get(s.hex) || 0) / totalPixels * 100
+      })).sort((a, b) => b.percent - a.percent);
+      setColorStats(stats);
 
       const ctx = target.getContext('2d');
       if (ctx) {
@@ -198,12 +180,42 @@ export function ColorHistogram({ sourceCanvasRef, active = true }: Props) {
         ctx.globalCompositeOperation = 'source-over';
         drawPath(lH, 'rgba(255, 255, 255, 0.3)', false, 1.2);
       }
-
-      rafId = requestAnimationFrame(update);
     };
 
-    rafId = requestAnimationFrame(update);
-    return () => cancelAnimationFrame(rafId);
+    const update = (): boolean => {
+      if (pending) return false;
+      const source = sourceCanvasRef.current;
+      const target = histogramCanvasRef.current;
+      if (!source || !target || source.width <= 0 || source.height <= 0) return false;
+
+      if (getRegisteredWebGLContext(source)) {
+        pending = true;
+        frameSource.readScaled(sample, HISTOGRAM_SAMPLE_SIZE, HISTOGRAM_SAMPLE_SIZE)
+          .then(ok => { if (ok && !stopped) analyze(sample, target); })
+          // A failed sample only skips this histogram update.
+          .catch(() => {})
+          .finally(() => { pending = false; });
+        return true;
+      }
+
+      // WebGL2を使えないときのCanvas2D Previewは、同期で読んでもGPUを待たない。
+      const offCtx = offscreen.getContext('2d', { willReadFrequently: true });
+      if (!offCtx) return false;
+      try {
+        offCtx.drawImage(source, 0, 0, source.width, source.height, 0, 0, HISTOGRAM_SAMPLE_SIZE, HISTOGRAM_SAMPLE_SIZE);
+        analyze(offCtx.getImageData(0, 0, HISTOGRAM_SAMPLE_SIZE, HISTOGRAM_SAMPLE_SIZE).data, target);
+      } catch {
+        return false;
+      }
+      return true;
+    };
+
+    const stopLoop = startThrottledFrameLoop(update, HISTOGRAM_SAMPLE_INTERVAL_MS);
+    return () => {
+      stopped = true;
+      stopLoop();
+      frameSource.dispose();
+    };
   }, [active, sourceCanvasRef, histogram.enabled, histogram.showRampDistribution, gradient.stops, gradient.opacityStops, gradient.rampColorMode, gradient.rampInterpolation, gradient.rampVariable, gradient.rampRepeat, gradient.rampOffset, gradient.rampMirror, uniqueStops]);
 
   if (!histogram.enabled) {
