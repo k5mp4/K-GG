@@ -249,6 +249,17 @@ const EFFECT_STACK_TRANSITION_FRAGMENT_SHADER = `
   }
 `;
 
+/**
+ * 変位マップのTextureと、最後に転送した入力。GeneratorとDistortレイヤーは同じフレームで
+ * 別の変位を使うため、Textureとcacheを共有すると毎フレーム両方のCPU再サンプリングが走る。
+ */
+type DistortMapSlot = {
+  texture: WebGLTexture;
+  displacement: number[] | null;
+  smoothMask: number[] | null;
+  mapResolution: number;
+};
+
 export type WebGLContext = {
   gl: WebGL2RenderingContext;
   performanceProfiler: WebGLPerformanceProfiler | null;
@@ -285,10 +296,8 @@ export type WebGLContext = {
   diffuseAsciiCount: number;
   diffuseAsciiRows: number;
   diffuseHistogramAt: number;
-  manualDistortTexture: WebGLTexture; // TEXTURE5: 手作業UV変位マップ
-  manualDistortDisplacement: number[] | null;
-  manualDistortSmoothMask: number[] | null;
-  manualDistortMapResolution: number;
+  manualDistortMap: DistortMapSlot; // TEXTURE5: Generatorの手作業UV変位マップ
+  distortLayerMap: DistortMapSlot; // TEXTURE5: Effect StackのDistortレイヤーの変位マップ
   sourceImageTexture: WebGLTexture; // TEXTURE4: 読み込み画像
   sourceImageCanvas: HTMLCanvasElement | null;
   imageGradientTexture: WebGLTexture; // TEXTURE7: 再配色用入力画像
@@ -717,13 +726,18 @@ export async function initWebGL(canvas: HTMLCanvasElement): Promise<WebGLContext
   gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
   gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
   gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
-  const manualDistortTexture = createOwnedTexture();
-  gl.bindTexture(gl.TEXTURE_2D, manualDistortTexture);
-  gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA32F, 1, 1, 0, gl.RGBA, gl.FLOAT, new Float32Array([0.5, 0.5, 0.0, 1.0]));
-  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
-  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
-  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
-  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+  const createDistortMapSlot = (): DistortMapSlot => {
+    const texture = createOwnedTexture();
+    gl.bindTexture(gl.TEXTURE_2D, texture);
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA32F, 1, 1, 0, gl.RGBA, gl.FLOAT, new Float32Array([0.5, 0.5, 0.0, 1.0]));
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+    return { texture, displacement: null, smoothMask: null, mapResolution: 0 };
+  };
+  const manualDistortMap = createDistortMapSlot();
+  const distortLayerMap = createDistortMapSlot();
   const sourceImageTexture = createOwnedTexture();
   gl.bindTexture(gl.TEXTURE_2D, sourceImageTexture);
   gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, 1, 1, 0, gl.RGBA, gl.UNSIGNED_BYTE, new Uint8Array([0, 0, 0, 255]));
@@ -804,7 +818,7 @@ export async function initWebGL(canvas: HTMLCanvasElement): Promise<WebGLContext
   ownedFlowGradient = flowGradient;
   const transitionTextureFrom = ownTexture(createTexture(gl));
   const transitionTextureTo = ownTexture(createTexture(gl));
-  const ctx: WebGLContext = { gl, performanceProfiler, gpuDiagnostics, renderOptimization, program, uniforms, geometryBuffer, transitionGeometryBuffer, generatorProgram: program, generatorUniforms: uniforms, bootstrapProgram: program, bootstrapUniforms: uniforms, activeNoiseVariants: createInitialNoiseVariants(), noiseVariantPrograms: new Map([[noiseVariantId('generator', GENERATOR_WITHOUT_NOISE_VARIANT), { program, uniforms }]]), noiseVariantStates: new Map(), gradientRampTexture, meshGradientTexture, meshGradientTextureSignature: '', meshCoordinateTexture, meshCoordinateTextureSignature: '', meshCoordinateUploadCount: 0, diffuseCurveTexture, diffuseCurveSignature: '', diffuseAsciiTexture, diffuseAsciiSignature: '', diffuseAsciiCount: 1, diffuseAsciiRows: ASCII_ATLAS_MAX_ROWS, diffuseHistogramAt: 0, manualDistortTexture, manualDistortDisplacement: null, manualDistortSmoothMask: null, manualDistortMapResolution: 0, sourceImageTexture, sourceImageCanvas: null, imageGradientTexture, imageGradientSource: null, imageMaskTexture, imageMaskSource: null, normalMapProgram: null, normalMapUniforms: {}, datamoshProgram: null, datamoshUniforms: {}, threeDPrograms: {}, textureProgram: null, textureUniforms: {}, iceProgram: null, iceUniforms: {}, textureImageTexture, textureImageSource: null, distortChromaProgram: null, distortChromaUniforms: {}, distortChromaImageTexture, distortChromaImageSource: null, shapesProgram: null, shapesUniforms: {}, shapesMaskTexture, shapesMaskKey: null, shapesFrameTexture, shapesFrameSize: [1, 1], fieldModelTexture, fieldModelVersion: 0, videoMotionFieldTexture, datamoshHistoryFbos: [datamoshHistoryFboA, datamoshHistoryFboB], datamoshHistoryTextures: [datamoshHistoryTextureA, datamoshHistoryTextureB], datamoshInputFbos: [datamoshInputFboA, datamoshInputFboB], datamoshInputTextures: [datamoshInputTextureA, datamoshInputTextureB], datamoshHistory: createDatamoshHistoryState(), gradFbo, gradTexture, blurProgram: null, blurUniforms: {}, stretchProgram: null, stretchUniforms: {}, seamlessProgram: null, seamlessUniforms: {}, postprocessProgram: null, postprocessUniforms: {}, stackCoreProgram: null, stackCoreUniforms: {}, noiseStackProgram: null, noiseStackUniforms: {}, noiseDiffuseStackProgram: null, noiseDiffuseStackUniforms: {}, glassProgram: null, glassUniforms: {}, glassFallbackActive: false, glassV2Program: null, glassV2Uniforms: {}, glassV2FallbackActive: false, glassTileProgram: null, glassTileUniforms: {}, glassTileFallbackActive: false, prismProgram: null, prismUniforms: {}, prismCompositeProgram: null, prismCompositeUniforms: {}, particleProgram: null, particleUniforms: {}, particleVao: null, particleQuadBuffer: null, particleInstanceBuffer: null, particleInstanceCount: 0, particleInstanceSeed: Number.NaN, flowGradient, normalFbo, normalTexture, hBlurFbo, hBlurTexture, postprocessFboA, postprocessTextureA, postprocessFboB, postprocessTextureB, prismScratchFbo, prismScratchTexture, prismBlurFbo, prismBlurTexture, prismGlowFbo, prismGlowTexture, shaderCompileExt, lazyProgramState: createLazyProgramState(), lazyProgramCompileQueue: createSerialAsyncQueue(), resourceLedger, hasPresentedFrame: false, disposed: false };
+  const ctx: WebGLContext = { gl, performanceProfiler, gpuDiagnostics, renderOptimization, program, uniforms, geometryBuffer, transitionGeometryBuffer, generatorProgram: program, generatorUniforms: uniforms, bootstrapProgram: program, bootstrapUniforms: uniforms, activeNoiseVariants: createInitialNoiseVariants(), noiseVariantPrograms: new Map([[noiseVariantId('generator', GENERATOR_WITHOUT_NOISE_VARIANT), { program, uniforms }]]), noiseVariantStates: new Map(), gradientRampTexture, meshGradientTexture, meshGradientTextureSignature: '', meshCoordinateTexture, meshCoordinateTextureSignature: '', meshCoordinateUploadCount: 0, diffuseCurveTexture, diffuseCurveSignature: '', diffuseAsciiTexture, diffuseAsciiSignature: '', diffuseAsciiCount: 1, diffuseAsciiRows: ASCII_ATLAS_MAX_ROWS, diffuseHistogramAt: 0, manualDistortMap, distortLayerMap, sourceImageTexture, sourceImageCanvas: null, imageGradientTexture, imageGradientSource: null, imageMaskTexture, imageMaskSource: null, normalMapProgram: null, normalMapUniforms: {}, datamoshProgram: null, datamoshUniforms: {}, threeDPrograms: {}, textureProgram: null, textureUniforms: {}, iceProgram: null, iceUniforms: {}, textureImageTexture, textureImageSource: null, distortChromaProgram: null, distortChromaUniforms: {}, distortChromaImageTexture, distortChromaImageSource: null, shapesProgram: null, shapesUniforms: {}, shapesMaskTexture, shapesMaskKey: null, shapesFrameTexture, shapesFrameSize: [1, 1], fieldModelTexture, fieldModelVersion: 0, videoMotionFieldTexture, datamoshHistoryFbos: [datamoshHistoryFboA, datamoshHistoryFboB], datamoshHistoryTextures: [datamoshHistoryTextureA, datamoshHistoryTextureB], datamoshInputFbos: [datamoshInputFboA, datamoshInputFboB], datamoshInputTextures: [datamoshInputTextureA, datamoshInputTextureB], datamoshHistory: createDatamoshHistoryState(), gradFbo, gradTexture, blurProgram: null, blurUniforms: {}, stretchProgram: null, stretchUniforms: {}, seamlessProgram: null, seamlessUniforms: {}, postprocessProgram: null, postprocessUniforms: {}, stackCoreProgram: null, stackCoreUniforms: {}, noiseStackProgram: null, noiseStackUniforms: {}, noiseDiffuseStackProgram: null, noiseDiffuseStackUniforms: {}, glassProgram: null, glassUniforms: {}, glassFallbackActive: false, glassV2Program: null, glassV2Uniforms: {}, glassV2FallbackActive: false, glassTileProgram: null, glassTileUniforms: {}, glassTileFallbackActive: false, prismProgram: null, prismUniforms: {}, prismCompositeProgram: null, prismCompositeUniforms: {}, particleProgram: null, particleUniforms: {}, particleVao: null, particleQuadBuffer: null, particleInstanceBuffer: null, particleInstanceCount: 0, particleInstanceSeed: Number.NaN, flowGradient, normalFbo, normalTexture, hBlurFbo, hBlurTexture, postprocessFboA, postprocessTextureA, postprocessFboB, postprocessTextureB, prismScratchFbo, prismScratchTexture, prismBlurFbo, prismBlurTexture, prismGlowFbo, prismGlowTexture, shaderCompileExt, lazyProgramState: createLazyProgramState(), lazyProgramCompileQueue: createSerialAsyncQueue(), resourceLedger, hasPresentedFrame: false, disposed: false };
   initializedContext = ctx;
   for (const key of NOISE_VARIANT_PROGRAM_KEYS) {
     ctx.lazyProgramState[key] = getNoiseVariantState(ctx, key, ctx.activeNoiseVariants[key]);
@@ -893,7 +907,8 @@ export function disposeWebGL(ctx: WebGLContext): void {
     ctx.meshCoordinateTexture,
     ctx.diffuseCurveTexture,
     ctx.diffuseAsciiTexture,
-    ctx.manualDistortTexture,
+    ctx.manualDistortMap.texture,
+    ctx.distortLayerMap.texture,
     ctx.sourceImageTexture,
     ctx.imageGradientTexture,
     ctx.imageMaskTexture,
@@ -2501,13 +2516,13 @@ function publishDiffuseInputHistogram(ctx: WebGLContext, gradient: GradientConfi
   }
 }
 
-function uploadManualDistortMap(ctx: WebGLContext, manualDistort: ManualDistortConfig): void {
+function uploadManualDistortMap(ctx: WebGLContext, slot: DistortMapSlot, manualDistort: ManualDistortConfig): void {
   const { gl } = ctx;
   const resolution = Math.max(1, Math.floor(manualDistort.mapResolution) || 1);
   if (
-    ctx.manualDistortDisplacement === manualDistort.displacement &&
-    ctx.manualDistortSmoothMask === manualDistort.smoothMask &&
-    ctx.manualDistortMapResolution === resolution
+    slot.displacement === manualDistort.displacement &&
+    slot.smoothMask === manualDistort.smoothMask &&
+    slot.mapResolution === resolution
   ) {
     return;
   }
@@ -2544,11 +2559,11 @@ function uploadManualDistortMap(ctx: WebGLContext, manualDistort: ManualDistortC
   }
 
   gl.activeTexture(gl.TEXTURE5);
-  gl.bindTexture(gl.TEXTURE_2D, ctx.manualDistortTexture);
+  gl.bindTexture(gl.TEXTURE_2D, slot.texture);
   gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA32F, textureResolution, textureResolution, 0, gl.RGBA, gl.FLOAT, data);
-  ctx.manualDistortDisplacement = manualDistort.displacement;
-  ctx.manualDistortSmoothMask = manualDistort.smoothMask;
-  ctx.manualDistortMapResolution = resolution;
+  slot.displacement = manualDistort.displacement;
+  slot.smoothMask = manualDistort.smoothMask;
+  slot.mapResolution = resolution;
 }
 /**
  * タイルレンダリングオプション。タイル単位で描画する際に指定。
@@ -2763,7 +2778,7 @@ function drawPostprocessPass(
   ctx.postprocessProgram = selectedProgram;
   ctx.postprocessUniforms = selectedUniforms;
   try {
-    if (effectMode === 'distort') uploadManualDistortMap(ctx, postprocess);
+    if (effectMode === 'distort') uploadManualDistortMap(ctx, ctx.distortLayerMap, postprocess);
     gl.useProgram(ctx.postprocessProgram);
     gl.viewport(0, 0, width, height);
     gl.disable(gl.BLEND);
@@ -2804,7 +2819,7 @@ function drawPostprocessPass(
       gl.bindTexture(gl.TEXTURE_2D, ctx.diffuseAsciiTexture);
       setUniform1i(gl, ctx.postprocessUniforms.u_diffuseAsciiAtlas, 9);
       gl.activeTexture(gl.TEXTURE5);
-      gl.bindTexture(gl.TEXTURE_2D, ctx.manualDistortTexture);
+      gl.bindTexture(gl.TEXTURE_2D, ctx.distortLayerMap.texture);
       setUniform1i(gl, ctx.postprocessUniforms.u_distortMap, 5);
     }
     gl.uniform2f(ctx.postprocessUniforms.u_resolution, width, height);
@@ -4625,9 +4640,9 @@ export function render(
   gl.uniform3f(uniforms.u_slitEdge, slitEdge[0], slitEdge[1], slitEdge[2]);
   gl.uniform4f(uniforms.u_slitEdgeBar, slitEdge[3], slitEdge[4], slitEdge[5], slitEdge[6]);
   // Stretch is applied later as a post-process that samples the rendered texture.
-  uploadManualDistortMap(ctx, manualDistort);
+  uploadManualDistortMap(ctx, ctx.manualDistortMap, manualDistort);
   gl.activeTexture(gl.TEXTURE5);
-  gl.bindTexture(gl.TEXTURE_2D, ctx.manualDistortTexture);
+  gl.bindTexture(gl.TEXTURE_2D, ctx.manualDistortMap.texture);
   setUniform1i(gl, uniforms.u_manualDistortMap, 5);
   setUniform1i(gl, uniforms.u_manualDistortEnabled, generatorLegacyColorFieldEnabled && manualDistort.enabled ? 1 : 0);
   gl.uniform1f(uniforms.u_manualDistortMaxDisplacement, manualDistort.maxDisplacement);

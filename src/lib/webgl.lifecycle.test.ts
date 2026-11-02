@@ -50,6 +50,8 @@ function makeContext() {
   } as unknown as WebGL2RenderingContext;
   const bootstrapProgram = {} as WebGLProgram;
   const noiseVariantProgram = {} as WebGLProgram;
+  const manualDistortTexture = {} as WebGLTexture;
+  const distortLayerTexture = {} as WebGLTexture;
   const context = {
     gl,
     performanceProfiler: null,
@@ -63,13 +65,15 @@ function makeContext() {
     transitionGeometryBuffer,
     flowGradient: makeFlowResources(),
     threeDPrograms: {},
+    manualDistortMap: { texture: manualDistortTexture, displacement: null, smoothMask: null, mapResolution: 0 },
+    distortLayerMap: { texture: distortLayerTexture, displacement: null, smoothMask: null, mapResolution: 0 },
     datamoshHistoryTextures: [{} as WebGLTexture, {} as WebGLTexture],
     datamoshHistoryFbos: [{} as WebGLFramebuffer, {} as WebGLFramebuffer],
     datamoshInputTextures: [{} as WebGLTexture, {} as WebGLTexture],
     datamoshInputFbos: [{} as WebGLFramebuffer, {} as WebGLFramebuffer],
     disposed: false,
   } as unknown as WebGLContext;
-  return { context, gl, geometryBuffer, transitionGeometryBuffer, bootstrapProgram, noiseVariantProgram };
+  return { context, gl, geometryBuffer, transitionGeometryBuffer, bootstrapProgram, noiseVariantProgram, manualDistortTexture, distortLayerTexture };
 }
 
 describe('WebGL context resource lifecycle', () => {
@@ -109,6 +113,15 @@ describe('WebGL context resource lifecycle', () => {
 
     expect(vi.mocked(gl.deleteBuffer).mock.calls.length).toBe(deleteBufferCount);
     expect(context.disposed).toBe(true);
+  });
+
+  it('releases the Generator and Distort layer displacement maps separately', () => {
+    const { context, gl, manualDistortTexture, distortLayerTexture } = makeContext();
+
+    disposeWebGL(context);
+
+    expect(gl.deleteTexture).toHaveBeenCalledWith(manualDistortTexture);
+    expect(gl.deleteTexture).toHaveBeenCalledWith(distortLayerTexture);
   });
 
   it('deletes every compiled Noise variant once, including inactive ones', () => {

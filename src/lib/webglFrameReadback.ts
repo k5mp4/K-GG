@@ -21,6 +21,10 @@ const MAX_WAIT_MS = 1000;
 export class WebGLCanvasFrameReader implements RgbaFrameSource {
   private pixelBuffer: WebGLBuffer | null = null;
   private pixelBufferBytes = 0;
+  private scaledFramebuffer: WebGLFramebuffer | null = null;
+  private scaledRenderbuffer: WebGLRenderbuffer | null = null;
+  private scaledWidth = 0;
+  private scaledHeight = 0;
   private reading = false;
   private disposed = false;
   private readonly gl: WebGL2RenderingContext;
@@ -46,18 +50,71 @@ export class WebGLCanvasFrameReader implements RgbaFrameSource {
 
   read(target: Uint8Array, width: number, height: number): Promise<boolean> {
     const gl = this.gl;
-    const byteLength = width * height * 4;
-    if (this.disposed || this.reading || gl.isContextLost() || target.byteLength < byteLength) {
-      return Promise.resolve(false);
-    }
+    if (this.disposed || gl.isContextLost()) return Promise.resolve(false);
     if (width !== gl.drawingBufferWidth || height !== gl.drawingBufferHeight) {
       return Promise.resolve(false);
     }
+    return this.readInto(target, width, height, () => {
+      gl.bindFramebuffer(gl.READ_FRAMEBUFFER, null);
+      return () => {};
+    });
+  }
+
+  /**
+   * Downscales the whole frame to `width`x`height` on the GPU (a linear blit
+   * into an owned RGBA8 renderbuffer) and reads only that, so a caller that
+   * needs a small sample neither transfers nor scales the full frame on the CPU.
+   * Rows are bottom-up like `readPixels`.
+   */
+  readScaled(target: Uint8Array, width: number, height: number): Promise<boolean> {
+    const gl = this.gl;
+    if (this.disposed || gl.isContextLost()) return Promise.resolve(false);
+    const sourceWidth = gl.drawingBufferWidth;
+    const sourceHeight = gl.drawingBufferHeight;
+    if (width <= 0 || height <= 0 || sourceWidth <= 0 || sourceHeight <= 0) return Promise.resolve(false);
+    return this.readInto(target, width, height, () => {
+      const previousDrawFramebuffer = gl.getParameter(gl.DRAW_FRAMEBUFFER_BINDING) as WebGLFramebuffer | null;
+      const scissorEnabled = gl.isEnabled(gl.SCISSOR_TEST);
+      const restore = () => {
+        gl.bindFramebuffer(gl.DRAW_FRAMEBUFFER, previousDrawFramebuffer);
+        if (scissorEnabled) gl.enable(gl.SCISSOR_TEST);
+      };
+      const framebuffer = this.ensureScaledFramebuffer(width, height);
+      if (!framebuffer) {
+        restore();
+        return null;
+      }
+      gl.bindFramebuffer(gl.READ_FRAMEBUFFER, null);
+      gl.bindFramebuffer(gl.DRAW_FRAMEBUFFER, framebuffer);
+      // The blit honours the scissor test, which the renderer may leave enabled.
+      gl.disable(gl.SCISSOR_TEST);
+      gl.blitFramebuffer(0, 0, sourceWidth, sourceHeight, 0, 0, width, height, gl.COLOR_BUFFER_BIT, gl.LINEAR);
+      gl.bindFramebuffer(gl.READ_FRAMEBUFFER, framebuffer);
+      return restore;
+    });
+  }
+
+  /**
+   * Queues `readPixels` of the framebuffer that `prepare` binds for reading and
+   * resolves once the GPU has written it. `prepare` returns a function that
+   * restores what it changed beyond the bindings restored here, or null to abort.
+   */
+  private readInto(
+    target: Uint8Array,
+    width: number,
+    height: number,
+    prepare: () => (() => void) | null,
+  ): Promise<boolean> {
+    const gl = this.gl;
+    const byteLength = width * height * 4;
+    if (this.reading || target.byteLength < byteLength) return Promise.resolve(false);
 
     const previousPackBuffer = gl.getParameter(gl.PIXEL_PACK_BUFFER_BINDING) as WebGLBuffer | null;
     const previousReadFramebuffer = gl.getParameter(gl.READ_FRAMEBUFFER_BINDING) as WebGLFramebuffer | null;
     const previousPackAlignment = gl.getParameter(gl.PACK_ALIGNMENT) as number;
+    let restorePrepared: (() => void) | null = null;
     const restore = () => {
+      restorePrepared?.();
       gl.bindBuffer(gl.PIXEL_PACK_BUFFER, previousPackBuffer);
       gl.bindFramebuffer(gl.READ_FRAMEBUFFER, previousReadFramebuffer);
       gl.pixelStorei(gl.PACK_ALIGNMENT, previousPackAlignment);
@@ -74,7 +131,8 @@ export class WebGLCanvasFrameReader implements RgbaFrameSource {
         gl.bufferData(gl.PIXEL_PACK_BUFFER, byteLength, gl.STREAM_READ);
         this.pixelBufferBytes = byteLength;
       }
-      gl.bindFramebuffer(gl.READ_FRAMEBUFFER, null);
+      restorePrepared = prepare();
+      if (!restorePrepared) return Promise.resolve(false);
       gl.bindBuffer(gl.PIXEL_PACK_BUFFER, this.pixelBuffer);
       gl.pixelStorei(gl.PACK_ALIGNMENT, 4);
       gl.readPixels(0, 0, width, height, gl.RGBA, gl.UNSIGNED_BYTE, 0);
@@ -122,12 +180,50 @@ export class WebGLCanvasFrameReader implements RgbaFrameSource {
     });
   }
 
+  private ensureScaledFramebuffer(width: number, height: number): WebGLFramebuffer | null {
+    const gl = this.gl;
+    if (this.scaledFramebuffer && this.scaledWidth === width && this.scaledHeight === height) {
+      return this.scaledFramebuffer;
+    }
+    this.deleteScaledFramebuffer();
+    const framebuffer = gl.createFramebuffer();
+    const renderbuffer = gl.createRenderbuffer();
+    if (!framebuffer || !renderbuffer) {
+      if (framebuffer) gl.deleteFramebuffer(framebuffer);
+      if (renderbuffer) gl.deleteRenderbuffer(renderbuffer);
+      return null;
+    }
+    const previousRenderbuffer = gl.getParameter(gl.RENDERBUFFER_BINDING) as WebGLRenderbuffer | null;
+    gl.bindRenderbuffer(gl.RENDERBUFFER, renderbuffer);
+    gl.renderbufferStorage(gl.RENDERBUFFER, gl.RGBA8, width, height);
+    gl.bindRenderbuffer(gl.RENDERBUFFER, previousRenderbuffer);
+    gl.bindFramebuffer(gl.DRAW_FRAMEBUFFER, framebuffer);
+    gl.framebufferRenderbuffer(gl.DRAW_FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.RENDERBUFFER, renderbuffer);
+    this.scaledFramebuffer = framebuffer;
+    this.scaledRenderbuffer = renderbuffer;
+    this.scaledWidth = width;
+    this.scaledHeight = height;
+    return framebuffer;
+  }
+
+  private deleteScaledFramebuffer(): void {
+    if (!this.gl.isContextLost()) {
+      if (this.scaledFramebuffer) this.gl.deleteFramebuffer(this.scaledFramebuffer);
+      if (this.scaledRenderbuffer) this.gl.deleteRenderbuffer(this.scaledRenderbuffer);
+    }
+    this.scaledFramebuffer = null;
+    this.scaledRenderbuffer = null;
+    this.scaledWidth = 0;
+    this.scaledHeight = 0;
+  }
+
   dispose(): void {
     if (this.disposed) return;
     this.disposed = true;
     if (this.pixelBuffer && !this.gl.isContextLost()) this.gl.deleteBuffer(this.pixelBuffer);
     this.pixelBuffer = null;
     this.pixelBufferBytes = 0;
+    this.deleteScaledFramebuffer();
   }
 }
 
@@ -137,10 +233,15 @@ export class WebGLCanvasFrameReader implements RgbaFrameSource {
  * so the reader is dropped on `webglcontextlost` (or a canvas change) and
  * recreated from the canvas' registered context once it is usable again.
  */
+export type CanvasFrameSource = RgbaFrameSource & {
+  /** Asynchronously reads the frame downscaled to `width`x`height`; false when it could not be read. */
+  readScaled(target: Uint8Array, width: number, height: number): Promise<boolean>;
+};
+
 export function createCanvasFrameSource(
   getCanvas: () => HTMLCanvasElement | null,
   getContext: (canvas: HTMLCanvasElement) => WebGL2RenderingContext | null,
-): RgbaFrameSource {
+): CanvasFrameSource {
   let reader: WebGLCanvasFrameReader | null = null;
   let boundCanvas: HTMLCanvasElement | null = null;
   let disposed = false;
@@ -172,6 +273,7 @@ export function createCanvasFrameSource(
   return {
     getSize: () => currentReader()?.getSize() ?? null,
     read: (target, width, height) => currentReader()?.read(target, width, height) ?? Promise.resolve(false),
+    readScaled: (target, width, height) => currentReader()?.readScaled(target, width, height) ?? Promise.resolve(false),
     dispose: () => {
       disposed = true;
       unbind();

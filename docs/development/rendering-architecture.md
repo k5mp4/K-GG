@@ -41,7 +41,7 @@ Render targetの寸法とtile offsetは名前付きframe入力の`width`／`heig
 | raw WebGL Program | `WebGLContext`のprogram slot。variantごとに一つ、Flowのslotも同じcompile queueを使用 | shader version変更は再init。loss／disposeで公開済み・未完了programを破棄 |
 | Shader handle | 共通`createProgramAsync`がcompile／linkの間だけ所有 | 成否にかかわらずfinallyでdelete |
 | Base／Normal／Blur／Prism／主Stack FBO＋Texture | `WebGLContext`が固定8組を所有。Planが必要な組のstorageだけ確保 | `webglResources`がtextureごとの寸法を記録し、同寸法のstorageを保持。disposeで全組delete |
-| Ramp／Mesh／Diffuse LUT／ASCII／Distort／入力画像Texture | raw WebGL owner。Rampは評価値のsignatureが同じ間、CPU生成・転送を省略 | 変更時だけ更新。Ramp cacheはcontext単位のWeakMap、disposeで削除。画像Canvasは既存の更新規則を維持 |
+| Ramp／Mesh／Diffuse LUT／ASCII／Distort／入力画像Texture | raw WebGL owner。Rampは評価値のsignatureが同じ間、CPU生成・転送を省略。変位マップはGenerator（Manual Distort）とDistortレイヤーが別々のTexture／cacheを持ち、入力の参照と解像度が同じ間はCPU再サンプリングを省略 | 変更時だけ更新。Ramp cacheはcontext単位のWeakMap、disposeで削除。画像Canvasは既存の更新規則を維持 |
 | Transition texture＋program＋VBO | raw WebGL owner。Effect Stack表示ブレンド専用 | context寿命に従いdispose。表示ブレンドの時刻・順序は変更しない |
 | Particle VAO／VBO | raw WebGL owner。seed／countに応じinstance bufferを更新 | disposeでdelete |
 | Flow Texture／FBO／VAO／VBO | `FlowGradientResources`、親contextがdisposeを呼ぶ | Density 1＋Trail 2の固定構成。40% viewport、RGBA8、seek／session／loopで既存reset／prewarm |

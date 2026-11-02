@@ -5,12 +5,12 @@ title: WebGL Performance Debug / Profiler
 status: current
 owners: [maintainer]
 created: 2026-08-12
-updated: 2026-10-20
-requirement_ids: [PERF-001, PERF-002, PERF-003, PERF-004, PERF-005, PERF-006, PERF-007, PERF-008, PERF-009, PERF-010, PERF-011]
+updated: 2026-10-28
+requirement_ids: [PERF-001, PERF-002, PERF-003, PERF-004, PERF-005, PERF-006, PERF-007, PERF-008, PERF-009, PERF-010, PERF-011, PERF-012]
 related_adrs: [ADR-0005, ADR-0015, ADR-0022, ADR-20260929-noise-shader-variants, ADR-20261019-ice-material-field]
 related_changes: [CHANGE-028, CHANGE-038, CHANGE-055]
-related_code: [src/lib/webglPerformance.ts, src/lib/webgl.ts, src/lib/gpuDiagnostics.ts, src/hooks/useWebGL.ts, src/components/WebGLPerformancePanel.tsx, src/components/GradientCanvas.tsx, src/lib/clothGradientRenderer.ts, src/lib/shaderWarmup.ts, src/lib/shaderWarmupHost.ts, src/lib/presetShaderWarmup.ts, src/lib/sceneRenderPlan.ts, src/lib/webglShaderSources.ts, src/shaders/noise.glsl, src/components/PostprocessStackPanel.tsx]
-related_tests: [src/lib/webglPerformance.test.ts, src/lib/webglPerformanceBenchmark.test.ts, src/lib/webglCompilePolicy.test.ts, src/lib/webglShaderSources.test.ts, src/lib/webglExportPrograms.test.ts, src/lib/shaderWarmup.test.ts, src/lib/presetShaderWarmup.test.ts, tests/e2e/shaders.spec.ts]
+related_code: [src/lib/webglPerformance.ts, src/lib/webgl.ts, src/lib/gpuDiagnostics.ts, src/hooks/useWebGL.ts, src/components/WebGLPerformancePanel.tsx, src/components/GradientCanvas.tsx, src/lib/clothGradientRenderer.ts, src/lib/shaderWarmup.ts, src/lib/shaderWarmupHost.ts, src/lib/presetShaderWarmup.ts, src/lib/sceneRenderPlan.ts, src/lib/webglShaderSources.ts, src/shaders/noise.glsl, src/components/PostprocessStackPanel.tsx, src/components/ColorHistogram.tsx, src/lib/throttledFrameLoop.ts, src/lib/webglFrameReadback.ts]
+related_tests: [src/lib/webglPerformance.test.ts, src/lib/webglPerformanceBenchmark.test.ts, src/lib/webglCompilePolicy.test.ts, src/lib/webglShaderSources.test.ts, src/lib/webglExportPrograms.test.ts, src/lib/shaderWarmup.test.ts, src/lib/presetShaderWarmup.test.ts, tests/e2e/shaders.spec.ts, src/lib/throttledFrameLoop.test.ts, src/lib/webglFrameReadback.test.ts]
 ---
 
 # WebGL Performance Debug / Profiler
@@ -88,6 +88,12 @@ VJが演奏用のProgramを保持している間は、通常のアイドルShade
 Preview contextの初期化後、現在のシーンに必要なShaderをdemandで準備し、その後にEffect Stackで使うShaderをアイドル時間に一つずつwarmupで準備する。現在のシーンに必要なShaderは、Generator variantが未準備でもNoiseを表示できるStack passの構成（PERF-010）で求める。warmupの順序は`stackCore`、`noiseStack`、`stretch`、`noiseDiffuseStack`、`blur`、`normalMap`、`glassTile`、`glassV2`、`generator`とし、コンパイルが長いGlass系とGeneratorのNoise variantを最後にする。Noise依存Programは現在のNoise種別のvariantだけを準備する。Datamosh、Flow、Particlesなど前フレームの履歴、外部入力、別パネルに依存するShaderは、現在のシーンや既定のwarmup順には含めず、要求時にコンパイルする。ただし内蔵Presetと保存済みPresetがそのShaderを使う場合は、上記のwarmupが終わった後のアイドル時間に、Presetが必要とするShaderと現在のNoise種別以外のvariantを一つずつwarmupで準備し（同じShaderは重複して準備しない）、初回のPreset適用でコンパイルを待たないようにする。Generatorの解析的Noise variantはPresetの適用時にもStack passで代替表示できるため、この準備の対象に含めない。保存済みPresetが増減したときは対象を更新する。warmupはExport中は開始せず、KHR並列Shaderコンパイルが使えない、またはValidationで同期リンクになる環境ではメインスレッドを止めないよう実行しない。
 
 Effect Stackの無効な行にポインターまたはフォーカスが入ったときは、その行を有効にした場合に必要となるShaderをprefetchで準備する。Noiseの行では、GeneratorのNoise variantではなく、代替表示に使うStack pass用Shaderを準備する。warmup／prefetchの失敗はdemandの失敗と同じ状態・フォールバックへ反映し、起動やEffect Stack全体を止めない。
+
+### PERF-012 毎フレームのCPU処理とGPU読み戻し
+
+Color HistogramはPreview Canvasの画素を集計するが、Canvasの同期読み戻し（`drawImage`→`getImageData`）はCPUがGPU描画の完了を待つ同期点になる。WebGL2のPreviewでは、Canvas全体をGPU上で64×64へ線形縮小し、その画素だけをPixel Pack Bufferへ読み、fenceの完了後に受け取る。読み戻し中は次の読み戻しを始めない。集計は表示中だけ、成功した回の間隔を200ms以上空けて行い（最大5回/秒）、毎フレームは行わない。入力Canvasが未準備のフレームは間隔の起点にせず、次のフレームで再試行する。WebGL2を使えないCanvas2D Previewは、従来どおり同期で64×64へ縮小して読む。Histogramの集計方法と表示は変えない。
+
+GeneratorのManual DistortとEffect StackのDistortレイヤーは、それぞれ専用の変位マップTextureとcacheを持つ。変位・Smooth Mask・マップ解像度が変わらない限り、再生中も変位マップのCPU再サンプリングと転送を行わない。両方が同じフレームで使われても、互いのTextureを上書きしない。描画結果は変えない。
 
 ## 境界と互換性
 

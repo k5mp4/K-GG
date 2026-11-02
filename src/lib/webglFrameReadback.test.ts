@@ -6,6 +6,15 @@ const GL = {
   PIXEL_PACK_BUFFER_BINDING: 0x88ed,
   READ_FRAMEBUFFER: 0x8ca8,
   READ_FRAMEBUFFER_BINDING: 0x8caa,
+  DRAW_FRAMEBUFFER: 0x8ca9,
+  DRAW_FRAMEBUFFER_BINDING: 0x8ca6,
+  RENDERBUFFER: 0x8d41,
+  RENDERBUFFER_BINDING: 0x8ca7,
+  RGBA8: 0x8058,
+  COLOR_ATTACHMENT0: 0x8ce0,
+  COLOR_BUFFER_BIT: 0x4000,
+  LINEAR: 0x2601,
+  SCISSOR_TEST: 0x0c11,
   PACK_ALIGNMENT: 0x0d05,
   STREAM_READ: 0x88e1,
   RGBA: 0x1908,
@@ -20,9 +29,12 @@ function fakeGl(options: { width?: number; height?: number; pendingPolls?: numbe
   const calls: string[] = [];
   const rendererPackBuffer = { name: 'renderer-pack' };
   const rendererFramebuffer = { name: 'renderer-fbo' };
+  const rendererDrawFramebuffer = { name: 'renderer-draw-fbo' };
   const state = {
     packBuffer: rendererPackBuffer as object | null,
     readFramebuffer: rendererFramebuffer as object | null,
+    drawFramebuffer: rendererDrawFramebuffer as object | null,
+    scissor: true,
     packAlignment: 1,
     lost: false,
     pendingPolls: options.pendingPolls ?? 1,
@@ -35,17 +47,34 @@ function fakeGl(options: { width?: number; height?: number; pendingPolls?: numbe
     getParameter: (name: number) => {
       if (name === GL.PIXEL_PACK_BUFFER_BINDING) return state.packBuffer;
       if (name === GL.READ_FRAMEBUFFER_BINDING) return state.readFramebuffer;
+      if (name === GL.DRAW_FRAMEBUFFER_BINDING) return state.drawFramebuffer;
       if (name === GL.PACK_ALIGNMENT) return state.packAlignment;
       return null;
     },
     createBuffer: () => { calls.push('createBuffer'); return { name: 'pbo' }; },
     deleteBuffer: () => calls.push('deleteBuffer'),
     bindBuffer: (_target: number, buffer: object | null) => { state.packBuffer = buffer; },
-    bindFramebuffer: (_target: number, framebuffer: object | null) => { state.readFramebuffer = framebuffer; },
+    bindFramebuffer: (target: number, framebuffer: object | null) => {
+      if (target === GL.DRAW_FRAMEBUFFER) state.drawFramebuffer = framebuffer;
+      else state.readFramebuffer = framebuffer;
+    },
+    isEnabled: (name: number) => name === GL.SCISSOR_TEST && state.scissor,
+    enable: (name: number) => { if (name === GL.SCISSOR_TEST) state.scissor = true; },
+    disable: (name: number) => { if (name === GL.SCISSOR_TEST) state.scissor = false; },
+    createFramebuffer: () => { calls.push('createFramebuffer'); return { name: 'scaled-fbo' }; },
+    createRenderbuffer: () => ({ name: 'scaled-rb' }),
+    deleteFramebuffer: () => calls.push('deleteFramebuffer'),
+    deleteRenderbuffer: () => calls.push('deleteRenderbuffer'),
+    bindRenderbuffer: () => {},
+    renderbufferStorage: (...args: unknown[]) => calls.push(`renderbufferStorage:${args.slice(1).join(',')}`),
+    framebufferRenderbuffer: () => {},
+    blitFramebuffer: (...args: unknown[]) => {
+      calls.push(`blit:${args.slice(0, 8).join(',')}:read=${state.readFramebuffer === null ? 'default' : 'other'}:draw=${(state.drawFramebuffer as { name?: string } | null)?.name}:scissor=${state.scissor}`);
+    },
     pixelStorei: (_name: number, value: number) => { state.packAlignment = value; },
     bufferData: () => calls.push('bufferData'),
     readPixels: (...args: unknown[]) => {
-      calls.push(`readPixels:${args.slice(0, 4).join(',')}:fbo=${state.readFramebuffer === null ? 'default' : 'other'}:pbo=${(state.packBuffer as { name?: string } | null)?.name}`);
+      calls.push(`readPixels:${args.slice(0, 4).join(',')}:fbo=${state.readFramebuffer === null ? 'default' : (state.readFramebuffer as { name?: string }).name}:pbo=${(state.packBuffer as { name?: string } | null)?.name}`);
     },
     fenceSync: () => ({ name: 'sync' }),
     flush: () => calls.push('flush'),
@@ -62,7 +91,7 @@ function fakeGl(options: { width?: number; height?: number; pendingPolls?: numbe
       target.set([1, 2, 3, 4, 5, 6, 7, 8]);
     },
   };
-  return { gl: gl as unknown as WebGL2RenderingContext, calls, state, rendererPackBuffer, rendererFramebuffer };
+  return { gl: gl as unknown as WebGL2RenderingContext, calls, state, rendererPackBuffer, rendererFramebuffer, rendererDrawFramebuffer };
 }
 
 function manualScheduler() {
@@ -114,6 +143,46 @@ describe('WebGLCanvasFrameReader', () => {
     scheduler.run();
     await expect(pending).resolves.toBe(false);
     expect(reader.getSize()).toBeNull();
+  });
+
+  it('downscales on the GPU and reads only the small frame', async () => {
+    const { gl, calls, state, rendererPackBuffer, rendererFramebuffer, rendererDrawFramebuffer } = fakeGl({ width: 1920, height: 1080 });
+    const scheduler = manualScheduler();
+    const reader = new WebGLCanvasFrameReader(gl, scheduler.schedule, () => 0);
+    const target = new Uint8Array(8);
+
+    const result = reader.readScaled(target, 2, 1);
+    expect(calls).toContain('renderbufferStorage:32856,2,1');
+    expect(calls).toContain('blit:0,0,1920,1080,0,0,2,1:read=default:draw=scaled-fbo:scissor=false');
+    expect(calls).toContain('readPixels:0,0,2,1:fbo=scaled-fbo:pbo=pbo');
+    // Renderer state is restored before the GPU finishes.
+    expect(state.readFramebuffer).toBe(rendererFramebuffer);
+    expect(state.drawFramebuffer).toBe(rendererDrawFramebuffer);
+    expect(state.packBuffer).toBe(rendererPackBuffer);
+    expect(state.scissor).toBe(true);
+
+    scheduler.run();
+    await expect(result).resolves.toBe(true);
+    expect(Array.from(target)).toEqual([1, 2, 3, 4, 5, 6, 7, 8]);
+
+    const second = reader.readScaled(target, 2, 1);
+    scheduler.run();
+    await expect(second).resolves.toBe(true);
+    expect(calls.filter(call => call === 'createFramebuffer')).toHaveLength(1);
+
+    reader.dispose();
+    expect(calls).toContain('deleteFramebuffer');
+    expect(calls).toContain('deleteRenderbuffer');
+  });
+
+  it('does not start a second readback while one is in flight', async () => {
+    const { gl } = fakeGl({ width: 4, height: 4 });
+    const scheduler = manualScheduler();
+    const reader = new WebGLCanvasFrameReader(gl, scheduler.schedule, () => 0);
+    const first = reader.readScaled(new Uint8Array(8), 2, 1);
+    await expect(reader.readScaled(new Uint8Array(8), 2, 1)).resolves.toBe(false);
+    scheduler.run();
+    await expect(first).resolves.toBe(true);
   });
 });
 
