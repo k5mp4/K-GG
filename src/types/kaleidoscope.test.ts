@@ -1,11 +1,15 @@
 import { describe, expect, it } from 'vitest';
-import sharedShader from '../shaders/postprocess/shared.glsl?raw';
+import rawSharedShader from '../shaders/postprocess/shared.glsl?raw';
 import {
   POSTPROCESS_KALEIDOSCOPE_LATTICE_TYPES,
   POSTPROCESS_KALEIDOSCOPE_SHADER_IDS,
   POSTPROCESS_KALEIDOSCOPE_TYPES,
   isKaleidoscopeLatticeType,
 } from './distortion';
+
+// Normalize line endings so the '\n' in the routing regex also matches when the
+// repository is checked out with CRLF on Windows runners.
+const sharedShader = rawSharedShader.replace(/\r\n?/g, '\n');
 
 describe('Kaleidoscope mirroring types', () => {
   it('keeps the shader ids of types saved by earlier presets', () => {
