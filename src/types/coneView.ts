@@ -207,12 +207,16 @@ export const THREE_D_ANTIALIAS_OPTIONS: { value: ThreeDAntialias; label: string 
   { value: 'x9', label: '9× · 3×3 grid' },
 ];
 
-/** Triply periodic minimal surfaces used by the Lattice shape. */
-export type LatticeType = 'gyroid' | 'schwarzP';
-export const LATTICE_TYPES = ['gyroid', 'schwarzP'] as const satisfies readonly LatticeType[];
+/** Triply periodic minimal surfaces and the Menger sponge used by the Lattice shape. */
+export type LatticeType = 'gyroid' | 'schwarzP' | 'schwarzD' | 'iwp' | 'lidinoid' | 'menger';
+export const LATTICE_TYPES = ['gyroid', 'schwarzP', 'schwarzD', 'iwp', 'lidinoid', 'menger'] as const satisfies readonly LatticeType[];
 export const LATTICE_TYPE_OPTIONS: { value: LatticeType; label: string }[] = [
   { value: 'gyroid', label: 'Gyroid' },
   { value: 'schwarzP', label: 'Schwarz P' },
+  { value: 'schwarzD', label: 'Schwarz D · Diamond' },
+  { value: 'iwp', label: 'Schoen I-WP' },
+  { value: 'lidinoid', label: 'Lidinoid' },
+  { value: 'menger', label: 'Menger sponge' },
 ];
 
 export type ConeSeamMode = 'mirror' | 'weld' | 'reapply';
@@ -361,7 +365,7 @@ export type ConeViewConfig = {
   wiggleSpeed: number;
   /** Timing inside each wiggle cycle; linear keeps the original sinusoids. */
   wiggleEasing: CameraWiggleEasing;
-  /** Lattice only: surface family. */
+  /** Lattice only: surface family, or the Menger sponge. */
   latticeType: LatticeType;
   /** Lattice only: world length of one lattice period. */
   latticeScale: number;

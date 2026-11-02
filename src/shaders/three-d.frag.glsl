@@ -525,34 +525,107 @@ ThreeDHit torusHit(vec3 localRay) {
 
 #if KGG_THREE_D_SHAPE < 0 || KGG_THREE_D_SHAPE == 2
 // ---------------------------------------------------------------------------
-// Lattice: a triply periodic minimal surface thickened into walls. Straight
-// channels run along x: the gyroid field is exactly 1 on (x, P/4, 0) and the
-// Schwarz P field is at least 1 on (x, 0, 0), so a camera moving along x never
-// touches a wall. Travel is measured in lattice periods, so integer Flow
-// Cycles return the camera to an identical view.
+// Lattice: a triply periodic minimal surface thickened into walls, or a
+// Menger sponge. Every field is scaled so its minimum |value| along the
+// camera channel is 1, so walls thinner than 1 never touch the camera:
+// Gyroid on (x, P/4, 0), Schwarz P on (x, 0, 0), Schwarz D on (t, t, -P/4),
+// I-WP on (t, t, t) and Lidinoid on (P/3, -P/3, 0) + t (1, 1, 1). The
+// Menger channel (x, P/2, P/2) runs through the central hole of every level.
+// Travel is measured in lattice translations along the channel, so integer
+// Flow Cycles return the camera to an identical view.
+
+const int LATTICE_SCHWARZ_P = 1;
+const int LATTICE_SCHWARZ_D = 2;
+const int LATTICE_IWP = 3;
+const int LATTICE_LIDINOID = 4;
+const int LATTICE_MENGER = 5;
 
 float latticeField(vec3 position, float period) {
   vec3 q = position * (TAU / period);
-  if (u_latticeType == 1) return cos(q.x) + cos(q.y) + cos(q.z);
+  if (u_latticeType == LATTICE_SCHWARZ_P) return cos(q.x) + cos(q.y) + cos(q.z);
+  if (u_latticeType == LATTICE_SCHWARZ_D) {
+    vec3 s = sin(q);
+    vec3 c = cos(q);
+    return s.x * s.y * s.z + s.x * c.y * c.z + c.x * s.y * c.z + c.x * c.y * s.z;
+  }
+  if (u_latticeType == LATTICE_IWP) {
+    vec3 c = cos(q);
+    return (2.0 * dot(c, c.yzx) - (cos(2.0 * q.x) + cos(2.0 * q.y) + cos(2.0 * q.z))) / 3.0;
+  }
+  if (u_latticeType == LATTICE_LIDINOID) {
+    vec3 s2 = sin(2.0 * q);
+    vec3 c2 = cos(2.0 * q);
+    return (0.5 * dot(s2 * cos(q.yzx), sin(q.zxy)) - 0.5 * dot(c2, c2.yzx) + 0.15) / 0.9;
+  }
   return dot(sin(q), cos(q.yzx));
 }
 
+// Menger sponge tiled through space: four levels of square holes, each a
+// third the size of the last. Thickness narrows the holes to 0.5 / (1 + 2t)
+// of a cell, so the default 0.25 gives the classic sponge's 1/3.
+float mengerDistance(vec3 position, float period) {
+  float halfHole = 0.25 / (1.0 + 2.0 * u_latticeThickness);
+  float size = period;
+  float distance = -period;
+  for (int level = 0; level < 4; level++) {
+    vec3 q = abs(mod(position, size) - 0.5 * size);
+    float bar = min(max(q.x, q.y), min(max(q.y, q.z), max(q.z, q.x)));
+    distance = max(distance, halfHole * size - bar);
+    size /= 3.0;
+  }
+  return distance;
+}
+
 float latticeDistance(vec3 position, float period) {
-  // The field gradient is bounded by about 1.8 in phase units, so scaling by
-  // 0.5 * period / TAU keeps the sphere-tracing step conservative.
-  return (abs(latticeField(position, period)) - u_latticeThickness) * period / TAU * 0.5;
+  if (u_latticeType == LATTICE_MENGER) return mengerDistance(position, period);
+  // Dividing by a bound on the field gradient in phase units (about 1.8, and
+  // 2.9 for the Lidinoid) keeps the sphere-tracing step conservative.
+  float gradientBound = u_latticeType == LATTICE_LIDINOID ? 3.2 : 2.0;
+  return (abs(latticeField(position, period)) - u_latticeThickness) * period / TAU / gradientBound;
+}
+
+// Channel direction and a point on it in periods, and the length in periods
+// of the shortest lattice translation along it.
+void latticeChannel(out vec3 forward, out vec3 up, out vec3 origin, out float repeat) {
+  forward = vec3(1.0, 0.0, 0.0);
+  up = vec3(0.0, 1.0, 0.0);
+  origin = vec3(0.0, 0.25, 0.0);
+  repeat = 1.0;
+  if (u_latticeType == LATTICE_SCHWARZ_P) {
+    origin = vec3(0.0);
+  } else if (u_latticeType == LATTICE_SCHWARZ_D) {
+    forward = vec3(0.7071067811865476, 0.7071067811865476, 0.0);
+    up = vec3(0.0, 0.0, 1.0);
+    origin = vec3(0.0, 0.0, -0.25);
+    repeat = 0.7071067811865476;
+  } else if (u_latticeType == LATTICE_IWP) {
+    forward = vec3(0.5773502691896258);
+    up = vec3(-0.4082482904638631, -0.4082482904638631, 0.8164965809277261);
+    origin = vec3(0.0);
+    repeat = 0.8660254037844386;
+  } else if (u_latticeType == LATTICE_LIDINOID) {
+    forward = vec3(0.5773502691896258);
+    up = vec3(-0.4082482904638631, -0.4082482904638631, 0.8164965809277261);
+    origin = vec3(1.0 / 3.0, -1.0 / 3.0, 0.0);
+    repeat = 0.8660254037844386;
+  } else if (u_latticeType == LATTICE_MENGER) {
+    origin = vec3(0.0, 0.5, 0.5);
+  }
 }
 
 ThreeDHit latticeHit(vec3 localRay) {
   ThreeDHit result = threeDMiss();
   float period = max(u_latticeScale, 0.1);
-  vec3 forward = vec3(1.0, 0.0, 0.0);
-  vec3 up = vec3(0.0, 1.0, 0.0);
+  vec3 forward;
+  vec3 up;
+  vec3 channelOrigin;
+  float repeat;
+  latticeChannel(forward, up, channelOrigin, repeat);
   threeDSetCameraBasis(forward, up);
   vec3 rayDirection = threeDWorldDirection(localRay, forward, up);
   vec3 right = normalize(cross(forward, up));
   vec2 offset = threeDRollMatrix() * u_cameraOffset * period * 0.15;
-  vec3 rayOrigin = vec3(u_threeDTravel * period, u_latticeType == 1 ? 0.0 : period * 0.25, 0.0)
+  vec3 rayOrigin = (channelOrigin + forward * u_threeDTravel * repeat) * period
     + right * offset.x + up * offset.y
     + g_cameraForward * u_cameraDolly * period * 0.5;
   float maxDistance = period * 12.0;
