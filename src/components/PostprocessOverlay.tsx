@@ -1,6 +1,7 @@
 import { isEffectStackLayerEnabled } from '../lib/effectPipeline';
 import { isPostprocessLayerEnabled } from '../lib/postprocessStack';
 import type { EffectPipelineConfig, PostprocessConfig } from '../types/distortion';
+import { isKaleidoscopeLatticeType } from '../types/distortion';
 import type React from 'react';
 
 type Props = {
@@ -111,7 +112,101 @@ function MirrorGuide({ width, height, mode }: { width: number; height: number; m
   );
 }
 
+// Mirrors the shader's lattice space: q = R(rotation) * centered / cell, with
+// one unit of `centered` equal to the frame height.
+function KaleidoscopeLatticeGuide({ width, height, postprocess }: { width: number; height: number; postprocess: PostprocessConfig }) {
+  const cx = width / 2;
+  const cy = height / 2;
+  const slices = Math.max(2, Math.min(64, Math.round(postprocess.kaleidoscopeSlices || 8)));
+  const cellPx = (2 / slices) * height;
+  const rotation = ((postprocess.kaleidoscopeRotation || 0) * Math.PI) / 180;
+  const cos = Math.cos(-rotation);
+  const sin = Math.sin(-rotation);
+  const toScreen = (qx: number, qy: number): Point => ({
+    x: cx + (cos * qx - sin * qy) * cellPx,
+    y: cy - (sin * qx + cos * qy) * cellPx,
+  });
+  const extent = Math.ceil(Math.hypot(width, height) / 2 / cellPx) + 2;
+  const segments: Array<{ from: Point; to: Point; accent: boolean }> = [];
+  const pushLine = (ax: number, ay: number, bx: number, by: number, accent = false) => {
+    segments.push({ from: toScreen(ax, ay), to: toScreen(bx, by), accent });
+  };
+  const type = postprocess.kaleidoscopeType;
+  let source: Point[];
+
+  if (type === 'triangle') {
+    const circumradius = 1 / Math.sqrt(3);
+    const rows = Math.ceil(extent / Math.sqrt(3)) + 1;
+    for (let j = -rows; j <= rows; j += 1) {
+      for (let i = -extent; i <= extent; i += 1) {
+        for (const [hx, hy] of [[i, j * Math.sqrt(3)], [i + 0.5, (j + 0.5) * Math.sqrt(3)]]) {
+          for (let k = 0; k < 3; k += 1) {
+            const a0 = Math.PI / 6 + (k * Math.PI) / 3;
+            const a1 = a0 + Math.PI / 3;
+            pushLine(hx + Math.cos(a0) * circumradius, hy + Math.sin(a0) * circumradius, hx + Math.cos(a1) * circumradius, hy + Math.sin(a1) * circumradius);
+          }
+        }
+      }
+    }
+    for (let k = 0; k < 12; k += 1) {
+      const angle = (k * Math.PI) / 6;
+      const reach = k % 2 === 0 ? 0.5 : circumradius;
+      pushLine(0, 0, Math.cos(angle) * reach, Math.sin(angle) * reach, k === 0);
+    }
+    source = [toScreen(0, 0), toScreen(0.5, 0), toScreen(0.5, 0.5 * Math.tan(Math.PI / 6))];
+  } else {
+    for (let k = -extent; k <= extent; k += 1) {
+      pushLine(k, -extent, k, extent, k === 0);
+      pushLine(-extent, k, extent, k, k === 0);
+    }
+    if (type === 'diaCross') {
+      for (let k = -extent - (extent % 2); k <= extent; k += 2) {
+        pushLine(-extent, k - extent, extent, k + extent);
+        pushLine(-extent, k + extent, extent, k - extent);
+      }
+      source = [toScreen(0, 0), toScreen(1, 0), toScreen(1, 1)];
+    } else {
+      source = [toScreen(0, 0), toScreen(1, 0), toScreen(1, 1), toScreen(0, 1)];
+    }
+  }
+
+  const sourceCenter = source.reduce((sum, p) => ({ x: sum.x + p.x / source.length, y: sum.y + p.y / source.length }), { x: 0, y: 0 });
+
+  return (
+    <>
+      <svg className="pointer-events-none absolute inset-0" width={width} height={height} viewBox={`0 0 ${width} ${height}`}>
+        <polygon
+          points={source.map((p) => `${p.x},${p.y}`).join(' ')}
+          fill="rgba(99,179,237,0.14)"
+          stroke={GUIDE_ACCENT}
+          strokeWidth={1.4}
+        />
+        {segments.map((segment, idx) => (
+          <line
+            key={idx}
+            x1={segment.from.x}
+            y1={segment.from.y}
+            x2={segment.to.x}
+            y2={segment.to.y}
+            stroke={segment.accent ? GUIDE_ACCENT : 'rgba(240,234,217,0.38)'}
+            strokeOpacity={segment.accent ? 1 : 0.72}
+            strokeWidth={segment.accent ? 1.4 : 0.8}
+            strokeDasharray={segment.accent ? 'none' : '7 6'}
+          />
+        ))}
+        <circle cx={cx} cy={cy} r={Math.max(4, Math.min(width, height) * 0.008)} fill={GUIDE_TEXT} />
+      </svg>
+
+      <div style={labelStyle(cx, cy - Math.min(height * 0.28, 90))}>{`${slices} SLICES`}</div>
+      <div style={labelStyle(sourceCenter.x, sourceCenter.y)}>SOURCE</div>
+    </>
+  );
+}
+
 function KaleidoscopeGuide({ width, height, postprocess }: { width: number; height: number; postprocess: PostprocessConfig }) {
+  if (isKaleidoscopeLatticeType(postprocess.kaleidoscopeType)) {
+    return <KaleidoscopeLatticeGuide width={width} height={height} postprocess={postprocess} />;
+  }
   const cx = width / 2;
   const cy = height / 2;
   const radius = Math.hypot(width, height);
