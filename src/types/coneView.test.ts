@@ -331,7 +331,8 @@ describe('cone view configuration', () => {
       latticeScale: 8,
       latticeThickness: 0.02,
     });
-    expect(normalizeConeViewConfig({ latticeType: 'diamond' }).latticeType).toBe('gyroid');
+    expect(normalizeConeViewConfig({ latticeType: 'menger' }).latticeType).toBe('menger');
+    expect(normalizeConeViewConfig({ latticeType: 'neovius' }).latticeType).toBe('gyroid');
   });
 
   it('normalizes the projection and treats removed shapes as the Cone', () => {

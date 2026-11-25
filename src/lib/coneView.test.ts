@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { DEFAULT_CONE_VIEW } from '../types/coneView';
+import threeDShader from '../shaders/three-d.frag.glsl?raw';
+import { DEFAULT_CONE_VIEW, LATTICE_TYPES } from '../types/coneView';
 import {
   CONE_APERTURE_OVERSCAN,
   CONE_CAMERA_DISTANCE,
@@ -688,6 +689,20 @@ describe('3D render parameters', () => {
 
   it('maps the lattice type to its shader index', () => {
     expect(getThreeDRenderParams({ ...DEFAULT_CONE_VIEW, latticeType: 'schwarzP' }, 0, 1).lattice.type).toBe(1);
+    expect(getThreeDRenderParams({ ...DEFAULT_CONE_VIEW, latticeType: 'menger' }, 0, 1).lattice.type).toBe(5);
+  });
+
+  it('keeps the shader lattice constants in step with the lattice types', () => {
+    const shaderNames: Record<string, string> = {
+      schwarzP: 'LATTICE_SCHWARZ_P',
+      schwarzD: 'LATTICE_SCHWARZ_D',
+      iwp: 'LATTICE_IWP',
+      lidinoid: 'LATTICE_LIDINOID',
+      menger: 'LATTICE_MENGER',
+    };
+    for (const [type, name] of Object.entries(shaderNames)) {
+      expect(threeDShader).toContain(`const int ${name} = ${LATTICE_TYPES.indexOf(type as (typeof LATTICE_TYPES)[number])};`);
+    }
   });
 
   it('derives the Cone aperture and apex from the canvas aspect', () => {
