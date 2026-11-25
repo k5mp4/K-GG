@@ -6,7 +6,8 @@
 | Timelineの開閉・高さで表示方法が変わらない | unit / e2e | `src/features/workspace/workspaceLayout.test.ts`、`tests/e2e/workspace-layout.spec.ts` | pass |
 | 全レイヤー名が省略されない（216px） | e2e / browser | `tests/e2e/workspace-layout.spec.ts`。1440×900で`Distort Chroma`は97px／表示幅103px | pass |
 | 幅不足時は左右パネルより先にレールへ切り替わり、幅が戻ればカラムへ戻る | unit / e2e | `workspaceLayout.test.ts`（1100×800でrail）、e2e | pass |
-| 手動のレール折りたたみ・展開、レールからのレイヤー選択 | e2e | `tests/e2e/workspace-layout.spec.ts` | pass |
+| 手動のレール折りたたみ・展開、レールからのレイヤー選択とドラッグ並べ替え（カラムへ戻した後も順序が保たれる） | e2e | `tests/e2e/workspace-layout.spec.ts` | pass |
+| 折りたたみ・展開時に幅（280ms）と内容のフェード（220ms）がアニメーションする | browser | 1440×900で`getAnimations()`により`width`のCSSTransitionと`effect-stack-layers-in`を確認 | pass |
 | native別ウインドウ表示中はLayersを隠しPreviewへ幅を返す | unit | `workspaceLayout.test.ts`（layersDetached） | pass（Tauri実機はRelease Gate） |
 | 1000px未満ではPreviewを覆うdrawerを使わず、左overlayのレイヤー／プロパティ切替で全レイヤーへ到達できる | e2e | `tests/e2e/workspace-layout.spec.ts`（640×480の並べ替え、スクロール、選択） | pass |
 | Histogramは既定で非表示、設定でONにすると右パネルのセクションに表示される | e2e / browser | `tests/e2e/licenses.spec.ts`、`workspace-layout.spec.ts`、ブラウザーで設定スイッチから確認 | pass |

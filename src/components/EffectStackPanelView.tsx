@@ -11,7 +11,7 @@ import { Icon } from './Icon';
 import { useLanguage } from '../i18n/LanguageProvider';
 import { EFFECT_STACK_TRANSITION_DURATION_MS } from '../lib/effectStackTransition';
 import type { EffectStackActions, EffectStackView } from '../features/effectStack/effectStackView';
-import { EFFECT_STACK_LABELS } from '../features/effectStack/effectStackLabels';
+import { EFFECT_STACK_LABELS, EFFECT_STACK_RAIL_ABBREVIATIONS } from '../features/effectStack/effectStackLabels';
 
 const ROW_HEIGHT = 38;
 const DRAG_SETTLE_MS = 150;
@@ -30,10 +30,15 @@ type RowTransitionPhase = 'idle' | 'from' | 'animate';
 type ViewProps = {
   view: EffectStackView;
   actions: EffectStackActions;
-  /** `column` fills the workspace Layers column; `window` fills a native Effect Stack window. */
-  variant?: 'column' | 'window';
+  /**
+   * `column` fills the workspace Layers column, `rail` is its collapsed icon rail
+   * and `window` fills a native Effect Stack window.
+   */
+  variant?: 'column' | 'rail' | 'window';
   /** Collapses the Layers column to its icon rail. */
   onCollapse?: () => void;
+  /** Expands the icon rail back to the Layers column. */
+  onExpand?: () => void;
   /** Shown in place of the version label when the stack can open in its own window. */
   onPopOut?: () => void;
   /** Select without opening an editor while reordering. */
@@ -46,6 +51,7 @@ export function EffectStackPanelView({
   actions,
   variant = 'column',
   onCollapse,
+  onExpand,
   onPopOut,
   onDragSelect,
 }: ViewProps) {
@@ -231,6 +237,21 @@ export function EffectStackPanelView({
       // The header stays fixed and the rows scroll inside the column or window.
       className={`flex w-full min-w-0 flex-col bg-k-bg ${variant === 'window' ? 'h-screen' : 'h-full'}`}
     >
+      {variant === 'rail' ? (
+      <div className="flex h-8 shrink-0 items-center justify-center border-b border-cream/15">
+        {onExpand && (
+          <button
+            type="button"
+            className="flex h-7 w-8 items-center justify-center p-0 text-cream/70 transition-colors hover:bg-cream/10 hover:text-fire focus:outline-none focus-visible:ring-2 focus-visible:ring-fire"
+            title={t('stack.expandColumn')}
+            aria-label={t('stack.expandColumn')}
+            onClick={onExpand}
+          >
+            <Icon name="chevronRight" className="text-[14px]" />
+          </button>
+        )}
+      </div>
+      ) : (
       <div className="flex h-8 shrink-0 items-center justify-between gap-1.5 border-b border-cream/15 px-2">
         <span className="min-w-0 truncate font-display text-[9px] font-bold uppercase tracking-wider text-cream/80">{t('effect.stack')}</span>
         <div className="flex shrink-0 items-center gap-1">
@@ -270,6 +291,7 @@ export function EffectStackPanelView({
           )}
         </div>
       </div>
+      )}
       <div
         id="kgg-effect-stack-content"
         className="min-h-0 flex-1 overflow-y-auto overflow-x-hidden scrollbar-thin"
@@ -278,6 +300,37 @@ export function EffectStackPanelView({
         {stack.map((layer, index) => {
           const selected = view.selectedKind === layer.kind;
           const isDragging = dragging?.kind === layer.kind;
+          if (variant === 'rail') {
+            const name = EFFECT_STACK_LABELS[layer.kind];
+            const status = t(layer.status.labelKey);
+            return (
+              <button
+                key={layer.kind}
+                type="button"
+                className="effect-stack-rail-row"
+                data-selected={selected ? 'true' : 'false'}
+                data-enabled={layer.enabled ? 'true' : 'false'}
+                data-dragging={isDragging ? 'true' : 'false'}
+                style={{
+                  top: index * ROW_HEIGHT,
+                  transform: rowTransform(layer.kind, index),
+                  transitionDuration: rowTransitionDuration(isDragging),
+                }}
+                aria-current={selected ? 'true' : undefined}
+                aria-label={`${name}: ${status}`}
+                title={`${name} · ${status}\n${t('stack.railHint')}`}
+                // Press selects and starts a drag; a press without movement is a plain selection.
+                onPointerDown={(event) => { if (!event.altKey) startDrag(event, layer.kind, index); }}
+                // Keyboard activation (detail 0) and Alt-click solo arrive as clicks.
+                onClick={(event) => { if (event.detail === 0 || event.altKey) actions.select(layer.kind, event.altKey); }}
+                onPointerEnter={() => { if (!layer.enabled) actions.prefetch(layer.kind); }}
+                onFocus={() => { if (!layer.enabled) actions.prefetch(layer.kind); }}
+              >
+                {EFFECT_STACK_RAIL_ABBREVIATIONS[layer.kind]}
+                <span aria-hidden="true" className="effect-stack-rail-row__dot" />
+              </button>
+            );
+          }
           return (
             <div
               key={layer.kind}
@@ -331,7 +384,7 @@ export function EffectStackPanelView({
           );
         })}
       </div>
-      {view.imageGradientEnabled && (
+      {view.imageGradientEnabled && variant !== 'rail' && (
         <div className="border-t border-cream/15 px-2 py-1.5 text-[8px] uppercase tracking-wider text-amber-300/90">
           Image Gradient: geometry-resampling layers are protected
         </div>

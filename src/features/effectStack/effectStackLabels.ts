@@ -18,3 +18,22 @@ export const EFFECT_STACK_LABELS: Record<EffectStackKind, string> = {
   distortChroma: 'Distort Chroma',
   ice: 'Ice',
 };
+
+/** Short names for the icon rail; the full name stays in the tooltip and accessible name. */
+export const EFFECT_STACK_RAIL_ABBREVIATIONS: Record<EffectStackKind, string> = {
+  diffuse: 'DF',
+  noise: 'NS',
+  slit: 'SL',
+  stretch: 'ST',
+  distort: 'DS',
+  mirror: 'MR',
+  kaleidoscope: 'KL',
+  voronoi: 'VR',
+  glass: 'GL',
+  glassTile: 'GT',
+  datamosh: 'DM',
+  cone: '3D',
+  texture: 'TX',
+  distortChroma: 'DC',
+  ice: 'IC',
+};

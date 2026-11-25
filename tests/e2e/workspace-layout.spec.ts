@@ -147,12 +147,29 @@ test('docked Layers column stays beside the preview regardless of timeline and w
   await expect(layers).toHaveAttribute('data-layers-presentation', 'column');
   await page.getByRole('button', { name: 'Close Animation', exact: true }).click();
 
+  const columnOrder = await layers.locator('.effect-stack-row__title').allTextContents();
   await layers.getByRole('button', { name: 'Collapse layers to icons' }).click();
   await expect(layers).toHaveAttribute('data-layers-presentation', 'rail');
+  // The dock eases to the rail width instead of jumping.
+  await expect.poll(async () => (await layers.boundingBox())!.width).toBeCloseTo(48, 0);
   await layers.getByRole('button', { name: /^Glass:/ }).click();
   await expect(properties.locator('[data-module="postprocess"]')).not.toHaveAttribute('inert');
+  // Rail rows reorder by dragging, like the column rows.
+  const railRows = layers.locator('.effect-stack-rail-row');
+  const railNames = () => railRows.evaluateAll(rows => rows
+    .sort((a, b) => a.getBoundingClientRect().top - b.getBoundingClientRect().top)
+    .map(row => row.getAttribute('aria-label')!.split(':')[0]));
+  await expect.poll(railNames).toEqual(columnOrder);
+  const firstRow = (await railRows.nth(0).boundingBox())!;
+  await page.mouse.move(firstRow.x + firstRow.width / 2, firstRow.y + 10);
+  await page.mouse.down();
+  await page.mouse.move(firstRow.x + firstRow.width / 2, firstRow.y + 48, { steps: 5 });
+  await page.mouse.up();
+  await expect.poll(railNames).toEqual([columnOrder[1], columnOrder[0], ...columnOrder.slice(2)]);
   await layers.getByRole('button', { name: 'Expand layers' }).click();
   await expect(layers).toHaveAttribute('data-layers-presentation', 'column');
+  await expect.poll(async () => (await layers.boundingBox())!.width).toBeCloseTo(216, 0);
+  await expect(layers.locator('.effect-stack-row__title')).toHaveText([columnOrder[1], columnOrder[0], ...columnOrder.slice(2)]);
 
   // A narrower dock workspace falls back to the rail first, and returns to the column when it widens.
   await page.setViewportSize({ width: 1100, height: 800 });
