@@ -4,7 +4,7 @@ import { UpdateButton } from '../updater/UpdateButton';
 import type { UpdateState } from '../updater/types';
 import type { MessageKey } from '../../i18n/messages';
 import type { Replacements } from '../../i18n/language';
-import type { LeftTab, LeftTabDefinition } from './tabs';
+import { isLayerTab, type LeftTab, type LeftTabDefinition } from './tabs';
 import type { PanelPresentation } from './workspaceLayout';
 
 export type WorkspaceTopBarProps = {
@@ -13,7 +13,10 @@ export type WorkspaceTopBarProps = {
   tabHoverSwitchEnabled: boolean;
   isHoverLocked: boolean;
   showRightSidebar: boolean;
+  /** Mode tabs; Effect Stack layers are reached from the Layers column. */
   tabs: readonly LeftTabDefinition[];
+  /** The layer being edited, shown as the entry back to its properties. */
+  editingLayer: { label: string; tab: LeftTab };
   gpuInfo: { label: string; title: string };
   updater: {
     supported: boolean;
@@ -32,8 +35,11 @@ function blur(event: MouseEvent<HTMLButtonElement>) {
   event.currentTarget.blur();
 }
 
+function getInteractionClassName(active: boolean, tabHoverSwitchEnabled: boolean, isHoverLocked: boolean): string {
+  return tabHoverSwitchEnabled && isHoverLocked && !active ? 'cursor-default opacity-80' : 'cursor-pointer';
+}
+
 function getTabClassName(value: LeftTab, leftTab: LeftTab, tabHoverSwitchEnabled: boolean, isHoverLocked: boolean): string {
-  const isPrimary = value === 'diffuse' || value === 'noise' || value === 'slit';
   const isUtility = value === 'export' || value === 'preset';
   const colorClass = isUtility
     ? leftTab === value
@@ -41,13 +47,8 @@ function getTabClassName(value: LeftTab, leftTab: LeftTab, tabHoverSwitchEnabled
       : 'text-deep/80 hover:text-deep bg-k-bg hover:bg-k-bg'
     : leftTab === value
       ? 'text-k-text bg-fire/10'
-      : isPrimary
-        ? 'text-fire/70 hover:text-fire hover:bg-k-surface'
-        : 'text-tab-inactive/60 hover:text-tab-inactive hover:bg-k-surface';
-  const interactionClass = tabHoverSwitchEnabled && isHoverLocked && leftTab !== value
-    ? 'cursor-default opacity-80'
-    : 'cursor-pointer';
-  return `${colorClass} ${interactionClass}`;
+      : 'text-tab-inactive/60 hover:text-tab-inactive hover:bg-k-surface';
+  return `${colorClass} ${getInteractionClassName(leftTab === value, tabHoverSwitchEnabled, isHoverLocked)}`;
 }
 
 export function WorkspaceTopBar({
@@ -57,6 +58,7 @@ export function WorkspaceTopBar({
   isHoverLocked,
   showRightSidebar,
   tabs,
+  editingLayer,
   gpuInfo,
   updater,
   translate,
@@ -66,9 +68,23 @@ export function WorkspaceTopBar({
   onOpenSettings,
   onToggleRightSidebar,
 }: WorkspaceTopBarProps) {
+  const editing = isLayerTab(leftTab);
   return (
     <div className="z-30 flex min-w-0 shrink-0 items-center gap-2 border-b border-panel-border bg-k-bg/95 px-2 py-1.5">
       <nav aria-label={translate('settings.title')} className="inline-flex min-w-0 flex-1 bg-k-surface/80 overflow-x-auto scrollbar-thin scroll-smooth">
+        <button
+          type="button"
+          data-editing-layer
+          onMouseEnter={() => { if (panelsPresentation === 'docked') onTabMouseEnter(editingLayer.tab); }}
+          aria-pressed={editing}
+          aria-controls="property-modules-panel"
+          aria-label={`${translate('workspace.editingLayer')}: ${editingLayer.label}`}
+          onClick={(event) => { onTabClick(editingLayer.tab); if (panelsPresentation === 'docked') blur(event); }}
+          className={`mr-1 flex h-10 min-w-[132px] max-w-[200px] shrink-0 flex-col items-start justify-center gap-0.5 !border-0 px-3 py-1 text-left font-display uppercase tracking-wider transition-all focus:outline-none focus-visible:ring-2 focus-visible:ring-fire ${editing ? 'bg-fire/10 text-k-text' : 'text-fire/80 hover:bg-k-surface hover:text-fire'} ${getInteractionClassName(editing, tabHoverSwitchEnabled, isHoverLocked)}`}
+            >
+          <span className="text-[9px] font-semibold leading-none text-tab-inactive">{translate('workspace.editingLayer')}</span>
+          <span className="w-full truncate text-[11px] font-bold leading-tight">{editingLayer.label}</span>
+        </button>
         {tabs.map(({ value, labelKey }) => {
           const enabled = getTabEnabled(value);
           return (

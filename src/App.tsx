@@ -24,7 +24,7 @@ import { IconButton } from './components/IconButton';
 import { useLanguage } from './i18n/LanguageProvider';
 import { UpdateDialog } from './features/updater/UpdateDialog';
 import { FfmpegSetupDialog } from './components/FfmpegSetupDialog';
-import { LEFT_TABS, TAB_ANIMATION_PREFIX } from './features/workspace/tabs';
+import { LEFT_TABS, TAB_ANIMATION_PREFIX, TOP_BAR_TABS } from './features/workspace/tabs';
 import { WorkspaceTopBar } from './features/workspace/WorkspaceTopBar';
 import { TimelineWorkspace } from './features/workspace/TimelineWorkspace';
 import { CanvasWorkspace } from './features/workspace/CanvasWorkspace';
@@ -149,6 +149,7 @@ export default function App() {
     panelsContainerRef,
     canvasWorkspaceProps,
     getTabEnabled,
+    editingLayer,
     handleTabClick,
     handleTabMouseEnter,
     handlePanelResizeStart,
@@ -187,7 +188,8 @@ export default function App() {
           tabHoverSwitchEnabled={tabHoverSwitchEnabled}
           isHoverLocked={isHoverLocked}
           showRightSidebar={showRightSidebar}
-          tabs={LEFT_TABS}
+          tabs={TOP_BAR_TABS}
+          editingLayer={editingLayer}
           gpuInfo={gpuInfo}
           updater={updater}
           translate={t}

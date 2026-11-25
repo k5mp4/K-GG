@@ -5,7 +5,7 @@ title: ワークスペースと小画面レイアウト
 status: current
 owners: [maintainer]
 created: 2026-10-03
-updated: 2026-11-25
+updated: 2026-11-26
 requirement_ids: [LAYOUT-001, LAYOUT-002, LAYOUT-003, LAYOUT-004, LAYOUT-005]
 related_adrs: [ADR-20261003-responsive-workspace-layout, ADR-20261125-workspace-layers-column]
 related_changes: []
@@ -27,7 +27,7 @@ related_tests: [src/features/workspace/workspaceLayout.test.ts, tests/e2e/worksp
 
 ### LAYOUT-002 パネルの表示
 
-Workspace root幅1000px以上では、左から「Layersカラム（[UI-009](./ui-controls.md)）、左プロパティパネル、Preview、右パネル」の順にdock表示する。未満では左右パネルをPreviewの上に開閉式overlayで表示する。overlayでは左右どちらかだけ開き、上部モジュールのclick、設定ボタン、Previewの「レイヤーを開く」ボタンから操作できる。左overlayの上部には「レイヤー／プロパティ」の切替を置き、同じ領域でレイヤー一覧とプロパティを行き来できる。「レイヤーを開く」はレイヤー一覧を、上部モジュールのclickはプロパティを開き、レイヤー名のclickでプロパティへ切り替わる。overlayのモジュール切替はclickで行う。Close、背景click、Escapeで閉じられる。開いたパネルのCloseへfocusを移し、閉じたbodyと非選択モジュールはinertにする。サイズ切替で内容を再マウントしない。
+Workspace root幅1000px以上では、左から「Layersカラム（[UI-009](./ui-controls.md)）、左プロパティパネル、Preview、右パネル」の順にdock表示する。未満では左右パネルをPreviewの上に開閉式overlayで表示する。overlayでは左右どちらかだけ開き、TOPバーの項目（「編集中」、SANDBOX、Export、Preset）のclick、設定ボタン、Previewの「レイヤーを開く」ボタンから操作できる。左overlayの上部には「レイヤー／プロパティ」の切替を置き、同じ領域でレイヤー一覧とプロパティを行き来できる。「レイヤーを開く」はレイヤー一覧を、TOPバーの項目のclickはプロパティを開き、レイヤー名のclickでプロパティへ切り替わる。overlayのモジュール切替はclickで行う。Close、背景click、Escapeで閉じられる。開いたパネルのCloseへfocusを移し、閉じたbodyと非選択モジュールはinertにする。サイズ切替で内容を再マウントしない。
 
 ### LAYOUT-003 表示領域の確保
 

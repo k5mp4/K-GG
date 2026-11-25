@@ -83,7 +83,12 @@ Tauri版ではカラムのヘッダーに別ウィンドウボタンを表示し
 
 ### UI-010 トップバーとSANDBOXのモジュール入口
 
-TOPバーは左から`Diffuse`、`Noise`、`Slit`、`Postprocess`、`SANDBOX`、`Export`、`Preset`の順に表示します。`Stretch`はTOPバーの独立項目として表示せず、Postprocessのプロパティモジュールで編集します。PostprocessのプロパティモジュールはON／OFFと`Edit Layer`を表示し、選択したEdit Layerの詳細プロパティをその下で操作できます。`Edit Layer`は`Stretch`、`Distort`、`Mirror`、`Kaleidoscope`、`Voronoi`、`Glass`、`GlassTile`、`Datamosh`の順に選択肢を表示し、選択はEffect Stackの選択レイヤーと同期します。Effect Stackで`Stretch`を選択するとPostprocessのプロパティモジュールを開き、Scan Position、Band Height、Height Variance、Variation、Seed、Glowの各パラメータを表示します。Stretch、Distort、Mirror、Kaleidoscopeなどの個別ON／OFFはプロパティモジュールに表示せず、いずれか一つ以上がEffect Stackで有効な場合にPostprocess全体をONとして表示します。SANDBOXの文字色はPostprocessと同じ通常色を使います。`Normal`と`Distort`も独立項目として表示しません。SANDBOXの左パネルにはPostprocessの`Edit Layer`と同じ選択要素を表示し、Cloth、Normal、Prism、Particles、Flow Gradient、Seamless、Shapesから一つを選択して既存の有効状態とパラメータを編集できます。モジュールのON／OFFと描画準備状態を確認でき、SANDBOXの選択状態はPresetへ保存しません。Video MotionはDatamoshレイヤーのmotion sourceとして選択し、動画source/runtimeは別のEffect Stackレイヤー選択で維持します。DistortはPostprocessの`Edit Layer`で選択し、Effect StackとPostprocessの主スタック編集UIにPrism／Particlesの重複入口を表示しません。
+Effect Stackのレイヤー（Diffuse、Noise、Slit、Stretch、Distort、Mirror、Kaleidoscope、Voronoi、Glass、GlassTile、Datamosh、3D、Texture、Distort Chroma、Ice）を編集する入口はEffect Stackだけとし、TOPバーにはレイヤーごとのタブを表示しません。TOPバーは左から「編集中」項目、`SANDBOX`、`Export`、`Preset`の順に表示します。「編集中」項目は`編集中`のラベルと、Effect Stackで選択中のレイヤー名を表示します。レイヤーのプロパティを開いている間は選択状態で表示し、SANDBOX、Export、Presetを開いているときにclick（ホバー切替が有効な場合はhover）すると、選択中レイヤーのプロパティへ戻ります。`SANDBOX`はモジュールのON／OFFを副ラベルで表示し、`Export`と`Preset`はON／OFFの副ラベルを表示しません。
+
+レイヤーのプロパティモジュールは、見出しにレイヤー名と、そのレイヤーのON／OFFスイッチを表示します。スイッチはEffect Stackの行のトグルと同じ状態を操作します。Postprocess系レイヤー（Stretch、Distort、Mirror、Kaleidoscope、Voronoi、Glass、GlassTile、Datamosh、3D、Texture、Distort Chroma、Ice）を選択した場合も同じ見出しを使い、`Edit Layer`の選択要素とPostprocess全体のON／OFFは表示しません。Effect Stackで`Stretch`を選択すると、Scan Position、Band Height、Height Variance、Variation、Seed、Glowの各パラメータを表示します。プロパティモジュールの内部ID（`diffuse`、`noise`、`slit`、`postprocess`、`sandbox`、`export`、`preset`）は、MCPなどの制御インターフェースから従来どおり指定できます。
+
+SANDBOXの文字色は通常色を使います。`Normal`と`Distort`は独立項目として表示しません。SANDBOXの左パネルには`Edit Layer`の選択要素を表示し、Cloth、Normal、Prism、Particles、Flow Gradient、Seamless、Shapesから一つを選択して既存の有効状態とパラメータを編集できます。モジュールのON／OFFと描画準備状態を確認でき、SANDBOXの選択状態はPresetへ保存しません。Video MotionはDatamoshレイヤーのmotion sourceとして選択し、動画source/runtimeは別のEffect Stackレイヤー選択で維持します。DistortはEffect Stackで選択し、Effect StackとPostprocess系レイヤーの編集UIにPrism／Particlesの重複入口を表示しません。
+
 ### UI-011 Diffuseのモードと適応カーブ
 
 DiffuseのモードはTweeqのInputDrumでBlock、Smooth、Dither、Halftone、ASCII、Stippleから選択できます。Halftoneの形状はInputRadio、ASCII文字セットはInputString、Halftone／ASCIIの背景色はInputColorで編集します。適応ソースと粒度適応の2本のBezierはTweeq InputCubicBezierを中心としたコンパクトな行で表示し、大きなSVGプレビューやヒストグラムは表示しません。
