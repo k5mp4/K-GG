@@ -426,7 +426,8 @@ export const STORE_DEFAULTS = {
   },
   effectPipeline: createDefaultEffectPipeline(),
   histogram: {
-    enabled: true,
+    // The Color Histogram is opt-in from the settings panel (UI-009 / LAYOUT-004).
+    enabled: false,
     showRampDistribution: true,
     scale: 1.0,
   },

@@ -9,17 +9,17 @@ import {
 import { EffectStackPanelView } from './EffectStackPanelView';
 
 type Props = {
-  onSwapWorkspace?: () => void;
   onSelectEffectStack?: (kind: EffectStackKind) => void;
   onPopOut?: () => void;
+  onCollapse?: () => void;
   openPropertiesOnDrag?: boolean;
 };
 
-/** The inline Effect Stack panel of the main window. */
+/** The Effect Stack panel of the main window's Layers column. */
 export function PostprocessStackPanel({
-  onSwapWorkspace,
   onSelectEffectStack,
   onPopOut,
+  onCollapse,
   openPropertiesOnDrag = true,
 }: Props = {}) {
   const view = useStore(getEffectStackViewStore(), state => state.view);
@@ -30,8 +30,9 @@ export function PostprocessStackPanel({
     <EffectStackPanelView
       view={view}
       actions={actions}
-      onSwapWorkspace={onSwapWorkspace}
+      variant="column"
       onPopOut={onPopOut}
+      onCollapse={onCollapse}
       onDragSelect={openPropertiesOnDrag ? undefined : kind => selectEffectStackLayer(kind, false)}
     />
   );

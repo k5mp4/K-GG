@@ -31,6 +31,7 @@ import type { CanvasWorkspaceProps } from './CanvasWorkspace';
 import { refreshPresetLibrary } from '../../lib/presetLibraryCache';
 import { LEFT_PANEL_MAX_WIDTH } from '../../lib/panelLayout';
 import { useWorkspaceLayout } from './useWorkspaceLayout';
+import { useEffectStackWindowHost } from '../effectStack/useEffectStackWindowHost';
 import { WORKSPACE_LAYOUT_POLICY } from './workspaceLayout';
 
 const MAX_DISPLAY_W = 1000;
@@ -251,6 +252,9 @@ export function useWorkspaceController({ translate, compact = false }: Workspace
   const [showGradientRamp, setShowGradientRamp] = useState(true);
   const [showOverlaySettings, setShowOverlaySettings] = useState(false);
   const [showImageGradientSource, setShowImageGradientSource] = useState(false);
+  const [layersCollapsed, setLayersCollapsed] = useState(false);
+  /** What the left overlay panel shows below the dock breakpoint. */
+  const [leftOverlaySection, setLeftOverlaySection] = useState<'layers' | 'properties'>('properties');
 
   const handleEffectStackSelection = (kind: EffectStackKind) => {
     const nextTab = EFFECT_STACK_TAB_MAP[kind] ?? 'postprocess';
@@ -258,6 +262,7 @@ export function useWorkspaceController({ translate, compact = false }: Workspace
     activeLeftTabRef.current = nextTab;
     setLeftTab(nextTab);
     setLeftPanelOpen(true);
+    setLeftOverlaySection('properties');
     if (layout.panels === 'overlay') {
       setShowLeftSidebar(true);
       setShowRightSidebar(false);
@@ -283,6 +288,7 @@ export function useWorkspaceController({ translate, compact = false }: Workspace
     activeLeftTabRef.current = value;
     setLeftTab(value);
     setLeftPanelOpen(true);
+    setLeftOverlaySection('properties');
     if (layout.panels === 'overlay') {
       setShowLeftSidebar(true);
       setShowRightSidebar(false);
@@ -366,10 +372,12 @@ export function useWorkspaceController({ translate, compact = false }: Workspace
   const [leftPanelW, setLeftPanelW] = useState(288);
   const [rightPanelW, setRightPanelW] = useState(320);
   const workspaceRef = useRef<HTMLDivElement>(null);
+  const effectStackWindow = useEffectStackWindowHost(kind => handleEffectStackSelection(kind));
   const layout = useWorkspaceLayout(workspaceRef, {
     leftWidth: leftPanelW, rightWidth: rightPanelW,
     leftOpen: leftPanelOpen, rightOpen: rightPanelOpen,
     timelineHeight, timelineOpen: showTimeline,
+    layersCollapsed, layersDetached: effectStackWindow.isOpen,
   });
   const [activeResizeSide, setActiveResizeSide] = useState<'left' | 'right' | null>(null);
   const resizingRef = useRef<'left' | 'right' | null>(null);
@@ -382,8 +390,8 @@ export function useWorkspaceController({ translate, compact = false }: Workspace
       if (!bounds) return;
       const origin = resizeOriginRef.current;
       const { panelMinWidth, previewMinWidth, timelineMinHeight } = WORKSPACE_LAYOUT_POLICY;
-      if (resizingRef.current === 'left') setLeftPanelW(Math.max(panelMinWidth, Math.min(LEFT_PANEL_MAX_WIDTH, bounds.width - previewMinWidth - (rightPanelOpen ? layout.rightWidth : 0), origin.width + event.clientX - origin.x)));
-      if (resizingRef.current === 'right') setRightPanelW(Math.max(panelMinWidth, Math.min(600, bounds.width - previewMinWidth - (leftPanelOpen ? layout.leftWidth : 0), origin.width + origin.x - event.clientX)));
+      if (resizingRef.current === 'left') setLeftPanelW(Math.max(panelMinWidth, Math.min(LEFT_PANEL_MAX_WIDTH, bounds.width - previewMinWidth - layout.layersWidth - (rightPanelOpen ? layout.rightWidth : 0), origin.width + event.clientX - origin.x)));
+      if (resizingRef.current === 'right') setRightPanelW(Math.max(panelMinWidth, Math.min(600, bounds.width - previewMinWidth - layout.layersWidth - (leftPanelOpen ? layout.leftWidth : 0), origin.width + origin.x - event.clientX)));
       if (timelineResizingRef.current) setTimelineHeight(Math.max(timelineMinHeight, Math.min(layout.timelineMaxHeight, bounds.bottom - event.clientY)));
     };
     const onUp = () => {
@@ -404,7 +412,7 @@ export function useWorkspaceController({ translate, compact = false }: Workspace
       window.removeEventListener('blur', onUp);
       document.removeEventListener('visibilitychange', onUp);
     };
-  }, [layout.leftWidth, layout.rightWidth, layout.timelineMaxHeight, leftPanelOpen, rightPanelOpen]);
+  }, [layout.leftWidth, layout.rightWidth, layout.layersWidth, layout.timelineMaxHeight, leftPanelOpen, rightPanelOpen]);
 
   const handlePanelResizeStart = (side: 'left' | 'right', event: ReactPointerEvent<HTMLDivElement>) => {
     event.preventDefault();
@@ -591,6 +599,10 @@ export function useWorkspaceController({ translate, compact = false }: Workspace
     setShowLeftSidebar(true);
     setShowRightSidebar(false);
   };
+  const handleOpenLayers = () => {
+    setLeftOverlaySection('layers');
+    handleOpenLeftSidebar();
+  };
   const handleToggleRightSidebar = () => {
     setRightPanelOpen(true);
     setShowRightSidebar(value => !value);
@@ -620,10 +632,8 @@ export function useWorkspaceController({ translate, compact = false }: Workspace
     },
     chrome: {
       panelsPresentation: layout.panels,
-      toolsPresentation: layout.tools,
-      showLeftSidebar,
-      showRightSidebar,
       onOpenLeftSidebar: handleOpenLeftSidebar,
+      onOpenLayers: handleOpenLayers,
       showFeedback: () => setShowFeedback(true),
       showGradientAnchors,
       onToggleGradientAnchors: () => setShowGradientAnchors(value => !value),
@@ -662,7 +672,6 @@ export function useWorkspaceController({ translate, compact = false }: Workspace
       controlUi: kggUiAdapter,
       controlProject: kggProjectAdapter,
       setManualDistort: applicationCommands.setPostprocess,
-      onSelectEffectStack: handleEffectStackSelection,
       onClothReady: () => setClothReady(true),
       onClothUnavailable: handleClothUnavailable,
     },
@@ -719,6 +728,11 @@ export function useWorkspaceController({ translate, compact = false }: Workspace
     setShowOverlaySettings,
     showImageGradientSource,
     setShowImageGradientSource,
+    layersCollapsed,
+    setLayersCollapsed,
+    leftOverlaySection,
+    setLeftOverlaySection,
+    effectStackWindow,
     showLeftSidebar,
     setShowLeftSidebar,
     showRightSidebar,

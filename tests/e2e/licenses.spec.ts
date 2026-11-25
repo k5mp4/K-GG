@@ -4,14 +4,13 @@ import { pauseAnimation, waitForE2EBridge, waitForWebGLReady } from './support/b
 test('Licenses display locally and preset import runs in a real Worker', async ({ page, browserErrors: _browserErrors }, testInfo) => {
   await page.addInitScript(() => localStorage.setItem('kgg.ui-language', 'en'));
   await page.goto('/', { waitUntil: 'domcontentloaded' });
-  // With software WebGL, preview playback and the realtime histogram's
-  // per-frame canvas readback saturate the CI main thread. This test covers
-  // dialog UI and the import Worker, so stop both before interacting.
+  // With software WebGL, preview playback saturates the CI main thread. This test
+  // covers dialog UI and the import Worker, so stop playback before interacting.
+  // The realtime histogram is opt-in and stays off by default.
   await waitForE2EBridge(page);
   await waitForWebGLReady(page);
   await pauseAnimation(page);
-  await page.locator('div', { hasText: /^Realtime Stats/ }).getByRole('button', { name: '✕' }).click();
-  await expect(page.getByRole('button', { name: 'Show Histogram' })).toBeVisible();
+  await expect(page.locator('#color-histogram-content')).toHaveCount(0);
   await page.getByRole('button', { name: 'Help', exact: true }).click();
   await page.getByRole('button', { name: 'Third-party licenses', exact: true }).click();
   const search = page.getByRole('searchbox');

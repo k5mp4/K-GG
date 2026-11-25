@@ -32,37 +32,34 @@ test('workspace adapts to small screens while preserving editors and preview', a
   await page.keyboard.press('Escape');
   await expect(settings.getByRole('button')).toHaveCount(0);
   await expect(page.getByRole('button', { name: 'Open K-GG', exact: true })).toBeFocused();
-  await page.getByRole('button', { name: 'Layers & histogram', exact: true }).click();
-  const tools = page.locator('#workspace-tools');
-  await expect(tools).toBeVisible();
-  const layerTitles = tools.locator('.effect-stack-row__title');
+  // Below the dock breakpoint the Layers live in the left overlay panel, never on the preview.
+  await expect(page.locator('[data-canvas-workspace] [data-effect-stack-workspace]')).toHaveCount(0);
+  await page.getByRole('button', { name: 'Open layers', exact: true }).click();
+  const layers = properties.locator('[data-effect-stack-workspace]');
+  await expect(layers).toBeVisible();
+  await expect(properties.getByRole('radio', { name: 'Layers' })).toHaveAttribute('aria-checked', 'true');
+  const layerTitles = layers.locator('.effect-stack-row__title');
   const originalOrder = await layerTitles.allTextContents();
-  const dragHandle = await tools.locator('.effect-stack-row__drag-handle').first().boundingBox();
+  const dragHandle = await layers.locator('.effect-stack-row__drag-handle').first().boundingBox();
   expect(dragHandle).not.toBeNull();
   await page.mouse.move(dragHandle!.x + 5, dragHandle!.y + 5);
   await page.mouse.down();
-  await expect(tools).toBeVisible();
+  await expect(layers).toBeVisible();
   await page.mouse.move(dragHandle!.x + 5, dragHandle!.y + 43, { steps: 5 });
   await page.mouse.up();
-  await expect(tools).toBeVisible();
+  await expect(layers).toBeVisible();
   await expect.poll(() => layerTitles.allTextContents()).toEqual([originalOrder[1], originalOrder[0], ...originalOrder.slice(2)]);
-  await expect(properties.getByRole('button')).toHaveCount(0);
+  const rows = layers.locator('#kgg-effect-stack-content');
   const previewWidthBeforeScroll = (await page.locator('#kgg-preview-canvas').boundingBox())!.width;
-  await tools.hover({ position: { x: 100, y: 100 } });
+  await rows.hover({ position: { x: 100, y: 100 } });
   await page.mouse.wheel(0, 500);
-  await expect.poll(() => tools.evaluate(element => element.scrollTop)).toBeGreaterThan(0);
+  await expect.poll(() => rows.evaluate(element => element.scrollTop)).toBeGreaterThan(0);
   expect((await page.locator('#kgg-preview-canvas').boundingBox())!.width).toBeCloseTo(previewWidthBeforeScroll, 1);
-  expect(await tools.evaluate(element => {
-    const down = new PointerEvent('pointerdown', { bubbles: true, cancelable: true, pointerType: 'touch', pointerId: 91 });
-    element.dispatchEvent(down);
-    const up = new PointerEvent('pointerup', { bubbles: true, cancelable: true, pointerType: 'touch', pointerId: 91 });
-    element.dispatchEvent(up);
-    return down.defaultPrevented || up.defaultPrevented;
-  })).toBe(false);
-  await tools.getByText('Texture', { exact: true }).scrollIntoViewIfNeeded();
-  await expect(tools.getByText('Texture', { exact: true })).toBeInViewport();
-  await tools.getByText('Texture', { exact: true }).click();
-  await expect(tools).toBeHidden();
+  await layers.getByText('Texture', { exact: true }).scrollIntoViewIfNeeded();
+  await expect(layers.getByText('Texture', { exact: true })).toBeInViewport();
+  await layers.getByText('Texture', { exact: true }).click();
+  await expect(layers).toBeHidden();
+  await expect(properties.getByRole('radio', { name: 'Properties' })).toHaveAttribute('aria-checked', 'true');
   await expect(properties.getByRole('button', { name: 'Close Property Modules' })).toBeVisible();
   await expect(properties.locator('[data-module="postprocess"]')).not.toHaveAttribute('inert');
   await properties.getByRole('button', { name: 'Close Property Modules' }).click();
@@ -119,4 +116,47 @@ test('workspace adapts to small screens while preserving editors and preview', a
   await page.setViewportSize({ width: 1440, height: 960 });
   await expect.poll(async () => (await timeline.boundingBox())!.height).toBeCloseTo(preferredTimelineHeight, 0);
   await expect.poll(async () => (await properties.boundingBox())!.width).toBeCloseTo(preferredWidth, 0);
+});
+
+test('docked Layers column stays beside the preview regardless of timeline and window size', async ({ page, browserErrors: _browserErrors }) => {
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await page.goto('/', { waitUntil: 'domcontentloaded' });
+  await waitForE2EBridge(page);
+  await pauseAnimation(page);
+  const workspace = page.locator('[data-workspace-layout]');
+  const layers = page.locator('[data-effect-stack-workspace]');
+  const preview = page.locator('[data-canvas-workspace]');
+  const properties = page.locator('#property-modules-panel');
+
+  await expect(workspace).toHaveAttribute('data-workspace-layout', 'docked');
+  await expect(layers).toHaveAttribute('data-layers-presentation', 'column');
+  await expect(preview.locator('[data-effect-stack-workspace]')).toHaveCount(0);
+  const layersBox = (await layers.boundingBox())!;
+  const propertiesBox = (await properties.boundingBox())!;
+  const previewBox = (await preview.boundingBox())!;
+  // Layers | Properties | Preview, side by side without overlap.
+  expect(layersBox.x + layersBox.width).toBeLessThanOrEqual(propertiesBox.x + 1);
+  expect(propertiesBox.x + propertiesBox.width).toBeLessThanOrEqual(previewBox.x + 1);
+  // All layer names fit without truncation.
+  expect(await layers.locator('.effect-stack-row__title').evaluateAll(titles => titles.filter(title => title.scrollWidth > title.clientWidth).map(title => title.textContent))).toEqual([]);
+  // The Color Histogram is opt-in.
+  await expect(page.locator('#color-histogram-content')).toHaveCount(0);
+
+  await page.getByRole('button', { name: 'Open Animation', exact: true }).click();
+  await expect(page.locator('#animation-timeline-panel')).toBeVisible();
+  await expect(layers).toHaveAttribute('data-layers-presentation', 'column');
+  await page.getByRole('button', { name: 'Close Animation', exact: true }).click();
+
+  await layers.getByRole('button', { name: 'Collapse layers to icons' }).click();
+  await expect(layers).toHaveAttribute('data-layers-presentation', 'rail');
+  await layers.getByRole('button', { name: /^Glass:/ }).click();
+  await expect(properties.locator('[data-module="postprocess"]')).not.toHaveAttribute('inert');
+  await layers.getByRole('button', { name: 'Expand layers' }).click();
+  await expect(layers).toHaveAttribute('data-layers-presentation', 'column');
+
+  // A narrower dock workspace falls back to the rail first, and returns to the column when it widens.
+  await page.setViewportSize({ width: 1100, height: 800 });
+  await expect(layers).toHaveAttribute('data-layers-presentation', 'rail');
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await expect(layers).toHaveAttribute('data-layers-presentation', 'column');
 });

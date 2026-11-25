@@ -11,32 +11,12 @@ import { Icon } from './Icon';
 import { useLanguage } from '../i18n/LanguageProvider';
 import { EFFECT_STACK_TRANSITION_DURATION_MS } from '../lib/effectStackTransition';
 import type { EffectStackActions, EffectStackView } from '../features/effectStack/effectStackView';
+import { EFFECT_STACK_LABELS } from '../features/effectStack/effectStackLabels';
 
-/** Width of the inline panel; EffectStackWorkspace places the histogram next to it. */
-export const EFFECT_STACK_PANEL_WIDTH = 200;
 const ROW_HEIGHT = 38;
 const DRAG_SETTLE_MS = 150;
 /** How long a committed drag waits for the moved order before it gives up. */
 const DRAG_COMMIT_TIMEOUT_MS = 1000;
-const STACK_PANEL_SESSION_KEY = 'kgg.effect-stack-panel.collapsed';
-
-const LABELS: Record<EffectStackKind, string> = {
-  diffuse: 'Diffuse',
-  noise: 'Noise',
-  slit: 'Slit',
-  stretch: 'Stretch',
-  distort: 'Distort',
-  mirror: 'Mirror',
-  kaleidoscope: 'Kaleidoscope',
-  voronoi: 'Voronoi',
-  glass: 'Glass',
-  glassTile: 'GlassTile',
-  datamosh: 'Datamosh',
-  cone: '3D',
-  texture: 'Texture',
-  distortChroma: 'Distort Chroma',
-  ice: 'Ice',
-};
 
 type DragState = Omit<EffectStackDragState, 'kind' | 'phase'> & {
   kind: EffectStackKind;
@@ -50,12 +30,13 @@ type RowTransitionPhase = 'idle' | 'from' | 'animate';
 type ViewProps = {
   view: EffectStackView;
   actions: EffectStackActions;
-  /** `window` fills a native Effect Stack window instead of floating over the canvas. */
-  variant?: 'inline' | 'window';
-  onSwapWorkspace?: () => void;
+  /** `column` fills the workspace Layers column; `window` fills a native Effect Stack window. */
+  variant?: 'column' | 'window';
+  /** Collapses the Layers column to its icon rail. */
+  onCollapse?: () => void;
   /** Shown in place of the version label when the stack can open in its own window. */
   onPopOut?: () => void;
-  /** Select without opening an editor when reordering inside a compact drawer. */
+  /** Select without opening an editor while reordering. */
   onDragSelect?: (kind: EffectStackKind) => void;
 };
 
@@ -63,8 +44,8 @@ type ViewProps = {
 export function EffectStackPanelView({
   view,
   actions,
-  variant = 'inline',
-  onSwapWorkspace,
+  variant = 'column',
+  onCollapse,
   onPopOut,
   onDragSelect,
 }: ViewProps) {
@@ -75,15 +56,6 @@ export function EffectStackPanelView({
   const dragCleanupRef = useRef<(() => void) | null>(null);
   const settleTimerRef = useRef<number | null>(null);
   const [dragging, setDragging] = useState<DragState | null>(null);
-  const [collapsed, setCollapsed] = useState(() => {
-    if (variant === 'window') return false;
-    try {
-      return typeof window !== 'undefined'
-        && window.sessionStorage.getItem(STACK_PANEL_SESSION_KEY) === 'true';
-    } catch {
-      return false;
-    }
-  });
   const [rowTransitionPhase, setRowTransitionPhase] = useState<RowTransitionPhase>('idle');
 
   const clearSettleTimer = () => {
@@ -119,15 +91,6 @@ export function EffectStackPanelView({
     draggingRef.current = null;
     setDragging(null);
   }, [orderKey]);
-
-  useEffect(() => {
-    if (variant === 'window') return;
-    try {
-      window.sessionStorage.setItem(STACK_PANEL_SESSION_KEY, String(collapsed));
-    } catch {
-      // sessionStorage may be unavailable in private or restricted contexts.
-    }
-  }, [collapsed, variant]);
 
   const cancelDrag = () => {
     dragCleanupRef.current?.();
@@ -264,27 +227,12 @@ export function EffectStackPanelView({
   return (
     <div
       data-effect-stack-panel
-      className={variant === 'window'
-        // The window body does not scroll: keep the header fixed and scroll the rows.
-        ? 'flex h-screen w-full min-w-0 flex-col bg-k-bg'
-        : 'min-h-8 overflow-hidden border border-cream/20 bg-k-bg/90 shadow-[0_18px_46px_rgba(0,0,0,0.36)] backdrop-blur-md'}
-      style={variant === 'window' ? undefined : { width: EFFECT_STACK_PANEL_WIDTH }}
+      data-variant={variant}
+      // The header stays fixed and the rows scroll inside the column or window.
+      className={`flex w-full min-w-0 flex-col bg-k-bg ${variant === 'window' ? 'h-screen' : 'h-full'}`}
     >
       <div className="flex h-8 shrink-0 items-center justify-between gap-1.5 border-b border-cream/15 px-2">
-        {variant === 'window' ? (
-          <span className="min-w-0 truncate font-display text-[9px] font-bold uppercase tracking-wider text-cream/80">{t('effect.stack')}</span>
-        ) : (
-          <button
-            type="button"
-            className="flex h-full min-w-0 flex-1 items-center gap-1 p-0 text-left text-cream/80 transition-colors hover:text-fire focus:outline-none focus-visible:ring-2 focus-visible:ring-fire"
-            aria-expanded={!collapsed}
-            aria-controls="kgg-effect-stack-content"
-            onClick={() => setCollapsed(value => !value)}
-          >
-            <Icon name={collapsed ? 'chevronRight' : 'chevronDown'} className="shrink-0 text-[12px]" />
-            <span className="truncate font-display text-[9px] font-bold uppercase tracking-wider">{t('effect.stack')}</span>
-          </button>
-        )}
+        <span className="min-w-0 truncate font-display text-[9px] font-bold uppercase tracking-wider text-cream/80">{t('effect.stack')}</span>
         <div className="flex shrink-0 items-center gap-1">
           <button
             type="button"
@@ -296,17 +244,6 @@ export function EffectStackPanelView({
           >
             <Icon name="shuffle" className="text-[12px]" />
           </button>
-          {onSwapWorkspace && (
-            <button
-              type="button"
-              className={headerButtonClass}
-              title={t('stack.swapHistogram')}
-              aria-label={t('stack.swapHistogram')}
-              onClick={onSwapWorkspace}
-            >
-              ⇄
-            </button>
-          )}
           {onPopOut ? (
             <button
               type="button"
@@ -320,12 +257,22 @@ export function EffectStackPanelView({
           ) : (
             <span className="text-[8px] font-bold uppercase text-emerald-300">{t('stack.version')}</span>
           )}
+          {onCollapse && (
+            <button
+              type="button"
+              className={headerButtonClass}
+              title={t('stack.collapseToRail')}
+              aria-label={t('stack.collapseToRail')}
+              onClick={onCollapse}
+            >
+              <Icon name="chevronLeft" className="text-[12px]" />
+            </button>
+          )}
         </div>
       </div>
       <div
         id="kgg-effect-stack-content"
-        hidden={collapsed}
-        className={variant === 'window' ? 'min-h-0 flex-1 overflow-y-auto overflow-x-hidden' : undefined}
+        className="min-h-0 flex-1 overflow-y-auto overflow-x-hidden scrollbar-thin"
       >
       <div className="relative" style={{ height: stack.length * ROW_HEIGHT }}>
         {stack.map((layer, index) => {
@@ -356,15 +303,15 @@ export function EffectStackPanelView({
               <button
                 type="button"
                 className="effect-stack-row__drag-handle"
-                aria-label={t('stack.drag', { effect: LABELS[layer.kind] })}
-                title={t('stack.drag', { effect: LABELS[layer.kind] })}
+                aria-label={t('stack.drag', { effect: EFFECT_STACK_LABELS[layer.kind] })}
+                title={t('stack.drag', { effect: EFFECT_STACK_LABELS[layer.kind] })}
                 onPointerDown={(e) => startDrag(e, layer.kind, index)}
                 onClick={onDragSelect ? event => event.stopPropagation() : undefined}
               >
                 <Icon name="gripVertical" className="text-[15px]" />
               </button>
               <div className="min-w-0 flex-1">
-                <div className="effect-stack-row__title">{LABELS[layer.kind]}</div>
+                <div className="effect-stack-row__title">{EFFECT_STACK_LABELS[layer.kind]}</div>
                 <div className={`effect-stack-row__status ${layer.status.className}`}>{t(layer.status.labelKey)}</div>
               </div>
               <div

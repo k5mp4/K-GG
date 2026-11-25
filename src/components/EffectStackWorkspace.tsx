@@ -1,118 +1,121 @@
-import { useCallback, useEffect, useLayoutEffect, useRef, useState, type RefObject } from 'react';
-import { ColorHistogram } from './ColorHistogram';
-import { PostprocessStackPanel } from './PostprocessStackPanel';
-import { EFFECT_STACK_PANEL_WIDTH } from './EffectStackPanelView';
+import { useMemo, useRef } from 'react';
+import { useStore } from 'zustand';
 import type { EffectStackKind } from '../types/distortion';
+import { createLocalEffectStackActions, getEffectStackViewStore } from '../features/effectStack/effectStackController';
 import { useLanguage } from '../i18n/LanguageProvider';
-import { useEffectStackWindowHost } from '../features/effectStack/useEffectStackWindowHost';
-import type { ToolPresentation } from '../features/workspace/workspaceLayout';
+import { EFFECT_STACK_LABELS } from '../features/effectStack/effectStackLabels';
+import { PostprocessStackPanel } from './PostprocessStackPanel';
+import { Icon } from './Icon';
 
-const WORKSPACE_ORDER_KEY = 'kgg.effect-stack-workspace.order';
-const STACK_SLOT_X = 0;
-const HISTOGRAM_SLOT_X = EFFECT_STACK_PANEL_WIDTH + 16;
-
-type WorkspaceOrder = 'stack-first' | 'histogram-first';
-
-function readWorkspaceOrder(): WorkspaceOrder {
-  try {
-    return window.sessionStorage.getItem(WORKSPACE_ORDER_KEY) === 'histogram-first'
-      ? 'histogram-first'
-      : 'stack-first';
-  } catch {
-    return 'stack-first';
-  }
-}
-
-type Props = {
-  sourceCanvasRef: RefObject<HTMLCanvasElement | null>;
-  hidden?: boolean;
-  onSelectEffectStack?: (kind: EffectStackKind) => void;
-  presentation?: ToolPresentation;
+/** Short names for the icon rail; the full name stays in the tooltip and accessible name. */
+const RAIL_ABBREVIATIONS: Record<EffectStackKind, string> = {
+  diffuse: 'DF',
+  noise: 'NS',
+  slit: 'SL',
+  stretch: 'ST',
+  distort: 'DS',
+  mirror: 'MR',
+  kaleidoscope: 'KL',
+  voronoi: 'VR',
+  glass: 'GL',
+  glassTile: 'GT',
+  datamosh: 'DM',
+  cone: '3D',
+  texture: 'TX',
+  distortChroma: 'DC',
+  ice: 'IC',
 };
 
-export function EffectStackWorkspace({
-  sourceCanvasRef,
-  hidden = false,
-  onSelectEffectStack,
-  presentation = 'inline',
-}: Props) {
+type Props = {
+  /** `column` lists the layers with their controls; `rail` shows the compact icon rail. */
+  presentation: 'column' | 'rail';
+  width?: number;
+  onSelectEffectStack?: (kind: EffectStackKind) => void;
+  onPopOut?: () => void;
+  /** Present only where the user can switch between the column and the rail. */
+  onCollapsedChange?: (collapsed: boolean) => void;
+  /** False keeps the Layers list open while reordering (overlay segment). */
+  openPropertiesOnDrag?: boolean;
+};
+
+/**
+ * The Effect Stack as the workspace Layers dock. It sits beside the property
+ * panel (or inside the overlay panel) and never covers the preview.
+ */
+export function EffectStackLayers({ presentation, width, onSelectEffectStack, onPopOut, onCollapsedChange, openPropertiesOnDrag = true }: Props) {
   const { t } = useLanguage();
-  const [order, setOrder] = useState<WorkspaceOrder>(readWorkspaceOrder);
-  const stackRef = useRef<HTMLDivElement>(null);
-  const histogramRef = useRef<HTMLDivElement>(null);
-  const stackWindow = useEffectStackWindowHost(onSelectEffectStack);
-  const stackDetached = stackWindow.isOpen;
-  const [drawerOpen, setDrawerOpen] = useState(false);
-  const drawer = presentation === 'drawer';
-  const visible = !hidden && (!drawer || drawerOpen);
-  const toggleRef = useRef<HTMLButtonElement>(null);
-  const closeRef = useRef<HTMLButtonElement>(null);
-  const closeDrawer = () => { setDrawerOpen(false); toggleRef.current?.focus(); };
-  useEffect(() => {
-    if (drawer && visible) closeRef.current?.focus({ preventScroll: true });
-  }, [drawer, visible]);
-
-  const swapOrder = useCallback(() => {
-    setOrder(current => current === 'stack-first' ? 'histogram-first' : 'stack-first');
-  }, []);
-
-  useLayoutEffect(() => {
-    const stackX = order === 'stack-first' ? STACK_SLOT_X : HISTOGRAM_SLOT_X;
-    // While the stack lives in its own window the histogram takes the first slot.
-    const histogramX = order === 'stack-first' && !stackDetached ? HISTOGRAM_SLOT_X : STACK_SLOT_X;
-    const nodes = [
-      [stackRef.current, stackX],
-      [histogramRef.current, histogramX],
-    ] as const;
-
-    nodes.forEach(([node, x]) => {
-      if (!node) return;
-      node.style.transition = window.matchMedia('(prefers-reduced-motion: reduce)').matches
-        ? 'none' : 'transform 420ms cubic-bezier(0.65, 0, 0.35, 1)';
-      node.style.transform = drawer ? 'none' : `translateX(${x}px)`;
-    });
-  }, [order, stackDetached, drawer]);
-
-  useLayoutEffect(() => {
-    try {
-      window.sessionStorage.setItem(WORKSPACE_ORDER_KEY, order);
-    } catch {
-      // Session storage is optional in restricted/PiP contexts.
-    }
-  }, [order]);
-
   return (
-    <>
-    {drawer && !hidden && (
-      <button ref={toggleRef} type="button" data-viewport-ui className="absolute bottom-3 left-2 z-30 min-h-10 border border-panel-border bg-k-surface px-3 text-[10px] text-cream" aria-controls="workspace-tools" aria-expanded={drawerOpen} onClick={() => setDrawerOpen(value => !value)}>{t('workspace.tools')}</button>
-    )}
-    <div
-      id="workspace-tools"
+    <section
       data-effect-stack-workspace
-      data-viewport-ui
-      data-presentation={presentation}
-      className={`absolute z-30 ${drawer ? 'inset-x-2 top-2 bottom-16 overflow-auto border border-panel-border bg-k-bg/95 p-3 scrollbar-thin' : 'inset-x-4 top-4 bottom-4 pointer-events-none'} ${visible ? 'block' : 'hidden'}`}
-      inert={!visible}
-      onKeyDown={event => { if (drawer && event.key === 'Escape') { event.stopPropagation(); closeDrawer(); } }}
-      aria-label={t('workspace.effectStack')}
+      data-layers-presentation={presentation}
+      aria-label={t('workspace.layers')}
+      className="flex h-full min-h-0 shrink-0 flex-col border-r border-panel-border bg-k-bg"
+      style={width === undefined ? undefined : { width }}
     >
-      {drawer && <div className="mb-3 flex items-center justify-between gap-2"><span className="text-xs text-cream">{t('workspace.tools')}</span><button ref={closeRef} type="button" className="min-h-8 px-3 text-xs" onClick={closeDrawer}>{t('common.close')}</button></div>}
-      <div className={drawer ? 'flex flex-wrap items-start gap-4' : 'relative h-full'}>
-        <div ref={stackRef} style={{ order: order === 'stack-first' ? 0 : 1 }} className={`${drawer ? 'relative' : 'absolute left-0 top-0 max-h-full overflow-y-auto scrollbar-thin'} pointer-events-auto`}>
-          {!stackDetached && (
-            <PostprocessStackPanel
-              onSwapWorkspace={swapOrder}
-              onSelectEffectStack={kind => { if (drawer) setDrawerOpen(false); onSelectEffectStack?.(kind); }}
-              onPopOut={stackWindow.supported ? stackWindow.open : undefined}
-              openPropertiesOnDrag={!drawer}
-            />
-          )}
-        </div>
-        <div ref={histogramRef} style={{ order: order === 'stack-first' ? 1 : 0 }} className={`${drawer ? 'relative' : 'absolute left-0 top-0 max-h-full overflow-auto scrollbar-thin'} pointer-events-auto`}>
-          <ColorHistogram sourceCanvasRef={sourceCanvasRef} active={visible} />
-        </div>
+      {presentation === 'column' ? (
+        <PostprocessStackPanel
+          onSelectEffectStack={onSelectEffectStack}
+          onPopOut={onPopOut}
+          onCollapse={onCollapsedChange ? () => onCollapsedChange(true) : undefined}
+          openPropertiesOnDrag={openPropertiesOnDrag}
+        />
+      ) : (
+        <EffectStackRail onSelectEffectStack={onSelectEffectStack} onExpand={onCollapsedChange ? () => onCollapsedChange(false) : undefined} />
+      )}
+    </section>
+  );
+}
+
+function EffectStackRail({ onSelectEffectStack, onExpand }: { onSelectEffectStack?: (kind: EffectStackKind) => void; onExpand?: () => void }) {
+  const { t } = useLanguage();
+  const view = useStore(getEffectStackViewStore(), state => state.view);
+  const selectRef = useRef(onSelectEffectStack);
+  selectRef.current = onSelectEffectStack;
+  const actions = useMemo(() => createLocalEffectStackActions(() => selectRef.current), []);
+  return (
+    <div data-effect-stack-rail className="flex h-full min-h-0 flex-col">
+      <div className="flex h-8 shrink-0 items-center justify-center border-b border-cream/15">
+        {onExpand && (
+          <button
+            type="button"
+            className="flex h-7 w-8 items-center justify-center p-0 text-cream/70 transition-colors hover:bg-cream/10 hover:text-fire focus:outline-none focus-visible:ring-2 focus-visible:ring-fire"
+            title={t('stack.expandColumn')}
+            aria-label={t('stack.expandColumn')}
+            onClick={onExpand}
+          >
+            <Icon name="chevronRight" className="text-[14px]" />
+          </button>
+        )}
       </div>
+      <ul className="min-h-0 flex-1 overflow-y-auto overflow-x-hidden scrollbar-thin" aria-label={t('effect.stack')}>
+        {view.layers.map(layer => {
+          const selected = view.selectedKind === layer.kind;
+          const name = EFFECT_STACK_LABELS[layer.kind];
+          return (
+            <li key={layer.kind}>
+              <button
+                type="button"
+                data-selected={selected ? 'true' : 'false'}
+                data-enabled={layer.enabled ? 'true' : 'false'}
+                aria-current={selected ? 'true' : undefined}
+                aria-label={`${name}: ${t(layer.status.labelKey)}`}
+                title={`${name} · ${t(layer.status.labelKey)}`}
+                onClick={event => actions.select(layer.kind, event.altKey)}
+                onPointerEnter={() => { if (!layer.enabled) actions.prefetch(layer.kind); }}
+                className={`relative flex h-[38px] w-full items-center justify-center border-b border-cream/10 p-0 font-display text-[11px] font-bold tracking-wider transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-fire ${selected
+                  ? 'bg-fire/15 text-k-text'
+                  : layer.enabled ? 'text-cream hover:bg-cream/10' : 'text-cream/55 hover:bg-cream/10 hover:text-cream'}`}
+              >
+                {RAIL_ABBREVIATIONS[layer.kind]}
+                <span
+                  aria-hidden="true"
+                  className={`absolute right-1.5 top-1.5 h-1.5 w-1.5 rounded-full ${layer.enabled ? 'bg-fire' : 'border border-cream/35'}`}
+                />
+              </button>
+            </li>
+          );
+        })}
+      </ul>
     </div>
-    </>
   );
 }
