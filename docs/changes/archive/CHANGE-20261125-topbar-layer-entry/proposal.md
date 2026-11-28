@@ -2,16 +2,19 @@
 type: change
 id: CHANGE-20261125-topbar-layer-entry
 title: TOPバーのモジュールタブ廃止とEffect Stackへの入口一本化
-status: review
+status: archived
 change_kind: F
 owners: [maintainer]
 created: 2026-11-25
-updated: 2026-11-26
+updated: 2026-11-28
 current_specs: [CURRENT-UI-CONTROLS, CURRENT-WORKSPACE-LAYOUT, CURRENT-EFFECT-STACK]
 related_adrs: [ADR-20261125-workspace-layers-column]
 related_code: [src/features/workspace/tabs.ts, src/features/workspace/WorkspaceTopBar.tsx, src/features/workspace/useWorkspaceController.ts, src/components/PostprocessPanel.tsx, src/App.tsx, src/i18n/messages.ts]
 related_tests: [src/features/workspace/tabs.test.ts, src/components/PostprocessPanel.test.tsx, tests/e2e/workspace-layout.spec.ts]
 human_review: required
+outcome: follow-up
+migration: historical
+follow_up: "issue-needed: Tauriアプリ上でTOPバー（編集中/SANDBOX/EXPORT/PRESET）とEffect Stack入口の目視確認（PR #133はbrowser E2Eのみ）"
 ---
 
 # TOPバーのモジュールタブ廃止とEffect Stackへの入口一本化
@@ -78,3 +81,10 @@ Issue: #125（前提: #124 Layersカラム化）
 ## 未決定事項
 
 なし。
+
+## Finalization
+
+- Finalized: 2026-11-28
+- Outcome: `follow-up`
+- Mode: historical migration; this move does not claim that every acceptance criterion passed.
+- Follow-up: issue-needed: Tauriアプリ上でTOPバー（編集中/SANDBOX/EXPORT/PRESET）とEffect Stack入口の目視確認（PR #133はbrowser E2Eのみ）
