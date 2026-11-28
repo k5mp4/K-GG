@@ -1,7 +1,7 @@
 ---
 id: ADR-0022
 title: スプラッシュの演出をアダプターで分離し、Shader準備をPreview contextで優先度付きに行う
-status: proposed
+status: accepted
 date: 2026-09-25
 deciders: [maintainer]
 related_specs: []
