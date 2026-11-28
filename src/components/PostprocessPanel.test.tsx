@@ -1,5 +1,5 @@
 import { renderToStaticMarkup } from 'react-dom/server';
-import { beforeEach, describe, expect, it } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { LanguageProvider } from '../i18n/LanguageProvider';
 import { updateEffectStackLayer } from '../lib/effectPipeline';
 import { useGradientStore } from '../store/gradientStore';
@@ -190,5 +190,39 @@ describe('PostprocessPanel layer surface', () => {
     expect(markup).not.toContain('Surface Height');
     expect(markup).not.toContain('Curvature');
     expect(markup).not.toContain('Detail Scale');
+  });
+});
+
+describe('PostprocessPanel layer names', () => {
+  beforeEach(() => {
+    useGradientStore.setState(useGradientStore.getInitialState(), true);
+  });
+
+  it('names Edit Layer choices as in the Effect Stack in Japanese too', () => {
+    vi.stubGlobal('window', {
+      localStorage: { getItem: () => 'ja', setItem: () => {} },
+      navigator: { language: 'ja' },
+    });
+    try {
+      const state = useGradientStore.getInitialState();
+      useGradientStore.setState({
+        ...state,
+        effectPipeline: {
+          ...state.effectPipeline,
+          selectedKind: 'glass',
+          effectStack: updateEffectStackLayer(state.effectPipeline.effectStack, 'glass', { enabled: true }),
+        },
+        postprocess: { ...state.postprocess, effectMode: 'glassV2' },
+      }, true);
+      const markup = renderToStaticMarkup(
+        <LanguageProvider>
+          <PostprocessPanel />
+        </LanguageProvider>,
+      );
+      expect(markup).toContain('>Glass<');
+      expect(markup).not.toContain('>ガラス<');
+    } finally {
+      vi.unstubAllGlobals();
+    }
   });
 });

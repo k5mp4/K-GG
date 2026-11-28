@@ -60,3 +60,53 @@ describe('Effect Stack window layout', () => {
     expect(markup).not.toContain('aria-expanded');
   });
 });
+
+describe('Effect Stack terminology', () => {
+  const view = (overrides: Partial<Parameters<typeof buildEffectStackView>[0]> = {}) => buildEffectStackView({
+    effectPipeline: STORE_DEFAULTS.effectPipeline,
+    normalMapEnabled: false,
+    imageGradientEnabled: false,
+    programStatus: {},
+    soloSnapshot: null,
+    randomizing: false,
+    previousOrder: [],
+    ...overrides,
+  });
+
+  it('shows the on/off state only in the switch, not as a status word', () => {
+    const allReady = view({ programStatus: Object.fromEntries(['stackCore', 'noiseStack', 'glassV2', 'glassTile', 'datamosh', 'texture', 'distortChroma', 'ice', 'threeD', 'stretch'].map(key => [key, 'ready'])) });
+    const markup = renderToStaticMarkup(
+      <LanguageProvider>
+        <EffectStackPanelView view={allReady} actions={noopActions} />
+      </LanguageProvider>,
+    );
+    expect(allReady.layers.some(layer => layer.status.notice)).toBe(false);
+    expect(markup).not.toContain('effect-stack-row__status');
+    expect(markup).toContain('role="switch"');
+  });
+
+  it('keeps a status word for states the switch cannot show', () => {
+    const pipeline = {
+      ...STORE_DEFAULTS.effectPipeline,
+      effectStack: STORE_DEFAULTS.effectPipeline.effectStack.map(layer => layer.kind === 'glass' ? { ...layer, enabled: true } : layer),
+    };
+    const markup = renderToStaticMarkup(
+      <LanguageProvider>
+        <EffectStackPanelView view={view({ effectPipeline: pipeline })} actions={noopActions} />
+      </LanguageProvider>,
+    );
+    const glassView = view({ effectPipeline: pipeline });
+    expect(glassView.layers.find(layer => layer.kind === 'glass')?.status.notice).toBe(true);
+    expect(markup.match(/effect-stack-row__status/g)?.length).toBe(glassView.layers.filter(layer => layer.status.notice).length);
+    expect(markup).toContain('Preparing…');
+  });
+
+  it('does not show the developer Stack V2 label in the browser header', () => {
+    const markup = renderToStaticMarkup(
+      <LanguageProvider>
+        <EffectStackPanelView view={view()} actions={noopActions} />
+      </LanguageProvider>,
+    );
+    expect(markup).not.toContain('Stack V2');
+  });
+});
