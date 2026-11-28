@@ -87,7 +87,7 @@ Effect Stackのレイヤー（Diffuse、Noise、Slit、Stretch、Distort、Mirro
 
 レイヤーのプロパティモジュールは、見出しにレイヤー名と、そのレイヤーのON／OFFスイッチを表示します。スイッチはEffect Stackの行のトグルと同じ状態を操作します。Postprocess系レイヤー（Stretch、Distort、Mirror、Kaleidoscope、Voronoi、Glass、GlassTile、Datamosh、3D、Texture、Distort Chroma、Ice）を選択した場合も同じ見出しを使い、`Edit Layer`の選択要素とPostprocess全体のON／OFFは表示しません。Effect Stackで`Stretch`を選択すると、Scan Position、Band Height、Height Variance、Variation、Seed、Glowの各パラメータを表示します。プロパティモジュールの内部ID（`diffuse`、`noise`、`slit`、`postprocess`、`sandbox`、`export`、`preset`）は、MCPなどの制御インターフェースから従来どおり指定できます。
 
-SANDBOXの文字色は通常色を使います。`Normal`と`Distort`は独立項目として表示しません。SANDBOXの左パネルには`Edit Layer`の選択要素を表示し、Cloth、Normal、Prism、Particles、Flow Gradient、Seamless、Shapesから一つを選択して既存の有効状態とパラメータを編集できます。モジュールのON／OFFと描画準備状態を確認でき、SANDBOXの選択状態はPresetへ保存しません。Video MotionはDatamoshレイヤーのmotion sourceとして選択し、動画source/runtimeは別のEffect Stackレイヤー選択で維持します。DistortはEffect Stackで選択し、Effect StackとPostprocess系レイヤーの編集UIにPrism／Particlesの重複入口を表示しません。
+SANDBOXの文字色は通常色を使います。`Normal`と`Distort`は独立項目として表示しません。SANDBOXの左パネルには`Edit Layer`の選択要素を表示せず、Cloth、Normal、Prism、Particles、Flow Gradient、Seamless、Shapes、Controllerを枠のない見出し行の一覧で表示します。各行はモジュール名（実験的なモジュールは`Beta`の補助表示）とON／OFFスイッチを持ち、見出しをクリックするとそのモジュールのパラメータを行の下に開きます。同時に開くのは1つだけで、既定ではClothを開きます。状態の文字は読み込み中・準備中・利用不可・Fallbackのようにスイッチで表せない状態のときだけ表示し、OffとAppliedは表示しません。有効なモジュール数の表示はありません。開いている行はPresetへ保存しません。Video MotionはDatamoshレイヤーのmotion sourceとして選択し、動画source/runtimeは別のEffect Stackレイヤー選択で維持します。DistortはEffect Stackで選択し、Effect StackとPostprocess系レイヤーの編集UIにPrism／Particlesの重複入口を表示しません。
 
 ### UI-011 Diffuseのモードと適応カーブ
 
@@ -107,7 +107,7 @@ StretchのGlow TintはTweeq InputColor、Postprocess DistortのBrush ModeはTwee
 
 ### UI-014 SANDBOX Clothの表示設定
 
-SANDBOXで`Cloth`を選択した場合、Quality、Surface Wave、Organic Motion、Lighting、Specular、Fresnel、Rampの詳細パラメータを同じプロパティモジュール内で編集できます。ClothモジュールのON/OFFが3D Cloth表示の切替も兼ねます。
+SANDBOXで`Cloth`の行を開いた場合、Quality、Surface Wave、Organic Motion、Lighting、Specular、Fresnel、Rampの詳細パラメータを同じ行の下で編集できます。各グループは枠なしの開閉見出しで表示します。ClothモジュールのON/OFFが3D Cloth表示の切替も兼ねます。
 
 ### UI-019 Effect Stack Cone layerと設定
 
@@ -115,7 +115,7 @@ Coneは通常の自由順序`EffectStackKind`として表示し、他レイヤ�
 
 ### UI-021 SANDBOX Flow Gradient
 
-SANDBOXのEdit Layerには`Flow Gradient`を表示し、固定段のON/OFFと設定編集を行えます。Flow GradientはSeed（0..9999整数）、Particle Count（10000..500000、1000刻み）、Curl Scale（0.1..20）、Curl Strength（0..2）、Speed（0..2）、Ribbon Width（0.5..128px）、Stretch（0..8）、Density（0..4）、Trail（0..1）、Contrast（0.1..4）、Flow Opacity（0..1、0.01刻み）、Particle Opacity（0..1、0.01刻み）、Particle Size（0.25..2、0.01刻み）を表示します。Flow Opacityは最終合成、Particle Opacityは各splatのDensity寄与、Particle Sizeは速度方向Ribbonの長さ・幅を調整します。値は共通parameterLimitsとnormalizerで扱います。LoopとLoop Durationは既存Animationの状態を参照し、Flow専用のDurationやDiffusion入力は表示しません。
+SANDBOXのモジュール一覧には`Flow Gradient`の行を表示し、固定段のON/OFFと設定編集を行えます。Flow GradientはSeed（0..9999整数）、Particle Count（10000..500000、1000刻み）、Curl Scale（0.1..20）、Curl Strength（0..2）、Speed（0..2）、Ribbon Width（0.5..128px）、Stretch（0..8）、Density（0..4）、Trail（0..1）、Contrast（0.1..4）、Flow Opacity（0..1、0.01刻み）、Particle Opacity（0..1、0.01刻み）、Particle Size（0.25..2、0.01刻み）を表示します。Flow Opacityは最終合成、Particle Opacityは各splatのDensity寄与、Particle Sizeは速度方向Ribbonの長さ・幅を調整します。値は共通parameterLimitsとnormalizerで扱います。LoopとLoop Durationは既存Animationの状態を参照し、Flow専用のDurationやDiffusion入力は表示しません。
 
 ### UI-026 Effect Stack Datamosh
 
@@ -182,7 +182,7 @@ Mode、Motion、Seed、Animationの保存キーを維持し、旧PresetのautoLo
 
 ### UI-031 SANDBOX Shapes
 
-SANDBOXの`Edit Layer`で`Shapes`（Betaバッジ付き）を選ぶと、モジュールのON／OFFと設定を表示します。設定は`Shape`（Source：円・星・文字のアウトライン・読み込んだSVG、SVGの読み込み・削除、Scale、Offset X／Y、Rotation）、`Edge`（Softness、Inner Shadow、Shadow Size、Shadow Offset、Light Angle）、`Fill`（Fill Source：フロー／リップル／ストライプ／K-GGの描画、Fill Amount、Fill Scale、Warp、Fill Cycles、Direction）、`Gradient`（Glow Radius、Glow Intensity、Contrast、Grain、背景を透明にする）、`Show / Hide Loop`（Mode：フェード＋発光／ワイプ／ネオン点滅／常に表示、Cycles、Transition、Hidden、Phase）に分けます。Fill SourceがK-GGの描画のときはFill Scale・Warp・Fill Cyclesを表示しません。着色は右サイドバーのGradient Rampで編集します。SVGを読み込むとSourceを読み込んだSVGへ切り替え、ファイル名を表示します。Sourceが読み込んだSVGで未読込のときは、星で描画中であることを警告色で示し、読み込みに失敗したときはエラーを表示します。モジュールがOFFのときはスライダーを無効にし、Source・Fill Source・Mode・SVGの読み込みは操作できます。Modeが常に表示のときはループ用のスライダーを無効にします。Resetは有効状態とSourceを保ったまま他の値を既定値へ戻します。
+SANDBOXのモジュール一覧で`Shapes`（`Beta`の補助表示付き）の行を開くと、モジュールのON／OFFと設定を表示します。設定は`Shape`（Source：円・星・文字のアウトライン・読み込んだSVG、SVGの読み込み・削除、Scale、Offset X／Y、Rotation）、`Edge`（Softness、Inner Shadow、Shadow Size、Shadow Offset、Light Angle）、`Fill`（Fill Source：フロー／リップル／ストライプ／K-GGの描画、Fill Amount、Fill Scale、Warp、Fill Cycles、Direction）、`Gradient`（Glow Radius、Glow Intensity、Contrast、Grain、背景を透明にする）、`Show / Hide Loop`（Mode：フェード＋発光／ワイプ／ネオン点滅／常に表示、Cycles、Transition、Hidden、Phase）に分けます。Fill SourceがK-GGの描画のときはFill Scale・Warp・Fill Cyclesを表示しません。着色は右サイドバーのGradient Rampで編集します。SVGを読み込むとSourceを読み込んだSVGへ切り替え、ファイル名を表示します。Sourceが読み込んだSVGで未読込のときは、星で描画中であることを警告色で示し、読み込みに失敗したときはエラーを表示します。モジュールがOFFのときはスライダーを無効にし、Source・Fill Source・Mode・SVGの読み込みは操作できます。Modeが常に表示のときはループ用のスライダーを無効にします。Resetは有効状態とSourceを保ったまま他の値を既定値へ戻します。
 
 ### UI-031 Effect Stack Distort Chroma
 

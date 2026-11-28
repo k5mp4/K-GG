@@ -24,7 +24,7 @@ const times = (value: number) => `${value.toFixed(0)}×`;
 function Section({ title, hint, children }: { title: string; hint?: string; children: ReactNode }) {
   const { language } = useLanguage();
   return (
-    <div className="space-y-3 border border-cream/25 bg-k-surface/35 p-3">
+    <div className="space-y-3">
       <span className={`block w-fit font-display text-[10px] font-semibold uppercase tracking-[0.16em] text-cyan-100${hint ? ' hint-label' : ''}`} title={hint}>{localizeUiLabel(title, language)}</span>
       {children}
     </div>

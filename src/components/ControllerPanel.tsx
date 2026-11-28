@@ -259,7 +259,7 @@ export function ControllerPanel() {
           <button
             type="button"
             onClick={() => setParameters([...settings.parameters, { source: 'cstick/y', target: 'noise.scale' }])}
-            className="w-full border border-cream/15 bg-k-surface/70 py-1.5 text-[10px] text-tab-inactive hover:border-fire/50 hover:text-k-text"
+            className="w-full border border-transparent bg-k-bg/60 py-1.5 text-[10px] text-tab-inactive hover:bg-k-muted hover:text-k-text"
           >
             + Add mapping
           </button>
@@ -305,7 +305,7 @@ export function ControllerPanel() {
       <button
         type="button"
         onClick={() => updateControllerSettings({ ...DEFAULT_CONTROLLER_SETTINGS, enabled: settings.enabled, port: settings.port })}
-        className="w-full border border-cream/15 bg-k-surface/70 py-1.5 text-[10px] text-tab-inactive hover:border-fire/50 hover:text-k-text"
+        className="w-full border border-transparent bg-k-bg/60 py-1.5 text-[10px] text-tab-inactive hover:bg-k-muted hover:text-k-text"
       >
         Reset mapping to defaults
       </button>
