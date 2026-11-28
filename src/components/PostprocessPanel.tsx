@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react';
+import { EFFECT_STACK_LABELS } from '../features/effectStack/effectStackLabels';
 import { createEmptyManualDistortMap, createEmptyManualSmoothMask, STORE_DEFAULTS, useGradientStore } from '../store/gradientStore';
 import { applicationCommands } from '../application/commands';
 import { applyMirrorT, applyRampRepeatT, getColorAtPosition } from '../lib/gradientRampUtils';
@@ -21,6 +22,13 @@ import { DistortChromaPanel } from './DistortChromaPanel';
 import { getDiffuseGrainParameterLimitKey } from '../lib/parameterLimits';
 import { VORONOI_FEATURES, VORONOI_METRICS } from '../lib/voronoi';
 import { StretchPanel } from './StretchPanel';
+
+/** Edit Layer choices, named as in the Effect Stack in both UI languages. */
+const EDIT_LAYER_OPTIONS = ([
+  ['stretch', 'stretch'], ['distort', 'distort'], ['mirror', 'mirror'], ['kaleidoscope', 'kaleidoscope'],
+  ['voronoi', 'voronoi'], ['glassV2', 'glass'], ['glassTile', 'glassTile'], ['datamosh', 'datamosh'],
+  ['texture', 'texture'], ['distortChroma', 'distortChroma'], ['ice', 'ice'],
+] as const).map(([value, kind]) => ({ value, label: EFFECT_STACK_LABELS[kind] }));
 
 const D = STORE_DEFAULTS.manualDistort;
 const GLASS_COLOR_INPUT_CLASS = 'tq-color-input w-[132px] min-w-0 flex-none border border-panel-border bg-k-bg/50';
@@ -471,19 +479,8 @@ export function PostprocessPanel({
         <CustomSelect
           label="Edit Layer"
           value={activeEffectMode}
-          options={[
-            { value: 'stretch', label: 'Stretch' },
-            { value: 'distort', label: 'Distort' },
-            { value: 'mirror', label: 'Mirror' },
-            { value: 'kaleidoscope', label: 'Kaleidoscope' },
-            { value: 'voronoi', label: 'Voronoi' },
-            { value: 'glassV2', label: 'Glass' },
-            { value: 'glassTile', label: 'GlassTile' },
-            { value: 'datamosh', label: 'Datamosh' },
-            { value: 'texture', label: 'Texture' },
-            { value: 'distortChroma', label: 'Distort Chroma' },
-            { value: 'ice', label: 'Ice' },
-          ]}
+          localizeOptions={false}
+          options={EDIT_LAYER_OPTIONS}
           onChange={(value) => {
             if (value === 'datamosh' || value === 'stretch' || value === 'texture' || value === 'distortChroma' || value === 'ice') {
               setEffectPipeline({ selectedKind: value });

@@ -17,7 +17,12 @@ import type { EffectPipelineConfig, EffectStackKind } from '../../types/distorti
 export type LazyProgramKey = 'stackCore' | 'noiseStack' | 'glassV2' | 'glassTile' | 'datamosh' | 'texture' | 'distortChroma' | 'ice' | 'threeD' | 'stretch' | 'prism' | 'prismComposite' | 'normalMap' | 'blur' | 'particles';
 export type LazyProgramStatus = 'loading' | 'ready' | 'failed' | 'fallback';
 
-export type EffectStackLayerStatus = { labelKey: MessageKey; className: string };
+/**
+ * `notice` marks a state the row shows as a status word. Off and Applied are
+ * already shown by the ON/OFF switch, so the row omits them; the rail and the
+ * accessible names still use the label.
+ */
+export type EffectStackLayerStatus = { labelKey: MessageKey; className: string; notice: boolean };
 
 export type EffectStackLayerView = {
   kind: EffectStackKind;
@@ -81,27 +86,27 @@ function programKeyForEffect(kind: EffectStackKind): LazyProgramKey {
 }
 
 function programStatusLabel(status: LazyProgramStatus | undefined, enabled: boolean): EffectStackLayerStatus {
-  if (!enabled) return { labelKey: 'stack.status.off', className: 'text-cream/40' };
-  if (status === 'loading') return { labelKey: 'stack.status.loading', className: 'text-amber-300' };
-  if (status === 'failed') return { labelKey: 'stack.status.unavailable', className: 'text-red-300' };
-  if (status === 'fallback') return { labelKey: 'stack.status.fallback', className: 'text-cyan-300' };
-  if (status === 'ready') return { labelKey: 'stack.status.applied', className: 'text-emerald-300' };
-  return { labelKey: 'stack.status.preparing', className: 'text-amber-300' };
+  if (!enabled) return { labelKey: 'stack.status.off', className: 'text-cream/40', notice: false };
+  if (status === 'loading') return { labelKey: 'stack.status.loading', className: 'text-amber-300', notice: true };
+  if (status === 'failed') return { labelKey: 'stack.status.unavailable', className: 'text-red-300', notice: true };
+  if (status === 'fallback') return { labelKey: 'stack.status.fallback', className: 'text-cyan-300', notice: true };
+  if (status === 'ready') return { labelKey: 'stack.status.applied', className: 'text-emerald-300', notice: false };
+  return { labelKey: 'stack.status.preparing', className: 'text-amber-300', notice: true };
 }
 
 function layerStatus(kind: EffectStackKind, enabled: boolean, input: EffectStackViewInput): EffectStackLayerStatus {
   const { soloSnapshot } = input;
   if (soloSnapshot && isEffectStackLayerTemporarilyHidden(kind, enabled, soloSnapshot.targetKind, soloSnapshot.enabledState)) {
-    return { labelKey: 'stack.status.stay', className: 'text-amber-300' };
+    return { labelKey: 'stack.status.stay', className: 'text-amber-300', notice: true };
   }
   if (input.imageGradientEnabled && IMAGE_GRADIENT_PROTECTED_EFFECTS.has(kind)) {
-    return { labelKey: 'stack.status.protected', className: 'text-amber-300' };
+    return { labelKey: 'stack.status.protected', className: 'text-amber-300', notice: true };
   }
   // Diffuse-only V2 is drawn directly by the Bootstrap generator and never
   // requests stackCore, so it is genuinely applied without a lazy-program
   // ready event.
   if (enabled && kind === 'diffuse' && canRenderV2Direct(input.effectPipeline, input.normalMapEnabled)) {
-    return { labelKey: 'stack.status.applied', className: 'text-emerald-300' };
+    return { labelKey: 'stack.status.applied', className: 'text-emerald-300', notice: false };
   }
   return programStatusLabel(input.programStatus[programKeyForEffect(kind)], enabled);
 }

@@ -39,7 +39,7 @@ type ViewProps = {
   onCollapse?: () => void;
   /** Expands the icon rail back to the Layers column. */
   onExpand?: () => void;
-  /** Shown in place of the version label when the stack can open in its own window. */
+  /** Shows the pop-out button when the stack can open in its own window. */
   onPopOut?: () => void;
   /** Select without opening an editor while reordering. */
   onDragSelect?: (kind: EffectStackKind) => void;
@@ -265,7 +265,7 @@ export function EffectStackPanelView({
           >
             <Icon name="shuffle" className="text-[12px]" />
           </button>
-          {onPopOut ? (
+          {onPopOut && (
             <button
               type="button"
               className={headerButtonClass}
@@ -275,8 +275,6 @@ export function EffectStackPanelView({
             >
               <Icon name="window" className="text-[12px]" />
             </button>
-          ) : (
-            <span className="text-[8px] font-bold uppercase text-emerald-300">{t('stack.version')}</span>
           )}
           {onCollapse && (
             <button
@@ -365,7 +363,10 @@ export function EffectStackPanelView({
               </button>
               <div className="min-w-0 flex-1">
                 <div className="effect-stack-row__title">{EFFECT_STACK_LABELS[layer.kind]}</div>
-                <div className={`effect-stack-row__status ${layer.status.className}`}>{t(layer.status.labelKey)}</div>
+                {/* Off and Applied are shown by the switch; only other states get a status word. */}
+                {layer.status.notice && (
+                  <div className={`effect-stack-row__status ${layer.status.className}`}>{t(layer.status.labelKey)}</div>
+                )}
               </div>
               <div
                 className="shrink-0"

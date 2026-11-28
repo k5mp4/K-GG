@@ -36,6 +36,17 @@ describe('Effect Stack view', () => {
     expect(disabled?.status.labelKey).toBe('stack.status.off');
   });
 
+  it('marks only states the ON/OFF switch does not show as notices', () => {
+    const pipeline = withEnabled(STORE_DEFAULTS.effectPipeline, 'glass');
+    const status = (kind: string, overrides: Partial<EffectStackViewInput>) =>
+      buildEffectStackView(input({ effectPipeline: pipeline, ...overrides })).layers.find(layer => layer.kind === kind)?.status;
+
+    expect(status('mirror', {})).toMatchObject({ labelKey: 'stack.status.off', notice: false });
+    expect(status('glass', { programStatus: { glassV2: 'ready' } })).toMatchObject({ labelKey: 'stack.status.applied', notice: false });
+    expect(status('glass', {})).toMatchObject({ labelKey: 'stack.status.preparing', notice: true });
+    expect(status('glass', { programStatus: { glassV2: 'failed' } })).toMatchObject({ labelKey: 'stack.status.unavailable', notice: true });
+  });
+
   it('reports lazy program state, image-gradient protection and solo STAY', () => {
     const pipeline = withEnabled(withEnabled(STORE_DEFAULTS.effectPipeline, 'glass'), 'mirror');
     const status = (kind: string, overrides: Partial<EffectStackViewInput>) =>

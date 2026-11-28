@@ -11,7 +11,7 @@ title: UI用語・アイコン表記ガイド
 - 文として説明する箇所は自然な文章、短いラベルは簡潔な名詞または動詞にする。
 - 英語は見出しをTitle Case、説明文をSentence caseとする。日本語の見出しには不要な空白を入れない。
 - `K-GG`、`Tweeq`、RGB、FPS、BPM、PNG、MP4、FFmpeg、WebGLは両言語で同じ表記にする。
-- トップバーとEffect Stackのエフェクト名・カテゴリ名・見出しは日英どちらの設定でも英語を使う。各パネル内の説明文とパラメータ名は選択言語へ翻訳する。保存キー、shader uniform、型名は変更しない。
+- トップバーとEffect Stackのエフェクト名・カテゴリ名・見出しは日英どちらの設定でも英語を使う。レイヤー名の一次情報は`src/features/effectStack/effectStackLabels.ts`とし、Postprocessの`Edit Layer`など左パネルでレイヤーを指す箇所も同じ名前を使う（`uiLabels.ts`で`ガラス`等へ翻訳しない）。各パネル内の説明文とパラメータ名は選択言語へ翻訳する。保存キー、shader uniform、型名は変更しない。
 - Diffuseのモード選択は`InputRadio`を使い、ラベルを`Block`、`Smooth`、`Dither`の英語表記に固定する。
 - アイコン専用ボタンは`IconButton`を使い、同じ翻訳結果を`title`と`aria-label`へ設定する。
 - 保存、書き出し、インストールなど結果が大きい主要操作はアイコンと短い文言を併記する。

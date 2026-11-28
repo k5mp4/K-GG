@@ -13,6 +13,7 @@ import { getDisplayKeyframes, getKeyframeEditTime, LOOP_KEYFRAME_END } from '../
 import { getTimelineTime, setTimelineTime } from '../lib/timelineClock';
 import { getTrackMode, type Keyframe } from '../types/keyframe';
 import { Icon } from './Icon';
+import { Toggle } from './Toggle';
 import { getAnimationGroup } from '../lib/animationRegistry';
 import { AnimationPropertyControls } from './AnimationPropertyControls';
 import { fromTweeqAngle, toTweeqAngle } from '../lib/tweeqAngle';
@@ -682,19 +683,17 @@ export function TimelineBar({ animLoopRef, onSeek, exportProgress = null, export
       style={{ height }}
     >
       <div className="flex min-h-10 shrink-0 items-center gap-2 overflow-x-auto scrollbar-thin border-b border-panel-border/60 bg-k-surface/80 px-3 py-1.5 [&>*]:shrink-0">
-        <button
-          type="button"
-          onClick={() => setAnimation({ enabled: !animation.enabled })}
-          className={`flex h-6 items-center gap-1.5 border px-2 text-[9px] font-display font-semibold uppercase tracking-wider transition-colors ${
-            animation.enabled
-              ? 'border-emerald-400/60 bg-emerald-400/10 text-emerald-300'
-              : 'border-k-muted/60 bg-k-bg text-tab-inactive'
-          }`}
-          title={t('animation.title')}
-        >
-          <span className={`h-1.5 w-1.5 rounded-full ${animation.enabled ? 'bg-emerald-400' : 'bg-k-muted'}`} />
-          {t('animation.title')}
-        </button>
+        {/* A labelled switch, so it does not read as the Animation panel heading or its tab. */}
+        <div className="flex h-6 items-center gap-1.5" data-animation-enabled-toggle title={t('animation.enableHint')}>
+          <Toggle
+            variant="switch"
+            size="xs"
+            checked={animation.enabled}
+            onChange={enabled => setAnimation({ enabled })}
+            ariaLabel={t('animation.enable')}
+          />
+          <span aria-hidden="true" className="text-[11px] font-display font-semibold text-k-text">{t('animation.enable')}</span>
+        </div>
         <div className="flex items-center border border-k-muted/50 bg-k-bg">
           {(['moving', 'selected', 'all'] as const).map(filter => (
             <button
