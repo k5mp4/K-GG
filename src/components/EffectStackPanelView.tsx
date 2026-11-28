@@ -15,6 +15,8 @@ import { EFFECT_STACK_LABELS, EFFECT_STACK_RAIL_ABBREVIATIONS } from '../feature
 
 const ROW_HEIGHT = 38;
 const DRAG_SETTLE_MS = 150;
+/** Rows slide to a keyboard-moved order (Alt+Up/Down) over this time. */
+const KEYBOARD_MOVE_MS = 160;
 /** How long a committed drag waits for the moved order before it gives up. */
 const DRAG_COMMIT_TIMEOUT_MS = 1000;
 
@@ -67,6 +69,10 @@ export function EffectStackPanelView({
   const selectButtonsRef = useRef(new Map<EffectStackKind, HTMLButtonElement>());
   /** A row moved from the keyboard keeps focus once the new order arrives. */
   const pendingFocusRef = useRef<EffectStackKind | null>(null);
+  /** Order before an Alt+Up/Down move, so the rows can slide from it once the new order arrives. */
+  const keyboardMoveFromRef = useRef<EffectStackKind[] | null>(null);
+  const [keyboardMoveFrom, setKeyboardMoveFrom] = useState<EffectStackKind[] | null>(null);
+  const keyboardMoveTimerRef = useRef<number | null>(null);
 
   const clearSettleTimer = () => {
     if (settleTimerRef.current !== null) {
@@ -101,6 +107,27 @@ export function EffectStackPanelView({
     draggingRef.current = null;
     setDragging(null);
   }, [orderKey]);
+
+  // A keyboard move renders the new order at the old positions ('from'), then slides
+  // to the new ones like a drag that settles.
+  useLayoutEffect(() => {
+    const previous = keyboardMoveFromRef.current;
+    if (!previous) return;
+    keyboardMoveFromRef.current = null;
+    if (window.matchMedia?.('(prefers-reduced-motion: reduce)').matches) return;
+    setKeyboardMoveFrom(previous);
+    setRowTransitionPhase('from');
+    if (keyboardMoveTimerRef.current !== null) window.clearTimeout(keyboardMoveTimerRef.current);
+    keyboardMoveTimerRef.current = window.setTimeout(() => {
+      keyboardMoveTimerRef.current = null;
+      setKeyboardMoveFrom(null);
+      setRowTransitionPhase(phase => (phase === 'animate' ? 'idle' : phase));
+    }, KEYBOARD_MOVE_MS + 50);
+  }, [orderKey]);
+
+  useEffect(() => () => {
+    if (keyboardMoveTimerRef.current !== null) window.clearTimeout(keyboardMoveTimerRef.current);
+  }, []);
 
   useLayoutEffect(() => {
     const kind = pendingFocusRef.current;
@@ -220,7 +247,7 @@ export function EffectStackPanelView({
       return `translate3d(0, ${ROW_HEIGHT}px, 0)`;
     }
     if (!dragging && rowTransitionPhase === 'from') {
-      const previousIndex = view.previousOrder.indexOf(kind);
+      const previousIndex = (keyboardMoveFrom ?? view.previousOrder).indexOf(kind);
       if (previousIndex >= 0) return `translate3d(0, ${(previousIndex - index) * ROW_HEIGHT}px, 0)`;
     }
     return 'translate3d(0, 0, 0)';
@@ -229,6 +256,7 @@ export function EffectStackPanelView({
   const rowTransitionDuration = (isDragging: boolean) => {
     if (rowTransitionPhase === 'from') return '0ms';
     if (view.randomizing) return `${EFFECT_STACK_TRANSITION_DURATION_MS}ms`;
+    if (keyboardMoveFrom) return `${KEYBOARD_MOVE_MS}ms`;
     if (!dragging || dragging.phase === 'committed') return '0ms';
     return dragging.phase === 'dragging' && isDragging ? '0ms' : `${DRAG_SETTLE_MS}ms`;
   };
@@ -245,6 +273,7 @@ export function EffectStackPanelView({
       const targetIndex = event.key === 'ArrowUp' ? index - 1 : index + 1;
       if (targetIndex < 0 || targetIndex > last || view.randomizing) return;
       pendingFocusRef.current = kind;
+      keyboardMoveFromRef.current = stack.map(layer => layer.kind);
       actions.move(kind, targetIndex);
       return;
     }
