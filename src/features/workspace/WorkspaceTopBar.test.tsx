@@ -18,6 +18,15 @@ function createProps(overrides: Partial<WorkspaceTopBarProps> = {}): WorkspaceTo
     isDirty: false,
     canUndo: false,
     canRedo: false,
+    animationEnabled: false,
+    isAnimationPlaying: false,
+    exportProgress: null,
+    spoutActive: false,
+    oscPort: null,
+    zoom: 1,
+    viewportModified: false,
+    canCopyPng: true,
+    quickExportFeedback: null,
     layoutMode: 'editor',
     gpuInfo: { label: 'GPU: Test / HIGH', title: 'Test GPU' },
     updater: {
@@ -31,7 +40,13 @@ function createProps(overrides: Partial<WorkspaceTopBarProps> = {}): WorkspaceTo
     onTabMouseEnter: vi.fn(),
     onUndo: vi.fn(),
     onRedo: vi.fn(),
+    onTogglePlayback: vi.fn(),
+    onResetViewport: vi.fn(),
+    onQuickSavePng: vi.fn(),
+    onQuickCopyPng: vi.fn(),
     onLayoutModeChange: vi.fn(),
+    onOpenFeedback: vi.fn(),
+    onOpenHelp: vi.fn(),
     onOpenSettings: vi.fn(),
     onToggleRightSidebar: vi.fn(),
     ...overrides,
@@ -73,5 +88,35 @@ describe('WorkspaceTopBar', () => {
     const vjMarkup = renderToStaticMarkup(<WorkspaceTopBar {...createProps({ layoutMode: 'vj' })} />);
     expect(vjMarkup).toContain('aria-checked="false" aria-label="Editor"');
     expect(vjMarkup).toContain('aria-checked="true" aria-label="VJ performance"');
+  });
+
+  it('shows ambient status chips only while background tasks are active', () => {
+    const idleMarkup = renderToStaticMarkup(<WorkspaceTopBar {...createProps()} />);
+    expect(idleMarkup).not.toContain('data-ambient-status="export"');
+    expect(idleMarkup).not.toContain('data-ambient-status="spout"');
+    expect(idleMarkup).not.toContain('data-ambient-status="osc"');
+
+    const activeMarkup = renderToStaticMarkup(
+      <WorkspaceTopBar {...createProps({ exportProgress: 0.48, spoutActive: true, oscPort: 9000 })} />,
+    );
+    expect(activeMarkup).toContain('data-ambient-status="export"');
+    expect(activeMarkup).toContain('EXPORT 48%');
+    expect(activeMarkup).toContain('data-ambient-status="spout"');
+    expect(activeMarkup).toContain('data-ambient-status="osc"');
+  });
+
+  it('renders playback toggle, zoom display, quick export actions, and utility icons', () => {
+    const markup = renderToStaticMarkup(
+      <WorkspaceTopBar {...createProps({ animationEnabled: true, isAnimationPlaying: true, zoom: 1.5, viewportModified: true, quickExportFeedback: 'copied' })} />,
+    );
+    expect(markup).toContain('data-topbar-playback="true"');
+    expect(markup).toContain('aria-pressed="true"');
+    expect(markup).toContain('data-topbar-zoom="true"');
+    expect(markup).toContain('>150%<');
+    expect(markup).toContain('data-quick-save-png="true"');
+    expect(markup).toContain('data-quick-copy-png="true"');
+    expect(markup).toContain('aria-label="PNG copied"');
+    expect(markup).toContain('aria-label="Feedback"');
+    expect(markup).toContain('aria-label="Help"');
   });
 });

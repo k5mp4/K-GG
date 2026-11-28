@@ -13,6 +13,7 @@ export type IconName =
   | 'download'
   | 'expand'
   | 'error'
+  | 'feedback'
   | 'firstPage'
   | 'gripVertical'
   | 'grid'
@@ -58,6 +59,7 @@ const PATHS: Record<IconName, string[]> = {
   download: ['M12 3v12', 'm7 10 5 5 5-5', 'M5 21h14'],
   expand: ['M8 3H3v5', 'M16 3h5v5', 'M8 21H3v-5', 'M16 21h5v-5', 'M3 8l6-6', 'm21 8-6-6', 'M3 16l6 6', 'm21-6-6 6'],
   error: ['M12 8v4', 'M12 16h.01', 'M22 12a10 10 0 1 1-20 0 10 10 0 0 1 20 0Z'],
+  feedback: ['M21 15a4 4 0 0 1-4 4H8l-5 3V7a4 4 0 0 1 4-4h10a4 4 0 0 1 4 4z', 'M8 9h8', 'M8 13h5'],
   firstPage: ['M6 5v14', 'm18 6-6 6 6 6'],
   gripVertical: ['M9 5h.01', 'M15 5h.01', 'M9 12h.01', 'M15 12h.01', 'M9 19h.01', 'M15 19h.01'],
   grid: ['M4 4h6v6H4z', 'M14 4h6v6h-6z', 'M4 14h6v6H4z', 'M14 14h6v6h-6z'],

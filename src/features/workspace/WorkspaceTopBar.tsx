@@ -23,6 +23,15 @@ export type WorkspaceTopBarProps = {
   isDirty: boolean;
   canUndo: boolean;
   canRedo: boolean;
+  animationEnabled: boolean;
+  isAnimationPlaying: boolean;
+  exportProgress: number | null;
+  spoutActive: boolean;
+  oscPort: number | null;
+  zoom: number;
+  viewportModified: boolean;
+  canCopyPng: boolean;
+  quickExportFeedback: 'saved' | 'copied' | null;
   layoutMode: VjSettings['layoutMode'];
   gpuInfo: { label: string; title: string };
   updater: {
@@ -36,7 +45,13 @@ export type WorkspaceTopBarProps = {
   onTabMouseEnter: (value: LeftTab) => void;
   onUndo: () => void;
   onRedo: () => void;
+  onTogglePlayback: () => void;
+  onResetViewport: () => void;
+  onQuickSavePng: () => void;
+  onQuickCopyPng: () => void;
   onLayoutModeChange: (mode: VjSettings['layoutMode']) => void;
+  onOpenFeedback: () => void;
+  onOpenHelp: () => void;
   onOpenSettings: () => void;
   onToggleRightSidebar: () => void;
 };
@@ -73,6 +88,15 @@ export function WorkspaceTopBar({
   isDirty,
   canUndo,
   canRedo,
+  animationEnabled,
+  isAnimationPlaying,
+  exportProgress,
+  spoutActive,
+  oscPort,
+  zoom,
+  viewportModified,
+  canCopyPng,
+  quickExportFeedback,
   layoutMode,
   gpuInfo,
   updater,
@@ -82,7 +106,13 @@ export function WorkspaceTopBar({
   onTabMouseEnter,
   onUndo,
   onRedo,
+  onTogglePlayback,
+  onResetViewport,
+  onQuickSavePng,
+  onQuickCopyPng,
   onLayoutModeChange,
+  onOpenFeedback,
+  onOpenHelp,
   onOpenSettings,
   onToggleRightSidebar,
 }: WorkspaceTopBarProps) {
@@ -92,6 +122,8 @@ export function WorkspaceTopBar({
   const presetStatusTitle = isDirty
     ? `${presetDisplayName} · ${translate('workspace.unsavedChanges')}`
     : presetDisplayName;
+  const exportPercent = exportProgress === null ? null : Math.max(0, Math.min(100, Math.round(exportProgress * 100)));
+  const zoomPercent = Math.round(zoom * 100);
 
   return (
     <div className="z-30 flex min-w-0 shrink-0 items-center gap-2 border-b border-panel-border bg-k-bg/95 px-2 py-1.5">
@@ -174,8 +206,8 @@ export function WorkspaceTopBar({
         })}
       </nav>
 
-      {/* 中央ゾーン: Undo/Redo */}
-      <div className="flex min-w-0 flex-1 items-center justify-center gap-2">
+      {/* 中央ゾーン: Undo/Redo・再生・アンビエント状態表示 */}
+      <div className="flex min-w-0 flex-1 items-center justify-center gap-1.5">
         <div
           className={`${panelsPresentation === 'docked' ? 'inline-flex' : 'hidden'} h-10 shrink-0 items-center bg-k-surface/80`}
           role="group"
@@ -202,10 +234,116 @@ export function WorkspaceTopBar({
             <Icon name="redo" className="text-[15px]" />
           </button>
         </div>
+
+        <button
+          type="button"
+          data-topbar-playback
+          aria-pressed={isAnimationPlaying}
+          onClick={(event) => { onTogglePlayback(); blur(event); }}
+          title={isAnimationPlaying ? translate('animation.pause') : translate('animation.play')}
+          aria-label={isAnimationPlaying ? translate('animation.pause') : translate('animation.play')}
+          className={`${panelsPresentation === 'docked' ? 'inline-flex' : 'hidden'} relative h-10 w-10 shrink-0 items-center justify-center !border-0 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-fire ${isAnimationPlaying
+            ? 'bg-fire/15 text-fire hover:bg-fire/25'
+            : 'bg-k-surface/80 text-k-text hover:bg-k-surface hover:text-cream'
+            }`}
+        >
+          <Icon name={isAnimationPlaying ? 'pause' : 'play'} className="text-[15px]" />
+          {animationEnabled && (
+            <span
+              className={`absolute right-1.5 top-1.5 h-1.5 w-1.5 rounded-full ${isAnimationPlaying ? 'bg-fire' : 'bg-emerald-400'}`}
+              aria-hidden="true"
+            />
+          )}
+        </button>
+
+        {exportPercent !== null && (
+          <button
+            type="button"
+            data-ambient-status="export"
+            onClick={(event) => { onTabClick('export'); blur(event); }}
+            title={translate('workspace.exportingStatus', { percent: exportPercent })}
+            aria-label={translate('workspace.exportingStatus', { percent: exportPercent })}
+            className="inline-flex h-7 shrink-0 items-center gap-1.5 !border-0 bg-fire/15 px-2.5 text-[10px] font-display font-bold uppercase tracking-wider tabular-nums text-cream transition-colors hover:bg-fire/25 focus:outline-none focus-visible:ring-2 focus-visible:ring-fire"
+          >
+            <span className="h-1.5 w-1.5 rounded-full bg-fire animate-pulse" aria-hidden="true" />
+            <span>EXPORT {exportPercent}%</span>
+          </button>
+        )}
+
+        {spoutActive && (
+          <button
+            type="button"
+            data-ambient-status="spout"
+            onClick={(event) => { onTabClick('export'); blur(event); }}
+            title={translate('workspace.spoutLive')}
+            aria-label={translate('workspace.spoutLive')}
+            className="inline-flex h-7 shrink-0 items-center gap-1.5 !border-0 bg-emerald-500/15 px-2.5 text-[10px] font-display font-bold uppercase tracking-wider text-emerald-300 transition-colors hover:bg-emerald-500/25 focus:outline-none focus-visible:ring-2 focus-visible:ring-fire"
+          >
+            <span className="h-1.5 w-1.5 rounded-full bg-emerald-400" aria-hidden="true" />
+            <span>SPOUT</span>
+          </button>
+        )}
+
+        {oscPort !== null && (
+          <button
+            type="button"
+            data-ambient-status="osc"
+            onClick={(event) => { onTabClick('sandbox'); blur(event); }}
+            title={translate('workspace.oscListening', { port: oscPort })}
+            aria-label={translate('workspace.oscListening', { port: oscPort })}
+            className="inline-flex h-7 shrink-0 items-center gap-1.5 !border-0 bg-cyan-500/15 px-2.5 text-[10px] font-display font-bold uppercase tracking-wider tabular-nums text-cyan-300 transition-colors hover:bg-cyan-500/25 focus:outline-none focus-visible:ring-2 focus-visible:ring-fire"
+          >
+            <span className="h-1.5 w-1.5 rounded-full bg-cyan-400" aria-hidden="true" />
+            <span>OSC</span>
+          </button>
+        )}
       </div>
 
-      {/* 右ゾーン: Editor/VJ 切替・GPU・更新・設定 */}
+      {/* 右ゾーン: ズーム・クイック書き出し・Editor/VJ切替・GPU・更新・ユーティリティ */}
       <div className="ml-auto flex h-10 shrink-0 items-stretch gap-1">
+        <button
+          type="button"
+          data-topbar-zoom
+          onClick={(event) => { onResetViewport(); blur(event); }}
+          title={translate('canvas.resetViewport')}
+          aria-label={`${translate('canvas.resetViewport')} (${zoomPercent}%)`}
+          className={`${panelsPresentation === 'docked' ? 'inline-flex' : 'hidden'} h-10 min-w-[54px] shrink-0 items-center justify-center !border-0 px-2 text-[10px] font-display font-semibold tracking-wider tabular-nums transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-fire ${viewportModified
+            ? 'bg-fire/10 text-cream hover:bg-fire/20'
+            : 'bg-k-surface/80 text-tab-inactive hover:bg-k-surface hover:text-k-text'
+            }`}
+        >
+          {zoomPercent}%
+        </button>
+
+        <div
+          className={`${panelsPresentation === 'docked' ? 'inline-flex' : 'hidden'} h-10 shrink-0 items-center bg-k-surface/80`}
+          role="group"
+          aria-label={translate('workspace.quickSavePng')}
+        >
+          <button
+            type="button"
+            data-quick-save-png
+            onClick={(event) => { onQuickSavePng(); blur(event); }}
+            title={quickExportFeedback === 'saved' ? translate('workspace.quickExportSaved') : translate('workspace.quickSavePng')}
+            aria-label={quickExportFeedback === 'saved' ? translate('workspace.quickExportSaved') : translate('workspace.quickSavePng')}
+            className={`inline-flex h-10 w-9 items-center justify-center !border-0 bg-transparent transition-colors hover:bg-k-surface focus:outline-none focus-visible:ring-2 focus-visible:ring-fire ${quickExportFeedback === 'saved' ? 'text-emerald-400' : 'text-k-text hover:text-cream'}`}
+          >
+            <Icon name={quickExportFeedback === 'saved' ? 'verified' : 'download'} className="text-[15px]" />
+          </button>
+          {canCopyPng && (
+            <button
+              type="button"
+              data-quick-copy-png
+              onClick={(event) => { onQuickCopyPng(); blur(event); }}
+              title={quickExportFeedback === 'copied' ? translate('workspace.quickExportCopied') : translate('workspace.quickCopyPng')}
+              aria-label={quickExportFeedback === 'copied' ? translate('workspace.quickExportCopied') : translate('workspace.quickCopyPng')}
+              className={`inline-flex h-10 w-9 items-center justify-center !border-0 bg-transparent transition-colors hover:bg-k-surface focus:outline-none focus-visible:ring-2 focus-visible:ring-fire ${quickExportFeedback === 'copied' ? 'text-emerald-400' : 'text-k-text hover:text-cream'}`}
+            >
+              <Icon name={quickExportFeedback === 'copied' ? 'verified' : 'copy'} className="text-[15px]" />
+            </button>
+          )}
+        </div>
+
         <LayoutModeSwitch
           layoutMode={layoutMode}
           onChange={onLayoutModeChange}
@@ -214,7 +352,7 @@ export function WorkspaceTopBar({
         />
 
         <div
-          className={`${panelsPresentation === 'docked' ? 'hidden xl:flex' : 'hidden'} min-w-0 max-w-[150px] items-center gap-2 px-2.5 text-tab-inactive`}
+          className={`${panelsPresentation === 'docked' ? 'hidden 2xl:flex' : 'hidden'} min-w-0 max-w-[140px] items-center gap-2 px-2 text-tab-inactive`}
           title={gpuInfo.title}
         >
           <Icon name="memory" className="text-[16px] text-deep" />
@@ -230,8 +368,26 @@ export function WorkspaceTopBar({
         )}
         <button
           type="button"
+          onClick={(event) => { onOpenFeedback(); blur(event); }}
+          className="inline-flex min-w-9 items-center justify-center border border-transparent bg-transparent px-2 text-tab-inactive transition-colors hover:bg-k-surface hover:text-k-text focus:outline-none focus-visible:ring-2 focus-visible:ring-fire"
+          title={translate('common.feedback')}
+          aria-label={translate('common.feedback')}
+        >
+          <Icon name="feedback" className="text-[16px]" />
+        </button>
+        <button
+          type="button"
+          onClick={(event) => { onOpenHelp(); blur(event); }}
+          className="inline-flex min-w-9 items-center justify-center border border-transparent bg-transparent px-2 text-tab-inactive transition-colors hover:bg-k-surface hover:text-k-text focus:outline-none focus-visible:ring-2 focus-visible:ring-fire"
+          title={translate('common.help')}
+          aria-label={translate('common.help')}
+        >
+          <Icon name="help" className="text-[16px]" />
+        </button>
+        <button
+          type="button"
           onClick={(event) => { onOpenSettings(); blur(event); }}
-          className={`inline-flex min-w-10 items-center justify-center gap-2 border px-2 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-fire ${tabHoverSwitchEnabled
+          className={`inline-flex min-w-9 items-center justify-center gap-2 border px-2 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-fire ${tabHoverSwitchEnabled
             ? 'border-transparent bg-fire/10 text-fire hover:bg-fire/20'
             : 'border-transparent bg-transparent text-tab-inactive hover:bg-k-surface hover:text-k-text'
             }`}

@@ -69,6 +69,15 @@ function getOwnership() {
 }
 
 /**
+ * Read-only subscription to the Spout output state without acquiring sender
+ * ownership. Safe for ambient status badges in the top bar.
+ */
+export function useSpoutOutputStatus() {
+  const output = getSpoutOutputController();
+  return useSyncExternalStore(output.subscribe, output.getState, output.getState);
+}
+
+/**
  * Connects the Spout controller to the processed preview canvas while an
  * owning component (the Export panel or the VJ deck) is mounted. The sender is
  * released when the last owner unmounts or the page unloads, so switching
