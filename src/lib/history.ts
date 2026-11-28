@@ -47,6 +47,12 @@ type HistoryEntry =
   | { kind: 'state'; snapshot: HistorySnapshot }
   | { kind: 'command'; command: HistoryCommand };
 
+export type HistoryStatus = {
+  canUndo: boolean;
+  canRedo: boolean;
+  isDirty: boolean;
+};
+
 class HistoryManager {
   private historyStack: HistoryEntry[] = [];
   private futureStack: HistoryEntry[] = [];
@@ -55,13 +61,17 @@ class HistoryManager {
   private applyingSnapshot = false;
   private pendingPrev: HistorySnapshot | null = null;
   private schedulePush: ReturnType<typeof debounce>;
+  private cleanDepth: number | null = 0;
+  private listeners = new Set<() => void>();
+  private statusCache: HistoryStatus = { canUndo: false, canRedo: false, isDirty: false };
 
   constructor() {
     this.schedulePush = debounce(() => {
       if (this.pendingPrev) {
         this.pushHistory({ kind: 'state', snapshot: this.pendingPrev });
-        this.futureStack.length = 0;
+        this.clearFuture();
         this.pendingPrev = null;
+        this.notify();
       }
     }, HISTORY_DEBOUNCE_MS);
 
@@ -92,15 +102,47 @@ class HistoryManager {
       if (!hasChanged) return;
 
       // バッチ先頭の「変更前」スナップショットを保持
-      if (!this.pendingPrev) this.pendingPrev = extractSnapshot(prev);
+      if (!this.pendingPrev) {
+        this.pendingPrev = extractSnapshot(prev);
+        this.notify();
+      }
 
       this.schedulePush();
     });
   }
 
+  private clearFuture(): void {
+    this.futureStack.length = 0;
+    if (this.cleanDepth !== null && this.cleanDepth > this.historyStack.length) {
+      this.cleanDepth = null;
+    }
+  }
+
+  private notify(): void {
+    const nextCanUndo = this.canUndo();
+    const nextCanRedo = this.canRedo();
+    const nextIsDirty = this.isDirty();
+    if (
+      this.statusCache.canUndo === nextCanUndo &&
+      this.statusCache.canRedo === nextCanRedo &&
+      this.statusCache.isDirty === nextIsDirty
+    ) {
+      return;
+    }
+    this.statusCache = { canUndo: nextCanUndo, canRedo: nextCanRedo, isDirty: nextIsDirty };
+    for (const listener of this.listeners) {
+      listener();
+    }
+  }
+
   private pushHistory(entry: HistoryEntry): void {
     this.historyStack.push(entry);
-    if (this.historyStack.length > MAX_HISTORY) this.historyStack.shift();
+    if (this.historyStack.length > MAX_HISTORY) {
+      this.historyStack.shift();
+      if (this.cleanDepth !== null) {
+        this.cleanDepth = this.cleanDepth > 0 ? this.cleanDepth - 1 : null;
+      }
+    }
   }
 
   private runCommand(task: () => void | Promise<void>): void {
@@ -117,7 +159,20 @@ class HistoryManager {
       this.pendingPrev = null;
     }
     this.pushHistory({ kind: 'command', command });
-    this.futureStack.length = 0;
+    this.clearFuture();
+    this.notify();
+  }
+
+  /** 現在の状態を「保存済み / プリセット読み込み直後」としてマークする。 */
+  markClean(): void {
+    if (this.pendingPrev) {
+      this.schedulePush.cancel();
+      this.pushHistory({ kind: 'state', snapshot: this.pendingPrev });
+      this.clearFuture();
+      this.pendingPrev = null;
+    }
+    this.cleanDepth = this.historyStack.length;
+    this.notify();
   }
 
   /** テスト用。履歴を空にする。 */
@@ -126,7 +181,9 @@ class HistoryManager {
     this.pendingPrev = null;
     this.historyStack.length = 0;
     this.futureStack.length = 0;
+    this.cleanDepth = 0;
     this.commandQueue = Promise.resolve();
+    this.notify();
   }
 
   private applySnapshot(snap: HistorySnapshot): void {
@@ -163,6 +220,7 @@ class HistoryManager {
       const prev = this.pendingPrev;
       this.pendingPrev = null;
       this.applySnapshot(prev);
+      this.notify();
       return;
     }
     const entry = this.historyStack.pop();
@@ -170,11 +228,13 @@ class HistoryManager {
     if (entry.kind === 'command') {
       this.futureStack.push(entry);
       this.runCommand(entry.command.undo);
+      this.notify();
       return;
     }
     const current = extractSnapshot(useGradientStore.getState());
     this.futureStack.push({ kind: 'state', snapshot: current });
     this.applySnapshot(entry.snapshot);
+    this.notify();
   }
 
   redo(): void {
@@ -183,11 +243,13 @@ class HistoryManager {
     if (entry.kind === 'command') {
       this.pushHistory(entry);
       this.runCommand(entry.command.redo);
+      this.notify();
       return;
     }
     const current = extractSnapshot(useGradientStore.getState());
     this.pushHistory({ kind: 'state', snapshot: current });
     this.applySnapshot(entry.snapshot);
+    this.notify();
   }
 
   canUndo(): boolean {
@@ -196,6 +258,19 @@ class HistoryManager {
 
   canRedo(): boolean {
     return this.futureStack.length > 0;
+  }
+
+  isDirty(): boolean {
+    return this.pendingPrev !== null || this.cleanDepth !== this.historyStack.length;
+  }
+
+  subscribe(listener: () => void): () => void {
+    this.listeners.add(listener);
+    return () => { this.listeners.delete(listener); };
+  }
+
+  getStatus(): HistoryStatus {
+    return this.statusCache;
   }
 }
 
@@ -206,5 +281,9 @@ export const undo = () => historyManager.undo();
 export const redo = () => historyManager.redo();
 export const canUndo = () => historyManager.canUndo();
 export const canRedo = () => historyManager.canRedo();
+export const isDocumentDirty = () => historyManager.isDirty();
+export const markDocumentClean = () => historyManager.markClean();
+export const subscribeHistory = (listener: () => void) => historyManager.subscribe(listener);
+export const getHistoryStatus = () => historyManager.getStatus();
 export const recordHistoryCommand = (command: HistoryCommand) => historyManager.record(command);
 export const resetHistoryForTest = () => historyManager.reset();

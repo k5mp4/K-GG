@@ -2,6 +2,7 @@ import { memo, useCallback, useEffect, useMemo, useRef, useState, useSyncExterna
 import { useGradientStore } from '../store/gradientStore';
 import { createPresetSaveState } from '../lib/presetModel';
 import { applyPresetToDocument } from '../lib/applyPreset';
+import { markDocumentClean } from '../lib/history';
 import {
   createFolder,
   deleteFolder,
@@ -379,6 +380,7 @@ export function PresetPanel({ canvasW, canvasH, setCanvasW, setCanvasH, aspectRa
       const thumbnail = await capturePresetThumbnail(state);
       const saved = await savePreset(trimmed, state, selectedFolderId, thumbnail);
       applicationCommands.setPresetName(trimmed);
+      markDocumentClean();
       setSelectedPresetId(saved.id);
       setName('');
       await refresh();

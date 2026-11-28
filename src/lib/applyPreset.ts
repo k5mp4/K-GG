@@ -21,6 +21,7 @@ import { keepLoopTimingOnPresetLoad } from './animationConfig';
 import { mergeUserColorPalettes } from './colorPalettes';
 import { resolveDiffuseBezier } from './diffuseCurve';
 import { createDefaultEffectPipeline, normalizeEffectPipelineConfig } from './effectPipeline';
+import { markDocumentClean } from './history';
 import type { Preset, StoreSnapshot } from './presetModel';
 
 export type PreparedPreset = {
@@ -167,6 +168,7 @@ export function applyPreparedPresetToDocument(prepared: PreparedPreset): { resol
 export function commitPreparedPresetToDocument(prepared: PreparedPreset, patch: Partial<GradientStore>): { resolution?: { width: number; height: number } } {
   if (prepared.inputs.colorPalettes) mergeUserColorPalettes(prepared.inputs.colorPalettes);
   useGradientStore.setState(patch);
+  markDocumentClean();
   return prepared.resolution ? { resolution: prepared.resolution } : {};
 }
 

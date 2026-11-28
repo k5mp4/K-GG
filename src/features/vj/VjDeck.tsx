@@ -9,6 +9,7 @@ import { createLocalEffectStackActions } from '../effectStack/effectStackControl
 import { getVjParameters, getVjParameterValue, type VjParameter, type VjParameterRule } from './vjParameters';
 import type { VjSession } from './useVjSession';
 import { VjSpoutToggle } from './VjSpoutToggle';
+import { LayoutModeSwitch } from '../workspace/LayoutModeSwitch';
 import type { EffectStackKind, EffectStackLayer } from '../../types/distortion';
 import './vj.css';
 
@@ -152,7 +153,13 @@ export function VjDeck({ session, canvasW, canvasH, windowFailed, canvasRef }: {
         <option value="sequential">{t('vj.sequential')}</option><option value="shuffle">{t('vj.shuffle')}</option>
       </select>
       <VjSpoutToggle canvasRef={canvasRef} />
-      <button type="button" className="vj-exit" onClick={() => session.updateSettings({ layoutMode: 'editor' })}>{t('vj.editor')}</button>
+      <LayoutModeSwitch
+        layoutMode={session.settings.layoutMode}
+        onChange={layoutMode => session.updateSettings({ layoutMode })}
+        translate={t}
+        size="compact"
+        className="vj-layout-switch"
+      />
     </header>
     <div className="vj-deck-body">
       <section className="vj-main">

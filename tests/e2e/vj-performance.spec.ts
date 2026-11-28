@@ -176,9 +176,10 @@ test('VJ controls preserve the canvas, output size and default editor', async ({
 
   await page.setViewportSize({ width: 640, height: 270 });
   expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(640);
-  await expect(deck.getByRole('button', { name: 'Return to editor' })).toBeInViewport();
+  await expect(deck.getByRole('radio', { name: 'Editor' })).toBeInViewport();
+  await expect(deck.getByRole('radio', { name: 'VJ performance' })).toHaveAttribute('aria-checked', 'true');
   await page.screenshot({ path: testInfo.outputPath('vj-640x270.png') });
-  await deck.getByRole('button', { name: 'Return to editor' }).click();
+  await deck.getByRole('radio', { name: 'Editor' }).click();
   await expect(page.locator('[data-layout-mode]')).toHaveAttribute('data-layout-mode', 'editor');
   await page.setViewportSize({ width: 1440, height: 960 });
   await expect(page.getByRole('navigation')).toBeVisible();
@@ -236,7 +237,7 @@ test('failed or cancelled preload preserves the live document and ready cues rem
       isBusy: () => false, getRequiredKeys: () => [], getRequiredKeysWithLayer: () => [] }, { plan: [] });
   });
   await expect(deck.getByRole('button', { name: '02 VJ Cue B', exact: true })).toBeDisabled();
-  await deck.getByRole('button', { name: 'Return to editor' }).click();
+  await deck.getByRole('radio', { name: 'Editor' }).click();
   await expect(page.locator('[data-layout-mode]')).toHaveAttribute('data-layout-mode', 'editor');
   await page.evaluate(() => (window as typeof window & { vjResolvePrepare?: () => void }).vjResolvePrepare?.());
   expect(await readDocument()).toBe(before);
