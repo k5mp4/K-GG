@@ -2,16 +2,19 @@
 type: change
 id: CHANGE-20260927-sandbox-datamosh
 title: Datamosh エフェクトと Video Motion の統合
-status: review
+status: archived
 change_kind: F
 owners: [maintainer]
 created: 2026-09-27
-updated: 2026-09-27
+updated: 2026-11-28
 current_specs: [CURRENT-EFFECT-STACK, CURRENT-PRESET, CURRENT-UI-CONTROLS, CURRENT-WEBGL-PERFORMANCE]
 related_adrs: [ADR-20260927-datamosh-feedback-layer]
 related_code: [src/types/datamosh.ts, src/shaders/datamosh/uniforms.glsl, src/shaders/datamosh/motion-field.glsl, src/shaders/datamosh/main.glsl, src/lib/webgl.ts, src/lib/webglShaderSources.ts, src/lib/effectPipeline.ts, src/lib/sceneRenderPlan.ts, src/components/DatamoshPanel.tsx, src/components/PostprocessPanel.tsx, src/components/EffectStackPanelView.tsx, src/lib/presetModel.ts, src/components/PresetPanel.tsx, src/store/documentActions.ts, src/components/GradientCanvas.tsx, src/lib/videoExportFrames.ts, packages/kgg-control/src/types.ts]
 related_tests: [src/types/datamosh.test.ts, src/lib/effectPipeline.test.ts, src/lib/webglExportPrograms.test.ts, src/store/gradientStore.effectPipeline.test.ts, src/components/PostprocessPanel.test.tsx, tests/e2e/shaders.spec.ts]
 human_review: required
+outcome: follow-up
+migration: historical
+follow_up: "PR #90でmerge済み。Release Gate未完: Tauri版でDatamoshの画面操作と実GPUでの見た目を確認"
 ---
 
 # Datamosh エフェクトと Video Motion の統合
@@ -70,3 +73,10 @@ GLSLとフレームフィードバックだけで、動画を解析しなくて�
 ## 未決定事項
 
 - なし（human reviewで、移行後の見た目の差を確認する）。
+
+## Finalization
+
+- Finalized: 2026-11-28
+- Outcome: `follow-up`
+- Mode: historical migration; this move does not claim that every acceptance criterion passed.
+- Follow-up: PR #90でmerge済み。Release Gate未完: Tauri版でDatamoshの画面操作と実GPUでの見た目を確認

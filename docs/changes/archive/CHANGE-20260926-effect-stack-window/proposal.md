@@ -2,16 +2,19 @@
 type: change
 id: CHANGE-20260926-effect-stack-window
 title: Effect Stackのネイティブ別ウインドウ化
-status: draft
+status: archived
 change_kind: F
 owners: [maintainer]
 created: 2026-09-26
-updated: 2026-09-26
+updated: 2026-11-28
 current_specs: [CURRENT-UI-CONTROLS]
 related_adrs: [ADR-20260926-native-secondary-windows]
 related_code: [src/components/PostprocessStackPanel.tsx, src/components/EffectStackPanelView.tsx, src/components/EffectStackWorkspace.tsx, src/features/effectStack/effectStackController.ts, src/features/effectStack/effectStackView.ts, src/features/effectStack/effectStackIntents.ts, src/features/effectStack/useEffectStackWindowHost.ts, src/features/effectStack/EffectStackWindowApp.tsx, src/adapters/tauri/toolWindows.ts, src/main.tsx, src/WindowRoot.tsx, src/i18n/messages.ts, src-tauri/src/tool_windows.rs, src-tauri/capabilities/tool-windows.json]
 related_tests: [src/features/effectStack/effectStack.test.ts, src/adapters/tauri/toolWindows.test.ts, src/components/PostprocessStackPanel.test.tsx]
 human_review: required
+outcome: follow-up
+migration: historical
+follow_up: "PR #85でmerge済み。Release Gate未完: Tauri実機でEffect Stack別ウインドウの再前面化・長時間操作を確認"
 ---
 
 # Effect Stackのネイティブ別ウインドウ化
@@ -72,3 +75,10 @@ Effect Stackはキャンバス上にフローティング表示され、キャ�
 ## 未決定事項
 
 - なし。
+
+## Finalization
+
+- Finalized: 2026-11-28
+- Outcome: `follow-up`
+- Mode: historical migration; this move does not claim that every acceptance criterion passed.
+- Follow-up: PR #85でmerge済み。Release Gate未完: Tauri実機でEffect Stack別ウインドウの再前面化・長時間操作を確認

@@ -67,7 +67,7 @@ Fast checkは全PRで実行します。次の変更がある場合だけ追加jo
 | 変更パス | 追加検証 |
 | --- | --- |
 | `src/shaders/**`、`src/lib/webgl*`、`src/lib/effect*`、`src/lib/render*`、`src/lib/export*` | e2e-check（全WebGL programのコンパイルE2Eを含む） |
-| `src-tauri/**`、`Cargo.toml`、`Cargo.lock`、Tauri設定 | native-check。Release時は実FFmpeg/Tauri buildをNative Release Gate |
+| `src-tauri/**`、`Cargo.toml`、`Cargo.lock`、Tauri設定 | native-checkとmacos-native-check（macOSの実FFmpeg smokeとDMG build）。Release時はWindowsの実FFmpeg/Tauri buildをNative Release Gate |
 | `src/App.tsx`、`src/components/**`、`src/features/workspace/**`、`src/adapters/**`、`src/hooks/useWebGL.ts`、Browser E2E、Playwright、render/export/webgl tooling、workflow | e2e-check |
 | `docs/**`、`AGENTS.md`、テンプレート、workflow | fast-check内のdocs check/build。`change:check`も実行 |
 | tag `v*.*.*` | release workflowのversion、署名、bundle |

@@ -2,16 +2,19 @@
 type: change
 id: CHANGE-20261009-vj-performance-layout
 title: VJレイアウトと拍同期プリセット演奏
-status: review
+status: archived
 change_kind: F
 owners: [maintainer]
 created: 2026-10-09
-updated: 2026-10-09
+updated: 2026-11-28
 current_specs: [CURRENT-VJ-PERFORMANCE, CURRENT-WORKSPACE-LAYOUT, CURRENT-PRESET, CURRENT-WEBGL-PERFORMANCE]
 related_adrs: [ADR-20261009-vj-performance-session, ADR-0009]
 related_code: [src/features/vj/useVjSession.ts, src/features/vj/VjDeck.tsx, src/lib/applyPreset.ts, src/adapters/tauri/vjWindow.ts]
 related_tests: [src/features/vj/vjPlayback.test.ts, src/features/vj/vjParameters.test.ts, src/features/vj/vjDocument.test.ts, src/lib/applyPreset.test.ts, src/adapters/tauri/vjWindow.test.ts, tests/e2e/vj-performance.spec.ts]
 human_review: required
+outcome: follow-up
+migration: historical
+follow_up: "PR #119でmerge済み。Release Gate未完: Tauri/WebView2の640×270論理px・OS表示倍率・最大化切替、Spout受信側の出力解像度固定、長時間演奏を確認"
 ---
 
 # VJレイアウトと拍同期プリセット演奏
@@ -66,3 +69,10 @@ Preset適用の抽出が通常読み込みへ影響するリスクは互換テ�
 ## 未決定事項
 
 実装範囲に未決定の要件はない。要件への実装依頼を受けた後の差分レビューは未完了としてhuman_review: requiredを保つ。Merge前に人間のレビュー記録、ADRの扱い、Release Gateの継続先を確認し、implementedへの更新とchange:finalizeを行う。
+
+## Finalization
+
+- Finalized: 2026-11-28
+- Outcome: `follow-up`
+- Mode: historical migration; this move does not claim that every acceptance criterion passed.
+- Follow-up: PR #119でmerge済み。Release Gate未完: Tauri/WebView2の640×270論理px・OS表示倍率・最大化切替、Spout受信側の出力解像度固定、長時間演奏を確認

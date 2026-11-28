@@ -2,16 +2,19 @@
 type: change
 id: CHANGE-20260929-noise-shader-variants
 title: Noise種別ごとのShader特殊化と起動・Effect反映の高速化
-status: draft
+status: archived
 change_kind: F
 owners: [maintainer]
 created: 2026-09-29
-updated: 2026-09-29
+updated: 2026-11-28
 current_specs: [CURRENT-WEBGL-PERFORMANCE, CURRENT-APP-STARTUP]
 related_adrs: [ADR-0022, ADR-20260929-noise-shader-variants]
 related_code: [src/shaders/noise.glsl, src/shaders/gradient.frag.glsl, src/shaders/postprocess/stack.glsl, src/lib/webglShaderSources.ts, src/lib/sceneRenderPlan.ts, src/lib/effectPipeline.ts, src/lib/webgl.ts, src/lib/shaderWarmup.ts, src/lib/shaderWarmupHost.ts]
 related_tests: [src/lib/webglShaderSources.test.ts, src/lib/webglExportPrograms.test.ts, src/lib/webgl.lifecycle.test.ts, tests/e2e/shaders.spec.ts]
 human_review: required
+outcome: follow-up
+migration: historical
+follow_up: "PR #98でmerge済み。未完: merge時のcheck:merge記録がpending。Tauri本番ビルドの起動待ち時間とWebView2メモリ、低性能CPUでのwatchdog内compileを確認"
 ---
 
 # Noise種別ごとのShader特殊化と起動・Effect反映の高速化
@@ -65,3 +68,10 @@ Windows（ANGLE/Direct3D11、RTX 3060 Ti）での実測では、全Noise種別�
 ## 未決定事項
 
 - なし
+
+## Finalization
+
+- Finalized: 2026-11-28
+- Outcome: `follow-up`
+- Mode: historical migration; this move does not claim that every acceptance criterion passed.
+- Follow-up: PR #98でmerge済み。未完: merge時のcheck:merge記録がpending。Tauri本番ビルドの起動待ち時間とWebView2メモリ、低性能CPUでのwatchdog内compileを確認

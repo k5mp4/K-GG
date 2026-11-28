@@ -2,16 +2,19 @@
 type: change
 id: CHANGE-20261125-effect-stack-layers-column
 title: Effect Stackの常設Layersカラム化
-status: review
+status: archived
 change_kind: F
 owners: [maintainer]
 created: 2026-11-25
-updated: 2026-11-25
+updated: 2026-11-28
 current_specs: [CURRENT-UI-CONTROLS, CURRENT-WORKSPACE-LAYOUT]
 related_adrs: [ADR-20261125-workspace-layers-column, ADR-20261003-responsive-workspace-layout]
 related_code: [src/features/workspace/workspaceLayout.ts, src/features/workspace/CanvasWorkspace.tsx, src/features/workspace/useWorkspaceController.ts, src/components/EffectStackWorkspace.tsx, src/components/EffectStackPanelView.tsx, src/components/PostprocessStackPanel.tsx, src/components/PropertyModulesSettingsPanel.tsx, src/store/documentModel.ts, src/i18n/messages.ts, src/App.tsx]
 related_tests: [src/features/workspace/workspaceLayout.test.ts, src/components/PostprocessStackPanel.test.tsx, tests/e2e/workspace-layout.spec.ts, tests/e2e/licenses.spec.ts]
 human_review: required
+outcome: follow-up
+migration: historical
+follow_up: "PR #124でmerge済み。Release Gate未完: Tauri実機でLayers列とレスポンシブ配置を確認"
 ---
 
 # Effect Stackの常設Layersカラム化
@@ -83,3 +86,10 @@ Effect Stack（幅200px）とColor HistogramはPreviewの上に重ねて表示�
 ## 未決定事項
 
 なし。
+
+## Finalization
+
+- Finalized: 2026-11-28
+- Outcome: `follow-up`
+- Mode: historical migration; this move does not claim that every acceptance criterion passed.
+- Follow-up: PR #124でmerge済み。Release Gate未完: Tauri実機でLayers列とレスポンシブ配置を確認

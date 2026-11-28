@@ -13,7 +13,8 @@ title: Native / FFmpeg / Tauri validation
 | Rust command/path/encoder contract | `npm run check:native` | Merge Gate（対象変更時） | Figma Connectorをビルドした後のRust unit testと`cargo check`の結果 |
 | Browser/Tauri adapter contract | `npm run check:fast`、またはnative gateの`npm test -- src/adapters/tauri` | Merge Gate | fake/native adapter testの結果 |
 | Spout2 sender（Windows、DirectX 11） | `cargo test --manifest-path src-tauri/Cargo.toml spout2 -- --ignored --nocapture --test-threads=1` | Native Release Gate | 共有textureの向き・BGRA・リサイズ・名前衝突・解放と、1080pの送信コスト。GPUのないrunnerでは実行しない |
-| 実FFmpeg + ffprobe | `npm run check:ffmpeg` | Native Release Gate | qtrle MOVとlibx264 MP4のcodec、pix_fmt、SAR、BT.709 metadata、サイズ、フレーム数、非空、temp cleanup |
+| 実FFmpeg + ffprobe（macOS） | `npm run check:ffmpeg`（CIの`macos-native-check`とrelease workflowのmacOS DMG job、Homebrew FFmpeg） | Merge Gate（native対象変更時）／Release Gate | 下記smokeの結果。GitHub-hosted macOS runnerで自動実行される |
+| 実FFmpeg + ffprobe（Windows） | `npm run check:ffmpeg`（`native-release-gate.yml`） | Native Release Gate | qtrle MOVとlibx264 MP4のcodec、pix_fmt、SAR、BT.709 metadata、サイズ、フレーム数、非空、temp cleanup |
 | Tauri binary | `npx tauri build --debug --no-bundle` | Native Release Gate | 実行環境でのbuild結果 |
 | Tauri UI | WebDriver手動Release Gate | Release Gate | 起動、Preset、Preview、PNG/ZIP、native FFmpeg statusのUI証跡 |
 
@@ -33,6 +34,11 @@ title: Native / FFmpeg / Tauri validation
 - smoke終了後の一時フォルダ削除
 
 Rust側の引数は`src-tauri/src/lib.rs`のunit testでcodec、pixel format、sequence numbering、CRF、faststartを固定しています。これらは実FFmpegの結果を代替しないため、Release Gateでは両方を実行します。
+
+次の出力経路はアプリに実装済みですが、smokeでは実FFmpeg processを実行していません。Rust unit testの引数検証だけがあり、実機では`not-run`として扱います。
+
+- WebM（`libvpx-vp9`）とGIF
+- H.264のハードウェアencoder（`h264_nvenc`、`h264_qsv`、`h264_amf`、`h264_videotoolbox`）と、失敗時のCPU（`libx264`）への切り戻し
 
 ## Tauri UI自動化の採否と範囲
 
@@ -65,7 +71,7 @@ PR Merge Gateへは未接続である。これは未実施のRelease Gateであ�
 
 ## 実行workflow
 
-- `.github/workflows/native-release-gate.yml`: manual-onlyのorg-managed `kgg-native` Windows runnerでRust、実FFmpeg、unbundled Tauri buildを実行します。FFmpegはrunnerの`KGG_FFMPEG_PATH` / `KGG_FFPROBE_PATH`またはPATHにある実行ファイルだけを使い、自動取得・同梱はしません。
+- `.github/workflows/native-release-gate.yml`: manual-onlyのorg-managed `kgg-native` Windows runnerでRust、実FFmpeg、unbundled Tauri buildを実行します。FFmpegはrunnerの`KGG_FFMPEG_PATH` / `KGG_FFPROBE_PATH`またはPATHにある実行ファイルだけを使い、自動取得・同梱はしません。Spout2の`--ignored` testはこのworkflowに含まれていないため、GPUのあるWindows機で手動実行します。
 - `.github/workflows/render-fixed-gpu.yml`: 固定GPUが必要なRGBA render Release Gateです。Tauri UIの判定を含めません。
 
-このworkflowのrunner labelや環境はリポジトリ内で新設しません。runnerが存在しない場合はworkflow未実行として扱い、release判定をpassにしません。
+このworkflowのrunner labelや環境はリポジトリ内で新設しません。runnerが存在しない場合はworkflow未実行として扱い、release判定をpassにしません。2026-11-28時点で`native-release-gate.yml`の実行履歴は0件、`render-fixed-gpu.yml`のmanual実行も0件で、どちらのRelease Gateもまだ一度もpassしていません。

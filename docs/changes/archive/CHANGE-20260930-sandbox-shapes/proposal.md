@@ -2,16 +2,19 @@
 type: change
 id: CHANGE-20260930-sandbox-shapes
 title: SANDBOX Shapes（SVG形状の輝度の場とGradient Ramp、表示・非表示ループ）
-status: review
+status: archived
 change_kind: F
 owners: [maintainer]
 created: 2026-09-30
-updated: 2026-09-30
+updated: 2026-11-28
 current_specs: [CURRENT-EFFECT-STACK, CURRENT-PRESET, CURRENT-UI-CONTROLS]
 related_adrs: [ADR-20260930-sandbox-shapes-final-stage]
 related_code: [src/types/shapes.ts, src/lib/shapesLibrary.ts, src/shaders/shapes.frag.glsl, src/lib/webgl.ts, src/lib/webglShaderSources.ts, src/lib/renderFrame.ts, src/lib/renderSceneAtTime.ts, src/lib/sceneRenderPlan.ts, src/lib/sceneEvaluation.ts, src/lib/presetModel.ts, src/lib/presetThumbnail.ts, src/lib/history.ts, src/lib/exportRenderState.ts, src/features/shapes/shapesMaskStore.ts, src/components/ShapesPanel.tsx, src/components/SandboxPanel.tsx, src/components/GradientCanvas.tsx, src/components/PresetPanel.tsx, src/store/documentActions.ts, packages/kgg-control/src/parameterLimits.ts]
 related_tests: [src/types/shapes.test.ts, src/lib/shapesLibrary.test.ts, src/lib/presetModel.shapes.test.ts, src/lib/renderFrame.test.ts, src/lib/webglExportPrograms.test.ts, src/components/SandboxPanel.test.tsx, tests/e2e/shaders.spec.ts]
 human_review: required
+outcome: follow-up
+migration: historical
+follow_up: "PR #103でmerge済み。Release Gate未完: 実GPUとTauri実機でShapesの見た目と操作を確認"
 ---
 
 # SANDBOX Shapes（SVG形状の輝度の場とGradient Ramp、表示・非表示ループ）
@@ -70,3 +73,10 @@ K-GGで作ったグラデーションやEffect Stackの画が、任意の形状�
 ## 未決定事項
 
 - なし（human reviewで、既定値と見た目を確認する）。
+
+## Finalization
+
+- Finalized: 2026-11-28
+- Outcome: `follow-up`
+- Mode: historical migration; this move does not claim that every acceptance criterion passed.
+- Follow-up: PR #103でmerge済み。Release Gate未完: 実GPUとTauri実機でShapesの見た目と操作を確認
