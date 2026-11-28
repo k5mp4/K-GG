@@ -66,9 +66,9 @@ Web 版は `index.html` で Google Fonts から Noto Sans JP、Open Sans を読�
 - GlassはGLASS V2による滑らかな勾配ノイズとRGB別屈折率を使う画面空間の光学近似です。PostprocessのプロパティにはGlassを一つだけ表示し、色収差は最大80px、Transmission TintとHighlight Tintはカラー入力から調整できます。
 - GlassTileはGlassとは別のエフェクトで、KG_Glassのタイル表面モデルを使います。Pattern、タイルサイズ、表面形状、屈折・分散、粗さ、Mix、Edge Mode、Seedを調整できます。
 - 行のグリップをドラッグすると、行が目的位置へ収束してから描画順序が確定します。各行のスイッチでレイヤーをON/OFFできます。
-- 手描きの`Distort`はPostprocessの`Edit Layer`から編集します。旧Presetの`manualDistort`は読み込み時にPostprocessへ移行されます。
+- 手描きの`Distort`はEffect Stackで`Distort`を選んで編集します。旧Presetの`manualDistort`は読み込み時にPostprocessへ移行されます。
 - Postprocessの全体ON／OFFは、Effect Stack内のStretch／Distort／Mirror／Kaleidoscope／Voronoi／Glass／GlassTile／Datamosh／Coneの有効状態を反映します。
-- DatamoshはEffect Stackのレイヤーで、前フレームの出力を不規則なブロックに分けたモーション場（前段のNoiseなどのアニメーションから推定したAnimation Flow、Curl Noise、または読み込んだ動画のVideo Motion）に沿ってずらして再利用します。Block Lockを下げると、ブロック単位ではなく画素ごとにアニメーションの流れへ沿って引き伸ばします。Luma／Saturation Stretchで明るい・鮮やかな画素ほど長く引き伸ばし、Refreshを下げるほど履歴が残ります。SourceをPixel Stretchにすると、Threshold以上の明るい画素がフレームごとにAngleの方向へ伸び（明るい画素からLengthまで）、伸びた画素はそのまま描画に残ります。Curlを上げると伸びる向きがcurlノイズの力場に沿って場所ごとに変わり、渦を巻くように伸びます。Curl Loopsで、タイムライン1ループの間に力場が変化して元へ戻る回数を決めます。Refreshを0にすると残し続けます。設定はPostprocessのEdit Layerで`Datamosh`を選んで編集します。履歴はアニメーションのフレームごとに進むため、タイムラインを再生して確認します。各レイヤーの個別ON／OFFはEffect Stackで操作し、Postprocessプロパティでは選択レイヤーの詳細を編集します。
+- DatamoshはEffect Stackのレイヤーで、前フレームの出力を不規則なブロックに分けたモーション場（前段のNoiseなどのアニメーションから推定したAnimation Flow、Curl Noise、または読み込んだ動画のVideo Motion）に沿ってずらして再利用します。Block Lockを下げると、ブロック単位ではなく画素ごとにアニメーションの流れへ沿って引き伸ばします。Luma／Saturation Stretchで明るい・鮮やかな画素ほど長く引き伸ばし、Refreshを下げるほど履歴が残ります。SourceをPixel Stretchにすると、Threshold以上の明るい画素がフレームごとにAngleの方向へ伸び（明るい画素からLengthまで）、伸びた画素はそのまま描画に残ります。Curlを上げると伸びる向きがcurlノイズの力場に沿って場所ごとに変わり、渦を巻くように伸びます。Curl Loopsで、タイムライン1ループの間に力場が変化して元へ戻る回数を決めます。Refreshを0にすると残し続けます。設定はEffect Stackで`Datamosh`を選んで編集します。履歴はアニメーションのフレームごとに進むため、タイムラインを再生して確認します。各レイヤーの個別ON／OFFはEffect Stackで操作し、Postprocessプロパティでは選択レイヤーの詳細を編集します。
 - Effect Stackヘッダーのシャッフル操作で主スタックの順序をランダム化できます。現在の見た目から新しい順序へ滑らかに遷移します。行またはオンオフToggleをAltクリックすると、そのレイヤーだけを有効にするソロ操作になり、ソロ化で一時的に非表示になったレイヤーは黄色の`STAY`で示されます。同じ対象をもう一度Altクリックすると元の有効状態へ戻ります。
 - Effect Stackは別ウィンドウへ切り離せます。別ウィンドウを閉じるとインライン表示へ戻ります。
 - 固定段は `Surface → Main Stack → Prism → Particles` です。ConeとDatamoshはMain Stack内の通常レイヤーとして前段textureを処理し、出力を後続レイヤーへ渡します。Normal、Prism、Particlesはトップバーの`SANDBOX`から編集し、DiffuseはMain Stack内の位置で一度だけ適用されます。
@@ -82,7 +82,7 @@ Web 版は `index.html` で Google Fonts から Noto Sans JP、Open Sans を読�
 - LinearのRounded Endsで、各帯を帯方向に複数のバーへ分け、端を Round（角丸）または Bevel（面取り）にできます。各バーは別々にずれるので、元の画像は残りません。Start／End／Both／Randomで角丸にする端を選び、Radiusが角の大きさ、Bar LengthとLength Varianceがバーの長さです。Slitのアニメーションを有効にすると、バーは帯に沿って流れ、ループの継ぎ目なくつながります。Speed Varianceで帯ごとに流れる速さをばらけさせられます
 
 ### SANDBOX
-- トップバーは `Diffuse → Noise → Slit → Postprocess → SANDBOX → Export → Preset` の順で、Stretchは独立項目およびPostprocessのプロパティモジュールに表示しません。PostprocessではEdit Layerを選択し、その詳細プロパティを操作できます。SANDBOXの文字色はPostprocessと同じです。
+- トップバーは `編集中: レイヤー名 → SANDBOX → Export → Preset` です。Diffuse、Noise、Slit、Postprocessのタブはなく、各レイヤーはEffect Stackの行を選んで編集します。「編集中」を押すと選択中レイヤーのプロパティへ戻ります。プロパティの見出しには選択中のレイヤー名とON／OFFが表示されます。
 - グラデーションの主スタックとは別に、Cloth、Normal、Prism、Particles、Flow Gradient、Seamless、Shapesの7モジュールを一つのパネルから編集できます。ConeはSANDBOXに含めず、Effect Stackの通常レイヤーとして扱います。
 - `Shapes` はSVGの形状を連続した輝度の場に変え、右サイドバーのGradient Rampで着色する最終段です（サーモグラフィやdepthパスのような見た目）。`Source`で円・星・文字のアウトラインか、`SVGを読み込む`で読み込んだSVGを選びます。SVGは形状（アルファ）だけを使い、色やスタイルは無視します。`Edge`のSoftnessで輪郭をなめらかにし、Inner Shadowで縁へ向かって暗くなる奥行きを作ります。`Fill`でフロー（流体のようなノイズ）、リップル（奥行きに沿って進む帯）、ストライプ、K-GGの描画の輝度のいずれかを内部で動かし（Fill CyclesはAnimation 1ループの周期数）、`Gradient`でオーラ・Contrast・Grainを調整します。`Show / Hide Loop`の`Mode`（フェード＋発光、ワイプ、ネオン点滅、常に表示）で、Animationの各ループ内に表示・非表示を`Cycles`回繰り返します。読み込んだSVGはPresetへ保存されず、未読込のときは星で描画します。
 

@@ -87,6 +87,7 @@ describe('PostprocessPanel layer surface', () => {
     expect(markup).toContain('Mapping');
     expect(markup).toContain('Flow Cycles');
     expect(markup).not.toContain('data-postprocess-master-toggle');
+    expect(markup).toContain('data-layer-header="cone"');
   });
 
   it('shows the Stretch parameters when Stretch is selected in the Effect Stack', () => {
@@ -96,14 +97,16 @@ describe('PostprocessPanel layer surface', () => {
     for (const label of ['Stretch', 'Scan Position', 'Band Height', 'Height Variance', 'Variation', 'Seed', 'Glow Intensity']) {
       expect(markup).toContain(label);
     }
-    expect(markup).toContain('Edit Layer');
-    // Stretch is a Postprocess layer: the Effect Stack owns its ON/OFF, so the
-    // module shows the Postprocess master switch and no per-layer switch.
-    expect(markup).toContain('data-postprocess-master-toggle');
+    // The Effect Stack is the only entry: no Edit Layer selector and no Postprocess master switch.
+    expect(markup).not.toContain('Edit Layer');
+    expect(markup).not.toContain('data-postprocess-master-toggle');
+    // The header names the selected layer and owns its ON/OFF, like the Effect Stack row.
+    expect(markup).toContain('data-layer-header="stretch"');
+    expect(markup).toMatch(/<button[^>]*role="switch"[^>]*aria-label="Stretch"/);
     // The hidden Datamosh panel's option switches are not layer switches.
     const switches = (markup.match(/<button[^>]*role="switch"[^>]*>/g) ?? [])
       .filter(tag => !/aria-label="(Freeze|Color Drift)"/.test(tag));
-    expect(switches).toHaveLength(2); // master + Glow
+    expect(switches).toHaveLength(2); // layer + Glow
   });
 
   it('exposes Glass IOR and refinable Chromatic Steps in Optics', () => {
@@ -198,29 +201,15 @@ describe('PostprocessPanel layer names', () => {
     useGradientStore.setState(useGradientStore.getInitialState(), true);
   });
 
-  it('names Edit Layer choices as in the Effect Stack in Japanese too', () => {
+  it('names the layer header as in the Effect Stack in Japanese too', () => {
     vi.stubGlobal('window', {
       localStorage: { getItem: () => 'ja', setItem: () => {} },
       navigator: { language: 'ja' },
     });
     try {
-      const state = useGradientStore.getInitialState();
-      useGradientStore.setState({
-        ...state,
-        effectPipeline: {
-          ...state.effectPipeline,
-          selectedKind: 'glass',
-          effectStack: updateEffectStackLayer(state.effectPipeline.effectStack, 'glass', { enabled: true }),
-        },
-        postprocess: { ...state.postprocess, effectMode: 'glassV2' },
-      }, true);
-      const markup = renderToStaticMarkup(
-        <LanguageProvider>
-          <PostprocessPanel />
-        </LanguageProvider>,
-      );
-      expect(markup).toContain('>Glass<');
-      expect(markup).not.toContain('>ガラス<');
+      const markup = renderPostprocessPanelWithLayerSelected('texture');
+      expect(markup).toMatch(/<h2[^>]*>Texture<\/h2>/);
+      expect(markup).toMatch(/<button[^>]*role="switch"[^>]*aria-label="Texture"/);
     } finally {
       vi.unstubAllGlobals();
     }

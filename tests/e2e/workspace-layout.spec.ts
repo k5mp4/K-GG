@@ -154,6 +154,17 @@ test('docked Layers column stays beside the preview regardless of timeline and w
   await expect.poll(async () => (await layers.boundingBox())!.width).toBeCloseTo(48, 0);
   await layers.getByRole('button', { name: /^Glass:/ }).click();
   await expect(properties.locator('[data-module="postprocess"]')).not.toHaveAttribute('inert');
+  // The Effect Stack is the only entry to layers: the TOP bar names the edited layer and lists the modes.
+  const nav = page.getByRole('navigation');
+  await expect(nav.getByRole('button', { name: /^(Diffuse|Noise|Slit|Postprocess)\b/ })).toHaveCount(0);
+  await expect(properties.locator('[data-module="postprocess"]').getByText('Edit Layer', { exact: true })).toHaveCount(0);
+  await expect(properties.locator('[data-layer-header="glass"]')).toBeVisible();
+  const editing = nav.getByRole('button', { name: 'Editing: Glass', exact: true });
+  await expect(editing).toHaveAttribute('aria-pressed', 'true');
+  await nav.getByRole('button', { name: /^Export\b/ }).click();
+  await expect(editing).toHaveAttribute('aria-pressed', 'false');
+  await editing.click();
+  await expect(properties.locator('[data-module="postprocess"]')).not.toHaveAttribute('inert');
   // Rail rows reorder by dragging, like the column rows.
   const railRows = layers.locator('.effect-stack-rail-row');
   const railNames = () => railRows.evaluateAll(rows => rows

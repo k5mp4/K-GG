@@ -4,7 +4,7 @@ import { createEmptyManualDistortMap, createEmptyManualSmoothMask, STORE_DEFAULT
 import { applicationCommands } from '../application/commands';
 import { applyMirrorT, applyRampRepeatT, getColorAtPosition } from '../lib/gradientRampUtils';
 import type { ColorStop, RampColorMode, RampInterpolation } from '../types/gradient';
-import type { GlassSurfaceType, ManualDistortConfig, PostprocessKaleidoscopeType, PostprocessParticleEmitterType, PostprocessStackKind } from '../types/distortion';
+import type { EffectStackKind, GlassSurfaceType, ManualDistortConfig, PostprocessKaleidoscopeType, PostprocessParticleEmitterType } from '../types/distortion';
 import { POSTPROCESS_KALEIDOSCOPE_TYPES } from '../types/distortion';
 import { Collapsible } from './Collapsible';
 import { CustomSelect } from './CustomSelect';
@@ -13,7 +13,8 @@ import { Icon } from './Icon';
 import { Toggle } from './Toggle';
 import { useLanguage } from '../i18n/LanguageProvider';
 import { InputColor, InputDrum, InputRadio, InputString } from 'tweeq';
-import { hasEnabledPostprocessEffectStack } from '../lib/effectPipeline';
+import { isEffectStackLayerEnabled } from '../lib/effectPipeline';
+import { toggleEffectStackLayer } from '../features/effectStack/effectStackController';
 import { ConeViewPanel } from './ConeViewPanel';
 import { DatamoshPanel } from './DatamoshPanel';
 import { TexturePanel } from './TexturePanel';
@@ -22,13 +23,6 @@ import { DistortChromaPanel } from './DistortChromaPanel';
 import { getDiffuseGrainParameterLimitKey } from '../lib/parameterLimits';
 import { VORONOI_FEATURES, VORONOI_METRICS } from '../lib/voronoi';
 import { StretchPanel } from './StretchPanel';
-
-/** Edit Layer choices, named as in the Effect Stack in both UI languages. */
-const EDIT_LAYER_OPTIONS = ([
-  ['stretch', 'stretch'], ['distort', 'distort'], ['mirror', 'mirror'], ['kaleidoscope', 'kaleidoscope'],
-  ['voronoi', 'voronoi'], ['glassV2', 'glass'], ['glassTile', 'glassTile'], ['datamosh', 'datamosh'],
-  ['texture', 'texture'], ['distortChroma', 'distortChroma'], ['ice', 'ice'],
-] as const).map(([value, kind]) => ({ value, label: EFFECT_STACK_LABELS[kind] }));
 
 const D = STORE_DEFAULTS.manualDistort;
 const GLASS_COLOR_INPUT_CLASS = 'tq-color-input w-[132px] min-w-0 flex-none border border-panel-border bg-k-bg/50';
@@ -401,7 +395,7 @@ export function PostprocessPanel({
 }: PostprocessPanelProps = {}) {
   const { t } = useLanguage();
   const { gradient, postprocess, effectPipeline } = useGradientStore();
-  const { setGradient, setPostprocess, setEffectPipeline } = applicationCommands;
+  const { setPostprocess } = applicationCommands;
   const selectedCone = !sandboxMode && effectPipeline.selectedKind === 'cone';
   const selectedStretch = !sandboxMode
     && effectPipeline.version === 'stack-v2'
@@ -441,58 +435,24 @@ export function PostprocessPanel({
   const postprocessDiffuseGrainLimitKey = getDiffuseGrainParameterLimitKey(postprocess.diffuseMode);
   const particleRampStops = gradient.stops ?? STORE_DEFAULTS.gradient.stops;
   const particleRampInterpolation = gradient.rampInterpolation ?? STORE_DEFAULTS.gradient.rampInterpolation;
-  const postprocessEnabled = postprocess.enabled || hasEnabledPostprocessEffectStack(effectPipeline);
-
-  const setEffectMode = (value: typeof postprocess.effectMode) => {
-    setPostprocess({ effectMode: value });
-    if (value === 'prism') {
-      const anchors = gradient.anchors ?? STORE_DEFAULTS.gradient.anchors;
-      setGradient({
-        anchors: [
-          [0.5, 0.5],
-          anchors[1],
-          anchors[2],
-          anchors[3],
-        ],
-      });
-    }
-  };
+  // The Effect Stack is the only entry to a layer: the header names the selected layer and owns its ON/OFF.
+  const layerKind: EffectStackKind = selectedCone
+    ? 'cone'
+    : (activeEffectMode === 'glassV2' ? 'glass' : activeEffectMode) as EffectStackKind;
+  const layerEnabled = isEffectStackLayerEnabled(effectPipeline, layerKind);
 
   return (
     <div className="space-y-4">
-      {!embedded && (
-        <div className="flex items-center justify-between">
-          <h2 className="font-semibold text-sm text-k-text">{t('effect.postprocess')}</h2>
-          {!selectedCone && (
-            <span data-postprocess-master-toggle>
-              <Toggle
-                variant="switch"
-                checked={postprocessEnabled}
-                onChange={(v) => setPostprocess({ enabled: v })}
-              />
-            </span>
-          )}
+      {!embedded && !sandboxMode && (
+        <div className="flex items-center justify-between" data-layer-header={layerKind}>
+          <h2 className="font-semibold text-sm text-k-text">{EFFECT_STACK_LABELS[layerKind]}</h2>
+          <Toggle
+            variant="switch"
+            checked={layerEnabled}
+            ariaLabel={EFFECT_STACK_LABELS[layerKind]}
+            onChange={enabled => toggleEffectStackLayer(layerKind, enabled)}
+          />
         </div>
-      )}
-
-      {!sandboxMode && !selectedCone && (
-        <CustomSelect
-          label="Edit Layer"
-          value={activeEffectMode}
-          localizeOptions={false}
-          options={EDIT_LAYER_OPTIONS}
-          onChange={(value) => {
-            if (value === 'datamosh' || value === 'stretch' || value === 'texture' || value === 'distortChroma' || value === 'ice') {
-              setEffectPipeline({ selectedKind: value });
-            } else {
-              const effectMode = value as Exclude<PostprocessStackKind, 'prism'>;
-              setEffectMode(effectMode);
-              // Keep the stack selection in step so a previously selected
-              // Datamosh / Stretch / Texture / Distort Chroma layer no longer pins the module.
-              setEffectPipeline({ selectedKind: effectMode === 'glassV2' ? 'glass' : effectMode });
-            }
-          }}
-        />
       )}
 
       <Collapsible isOpen>

@@ -14,11 +14,7 @@ import type { ExportStage, VideoExportFrameRenderer } from '../../adapters';
 import { adapters } from '../../adapters';
 import type { StoreSnapshot as PresetStoreSnapshot } from '../../lib/presetModel';
 import type { KggControlProjectAdapter, KggControlUiAdapter } from '../../lib/kggControlRuntime';
-import {
-  hasEnabledPostprocessEffectStack,
-  isEffectStackLayerEnabled,
-  updateEffectStackLayer,
-} from '../../lib/effectPipeline';
+import { updateEffectStackLayer } from '../../lib/effectPipeline';
 import type { EffectStackKind } from '../../types/distortion';
 import type { RenderViewMode } from '../../types/renderView';
 import type { OverlayImageMode } from '../../types/workspace';
@@ -26,7 +22,7 @@ import type { MessageKey } from '../../i18n/messages';
 import type { Replacements } from '../../i18n/language';
 import { useAppUpdater } from '../updater/useAppUpdater';
 import { useNativeFfmpeg } from '../native/useNativeFfmpeg';
-import { LEFT_TABS, type LeftTab } from './tabs';
+import { getLayerTab, LEFT_TABS, resolveEditingLayer, type LeftTab } from './tabs';
 import type { CanvasWorkspaceProps } from './CanvasWorkspace';
 import { refreshPresetLibrary } from '../../lib/presetLibraryCache';
 import { LEFT_PANEL_MAX_WIDTH } from '../../lib/panelLayout';
@@ -44,29 +40,11 @@ export const CANVAS_SIZE_PRESETS = [
 ] as const;
 
 type StoreSnapshot = ReturnType<typeof useGradientStore.getState>;
-type AppStoreState = Pick<StoreSnapshot, 'diffuse' | 'noiseDistortion' | 'slitScan' | 'normalMap' | 'effectPipeline' | 'seamless' | 'shapes' | 'postprocess'>;
+type AppStoreState = Pick<StoreSnapshot, 'normalMap' | 'effectPipeline' | 'seamless' | 'shapes'>;
 
+/** ON/OFF sub-labels of the TOP bar modes; Export and Preset have none. */
 const TAB_ENABLED_MAP: Partial<Record<LeftTab, (state: AppStoreState) => boolean>> = {
-  diffuse: state => state.diffuse.enabled,
-  noise: state => state.noiseDistortion.enabled,
-  slit: state => state.slitScan.enabled,
   sandbox: state => state.normalMap.enabled || state.effectPipeline.prismEnabled || state.effectPipeline.particlesEnabled || state.seamless.enabled || state.shapes.enabled,
-  postprocess: state => state.postprocess.enabled
-    || hasEnabledPostprocessEffectStack(state.effectPipeline)
-    || isEffectStackLayerEnabled(state.effectPipeline, 'cone')
-    || state.effectPipeline.selectedKind === 'cone',
-};
-
-const EFFECT_STACK_TAB_MAP: Partial<Record<EffectStackKind, LeftTab>> = {
-  diffuse: 'diffuse',
-  noise: 'noise',
-  slit: 'slit',
-  stretch: 'postprocess',
-  datamosh: 'postprocess',
-  cone: 'postprocess',
-  texture: 'postprocess',
-  distortChroma: 'postprocess',
-  ice: 'postprocess',
 };
 
 function formatGpuBytes(bytes: number | null | undefined): string | null {
@@ -257,7 +235,7 @@ export function useWorkspaceController({ translate, compact = false }: Workspace
   const [leftOverlaySection, setLeftOverlaySection] = useState<'layers' | 'properties'>('properties');
 
   const handleEffectStackSelection = (kind: EffectStackKind) => {
-    const nextTab = EFFECT_STACK_TAB_MAP[kind] ?? 'postprocess';
+    const nextTab = getLayerTab(kind);
     if (kind === 'distort') applicationCommands.setPostprocess({ effectMode: 'distort' });
     activeLeftTabRef.current = nextTab;
     setLeftTab(nextTab);
@@ -613,7 +591,8 @@ export function useWorkspaceController({ translate, compact = false }: Workspace
     setClothUnavailable(true);
     setRenderViewMode('canvas');
   };
-  const getTabEnabled = (value: LeftTab) => TAB_ENABLED_MAP[value]?.(store) ?? false;
+  const getTabEnabled = (value: LeftTab) => TAB_ENABLED_MAP[value]?.(store);
+  const editingLayer = resolveEditingLayer(leftTab, effectPipeline.selectedKind);
   const canvasWorkspaceProps: CanvasWorkspaceProps = {
     viewport: {
       viewportRef,
@@ -799,6 +778,7 @@ export function useWorkspaceController({ translate, compact = false }: Workspace
     timelineResizingRef,
     canvasWorkspaceProps,
     getTabEnabled,
+    editingLayer,
     handleTabClick,
     handleTabMouseEnter,
     handleEffectStackSelection,
