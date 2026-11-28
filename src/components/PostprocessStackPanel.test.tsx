@@ -6,6 +6,8 @@ import { PostprocessStackPanel } from './PostprocessStackPanel';
 import { EffectStackPanelView } from './EffectStackPanelView';
 import { buildEffectStackView } from '../features/effectStack/effectStackView';
 import { STORE_DEFAULTS } from '../store/documentModel';
+import { EFFECT_STACK_LABELS, effectDescriptionKey } from '../features/effectStack/effectStackLabels';
+import { enMessages, jaMessages } from '../i18n/messages';
 
 const noopActions = { select: () => {}, toggle: () => {}, move: () => {}, randomize: () => {}, prefetch: () => {} };
 
@@ -164,5 +166,41 @@ describe('Effect Stack row switch', () => {
       </LanguageProvider>,
     );
     expect(html).toMatch(/role="switch"[^>]*aria-label="Enable Noise"[^]*?text-\[7px\][^>]*>Off</);
+  });
+});
+
+describe('Effect Stack rail detail card', () => {
+  it('has a short role description for every layer in both languages', () => {
+    for (const kind of Object.keys(EFFECT_STACK_LABELS) as (keyof typeof EFFECT_STACK_LABELS)[]) {
+      const key = effectDescriptionKey(kind);
+      for (const messages of [enMessages, jaMessages]) {
+        const text = (messages as Record<string, string>)[key];
+        expect(text, `${key}`).toBeTruthy();
+        // Two sentences, short enough for three lines in the card.
+        expect(text.split(/[.。](?:\s|$)/).filter(Boolean).length, `${key}`).toBeLessThanOrEqual(2);
+      }
+    }
+  });
+
+  it('describes each rail icon to assistive technology instead of a native tooltip', () => {
+    const html = renderToStaticMarkup(
+      <LanguageProvider>
+        <EffectStackPanelView
+          variant="rail"
+          view={buildEffectStackView({
+            effectPipeline: STORE_DEFAULTS.effectPipeline,
+            normalMapEnabled: false,
+            imageGradientEnabled: false,
+            programStatus: {},
+            soloSnapshot: null,
+            randomizing: false,
+            previousOrder: [],
+          })}
+          actions={noopActions}
+        />
+      </LanguageProvider>,
+    );
+    expect(html).toContain('aria-description="Warps the image coordinates');
+    expect(html).not.toMatch(/class="effect-stack-rail-row"[^>]*title=/);
   });
 });
