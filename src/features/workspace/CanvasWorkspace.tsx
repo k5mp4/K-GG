@@ -211,7 +211,7 @@ export function CanvasWorkspace({
         type="button"
         data-viewport-ui
         onClick={onOpenLayers}
-        className={`${panelsPresentation === 'overlay' ? 'flex' : 'hidden'} absolute bottom-3 left-4 z-20 min-h-10 items-center gap-2 border border-cream/30 bg-k-surface/85 px-3 font-display text-xs font-bold uppercase tracking-wider text-cream backdrop-blur-sm transition-colors hover:border-fire hover:text-k-text focus:outline-none focus-visible:ring-2 focus-visible:ring-fire`}
+        className={`${panelsPresentation === 'overlay' ? 'flex' : 'hidden'} absolute bottom-3 left-4 z-20 min-h-10 items-center gap-2 border border-transparent bg-k-surface/85 px-3 font-display text-xs font-bold uppercase tracking-wider text-cream backdrop-blur-sm transition-colors hover:bg-k-surface hover:text-k-text focus:outline-none focus-visible:ring-2 focus-visible:ring-fire`}
       >
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
           <path d="m12 3 9 5-9 5-9-5 9-5Z" />
@@ -249,7 +249,7 @@ export function CanvasWorkspace({
         <button
           type="button"
           onClick={(event) => { showFeedback(); event.currentTarget.blur(); }}
-          className="h-10 w-10 shrink-0 flex items-center justify-center border border-cream/30 bg-k-surface/85 p-0 text-fire shadow-[0_10px_24px_rgba(0,0,0,0.28)] backdrop-blur-sm transition-all duration-150 hover:border-fire hover:bg-fire/15 hover:text-k-text focus:outline-none focus-visible:ring-2 focus-visible:ring-fire"
+          className="h-10 w-10 shrink-0 flex items-center justify-center border border-transparent bg-k-surface/85 p-0 text-cream/70 shadow-[0_10px_24px_rgba(0,0,0,0.28)] backdrop-blur-sm transition-all duration-150 hover:bg-fire/15 hover:text-k-text focus:outline-none focus-visible:ring-2 focus-visible:ring-fire"
           title={translate('common.feedback')}
           aria-label={translate('common.feedback')}
         >
@@ -264,7 +264,7 @@ export function CanvasWorkspace({
           onClick={(event) => { onToggleGradientAnchors(); event.currentTarget.blur(); }}
           className={`h-10 w-10 shrink-0 flex items-center justify-center border shadow-[0_10px_24px_rgba(0,0,0,0.28)] backdrop-blur-sm transition-all duration-150 focus:outline-none focus-visible:ring-2 focus-visible:ring-fire ${showGradientAnchors
             ? 'border-fire bg-fire/15 text-fire hover:bg-fire/25 hover:border-fire'
-            : 'border-cream/30 bg-k-surface/85 text-cream/70 hover:border-fire hover:bg-fire/15 hover:text-k-text'
+            : 'border-transparent bg-k-surface/85 text-cream/70 hover:bg-fire/15 hover:text-k-text'
             }`}
           title={showGradientAnchors ? translate('canvas.hideAnchors') : translate('canvas.showAnchors')}
           aria-label={showGradientAnchors ? translate('canvas.hideAnchors') : translate('canvas.showAnchors')}
@@ -291,7 +291,7 @@ export function CanvasWorkspace({
         <button
           type="button"
           onClick={(event) => { onResetViewport(); event.currentTarget.blur(); }}
-          className="h-10 w-10 shrink-0 flex items-center justify-center border border-cream/30 bg-k-surface/85 p-0 text-fire shadow-[0_10px_24px_rgba(0,0,0,0.28)] backdrop-blur-sm transition-all duration-150 hover:border-fire hover:bg-fire/15 hover:text-k-text focus:outline-none focus-visible:ring-2 focus-visible:ring-fire"
+          className="h-10 w-10 shrink-0 flex items-center justify-center border border-transparent bg-k-surface/85 p-0 text-cream/70 shadow-[0_10px_24px_rgba(0,0,0,0.28)] backdrop-blur-sm transition-all duration-150 hover:bg-fire/15 hover:text-k-text focus:outline-none focus-visible:ring-2 focus-visible:ring-fire"
           title={translate('canvas.resetViewport')}
           aria-label={translate('canvas.resetViewport')}
         >

@@ -55,7 +55,6 @@ export default function App() {
     updater,
     animation,
     canvasSizePresets: CANVAS_SIZE_PRESETS,
-    activeCanvasPreset,
     canvasPresetValue,
     applyCanvasPreset,
     swapCanvasSize,
@@ -370,19 +369,14 @@ export default function App() {
                 />
               </div>
 
-              <div className="space-y-3 border border-fire/25 bg-fire/[0.04] p-3">
-                <div className="flex items-end justify-between gap-3">
-                  <div>
-                    <label htmlFor="canvas-size-preset" className="block text-xs font-display font-semibold uppercase tracking-wider text-k-text">{t('canvas.size')}</label>
-                  </div>
-                  <span className="text-[9px] font-display uppercase tracking-widest text-tab-inactive">{t('common.output')}</span>
-                </div>
+              <div className="space-y-2">
+                <label htmlFor="canvas-size-preset" className="block text-xs font-display font-semibold uppercase tracking-wider text-k-text hint-label w-fit" title={t('canvas.customHint')}>{t('canvas.size')}</label>
                 <div className="relative">
                   <select
                     id="canvas-size-preset"
                     value={canvasPresetValue}
                     onChange={(e) => applyCanvasPreset(e.target.value)}
-                    className="w-full appearance-none bg-k-surface border border-panel-border/70 text-k-text text-sm rounded-none px-3 py-2.5 pr-9 focus:border-fire focus:outline-none focus-visible:ring-1 focus-visible:ring-fire"
+                    className="w-full appearance-none bg-k-bg/60 border border-transparent text-k-text text-sm rounded-none px-3 py-2 pr-9 hover:bg-k-bg focus:border-fire focus:outline-none focus-visible:ring-1 focus-visible:ring-fire"
                   >
                     {CANVAS_SIZE_PRESETS.map((preset) => (
                       <option key={preset.value} value={preset.value}>
@@ -391,24 +385,14 @@ export default function App() {
                     ))}
                     <option value="custom">{t('common.custom')} · {canvasW}×{canvasH}</option>
                   </select>
-                  <svg className="pointer-events-none absolute right-3 top-1/2 h-3 w-3 -translate-y-1/2 text-fire" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                  <svg className="pointer-events-none absolute right-3 top-1/2 h-3 w-3 -translate-y-1/2 text-tab-inactive" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
                     <path d="m4 6 4 4 4-4" />
                   </svg>
                 </div>
-                <p className="hint-label text-[9px] leading-relaxed text-tab-inactive" title={t('canvas.customHint')}>
-                  {activeCanvasPreset ? `${activeCanvasPreset.label} · ${activeCanvasPreset.width}×${activeCanvasPreset.height}` : `${t('common.custom')} · ${canvasW}×${canvasH}`}
-                </p>
-              </div>
-
-              <div className="space-y-2">
-                <div className="flex items-center justify-between">
-                  <span className="text-[9px] font-display uppercase tracking-[0.18em] text-tab-inactive">{t('canvas.customDimensions')}</span>
-                  <span className="text-[9px] font-display uppercase tracking-widest text-tab-inactive">px</span>
-                </div>
-              <div className="flex items-center gap-1">
-                <div className="flex-1 space-y-1">
+              <div className="flex items-end gap-1">
+                <div className="grid flex-1 grid-cols-2 gap-2">
                   <div>
-                    <p className="text-xs text-deep mb-1">W</p>
+                    <p className="text-[10px] text-tab-inactive mb-0.5">W</p>
                     <input
                       ref={wInputRef}
                       title={t('canvas.wheelHint')}
@@ -420,11 +404,11 @@ export default function App() {
                         if (e.key === 'Enter') { commitW(); e.currentTarget.blur(); }
                         if (e.key === 'Escape') { cancelResRef.current = true; setWDraft(String(canvasW)); e.currentTarget.blur(); }
                       }}
-                      className="w-full bg-k-surface border border-k-muted text-k-text text-xs rounded-none px-2 py-1 focus:border-fire focus:outline-none"
+                      className="w-full bg-k-bg/60 border border-transparent text-k-text text-xs rounded-none px-2 py-1 focus:border-fire focus:outline-none"
                     />
                   </div>
                   <div>
-                    <p className="text-xs text-deep mb-1">H</p>
+                    <p className="text-[10px] text-tab-inactive mb-0.5">H</p>
                     <input
                       ref={hInputRef}
                       title={t('canvas.wheelHint')}
@@ -436,15 +420,15 @@ export default function App() {
                         if (e.key === 'Enter') { commitH(); e.currentTarget.blur(); }
                         if (e.key === 'Escape') { cancelResRef.current = true; setHDraft(String(canvasH)); e.currentTarget.blur(); }
                       }}
-                      className="w-full bg-k-surface border border-k-muted text-k-text text-xs rounded-none px-2 py-1 focus:border-fire focus:outline-none"
+                      className="w-full bg-k-bg/60 border border-transparent text-k-text text-xs rounded-none px-2 py-1 focus:border-fire focus:outline-none"
                     />
                   </div>
                 </div>
-                <div className="flex flex-col gap-1">
+                <div className="flex gap-0.5">
                   <button
                     type="button"
                     onClick={swapCanvasSize}
-                    className="p-1.5 rounded-none transition-colors duration-150 text-fire hover:text-cream"
+                    className="p-1.5 rounded-none transition-colors duration-150 text-tab-inactive hover:text-k-text"
                     title={t('canvas.swap')}
                     aria-label={t('canvas.swap')}
                   >

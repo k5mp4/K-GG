@@ -17,7 +17,7 @@
   --color-k-text: #F0EAD9;
 
   /* Border Tokens - ここを編集すれば境界線が一括で変わります */
-  --color-panel-border: rgba(236, 219, 190, 1); /* 境界線の色 (#ECDBBE の 40%) */
+  --color-panel-border: rgba(236, 219, 190, 0.18); /* 境界線の色 (#ECDBBE の 18%)。強調が必要な箇所は fire/cream を個別に使う */
   --border-width-panel: 1px;                      /* 境界線の太さ */
 
   /* Component-Level Tokens */
