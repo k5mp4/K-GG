@@ -1,3 +1,4 @@
+import { useId } from 'react';
 import { Toggle } from './Toggle';
 import { Icon } from './Icon';
 import { IconButton } from './IconButton';
@@ -26,6 +27,7 @@ export function PropertyModulesSettingsPanel({
   onLayoutModeChange,
 }: PropertyModulesSettingsPanelProps) {
   const { language, setLanguage, t } = useLanguage();
+  const titleId = useId();
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-10">
       <div
@@ -33,9 +35,14 @@ export function PropertyModulesSettingsPanel({
         onClick={onClose}
       />
 
-      <div className="relative flex max-h-[85vh] w-full max-w-md flex-col overflow-hidden border border-cream/40 bg-k-surface shadow-2xl animate-in fade-in zoom-in duration-200">
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby={titleId}
+        className="relative flex max-h-[85vh] w-full max-w-md flex-col overflow-hidden border border-cream/40 bg-k-surface shadow-2xl animate-in fade-in zoom-in duration-200"
+      >
         <div className="sticky top-0 z-10 flex shrink-0 items-center justify-between border-b border-cream/40 bg-k-surface p-4">
-          <h2 className="flex items-center gap-2 text-lg font-display font-bold text-k-text">
+          <h2 id={titleId} className="flex items-center gap-2 text-lg font-display font-bold text-k-text">
             <Icon name="settings" className="text-[20px] text-fire" />
             {t('settings.title')}
           </h2>

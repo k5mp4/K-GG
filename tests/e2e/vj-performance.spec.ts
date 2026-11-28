@@ -69,7 +69,7 @@ test('VJ controls preserve the canvas, output size and default editor', async ({
   const dimensions = await canvas!.evaluate(element => ({ width: (element as HTMLCanvasElement).width, height: (element as HTMLCanvasElement).height }));
   await expect(page.locator('[data-layout-mode]')).toHaveAttribute('data-layout-mode', 'editor');
   await page.getByRole('button', { name: 'Settings', exact: true }).click();
-  await page.getByRole('radio', { name: 'VJ performance', exact: true }).click();
+  await page.getByRole('dialog', { name: 'Property Modules' }).getByRole('radio', { name: 'VJ performance', exact: true }).click();
   const deck = page.locator('[data-vj-deck]');
   await expect(deck).toBeVisible();
   await expect(page.getByRole('navigation')).toHaveCount(0);
@@ -194,7 +194,7 @@ test('VJ controls preserve the canvas, output size and default editor', async ({
     applyPresetToDocument(getPresetLibrarySnapshot().library.presets.find((preset: { id: string }) => preset.id === 'vj-a'));
   });
   await page.getByRole('button', { name: 'Settings', exact: true }).click();
-  await page.getByRole('radio', { name: 'VJ performance', exact: true }).click();
+  await page.getByRole('dialog', { name: 'Property Modules' }).getByRole('radio', { name: 'VJ performance', exact: true }).click();
   await expect(deck.locator('.vj-live-label')).toContainText('VJ Cue A');
   await expect(deck.locator('.vj-load-preset[aria-pressed="true"]')).toHaveCount(0);
   await expect(deck.locator('.vj-cue').first()).toContainText('VJ Cue A');
@@ -250,7 +250,7 @@ test('failed or cancelled preload preserves the live document and ready cues rem
   });
   await page.setViewportSize({ width: 1440, height: 960 });
   await page.getByRole('button', { name: 'Settings', exact: true }).click();
-  await page.getByRole('radio', { name: 'VJ performance', exact: true }).click();
+  await page.getByRole('dialog', { name: 'Property Modules' }).getByRole('radio', { name: 'VJ performance', exact: true }).click();
   await expect(deck.getByRole('button', { name: '01 VJ Cue A', exact: true })).toBeEnabled();
   await expect(deck.getByRole('button', { name: '03 VJ Broken Cue', exact: true })).toBeDisabled();
   await expect(deck.getByRole('status')).toContainText('The preset could not be applied.');
