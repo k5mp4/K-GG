@@ -369,8 +369,9 @@ export function EffectStackPanelView({
       <div
         className="relative"
         style={{ height: stack.length * ROW_HEIGHT }}
-        role="list"
-        aria-label={t('stack.listLabel')}
+        // The rail rows are plain buttons, so only the column exposes a list.
+        role={variant === 'rail' ? undefined : 'list'}
+        aria-label={variant === 'rail' ? undefined : t('stack.listLabel')}
       >
         {stack.map((layer, index) => {
           const selected = view.selectedKind === layer.kind;
