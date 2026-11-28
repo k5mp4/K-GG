@@ -122,12 +122,13 @@ h1 {
     cursor: pointer;
     transition: border-color 0.25s;
   }
-  button:hover {
-    border-color: var(--color-cream);
+  /* ホバーで枠線を出さない。キーボード操作時だけフォーカスリングを表示する。 */
+  button:focus {
+    outline: none;
   }
-  button:focus,
   button:focus-visible {
-    outline: 4px auto -webkit-focus-ring-color;
+    outline: 2px solid var(--color-fire);
+    outline-offset: 1px;
   }
 }
 

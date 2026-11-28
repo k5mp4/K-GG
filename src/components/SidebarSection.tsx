@@ -23,21 +23,19 @@ export function SidebarSection({
   const contentId = `${id}-content`;
 
   return (
-    <section className={nested ? 'border-t border-panel-border/25 pt-3' : 'border-t border-panel-border/45 pt-1'}>
+    <section className={nested ? 'pt-2' : 'border-t border-panel-border pt-1'}>
       <button
         type="button"
         onClick={onToggle}
         aria-expanded={open}
         aria-controls={contentId}
-        className={`group flex w-full items-center gap-3 bg-transparent px-0 py-3 text-left transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-fire ${
-          nested ? 'hover:text-cream' : 'hover:text-cream'
-        }`}
+        className="group flex w-full items-center gap-2 bg-transparent px-0 py-3 text-left transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-fire"
       >
         <span
-          className={`relative flex h-7 w-7 shrink-0 items-center justify-center border transition-colors ${
+          className={`relative flex h-5 w-5 shrink-0 items-center justify-center transition-colors ${
             open
-              ? 'border-fire/70 bg-fire/10 text-fire'
-              : 'border-panel-border/45 bg-k-bg/30 text-tab-inactive group-hover:border-cream/45 group-hover:text-cream'
+              ? 'text-fire'
+              : 'text-tab-inactive group-hover:text-k-text'
           }`}
           aria-hidden="true"
         >

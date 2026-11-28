@@ -1685,7 +1685,7 @@ export function GradientRamp({ showHeader = true, variant = 'panel', onUndo = un
     if (!rampHover || rampHover.scope !== scope) return null;
     return (
       <div
-        className="pointer-events-none absolute z-20 -translate-x-1/2 rounded-sm border border-cream/25 bg-k-surface/95 px-1.5 py-0.5 text-[10px] font-semibold tabular-nums text-k-text shadow-lg"
+        className="pointer-events-none absolute z-20 -translate-x-1/2 rounded-sm bg-k-surface/95 px-1.5 py-0.5 text-[10px] font-semibold tabular-nums text-k-text shadow-lg"
         style={{ left: rampHover.x, top: rampHover.y }}
       >
         {formatStopPosition(rampHover.position)}

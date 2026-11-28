@@ -25,7 +25,7 @@ export function UpdateButton({ status, onClick }: UpdateButtonProps) {
           ? 'border-fire bg-fire/15 text-fire hover:bg-fire/25'
           : failed
             ? 'border-red-400/50 bg-red-400/10 text-red-300 hover:bg-red-400/20'
-            : 'border-cream/25 bg-k-surface text-tab-inactive hover:border-cream/45 hover:text-k-text'
+            : 'border-transparent bg-transparent text-tab-inactive hover:bg-k-surface hover:text-k-text'
       }`}
       title={available ? t('update.available') : t('common.checkUpdates')}
       aria-label={available ? t('update.available') : t('common.checkUpdates')}

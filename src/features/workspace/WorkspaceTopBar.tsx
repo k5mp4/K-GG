@@ -109,7 +109,7 @@ export function WorkspaceTopBar({
 
       <div className="ml-auto flex h-10 shrink-0 items-stretch gap-1">
         <div
-          className={`${panelsPresentation === 'docked' ? 'flex' : 'hidden'} min-w-0 max-w-[160px] items-center gap-2 border border-cream/20 bg-k-surface px-3 text-tab-inactive`}
+          className={`${panelsPresentation === 'docked' ? 'flex' : 'hidden'} min-w-0 max-w-[160px] items-center gap-2 px-3 text-tab-inactive`}
           title={gpuInfo.title}
         >
           <Icon name="memory" className="text-[16px] text-deep" />
@@ -127,16 +127,13 @@ export function WorkspaceTopBar({
           type="button"
           onClick={(event) => { onOpenSettings(); blur(event); }}
           className={`inline-flex min-w-10 items-center justify-center gap-2 border px-2 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-fire ${tabHoverSwitchEnabled
-            ? 'border-fire/55 bg-fire/10 text-fire hover:bg-fire/20'
-            : 'border-cream/25 bg-k-surface text-tab-inactive hover:border-cream/45 hover:text-k-text'
+            ? 'border-transparent bg-fire/10 text-fire hover:bg-fire/20'
+            : 'border-transparent bg-transparent text-tab-inactive hover:bg-k-surface hover:text-k-text'
             }`}
           title={`${translate('settings.title')} · ${tabHoverSwitchEnabled ? translate('settings.hover') : translate('settings.clickOnly')}`}
           aria-label={translate('common.settings')}
         >
           <Icon name="settings" className="text-[16px]" />
-          <span className="hidden text-[9px] font-display font-semibold uppercase tracking-wider xl:inline">
-            {tabHoverSwitchEnabled ? translate('settings.hover') : translate('settings.clickOnly')}
-          </span>
         </button>
       </div>
 
@@ -146,7 +143,7 @@ export function WorkspaceTopBar({
         aria-label={translate('panel.toggle', { action: showRightSidebar ? translate('common.close') : translate('common.open'), panel: 'K-GG' })}
         aria-controls="gradient-settings-panel"
         aria-expanded={showRightSidebar}
-        className={`${panelsPresentation === 'overlay' ? 'block' : 'hidden'} ml-1 h-10 w-10 shrink-0 p-0 bg-k-surface border border-panel-border text-k-text hover:text-cream focus:outline-none focus-visible:ring-2 focus-visible:ring-fire`}
+        className={`${panelsPresentation === 'overlay' ? 'block' : 'hidden'} ml-1 h-10 w-10 shrink-0 p-0 bg-k-surface border border-transparent text-k-text hover:text-cream focus:outline-none focus-visible:ring-2 focus-visible:ring-fire`}
       >
         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
           <line x1="3" y1="12" x2="21" y2="12"></line>
