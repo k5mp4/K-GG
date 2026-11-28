@@ -18,18 +18,18 @@ function ClothControlGroup({ title, defaultOpen = true, children }: ControlGroup
   const [isOpen, setIsOpen] = useState(defaultOpen);
 
   return (
-    <div className="border border-cream/35 bg-k-surface/45">
+    <div>
       <button
         type="button"
         onClick={() => setIsOpen((prev) => !prev)}
-        className="flex w-full items-center justify-between px-3 py-2 text-left font-display text-xs uppercase tracking-wider text-deep hover:bg-k-muted/40"
+        className="flex w-full items-center justify-between bg-transparent px-0 py-2 text-left font-display text-xs uppercase tracking-wider text-deep hover:text-k-text"
         aria-expanded={isOpen}
       >
         <span>{title}</span>
         <span className="text-[10px] opacity-60">{isOpen ? '−' : '+'}</span>
       </button>
       <Collapsible isOpen={isOpen}>
-        <div className="border-t border-cream/20 p-3">{children}</div>
+        <div className="pb-2 pt-1">{children}</div>
       </Collapsible>
     </div>
   );
@@ -42,7 +42,7 @@ export function ClothGradientPanel() {
   return (
     <div className="space-y-3 text-[11px]" data-cloth-panel>
       {/* Quality */}
-      <div className="space-y-2 border-b border-cream/10 pb-3">
+      <div className="space-y-2">
         <CustomSelect
           label="Quality"
           value={clothGradient.quality}
@@ -58,7 +58,7 @@ export function ClothGradientPanel() {
       {/* Surface Wave */}
       <ClothControlGroup title="Surface Wave" defaultOpen>
         <div className="space-y-3">
-          <div className="flex items-center justify-between border border-cream/20 bg-k-surface/40 px-2.5 py-2">
+          <div className="flex items-center justify-between">
             <span className="text-[10px] uppercase tracking-wider text-cream/70">Seamless Loop</span>
             <Toggle
               variant="switch"

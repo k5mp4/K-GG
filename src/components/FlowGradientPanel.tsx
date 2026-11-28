@@ -107,22 +107,21 @@ export function FlowGradientPanel() {
           format={(value) => value.toFixed(2)}
         />
       </div>
-      <div className="border border-cream/15 bg-black/10 px-3 py-2.5" data-flow-gradient-ramp-preview>
-        <div className="mb-1.5 flex items-center justify-between gap-2 text-[9px] uppercase tracking-[0.14em] text-tab-inactive">
-          <span>Gradient Ramp</span>
-          <span className="text-[8px] normal-case tracking-normal text-cream/50">Current Ramp</span>
-        </div>
+      <div data-flow-gradient-ramp-preview>
+        <p
+          className="hint-label mb-1.5 w-fit text-[9px] uppercase tracking-[0.14em] text-tab-inactive"
+          title="Flow density is mapped to this Ramp. Edit the Gradient Ramp to reassign its colors."
+        >
+          Gradient Ramp
+        </p>
         <div
-          className="h-3 w-full border border-cream/20"
+          className="h-3 w-full"
           style={{ background: `linear-gradient(90deg, ${rampPreview})` }}
           aria-label="Flow Gradient Ramp preview"
           role="img"
         />
-        <p className="mt-1.5 text-[9px] leading-relaxed text-cream/60">
-          Flow density is mapped to this Ramp. Edit the Gradient Ramp to reassign its colors.
-        </p>
       </div>
-      <div className="border-t border-cream/15 pt-3 text-[9px] uppercase tracking-[0.14em] text-tab-inactive">
+      <div className="pt-1 text-[9px] uppercase tracking-[0.14em] text-tab-inactive">
         {t('sandbox.flowLoop')}: {animation.previewLoop ? t('common.on') : t('common.off')} · {t('animation.duration')}: {animation.duration.toFixed(2)}s
       </div>
     </div>

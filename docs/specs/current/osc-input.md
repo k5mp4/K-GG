@@ -5,7 +5,7 @@ title: OSC入力（Controller）
 status: current
 owners: [maintainer]
 created: 2026-10-03
-updated: 2026-10-05
+updated: 2026-11-28
 requirement_ids: [OSC-001, OSC-002, OSC-003, OSC-004, OSC-005]
 related_adrs: [ADR-20261003-osc-gamepad-input]
 related_changes: []
@@ -29,7 +29,7 @@ related_tests: [src/lib/gcInput.test.ts]
 
 ### OSC-002 Controllerパネル
 
-SANDBOXのEdit Layerに`Controller`があり、見出しのスイッチで受信を切り替えます。状態は、停止中・待機中（ポート表示）・受信中（接続中のコントローラー番号）・エラーを表示します。ポート、Presetを選ぶスティック、ボタンの割り当て、パラメータの割り当て、時間スクラブを編集できます。マッピングは既定値へ戻せます。保存値が壊れていたり未知の値を含む場合は、その項目だけ既定へ戻します。
+SANDBOXのモジュール一覧に`Controller`の行があり、見出しのスイッチで受信を切り替えます。状態は、停止中・待機中（ポート表示）・受信中（接続中のコントローラー番号）・エラーを表示します。ポート、Presetを選ぶスティック、ボタンの割り当て、パラメータの割り当て、時間スクラブを編集できます。マッピングは既定値へ戻せます。保存値が壊れていたり未知の値を含む場合は、その項目だけ既定へ戻します。
 
 ### OSC-003 入力の割り当て
 

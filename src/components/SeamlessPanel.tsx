@@ -11,7 +11,7 @@ export function SeamlessPanel() {
   return (
     <div className="space-y-3 text-[11px]" data-seamless-panel>
       <div
-        className="space-y-3 border border-cream/25 bg-k-surface/35 p-3"
+        className="space-y-3"
         title={[t('sandbox.seamlessDescription'), t('sandbox.seamlessHint')].join('\n')}
       >
         <SliderField
