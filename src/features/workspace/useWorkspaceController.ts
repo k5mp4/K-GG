@@ -1,6 +1,8 @@
-import { useEffect, useLayoutEffect, useRef, useState, type ChangeEvent, type PointerEvent as ReactPointerEvent } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState, useSyncExternalStore, type ChangeEvent, type PointerEvent as ReactPointerEvent } from 'react';
 import { useShallow } from 'zustand/react/shallow';
-import { AnimationLoop } from '../../lib/animation';
+import { AnimationLoop, getAnimationPlaybackRevision, subscribeAnimationPlayback } from '../../lib/animation';
+import { canvasToPngBlob, downloadPNG, sanitizeStem } from '../../lib/export';
+import { renderBridge } from '../../lib/renderBridge';
 import { useGradientStore } from '../../store/gradientStore';
 import { useViewportControl } from '../../hooks/useViewportControl';
 import { useCanvasSize } from '../../hooks/useCanvasSize';
@@ -115,6 +117,17 @@ export function useWorkspaceController({ translate, compact = false }: Workspace
     typeof window === 'undefined' ? null : window.__KAGARIBI_GPU_DIAGNOSTICS__ ?? null
   ));
   const animLoopRef = useRef<AnimationLoop | null>(null);
+  const playbackRevision = useSyncExternalStore(
+    subscribeAnimationPlayback,
+    getAnimationPlaybackRevision,
+    getAnimationPlaybackRevision,
+  );
+  const isAnimationPlaying = animation.enabled && playbackRevision >= 0 && Boolean(animLoopRef.current && !animLoopRef.current.isPaused);
+  const [quickExportFeedback, setQuickExportFeedback] = useState<'saved' | 'copied' | null>(null);
+  const quickExportTimerRef = useRef<number | null>(null);
+  useEffect(() => () => {
+    if (quickExportTimerRef.current !== null) window.clearTimeout(quickExportTimerRef.current);
+  }, []);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const clothCanvasRef = useRef<HTMLCanvasElement | null>(null);
   const clothExportFrameRendererRef = useRef<VideoExportFrameRenderer | null>(null);
@@ -613,7 +626,6 @@ export function useWorkspaceController({ translate, compact = false }: Workspace
       panelsPresentation: layout.panels,
       onOpenLeftSidebar: handleOpenLeftSidebar,
       onOpenLayers: handleOpenLayers,
-      showFeedback: () => setShowFeedback(true),
       showGradientAnchors,
       onToggleGradientAnchors: () => setShowGradientAnchors(value => !value),
       onResetViewport: resetViewport,
@@ -823,6 +835,50 @@ export function useWorkspaceController({ translate, compact = false }: Workspace
       setTextureImageSourceName('');
     },
     handleSeek: () => setSeekVersion(value => value + 1),
+    handleTogglePlayback: () => {
+      const loop = animLoopRef.current;
+      if (!animation.enabled || !loop) {
+        renderBridge.requestPlay();
+        applicationCommands.setAnimation({ enabled: true });
+        return;
+      }
+      if (loop.isPaused && loop.currentNormalizedTime >= 0.999999) {
+        loop.seekTo(0);
+        applicationCommands.setCurrentTime(0);
+      }
+      loop.togglePause();
+      applicationCommands.setCurrentTime(loop.currentNormalizedTime);
+    },
+    isAnimationPlaying,
+    zoom,
+    pan,
+    resetViewport,
+    quickExportFeedback,
+    canCopyPng: typeof navigator !== 'undefined' && typeof ClipboardItem !== 'undefined' && Boolean(navigator.clipboard?.write),
+    handleQuickSavePng: async () => {
+      const targetCanvas = renderViewMode === 'cloth' && clothReady ? clothCanvasRef.current : canvasRef.current;
+      if (!targetCanvas) return;
+      const stem = sanitizeStem(useGradientStore.getState().presetName || 'gradient');
+      const saved = await downloadPNG(targetCanvas, stem, null);
+      if (saved) {
+        setQuickExportFeedback('saved');
+        if (quickExportTimerRef.current !== null) window.clearTimeout(quickExportTimerRef.current);
+        quickExportTimerRef.current = window.setTimeout(() => setQuickExportFeedback(null), 1800);
+      }
+    },
+    handleQuickCopyPng: async () => {
+      const targetCanvas = renderViewMode === 'cloth' && clothReady ? clothCanvasRef.current : canvasRef.current;
+      if (!targetCanvas || typeof ClipboardItem === 'undefined' || !navigator.clipboard?.write) return;
+      try {
+        const blob = await canvasToPngBlob(targetCanvas);
+        await navigator.clipboard.write([new ClipboardItem({ 'image/png': blob })]);
+        setQuickExportFeedback('copied');
+        if (quickExportTimerRef.current !== null) window.clearTimeout(quickExportTimerRef.current);
+        quickExportTimerRef.current = window.setTimeout(() => setQuickExportFeedback(null), 1800);
+      } catch (error) {
+        console.warn('Quick PNG copy failed:', error);
+      }
+    },
     handleTimelineToggle: () => setShowTimeline(value => !value),
     handleTimeRemapToggle: () => setShowTimeRemap(value => !value),
     handleCloseTimeRemap: () => setShowTimeRemap(false),

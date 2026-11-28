@@ -35,6 +35,8 @@ import { startPresetShaderWarmupSync } from './lib/presetShaderWarmup';
 import { getVjLayoutMode, subscribeVjSettings, updateVjSettings } from './features/vj/vjSettings';
 import { useVjWindow } from './features/vj/useVjWindow';
 import { VjWorkspace } from './features/vj/VjWorkspace';
+import { useOscReceiverStatus } from './features/native/controllerReceiver';
+import { useSpoutOutputStatus } from './features/native/useSpoutOutput';
 import { getHistoryStatus, redo, subscribeHistory, undo } from './lib/history';
 
 export default function App() {
@@ -167,13 +169,28 @@ export default function App() {
     handleDistortChromaImageLoad,
     handleDistortChromaImageClear,
     handleSeek,
+    handleTogglePlayback,
+    isAnimationPlaying,
+    zoom,
+    pan,
+    resetViewport,
+    quickExportFeedback,
+    canCopyPng,
+    handleQuickSavePng,
+    handleQuickCopyPng,
     handleTimelineToggle,
     handleTimeRemapToggle,
     handleShowHelp,
+    handleShowFeedback,
   } = useWorkspaceController({ translate: t, compact: vjEnabled });
   const histogramEnabled = useGradientStore(state => state.histogram.enabled);
   const presetName = useGradientStore(state => state.presetName);
   const historyStatus = useSyncExternalStore(subscribeHistory, getHistoryStatus, getHistoryStatus);
+  const spoutStatus = useSpoutOutputStatus();
+  const oscStatus = useOscReceiverStatus();
+  const spoutActive = spoutStatus.enabled && (spoutStatus.status === 'sending' || spoutStatus.status === 'ready' || spoutStatus.status === 'starting');
+  const oscPort = oscStatus.listening ? oscStatus.port : null;
+  const viewportModified = Math.abs(zoom - 1) > 0.005 || Math.abs(pan.x) > 1 || Math.abs(pan.y) > 1;
   const [showHistogramSection, setShowHistogramSection] = useState(true);
   const popOutEffectStack = effectStackWindow.supported ? effectStackWindow.open : undefined;
   const layersSegment = layout.panels === 'overlay';
@@ -196,6 +213,15 @@ export default function App() {
           isDirty={historyStatus.isDirty}
           canUndo={historyStatus.canUndo}
           canRedo={historyStatus.canRedo}
+          animationEnabled={animation.enabled}
+          isAnimationPlaying={isAnimationPlaying}
+          exportProgress={exportProgress}
+          spoutActive={spoutActive}
+          oscPort={oscPort}
+          zoom={zoom}
+          viewportModified={viewportModified}
+          canCopyPng={canCopyPng}
+          quickExportFeedback={quickExportFeedback}
           layoutMode={layoutMode}
           gpuInfo={gpuInfo}
           updater={updater}
@@ -205,7 +231,13 @@ export default function App() {
           onTabMouseEnter={handleTabMouseEnter}
           onUndo={undo}
           onRedo={redo}
+          onTogglePlayback={handleTogglePlayback}
+          onResetViewport={resetViewport}
+          onQuickSavePng={() => { void handleQuickSavePng(); }}
+          onQuickCopyPng={() => { void handleQuickCopyPng(); }}
           onLayoutModeChange={nextMode => updateVjSettings({ layoutMode: nextMode })}
+          onOpenFeedback={handleShowFeedback}
+          onOpenHelp={handleShowHelp}
           onOpenSettings={() => setShowPropertyModulesSettings(true)}
           onToggleRightSidebar={handleToggleRightSidebar}
         />
@@ -366,18 +398,9 @@ export default function App() {
             onResizeStart={(event) => handlePanelResizeStart('right', event)}
           >
             <div className="space-y-6 pt-6">
-              <div className="flex items-start justify-between gap-4">
-                <div className="min-w-0">
-                  <h2 className="text-2xl font-display font-bold uppercase tracking-[0.18em] leading-none text-k-text">K-GG</h2>
-                  <p className="mt-3 text-[10px] font-body tracking-normal leading-tight text-tab-inactive">© 2026 ke-go. All rights reserved.</p>
-                </div>
-                <IconButton
-                  icon="help"
-                  label={t('common.help')}
-                  onClick={handleShowHelp}
-                  className="shrink-0 p-2 text-deep hover:bg-k-border hover:text-k-text rounded-none transition-all duration-150 focus:outline-none focus-visible:ring-2 focus-visible:ring-fire"
-                  iconClassName="text-[20px]"
-                />
+              <div className="min-w-0">
+                <h2 className="text-2xl font-display font-bold uppercase tracking-[0.18em] leading-none text-k-text">K-GG</h2>
+                <p className="mt-3 text-[10px] font-body tracking-normal leading-tight text-tab-inactive">© 2026 ke-go. All rights reserved.</p>
               </div>
 
               <div className="space-y-2">

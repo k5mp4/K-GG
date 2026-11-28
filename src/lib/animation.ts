@@ -1,5 +1,22 @@
 type OnFrameCallback = (loopTime: number, normalizedTime: number) => void;
 
+const playbackListeners = new Set<() => void>();
+let playbackRevision = 0;
+
+function notifyPlaybackChange(): void {
+  playbackRevision += 1;
+  for (const listener of playbackListeners) listener();
+}
+
+export function subscribeAnimationPlayback(listener: () => void): () => void {
+  playbackListeners.add(listener);
+  return () => { playbackListeners.delete(listener); };
+}
+
+export function getAnimationPlaybackRevision(): number {
+  return playbackRevision;
+}
+
 export class AnimationLoop {
   private startTime: number | null = null;
   private pausedAt: number | null = null;   // 一時停止した時刻 (performance.now())
@@ -36,6 +53,7 @@ export class AnimationLoop {
     } else {
       this.tick();
     }
+    notifyPlaybackChange();
   }
 
   stop(): void {
@@ -44,6 +62,7 @@ export class AnimationLoop {
       this.rafId = null;
     }
     this.pausedAt = null;
+    notifyPlaybackChange();
   }
 
   /** 現在のフレームで停止（位置を保持） */
@@ -67,6 +86,7 @@ export class AnimationLoop {
     this.pausedAt = now;
     this.lastEmittedNormalizedTime = null;
     this.emitFrame(snappedTime, true);
+    notifyPlaybackChange();
   }
 
   /** 停止した位置から再開 */
@@ -75,6 +95,7 @@ export class AnimationLoop {
     this.startTime = performance.now();
     this.pausedAt = null;
     this.tick();
+    notifyPlaybackChange();
   }
 
   /** 現在ポーズ中かどうか */

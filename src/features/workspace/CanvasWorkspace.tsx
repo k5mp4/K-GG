@@ -43,7 +43,6 @@ type CanvasWorkspaceChromeProps = {
   panelsPresentation: PanelPresentation;
   onOpenLeftSidebar: () => void;
   onOpenLayers: () => void;
-  showFeedback: () => void;
   showGradientAnchors: boolean;
   onToggleGradientAnchors: () => void;
   onResetViewport: () => void;
@@ -129,7 +128,6 @@ export function CanvasWorkspace({
     panelsPresentation,
     onOpenLeftSidebar,
     onOpenLayers,
-    showFeedback,
     showGradientAnchors,
     onToggleGradientAnchors,
     onResetViewport,
@@ -245,20 +243,7 @@ export function CanvasWorkspace({
         </button>
       </div>
 
-      <div data-viewport-ui className={`absolute right-4 z-20 flex gap-2 ${panelsPresentation === 'overlay' ? 'bottom-3 flex-row' : 'top-6 flex-col'}`}>
-        <button
-          type="button"
-          onClick={(event) => { showFeedback(); event.currentTarget.blur(); }}
-          className="h-10 w-10 shrink-0 flex items-center justify-center border border-transparent bg-k-surface/85 p-0 text-cream/70 shadow-[0_10px_24px_rgba(0,0,0,0.28)] backdrop-blur-sm transition-all duration-150 hover:bg-fire/15 hover:text-k-text focus:outline-none focus-visible:ring-2 focus-visible:ring-fire"
-          title={translate('common.feedback')}
-          aria-label={translate('common.feedback')}
-        >
-          <svg className="shrink-0" width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round">
-            <path d="M21 15a4 4 0 0 1-4 4H8l-5 3V7a4 4 0 0 1 4-4h10a4 4 0 0 1 4 4z" />
-            <path d="M8 9h8" />
-            <path d="M8 13h5" />
-          </svg>
-        </button>
+      <div data-viewport-ui className={`absolute right-4 z-20 flex gap-2 ${panelsPresentation === 'overlay' ? 'bottom-3 flex-row' : 'top-4 flex-col'}`}>
         <button
           type="button"
           onClick={(event) => { onToggleGradientAnchors(); event.currentTarget.blur(); }}
@@ -288,15 +273,17 @@ export function CanvasWorkspace({
             </svg>
           )}
         </button>
-        <button
-          type="button"
-          onClick={(event) => { onResetViewport(); event.currentTarget.blur(); }}
-          className="h-10 w-10 shrink-0 flex items-center justify-center border border-transparent bg-k-surface/85 p-0 text-cream/70 shadow-[0_10px_24px_rgba(0,0,0,0.28)] backdrop-blur-sm transition-all duration-150 hover:bg-fire/15 hover:text-k-text focus:outline-none focus-visible:ring-2 focus-visible:ring-fire"
-          title={translate('canvas.resetViewport')}
-          aria-label={translate('canvas.resetViewport')}
-        >
-          <Icon name="restart" style={{ fontSize: 16 }} />
-        </button>
+        {panelsPresentation === 'overlay' && (
+          <button
+            type="button"
+            onClick={(event) => { onResetViewport(); event.currentTarget.blur(); }}
+            className="h-10 w-10 shrink-0 flex items-center justify-center border border-transparent bg-k-surface/85 p-0 text-cream/70 shadow-[0_10px_24px_rgba(0,0,0,0.28)] backdrop-blur-sm transition-all duration-150 hover:bg-fire/15 hover:text-k-text focus:outline-none focus-visible:ring-2 focus-visible:ring-fire"
+            title={translate('canvas.resetViewport')}
+            aria-label={translate('canvas.resetViewport')}
+          >
+            <Icon name="restart" style={{ fontSize: 16 }} />
+          </button>
+        )}
       </div>
 
       <div className="canvas-frame relative min-h-0 flex-1 flex items-center justify-center p-2 md:p-6 overflow-visible">
