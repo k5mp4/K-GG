@@ -5,7 +5,7 @@ title: Effect Stack
 status: current
 owners: [maintainer]
 created: 2026-07-27
-updated: 2026-11-26
+updated: 2026-11-28
 requirement_ids: [EFFECT-001, EFFECT-002, EFFECT-003, EFFECT-004, EFFECT-005, EFFECT-006, EFFECT-007, EFFECT-008, EFFECT-009, EFFECT-010, EFFECT-011, EFFECT-012, EFFECT-013, EFFECT-014, EFFECT-015, EFFECT-016, EFFECT-017, EFFECT-018, EFFECT-019, EFFECT-020, EFFECT-021, EFFECT-022, EFFECT-023, EFFECT-025, EFFECT-026, EFFECT-027, EFFECT-028, EFFECT-029, EFFECT-030, EFFECT-031, EFFECT-032, EFFECT-033, DISTORT-001, DISTORT-002, CLOTH-001, CLOTH-002, CLOTH-003, SANDBOX-001, FLOW-001, FLOW-002, FLOW-003, FLOW-004, FLOW-005, FLOW-006, FLOW-007, FLOW-008, FLOW-009, FLOW-010, FLOW-011, FLOW-012, VIDEO-MOTION-001, VIDEO-MOTION-002, VIDEO-MOTION-003, VIDEO-MOTION-004, DATAMOSH-001, DATAMOSH-002, DATAMOSH-003, DATAMOSH-004, DATAMOSH-005, DATAMOSH-006, TEXTURE-001, TEXTURE-002, TEXTURE-003, DISTORT-CHROMA-001, DISTORT-CHROMA-002, DISTORT-CHROMA-003, ICE-001, ICE-002, ICE-003, SHAPES-001, SHAPES-002, SHAPES-003, SHAPES-004]
 related_adrs: [ADR-0004, ADR-0005, ADR-0009, ADR-0010, ADR-0017, ADR-20260927-datamosh-feedback-layer, ADR-20260929-sandbox-texture-material-stage, ADR-20260930-sandbox-shapes-final-stage, ADR-20261019-ice-material-field]
 related_changes: [CHANGE-001, CHANGE-011, CHANGE-012, CHANGE-013, CHANGE-014, CHANGE-015, CHANGE-018, CHANGE-019, CHANGE-020, CHANGE-021, CHANGE-022, CHANGE-023, CHANGE-024, CHANGE-025, CHANGE-026, CHANGE-027, CHANGE-030, CHANGE-031, CHANGE-032, CHANGE-033, CHANGE-034, CHANGE-035, CHANGE-036, CHANGE-037, CHANGE-044, CHANGE-046, CHANGE-047, CHANGE-048, CHANGE-053]
@@ -244,7 +244,7 @@ PostprocessのVoronoiは、Euclidean、Manhattan、Chebyshev、Minkowskiの距�
 
 ### EFFECT-012 SANDBOX固定段
 
-TOPバーのSANDBOXから、SANDBOXの`Edit Layer`選択要素でNormal、Prism、Particles、Flow Gradientのいずれか一つを選択して編集できます。SANDBOXのモジュール選択は描画順を変更せず、NormalはSurface、Prismは主スタック後、Flow GradientはPrismとParticlesの間、Particlesは最終オーバーレイとして既存のEffect Pipelineへ反映します。SANDBOXの選択状態は保存せず、各モジュールの設定だけをPreset、Preview、Thumbnail、Exportへ引き継ぎます。Flow Gradientの設定はSeed、Particle Count、Curl Scale、Curl Strength、Speed、Ribbon Width、Stretch、Density、Trail、Contrast、Flow Opacity、Particle Opacity、Particle Sizeで構成し、LoopとDurationは既存Animationを参照します。Flow Opacityは最終合成、Particle Opacityは各splatのDensity寄与、Particle Sizeは速度方向Ribbonの投影サイズへ適用します。DiffusionはPhase Aでは提供しません。
+TOPバーのSANDBOXから、SANDBOXのモジュール一覧でNormal、Prism、Particles、Flow Gradientの行を開いて編集できます。どの行を開いても描画順は変わらず、NormalはSurface、Prismは主スタック後、Flow GradientはPrismとParticlesの間、Particlesは最終オーバーレイとして既存のEffect Pipelineへ反映します。SANDBOXで開いている行は保存せず、各モジュールの設定だけをPreset、Preview、Thumbnail、Exportへ引き継ぎます。Flow Gradientの設定はSeed、Particle Count、Curl Scale、Curl Strength、Speed、Ribbon Width、Stretch、Density、Trail、Contrast、Flow Opacity、Particle Opacity、Particle Sizeで構成し、LoopとDurationは既存Animationを参照します。Flow Opacityは最終合成、Particle Opacityは各splatのDensity寄与、Particle Sizeは速度方向Ribbonの投影サイズへ適用します。DiffusionはPhase Aでは提供しません。
 
 ### EFFECT-013 Normal Mapの描画互換
 
@@ -321,7 +321,7 @@ Cloth の全パラメータ (Surface Wave, Organic Motion, Lighting, Specular, F
 
 ### SANDBOX-001 SANDBOX パネルモジュールの拡張
 
-SANDBOXのEdit Layerには`Cloth`、`Normal`、`Prism`、`Particles`、`Flow Gradient`、`Seamless`、`Shapes`の7モジュールを表示し、アクティブカウントを`/7`で示します。ConeはSANDBOXから除外し、EFFECT-021のMain StackレイヤーとしてEffect Stackで管理します。モジュールのON/OFF状態およびプログラム状態をUI上に可視化します。
+SANDBOXのモジュール一覧には`Cloth`、`Normal`、`Prism`、`Particles`、`Flow Gradient`、`Seamless`、`Shapes`の7モジュールと`Controller`を表示します。ConeはSANDBOXから除外し、EFFECT-021のMain StackレイヤーとしてEffect Stackで管理します。モジュールのON/OFFは各行のスイッチで、プログラムの準備中・読み込み中・利用不可・Fallbackは行の状態文字で示します。
 
 ### SHAPES-001 SANDBOX Shapes最終段
 

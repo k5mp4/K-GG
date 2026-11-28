@@ -19,7 +19,7 @@ describe('SandboxPanel Cone ownership', () => {
     useGradientStore.setState(useGradientStore.getInitialState(), true);
   });
 
-  it('keeps Cone out of the SANDBOX Edit Layer selector and modules', () => {
+  it('keeps Cone out of the SANDBOX module list', () => {
     const markup = renderSandbox();
 
     expect(markup).toContain('data-sandbox-panel');
@@ -56,7 +56,6 @@ describe('Texture layer panel', () => {
   it('keeps Texture out of the SANDBOX modules because it is an Effect Stack layer', () => {
     const markup = renderWithTexture({ enabled: true }, renderSandbox);
 
-    expect(markup).toContain('/7');
     expect(markup).not.toContain('data-sandbox-module="texture"');
     expect(markup).not.toContain('data-texture-panel');
   });
@@ -91,16 +90,42 @@ describe('SANDBOX Shapes module', () => {
     useGradientStore.setState(useGradientStore.getInitialState(), true);
   });
 
-  it('lists Shapes in the Edit Layer selector and counts it as a module', () => {
+  it('lists Shapes as a module row with its own switch', () => {
     const initialState = useGradientStore.getInitialState();
     const previous = initialState.shapes;
     initialState.shapes = { ...previous, enabled: true };
     try {
       const markup = renderSandbox();
-      expect(markup).toContain('Shapes');
-      expect(markup).toContain('1<span class="text-cyan-100/40">/7</span>');
+      expect(markup).toContain('data-sandbox-module="shapes"');
+      expect(markup).toContain('aria-label="Shapes on"');
     } finally {
       initialState.shapes = previous;
     }
+  });
+});
+
+describe('SANDBOX module list', () => {
+  beforeEach(() => {
+    useGradientStore.setState(useGradientStore.getInitialState(), true);
+  });
+
+  it('lists every module without an Edit Layer selector and opens only Cloth by default', () => {
+    const markup = renderSandbox();
+
+    expect(markup).not.toContain('Edit Layer');
+    for (const id of ['cloth', 'normal', 'prism', 'particles', 'flowGradient', 'seamless', 'shapes', 'controller']) {
+      expect(markup).toContain(`data-sandbox-module="${id}"`);
+    }
+    expect(markup.match(/data-open="true"/g)).toHaveLength(1);
+    expect(markup).toContain('data-sandbox-module="cloth" data-open="true"');
+    expect(markup).toContain('data-cloth-panel');
+  });
+
+  it('shows Off and Applied only through the switch, not as status text', () => {
+    const markup = renderSandbox();
+
+    // Row status text uses the cream/40 class; the switch carries Off/On itself.
+    expect(markup).not.toContain('tracking-wider text-cream/40">Off<');
+    expect(markup).not.toContain('text-emerald-300">Applied<');
   });
 });
