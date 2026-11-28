@@ -1572,7 +1572,7 @@ export function GradientRamp({ showHeader = true, variant = 'panel', onUndo = un
   const hasOpacitySelection = selectedOpacityIdxs.size > 0;
   const showOpacityControls = hasOpacitySelection && !isOpacityControlsDismissed;
   const opacitySliderControls = (
-    <div className="space-y-2 border border-k-muted/50 bg-k-bg/40 p-2 pb-2">
+    <div className="space-y-2 bg-k-bg/40 p-2 pb-2">
       <div className="flex items-center justify-between gap-2">
         <span
           className="text-[10px] text-tab-inactive uppercase tracking-wider truncate"
@@ -2058,10 +2058,7 @@ export function GradientRamp({ showHeader = true, variant = 'panel', onUndo = un
             );
           })()}
 
-          {/* ストップ編集: 頻繁に操作するためグラデーションタイプの直下に固定 */}
-          <p className="text-xs text-tab-inactive">
-            {t('gradient.editInstructions')}
-          </p>
+          {/* ストップ編集: 頻繁に操作するためグラデーションタイプの直下に固定。操作説明はランプのツールチップで示す */}
 
           <div className="relative space-y-1">
             <AnimatedOpacityControls visible={showOpacityControls}>
@@ -2077,6 +2074,7 @@ export function GradientRamp({ showHeader = true, variant = 'panel', onUndo = un
               onPointerUp={handlePointerUp}
               onPointerLeave={clearRampHover}
               onClick={handleClick}
+              title={t('gradient.editInstructions')}
               className="w-full rounded-none cursor-crosshair touch-none"
               style={{ height: BAR_H + HANDLE_AREA + OPACITY_HANDLE_AREA, pointerEvents: isSlitAdjusting ? 'none' : 'auto', touchAction: 'none' }}
             />
@@ -2157,10 +2155,10 @@ export function GradientRamp({ showHeader = true, variant = 'panel', onUndo = un
               type="button"
               aria-pressed={showRampOptionPreviews}
               onClick={() => setShowRampOptionPreviews((visible) => !visible)}
-              className={`inline-flex items-center gap-1.5 border px-2 py-1 text-[10px] uppercase tracking-wider transition-colors focus:outline-none focus:ring-1 focus:ring-fire ${showRampOptionPreviews ? 'border-fire/70 bg-fire/15 text-cream' : 'border-panel-border text-tab-inactive hover:border-cream/50 hover:text-k-text'}`}
+              className={`inline-flex items-center gap-1.5 border px-2 py-1 text-[10px] uppercase tracking-wider transition-colors focus:outline-none focus:ring-1 focus:ring-fire ${showRampOptionPreviews ? 'border-fire/70 bg-fire/15 text-cream' : 'border-transparent text-tab-inactive hover:bg-k-muted/60 hover:text-k-text'}`}
               title="常時プレビューを切り替え"
             >
-              <span className="h-2.5 w-5 border border-current/40 bg-[linear-gradient(90deg,#d11402,#e5dabd,#6075a4)]" aria-hidden="true" />
+              <span className="h-2.5 w-5 bg-[linear-gradient(90deg,#d11402,#e5dabd,#6075a4)]" aria-hidden="true" />
               {showRampOptionPreviews ? 'Hide previews' : 'Show previews'}
             </button>
           </div>

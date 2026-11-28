@@ -35,7 +35,7 @@ export function SpoutOutputPanel({ canvasRef }: Props) {
   const renamed = state.activeSenderName !== null && state.activeSenderName !== state.senderName;
 
   return (
-    <section className="space-y-3 border-t border-panel-border border-t-panel pt-4" aria-labelledby="spout-output-title">
+    <section className="space-y-3 border-t border-panel-border pt-4" aria-labelledby="spout-output-title">
       <div className="flex items-center justify-between gap-3">
         <h3 id="spout-output-title" className="font-display text-xs font-semibold uppercase tracking-wider text-k-text">{t('spout.title')}</h3>
         <span className="flex items-center gap-1.5 text-[10px] text-deep" role="status" aria-live="polite">
@@ -45,7 +45,7 @@ export function SpoutOutputPanel({ canvasRef }: Props) {
       </div>
 
       {!state.supported ? (
-        <p className="border border-panel-border bg-k-surface px-2.5 py-2 text-[10px] leading-relaxed text-deep">
+        <p className="text-[10px] leading-relaxed text-deep">
           {state.status === 'checking' ? t('common.checking') : t('spout.unsupported')}
         </p>
       ) : (
