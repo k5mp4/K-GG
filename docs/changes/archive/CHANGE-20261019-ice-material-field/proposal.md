@@ -2,16 +2,19 @@
 type: change
 id: CHANGE-20261019-ice-material-field
 title: 共有Material Fieldによる配色とIceレイヤー
-status: review
+status: archived
 change_kind: F
 owners: [maintainer]
 created: 2026-10-19
-updated: 2026-10-20
+updated: 2026-11-28
 current_specs: [CURRENT-GRADIENT, CURRENT-PRESET, CURRENT-UI-CONTROLS, CURRENT-WEBGL-PERFORMANCE, CURRENT-EFFECT-STACK, CURRENT-VIDEO-EXPORT, CURRENT-VJ-PERFORMANCE]
 related_adrs: [ADR-20261019-ice-material-field]
 related_code: [src/types/materialField.ts, src/lib/materialField.ts, src/shaders/material-field.glsl, src/shaders/gradient.frag.glsl, src/types/ice.ts, src/lib/ice.ts, src/shaders/ice.frag.glsl, src/lib/webglShaderSources.ts, src/lib/sceneRenderPlan.ts, src/lib/effectPipeline.ts, src/lib/meshGradientField.ts, src/lib/webgl.ts, src/lib/sceneEvaluation.ts, src/lib/tileRender.ts, src/lib/renderBridge.ts, src/hooks/useWebGL.ts, src/components/MaterialFieldControls.tsx, src/components/IcePanel.tsx]
 related_tests: [src/types/materialField.test.ts, src/lib/materialField.test.ts, src/lib/presetModel.materialField.test.ts, src/store/gradientStore.materialField.test.ts, src/lib/sceneRenderPlan.materialField.test.ts, src/lib/meshCoordinateField.test.ts, src/lib/webglMaterialField.test.ts, src/components/MaterialFieldControls.test.tsx, src/types/ice.test.ts, src/lib/ice.test.ts, src/lib/presetModel.ice.test.ts, src/lib/sceneEvaluation.ice.test.ts, src/components/IcePanel.test.tsx, tests/e2e/ice.spec.ts, tests/e2e/shaders.spec.ts]
 human_review: required
+outcome: follow-up
+migration: historical
+follow_up: "PR #120でmerge済み。未完: AE3 境界前後の有限差分速度はnot run"
 ---
 
 # 共有Material Fieldによる配色とIceレイヤー
@@ -76,3 +79,10 @@ Request source: Direct request。[Ice Material Field - Plan](../../../plans/2026
 ## 未決定事項
 
 - 実GPUでの画質・性能（16.7ms/frameの暫定目標）とNative出力（Tauri／FFmpeg／After Effects）はRelease Gate。Browserの自動検証から合格を推測しない。
+
+## Finalization
+
+- Finalized: 2026-11-28
+- Outcome: `follow-up`
+- Mode: historical migration; this move does not claim that every acceptance criterion passed.
+- Follow-up: PR #120でmerge済み。未完: AE3 境界前後の有限差分速度はnot run

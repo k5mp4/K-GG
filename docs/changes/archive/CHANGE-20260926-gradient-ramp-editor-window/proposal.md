@@ -2,16 +2,19 @@
 type: change
 id: CHANGE-20260926-gradient-ramp-editor-window
 title: Gradient Ramp editorのネイティブ別ウインドウ化
-status: draft
+status: archived
 change_kind: F
 owners: [maintainer]
 created: 2026-09-26
-updated: 2026-09-26
+updated: 2026-11-28
 current_specs: [CURRENT-UI-CONTROLS]
 related_adrs: [ADR-20260926-native-secondary-windows]
 related_code: [src/components/GradientRamp.tsx, src/adapters/tauri/gradientRampEditorWindow.ts, src/features/gradientRampEditor/GradientRampEditorWindowApp.tsx, src/features/gradientRampEditor/useGradientRampEditorHost.ts, src/features/workspace/useWorkspaceController.ts, src/main.tsx, src-tauri/src/tool_windows.rs, src-tauri/src/lib.rs, src-tauri/capabilities/tool-windows.json, src/adapters/tauri/toolWindows.ts]
 related_tests: [src/adapters/tauri/toolWindows.test.ts]
 human_review: required
+outcome: follow-up
+migration: historical
+follow_up: "PR #85でmerge済み。Release Gate未完: AC-004 メイン終了時にエディタが残らないこと、2回目の前面化をTauri実機で確認"
 ---
 
 # Gradient Ramp editorのネイティブ別ウインドウ化
@@ -70,3 +73,10 @@ CHANGE-015ではEffect Stackの別ウインドウ化がWebView2で失敗し（16
 ## 未決定事項
 
 - なし（Tauri実機確認の結果によって方式を見直す）。
+
+## Finalization
+
+- Finalized: 2026-11-28
+- Outcome: `follow-up`
+- Mode: historical migration; this move does not claim that every acceptance criterion passed.
+- Follow-up: PR #85でmerge済み。Release Gate未完: AC-004 メイン終了時にエディタが残らないこと、2回目の前面化をTauri実機で確認

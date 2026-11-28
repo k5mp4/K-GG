@@ -2,16 +2,19 @@
 type: change
 id: CHANGE-20261003-responsive-workspace
 title: 小画面に対応する拡張可能なワークスペース
-status: review
+status: archived
 change_kind: F
 owners: [maintainer]
 created: 2026-10-03
-updated: 2026-10-03
+updated: 2026-11-28
 current_specs: [CURRENT-UI-CONTROLS, CURRENT-WORKSPACE-LAYOUT]
 related_adrs: [ADR-20261003-responsive-workspace-layout]
 related_code: [src/App.tsx, src/components/DockPanel.tsx, src/features/workspace/workspaceLayout.ts, src/features/workspace/useWorkspaceLayout.ts, src/features/workspace/useWorkspaceController.ts, src/components/EffectStackWorkspace.tsx, src-tauri/tauri.conf.json]
 related_tests: [src/features/workspace/workspaceLayout.test.ts, tests/e2e/workspace-layout.spec.ts]
 human_review: required
+outcome: follow-up
+migration: historical
+follow_up: "PR #107と#124でmerge済み。未完: OS表示倍率、実タッチ端末、Effect Stack別ウインドウのdetach/reattach、Timelineの全設定操作を確認"
 ---
 
 # 小画面に対応する拡張可能なワークスペース
@@ -42,3 +45,10 @@ Request source: Direct request。利用者は、小さい画面で操作でき�
 ## 主なリスク・未確認事項
 
 Tauri／WebView2実機での640×480のリサイズ、OS表示倍率、実タッチ端末はRelease Gate／Observationへ記録する。追加指示でcommit・push・ドラフトPR作成を行う。Issue作成は依頼対象外。差分の人間レビュー後にhuman_reviewを更新しfinalizeする。
+
+## Finalization
+
+- Finalized: 2026-11-28
+- Outcome: `follow-up`
+- Mode: historical migration; this move does not claim that every acceptance criterion passed.
+- Follow-up: PR #107と#124でmerge済み。未完: OS表示倍率、実タッチ端末、Effect Stack別ウインドウのdetach/reattach、Timelineの全設定操作を確認

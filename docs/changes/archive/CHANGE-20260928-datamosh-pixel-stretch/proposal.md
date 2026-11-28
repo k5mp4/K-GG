@@ -2,16 +2,19 @@
 type: change
 id: CHANGE-20260928-datamosh-pixel-stretch
 title: Datamosh Pixel Stretch
-status: review
+status: archived
 change_kind: F
 owners: [maintainer]
 created: 2026-09-28
-updated: 2026-09-28
+updated: 2026-11-28
 current_specs: [CURRENT-EFFECT-STACK, CURRENT-UI-CONTROLS, CURRENT-PRESET]
 related_adrs: [ADR-20260927-datamosh-feedback-layer]
 related_code: [src/types/datamosh.ts, src/shaders/datamosh/pixel-stretch.glsl, src/shaders/datamosh/motion-field.glsl, src/shaders/datamosh/uniforms.glsl, src/shaders/datamosh/main.glsl, src/lib/webglShaderSources.ts, src/lib/webgl.ts, src/components/DatamoshPanel.tsx, src/i18n/messages.ts]
 related_tests: [src/types/datamosh.test.ts, src/lib/webglExportPrograms.test.ts, tests/e2e/shaders.spec.ts]
 human_review: required
+outcome: follow-up
+migration: historical
+follow_up: "PR #97でmerge済み。Release Gate未完: 実アプリPreviewでPixel Stretchの見た目を確認"
 ---
 
 # Datamosh Pixel Stretch
@@ -68,3 +71,10 @@ Datamoshは前フレームの履歴をmotion fieldに沿ってずらすことで
 ## 未決定事項
 
 - なし（伸び方はストリーク型、実装形態はmotion source、伸びた描画は保持で利用者と合意済み）。
+
+## Finalization
+
+- Finalized: 2026-11-28
+- Outcome: `follow-up`
+- Mode: historical migration; this move does not claim that every acceptance criterion passed.
+- Follow-up: PR #97でmerge済み。Release Gate未完: 実アプリPreviewでPixel Stretchの見た目を確認

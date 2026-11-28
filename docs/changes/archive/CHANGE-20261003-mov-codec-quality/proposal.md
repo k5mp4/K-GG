@@ -2,16 +2,19 @@
 type: change
 id: CHANGE-20261003-mov-codec-quality
 title: MOVのコーデックと品質選択
-status: review
+status: archived
 change_kind: F
 owners: [maintainer]
 created: 2026-10-03
-updated: 2026-10-03
+updated: 2026-11-28
 current_specs: [CURRENT-VIDEO-EXPORT]
 related_adrs: [ADR-0018, ADR-0021]
 related_code: [src/components/ExportPanel.tsx, src/lib/videoExportFormats.ts, src/adapters/types.ts, src/adapters/tauri/videoExportService.ts, src-tauri/src/lib.rs, tools/ffmpeg-native-smoke.mjs]
 related_tests: [src/lib/videoExportFormats.test.ts, src/adapters/tauri/videoExportService.native-artifact.test.ts, src/components/ExportPanel.mov.test.tsx]
 human_review: required
+outcome: follow-up
+migration: historical
+follow_up: "PR #108でmerge済み。Release Gate未完: Tauri UI、After Effects、macOSでのMOVコーデック・品質選択、モバイル幅のMOV操作を確認"
 ---
 
 # MOVのコーデックと品質選択
@@ -42,3 +45,10 @@ H.264／ProResの圧縮と色サブサンプリングは従来RGBロスレスと
 ## 検証
 
 検証結果は[validation.md](./validation.md)に記録する。
+
+## Finalization
+
+- Finalized: 2026-11-28
+- Outcome: `follow-up`
+- Mode: historical migration; this move does not claim that every acceptance criterion passed.
+- Follow-up: PR #108でmerge済み。Release Gate未完: Tauri UI、After Effects、macOSでのMOVコーデック・品質選択、モバイル幅のMOV操作を確認

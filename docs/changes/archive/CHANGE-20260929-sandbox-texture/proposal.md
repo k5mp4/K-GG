@@ -2,16 +2,19 @@
 type: change
 id: CHANGE-20260929-sandbox-texture
 title: Texture Effect Stackレイヤー（異方性反射・質感）
-status: review
+status: archived
 change_kind: F
 owners: [maintainer]
 created: 2026-09-29
-updated: 2026-09-29
+updated: 2026-11-28
 current_specs: [CURRENT-EFFECT-STACK, CURRENT-PRESET, CURRENT-UI-CONTROLS]
 related_adrs: [ADR-20260929-sandbox-texture-material-stage]
 related_code: [src/types/texture.ts, src/shaders/texture.frag.glsl, src/lib/webgl.ts, src/lib/webglShaderSources.ts, src/lib/effectPipeline.ts, src/lib/sceneRenderPlan.ts, src/lib/renderFrame.ts, src/lib/renderSceneAtTime.ts, src/lib/presetModel.ts, src/lib/presetThumbnail.ts, src/lib/history.ts, src/lib/exportRenderState.ts, src/components/TexturePanel.tsx, src/components/SandboxPanel.tsx, src/components/GradientCanvas.tsx, src/components/PresetPanel.tsx, src/features/workspace/useWorkspaceController.ts, src/store/documentActions.ts, packages/kgg-control/src/parameterLimits.ts]
 related_tests: [src/types/texture.test.ts, src/store/gradientStore.texture.test.ts, src/lib/presetModel.texture.test.ts, src/lib/effectPipeline.test.ts, src/lib/webglExportPrograms.test.ts, src/lib/renderFrame.test.ts, src/components/SandboxPanel.test.tsx, tests/e2e/shaders.spec.ts]
 human_review: required
+outcome: follow-up
+migration: historical
+follow_up: "PR #95でmerge済み。Release Gate未完: 実GPUとTauri実機で質感プリセットの見た目を人間が最終確認"
 ---
 
 # Texture Effect Stackレイヤー（異方性反射・質感）
@@ -68,3 +71,10 @@ Effect Stackで作った画像に、任意の画像または決まった描画�
 ## 未決定事項
 
 - なし（human reviewで、プリセットの初期値と見た目を確認する）。
+
+## Finalization
+
+- Finalized: 2026-11-28
+- Outcome: `follow-up`
+- Mode: historical migration; this move does not claim that every acceptance criterion passed.
+- Follow-up: PR #95でmerge済み。Release Gate未完: 実GPUとTauri実機で質感プリセットの見た目を人間が最終確認
