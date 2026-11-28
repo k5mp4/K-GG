@@ -110,3 +110,59 @@ describe('Effect Stack terminology', () => {
     expect(markup).not.toContain('Stack V2');
   });
 });
+
+describe('Effect Stack accessibility', () => {
+  const markup = () => renderToStaticMarkup(
+    <LanguageProvider>
+      <EffectStackPanelView
+        view={buildEffectStackView({
+          effectPipeline: { ...STORE_DEFAULTS.effectPipeline, selectedKind: 'glass' },
+          normalMapEnabled: false,
+          imageGradientEnabled: false,
+          programStatus: {},
+          soloSnapshot: null,
+          randomizing: false,
+          previousOrder: [],
+        })}
+        actions={noopActions}
+      />
+    </LanguageProvider>,
+  );
+
+  it('names every switch and solo button after its layer', () => {
+    const html = markup();
+    expect(html).toMatch(/role="switch"[^>]*aria-label="Enable Glass"/);
+    expect(html).toContain('aria-label="Solo Glass"');
+    expect(html).not.toMatch(/role="switch"[^>]*aria-label="(Enabled|Disabled)"/);
+  });
+
+  it('exposes the rows as a list that states the apply order, with one row in the Tab order', () => {
+    const html = markup();
+    expect(html).toContain('role="list" aria-label="Effect Stack layers, applied from top to bottom"');
+    expect(html.match(/class="effect-stack-row__select" tabindex="0"/g)?.length).toBe(1);
+    expect(html).toMatch(/class="effect-stack-row__select" tabindex="0" aria-current="true"/);
+    expect(html).toContain('Applied from top to bottom');
+  });
+});
+
+describe('Effect Stack row switch', () => {
+  it('keeps a small ON/OFF text inside the row switch', () => {
+    const html = renderToStaticMarkup(
+      <LanguageProvider>
+        <EffectStackPanelView
+          view={buildEffectStackView({
+            effectPipeline: STORE_DEFAULTS.effectPipeline,
+            normalMapEnabled: false,
+            imageGradientEnabled: false,
+            programStatus: {},
+            soloSnapshot: null,
+            randomizing: false,
+            previousOrder: [],
+          })}
+          actions={noopActions}
+        />
+      </LanguageProvider>,
+    );
+    expect(html).toMatch(/role="switch"[^>]*aria-label="Enable Noise"[^]*?text-\[7px\][^>]*>Off</);
+  });
+});

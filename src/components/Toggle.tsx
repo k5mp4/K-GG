@@ -7,9 +7,10 @@ interface ToggleProps {
   variant?: 'checkbox' | 'switch';
   className?: string;
   ariaLabel?: string;
+  tabIndex?: number;
 }
 
-export function Toggle({ checked, onChange, size = 'md', variant = 'checkbox', className = '', ariaLabel }: ToggleProps) {
+export function Toggle({ checked, onChange, size = 'md', variant = 'checkbox', className = '', ariaLabel, tabIndex }: ToggleProps) {
   const { t } = useLanguage();
   if (variant === 'switch') {
     const trackSize = size === 'xs'
@@ -39,6 +40,7 @@ export function Toggle({ checked, onChange, size = 'md', variant = 'checkbox', c
         role="switch"
         aria-checked={checked}
         aria-label={ariaLabel ?? (checked ? t('common.enabled') : t('common.disabled'))}
+        tabIndex={tabIndex}
         onClick={() => onChange(!checked)}
         className={`group relative shrink-0 inline-flex items-center rounded-full border px-0 py-0 transition-all duration-200 ease-out focus:outline-none focus-visible:ring-2 focus-visible:ring-fire focus-visible:ring-offset-1 focus-visible:ring-offset-black ${
           trackSize

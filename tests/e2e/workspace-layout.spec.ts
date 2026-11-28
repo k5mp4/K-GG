@@ -177,3 +177,63 @@ test('docked Layers column stays beside the preview regardless of timeline and w
   await page.setViewportSize({ width: 1440, height: 900 });
   await expect(layers).toHaveAttribute('data-layers-presentation', 'column');
 });
+
+test('Effect Stack rows are operable from the keyboard with named switches', async ({ page, browserErrors: _browserErrors }) => {
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await page.goto('/', { waitUntil: 'domcontentloaded' });
+  await waitForE2EBridge(page);
+  await pauseAnimation(page);
+  const layers = page.locator('[data-effect-stack-workspace]');
+  await expect(layers).toHaveAttribute('data-layers-presentation', 'column');
+
+  const list = layers.getByRole('list', { name: 'Effect Stack layers, applied from top to bottom' });
+  await expect(list).toBeVisible();
+  await expect(layers.locator('[data-effect-stack-order]')).toBeVisible();
+  // Each switch names its layer, so the 15 switches can be told apart.
+  await expect(list.getByRole('switch', { name: 'Enable Glass', exact: true })).toBeVisible();
+  await expect(list.getByRole('switch', { name: /^Enable / })).toHaveCount(15);
+
+  // Text is at least 11px (the ON/OFF text inside switches is deliberately secondary)
+  // and Off rows are not dimmed with opacity.
+  const textStyles = await layers.evaluate(root => {
+    const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
+    const sizes: number[] = [];
+    for (let node = walker.nextNode(); node; node = walker.nextNode()) {
+      const parent = node.parentElement;
+      if (!parent || !node.textContent?.trim() || parent.getClientRects().length === 0) continue;
+      if (parent.closest('[role="switch"]')) continue;
+      sizes.push(parseFloat(getComputedStyle(parent).fontSize));
+    }
+    const opacities = [...root.querySelectorAll<HTMLElement>('.effect-stack-row')].map(row => Number(getComputedStyle(row).opacity));
+    return { minSize: Math.min(...sizes), minOpacity: Math.min(...opacities) };
+  });
+  expect(textStyles.minSize).toBeGreaterThanOrEqual(11);
+  expect(textStyles.minOpacity).toBe(1);
+
+  const selectButtons = list.locator('.effect-stack-row__select');
+  const names = () => list.locator('.effect-stack-row').evaluateAll(rows => rows
+    .sort((a, b) => a.getBoundingClientRect().top - b.getBoundingClientRect().top)
+    .map(row => row.querySelector('.effect-stack-row__title')!.textContent));
+  const order = await names();
+  // One row is in the Tab order (roving focus).
+  await expect(list.locator('.effect-stack-row__select[tabindex="0"]')).toHaveCount(1);
+
+  const rowButton = (name: string) => selectButtons.filter({ has: page.locator('.effect-stack-row__title', { hasText: new RegExp(`^${name}$`) }) });
+  await rowButton(order[0]!).focus();
+  await page.keyboard.press('ArrowDown');
+  await expect(rowButton(order[1]!)).toBeFocused();
+  await expect(rowButton(order[1]!)).toHaveAttribute('aria-current', 'true');
+
+  await page.keyboard.press('Alt+ArrowUp');
+  await expect.poll(names).toEqual([order[1], order[0], ...order.slice(2)]);
+  await expect(rowButton(order[1]!)).toBeFocused();
+
+  await page.keyboard.press('End');
+  await expect(rowButton(order[order.length - 1]!)).toBeFocused();
+  await page.keyboard.press('Home');
+  await expect(rowButton(order[1]!)).toBeFocused();
+
+  // Solo is a real button, revealed when its row has focus.
+  const solo = list.getByRole('button', { name: `Solo ${order[1]}`, exact: true });
+  await expect(solo).toBeVisible();
+});

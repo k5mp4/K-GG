@@ -15,6 +15,8 @@ import { EFFECT_STACK_LABELS, EFFECT_STACK_RAIL_ABBREVIATIONS } from '../feature
 
 const ROW_HEIGHT = 38;
 const DRAG_SETTLE_MS = 150;
+/** Rows slide to a keyboard-moved order (Alt+Up/Down) over this time. */
+const KEYBOARD_MOVE_MS = 160;
 /** How long a committed drag waits for the moved order before it gives up. */
 const DRAG_COMMIT_TIMEOUT_MS = 1000;
 
@@ -63,6 +65,19 @@ export function EffectStackPanelView({
   const settleTimerRef = useRef<number | null>(null);
   const [dragging, setDragging] = useState<DragState | null>(null);
   const [rowTransitionPhase, setRowTransitionPhase] = useState<RowTransitionPhase>('idle');
+  const [activeKind, setActiveKind] = useState<EffectStackKind | null>(null);
+  const selectButtonsRef = useRef(new Map<EffectStackKind, HTMLButtonElement>());
+  /** A row moved from the keyboard keeps focus once the new order arrives. */
+  const pendingFocusRef = useRef<EffectStackKind | null>(null);
+  const rowsRef = useRef<HTMLDivElement | null>(null);
+  /**
+   * Where each row was drawn (px from the list top) when an Alt+Up/Down move started, so the rows
+   * slide from there once the new order arrives. Measured rather than derived from the old order,
+   * so a move pressed while the previous one is still sliding continues from the current positions.
+   */
+  const keyboardMoveFromRef = useRef<Map<EffectStackKind, number> | null>(null);
+  const [keyboardMoveFrom, setKeyboardMoveFrom] = useState<Map<EffectStackKind, number> | null>(null);
+  const keyboardMoveTimerRef = useRef<number | null>(null);
 
   const clearSettleTimer = () => {
     if (settleTimerRef.current !== null) {
@@ -96,6 +111,35 @@ export function EffectStackPanelView({
     clearSettleTimer();
     draggingRef.current = null;
     setDragging(null);
+  }, [orderKey]);
+
+  // A keyboard move renders the new order at the old positions ('from'), then slides
+  // to the new ones like a drag that settles.
+  useLayoutEffect(() => {
+    const previous = keyboardMoveFromRef.current;
+    if (!previous) return;
+    keyboardMoveFromRef.current = null;
+    if (window.matchMedia?.('(prefers-reduced-motion: reduce)').matches) return;
+    setKeyboardMoveFrom(previous);
+    setRowTransitionPhase('from');
+    if (keyboardMoveTimerRef.current !== null) window.clearTimeout(keyboardMoveTimerRef.current);
+    keyboardMoveTimerRef.current = window.setTimeout(() => {
+      keyboardMoveTimerRef.current = null;
+      setKeyboardMoveFrom(null);
+      setRowTransitionPhase(phase => (phase === 'animate' ? 'idle' : phase));
+    }, KEYBOARD_MOVE_MS + 50);
+  }, [orderKey]);
+
+  useEffect(() => () => {
+    if (keyboardMoveTimerRef.current !== null) window.clearTimeout(keyboardMoveTimerRef.current);
+  }, []);
+
+  useLayoutEffect(() => {
+    const kind = pendingFocusRef.current;
+    if (!kind) return;
+    pendingFocusRef.current = null;
+    const button = selectButtonsRef.current.get(kind);
+    if (button && document.activeElement !== button) button.focus();
   }, [orderKey]);
 
   const cancelDrag = () => {
@@ -208,7 +252,9 @@ export function EffectStackPanelView({
       return `translate3d(0, ${ROW_HEIGHT}px, 0)`;
     }
     if (!dragging && rowTransitionPhase === 'from') {
-      const previousIndex = view.previousOrder.indexOf(kind);
+      const drawnTop = keyboardMoveFrom?.get(kind);
+      if (drawnTop !== undefined) return `translate3d(0, ${drawnTop - index * ROW_HEIGHT}px, 0)`;
+      const previousIndex = keyboardMoveFrom ? -1 : view.previousOrder.indexOf(kind);
       if (previousIndex >= 0) return `translate3d(0, ${(previousIndex - index) * ROW_HEIGHT}px, 0)`;
     }
     return 'translate3d(0, 0, 0)';
@@ -217,8 +263,54 @@ export function EffectStackPanelView({
   const rowTransitionDuration = (isDragging: boolean) => {
     if (rowTransitionPhase === 'from') return '0ms';
     if (view.randomizing) return `${EFFECT_STACK_TRANSITION_DURATION_MS}ms`;
+    if (keyboardMoveFrom) return `${KEYBOARD_MOVE_MS}ms`;
     if (!dragging || dragging.phase === 'committed') return '0ms';
     return dragging.phase === 'dragging' && isDragging ? '0ms' : `${DRAG_SETTLE_MS}ms`;
+  };
+
+  const measureDrawnRowTops = () => {
+    const list = rowsRef.current;
+    const tops = new Map<EffectStackKind, number>();
+    if (!list) return tops;
+    const listTop = list.getBoundingClientRect().top;
+    for (const [kind, button] of selectButtonsRef.current) {
+      const row = button.closest<HTMLElement>('.effect-stack-row');
+      if (row) tops.set(kind, row.getBoundingClientRect().top - listTop);
+    }
+    return tops;
+  };
+
+  // Roving focus: one row is in the Tab order, the arrow keys move between rows.
+  const rovingKind = (activeKind && stack.some(layer => layer.kind === activeKind))
+    ? activeKind
+    : (stack.some(layer => layer.kind === view.selectedKind) ? view.selectedKind : stack[0]?.kind) ?? null;
+
+  const handleRowKeyDown = (event: React.KeyboardEvent<HTMLButtonElement>, kind: EffectStackKind, index: number) => {
+    const last = stack.length - 1;
+    if (event.altKey && (event.key === 'ArrowUp' || event.key === 'ArrowDown')) {
+      event.preventDefault();
+      const targetIndex = event.key === 'ArrowUp' ? index - 1 : index + 1;
+      if (targetIndex < 0 || targetIndex > last || view.randomizing) return;
+      pendingFocusRef.current = kind;
+      keyboardMoveFromRef.current = measureDrawnRowTops();
+      actions.move(kind, targetIndex);
+      return;
+    }
+    if (event.altKey || event.ctrlKey || event.metaKey) return;
+    const targetIndex = event.key === 'ArrowUp' ? index - 1
+      : event.key === 'ArrowDown' ? index + 1
+      : event.key === 'Home' ? 0
+      : event.key === 'End' ? last
+      : null;
+    if (targetIndex === null) return;
+    event.preventDefault();
+    const target = stack[Math.max(0, Math.min(last, targetIndex))];
+    if (!target || target.kind === kind) return;
+    setActiveKind(target.kind);
+    // Moving through the list selects without leaving it, like a drag selection.
+    if (onDragSelect) onDragSelect(target.kind);
+    else actions.select(target.kind, false);
+    selectButtonsRef.current.get(target.kind)?.focus();
   };
 
   const handleLayerToggleClickCapture = (event: React.MouseEvent<HTMLDivElement>, kind: EffectStackKind) => {
@@ -253,7 +345,7 @@ export function EffectStackPanelView({
       </div>
       ) : (
       <div className="flex h-8 shrink-0 items-center justify-between gap-1.5 border-b border-cream/15 px-2">
-        <span className="min-w-0 truncate font-display text-[9px] font-bold uppercase tracking-wider text-cream/80">{t('effect.stack')}</span>
+        <span className="min-w-0 truncate font-display text-[11px] font-bold uppercase tracking-wider text-cream/90">{t('effect.stack')}</span>
         <div className="flex shrink-0 items-center gap-1">
           <button
             type="button"
@@ -290,11 +382,25 @@ export function EffectStackPanelView({
         </div>
       </div>
       )}
+      {variant !== 'rail' && (
+        // The apply order is part of the list's accessible name; this line shows it.
+        <div aria-hidden="true" className="flex h-6 shrink-0 items-center gap-1 border-b border-cream/10 px-2 text-[11px] text-cream/75" data-effect-stack-order>
+          <Icon name="chevronDown" className="text-[11px]" />
+          <span className="min-w-0 truncate">{t('stack.applyOrder')}</span>
+        </div>
+      )}
       <div
         id="kgg-effect-stack-content"
         className="min-h-0 flex-1 overflow-y-auto overflow-x-hidden scrollbar-thin"
       >
-      <div className="relative" style={{ height: stack.length * ROW_HEIGHT }}>
+      <div
+        ref={rowsRef}
+        className="relative"
+        style={{ height: stack.length * ROW_HEIGHT }}
+        // The rail rows are plain buttons, so only the column exposes a list.
+        role={variant === 'rail' ? undefined : 'list'}
+        aria-label={variant === 'rail' ? undefined : t('stack.listLabel')}
+      >
         {stack.map((layer, index) => {
           const selected = view.selectedKind === layer.kind;
           const isDragging = dragging?.kind === layer.kind;
@@ -329,9 +435,12 @@ export function EffectStackPanelView({
               </button>
             );
           }
+          const name = EFFECT_STACK_LABELS[layer.kind];
+          const focusable = rovingKind === layer.kind;
           return (
             <div
               key={layer.kind}
+              role="listitem"
               className="effect-stack-row"
               data-selected={selected ? 'true' : 'false'}
               data-enabled={layer.enabled ? 'true' : 'false'}
@@ -341,33 +450,61 @@ export function EffectStackPanelView({
                 transform: rowTransform(layer.kind, index),
                 transitionDuration: rowTransitionDuration(isDragging),
               }}
-              title={t('stack.soloHint')}
               onClick={(event) => actions.select(layer.kind, event.altKey)}
               onPointerEnter={() => {
                 // Start a cold shader compile before the toggle click lands.
                 if (!layer.enabled) actions.prefetch(layer.kind);
               }}
               onFocusCapture={() => {
+                setActiveKind(layer.kind);
                 if (!layer.enabled) actions.prefetch(layer.kind);
               }}
             >
               <button
                 type="button"
+                // Pointer-only; the keyboard reorders with Alt+Up/Down on the layer name.
+                tabIndex={-1}
                 className="effect-stack-row__drag-handle"
-                aria-label={t('stack.drag', { effect: EFFECT_STACK_LABELS[layer.kind] })}
-                title={t('stack.drag', { effect: EFFECT_STACK_LABELS[layer.kind] })}
+                aria-label={t('stack.drag', { effect: name })}
+                title={t('stack.drag', { effect: name })}
                 onPointerDown={(e) => startDrag(e, layer.kind, index)}
                 onClick={onDragSelect ? event => event.stopPropagation() : undefined}
               >
                 <Icon name="gripVertical" className="text-[15px]" />
               </button>
-              <div className="min-w-0 flex-1">
-                <div className="effect-stack-row__title">{EFFECT_STACK_LABELS[layer.kind]}</div>
-                {/* Off and Applied are shown by the switch; only other states get a status word. */}
+              <button
+                type="button"
+                ref={element => {
+                  if (element) selectButtonsRef.current.set(layer.kind, element);
+                  else selectButtonsRef.current.delete(layer.kind);
+                }}
+                className="effect-stack-row__select"
+                tabIndex={focusable ? 0 : -1}
+                aria-current={selected ? 'true' : undefined}
+                aria-keyshortcuts="ArrowUp ArrowDown Home End Alt+ArrowUp Alt+ArrowDown"
+                title={t('stack.rowHint')}
+                onKeyDown={(event) => handleRowKeyDown(event, layer.kind, index)}
+              >
+                <span className="effect-stack-row__title">{name}</span>
+                {/* Off and Applied are shown by the switch; only other states get a status word, beside the name. */}
                 {layer.status.notice && (
-                  <div className={`effect-stack-row__status ${layer.status.className}`}>{t(layer.status.labelKey)}</div>
+                  <span className={`effect-stack-row__status ${layer.status.className}`} title={t(layer.status.labelKey)}>{t(layer.status.labelKey)}</span>
                 )}
-              </div>
+              </button>
+              <button
+                type="button"
+                className="effect-stack-row__solo"
+                tabIndex={focusable ? 0 : -1}
+                aria-label={t('stack.soloLayer', { effect: name })}
+                title={t('stack.soloLayer', { effect: name })}
+                onClick={(event) => {
+                  event.stopPropagation();
+                  actions.select(layer.kind, true);
+                }}
+                onPointerDown={(event) => event.stopPropagation()}
+              >
+                {t('stack.solo')}
+              </button>
               <div
                 className="shrink-0"
                 onClick={(event) => event.stopPropagation()}
@@ -377,6 +514,8 @@ export function EffectStackPanelView({
                 <Toggle
                   variant="switch"
                   size="xs"
+                  tabIndex={focusable ? 0 : -1}
+                  ariaLabel={t('stack.enableLayer', { effect: name })}
                   checked={layer.enabled}
                   onChange={(enabled) => actions.toggle(layer.kind, enabled)}
                 />
@@ -386,7 +525,7 @@ export function EffectStackPanelView({
         })}
       </div>
       {view.imageGradientEnabled && variant !== 'rail' && (
-        <div className="border-t border-cream/15 px-2 py-1.5 text-[8px] uppercase tracking-wider text-amber-300/90">
+        <div className="border-t border-cream/15 px-2 py-1.5 text-[11px] text-amber-300">
           Image Gradient: geometry-resampling layers are protected
         </div>
       )}
