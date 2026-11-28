@@ -25,6 +25,39 @@ async function seedVjPresets(page: Page, includeMalformed = false) {
   }, includeMalformed);
 }
 
+/**
+ * Auto switching advances on a beat clock, while Playwright observes the page with polling and
+ * round trips that can exceed one bar on a slow CI runner. Stop from inside the page, in the same
+ * store update that makes the cue live, so the test never races the next bar boundary.
+ * The next cue is prepared only after the previous one is live (VJ-003); a software GPU can need
+ * longer than one bar, so each run below starts once the prepared cue has enabled Start.
+ */
+async function stopAutoSwitchingWhenLive(page: Page, presetName: string) {
+  await page.evaluate(async presetName => {
+    const path = '/src/store/gradientStore.ts';
+    const { useGradientStore } = await import(path);
+    const root = window as typeof window & { vjAutoStoppedOn?: string | null };
+    root.vjAutoStoppedOn = null;
+    const unsubscribe = useGradientStore.subscribe((state: { presetName: string }, previous: { presetName: string }) => {
+      if (state.presetName !== presetName || previous.presetName === presetName) return;
+      unsubscribe();
+      document.querySelector<HTMLButtonElement>('[data-vj-deck] .vj-auto[aria-pressed="true"]')?.click();
+      root.vjAutoStoppedOn = presetName;
+    });
+  }, presetName);
+}
+
+async function runAutoSwitchingUntil(page: Page, presetName: string) {
+  const deck = page.locator('[data-vj-deck]');
+  await expect(deck.getByRole('button', { name: 'Start auto switching' })).toBeEnabled({ timeout: 60_000 });
+  await stopAutoSwitchingWhenLive(page, presetName);
+  await deck.getByRole('button', { name: 'Start auto switching' }).click();
+  await expect.poll(() => page.evaluate(() => (window as typeof window & { vjAutoStoppedOn?: string | null }).vjAutoStoppedOn),
+    { timeout: 30_000 }).toBe(presetName);
+  await expect(deck.getByRole('button', { name: 'Start auto switching' })).toBeVisible();
+  await expect(deck.locator('.vj-live-label')).toContainText(presetName);
+}
+
 test('VJ controls preserve the canvas, output size and default editor', async ({ page, browserErrors: _browserErrors }, testInfo) => {
   await seedVjPresets(page);
   await page.setViewportSize({ width: 1920, height: 1080 });
@@ -85,9 +118,8 @@ test('VJ controls preserve the canvas, output size and default editor', async ({
       if (state.presetName === 'VJ Cue B' && previous.presetName !== state.presetName) root.vjAutoAmounts!.push(state.noiseDistortion.amount);
     });
   });
-  await deck.getByRole('button', { name: 'Start auto switching' }).click();
-  await expect(deck.getByRole('button', { name: '02 VJ Cue B', exact: true })).toHaveAttribute('aria-pressed', 'true', { timeout: 10_000 });
-  await deck.getByRole('button', { name: 'Stop auto switching' }).click();
+  await runAutoSwitchingUntil(page, 'VJ Cue B');
+  await expect(deck.getByRole('button', { name: '02 VJ Cue B', exact: true })).toHaveAttribute('aria-pressed', 'true');
   expect(await page.evaluate(() => (window as typeof window & { vjAutoAmounts: number[] }).vjAutoAmounts)).toEqual([0.23]);
   await page.evaluate(() => (window as typeof window & { vjStopObserving?: () => void }).vjStopObserving?.());
   await expect(deck.getByRole('button', { name: 'Start auto switching' })).toBeVisible();
@@ -227,9 +259,8 @@ test('failed or cancelled preload preserves the live document and ready cues rem
   await deck.getByRole('button', { name: 'Remove VJ Broken Cue from performance list', exact: true }).click();
   await expect(deck.getByRole('button', { name: 'Start auto switching' })).toBeEnabled();
   await deck.getByRole('spinbutton', { name: 'BPM', exact: true }).fill('999');
-  await deck.getByRole('button', { name: 'Start auto switching' }).click();
+  await runAutoSwitchingUntil(page, 'VJ Cue B');
   await expect(deck.getByRole('button', { name: '02 VJ Cue B', exact: true })).toHaveAttribute('aria-pressed', 'true');
-  await deck.getByRole('button', { name: 'Stop auto switching' }).click();
   const stopped = await readDocument();
   await page.waitForTimeout(550);
   expect(await readDocument()).toBe(stopped);
@@ -293,10 +324,9 @@ test('saved folders preload once and loop with synchronous cue changes', async (
     await expect(deck.locator('.vj-live-label')).toContainText(expected);
   }
   await deck.getByRole('spinbutton', { name: 'BPM', exact: true }).fill('240');
-  await deck.getByRole('button', { name: 'Start auto switching' }).click();
-  await expect(deck.getByRole('button', { name: '01 VJ Cue A', exact: true })).toHaveAttribute('aria-pressed', 'true');
-  await expect(deck.getByRole('button', { name: '02 VJ Cue B', exact: true })).toHaveAttribute('aria-pressed', 'true');
-  await deck.getByRole('button', { name: 'Stop auto switching' }).click();
+  // The loop wraps from the last cue to the first and continues with the next prepared cue.
+  await runAutoSwitchingUntil(page, 'VJ Cue A');
+  await runAutoSwitchingUntil(page, 'VJ Cue B');
   await deck.getByRole('combobox', { name: 'Performance list', exact: true }).selectOption('shuffle');
   await deck.getByRole('button', { name: 'Next preset', exact: true }).click();
   await expect(deck.locator('.vj-live-label')).toContainText('VJ Cue A');
