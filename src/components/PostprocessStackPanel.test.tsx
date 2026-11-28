@@ -144,3 +144,25 @@ describe('Effect Stack accessibility', () => {
     expect(html).toContain('Applied from top to bottom');
   });
 });
+
+describe('Effect Stack row switch', () => {
+  it('keeps the 11px ON/OFF text inside the row switch', () => {
+    const html = renderToStaticMarkup(
+      <LanguageProvider>
+        <EffectStackPanelView
+          view={buildEffectStackView({
+            effectPipeline: STORE_DEFAULTS.effectPipeline,
+            normalMapEnabled: false,
+            imageGradientEnabled: false,
+            programStatus: {},
+            soloSnapshot: null,
+            randomizing: false,
+            previousOrder: [],
+          })}
+          actions={noopActions}
+        />
+      </LanguageProvider>,
+    );
+    expect(html).toMatch(/role="switch"[^>]*aria-label="Enable Noise"[^]*?text-\[11px\][^>]*>Off</);
+  });
+});

@@ -34,21 +34,21 @@
 }
 
 .effect-stack-row__select {
-  @apply flex min-w-0 flex-1 flex-col items-start justify-center self-stretch rounded-none border-0 bg-transparent p-0 text-left text-inherit focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-fire;
+  @apply flex min-w-0 flex-1 items-center gap-1.5 self-stretch rounded-none border-0 bg-transparent p-0 text-left text-inherit focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-fire;
 }
 
 /* Layer names keep the casing of effectStackLabels.ts so they read the same as the property panel. */
 .effect-stack-row__title {
-  @apply block max-w-full truncate font-display text-[11px] font-bold leading-tight tracking-wide;
+  @apply block shrink-0 whitespace-nowrap font-display text-[11px] font-bold leading-tight tracking-wide;
 }
 
 .effect-stack-row__status {
-  @apply block max-w-full truncate text-[11px] font-medium leading-tight;
+  @apply block min-w-0 truncate text-[11px] font-medium leading-tight;
 }
 
 /* Solo is revealed on hover or keyboard focus, over the end of the name. */
 .effect-stack-row__solo {
-  @apply pointer-events-none absolute right-[56px] top-1/2 -translate-y-1/2 rounded border border-cream/40 bg-k-bg px-1.5 py-0.5 text-[11px] font-semibold leading-none text-cream opacity-0 transition-opacity hover:border-fire hover:text-fire focus:outline-none focus-visible:ring-2 focus-visible:ring-fire;
+  @apply pointer-events-none absolute right-[68px] top-1/2 -translate-y-1/2 rounded border border-cream/40 bg-k-bg px-1.5 py-0.5 text-[11px] font-semibold leading-none text-cream opacity-0 transition-opacity hover:border-fire hover:text-fire focus:outline-none focus-visible:ring-2 focus-visible:ring-fire;
 }
 
 .effect-stack-row:hover .effect-stack-row__solo,

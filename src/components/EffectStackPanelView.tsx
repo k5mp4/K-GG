@@ -436,9 +436,9 @@ export function EffectStackPanelView({
                 onKeyDown={(event) => handleRowKeyDown(event, layer.kind, index)}
               >
                 <span className="effect-stack-row__title">{name}</span>
-                {/* Off and Applied are shown by the switch; only other states get a status word. */}
+                {/* Off and Applied are shown by the switch; only other states get a status word, beside the name. */}
                 {layer.status.notice && (
-                  <span className={`effect-stack-row__status ${layer.status.className}`}>{t(layer.status.labelKey)}</span>
+                  <span className={`effect-stack-row__status ${layer.status.className}`} title={t(layer.status.labelKey)}>{t(layer.status.labelKey)}</span>
                 )}
               </button>
               <button
@@ -463,8 +463,7 @@ export function EffectStackPanelView({
               >
                 <Toggle
                   variant="switch"
-                  size="xs"
-                  showStateLabel={false}
+                  size="row"
                   tabIndex={focusable ? 0 : -1}
                   ariaLabel={t('stack.enableLayer', { effect: name })}
                   checked={layer.enabled}

@@ -3,7 +3,8 @@ import { useLanguage } from '../i18n/LanguageProvider';
 interface ToggleProps {
   checked: boolean;
   onChange: (checked: boolean) => void;
-  size?: 'xs' | 'sm' | 'md';
+  /** `row` is a compact switch whose ON/OFF text is still 11px with 4.5:1 contrast (Effect Stack rows). */
+  size?: 'xs' | 'sm' | 'md' | 'row';
   variant?: 'checkbox' | 'switch';
   className?: string;
   ariaLabel?: string;
@@ -15,24 +16,30 @@ interface ToggleProps {
 export function Toggle({ checked, onChange, size = 'md', variant = 'checkbox', className = '', ariaLabel, showStateLabel = true, tabIndex }: ToggleProps) {
   const { t } = useLanguage();
   if (variant === 'switch') {
-    const trackSize = size === 'xs'
+    const trackSize = size === 'row'
+      ? 'h-5 w-[52px]'
+      : size === 'xs'
       ? 'h-5 w-10'
       : size === 'sm'
       ? 'h-5 w-11'
       : 'h-6 w-[58px]';
-    const knobSize = size === 'xs' || size === 'sm'
+    const knobSize = size === 'xs' || size === 'sm' || size === 'row'
       ? 'h-4 w-4'
       : 'h-5 w-5';
-    const knobTranslate = size === 'xs'
+    const knobTranslate = size === 'row'
+      ? 'translate-x-[32px]'
+      : size === 'xs'
       ? 'translate-x-[20px]'
       : size === 'sm'
       ? 'translate-x-[23px]'
       : 'translate-x-[33px]';
-    const labelClass = size === 'xs' ? 'text-[7px]' : 'text-[8px]';
-    const labelPosition = checked
+    const labelClass = size === 'row' ? 'text-[11px]' : size === 'xs' ? 'text-[7px]' : 'text-[8px]';
+    const labelPosition = size === 'row'
+      ? (checked ? 'left-1.5 text-white' : 'right-1.5 text-cream/75')
+      : checked
       ? (size === 'xs' ? 'left-1.5 text-cream' : 'left-2 text-cream')
       : (size === 'xs' ? 'right-1.5 text-deep' : 'right-2 text-deep');
-    const arrowSize = size === 'xs'
+    const arrowSize = size === 'xs' || size === 'row'
       ? 'border-y-[3px] border-l-[4px]'
       : 'border-y-[4px] border-l-[5px]';
 

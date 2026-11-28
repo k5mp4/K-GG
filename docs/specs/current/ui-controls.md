@@ -71,7 +71,7 @@ PostprocessのEdit LayerからGlassTileを選択できます。PatternとEdge Mo
 
 ### UI-009 Effect Stackの表示形態
 
-Effect StackはPreviewへ重ねず、左のプロパティパネルの外側に常設する「Layers」カラム（幅216px）として表示します。表示方法と境界は[Workspace Layout](./workspace-layout.md)のLAYOUT-002〜004に従います。ヘッダーを上端に固定し、カラムの高さに収まらないレイヤー行は縦スクロールで表示します。各行はドラッグハンドル、レイヤー名、状態、ON／OFFトグルで構成し、ON／OFFはトグルだけで示します。状態の文字は、準備中・読み込み中・利用不可・Fallback・保護・`STAY`のようにトグルで表せない状態のときだけレイヤー名の下に表示し、`Off`と`Applied`は表示しません（レールのツールチップとアクセシブルネームでは従来どおり状態を含めます）。レイヤー名は言語設定に関係なく英語で表示し、Postprocessの`Edit Layer`の選択肢にも同じ名前を使います。レイヤー名は大文字化せず、`effectStackLabels.ts`の表記（例: `Glass`、`Distort Chroma`）のまま表示します。
+Effect StackはPreviewへ重ねず、左のプロパティパネルの外側に常設する「Layers」カラム（幅216px）として表示します。表示方法と境界は[Workspace Layout](./workspace-layout.md)のLAYOUT-002〜004に従います。ヘッダーを上端に固定し、カラムの高さに収まらないレイヤー行は縦スクロールで表示します。各行はドラッグハンドル、レイヤー名、状態、ON／OFFトグルで構成し、ON／OFFはトグルだけで示し、トグル内に「オン」／「オフ」（`On`／`Off`）を11pxで表示します。状態の文字は、準備中・読み込み中・利用不可・Fallback・保護・`STAY`のようにトグルで表せない状態のときだけレイヤー名の右側に表示し（入りきらない場合は省略し、ツールチップで全文を示します）、`Off`と`Applied`は表示しません（レールのツールチップとアクセシブルネームでは従来どおり状態を含めます）。レイヤー名は言語設定に関係なく英語で表示し、Postprocessの`Edit Layer`の選択肢にも同じ名前を使います。レイヤー名は大文字化せず、`effectStackLabels.ts`の表記（例: `Glass`、`Distort Chroma`）のまま表示します。
 
 カラムの文字は11px以上で表示します。OFFの行は透明度ではなく文字色（cream 65%）で区別し、行の背景（通常・hover・選択）のいずれでもレイヤー名のコントラストを4.5:1以上に保ちます。ヘッダーの下に適用順（「上から順に適用」／`Applied from top to bottom`）を表示し、上の行から順に適用されることを示します。
 
