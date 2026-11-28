@@ -63,7 +63,7 @@ export function GradientTypeSelector({ value, onChange, disabled = false }: Grad
               aria-checked={checked} aria-label={`${label}: ${description}`} title={`${label} — ${description}`}
               tabIndex={checked ? 0 : -1} disabled={disabled} onClick={() => onChange(type.value)}
               onKeyDown={event => handleKeyDown(event, index)}
-              className={`group min-w-0 border px-1.5 pb-1.5 pt-1 text-left transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-fire disabled:cursor-not-allowed disabled:opacity-35 ${checked ? 'border-fire bg-fire/12 text-fire' : 'border-panel-border/70 bg-k-surface text-tab-inactive hover:border-cream/45 hover:text-k-text'}`}>
+              className={`group min-w-0 border px-1.5 pb-1.5 pt-1 text-left transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-fire disabled:cursor-not-allowed disabled:opacity-35 ${checked ? 'border-fire/70 bg-fire/12 text-fire' : 'border-transparent bg-k-bg/60 text-tab-inactive hover:bg-k-muted/60 hover:text-k-text'}`}>
               <TypeDiagram type={type.value} />
               <span className="block truncate text-center text-[8px] font-display font-semibold uppercase tracking-wider">{label}</span>
             </button>

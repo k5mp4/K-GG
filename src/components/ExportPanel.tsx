@@ -632,7 +632,7 @@ export function ExportPanel({
           type="text"
           value={fileName}
           onChange={(e) => setFileName(e.target.value)}
-          className="w-full px-2 py-1.5 bg-k-surface border border-panel-border border-panel rounded-none text-xs text-k-text focus:outline-none focus:border-fire"
+          className="w-full px-2 py-1.5 bg-k-bg/60 border border-transparent rounded-none text-xs text-k-text focus:outline-none focus:border-fire"
           placeholder="gradient"
           spellCheck={false}
         />
@@ -644,7 +644,7 @@ export function ExportPanel({
           <label className="text-xs text-deep">{t('export.destination')}</label>
           {dirName ? (
             <div className="flex items-center gap-2">
-              <span className="flex-1 px-2 py-1.5 bg-k-surface border border-panel-border border-panel rounded-none text-xs text-k-text truncate">
+              <span className="flex-1 px-2 py-1.5 bg-k-bg/60 border border-transparent rounded-none text-xs text-k-text truncate">
                 📁 {dirName}
               </span>
               <button
@@ -659,13 +659,11 @@ export function ExportPanel({
           ) : (
             <button
               onClick={handlePickDirectory}
-              className="w-full px-3 py-1.5 bg-k-surface hover:bg-k-muted border border-panel-border border-panel border-dashed rounded-none text-xs text-deep hover:text-k-text transition-colors"
+              title={t('export.downloadFallback')}
+              className="w-full px-3 py-1.5 bg-k-bg/60 hover:bg-k-muted border border-transparent rounded-none text-xs text-deep hover:text-k-text transition-colors"
             >
               {t('export.chooseFolder')}
             </button>
-          )}
-          {!dirName && (
-            <p className="text-xs text-tab-inactive">{t('export.downloadFallback')}</p>
           )}
         </div>
       )}
@@ -674,7 +672,6 @@ export function ExportPanel({
       <div className="space-y-2">
         <p className="text-xs text-deep">{t('export.stillImage')}</p>
         <div>
-          <p className="text-xs mb-1 text-deep font-display uppercase tracking-wider">{t('export.format')}</p>
           <InputDrum
             value={imageFormat}
             options={IMAGE_EXPORT_FORMATS.map(format => format.value)}
@@ -696,7 +693,7 @@ export function ExportPanel({
 
       {/* スリット書き出し */}
       {slitScan.enabled && (
-        <div className="border-t border-panel-border border-t-panel pt-4 space-y-2">
+        <div className="border-t border-panel-border pt-4 space-y-2">
           <p
             className="hint-label text-xs text-deep"
             title={`${slitScan.mode === 'circular' ? '同心円' : slitScan.mode === 'polygon' ? `正${slitScan.polygonSides ?? 6}角形` : '直線'}スリットごとに個別 PNG を書き出します`}
@@ -741,18 +738,25 @@ export function ExportPanel({
       )}
 
       {/* 動画 */}
-      <div className="border-t border-panel-border border-t-panel pt-4 space-y-3">
-        <p className="text-xs text-deep">{t('export.video')}</p>
+      <div className="border-t border-panel-border pt-4 space-y-3">
+        <p
+          className="hint-label w-fit text-xs text-deep"
+          title={selectedNativeVideoFormat
+            ? selectedNativeVideoFormat.description
+            : t('export.imageSequenceDescription')}
+        >
+          {t('export.video')}
+        </p>
 
         {!animation.enabled && (
           <p className="text-xs text-tab-inactive">{t('export.enableAnimation')}</p>
         )}
 
         {nativeFfmpegAvailable && (
-          <div className={`border p-3 text-xs ${
+          <div className={`p-3 text-xs ${
             ffmpegStatus?.available
-              ? 'border-emerald-400/35 bg-emerald-400/10'
-              : 'border-amber-300/35 bg-amber-300/10'
+              ? 'bg-emerald-400/10'
+              : 'bg-amber-300/10'
           }`}>
             <div className="flex items-start justify-between gap-3">
               <div className="min-w-0">
@@ -781,7 +785,7 @@ export function ExportPanel({
                 type="button"
                 onClick={() => void onCheckFfmpeg(true)}
                 disabled={ffmpegChecking}
-                className="shrink-0 border border-cream/30 px-2 py-1 text-[9px] font-display font-semibold uppercase tracking-wider text-k-text hover:border-cream disabled:opacity-40"
+                className="shrink-0 bg-k-bg/60 px-2 py-1 text-[9px] font-display font-semibold uppercase tracking-wider text-k-text hover:bg-k-muted disabled:opacity-40"
               >
                 Check
               </button>
@@ -805,14 +809,6 @@ export function ExportPanel({
         {/* オフライン書き出し */}
         <div className="space-y-1.5">
           <div>
-            <p
-              className="hint-label w-fit text-xs mb-1 text-deep font-display uppercase tracking-wider"
-              title={selectedNativeVideoFormat
-                ? selectedNativeVideoFormat.description
-                : t('export.imageSequenceDescription')}
-            >
-              {t('export.format')}
-            </p>
             <InputDrum
               value={selectedVideoFormat}
               options={videoFormatOptions}
@@ -928,10 +924,10 @@ export function ExportPanel({
       </div>
 
       {/* After Effects Connect */}
-      <div className="border-t border-panel-border border-t-panel pt-4 space-y-2 transition-opacity">
+      <div className="border-t border-panel-border pt-4 space-y-2 transition-opacity">
         <div className="flex items-center gap-2">
           <p className="text-xs text-deep">{t('export.aeConnectionTitle')}</p>
-          <span className="px-1.5 py-0.5 border border-fire/40 bg-fire/10 text-[9px] font-display font-semibold uppercase tracking-wider text-fire">
+          <span className="px-1.5 py-0.5 bg-fire/10 text-[9px] font-display font-semibold uppercase tracking-wider text-fire">
             Beta
           </span>
         </div>
@@ -963,7 +959,7 @@ export function ExportPanel({
         )}
 
         {!aePlatformSupported ? (
-          <div className="rounded-none bg-k-bg border border-panel-border border-panel px-3 py-2 space-y-1">
+          <div className="rounded-none bg-k-bg/60 px-3 py-2 space-y-1">
             <p className="text-xs text-red-400">{t('export.aeUnsupported')}</p>
           </div>
         ) : bridgeAvailable ? (
@@ -1009,7 +1005,7 @@ export function ExportPanel({
               </p>
               {aeSaveDirStatus.mode === 'custom' ? (
                 <div className="flex items-center gap-2">
-                  <span className="flex-1 px-2 py-1.5 bg-k-surface border border-panel-border border-panel rounded-none text-xs text-k-text truncate">
+                  <span className="flex-1 px-2 py-1.5 bg-k-bg/60 border border-transparent rounded-none text-xs text-k-text truncate">
                     {aeSaveDirStatus.name ?? aeSaveDirStatus.path}
                   </span>
                   <button
@@ -1025,7 +1021,7 @@ export function ExportPanel({
                 <button
                   type="button"
                   onClick={handleAePickDirectory}
-                  className="w-full px-3 py-1.5 bg-k-surface hover:bg-k-muted border border-panel-border border-panel border-dashed rounded-none text-xs text-deep hover:text-k-text transition-colors"
+                  className="w-full px-3 py-1.5 bg-k-bg/60 hover:bg-k-muted border border-transparent rounded-none text-xs text-deep hover:text-k-text transition-colors"
                 >
                   {t('export.aeChooseDirectory')}
                 </button>
@@ -1072,7 +1068,7 @@ export function ExportPanel({
             </button>
           </>
         ) : (
-          <div className="rounded-none bg-k-bg border border-panel-border border-panel px-3 py-2 space-y-1">
+          <div className="rounded-none bg-k-bg/60 px-3 py-2 space-y-1">
             <p className="text-xs text-yellow-400">
               {t(aeRuntime === 'tauri-native' ? 'export.aeUnavailable' : 'export.aeDevelopment')}
             </p>

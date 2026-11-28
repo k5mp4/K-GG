@@ -136,20 +136,20 @@ export function DesignAppSendPanel({ canvas, imageName }: Props) {
   }
 
   return (
-    <section className="space-y-3 border-t border-panel-border border-t-panel pt-4" aria-labelledby="design-app-send-title">
+    <section className="space-y-3 border-t border-panel-border pt-4" aria-labelledby="design-app-send-title">
       <div className="flex items-center justify-between gap-3">
         <h3 id="design-app-send-title" className="font-display text-xs font-semibold uppercase tracking-wider text-k-text hint-label" title="受信アプリから接続をリクエストし、ここで許可するとPNGを直接送れます。">デザインアプリへ送信</h3>
         <span className={`h-2 w-2 shrink-0 rounded-full ${bridge.available ? 'bg-emerald-400' : 'bg-k-muted'}`} aria-label={bridge.available ? 'ローカル接続を利用できます' : 'ローカル接続を準備中'} />
       </div>
 
       {!bridge.available && (
-        <p className="border border-panel-border bg-k-surface px-2.5 py-2 text-[10px] leading-relaxed text-deep" role="status">
+        <p className="text-[10px] leading-relaxed text-deep" role="status">
           {loading ? 'ローカル接続を確認しています…' : bridge.error || 'K-GG DesktopからFigmaへ直接送信できます。'}
         </p>
       )}
 
       {isTauriRuntime() && (
-        <div className="flex items-center gap-2 border border-panel-border bg-k-surface px-2.5 py-2">
+        <div className="flex items-center gap-2">
           <div className="min-w-0 flex-1">
             <p className="hint-label text-[10px] font-semibold text-k-text" title="FigmaのDevelopment Plugin登録で、同梱のmanifest.jsonを選びます。">Figma Pluginの初回登録</p>
           </div>
@@ -157,7 +157,7 @@ export function DesignAppSendPanel({ canvas, imageName }: Props) {
             type="button"
             onClick={() => void handleOpenFigmaConnectorFolder()}
             disabled={openingConnectorFolder}
-            className="shrink-0 border border-panel-border px-2 py-1.5 text-[10px] font-semibold text-k-text hover:bg-k-muted disabled:cursor-not-allowed disabled:opacity-40"
+            className="shrink-0 bg-k-bg/60 px-2 py-1.5 text-[10px] font-semibold text-k-text hover:bg-k-muted disabled:cursor-not-allowed disabled:opacity-40"
           >
             {openingConnectorFolder ? '開いています…' : 'manifest.jsonの場所を開く'}
           </button>
@@ -185,7 +185,7 @@ export function DesignAppSendPanel({ canvas, imageName }: Props) {
 
       {actionMessage && (
         <p
-          className={`border px-2.5 py-2 text-[10px] leading-relaxed ${actionMessage.level === 'error' ? 'border-red-500/40 bg-red-950/30 text-red-300' : 'border-panel-border bg-k-surface text-k-text/80'}`}
+          className={`border px-2.5 py-2 text-[10px] leading-relaxed ${actionMessage.level === 'error' ? 'border-red-500/40 bg-red-950/30 text-red-300' : 'border-transparent bg-k-bg/60 text-k-text/80'}`}
           role={actionMessage.level === 'error' ? 'alert' : 'status'}
           aria-live="polite"
         >
@@ -203,11 +203,12 @@ function AffinityPausedPanel() {
         type="button"
         disabled
         aria-describedby="affinity-paused-message"
-        className="min-h-10 w-full cursor-not-allowed border border-panel-border bg-k-muted/30 px-2 py-2 text-left text-xs font-semibold text-tab-inactive opacity-60"
+        title={AFFINITY_CONNECTOR_PAUSED_MESSAGE}
+        className="min-h-10 w-full cursor-not-allowed border border-transparent bg-k-muted/30 px-2 py-2 text-left text-xs font-semibold text-tab-inactive opacity-60"
       >
         Affinityへ送信 <span className="ml-1 font-normal">準備中</span>
       </button>
-      <p id="affinity-paused-message" className="mt-1 text-[10px] leading-relaxed text-deep">
+      <p id="affinity-paused-message" className="sr-only">
         {AFFINITY_CONNECTOR_PAUSED_MESSAGE}
       </p>
     </div>
@@ -268,7 +269,7 @@ function ConnectionRow({
         : null;
 
   return (
-    <div className="border border-panel-border bg-k-surface px-2.5 py-2">
+    <div className="bg-k-bg/60 px-2.5 py-2">
       <div className="flex items-center gap-2">
         <span className={`h-1.5 w-1.5 shrink-0 rounded-full ${connection.connected ? 'bg-emerald-400' : 'bg-k-muted'}`} />
         <div className="min-w-0 flex-1">
@@ -278,7 +279,7 @@ function ConnectionRow({
         {connection.connected && <button type="button" onClick={() => onDisconnect(target)} className="shrink-0 px-1 text-[10px] text-deep hover:text-k-text">解除</button>}
       </div>
       {connection.connectionRequest && (
-        <div className="mt-2 flex items-center gap-2 border-t border-panel-border/70 pt-2">
+        <div className="mt-2 flex items-center gap-2 border-t border-panel-border pt-2">
           <p className="min-w-0 flex-1 truncate text-[10px] text-k-text/80">{connection.connectionRequest.displayName} から接続リクエスト</p>
           <button
             type="button"

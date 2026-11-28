@@ -166,12 +166,12 @@ export function ColorPaletteGenerator() {
   };
 
   return (
-    <section className="space-y-4 border border-fire/35 bg-k-surface/55 p-3">
+    <section className="space-y-4">
       <div className="min-w-0">
         <label className="mb-1 block text-[9px] font-display uppercase tracking-wider text-cream/80">
           {t('gradient.generatorBaseColor')}
         </label>
-        <div className="tq-color-input min-w-0 border border-panel-border bg-k-bg/50">
+        <div className="tq-color-input min-w-0 bg-k-bg/50">
           <InputColor
             value={generatorBaseColor}
             onChange={setGeneratorBaseColor}
@@ -186,13 +186,13 @@ export function ColorPaletteGenerator() {
           {t('gradient.generatorPreview')}
         </label>
         <div
-          className="h-12 w-full border border-panel-border bg-k-bg"
+          className="h-12 w-full bg-k-bg"
           style={generatorPreviewStyle}
           role="img"
           aria-label={t('gradient.generatorPreview')}
         />
         <div
-          className="flex h-8 w-full overflow-hidden border border-panel-border bg-k-bg"
+          className="flex h-8 w-full overflow-hidden bg-k-bg"
           role="group"
           aria-label={t('gradient.generatorStops')}
           title={t('gradient.generatorEditStopHint')}
@@ -232,7 +232,7 @@ export function ColorPaletteGenerator() {
         <button
           type="button"
           onClick={handleShuffleGenerator}
-          className="border border-panel-border bg-k-bg/40 py-2 text-[10px] font-display font-bold uppercase tracking-wider text-cream transition-colors hover:border-cream/50 hover:bg-cream/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-fire"
+          className="bg-k-bg/60 py-2 text-[10px] font-display font-bold uppercase tracking-wider text-cream transition-colors hover:bg-cream/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-fire"
         >
           {t('common.shuffle')}
         </button>
@@ -256,7 +256,7 @@ export function ColorPaletteGenerator() {
             type="button"
             onClick={handleResetEditedStop}
             disabled={!selectedStopIsEdited}
-            className="border border-panel-border px-2 py-1 text-[10px] text-cream transition-colors hover:border-cream/50 hover:bg-cream/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-fire disabled:cursor-not-allowed disabled:opacity-40"
+            className="bg-k-bg/60 px-2 py-1 text-[10px] text-cream transition-colors hover:bg-cream/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-fire disabled:cursor-not-allowed disabled:opacity-40"
           >
             {t('gradient.generatorResetStop')}
           </button>
