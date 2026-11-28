@@ -8,7 +8,7 @@
 | AC-004 | manual | Chromium（SwiftShader）でJavaScript無効時の静的ポスターと、React起動後の引き継ぎをDOM記録で確認。黒い背景とアプリバージョンの表示に変更した後、Edge（Productionビルド）でJavaScript無効時と有効時のスクリーンショットを確認し、`K-GG`、中央の進捗バー、`v1.1.0`が表示され、引き継ぎの前後で位置が変わらないことを確認した。引き継いだポスターが進捗バーを覆っていた問題を修正した。Tauriは未確認 | browser pass / Tauri pending |
 | AC-005 | unit / manual | `src/features/splash/splash.test.ts`、Chromium（SwiftShader）で`showing → exiting → fading`の遷移を確認。Edge（Productionビルド）でrequestAnimationFrameごとに記録し、準備未完了（10%）で閉じる場合もexitingで進捗バーが約0.2秒で100%まで伸び、約0.2秒保持してからフェードすることを確認 | pass |
 | AC-006 | unit | `src/features/splash/splash.test.ts` | pass |
-| AC-007 | manual / e2e | `VITE_KGG_E2E=1`のDevelopment起動で、オーバーレイが出ずポスターが除去されることを確認。`npm run check:e2e`は未実行 | manual pass / e2e pending |
+| AC-007 | manual / e2e | `VITE_KGG_E2E=1`のDevelopment起動で、オーバーレイが出ずポスターが除去されることを確認。`npm run check:e2e`はPR #74のCI（`e2e-check`、head `45fc09c`）で通過 | manual pass / e2e pass |
 | AC-008 | unit / manual | `src/features/splash/splash.test.ts`（候補の順序、コーデックによる除外、reduced motion）。Playwrightの同梱ChromiumとMicrosoft Edge（WebView2と同じエンジン）で、生成したAV1／H.264のMP4、アニメーションAVIF、GIF、PNGを使い、AV1優先の選択、壊れたファイルからGIFへのフォールバック、全候補失敗時のreject、reduced motionでの静止画・先頭フレーム停止、`finishOnExit`での再生完了、`dispose`での要素除去を確認。`brand.ts`を一時的に切り替えてアプリ起動でも表示と終了を確認。Tauri（WebView2／WKWebView／WebKitGTK）は未確認 デモ動画（H.264 High@5.0、1920×1080、5秒、29.6MB）でもProductionビルドとEdgeで表示を確認した。コールドスタート3回はいずれも0.3〜0.4秒で最初のフレームを表示し、サーバー起動直後の1回目だけ1.5秒の上限を超えて静的ポスターを表示した。既定の演出は静的ポスターのままとした | unit pass / browser pass / Tauri pending |
 
 ## Merge Gate
