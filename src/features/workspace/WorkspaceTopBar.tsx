@@ -206,12 +206,14 @@ export function WorkspaceTopBar({
 
       {/* 右ゾーン: Editor/VJ 切替・GPU・更新・設定 */}
       <div className="ml-auto flex h-10 shrink-0 items-stretch gap-1">
-        <LayoutModeSwitch
-          layoutMode={layoutMode}
-          onChange={onLayoutModeChange}
-          translate={translate}
-          className={panelsPresentation === 'docked' ? 'inline-flex' : 'hidden'}
-        />
+        {/* LayoutModeSwitch always sets inline-flex, which would override a passed `hidden`. */}
+        <div className={panelsPresentation === 'docked' ? 'flex' : 'hidden'}>
+          <LayoutModeSwitch
+            layoutMode={layoutMode}
+            onChange={onLayoutModeChange}
+            translate={translate}
+          />
+        </div>
 
         <div
           className={`${panelsPresentation === 'docked' ? 'hidden xl:flex' : 'hidden'} min-w-0 max-w-[150px] items-center gap-2 px-2.5 text-tab-inactive`}

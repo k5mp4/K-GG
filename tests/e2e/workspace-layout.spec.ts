@@ -12,6 +12,8 @@ test('workspace adapts to small screens while preserving editors and preview', a
   const settings = page.locator('#gradient-settings-panel');
 
   await expect(workspace).toHaveAttribute('data-workspace-layout', 'overlay');
+  // The top bar's Editor/VJ switch is docked-only; in overlay it must not cover the tabs.
+  await expect(page.locator('[data-layout-mode-switch]')).toBeHidden();
   await expect(properties.getByRole('button')).toHaveCount(0); // Closed editors are inert.
   expect(await properties.locator('button').first().evaluate(button => {
     button.focus();
