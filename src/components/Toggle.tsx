@@ -7,9 +7,12 @@ interface ToggleProps {
   variant?: 'checkbox' | 'switch';
   className?: string;
   ariaLabel?: string;
+  /** Hides the ON/OFF text inside a switch whose state is shown by its colour and knob alone. */
+  showStateLabel?: boolean;
+  tabIndex?: number;
 }
 
-export function Toggle({ checked, onChange, size = 'md', variant = 'checkbox', className = '', ariaLabel }: ToggleProps) {
+export function Toggle({ checked, onChange, size = 'md', variant = 'checkbox', className = '', ariaLabel, showStateLabel = true, tabIndex }: ToggleProps) {
   const { t } = useLanguage();
   if (variant === 'switch') {
     const trackSize = size === 'xs'
@@ -39,6 +42,7 @@ export function Toggle({ checked, onChange, size = 'md', variant = 'checkbox', c
         role="switch"
         aria-checked={checked}
         aria-label={ariaLabel ?? (checked ? t('common.enabled') : t('common.disabled'))}
+        tabIndex={tabIndex}
         onClick={() => onChange(!checked)}
         className={`group relative shrink-0 inline-flex items-center rounded-full border px-0 py-0 transition-all duration-200 ease-out focus:outline-none focus-visible:ring-2 focus-visible:ring-fire focus-visible:ring-offset-1 focus-visible:ring-offset-black ${
           trackSize
@@ -48,11 +52,13 @@ export function Toggle({ checked, onChange, size = 'md', variant = 'checkbox', c
             : 'border-cream/35 bg-k-surface shadow-[inset_0_0_0_1px_rgba(0,0,0,0.65)] hover:border-cream/70'
         } ${className}`}
       >
-        <span
-          className={`absolute inset-y-0 flex items-center font-display ${labelClass} font-bold uppercase leading-none transition-colors ${labelPosition}`}
-        >
-          {checked ? t('common.on') : t('common.off')}
-        </span>
+        {showStateLabel && (
+          <span
+            className={`absolute inset-y-0 flex items-center font-display ${labelClass} font-bold uppercase leading-none transition-colors ${labelPosition}`}
+          >
+            {checked ? t('common.on') : t('common.off')}
+          </span>
+        )}
         <span
           className={`absolute left-0.5 top-1/2 -translate-y-1/2 rounded-full bg-cream text-k-bg shadow-[0_1px_5px_rgba(0,0,0,0.45)] transition-transform duration-200 ease-out ${
             knobSize

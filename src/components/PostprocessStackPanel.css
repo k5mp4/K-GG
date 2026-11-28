@@ -1,7 +1,7 @@
 @reference "../index.css";
 
 .effect-stack-row {
-  @apply absolute left-0 right-0 flex h-[38px] items-center gap-2 border-b border-cream/10 px-2 transition-[top,transform,background-color,border-color,opacity] ease-in-out duration-150;
+  @apply absolute left-0 right-0 flex h-[38px] items-center gap-2 border-b border-cream/10 px-2 transition-[top,transform,background-color,border-color,color] ease-in-out duration-150;
 }
 
 .effect-stack-row[data-selected='true'] {
@@ -9,15 +9,16 @@
 }
 
 .effect-stack-row[data-selected='false'] {
-  @apply bg-transparent text-cream/80;
+  @apply bg-transparent text-cream;
 }
 
 .effect-stack-row[data-selected='false']:hover {
   @apply bg-cream/10;
 }
 
+/* Off rows are dimmed by text colour, not opacity, so the name keeps 4.5:1 on every row background. */
 .effect-stack-row[data-enabled='false'] {
-  @apply opacity-56;
+  @apply text-cream/65;
 }
 
 .effect-stack-row[data-dragging='true'] {
@@ -32,12 +33,27 @@
   @apply flex h-7 w-6 shrink-0 cursor-grab touch-none items-center justify-center text-cream/50 transition-colors hover:text-fire active:cursor-grabbing;
 }
 
+.effect-stack-row__select {
+  @apply flex min-w-0 flex-1 flex-col items-start justify-center self-stretch rounded-none border-0 bg-transparent p-0 text-left text-inherit focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-fire;
+}
+
+/* Layer names keep the casing of effectStackLabels.ts so they read the same as the property panel. */
 .effect-stack-row__title {
-  @apply truncate font-display text-[10px] font-bold uppercase tracking-wider;
+  @apply block max-w-full truncate font-display text-[11px] font-bold leading-tight tracking-wide;
 }
 
 .effect-stack-row__status {
-  @apply truncate text-[8px] font-medium uppercase tracking-wide;
+  @apply block max-w-full truncate text-[11px] font-medium leading-tight;
+}
+
+/* Solo is revealed on hover or keyboard focus, over the end of the name. */
+.effect-stack-row__solo {
+  @apply pointer-events-none absolute right-[56px] top-1/2 -translate-y-1/2 rounded border border-cream/40 bg-k-bg px-1.5 py-0.5 text-[11px] font-semibold leading-none text-cream opacity-0 transition-opacity hover:border-fire hover:text-fire focus:outline-none focus-visible:ring-2 focus-visible:ring-fire;
+}
+
+.effect-stack-row:hover .effect-stack-row__solo,
+.effect-stack-row:focus-within .effect-stack-row__solo {
+  @apply pointer-events-auto opacity-100;
 }
 
 .effect-stack-rail-row {
@@ -53,7 +69,7 @@
 }
 
 .effect-stack-rail-row[data-selected='false'][data-enabled='false'] {
-  @apply bg-k-bg text-cream/55 hover:bg-cream/10 hover:text-cream;
+  @apply bg-k-bg text-cream/65 hover:bg-cream/10 hover:text-cream;
 }
 
 .effect-stack-rail-row[data-dragging='true'] {
