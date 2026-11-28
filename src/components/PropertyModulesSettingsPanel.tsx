@@ -7,6 +7,8 @@ import type { VjSettings } from '../features/vj/vjSettings';
 type PropertyModulesSettingsPanelProps = {
   hoverSwitchEnabled: boolean;
   onHoverSwitchChange: (enabled: boolean) => void;
+  histogramEnabled?: boolean;
+  onHistogramEnabledChange?: (enabled: boolean) => void;
   onRefreshApp: () => void;
   onClose: () => void;
   layoutMode?: VjSettings['layoutMode'];
@@ -16,6 +18,8 @@ type PropertyModulesSettingsPanelProps = {
 export function PropertyModulesSettingsPanel({
   hoverSwitchEnabled,
   onHoverSwitchChange,
+  histogramEnabled = false,
+  onHistogramEnabledChange,
   onRefreshApp,
   onClose,
   layoutMode = 'editor',
@@ -86,6 +90,23 @@ export function PropertyModulesSettingsPanel({
               {hoverSwitchEnabled ? t('settings.hover') : t('settings.clickOnly')}
             </span>
           </div>
+
+          {onHistogramEnabledChange && <div className="border border-cream/20 bg-k-bg/55 p-4">
+            <div className="flex items-start justify-between gap-4">
+              <div className="min-w-0 flex-1">
+                <p className="text-sm font-display font-semibold uppercase tracking-wider text-k-text">{t('settings.histogram')}</p>
+                <p className="mt-1 text-xs leading-relaxed text-tab-inactive">{t('settings.histogramDescription')}</p>
+              </div>
+              <Toggle
+                variant="switch"
+                size="sm"
+                checked={histogramEnabled}
+                onChange={onHistogramEnabledChange}
+                ariaLabel={t('settings.histogram')}
+                className="mt-0.5"
+              />
+            </div>
+          </div>}
 
           <div className="border border-cream/20 bg-k-bg/55 p-4">
             <p className="text-sm font-display font-semibold uppercase tracking-wider text-k-text">{t('settings.language')}</p>

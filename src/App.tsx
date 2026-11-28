@@ -1,5 +1,5 @@
 import './App.css';
-import { Activity, useEffect, useSyncExternalStore } from 'react';
+import { Activity, useEffect, useState, useSyncExternalStore } from 'react';
 import { NoiseDistortionPanel } from './components/NoiseDistortionPanel';
 import { DiffusePanel } from './components/BlockNoisePanel';
 import { ExportPanel } from './components/ExportPanel';
@@ -16,6 +16,10 @@ import { PropertyModulesSettingsPanel } from './components/PropertyModulesSettin
 import { InteractionSettingsProvider } from './components/InteractionSettingsContext';
 import { DockPanel } from './components/DockPanel';
 import { SidebarSection } from './components/SidebarSection';
+import { EffectStackLayers } from './components/EffectStackWorkspace';
+import { ColorHistogram } from './components/ColorHistogram';
+import { useGradientStore } from './store/gradientStore';
+import { applicationCommands } from './application/commands';
 import { IconButton } from './components/IconButton';
 import { useLanguage } from './i18n/LanguageProvider';
 import { UpdateDialog } from './features/updater/UpdateDialog';
@@ -89,6 +93,11 @@ export default function App() {
     showOverlaySettings,
     setShowOverlaySettings,
     showImageGradientSource,
+    setLayersCollapsed,
+    leftOverlaySection,
+    setLeftOverlaySection,
+    effectStackWindow,
+    handleEffectStackSelection,
     setShowImageGradientSource,
     showLeftSidebar,
     setShowLeftSidebar,
@@ -161,6 +170,11 @@ export default function App() {
     handleTimeRemapToggle,
     handleShowHelp,
   } = useWorkspaceController({ translate: t, compact: vjEnabled });
+  const histogramEnabled = useGradientStore(state => state.histogram.enabled);
+  const [showHistogramSection, setShowHistogramSection] = useState(true);
+  const popOutEffectStack = effectStackWindow.supported ? effectStackWindow.open : undefined;
+  const layersSegment = layout.panels === 'overlay';
+  const showLayersSegment = layersSegment && leftOverlaySection === 'layers' && !effectStackWindow.isOpen;
 
   return (
     <InteractionSettingsProvider value={{ hoverInteractionsEnabled: tabHoverSwitchEnabled }}>
@@ -192,6 +206,21 @@ export default function App() {
             <button type="button" tabIndex={-1} className="absolute inset-0 bg-k-bg/50 z-30 !border-0" aria-label={t('common.close')} onClick={() => { setShowLeftSidebar(false); setShowRightSidebar(false); }} />
           )}
 
+          {/* Layers: Effect Stackはプレビューへ重ねず、左パネルの外側に常設する */}
+          {(layout.layers === 'column' || layout.layers === 'rail') && (
+            <Activity mode={vjEnabled ? 'hidden' : 'visible'}>
+            <div className="editor-only flex min-h-0" inert={vjEnabled}>
+              <EffectStackLayers
+                presentation={layout.layers}
+                width={layout.layersWidth}
+                onSelectEffectStack={handleEffectStackSelection}
+                onPopOut={popOutEffectStack}
+                onCollapsedChange={setLayersCollapsed}
+              />
+            </div>
+            </Activity>
+          )}
+
           {/* 詳細プロパティ表示用の左サイドバー */}
           <Activity mode={vjEnabled ? 'hidden' : 'visible'}>
           <div className="editor-only flex min-h-0" inert={vjEnabled}>
@@ -206,10 +235,31 @@ export default function App() {
             onOpenChange={setLeftPanelOpen}
             onMobileOpenChange={setShowLeftSidebar}
             resizing={activeResizeSide === 'left'}
-            bodyClassName="overflow-hidden"
+            bodyClassName="flex flex-col overflow-hidden"
             onResizeStart={(event) => handlePanelResizeStart('left', event)}
           >
-            <div className="relative h-full overflow-hidden">
+            {layersSegment && (
+              <div className="grid shrink-0 grid-cols-2 gap-1 border-b border-panel-border p-2" role="radiogroup" aria-label={t('workspace.panelSection')}>
+                {(['layers', 'properties'] as const).map(section => (
+                  <button
+                    key={section}
+                    type="button"
+                    role="radio"
+                    aria-checked={leftOverlaySection === section}
+                    onClick={() => setLeftOverlaySection(section)}
+                    className={`min-h-9 border px-3 font-display text-xs font-bold uppercase tracking-wider transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-fire ${leftOverlaySection === section ? 'border-fire bg-fire/15 text-cream' : 'border-cream/20 bg-k-surface text-tab-inactive hover:text-k-text'}`}
+                  >
+                    {t(section === 'layers' ? 'workspace.layers' : 'workspace.properties')}
+                  </button>
+                ))}
+              </div>
+            )}
+            {showLayersSegment && (
+              <div className="min-h-0 flex-1">
+                <EffectStackLayers presentation="column" onSelectEffectStack={handleEffectStackSelection} onPopOut={popOutEffectStack} openPropertiesOnDrag={false} />
+              </div>
+            )}
+            <div className={`relative min-h-0 flex-1 overflow-hidden${showLayersSegment ? ' hidden' : ''}`}>
               <div
                 ref={panelsContainerRef}
                 className="flex flex-row h-full w-full"
@@ -435,6 +485,19 @@ export default function App() {
                 <GradientRamp showHeader={false} />
               </SidebarSection>
 
+              {histogramEnabled && (
+                <SidebarSection
+                  id="color-histogram"
+                  title={t('settings.histogram')}
+                  open={showHistogramSection}
+                  onToggle={() => setShowHistogramSection(value => !value)}
+                >
+                  <div className="overflow-x-auto scrollbar-thin">
+                    <ColorHistogram sourceCanvasRef={canvasRef} active={showHistogramSection && !vjEnabled} />
+                  </div>
+                </SidebarSection>
+              )}
+
               <SidebarSection
                 id="image-overlay"
                 title={t('workspace.imageOverlay')}
@@ -564,6 +627,8 @@ export default function App() {
           <PropertyModulesSettingsPanel
             hoverSwitchEnabled={tabHoverSwitchEnabled}
             onHoverSwitchChange={setTabHoverSwitchMode}
+            histogramEnabled={histogramEnabled}
+            onHistogramEnabledChange={enabled => applicationCommands.setHistogram({ enabled })}
             onRefreshApp={() => window.location.reload()}
             onClose={() => setShowPropertyModulesSettings(false)}
             layoutMode={layoutMode}

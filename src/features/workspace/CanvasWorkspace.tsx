@@ -3,7 +3,6 @@ import { BezierEasingEditor } from '../../components/BezierEasingEditor';
 import { ClothCanvas } from '../../components/ClothCanvas';
 import { ConeApexEditor } from '../../components/ConeApexEditor';
 import { DistortOverlay } from '../../components/DistortOverlay';
-import { EffectStackWorkspace } from '../../components/EffectStackWorkspace';
 import { GradientAnchorEditor } from '../../components/GradientAnchorEditor';
 import { GradientCanvas } from '../../components/GradientCanvas';
 import { Icon } from '../../components/Icon';
@@ -16,13 +15,13 @@ import { isPostprocessLayerEnabled } from '../../lib/postprocessStack';
 import { isEffectStackLayerEnabled } from '../../lib/effectPipeline';
 import type { KggControlProjectAdapter, KggControlUiAdapter } from '../../lib/kggControlRuntime';
 import type { ClothGradientConfig } from '../../types/clothGradient';
-import type { EffectPipelineConfig, EffectStackKind, PostprocessConfig } from '../../types/distortion';
+import type { EffectPipelineConfig, PostprocessConfig } from '../../types/distortion';
 import type { RenderViewMode } from '../../types/renderView';
 import type { MessageKey } from '../../i18n/messages';
 import type { Replacements } from '../../i18n/language';
 import type { GestureFeedback, OverlayImageMode, Pan } from '../../types/workspace';
 import type { LeftTab } from './tabs';
-import type { PanelPresentation, ToolPresentation } from './workspaceLayout';
+import type { PanelPresentation } from './workspaceLayout';
 
 type CanvasWorkspaceViewportProps = {
   viewportRef: RefObject<HTMLDivElement | null>;
@@ -42,10 +41,8 @@ type CanvasWorkspaceViewportProps = {
 
 type CanvasWorkspaceChromeProps = {
   panelsPresentation: PanelPresentation;
-  toolsPresentation: ToolPresentation;
-  showLeftSidebar: boolean;
-  showRightSidebar: boolean;
   onOpenLeftSidebar: () => void;
+  onOpenLayers: () => void;
   showFeedback: () => void;
   showGradientAnchors: boolean;
   onToggleGradientAnchors: () => void;
@@ -88,7 +85,6 @@ type CanvasWorkspaceControlsProps = {
   controlUi: KggControlUiAdapter;
   controlProject: KggControlProjectAdapter;
   setManualDistort: (value: Partial<PostprocessConfig>) => void;
-  onSelectEffectStack: (kind: EffectStackKind) => void;
   onClothReady: () => void;
   onClothUnavailable: () => void;
 };
@@ -131,10 +127,8 @@ export function CanvasWorkspace({
   } = viewport;
   const {
     panelsPresentation,
-    toolsPresentation,
-    showLeftSidebar,
-    showRightSidebar,
     onOpenLeftSidebar,
+    onOpenLayers,
     showFeedback,
     showGradientAnchors,
     onToggleGradientAnchors,
@@ -174,7 +168,6 @@ export function CanvasWorkspace({
     controlUi,
     controlProject,
     setManualDistort,
-    onSelectEffectStack,
     onClothReady,
     onClothUnavailable,
   } = controls;
@@ -212,6 +205,19 @@ export function CanvasWorkspace({
           <rect x="3" y="3" width="18" height="18" rx="2"></rect>
           <line x1="9" y1="3" x2="9" y2="21"></line>
         </svg>
+      </button>
+
+      <button
+        type="button"
+        data-viewport-ui
+        onClick={onOpenLayers}
+        className={`${panelsPresentation === 'overlay' ? 'flex' : 'hidden'} absolute bottom-3 left-4 z-20 min-h-10 items-center gap-2 border border-cream/30 bg-k-surface/85 px-3 font-display text-xs font-bold uppercase tracking-wider text-cream backdrop-blur-sm transition-colors hover:border-fire hover:text-k-text focus:outline-none focus-visible:ring-2 focus-visible:ring-fire`}
+      >
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+          <path d="m12 3 9 5-9 5-9-5 9-5Z" />
+          <path d="m3 13 9 5 9-5" />
+        </svg>
+        {translate('workspace.openLayers')}
       </button>
 
       <div data-viewport-ui className={`${panelsPresentation === 'overlay' ? 'flex' : 'hidden'} absolute top-4 right-4 gap-2 z-10`}>
@@ -294,12 +300,6 @@ export function CanvasWorkspace({
       </div>
 
       <div className="canvas-frame relative min-h-0 flex-1 flex items-center justify-center p-2 md:p-6 overflow-visible">
-        <EffectStackWorkspace
-          sourceCanvasRef={canvasRef}
-          hidden={compact || (panelsPresentation === 'overlay' && (showLeftSidebar || showRightSidebar))}
-          presentation={toolsPresentation}
-          onSelectEffectStack={onSelectEffectStack}
-        />
         <div style={{
           position: 'relative',
           width: displayW,

@@ -39,3 +39,61 @@
 .effect-stack-row__status {
   @apply truncate text-[8px] font-medium uppercase tracking-wide;
 }
+
+.effect-stack-rail-row {
+  @apply absolute left-0 right-0 flex h-[38px] cursor-grab touch-none items-center justify-center border-b border-cream/10 p-0 font-display text-[11px] font-bold tracking-wider transition-[top,transform,background-color,color] ease-in-out duration-150 focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-fire active:cursor-grabbing;
+}
+
+.effect-stack-rail-row[data-selected='true'] {
+  @apply bg-fire/15 text-k-text;
+}
+
+.effect-stack-rail-row[data-selected='false'][data-enabled='true'] {
+  @apply bg-k-bg text-cream hover:bg-cream/10;
+}
+
+.effect-stack-rail-row[data-selected='false'][data-enabled='false'] {
+  @apply bg-k-bg text-cream/55 hover:bg-cream/10 hover:text-cream;
+}
+
+.effect-stack-rail-row[data-dragging='true'] {
+  @apply z-10 shadow-[0_12px_28px_rgba(0,0,0,0.42)];
+}
+
+.effect-stack-rail-row__dot {
+  @apply absolute right-1.5 top-1.5 h-1.5 w-1.5 rounded-full border border-cream/35;
+}
+
+.effect-stack-rail-row[data-enabled='true'] .effect-stack-rail-row__dot {
+  @apply border-fire bg-fire;
+}
+
+/* Expanding or collapsing the Layers dock: the dock width eases while its content fades in. */
+.effect-stack-layers {
+  transition: width 280ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.effect-stack-layers__content {
+  animation: effect-stack-layers-in 220ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+@keyframes effect-stack-layers-in {
+  from {
+    opacity: 0;
+    transform: translate3d(-8px, 0, 0);
+  }
+  to {
+    opacity: 1;
+    transform: translate3d(0, 0, 0);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .effect-stack-layers {
+    transition: none;
+  }
+
+  .effect-stack-layers__content {
+    animation: none;
+  }
+}
