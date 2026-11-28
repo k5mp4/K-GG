@@ -463,7 +463,7 @@ export function EffectStackPanelView({
               >
                 <Toggle
                   variant="switch"
-                  size="row"
+                  size="xs"
                   tabIndex={focusable ? 0 : -1}
                   ariaLabel={t('stack.enableLayer', { effect: name })}
                   checked={layer.enabled}

@@ -48,7 +48,7 @@
 
 /* Solo is revealed on hover or keyboard focus, over the end of the name. */
 .effect-stack-row__solo {
-  @apply pointer-events-none absolute right-[68px] top-1/2 -translate-y-1/2 rounded border border-cream/40 bg-k-bg px-1.5 py-0.5 text-[11px] font-semibold leading-none text-cream opacity-0 transition-opacity hover:border-fire hover:text-fire focus:outline-none focus-visible:ring-2 focus-visible:ring-fire;
+  @apply pointer-events-none absolute right-[56px] top-1/2 -translate-y-1/2 rounded border border-cream/40 bg-k-bg px-1.5 py-0.5 text-[11px] font-semibold leading-none text-cream opacity-0 transition-opacity hover:border-fire hover:text-fire focus:outline-none focus-visible:ring-2 focus-visible:ring-fire;
 }
 
 .effect-stack-row:hover .effect-stack-row__solo,

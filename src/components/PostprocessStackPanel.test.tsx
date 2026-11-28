@@ -146,7 +146,7 @@ describe('Effect Stack accessibility', () => {
 });
 
 describe('Effect Stack row switch', () => {
-  it('keeps the 11px ON/OFF text inside the row switch', () => {
+  it('keeps a small ON/OFF text inside the row switch', () => {
     const html = renderToStaticMarkup(
       <LanguageProvider>
         <EffectStackPanelView
@@ -163,6 +163,6 @@ describe('Effect Stack row switch', () => {
         />
       </LanguageProvider>,
     );
-    expect(html).toMatch(/role="switch"[^>]*aria-label="Enable Noise"[^]*?text-\[11px\][^>]*>Off</);
+    expect(html).toMatch(/role="switch"[^>]*aria-label="Enable Noise"[^]*?text-\[7px\][^>]*>Off</);
   });
 });

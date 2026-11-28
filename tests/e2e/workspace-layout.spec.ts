@@ -193,13 +193,15 @@ test('Effect Stack rows are operable from the keyboard with named switches', asy
   await expect(list.getByRole('switch', { name: 'Enable Glass', exact: true })).toBeVisible();
   await expect(list.getByRole('switch', { name: /^Enable / })).toHaveCount(15);
 
-  // Text is at least 11px and Off rows are not dimmed with opacity.
+  // Text is at least 11px (the ON/OFF text inside switches is deliberately secondary)
+  // and Off rows are not dimmed with opacity.
   const textStyles = await layers.evaluate(root => {
     const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
     const sizes: number[] = [];
     for (let node = walker.nextNode(); node; node = walker.nextNode()) {
       const parent = node.parentElement;
       if (!parent || !node.textContent?.trim() || parent.getClientRects().length === 0) continue;
+      if (parent.closest('[role="switch"]')) continue;
       sizes.push(parseFloat(getComputedStyle(parent).fontSize));
     }
     const opacities = [...root.querySelectorAll<HTMLElement>('.effect-stack-row')].map(row => Number(getComputedStyle(row).opacity));

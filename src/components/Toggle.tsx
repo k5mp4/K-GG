@@ -3,43 +3,34 @@ import { useLanguage } from '../i18n/LanguageProvider';
 interface ToggleProps {
   checked: boolean;
   onChange: (checked: boolean) => void;
-  /** `row` is a compact switch whose ON/OFF text is still 11px with 4.5:1 contrast (Effect Stack rows). */
-  size?: 'xs' | 'sm' | 'md' | 'row';
+  size?: 'xs' | 'sm' | 'md';
   variant?: 'checkbox' | 'switch';
   className?: string;
   ariaLabel?: string;
-  /** Hides the ON/OFF text inside a switch whose state is shown by its colour and knob alone. */
-  showStateLabel?: boolean;
   tabIndex?: number;
 }
 
-export function Toggle({ checked, onChange, size = 'md', variant = 'checkbox', className = '', ariaLabel, showStateLabel = true, tabIndex }: ToggleProps) {
+export function Toggle({ checked, onChange, size = 'md', variant = 'checkbox', className = '', ariaLabel, tabIndex }: ToggleProps) {
   const { t } = useLanguage();
   if (variant === 'switch') {
-    const trackSize = size === 'row'
-      ? 'h-5 w-[52px]'
-      : size === 'xs'
+    const trackSize = size === 'xs'
       ? 'h-5 w-10'
       : size === 'sm'
       ? 'h-5 w-11'
       : 'h-6 w-[58px]';
-    const knobSize = size === 'xs' || size === 'sm' || size === 'row'
+    const knobSize = size === 'xs' || size === 'sm'
       ? 'h-4 w-4'
       : 'h-5 w-5';
-    const knobTranslate = size === 'row'
-      ? 'translate-x-[32px]'
-      : size === 'xs'
+    const knobTranslate = size === 'xs'
       ? 'translate-x-[20px]'
       : size === 'sm'
       ? 'translate-x-[23px]'
       : 'translate-x-[33px]';
-    const labelClass = size === 'row' ? 'text-[11px]' : size === 'xs' ? 'text-[7px]' : 'text-[8px]';
-    const labelPosition = size === 'row'
-      ? (checked ? 'left-1.5 text-white' : 'right-1.5 text-cream/75')
-      : checked
+    const labelClass = size === 'xs' ? 'text-[7px]' : 'text-[8px]';
+    const labelPosition = checked
       ? (size === 'xs' ? 'left-1.5 text-cream' : 'left-2 text-cream')
       : (size === 'xs' ? 'right-1.5 text-deep' : 'right-2 text-deep');
-    const arrowSize = size === 'xs' || size === 'row'
+    const arrowSize = size === 'xs'
       ? 'border-y-[3px] border-l-[4px]'
       : 'border-y-[4px] border-l-[5px]';
 
@@ -59,13 +50,11 @@ export function Toggle({ checked, onChange, size = 'md', variant = 'checkbox', c
             : 'border-cream/35 bg-k-surface shadow-[inset_0_0_0_1px_rgba(0,0,0,0.65)] hover:border-cream/70'
         } ${className}`}
       >
-        {showStateLabel && (
-          <span
-            className={`absolute inset-y-0 flex items-center font-display ${labelClass} font-bold uppercase leading-none transition-colors ${labelPosition}`}
-          >
-            {checked ? t('common.on') : t('common.off')}
-          </span>
-        )}
+        <span
+          className={`absolute inset-y-0 flex items-center font-display ${labelClass} font-bold uppercase leading-none transition-colors ${labelPosition}`}
+        >
+          {checked ? t('common.on') : t('common.off')}
+        </span>
         <span
           className={`absolute left-0.5 top-1/2 -translate-y-1/2 rounded-full bg-cream text-k-bg shadow-[0_1px_5px_rgba(0,0,0,0.45)] transition-transform duration-200 ease-out ${
             knobSize
