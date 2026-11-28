@@ -72,9 +72,14 @@ export function EffectStackPanelView({
   const selectButtonsRef = useRef(new Map<EffectStackKind, HTMLButtonElement>());
   /** A row moved from the keyboard keeps focus once the new order arrives. */
   const pendingFocusRef = useRef<EffectStackKind | null>(null);
-  /** Order before an Alt+Up/Down move, so the rows can slide from it once the new order arrives. */
-  const keyboardMoveFromRef = useRef<EffectStackKind[] | null>(null);
-  const [keyboardMoveFrom, setKeyboardMoveFrom] = useState<EffectStackKind[] | null>(null);
+  const rowsRef = useRef<HTMLDivElement | null>(null);
+  /**
+   * Where each row was drawn (px from the list top) when an Alt+Up/Down move started, so the rows
+   * slide from there once the new order arrives. Measured rather than derived from the old order,
+   * so a move pressed while the previous one is still sliding continues from the current positions.
+   */
+  const keyboardMoveFromRef = useRef<Map<EffectStackKind, number> | null>(null);
+  const [keyboardMoveFrom, setKeyboardMoveFrom] = useState<Map<EffectStackKind, number> | null>(null);
   const keyboardMoveTimerRef = useRef<number | null>(null);
 
   const clearSettleTimer = () => {
@@ -250,7 +255,9 @@ export function EffectStackPanelView({
       return `translate3d(0, ${ROW_HEIGHT}px, 0)`;
     }
     if (!dragging && rowTransitionPhase === 'from') {
-      const previousIndex = (keyboardMoveFrom ?? view.previousOrder).indexOf(kind);
+      const drawnTop = keyboardMoveFrom?.get(kind);
+      if (drawnTop !== undefined) return `translate3d(0, ${drawnTop - index * ROW_HEIGHT}px, 0)`;
+      const previousIndex = keyboardMoveFrom ? -1 : view.previousOrder.indexOf(kind);
       if (previousIndex >= 0) return `translate3d(0, ${(previousIndex - index) * ROW_HEIGHT}px, 0)`;
     }
     return 'translate3d(0, 0, 0)';
@@ -262,6 +269,18 @@ export function EffectStackPanelView({
     if (keyboardMoveFrom) return `${KEYBOARD_MOVE_MS}ms`;
     if (!dragging || dragging.phase === 'committed') return '0ms';
     return dragging.phase === 'dragging' && isDragging ? '0ms' : `${DRAG_SETTLE_MS}ms`;
+  };
+
+  const measureDrawnRowTops = () => {
+    const list = rowsRef.current;
+    const tops = new Map<EffectStackKind, number>();
+    if (!list) return tops;
+    const listTop = list.getBoundingClientRect().top;
+    for (const [kind, button] of selectButtonsRef.current) {
+      const row = button.closest<HTMLElement>('.effect-stack-row');
+      if (row) tops.set(kind, row.getBoundingClientRect().top - listTop);
+    }
+    return tops;
   };
 
   // Roving focus: one row is in the Tab order, the arrow keys move between rows.
@@ -276,7 +295,7 @@ export function EffectStackPanelView({
       const targetIndex = event.key === 'ArrowUp' ? index - 1 : index + 1;
       if (targetIndex < 0 || targetIndex > last || view.randomizing) return;
       pendingFocusRef.current = kind;
-      keyboardMoveFromRef.current = stack.map(layer => layer.kind);
+      keyboardMoveFromRef.current = measureDrawnRowTops();
       actions.move(kind, targetIndex);
       return;
     }
@@ -396,6 +415,7 @@ export function EffectStackPanelView({
         onScroll={flyout ? () => setFlyout(null) : undefined}
       >
       <div
+        ref={rowsRef}
         className="relative"
         style={{ height: stack.length * ROW_HEIGHT }}
         // The rail rows are plain buttons, so only the column exposes a list.
