@@ -35,6 +35,7 @@ import { startPresetShaderWarmupSync } from './lib/presetShaderWarmup';
 import { getVjLayoutMode, subscribeVjSettings, updateVjSettings } from './features/vj/vjSettings';
 import { useVjWindow } from './features/vj/useVjWindow';
 import { VjWorkspace } from './features/vj/VjWorkspace';
+import { getHistoryStatus, redo, subscribeHistory, undo } from './lib/history';
 
 export default function App() {
   useEffect(() => () => {
@@ -171,6 +172,8 @@ export default function App() {
     handleShowHelp,
   } = useWorkspaceController({ translate: t, compact: vjEnabled });
   const histogramEnabled = useGradientStore(state => state.histogram.enabled);
+  const presetName = useGradientStore(state => state.presetName);
+  const historyStatus = useSyncExternalStore(subscribeHistory, getHistoryStatus, getHistoryStatus);
   const [showHistogramSection, setShowHistogramSection] = useState(true);
   const popOutEffectStack = effectStackWindow.supported ? effectStackWindow.open : undefined;
   const layersSegment = layout.panels === 'overlay';
@@ -189,12 +192,20 @@ export default function App() {
           showRightSidebar={showRightSidebar}
           tabs={TOP_BAR_TABS}
           editingLayer={editingLayer}
+          presetName={presetName}
+          isDirty={historyStatus.isDirty}
+          canUndo={historyStatus.canUndo}
+          canRedo={historyStatus.canRedo}
+          layoutMode={layoutMode}
           gpuInfo={gpuInfo}
           updater={updater}
           translate={t}
           getTabEnabled={getTabEnabled}
           onTabClick={handleTabClick}
           onTabMouseEnter={handleTabMouseEnter}
+          onUndo={undo}
+          onRedo={redo}
+          onLayoutModeChange={nextMode => updateVjSettings({ layoutMode: nextMode })}
           onOpenSettings={() => setShowPropertyModulesSettings(true)}
           onToggleRightSidebar={handleToggleRightSidebar}
         />

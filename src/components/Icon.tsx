@@ -23,6 +23,7 @@ export type IconName =
   | 'pause'
   | 'play'
   | 'progress'
+  | 'redo'
   | 'reverse'
   | 'restart'
   | 'save'
@@ -32,6 +33,7 @@ export type IconName =
   | 'skipPrevious'
   | 'systemUpdate'
   | 'timer'
+  | 'undo'
   | 'upload'
   | 'window'
   | 'verified'
@@ -76,6 +78,7 @@ const PATHS: Record<IconName, string[]> = {
   pause: ['M9 5v14', 'M15 5v14'],
   play: ['m8 5 11 7-11 7Z'],
   progress: ['M21 12a9 9 0 1 1-5.3-8.2'],
+  redo: ['m15 14 5-5-5-5', 'M4 20v-7a4 4 0 0 1 4-4h12'],
   reverse: ['M17 3l4 4-4 4', 'M3 7h18', 'm7 21-4-4 4-4', 'M21 17H3'],
   restart: ['M3 12a9 9 0 1 0 3-6.7', 'M3 4v6h6'],
   save: ['M5 3h12l2 2v16H5z', 'M8 3v6h8V3', 'M8 21v-7h8v7'],
@@ -88,6 +91,7 @@ const PATHS: Record<IconName, string[]> = {
   skipPrevious: ['m18 5-9 7 9 7Z', 'M6 5v14'],
   systemUpdate: ['M12 3v11', 'm8 10 4 4 4-4', 'M5 19h14'],
   timer: ['M12 8v5l3 2', 'M9 2h6', 'M12 5a8 8 0 1 1-8 8'],
+  undo: ['M9 14 4 9l5-5', 'M20 20v-7a4 4 0 0 0-4-4H4'],
   upload: ['M12 21V9', 'm17 14-5-5-5 5', 'M5 3h14'],
   window: ['M3 5h18v14H3z', 'M3 9h18', 'm14 3 4 4', 'M18 12v4h-4'],
   verified: ['M22 12a10 10 0 1 1-20 0 10 10 0 0 1 20 0Z', 'm8 12 2.5 2.5L16 9'],

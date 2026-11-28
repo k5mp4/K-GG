@@ -1,6 +1,17 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { HISTORY_DEBOUNCE_MS } from './constants';
-import { canRedo, canUndo, recordHistoryCommand, redo, resetHistoryForTest, undo } from './history';
+import {
+  canRedo,
+  canUndo,
+  getHistoryStatus,
+  isDocumentDirty,
+  markDocumentClean,
+  recordHistoryCommand,
+  redo,
+  resetHistoryForTest,
+  subscribeHistory,
+  undo,
+} from './history';
 import { useGradientStore } from '../store/gradientStore';
 
 const settle = async () => { await vi.advanceTimersByTimeAsync(0); };
@@ -75,5 +86,43 @@ describe('history commands', () => {
     await vi.advanceTimersByTimeAsync(HISTORY_DEBOUNCE_MS);
 
     expect(calls).toEqual(['second', 'first']);
+  });
+
+  it('tracks dirty status and notifies subscribers across edits, undo/redo, and markDocumentClean', async () => {
+    const notifications: Array<ReturnType<typeof getHistoryStatus>> = [];
+    const unsubscribe = subscribeHistory(() => {
+      notifications.push(getHistoryStatus());
+    });
+
+    try {
+      expect(isDocumentDirty()).toBe(false);
+      expect(getHistoryStatus()).toEqual({ canUndo: false, canRedo: false, isDirty: false });
+
+      const initialDuration = useGradientStore.getState().animation.duration;
+      useGradientStore.getState().setAnimation({ ...useGradientStore.getState().animation, duration: initialDuration + 2 });
+      expect(isDocumentDirty()).toBe(true);
+      expect(getHistoryStatus()).toEqual({ canUndo: true, canRedo: false, isDirty: true });
+
+      undo();
+      expect(isDocumentDirty()).toBe(false);
+      expect(getHistoryStatus()).toEqual({ canUndo: false, canRedo: true, isDirty: false });
+
+      redo();
+      expect(isDocumentDirty()).toBe(true);
+      expect(getHistoryStatus()).toEqual({ canUndo: true, canRedo: false, isDirty: true });
+
+      markDocumentClean();
+      expect(isDocumentDirty()).toBe(false);
+      expect(getHistoryStatus()).toEqual({ canUndo: true, canRedo: false, isDirty: false });
+
+      undo();
+      expect(isDocumentDirty()).toBe(true);
+      redo();
+      expect(isDocumentDirty()).toBe(false);
+
+      expect(notifications.length).toBeGreaterThanOrEqual(5);
+    } finally {
+      unsubscribe();
+    }
   });
 });
