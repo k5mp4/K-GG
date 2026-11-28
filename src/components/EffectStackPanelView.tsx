@@ -8,10 +8,11 @@ import {
 } from '../lib/effectStackDrag';
 import { Toggle } from './Toggle';
 import { Icon } from './Icon';
+import { EffectStackRailFlyout, type RailFlyoutAnchor } from './EffectStackRailFlyout';
 import { useLanguage } from '../i18n/LanguageProvider';
 import { EFFECT_STACK_TRANSITION_DURATION_MS } from '../lib/effectStackTransition';
 import type { EffectStackActions, EffectStackView } from '../features/effectStack/effectStackView';
-import { EFFECT_STACK_LABELS, EFFECT_STACK_RAIL_ABBREVIATIONS } from '../features/effectStack/effectStackLabels';
+import { EFFECT_STACK_LABELS, EFFECT_STACK_RAIL_ABBREVIATIONS, effectDescriptionKey } from '../features/effectStack/effectStackLabels';
 
 const ROW_HEIGHT = 38;
 const DRAG_SETTLE_MS = 150;
@@ -66,6 +67,8 @@ export function EffectStackPanelView({
   const [dragging, setDragging] = useState<DragState | null>(null);
   const [rowTransitionPhase, setRowTransitionPhase] = useState<RowTransitionPhase>('idle');
   const [activeKind, setActiveKind] = useState<EffectStackKind | null>(null);
+  /** The rail icon that is stretched into its detail card (hover or keyboard focus). */
+  const [flyout, setFlyout] = useState<{ kind: EffectStackKind; element: HTMLElement } | null>(null);
   const selectButtonsRef = useRef(new Map<EffectStackKind, HTMLButtonElement>());
   /** A row moved from the keyboard keeps focus once the new order arrives. */
   const pendingFocusRef = useRef<EffectStackKind | null>(null);
@@ -86,10 +89,19 @@ export function EffectStackPanelView({
     }
   };
 
+  const actionsRef = useRef(actions);
+  useLayoutEffect(() => {
+    actionsRef.current = actions;
+  });
+
   useEffect(() => () => {
     dragCleanupRef.current?.();
     clearSettleTimer();
     document.body.style.cursor = '';
+    // Switching between the column and the rail remounts the panel. A drag that was released but
+    // is still settling would otherwise be dropped, so its move is committed right away.
+    const settling = draggingRef.current;
+    if (settling?.phase === 'settling') actionsRef.current.move(settling.kind, settling.targetIndex);
   }, []);
 
   // A randomized order first renders at the previous positions ('from'),
@@ -320,7 +332,23 @@ export function EffectStackPanelView({
     actions.select(kind, true);
   };
 
-  const headerButtonClass = 'rounded px-1 text-[12px] leading-none text-cream/55 transition-colors hover:bg-cream/10 hover:text-fire focus:outline-none focus-visible:ring-2 focus-visible:ring-fire';
+  const flyoutLayer = variant === 'rail' && flyout && !dragging && flyout.element.isConnected
+    ? stack.find(layer => layer.kind === flyout.kind)
+    : undefined;
+  let railFlyoutAnchor: RailFlyoutAnchor | null = null;
+  if (flyout && flyoutLayer) {
+    const box = flyout.element.getBoundingClientRect();
+    railFlyoutAnchor = {
+      kind: flyoutLayer.kind,
+      enabled: flyoutLayer.enabled,
+      selected: view.selectedKind === flyoutLayer.kind,
+      statusKey: flyoutLayer.status.labelKey,
+      statusClassName: flyoutLayer.status.className,
+      rect: { left: box.left, top: box.top, width: box.width, height: box.height },
+    };
+  }
+
+  const headerButtonClass ='rounded px-1 text-[12px] leading-none text-cream/55 transition-colors hover:bg-cream/10 hover:text-fire focus:outline-none focus-visible:ring-2 focus-visible:ring-fire';
 
   return (
     <div
@@ -392,6 +420,8 @@ export function EffectStackPanelView({
       <div
         id="kgg-effect-stack-content"
         className="min-h-0 flex-1 overflow-y-auto overflow-x-hidden scrollbar-thin"
+        // The rail's detail card is placed from the icon's box, so scrolling closes it.
+        onScroll={flyout ? () => setFlyout(null) : undefined}
       >
       <div
         ref={rowsRef}
@@ -422,13 +452,24 @@ export function EffectStackPanelView({
                 }}
                 aria-current={selected ? 'true' : undefined}
                 aria-label={`${name}: ${status}`}
-                title={`${name} · ${status}\n${t('stack.railHint')}`}
+                aria-description={`${t(effectDescriptionKey(layer.kind))} ${t('stack.railHint')}`}
                 // Press selects and starts a drag; a press without movement is a plain selection.
-                onPointerDown={(event) => { if (!event.altKey) startDrag(event, layer.kind, index); }}
+                onPointerDown={(event) => {
+                  setFlyout(null);
+                  if (!event.altKey) startDrag(event, layer.kind, index);
+                }}
                 // Keyboard activation (detail 0) and Alt-click solo arrive as clicks.
                 onClick={(event) => { if (event.detail === 0 || event.altKey) actions.select(layer.kind, event.altKey); }}
-                onPointerEnter={() => { if (!layer.enabled) actions.prefetch(layer.kind); }}
-                onFocus={() => { if (!layer.enabled) actions.prefetch(layer.kind); }}
+                onPointerEnter={(event) => {
+                  if (!layer.enabled) actions.prefetch(layer.kind);
+                  if (!draggingRef.current) setFlyout({ kind: layer.kind, element: event.currentTarget });
+                }}
+                onPointerLeave={() => setFlyout(current => (current?.kind === layer.kind ? null : current))}
+                onFocus={(event) => {
+                  if (!layer.enabled) actions.prefetch(layer.kind);
+                  if (event.currentTarget.matches(':focus-visible')) setFlyout({ kind: layer.kind, element: event.currentTarget });
+                }}
+                onBlur={() => setFlyout(current => (current?.kind === layer.kind ? null : current))}
               >
                 {EFFECT_STACK_RAIL_ABBREVIATIONS[layer.kind]}
                 <span aria-hidden="true" className="effect-stack-rail-row__dot" />
@@ -530,6 +571,7 @@ export function EffectStackPanelView({
         </div>
       )}
       </div>
+      {railFlyoutAnchor && <EffectStackRailFlyout key={railFlyoutAnchor.kind} anchor={railFlyoutAnchor} />}
     </div>
   );
 }

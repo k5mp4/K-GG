@@ -1,4 +1,5 @@
 import type { EffectStackKind } from '../../types/distortion';
+import type { MessageKey } from '../../i18n/messages';
 
 /** Display names of the Effect Stack layers, shared by the column, rail and window. */
 export const EFFECT_STACK_LABELS: Record<EffectStackKind, string> = {
@@ -37,3 +38,8 @@ export const EFFECT_STACK_RAIL_ABBREVIATIONS: Record<EffectStackKind, string> = 
   distortChroma: 'DC',
   ice: 'IC',
 };
+
+/** Message key of the two-sentence role description shown when a rail icon stretches open. */
+export function effectDescriptionKey(kind: EffectStackKind): MessageKey {
+  return `stack.description.${kind}` as MessageKey;
+}

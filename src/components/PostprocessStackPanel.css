@@ -84,6 +84,90 @@
   @apply border-fire bg-fire;
 }
 
+/*
+ * Hovering (or keyboard-focusing) a rail icon stretches it sideways into a detail card.
+ * The card is drawn above the workspace and ignores the pointer; the icon square stays the hit area.
+ */
+.effect-stack-rail-flyout {
+  @apply pointer-events-none fixed z-[60] flex items-stretch border border-cream/25 bg-k-bg text-cream shadow-[0_12px_28px_rgba(0,0,0,0.5)];
+  animation: effect-stack-rail-flyout-stretch-right 200ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.effect-stack-rail-flyout[data-side='left'] {
+  @apply flex-row-reverse;
+  animation-name: effect-stack-rail-flyout-stretch-left;
+}
+
+.effect-stack-rail-flyout[data-selected='true'] {
+  @apply border-fire/60;
+}
+
+.effect-stack-rail-flyout__icon {
+  @apply flex shrink-0 items-center justify-center self-start font-display text-[11px] font-bold tracking-wider;
+  width: var(--rail-icon-width);
+  height: var(--rail-icon-height);
+}
+
+.effect-stack-rail-flyout[data-enabled='false'] .effect-stack-rail-flyout__icon {
+  @apply text-cream/65;
+}
+
+.effect-stack-rail-flyout__body {
+  @apply flex min-w-0 flex-1 flex-col gap-1 py-2 pr-3;
+  animation: effect-stack-rail-flyout-content 160ms ease-out 90ms both;
+}
+
+.effect-stack-rail-flyout[data-side='left'] .effect-stack-rail-flyout__body {
+  @apply pl-3 pr-0;
+}
+
+.effect-stack-rail-flyout__head {
+  @apply flex min-w-0 items-baseline gap-2;
+}
+
+.effect-stack-rail-flyout__name {
+  @apply min-w-0 truncate font-display text-[12px] font-bold leading-tight tracking-wide text-k-text;
+}
+
+.effect-stack-rail-flyout__status {
+  @apply shrink-0 text-[11px] font-medium leading-tight;
+}
+
+.effect-stack-rail-flyout__status.text-cream\/40 {
+  @apply text-cream/65;
+}
+
+/* Two sentences, never more than three lines. */
+.effect-stack-rail-flyout__description {
+  @apply text-[11px] leading-snug text-cream/80;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+  overflow: hidden;
+}
+
+@keyframes effect-stack-rail-flyout-stretch-right {
+  from { clip-path: inset(0 calc(100% - var(--rail-icon-width)) calc(100% - var(--rail-icon-height)) 0); }
+  to { clip-path: inset(0 0 0 0); }
+}
+
+@keyframes effect-stack-rail-flyout-stretch-left {
+  from { clip-path: inset(0 0 calc(100% - var(--rail-icon-height)) calc(100% - var(--rail-icon-width))); }
+  to { clip-path: inset(0 0 0 0); }
+}
+
+@keyframes effect-stack-rail-flyout-content {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .effect-stack-rail-flyout,
+  .effect-stack-rail-flyout__body {
+    animation: none;
+  }
+}
+
 /* Expanding or collapsing the Layers dock: the dock width eases while its content fades in. */
 .effect-stack-layers {
   transition: width 280ms cubic-bezier(0.22, 1, 0.36, 1);
