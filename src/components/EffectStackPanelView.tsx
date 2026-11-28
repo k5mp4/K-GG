@@ -89,10 +89,19 @@ export function EffectStackPanelView({
     }
   };
 
+  const actionsRef = useRef(actions);
+  useLayoutEffect(() => {
+    actionsRef.current = actions;
+  });
+
   useEffect(() => () => {
     dragCleanupRef.current?.();
     clearSettleTimer();
     document.body.style.cursor = '';
+    // Switching between the column and the rail remounts the panel. A drag that was released but
+    // is still settling would otherwise be dropped, so its move is committed right away.
+    const settling = draggingRef.current;
+    if (settling?.phase === 'settling') actionsRef.current.move(settling.kind, settling.targetIndex);
   }, []);
 
   // A randomized order first renders at the previous positions ('from'),
